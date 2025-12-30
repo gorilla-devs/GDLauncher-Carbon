@@ -16,10 +16,7 @@ use crate::{
     managers::java::java_checker::RealJavaChecker,
 };
 use anyhow::bail;
-use carbon_repos::{
-    db::PrismaClient,
-    pcr::{QueryError, prisma_errors::query_engine::UniqueKeyViolation},
-};
+use carbon_repos::{models, queries, DbPool};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -48,57 +45,60 @@ impl JavaManager {
         }
     }
 
-    pub async fn ensure_profiles_in_db(db_client: &PrismaClient) -> anyhow::Result<()> {
+    pub async fn ensure_profiles_in_db(db_pool: &DbPool) -> anyhow::Result<()> {
         debug!("Ensuring system java profiles are in db");
-        for profile in SystemJavaProfileName::iter() {
-            let exists = db_client
-                .java_profile()
-                .find_unique(carbon_repos::db::java_profile::name::equals(
-                    profile.to_string(),
-                ))
-                .exec()
-                .await?;
 
-            if exists.is_some() {
-                let exists = exists.unwrap();
-                if !exists.is_system_profile {
-                    db_client
-                        .java_profile()
-                        .update(
-                            carbon_repos::db::java_profile::name::equals(profile.to_string()),
-                            vec![carbon_repos::db::java_profile::is_system_profile::set(true)],
-                        )
-                        .exec()
-                        .await?;
-                }
-            } else {
-                let creation: Result<carbon_repos::db::java_profile::Data, QueryError> = db_client
-                    .java_profile()
-                    .create(
-                        profile.to_string(),
-                        vec![carbon_repos::db::java_profile::is_system_profile::set(true)],
+        let profiles_to_check: Vec<_> = SystemJavaProfileName::iter().collect();
+        let pool = db_pool.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+
+            for profile in profiles_to_check {
+                let profile_name = profile.to_string();
+
+                // Check if profile exists
+                let exists: Option<models::JavaProfile> = conn
+                    .query_row(
+                        queries::java::FindJavaProfileByName::SQL,
+                        rusqlite::params![&profile_name],
+                        |row| models::JavaProfile::from_row(row),
                     )
-                    .exec()
-                    .await;
+                    .ok();
 
-                match creation {
-                    Err(error) => {
-                        error!("Error creating profile {profile:?}: {error}");
-                        return Err(error.into());
+                if let Some(existing) = exists {
+                    if !existing.is_system_profile {
+                        conn.execute(
+                            "UPDATE JavaProfile SET isSystemProfile = 1 WHERE name = ?1",
+                            rusqlite::params![&profile_name],
+                        )?;
                     }
-                    Ok(_) => {
-                        trace!("Profile {profile:?} created");
+                } else {
+                    match conn.execute(
+                        queries::java::CreateJavaProfile::SQL,
+                        rusqlite::params![&profile_name, true, Option::<String>::None],
+                    ) {
+                        Err(error) => {
+                            error!("Error creating profile {profile:?}: {error}");
+                            return Err(error.into());
+                        }
+                        Ok(_) => {
+                            trace!("Profile {profile:?} created");
+                        }
                     }
                 }
             }
-        }
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         Ok(())
     }
 
     pub async fn scan_and_sync<T, G>(
         auto_manage_java_system_profiles: bool,
-        db: &Arc<PrismaClient>,
+        db_pool: &DbPool,
         discovery: &T,
         java_checker: &G,
     ) -> anyhow::Result<()>
@@ -106,12 +106,12 @@ impl JavaManager {
         T: Discovery,
         G: JavaChecker,
     {
-        scan_and_sync::scan_and_sync_local(db, discovery, java_checker).await?;
-        scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
-        scan_and_sync::scan_and_sync_managed(db, discovery, java_checker).await?;
+        scan_and_sync::scan_and_sync_local(db_pool, discovery, java_checker).await?;
+        scan_and_sync::scan_and_sync_custom(db_pool, java_checker).await?;
+        scan_and_sync::scan_and_sync_managed(db_pool, discovery, java_checker).await?;
 
         if auto_manage_java_system_profiles {
-            scan_and_sync::sync_system_java_profiles(db).await?;
+            scan_and_sync::sync_system_java_profiles(db_pool).await?;
         }
 
         Ok(())
@@ -120,8 +120,17 @@ impl JavaManager {
 
 impl ManagerRef<'_, JavaManager> {
     pub async fn get_available_javas(&self) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
-        let db = &self.app.prisma_client;
-        let all_javas = db.java().find_many(vec![]).exec().await?;
+        let pool = self.app.db_pool.clone();
+
+        let all_javas = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let mut stmt = conn.prepare(queries::java::ListJavas::SQL)?;
+            let javas = stmt
+                .query_map([], |row| models::Java::from_row(row))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok::<_, anyhow::Error>(javas)
+        })
+        .await??;
 
         let mut result = HashMap::new();
 
@@ -135,12 +144,19 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn get_java_profiles(&self) -> anyhow::Result<Vec<JavaProfile>> {
-        let db = &self.app.prisma_client;
-        let all_profiles = db
-            .java_profile()
-            .find_many(vec![])
-            .exec()
-            .await?
+        let pool = self.app.db_pool.clone();
+
+        let all_profiles = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let mut stmt = conn.prepare(queries::java::ListJavaProfiles::SQL)?;
+            let profiles = stmt
+                .query_map([], |row| models::JavaProfile::from_row(row))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok::<_, anyhow::Error>(profiles)
+        })
+        .await??;
+
+        let all_profiles = all_profiles
             .into_iter()
             .map(JavaProfile::try_from)
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -181,29 +197,16 @@ impl ManagerRef<'_, JavaManager> {
             anyhow::bail!("Auto manage java is enabled");
         }
 
-        if let Some(java_id) = java_id {
-            self.app
-                .prisma_client
-                .java_profile()
-                .update(
-                    carbon_repos::db::java_profile::name::equals(profile_name.to_string()),
-                    vec![carbon_repos::db::java_profile::java::connect(
-                        carbon_repos::db::java::id::equals(java_id),
-                    )],
-                )
-                .exec()
-                .await?;
-        } else {
-            self.app
-                .prisma_client
-                .java_profile()
-                .update(
-                    carbon_repos::db::java_profile::name::equals(profile_name.to_string()),
-                    vec![carbon_repos::db::java_profile::java::disconnect()],
-                )
-                .exec()
-                .await?;
-        }
+        let pool = self.app.db_pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::java::UpdateJavaProfileJavaId::SQL,
+                rusqlite::params![&profile_name, &java_id],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
 
@@ -225,31 +228,33 @@ impl ManagerRef<'_, JavaManager> {
 
         let java_id = java_id.ok_or_else(|| anyhow::anyhow!("java_id is required"))?;
 
-        let exists = self
-            .app
-            .prisma_client
-            .java_profile()
-            .find_unique(carbon_repos::db::java_profile::name::equals(
-                profile_name.clone(),
-            ))
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let profile_name_clone = profile_name.clone();
 
-        if exists.is_some() {
-            anyhow::bail!("Profile with name {} already exists", profile_name);
-        }
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
 
-        self.app
-            .prisma_client
-            .java_profile()
-            .create(
-                profile_name,
-                vec![carbon_repos::db::java_profile::java::connect(
-                    carbon_repos::db::java::id::equals(java_id),
-                )],
-            )
-            .exec()
-            .await?;
+            // Check if profile exists
+            let exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) > 0 FROM JavaProfile WHERE name = ?1",
+                    rusqlite::params![&profile_name_clone],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+
+            if exists {
+                anyhow::bail!("Profile with name {} already exists", profile_name_clone);
+            }
+
+            conn.execute(
+                queries::java::CreateJavaProfile::SQL,
+                rusqlite::params![&profile_name_clone, false, Some(&java_id)],
+            )?;
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
 
@@ -270,12 +275,16 @@ impl ManagerRef<'_, JavaManager> {
             anyhow::bail!("Auto manage java is enabled");
         }
 
-        self.app
-            .prisma_client
-            .java_profile()
-            .delete(carbon_repos::db::java_profile::name::equals(profile_name))
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::java::DeleteJavaProfile::SQL,
+                rusqlite::params![&profile_name],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
 
@@ -290,33 +299,44 @@ impl ManagerRef<'_, JavaManager> {
         )
         .await?;
 
-        let exists = self
-            .app
-            .prisma_client
-            .java()
-            .find_unique(carbon_repos::db::java::path::equals(path.clone()))
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let path_clone = path.clone();
 
-        if exists.is_some() {
-            anyhow::bail!("Java with path {} already exists", path);
-        }
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
 
-        self.app
-            .prisma_client
-            .java()
-            .create(
-                java.path,
-                java.version.major as i32,
-                java.version.to_string(),
-                java._type.to_string(),
-                java.os.to_string(),
-                java.arch.to_string(),
-                java.vendor,
-                vec![],
-            )
-            .exec()
-            .await?;
+            // Check if java with this path already exists
+            let exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) > 0 FROM Java WHERE path = ?1",
+                    rusqlite::params![&path_clone],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+
+            if exists {
+                anyhow::bail!("Java with path {} already exists", path_clone);
+            }
+
+            let id = uuid::Uuid::new_v4().to_string();
+            conn.execute(
+                queries::java::CreateJava::SQL,
+                rusqlite::params![
+                    &id,
+                    &java.path,
+                    java.version.major as i32,
+                    &java.version.to_string(),
+                    &java._type.to_string(),
+                    &java.os.to_string(),
+                    &java.arch.to_string(),
+                    &java.vendor,
+                    true
+                ],
+            )?;
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_AVAILABLE_JAVAS, None);
 
@@ -324,25 +344,35 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
-        let java_from_db = self
-            .app
-            .prisma_client
-            .java()
-            .find_unique(carbon_repos::db::java::id::equals(java_id.clone()))
-            .exec()
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Java with id {} not found", java_id.clone()))?;
+        let pool = self.app.db_pool.clone();
+        let java_id_clone = java_id.clone();
 
-        let java_component_type = JavaComponentType::try_from(&*java_from_db.r#type)?;
+        let java_from_db = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let java: models::Java = conn.query_row(
+                queries::java::FindJavaById::SQL,
+                rusqlite::params![&java_id_clone],
+                |row| models::Java::from_row(row),
+            )?;
+            Ok::<_, anyhow::Error>(java)
+        })
+        .await??;
+
+        let java_component_type = JavaComponentType::try_from(&*java_from_db.java_type)?;
 
         match java_component_type {
             JavaComponentType::Custom => {
-                self.app
-                    .prisma_client
-                    .java()
-                    .delete(carbon_repos::db::java::id::equals(java_id))
-                    .exec()
-                    .await?;
+                let pool = self.app.db_pool.clone();
+                let java_id_clone = java_id.clone();
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.execute(
+                        queries::java::DeleteJava::SQL,
+                        rusqlite::params![&java_id_clone],
+                    )?;
+                    Ok::<_, anyhow::Error>(())
+                })
+                .await??;
             }
             JavaComponentType::Managed => {
                 let root_managed_path = self
@@ -365,12 +395,17 @@ impl ManagerRef<'_, JavaManager> {
                     std::fs::remove_dir_all(managed_java_dir)?;
                 }
 
-                self.app
-                    .prisma_client
-                    .java()
-                    .delete(carbon_repos::db::java::id::equals(java_id))
-                    .exec()
-                    .await?;
+                let pool = self.app.db_pool.clone();
+                let java_id_clone = java_id.clone();
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.execute(
+                        queries::java::DeleteJava::SQL,
+                        rusqlite::params![&java_id_clone],
+                    )?;
+                    Ok::<_, anyhow::Error>(())
+                })
+                .await??;
             }
             JavaComponentType::Local => {
                 anyhow::bail!("Java with id {} is local. Cannot delete.", java_id.clone());
@@ -388,29 +423,43 @@ impl ManagerRef<'_, JavaManager> {
         self,
         target_profile: SystemJavaProfileName,
     ) -> anyhow::Result<Option<JavaComponent>> {
-        use carbon_repos::db::{java, java_profile};
+        let pool = self.app.db_pool.clone();
+        let target_profile_name = target_profile.to_string();
 
-        let profile = self
-            .app
-            .prisma_client
-            .java_profile()
-            .find_many(vec![
-                carbon_repos::db::java_profile::is_system_profile::equals(true),
-            ])
-            .exec()
-            .await?
-            .into_iter()
-            .find(|profile| profile.name == target_profile.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Profile not found"))?;
+        // Find the profile
+        let profile = tokio::task::spawn_blocking({
+            let pool = pool.clone();
+            let target_profile_name = target_profile_name.clone();
+            move || {
+                let conn = pool.get()?;
+                let mut stmt = conn.prepare(queries::java::ListSystemJavaProfiles::SQL)?;
+                let profiles: Vec<models::JavaProfile> = stmt
+                    .query_map([], |row| models::JavaProfile::from_row(row))?
+                    .collect::<Result<Vec<_>, _>>()?;
+                profiles
+                    .into_iter()
+                    .find(|p| p.name == target_profile_name)
+                    .ok_or_else(|| anyhow::anyhow!("Profile not found"))
+            }
+        })
+        .await??;
 
+        // Find associated java if any
         let java = match profile.java_id {
             Some(java_id) => {
-                self.app
-                    .prisma_client
-                    .java()
-                    .find_unique(java::id::equals(java_id))
-                    .exec()
-                    .await?
+                let pool = pool.clone();
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    let java: Option<models::Java> = conn
+                        .query_row(
+                            queries::java::FindJavaById::SQL,
+                            rusqlite::params![&java_id],
+                            |row| models::Java::from_row(row),
+                        )
+                        .ok();
+                    Ok::<_, anyhow::Error>(java)
+                })
+                .await??
             }
             None => None,
         };
@@ -420,7 +469,7 @@ impl ManagerRef<'_, JavaManager> {
                 let bin_result = RealJavaChecker::get_bin_info(
                     &RealJavaChecker,
                     Path::new(&java.path),
-                    (&*java.r#type).try_into()?,
+                    (&*java.java_type).try_into()?,
                 )
                 .await;
 
@@ -433,35 +482,39 @@ impl ManagerRef<'_, JavaManager> {
                             err
                         );
 
-                        let all_profiles_using_this_java = self
-                            .app
-                            .prisma_client
-                            .java_profile()
-                            .find_many(vec![java_profile::java_id::equals(Some(java.id.clone()))])
-                            .exec()
-                            .await?;
+                        // Update all profiles using this java to disconnect
+                        let pool = self.app.db_pool.clone();
+                        let java_id = java.id.clone();
+                        tokio::task::spawn_blocking(move || {
+                            let conn = pool.get()?;
 
-                        for profile in all_profiles_using_this_java {
-                            self.app
-                                .prisma_client
-                                .java_profile()
-                                .update(
-                                    java_profile::name::equals(profile.name.to_string()),
-                                    vec![java_profile::java::disconnect()],
-                                )
-                                .exec()
-                                .await?;
-                        }
+                            // Find all profiles using this java
+                            let mut stmt = conn.prepare(
+                                "SELECT * FROM JavaProfile WHERE javaId = ?1",
+                            )?;
+                            let profiles: Vec<models::JavaProfile> = stmt
+                                .query_map(rusqlite::params![&java_id], |row| {
+                                    models::JavaProfile::from_row(row)
+                                })?
+                                .collect::<Result<Vec<_>, _>>()?;
 
-                        self.app
-                            .prisma_client
-                            .java()
-                            .update(
-                                java::id::equals(java.id.clone()),
-                                vec![java::is_valid::set(false)],
-                            )
-                            .exec()
-                            .await?;
+                            // Disconnect them
+                            for profile in profiles {
+                                conn.execute(
+                                    queries::java::UpdateJavaProfileJavaId::SQL,
+                                    rusqlite::params![&profile.name, Option::<String>::None],
+                                )?;
+                            }
+
+                            // Mark java as invalid
+                            conn.execute(
+                                queries::java::UpdateJavaValid::SQL,
+                                rusqlite::params![&java_id, false],
+                            )?;
+
+                            Ok::<_, anyhow::Error>(())
+                        })
+                        .await??;
 
                         None
                     }
@@ -487,8 +540,6 @@ impl ManagerRef<'_, JavaManager> {
         update_target_profile: bool,
         progress: Option<watch::Sender<Step>>,
     ) -> anyhow::Result<Option<JavaComponent>> {
-        use carbon_repos::db::java::UniqueWhereParam;
-
         static LOCK: Mutex<()> = Mutex::const_new(());
         let _guard = LOCK.lock().await;
 
@@ -526,19 +577,27 @@ impl ManagerRef<'_, JavaManager> {
             )
             .await?;
 
-        let java = self
-            .app
-            .prisma_client
-            .java()
-            .find_unique(carbon_repos::db::java::id::equals(id.clone()))
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let id_clone = id.clone();
 
-        let java = match java {
+        let java_from_db = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let java: Option<models::Java> = conn
+                .query_row(
+                    queries::java::FindJavaById::SQL,
+                    rusqlite::params![&id_clone],
+                    |row| models::Java::from_row(row),
+                )
+                .ok();
+            Ok::<_, anyhow::Error>(java)
+        })
+        .await??;
+
+        let java = match java_from_db {
             Some(java) => RealJavaChecker::get_bin_info(
                 &RealJavaChecker,
                 Path::new(&java.path),
-                (&*java.r#type).try_into()?,
+                (&*java.java_type).try_into()?,
             )
             .await
             .map_err(|_| anyhow::anyhow!("downloaded java was not runnable"))?,
@@ -546,49 +605,50 @@ impl ManagerRef<'_, JavaManager> {
         };
 
         if update_target_profile {
-            self.app
-                .prisma_client
-                .java_profile()
-                .update(
-                    carbon_repos::db::java_profile::name::equals(target_profile.to_string()),
-                    vec![carbon_repos::db::java_profile::java::connect(
-                        carbon_repos::db::java::id::equals(id.clone()),
-                    )],
-                )
-                .exec()
-                .await?;
+            let pool = self.app.db_pool.clone();
+            let target_profile_name = target_profile.to_string();
+            let id_clone = id.clone();
+            let java_version = java.version.clone();
 
-            let system_profiles_in_db = self
-                .app
-                .prisma_client
-                .java_profile()
-                .find_many(vec![
-                    carbon_repos::db::java_profile::is_system_profile::equals(true),
-                ])
-                .exec()
-                .await?;
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
 
-            for system_profile in system_profiles_in_db {
-                let system_profile_name = SystemJavaProfileName::try_from(&*system_profile.name)?;
-                if system_profile_name == target_profile
-                    || !system_profile_name.is_java_version_compatible(&java.version)
-                    || system_profile.java_id.is_some()
-                {
-                    continue;
+                // Update target profile
+                conn.execute(
+                    queries::java::UpdateJavaProfileJavaId::SQL,
+                    rusqlite::params![&target_profile_name, Some(&id_clone)],
+                )?;
+
+                // Get all system profiles
+                let mut stmt = conn.prepare(queries::java::ListSystemJavaProfiles::SQL)?;
+                let system_profiles: Vec<models::JavaProfile> = stmt
+                    .query_map([], |row| models::JavaProfile::from_row(row))?
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                for system_profile in system_profiles {
+                    let system_profile_name_result =
+                        SystemJavaProfileName::try_from(&*system_profile.name);
+                    let Ok(system_profile_name) = system_profile_name_result else {
+                        continue;
+                    };
+
+                    if system_profile_name == target_profile
+                        || !system_profile_name.is_java_version_compatible(&java_version)
+                        || system_profile.java_id.is_some()
+                    {
+                        continue;
+                    }
+
+                    conn.execute(
+                        queries::java::UpdateJavaProfileJavaId::SQL,
+                        rusqlite::params![&system_profile.name, Some(&id_clone)],
+                    )?;
                 }
 
-                self.app
-                    .prisma_client
-                    .java_profile()
-                    .update(
-                        carbon_repos::db::java_profile::name::equals(system_profile.name),
-                        vec![carbon_repos::db::java_profile::java::connect(
-                            carbon_repos::db::java::id::equals(id.clone()),
-                        )],
-                    )
-                    .exec()
-                    .await?;
-            }
+                Ok::<_, anyhow::Error>(())
+            })
+            .await??;
+
             self.app.invalidate(GET_JAVA_PROFILES, None);
         }
 
@@ -598,6 +658,7 @@ impl ManagerRef<'_, JavaManager> {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::{
         domain::java::{JavaArch, JavaOs, JavaVendor, SystemJavaProfileName},
         setup_managers_for_test,
@@ -617,15 +678,21 @@ mod test {
             .unwrap()
             .unwrap();
 
-        let profiles_in_db = app
-            .prisma_client
-            .java_profile()
-            .find_many(vec![
-                carbon_repos::db::java_profile::is_system_profile::equals(true),
-            ])
-            .exec()
-            .await
-            .unwrap();
+        let pool = app.db_pool.clone();
+        let profiles_in_db = tokio::task::spawn_blocking(move || {
+            let conn = pool.get().unwrap();
+            let mut stmt = conn
+                .prepare(queries::java::ListSystemJavaProfiles::SQL)
+                .unwrap();
+            let profiles: Vec<models::JavaProfile> = stmt
+                .query_map([], |row| models::JavaProfile::from_row(row))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            profiles
+        })
+        .await
+        .unwrap();
 
         assert_eq!(
             profiles_in_db
@@ -669,17 +736,28 @@ mod test {
             )
             .await
             .unwrap();
-        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+
+        let pool = app.db_pool.clone();
+        let count: i64 = tokio::task::spawn_blocking(move || {
+            let conn = pool.get().unwrap();
+            conn.query_row(queries::java::CountJavas::SQL, [], |row| row.get(0))
+                .unwrap()
+        })
+        .await
+        .unwrap();
         assert_eq!(count, 1);
 
-        let from_db = app
-            .prisma_client
-            .java()
-            .find_first(vec![])
-            .exec()
-            .await
-            .unwrap()
-            .unwrap();
+        let pool = app.db_pool.clone();
+        let from_db: models::Java = tokio::task::spawn_blocking(move || {
+            let conn = pool.get().unwrap();
+            let mut stmt = conn.prepare(queries::java::ListJavas::SQL).unwrap();
+            let java = stmt
+                .query_row([], |row| models::Java::from_row(row))
+                .unwrap();
+            java
+        })
+        .await
+        .unwrap();
 
         assert!(std::path::Path::new(&from_db.path).exists());
 
@@ -690,21 +768,26 @@ mod test {
 
         assert!(result_first_delete.is_ok());
 
-        app.prisma_client
-            .app_configuration()
-            .update(
-                carbon_repos::db::app_configuration::id::equals(0),
-                vec![
-                    carbon_repos::db::app_configuration::auto_manage_java_system_profiles::set(
-                        false,
-                    ),
-                ],
+        let pool = app.db_pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get().unwrap();
+            conn.execute(
+                "UPDATE AppConfiguration SET autoManageJavaSystemProfiles = 0 WHERE id = 0",
+                [],
             )
-            .exec()
-            .await
             .unwrap();
+        })
+        .await
+        .unwrap();
 
-        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+        let pool = app.db_pool.clone();
+        let count: i64 = tokio::task::spawn_blocking(move || {
+            let conn = pool.get().unwrap();
+            conn.query_row(queries::java::CountJavas::SQL, [], |row| row.get(0))
+                .unwrap()
+        })
+        .await
+        .unwrap();
         assert_eq!(count, 0);
 
         assert!(!std::path::Path::new(&from_db.path).exists());

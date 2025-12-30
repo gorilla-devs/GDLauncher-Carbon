@@ -21,7 +21,7 @@ use carbon_platforms::modrinth::version::{
 use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
 
-use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use carbon_repos::{models, queries};
 
 use super::ZipMode;
 
@@ -107,30 +107,30 @@ pub async fn export_modrinth(
                         .override_caching_and_wait(instance_id, false, true)
                         .await?;
 
-                    let mods2 = app
-                        .prisma_client
-                        .mod_file_cache()
-                        .find_many(vec![fcdb::instance_id::equals(*instance_id)])
-                        .with(fcdb::metadata::fetch().with(metadb::modrinth::fetch()))
-                        .exec()
-                        .await?
+                    let pool = app.db_pool.clone();
+                    let inst_id = *instance_id;
+                    let mods2 = tokio::task::spawn_blocking(move || {
+                        let conn = pool.get()?;
+                        let mut stmt = conn.prepare(queries::metadata::ListModFileCacheWithModrinthByInstance::SQL)?;
+                        let mods: Vec<models::ModFileCacheWithModrinth> = stmt
+                            .query_map(rusqlite::params![inst_id], |row| {
+                                models::ModFileCacheWithModrinth::from_row(row)
+                            })?
+                            .collect::<Result<Vec<_>, _>>()?;
+                        Ok::<_, anyhow::Error>(mods)
+                    })
+                    .await??;
+
+                    let mods2 = mods2
                         .into_iter()
                         .filter_map(|m| {
-                            let Some(metadata) = m.metadata else {
-                                return None;
-                            };
-
-                            let Some(Some(modrinth)) = metadata.modrinth else {
-                                return None;
-                            };
-
                             match mods_filter.remove(&m.filename) {
                                 Some(_) => Some((
                                     m.filename.clone(),
                                     m.filesize,
-                                    metadata.sha_512,
-                                    metadata.sha_1,
-                                    modrinth.file_url,
+                                    m.sha512,
+                                    m.sha1,
+                                    m.mr_file_url,
                                 )),
                                 None => None,
                             }

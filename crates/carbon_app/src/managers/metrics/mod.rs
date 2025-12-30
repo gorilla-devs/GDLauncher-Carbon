@@ -1,10 +1,9 @@
-use crate::{domain::metrics::GDLMetricsEvent, iridium_client::get_client};
-use carbon_repos::db::{PrismaClient, app_configuration};
+use crate::domain::metrics::GDLMetricsEvent;
+use carbon_repos::{DbPool, queries, models::AppConfiguration};
 use display_info::DisplayInfo;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
 use serde_json::json;
-use std::sync::Arc;
 use tracing::info;
 use uuid::Uuid;
 
@@ -12,14 +11,14 @@ use super::ManagerRef;
 
 pub(crate) struct MetricsManager {
     client: ClientWithMiddleware,
-    prisma_client: Arc<PrismaClient>,
+    db_pool: DbPool,
     gdl_base_api: String,
     random_session_uuid: Uuid,
 }
 
 impl MetricsManager {
     pub fn new(
-        prisma_client: Arc<PrismaClient>,
+        db_pool: DbPool,
         http_client: ClientWithMiddleware,
         gdl_base_api: String,
     ) -> Self {
@@ -27,7 +26,7 @@ impl MetricsManager {
 
         Self {
             client: http_client,
-            prisma_client,
+            db_pool,
             gdl_base_api,
             random_session_uuid,
         }
@@ -38,23 +37,32 @@ impl ManagerRef<'_, MetricsManager> {
     pub async fn track_event(&self, event: GDLMetricsEvent) -> anyhow::Result<()> {
         let endpoint = format!("{}/v1/metrics/event", self.gdl_base_api);
 
-        let Some(metrics_user_id) = self
-            .prisma_client
-            .app_configuration()
-            .find_unique(app_configuration::id::equals(0))
-            .exec()
-            .await?
-            .and_then(|data| {
-                // TODO: Keep a backlog of events if the user has not accepted the terms yet
-                if !data.terms_and_privacy_accepted {
-                    None
-                } else {
-                    Some(self.random_session_uuid.to_string())
-                }
-            })
-        else {
+        // Query app configuration to check if terms are accepted
+        let pool = self.db_pool.clone();
+        let random_session_uuid = self.random_session_uuid;
+        let terms_accepted = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let result = conn.query_row(
+                queries::settings::GetSettings::SQL,
+                [],
+                |row| {
+                    let config = AppConfiguration::from_row(row)?;
+                    Ok(config.terms_and_privacy_accepted)
+                },
+            );
+
+            match result {
+                Ok(accepted) => Ok(accepted),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+                Err(e) => Err(anyhow::Error::from(e)),
+            }
+        }).await??;
+
+        // TODO: Keep a backlog of events if the user has not accepted the terms yet
+        if !terms_accepted {
             return Ok(());
-        };
+        }
+        let metrics_user_id = random_session_uuid.to_string();
 
         #[derive(Serialize)]
         struct GDLAppEvent {

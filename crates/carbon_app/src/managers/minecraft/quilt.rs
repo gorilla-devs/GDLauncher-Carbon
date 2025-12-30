@@ -1,13 +1,10 @@
-use std::sync::Arc;
-
 use anyhow::Context;
+use carbon_repos::{models, queries, DatabaseError, DbPool, OptionalExt};
 use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tracing::trace;
 use url::Url;
-
-use carbon_repos::db::PrismaClient;
 
 use super::META_VERSION;
 
@@ -34,7 +31,7 @@ pub async fn get_manifest(
 }
 
 pub async fn get_version(
-    db_client: Arc<PrismaClient>,
+    db_pool: DbPool,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     quilt_version: &str,
     meta_base_url: &Url,
@@ -70,23 +67,18 @@ pub async fn get_version(
             )
         })?;
 
-        db_client
-            .partial_version_info_cache()
-            .upsert(
-                carbon_repos::db::partial_version_info_cache::id::equals(db_entry_name.clone()),
-                carbon_repos::db::partial_version_info_cache::create(
-                    db_entry_name.clone(),
-                    version_bytes.to_vec(),
-                    vec![],
-                ),
-                vec![
-                    carbon_repos::db::partial_version_info_cache::partial_version_info::set(
-                        version_bytes.to_vec(),
-                    ),
-                ],
-            )
-            .exec()
-            .await?;
+        let pool = db_pool.clone();
+        let db_entry_name_clone = db_entry_name.clone();
+        let version_bytes_vec = version_bytes.to_vec();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::cache::UpsertPartialVersionInfoCache::SQL,
+                rusqlite::params![db_entry_name_clone, version_bytes_vec],
+            )?;
+            Ok::<_, DatabaseError>(())
+        })
+        .await??;
 
         Ok(version_bytes)
     };
@@ -94,14 +86,20 @@ pub async fn get_version(
     let version_bytes = match update_cache().await {
         Ok(version_bytes) => version_bytes,
         Err(err) => {
-            let db_cache = db_client
-                .partial_version_info_cache()
-                .find_unique(carbon_repos::db::partial_version_info_cache::id::equals(
-                    db_entry_name.clone(),
-                ))
-                .exec()
-                .await
-                .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
+            let pool = db_pool.clone();
+            let db_entry_name_clone = db_entry_name.clone();
+            let db_cache = tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::cache::FindPartialVersionInfoCache::SQL,
+                    rusqlite::params![db_entry_name_clone],
+                    |row| models::PartialVersionInfoCache::from_row(row),
+                )
+                .optional()
+            })
+            .await
+            .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?
+            .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
             if let Some(db_cache) = db_cache {
                 let db_cache = serde_json::from_slice(&db_cache.partial_version_info);

@@ -1,9 +1,8 @@
 use anyhow::Context;
-use carbon_repos::db::PrismaClient;
-use carbon_repos::pcr::QueryError;
+use carbon_repos::{models, queries, DatabaseError, DbPool, OptionalExt};
 use carbon_rt_path::AssetsPath;
 use daedalus::minecraft::{AssetIndex, AssetsIndex};
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, path::PathBuf};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tracing::trace;
@@ -13,17 +12,19 @@ pub enum AssetsError {
     #[error("Can't fetch assets index manifest: {0}")]
     FetchAssetsIndexManifest(#[from] reqwest::Error),
     #[error("Can't execute db query: {0}")]
-    QueryError(#[from] QueryError),
+    QueryError(#[from] DatabaseError),
 }
 
 pub async fn get_meta(
-    db_client: Arc<PrismaClient>,
+    db_pool: DbPool,
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     version_asset_index: &AssetIndex,
     asset_indexes_path: PathBuf,
 ) -> anyhow::Result<(AssetsIndex, Vec<u8>)> {
     static LOCK: Mutex<()> = Mutex::const_new(());
     let _guard = LOCK.lock().await;
+
+    let asset_id = version_asset_index.id.clone();
 
     let update_cache = || async {
         let resp = reqwest_client
@@ -46,21 +47,18 @@ pub async fn get_meta(
             )
         })?;
 
-        db_client
-            .assets_meta_cache()
-            .upsert(
-                carbon_repos::db::assets_meta_cache::id::equals(version_asset_index.id.clone()),
-                carbon_repos::db::assets_meta_cache::create(
-                    version_asset_index.id.clone(),
-                    asset_index.to_vec(),
-                    vec![],
-                ),
-                vec![carbon_repos::db::assets_meta_cache::assets_index::set(
-                    asset_index.to_vec(),
-                )],
-            )
-            .exec()
-            .await?;
+        let pool = db_pool.clone();
+        let asset_id_clone = asset_id.clone();
+        let asset_index_vec = asset_index.to_vec();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::cache::UpsertAssetsMetaCache::SQL,
+                rusqlite::params![asset_id_clone, asset_index_vec],
+            )?;
+            Ok::<_, DatabaseError>(())
+        })
+        .await??;
 
         Ok(asset_index)
     };
@@ -70,13 +68,20 @@ pub async fn get_meta(
     let asset_index = match asset_index {
         Ok(asset_index) => Ok((serde_json::from_slice(&asset_index)?, asset_index.to_vec())),
         Err(err) => {
-            let db_cache = db_client
-                .assets_meta_cache()
-                .find_unique(carbon_repos::db::assets_meta_cache::id::equals(
-                    version_asset_index.id.clone(),
-                ))
-                .exec()
-                .await?;
+            let pool = db_pool.clone();
+            let asset_id_clone = asset_id.clone();
+            let db_cache = tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::cache::FindAssetsMetaCache::SQL,
+                    rusqlite::params![asset_id_clone],
+                    |row| models::AssetsMetaCache::from_row(row),
+                )
+                .optional()
+            })
+            .await
+            .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?
+            .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
             if let Some(db_cache) = db_cache {
                 let asset_index = serde_json::from_slice(&db_cache.assets_index);
@@ -118,14 +123,14 @@ impl AssetsDir {
 }
 
 pub async fn get_assets_dir(
-    db_client: Arc<PrismaClient>,
+    db_pool: DbPool,
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     version_assets_index: &AssetIndex,
     assets_path: AssetsPath,
     resources_dir: PathBuf,
 ) -> anyhow::Result<AssetsDir> {
     let (assets_index, _) = get_meta(
-        db_client,
+        db_pool,
         reqwest_client,
         version_assets_index,
         assets_path.get_indexes_path(),
@@ -146,14 +151,14 @@ pub async fn get_assets_dir(
 }
 
 pub async fn reconstruct_assets(
-    db_client: Arc<PrismaClient>,
+    db_pool: DbPool,
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     version_asset_index: &AssetIndex,
     assets_path: AssetsPath,
     resources_dir: PathBuf,
 ) -> anyhow::Result<()> {
     let (assets_index, assets_index_bytes) = get_meta(
-        db_client,
+        db_pool,
         reqwest_client,
         version_asset_index,
         assets_path.get_indexes_path(),

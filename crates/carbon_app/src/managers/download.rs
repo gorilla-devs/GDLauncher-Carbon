@@ -7,8 +7,7 @@ use std::{
 };
 
 use anyhow::bail;
-use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::pcr::QueryError;
+use carbon_repos::{models::ActiveDownload, queries, DatabaseError, OptionalExt};
 use reqwest::Response;
 use reqwest_middleware::ClientWithMiddleware;
 use thiserror::Error;
@@ -68,8 +67,6 @@ impl ManagerRef<'_, DownloadManager> {
     ///
     /// If the download has already finished the files will be deleted anyway.
     pub async fn cancel_download(self, handle: DownloadHandle) -> Result<(), DownloadCancelError> {
-        use carbon_repos::db::active_downloads::UniqueWhereParam;
-
         // stop the handle's drop() from being called
         let mut handle = handle.into_inner();
 
@@ -87,12 +84,18 @@ impl ManagerRef<'_, DownloadManager> {
 
         tokio::fs::remove_file(path).await?;
 
-        self.app
-            .prisma_client
-            .active_downloads()
-            .delete(UniqueWhereParam::FileIdEquals(handle.id))
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let file_id = handle.id.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::cache::DeleteActiveDownloadByFileId::SQL,
+                rusqlite::params![file_id],
+            )?;
+            Ok::<_, DatabaseError>(())
+        })
+        .await
+        .map_err(|e| DownloadCancelError::Query(DatabaseError::Custom(e.to_string())))??;
 
         Ok(())
     }
@@ -102,8 +105,6 @@ impl ManagerRef<'_, DownloadManager> {
         handle: DownloadHandle,
         target: &Path,
     ) -> Result<(), DownloadCompleteError> {
-        use carbon_repos::db::active_downloads::UniqueWhereParam;
-
         let mut handle = handle.into_inner();
 
         if let Err(_) = handle.complete_channel.try_recv() {
@@ -125,19 +126,23 @@ impl ManagerRef<'_, DownloadManager> {
             // not just an IO error
             .map_err(DownloadCompleteError::RenameError)?;
 
-        self.app
-            .prisma_client
-            .active_downloads()
-            .delete(UniqueWhereParam::FileIdEquals(handle.id))
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let file_id = handle.id.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::cache::DeleteActiveDownloadByFileId::SQL,
+                rusqlite::params![file_id],
+            )?;
+            Ok::<_, DatabaseError>(())
+        })
+        .await
+        .map_err(|e| DownloadCompleteError::Query(DatabaseError::Custom(e.to_string())))??;
 
         Ok(())
     }
 
     pub async fn start_download(self, url: String) -> Result<DownloadHandle, DownloadStartError> {
-        use carbon_repos::db::active_downloads::WhereParam;
-
         // Lock active_downloads. Any future downloads will have to wait here.
         // active_downloads is locked to prevent two downloads attempting to start
         // for the same file. Whichever download gets here later must wait for the
@@ -148,25 +153,38 @@ impl ManagerRef<'_, DownloadManager> {
             return Err(DownloadStartError::AlreadyActive);
         }
 
-        let active_download = self
-            .app
-            .prisma_client
-            .active_downloads()
-            .find_first(vec![WhereParam::Url(StringFilter::Equals(url.clone()))])
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let url_clone = url.clone();
+        let active_download = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::cache::FindActiveDownload::SQL,
+                rusqlite::params![url_clone],
+                |row| ActiveDownload::from_row(row),
+            )
+            .optional()
+        })
+        .await
+        .map_err(|e| DownloadStartError::Query(DatabaseError::Custom(e.to_string())))??;
 
         let id = match active_download {
             Some(download) => download.file_id,
             None => {
                 let id = Uuid::new_v4().to_string();
 
-                self.app
-                    .prisma_client
-                    .active_downloads()
-                    .create(url.clone(), id.clone(), Vec::new())
-                    .exec()
-                    .await?;
+                let pool = self.app.db_pool.clone();
+                let url_clone = url.clone();
+                let id_clone = id.clone();
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.execute(
+                        queries::cache::CreateActiveDownload::SQL,
+                        rusqlite::params![url_clone, id_clone],
+                    )?;
+                    Ok::<_, DatabaseError>(())
+                })
+                .await
+                .map_err(|e| DownloadStartError::Query(DatabaseError::Custom(e.to_string())))??;
 
                 id
             }
@@ -440,7 +458,7 @@ pub enum DownloadCancelError {
     NotStarted,
 
     #[error("query error: {0}")]
-    Query(#[from] QueryError),
+    Query(#[from] DatabaseError),
 
     #[error("io error: {0}")]
     Io(#[from] io::Error),
@@ -452,7 +470,7 @@ pub enum DownloadStartError {
     AlreadyActive,
 
     #[error("query error")]
-    Query(#[from] QueryError),
+    Query(#[from] DatabaseError),
 }
 
 #[derive(Error, Debug)]
@@ -481,7 +499,7 @@ impl Clone for ActiveDownloadError {
 #[derive(Error, Debug)]
 pub enum DownloadCompleteError {
     #[error("query error: {0}")]
-    Query(#[from] QueryError),
+    Query(#[from] DatabaseError),
 
     #[error("download was not completed")]
     DownloadIncomplete,

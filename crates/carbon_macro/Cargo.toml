@@ -9,5 +9,6 @@ proc-macro = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+proc-macro2 = "1"
 quote = { workspace = true }
-syn = { workspace = true }
+syn = { workspace = true, features = ["full"] }

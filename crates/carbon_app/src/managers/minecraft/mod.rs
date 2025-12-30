@@ -1,7 +1,6 @@
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
-    sync::Arc,
 };
 
 use carbon_net::Downloadable;
@@ -67,7 +66,7 @@ impl ManagerRef<'_, MinecraftManager> {
         let _guard = LOCK.lock().await;
 
         minecraft::get_version(
-            self.app.prisma_client.clone(),
+            self.app.db_pool.clone(),
             &self.app.reqwest_client,
             mc_version,
             &self.meta_base_url,
@@ -109,7 +108,7 @@ impl ManagerRef<'_, MinecraftManager> {
         let mut all_files = vec![];
 
         let lwjgl = get_lwjgl_meta(
-            Arc::clone(&self.app.prisma_client),
+            self.app.db_pool.clone(),
             &self.app.reqwest_client,
             &version_info,
             &self.meta_base_url,
@@ -187,7 +186,7 @@ impl ManagerRef<'_, MinecraftManager> {
         }
 
         let (assets_meta, _) = assets::get_meta(
-            Arc::clone(&self.app.prisma_client),
+            self.app.db_pool.clone(),
             self.app.reqwest_client.clone(),
             &version_info.asset_index,
             runtime_path.get_assets().get_indexes_path(),
@@ -298,7 +297,7 @@ mod tests {
             .clone();
 
         let version_info = crate::managers::minecraft::minecraft::get_version(
-            app.prisma_client.clone(),
+            app.db_pool.clone(),
             &app.reqwest_client,
             &manifest_version.id,
             &app.minecraft_manager.meta_base_url,
@@ -307,7 +306,7 @@ mod tests {
         .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            app.prisma_client.clone(),
+            app.db_pool.clone(),
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version_info,
             &app.minecraft_manager().meta_base_url,
@@ -333,7 +332,7 @@ mod tests {
             .clone();
 
         let forge_version_info = crate::managers::minecraft::forge::get_version(
-            app.prisma_client.clone(),
+            app.db_pool.clone(),
             &app.reqwest_client,
             &forge_version,
             &app.minecraft_manager.meta_base_url,
@@ -422,7 +421,7 @@ mod tests {
         };
 
         let assets_dir = crate::managers::minecraft::assets::get_assets_dir(
-            app.prisma_client.clone(),
+            app.db_pool.clone(),
             reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version_info.asset_index,
             runtime_path.get_assets(),

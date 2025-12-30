@@ -31,7 +31,6 @@ You can read more [here](https://gdlauncher.com/en/blog/curseforge-partnership-a
     - [Pnpm](#pnpm)
     - [Install Dependencies](#install-dependencies)
     - [Run app in dev mode](#run-app-in-dev-mode)
-    - [Generate DB migration](#generate-db-migration)
   - [🔍 Test](#-test)
   - [\</\> Lint](#-lint)
   - [\</\> Code Formatting](#-code-formatting)
@@ -103,7 +102,7 @@ At this point make sure you have pnpm installed:
 
 ### Run app in dev mode
 
-First of all you'll need to generate the prisma code and rspc bindings. To do that run
+First of all you'll need to generate the rspc bindings. To do that run
 
 `pnpm codegen`
 
@@ -115,14 +114,6 @@ Note: Core module hot reload doesn't currently work on windows
 Now open a new terminal and run the actual app
 
 `pnpm watch:app`
-
-### Generate DB migration
-
-To generate a new migration please run
-
-`pnpm prisma:migrate --name {migration_name}`
-
-Replace `{migration_name}` with the name of the migration you want to create.
 
 ## 🔍 Test
 

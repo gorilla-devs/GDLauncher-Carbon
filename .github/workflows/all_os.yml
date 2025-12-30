@@ -26,19 +26,13 @@ jobs:
           toolchain: 1.85.1
           targets: aarch64-apple-darwin, x86_64-apple-darwin
           components: clippy, rustfmt
-      - name: Prepare
-        run: |
-          echo "" > crates/carbon_repos/src/db.rs
-          cargo fmt --check
+      - name: Check formatting
+        run: cargo fmt --check
       - run: |
           npm run sudo-init
           chmod -R a+x node_modules
       - name: Iridium patchfix
         run: node iridium_patchfix.js
-      - name: Prisma codegen
-        env:
-          CARGO_INCREMENTAL: 0
-        run: pnpm prisma:generate
       - name: Build
         run: pnpm build:mac-universal
         env:
@@ -109,19 +103,13 @@ jobs:
           toolchain: 1.85.1
           targets: x86_64-unknown-linux-gnu
           components: clippy, rustfmt
-      - name: Prepare
-        run: |
-          echo "" > crates/carbon_repos/src/db.rs
-          cargo fmt --check
+      - name: Check formatting
+        run: cargo fmt --check
       - run: |
           npm run sudo-init
           chmod -R a+x node_modules
       - name: Iridium patchfix
         run: node iridium_patchfix.js
-      - name: Prisma codegen
-        env:
-          CARGO_INCREMENTAL: 0
-        run: pnpm prisma:generate:linux-x64
       - name: Build
         run: pnpm build:linux-x64
         env:
@@ -205,23 +193,14 @@ jobs:
         run: |
           Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
           scoop install llvm
-      - name: Prepare
-        shell: bash
-        run: |
-          echo "" > crates/carbon_repos/src/db.rs
-          cargo fmt --check
+      - name: Check formatting
+        run: cargo fmt --check
       - name: init
         shell: bash
         run: npm run init
       - name: Iridium patchfix
         shell: bash
         run: node iridium_patchfix.js
-      - name: Prisma codegen
-        shell: bash
-        env:
-          CARGO_INCREMENTAL: 0
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: pnpm prisma:generate:win-x64
       - name: Build
         shell: bash
         run: pnpm build:win-x64

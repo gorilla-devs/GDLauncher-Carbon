@@ -32,10 +32,7 @@ use carbon_platforms::{
         search::{ProjectID, VersionID},
     },
 };
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
-};
+use carbon_repos::{models, queries, OptionalExt};
 use carbon_rt_path::InstancePath;
 use futures::future::Future;
 use std::{ops::Deref, path::PathBuf, pin::Pin, sync::Arc, time::Duration};
@@ -691,19 +688,24 @@ impl ResourceInstaller for CurseforgeModInstaller {
             if let curseforge::FileRelationType::RequiredDependency = dep.relation_type {
                 installers.push(Box::new(move || {
                     Box::pin(async move {
-                        let existing = app_clone
-                            .prisma_client
-                            .mod_file_cache()
-                            .find_first(vec![
-                                fcdb::instance_id::equals(*instance_id),
-                                fcdb::metadata::is(vec![metadb::curseforge::is(vec![
-                                    cfdb::project_id::equals(mod_id),
-                                ])]),
-                            ])
-                            .exec()
-                            .await;
+                        // Check if a mod with this curseforge project_id is already installed
+                        let pool = app_clone.db_pool.clone();
+                        let inst_id = *instance_id;
+                        let existing = tokio::task::spawn_blocking(move || {
+                            let conn = pool.get()?;
+                            conn.query_row(
+                                queries::metadata::FindModFileCacheByInstanceAndCfProject::SQL,
+                                rusqlite::params![inst_id, mod_id],
+                                |row| models::ModFileCache::from_row(row),
+                            )
+                            .optional()
+                        })
+                        .await
+                        .ok()
+                        .and_then(|r| r.ok())
+                        .flatten();
 
-                        if let Ok(Some(_)) = existing {
+                        if existing.is_some() {
                             return None;
                         }
 
@@ -813,19 +815,22 @@ impl ResourceInstaller for CurseforgeModInstaller {
         app: &Arc<AppInner>,
         instance_id: InstanceId,
     ) -> anyhow::Result<bool> {
-        use carbon_repos::db::mod_file_cache as fcdb;
-
         // TODO: check with fingerprint?
-        let is_installed = app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                *instance_id,
-                self.file.file_name.clone(),
-            ))
-            .exec()
-            .await?
-            .is_some();
+        let pool = app.db_pool.clone();
+        let inst_id = *instance_id;
+        let filename = self.file.file_name.clone();
+
+        let is_installed = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::metadata::FindModFileCacheByInstanceAndFilename::SQL,
+                rusqlite::params![inst_id, filename],
+                |row| models::ModFileCache::from_row(row),
+            )
+            .optional()
+            .map(|opt| opt.is_some())
+        })
+        .await??;
 
         Ok(is_installed)
     }
@@ -1004,19 +1009,25 @@ impl ResourceInstaller for ModrinthModInstaller {
                 if let Some(project_id) = project_id {
                     installers.push(Box::new(move || {
                         Box::pin(async move {
-                            let existing = app_clone
-                                .prisma_client
-                                .mod_file_cache()
-                                .find_first(vec![
-                                    fcdb::instance_id::equals(*instance_id),
-                                    fcdb::metadata::is(vec![metadb::modrinth::is(vec![
-                                        mrdb::project_id::equals(project_id.clone()),
-                                    ])]),
-                                ])
-                                .exec()
-                                .await;
+                            // Check if a mod with this modrinth project_id is already installed
+                            let pool = app_clone.db_pool.clone();
+                            let inst_id = *instance_id;
+                            let proj_id = project_id.clone();
+                            let existing = tokio::task::spawn_blocking(move || {
+                                let conn = pool.get()?;
+                                conn.query_row(
+                                    queries::metadata::FindModFileCacheByInstanceAndMrProject::SQL,
+                                    rusqlite::params![inst_id, proj_id],
+                                    |row| models::ModFileCache::from_row(row),
+                                )
+                                .optional()
+                            })
+                            .await
+                            .ok()
+                            .and_then(|r| r.ok())
+                            .flatten();
 
-                            if let Ok(Some(_)) = existing {
+                            if existing.is_some() {
                                 return None;
                             }
 
@@ -1146,19 +1157,22 @@ impl ResourceInstaller for ModrinthModInstaller {
         app: &Arc<AppInner>,
         instance_id: InstanceId,
     ) -> anyhow::Result<bool> {
-        use carbon_repos::db::mod_file_cache as fcdb;
-
         // TODO: check with fingerprint?
-        let is_installed = app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                *instance_id,
-                self.file.filename.clone(),
-            ))
-            .exec()
-            .await?
-            .is_some();
+        let pool = app.db_pool.clone();
+        let inst_id = *instance_id;
+        let filename = self.file.filename.clone();
+
+        let is_installed = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::metadata::FindModFileCacheByInstanceAndFilename::SQL,
+                rusqlite::params![inst_id, filename],
+                |row| models::ModFileCache::from_row(row),
+            )
+            .optional()
+            .map(|opt| opt.is_some())
+        })
+        .await??;
 
         Ok(is_installed)
     }

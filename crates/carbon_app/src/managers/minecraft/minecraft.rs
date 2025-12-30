@@ -10,8 +10,7 @@ use crate::{
     },
 };
 use anyhow::Context;
-use carbon_repos::db::{PrismaClient, app_configuration::pre_launch_hook};
-use carbon_repos::pcr::QueryError;
+use carbon_repos::{models, queries, DatabaseError, DbPool, OptionalExt};
 use carbon_rt_path::{InstancePath, RuntimePath};
 use daedalus::minecraft::{
     Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
@@ -36,7 +35,7 @@ pub enum VersionError {
     #[error("Could not fetch version meta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Could not execute db query: {0}")]
-    QueryError(#[from] QueryError),
+    QueryError(#[from] DatabaseError),
 }
 
 #[derive(Error, Debug)]
@@ -44,7 +43,7 @@ pub enum MinecraftManifestError {
     #[error("Could not fetch minecraft manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Manifest database query error: {0}")]
-    DBQueryError(#[from] QueryError),
+    DBQueryError(#[from] DatabaseError),
 }
 
 pub async fn get_manifest(
@@ -68,7 +67,7 @@ pub async fn get_manifest(
 }
 
 pub async fn get_version(
-    db_client: Arc<PrismaClient>,
+    db_pool: DbPool,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     mc_version: &str,
     meta_base_url: &Url,
@@ -104,21 +103,18 @@ pub async fn get_version(
             )
         })?;
 
-        db_client
-            .version_info_cache()
-            .upsert(
-                carbon_repos::db::version_info_cache::id::equals(mc_version.to_string()),
-                carbon_repos::db::version_info_cache::create(
-                    mc_version.to_string(),
-                    version_meta.to_vec(),
-                    vec![],
-                ),
-                vec![carbon_repos::db::version_info_cache::version_info::set(
-                    version_meta.to_vec(),
-                )],
-            )
-            .exec()
-            .await?;
+        let pool = db_pool.clone();
+        let mc_version_str = mc_version.to_string();
+        let version_meta_vec = version_meta.to_vec();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::cache::UpsertVersionInfoCache::SQL,
+                rusqlite::params![mc_version_str, version_meta_vec],
+            )?;
+            Ok::<_, DatabaseError>(())
+        })
+        .await??;
 
         Ok(version_meta)
     };
@@ -126,14 +122,20 @@ pub async fn get_version(
     let version_meta = match update_cache().await {
         Ok(version_meta) => version_meta,
         Err(err) => {
-            let db_cache = db_client
-                .version_info_cache()
-                .find_unique(carbon_repos::db::version_info_cache::id::equals(
-                    mc_version.to_string(),
-                ))
-                .exec()
-                .await
-                .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
+            let pool = db_pool.clone();
+            let mc_version_str = mc_version.to_string();
+            let db_cache = tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::cache::FindVersionInfoCache::SQL,
+                    rusqlite::params![mc_version_str],
+                    |row| models::VersionInfoCache::from_row(row),
+                )
+                .optional()
+            })
+            .await
+            .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?
+            .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
             if let Some(db_cache) = db_cache {
                 let db_cache = serde_json::from_slice(&db_cache.version_info);
@@ -161,7 +163,7 @@ pub async fn get_version(
 }
 
 pub async fn get_lwjgl_meta(
-    db_client: Arc<PrismaClient>,
+    db_pool: DbPool,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     version_info: &VersionInfo,
     meta_base_url: &Url,
@@ -185,6 +187,8 @@ pub async fn get_lwjgl_meta(
 
     static LOCK: Mutex<()> = Mutex::const_new(());
     let _guard = LOCK.lock().await;
+
+    let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
     let update_cache = || async {
         let lwjgl_json_url = meta_base_url.join(&format!(
@@ -214,23 +218,18 @@ pub async fn get_lwjgl_meta(
             )
         })?;
 
-        let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
-
-        db_client
-            .lwjgl_meta_cache()
-            .upsert(
-                carbon_repos::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
-                carbon_repos::db::lwjgl_meta_cache::create(
-                    db_entry_name.clone(),
-                    lwjgl.to_vec(),
-                    vec![],
-                ),
-                vec![carbon_repos::db::lwjgl_meta_cache::lwjgl::set(
-                    lwjgl.to_vec(),
-                )],
-            )
-            .exec()
-            .await?;
+        let pool = db_pool.clone();
+        let db_entry_name_clone = db_entry_name.clone();
+        let lwjgl_vec = lwjgl.to_vec();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::cache::UpsertLwjglMetaCache::SQL,
+                rusqlite::params![db_entry_name_clone, lwjgl_vec],
+            )?;
+            Ok::<_, DatabaseError>(())
+        })
+        .await??;
 
         Ok(lwjgl)
     };
@@ -238,15 +237,20 @@ pub async fn get_lwjgl_meta(
     let lwjgl = match update_cache().await {
         Ok(lwjgl) => lwjgl,
         Err(err) => {
-            let db_cache = db_client
-                .lwjgl_meta_cache()
-                .find_unique(carbon_repos::db::lwjgl_meta_cache::id::equals(format!(
-                    "{}-{}",
-                    version_info_lwjgl_requirement.uid, lwjgl_suggest
-                )))
-                .exec()
-                .await
-                .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
+            let pool = db_pool.clone();
+            let db_entry_name_clone = db_entry_name.clone();
+            let db_cache = tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::cache::FindLwjglMetaCache::SQL,
+                    rusqlite::params![db_entry_name_clone],
+                    |row| models::LwjglMetaCache::from_row(row),
+                )
+                .optional()
+            })
+            .await
+            .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?
+            .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
             if let Some(db_cache) = db_cache {
                 let lwjgl = serde_json::from_slice(&db_cache.lwjgl);
@@ -837,7 +841,7 @@ mod tests {
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            app.prisma_client.clone(),
+            app.db_pool.clone(),
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version,
             &app.minecraft_manager().meta_base_url,
@@ -866,7 +870,7 @@ mod tests {
             .unwrap();
 
         let assets_dir = crate::managers::minecraft::assets::get_assets_dir(
-            app.prisma_client.clone(),
+            app.db_pool.clone(),
             reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version.asset_index,
             runtime_path.get_assets(),
@@ -926,7 +930,7 @@ mod tests {
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            app.prisma_client.clone(),
+            app.db_pool.clone(),
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version,
             &app.minecraft_manager().meta_base_url,

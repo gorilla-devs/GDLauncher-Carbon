@@ -5,10 +5,7 @@ use crate::managers::App;
 use crate::managers::ManagerRef;
 use crate::managers::vtask::VisualTask;
 use anyhow::anyhow;
-use carbon_repos::db::read_filters::BytesFilter;
-use carbon_repos::db::read_filters::IntFilter;
-use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use carbon_repos::{queries, models::ModFileCache as DbModFileCache, models::ModMetadata as DbModMetadata, DbPool};
 use carbon_rt_path::InstancesPath;
 use curseforge::CurseforgeModCacher;
 use futures::Future;
@@ -62,10 +59,10 @@ pub struct MetaCacheManager {
     local_targets: LockNotify<CacheTargets>,
     curseforge_targets: LockNotify<CacheTargets>,
     modrinth_targets: LockNotify<CacheTargets>,
-    image_scale_semaphore: Semaphore,
-    image_download_semaphore: Semaphore,
+    pub(crate) image_scale_semaphore: Semaphore,
+    pub(crate) image_download_semaphore: Semaphore,
     watched_instance: watch::Sender<Option<InstanceId>>,
-    pause_caching: watch::Sender<bool>,
+    pub(crate) pause_caching: watch::Sender<bool>,
 }
 
 impl MetaCacheManager {
@@ -91,13 +88,13 @@ impl MetaCacheManager {
 }
 
 #[derive(Clone)]
-struct UpdateNotifier {
+pub(crate) struct UpdateNotifier {
     target: Arc<AtomicI32>,
     sender: Arc<watch::Sender<()>>,
 }
 
 impl UpdateNotifier {
-    fn send(&self, instance_id: InstanceId) {
+    pub(crate) fn send(&self, instance_id: InstanceId) {
         // let target = self.target.load(atomic::Ordering::SeqCst);
 
         // if target == *instance_id {
@@ -470,7 +467,7 @@ impl<T: LoopValue> LoopWatcher<T> {
 }
 
 #[async_trait::async_trait]
-trait ModplatformCacher {
+pub(crate) trait ModplatformCacher {
     const NAME: &'static str;
     type SaveBundle: Send + Sync;
 
@@ -487,7 +484,7 @@ trait ModplatformCacher {
 
 type ModplatformCacheBundle<T> = (InstanceId, bool, Option<T>, Option<oneshot::Sender<()>>);
 
-struct BundleSender<'a, T> {
+pub(crate) struct BundleSender<'a, T> {
     should_wait: bool,
     instance_id: InstanceId,
     update_images: bool,
@@ -511,7 +508,7 @@ impl<'a, T> BundleSender<'a, T> {
         }
     }
 
-    fn send(&mut self, bundle: T) {
+    pub(crate) fn send(&mut self, bundle: T) {
         let (tx, rx) = match self.should_wait {
             true => {
                 let (tx, rx) = oneshot::channel();
@@ -699,27 +696,34 @@ impl ManagerRef<'_, MetaCacheManager> {
                 .send_modify(|targets| targets.revoke_target(instance_id)),
         );
 
-        let _ = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .delete_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
-                *instance_id,
-            ))])
-            .exec()
-            .await;
+        // Delete mod file cache entries for the instance
+        let pool = self.app.db_pool.clone();
+        let id = *instance_id;
+        let delete_result = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(queries::metadata::DeleteModFileCacheByInstance::SQL, rusqlite::params![id])?;
+            Ok::<_, anyhow::Error>(())
+        }).await;
+
+        if let Err(e) = delete_result {
+            error!({ error = ?e }, "Failed to delete mod file cache for instance {instance_id}");
+        }
 
         self.gc_mod_metadata().await;
     }
 
     pub async fn gc_mod_metadata(self) {
-        let _ = self
-            .app
-            .prisma_client
-            .mod_metadata()
-            .delete_many(vec![metadb::WhereParam::CachedFilesNone(Vec::new())])
-            .exec()
-            .await;
+        // Delete orphaned mod metadata entries (those with no cached files referencing them)
+        let pool = self.app.db_pool.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(queries::metadata::DeleteOrphanedModMetadata::SQL, [])?;
+            Ok::<_, anyhow::Error>(())
+        }).await;
+
+        if let Err(e) = result {
+            error!({ error = ?e }, "Failed to garbage collect mod metadata");
+        }
     }
 
     // this will need further refactoring. left for later.
@@ -1061,24 +1065,28 @@ impl ManagerRef<'_, MetaCacheManager> {
             }
         };
 
-        let dbmeta = self
-            .app
-            .prisma_client
-            .mod_metadata()
-            // just check both hashes for now
-            .find_first(vec![
-                metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(sha512))),
-                metadb::WhereParam::Murmur2(IntFilter::Equals(murmur2 as i32)),
-            ])
-            .exec()
-            .await?;
+        // Check if metadata already exists by sha512 and murmur2
+        let pool = self.app.db_pool.clone();
+        let sha512_vec = Vec::from(sha512);
+        let murmur2_i32 = murmur2 as i32;
+        let dbmeta = tokio::task::spawn_blocking({
+            let sha512_vec = sha512_vec.clone();
+            move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::metadata::FindModMetadataBySha512AndMurmur2::SQL,
+                    rusqlite::params![sha512_vec, murmur2_i32],
+                    |row| DbModMetadata::from_row(row),
+                ).optional()
+            }
+        }).await??;
 
         let (meta_id, meta_insert, logo_insert) = match dbmeta {
-            Some(meta) => (meta.id, None, None),
+            Some(meta) => (meta.id, false, false),
             None => {
                 let meta_id = Uuid::new_v4().to_string();
 
-                let logo_insert = match image_data {
+                let logo_data = match image_data {
                     Some(image_data) => {
                         let permit = self
                             .image_scale_semaphore
@@ -1095,13 +1103,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                         drop(permit);
 
                         match logo {
-                            Ok(Some(data)) => {
-                                Some(self.app.prisma_client.local_mod_image_cache().create(
-                                    data,
-                                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                                    Vec::new(),
-                                ))
-                            }
+                            Ok(Some(data)) => Some(data),
                             Ok(None) => None,
                             Err(e) => {
                                 error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
@@ -1112,79 +1114,89 @@ impl ManagerRef<'_, MetaCacheManager> {
                     None => None,
                 };
 
-                let meta_insert = self.app.prisma_client.mod_metadata().create(
-                    meta_id.clone(),
-                    murmur2 as i32,
-                    Vec::from(sha512),
-                    Vec::from(sha1),
-                    meta.as_ref()
-                        .map(|meta| &meta.modloaders)
-                        .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
-                        .unwrap_or(String::new()),
-                    match meta {
-                        Some(meta) => vec![
-                            metadb::SetParam::SetName(meta.name),
-                            metadb::SetParam::SetModid(meta.modid),
-                            metadb::SetParam::SetVersion(meta.version),
-                            metadb::SetParam::SetDescription(meta.description),
-                            metadb::SetParam::SetAuthors(meta.authors),
-                        ],
+                // Insert mod metadata
+                let pool = self.app.db_pool.clone();
+                let meta_id_clone = meta_id.clone();
+                let sha512_vec_clone = sha512_vec.clone();
+                let sha1_vec = Vec::from(sha1);
+                let modloaders = meta.as_ref()
+                    .map(|meta| &meta.modloaders)
+                    .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
+                    .unwrap_or(String::new());
+                let name = meta.as_ref().and_then(|m| m.name.clone());
+                let modid = meta.as_ref().and_then(|m| m.modid.clone());
+                let version = meta.as_ref().and_then(|m| m.version.clone());
+                let description = meta.as_ref().and_then(|m| m.description.clone());
+                let authors = meta.as_ref().and_then(|m| m.authors.clone());
 
-                        // Prisma sucks and is generating invalid sql.
-                        // As a workaround, all the defaults are manually set to None.
-                        None => vec![
-                            metadb::SetParam::SetName(None),
-                            metadb::SetParam::SetModid(None),
-                            metadb::SetParam::SetVersion(None),
-                            metadb::SetParam::SetDescription(None),
-                            metadb::SetParam::SetAuthors(None),
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.execute(
+                        queries::metadata::CreateModMetadata::SQL,
+                        rusqlite::params![
+                            meta_id_clone,
+                            murmur2_i32,
+                            sha512_vec_clone,
+                            sha1_vec,
+                            name,
+                            modid,
+                            version,
+                            description,
+                            authors,
+                            modloaders
                         ],
-                    },
-                );
+                    )?;
+                    Ok::<_, anyhow::Error>(())
+                }).await??;
 
-                (meta_id, Some(meta_insert), logo_insert)
+                // Insert logo if present
+                let has_logo = logo_data.is_some();
+                if let Some(logo_data) = logo_data {
+                    let pool = self.app.db_pool.clone();
+                    let meta_id_clone = meta_id.clone();
+                    tokio::task::spawn_blocking(move || {
+                        let conn = pool.get()?;
+                        conn.execute(
+                            queries::metadata::UpsertLocalModImageCache::SQL,
+                            rusqlite::params![meta_id_clone, logo_data],
+                        )?;
+                        Ok::<_, anyhow::Error>(())
+                    }).await??;
+                }
+
+                (meta_id, true, has_logo)
             }
         };
 
-        if let Some(meta_insert) = meta_insert {
-            meta_insert.exec().await?;
-        }
-
-        if let Some(logo_insert) = logo_insert {
-            logo_insert.exec().await?;
-        }
-
-        self.app
-            .prisma_client
-            .mod_file_cache()
-            .upsert(
-                fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                    *instance_id,
-                    mod_filename.to_string(),
-                ),
-                fcdb::create(
-                    carbon_repos::db::instance::UniqueWhereParam::IdEquals(*instance_id),
-                    mod_filename.to_string(),
+        // Upsert mod file cache entry
+        let pool = self.app.db_pool.clone();
+        let file_id = Uuid::new_v4().to_string();
+        let meta_id_clone = meta_id.clone();
+        let instance_id_i32 = *instance_id;
+        let mod_filename_clone = mod_filename.clone();
+        let addon_type_clone = addon_type.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::metadata::UpsertModFileCache::SQL,
+                rusqlite::params![
+                    file_id,
+                    instance_id_i32,
+                    mod_filename_clone,
                     content_len as i32,
                     enabled,
-                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                    vec![fcdb::SetParam::SetAddonType(addon_type.clone())],
-                ),
-                vec![
-                    fcdb::SetParam::SetFilesize(content_len as i32),
-                    fcdb::SetParam::SetEnabled(enabled),
-                    fcdb::SetParam::SetMetadataId(meta_id.clone()),
-                    fcdb::SetParam::SetAddonType(addon_type),
+                    addon_type_clone,
+                    meta_id_clone
                 ],
-            )
-            .exec()
-            .await?;
+            )?;
+            Ok::<_, anyhow::Error>(())
+        }).await??;
 
         Ok(meta_id)
     }
 }
 
-fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
+pub fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
     use image::imageops::*;
 
     const TARGET_SIZE: f32 = 45.0;
@@ -1231,15 +1243,16 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
         let update_notifier = &update_notifier;
 
         let cache_instance = |instance_id: InstanceId| async move {
-            let app2 = app.clone();
+            let pool = app.db_pool.clone();
+            let id = *instance_id;
             let cached_entries = tokio::spawn(async move {
-                app2.prisma_client
-                    .mod_file_cache()
-                    .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
-                        *instance_id,
-                    ))])
-                    .exec()
-                    .await
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    let mut stmt = conn.prepare(queries::metadata::ListModFileCacheByInstance::SQL)?;
+                    let entries = stmt.query_map(rusqlite::params![id], |row| DbModFileCache::from_row(row))?
+                        .collect::<Result<Vec<_>, _>>()?;
+                    Ok::<_, anyhow::Error>(entries)
+                }).await?
             });
 
             let instance_manager = app.instance_manager();
@@ -1394,14 +1407,18 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             continue;
                         }
                     } else {
-                        app.prisma_client
-                            .mod_file_cache()
-                            .delete(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                                *instance_id,
-                                entry.filename,
-                            ))
-                            .exec()
-                            .await?;
+                        // Delete cache entry for file that no longer exists
+                        let pool = app.db_pool.clone();
+                        let id = *instance_id;
+                        let filename = entry.filename.clone();
+                        let _ = tokio::task::spawn_blocking(move || {
+                            let conn = pool.get()?;
+                            conn.execute(
+                                queries::metadata::DeleteModFileCacheByInstanceAndFilename::SQL,
+                                rusqlite::params![id, filename],
+                            )?;
+                            Ok::<_, anyhow::Error>(())
+                        }).await;
                     }
 
                     has_outdated_entries = true;
@@ -1572,4 +1589,19 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             }
         ).await;
     });
+}
+
+/// Helper trait to convert rusqlite's Result<Option<T>> pattern.
+trait OptionalExt<T> {
+    fn optional(self) -> Result<Option<T>, anyhow::Error>;
+}
+
+impl<T> OptionalExt<T> for rusqlite::Result<T> {
+    fn optional(self) -> Result<Option<T>, anyhow::Error> {
+        match self {
+            Ok(v) => Ok(Some(v)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
 }

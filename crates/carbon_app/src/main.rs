@@ -178,7 +178,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     crate::managers::java::JavaManager::scan_and_sync(
         auto_manage_java_system_profiles,
-        &app.prisma_client,
+        &app.db_pool,
         &RealDiscovery::new(app.settings_manager().runtime_path.clone()),
         &RealJavaChecker,
     )

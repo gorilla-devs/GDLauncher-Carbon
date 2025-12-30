@@ -19,10 +19,7 @@ use carbon_platforms::modrinth::version::VersionType;
 use carbon_platforms::{
     ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion, curseforge, modrinth,
 };
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
-};
+use carbon_repos::{models, queries, OptionalExt};
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::Future;
 use std::borrow::Cow;
@@ -111,38 +108,39 @@ impl ManagerRef<'_, InstanceManager> {
                     .is_some()
             };
 
-        let mut query_filters = vec![fcdb::instance_id::equals(*instance_id)];
+        let pool = self.app.db_pool.clone();
+        let instance_id_val = *instance_id;
+        let addon_type_filter = addon_type.map(|t| t.to_db_string().to_string());
 
-        if let Some(addon_type) = addon_type {
-            query_filters.push(fcdb::addon_type::equals(
-                addon_type.to_db_string().to_string(),
-            ));
-        }
+        let mods = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
 
-        let mods = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .find_many(query_filters)
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::logo_image::fetch())
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
-            .exec()
-            .await?;
+            let mods: Vec<models::ModFileCacheWithMetadataAndImages> = if let Some(ref addon_type_str) = addon_type_filter {
+                let mut stmt = conn.prepare(queries::metadata::ListModFileCacheWithMetadataAndImagesByInstanceAndType::SQL)?;
+                stmt.query_map(rusqlite::params![instance_id_val, addon_type_str], |row| {
+                    models::ModFileCacheWithMetadataAndImages::from_row(row)
+                })?
+                .collect::<Result<Vec<_>, _>>()?
+            } else {
+                let mut stmt = conn.prepare(queries::metadata::ListModFileCacheWithMetadataAndImagesByInstance::SQL)?;
+                stmt.query_map(rusqlite::params![instance_id_val], |row| {
+                    models::ModFileCacheWithMetadataAndImages::from_row(row)
+                })?
+                .collect::<Result<Vec<_>, _>>()?
+            };
+
+            Ok::<_, anyhow::Error>(mods)
+        })
+        .await??;
 
         // Detect duplicated mods by grouping enabled mods by modid
         let mut modid_counts: std::collections::HashMap<String, u32> =
             std::collections::HashMap::new();
         for m in &mods {
-            // Only consider enabled mods with metadata and modid
+            // Only consider enabled mods with modid
             if m.enabled {
-                if let Some(ref metadata) = m.metadata {
-                    if let Some(ref modid) = metadata.modid {
-                        *modid_counts.entry(modid.clone()).or_insert(0) += 1;
-                    }
+                if let Some(ref modid) = m.modid {
+                    *modid_counts.entry(modid.clone()).or_insert(0) += 1;
                 }
             }
         }
@@ -155,116 +153,105 @@ impl ManagerRef<'_, InstanceManager> {
             .collect();
 
         let mods = mods.into_iter().map(|m| {
-            let (mid, cf, mr) = m
-                .metadata
-                .clone()
-                .map(|m| (Some(m.id), m.curseforge.flatten(), m.modrinth.flatten()))
-                .unwrap_or((None, None, None));
+            let has_cf = m.cf_project_id.is_some();
+            let has_mr = m.mr_project_id.is_some();
 
-            let has_curseforge_update = cf
-                .as_ref()
-                .map(|cf| {
-                    let Ok(channel) = ModChannel::try_from(cf.release_type) else {
+            let has_curseforge_update = if let (Some(release_type), Some(update_paths)) = (m.cf_release_type, &m.cf_update_paths) {
+                match ModChannel::try_from(release_type) {
+                    Ok(channel) => {
+                        !mod_sources
+                            .platform_blacklist
+                            .contains(&ModPlatform::Curseforge)
+                            && has_update_for_paths(channel, &split_paths(update_paths))
+                    }
+                    Err(_) => {
                         tracing::error!(
                             "Invalid ModChannel in database for curseforge entry {}: {}",
-                            mid.as_ref().unwrap(),
-                            cf.release_type
+                            &m.metadata_id,
+                            release_type
                         );
-                        return false;
-                    };
+                        false
+                    }
+                }
+            } else {
+                false
+            };
 
-                    !mod_sources
-                        .platform_blacklist
-                        .contains(&ModPlatform::Curseforge)
-                        && has_update_for_paths(channel, &split_paths(&cf.update_paths))
-                })
-                .unwrap_or(false);
-
-            let has_modrinth_update = mr
-                .as_ref()
-                .map(|mr| {
-                    let Ok(channel) = ModChannel::try_from(mr.release_type) else {
+            let has_modrinth_update = if let (Some(release_type), Some(update_paths)) = (m.mr_release_type, &m.mr_update_paths) {
+                match ModChannel::try_from(release_type) {
+                    Ok(channel) => {
+                        !mod_sources
+                            .platform_blacklist
+                            .contains(&ModPlatform::Modrinth)
+                            && has_update_for_paths(channel, &split_paths(update_paths))
+                    }
+                    Err(_) => {
                         tracing::error!(
                             "Invalid ModChannel in database for modrinth entry {}: {}",
-                            mid.as_ref().unwrap(),
-                            mr.release_type
+                            &m.metadata_id,
+                            release_type
                         );
-                        return false;
-                    };
-
-                    !mod_sources
-                        .platform_blacklist
-                        .contains(&ModPlatform::Modrinth)
-                        && has_update_for_paths(channel, &split_paths(&mr.update_paths))
-                })
-                .unwrap_or(false);
+                        false
+                    }
+                }
+            } else {
+                false
+            };
 
             domain::Mod {
-                id: m.id,
-                filename: m.filename,
+                id: m.id.clone(),
+                filename: m.filename.clone(),
                 enabled: m.enabled,
                 addon_type: domain::AddonType::from_db_string(&m.addon_type)
                     .unwrap_or(domain::AddonType::Mods),
-                metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
-                    id: m.id.clone(),
+                metadata: Some(domain::ModFileMetadata {
+                    id: m.metadata_id.clone(),
                     modid: m.modid.clone(),
                     name: m.name.clone(),
                     version: m.version.clone(),
                     description: m.description.clone(),
                     authors: m.authors.clone(),
-                    modloaders: m
-                        .modloaders
+                    modloaders: m.modloaders
                         .split(',')
-                        // ignore unknown modloaders
                         .flat_map(|loader| ModLoaderType::try_from(loader).ok())
                         .collect::<Vec<_>>(),
-                    sha_512: m.sha_512.clone(),
-                    sha_1: m.sha_1.clone(),
-                    murmur_2: m.murmur_2,
-                    has_image: m
-                        .logo_image
-                        .as_ref()
-                        .map(|v| v.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
+                    sha_512: m.sha512.clone(),
+                    sha_1: m.sha1.clone(),
+                    murmur_2: m.murmur2,
+                    has_image: m.has_local_image,
                 }),
-                curseforge: cf.map(|m| domain::CurseForgeModMetadata {
-                    project_id: m.project_id as u32,
-                    file_id: m.file_id as u32,
-                    name: m.name,
-                    version: m.version,
-                    urlslug: m.urlslug,
-                    summary: m.summary,
-                    authors: m.authors,
-                    has_image: m
-                        .logo_image
-                        .flatten()
-                        .as_ref()
-                        .map(|row| row.data.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
-                }),
-                modrinth: mr.map(|m| domain::ModrinthModMetadata {
-                    project_id: m.project_id,
-                    version_id: m.version_id,
-                    title: m.title,
-                    version: m.version,
-                    urlslug: m.urlslug,
-                    description: m.description,
-                    authors: m.authors,
-                    has_image: m
-                        .logo_image
-                        .flatten()
-                        .as_ref()
-                        .map(|row| row.data.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
-                }),
+                curseforge: if has_cf {
+                    Some(domain::CurseForgeModMetadata {
+                        project_id: m.cf_project_id.unwrap() as u32,
+                        file_id: m.cf_file_id.unwrap() as u32,
+                        name: m.cf_name.clone().unwrap_or_default(),
+                        version: m.cf_version.clone().unwrap_or_default(),
+                        urlslug: m.cf_urlslug.clone().unwrap_or_default(),
+                        summary: m.cf_summary.clone().unwrap_or_default(),
+                        authors: m.cf_authors.clone().unwrap_or_default(),
+                        has_image: m.has_cf_image,
+                    })
+                } else {
+                    None
+                },
+                modrinth: if has_mr {
+                    Some(domain::ModrinthModMetadata {
+                        project_id: m.mr_project_id.clone().unwrap(),
+                        version_id: m.mr_version_id.clone().unwrap(),
+                        title: m.mr_title.clone().unwrap_or_default(),
+                        version: m.mr_version.clone().unwrap_or_default(),
+                        urlslug: m.mr_urlslug.clone().unwrap_or_default(),
+                        description: m.mr_description.clone().unwrap_or_default(),
+                        authors: m.mr_authors.clone().unwrap_or_default(),
+                        has_image: m.has_mr_image,
+                    })
+                } else {
+                    None
+                },
                 has_update: has_curseforge_update || has_modrinth_update,
                 is_duplicate: m.enabled
-                    && m.metadata
+                    && m.modid
                         .as_ref()
-                        .and_then(|meta| meta.modid.as_ref())
                         .map(|modid| duplicate_modids.contains(modid))
                         .unwrap_or(false),
                 file_size: m.filesize as u64,
@@ -330,14 +317,19 @@ impl ManagerRef<'_, InstanceManager> {
 
         let shortpath = &instance.shortpath;
 
-        let m = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .exec()
-            .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
+        let pool = self.app.db_pool.clone();
+        let id_clone = id.clone();
+        let m = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::metadata::FindModFileCache::SQL,
+                rusqlite::params![id_clone],
+                |row| models::ModFileCache::from_row(row),
+            )
+            .optional()
+        })
+        .await??
+        .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
 
         let mut disabled_path = self
             .app
@@ -375,15 +367,16 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::rename(enabled_path, disabled_path).await?;
         }
 
-        self.app
-            .prisma_client
-            .mod_file_cache()
-            .update(
-                fcdb::UniqueWhereParam::IdEquals(id),
-                vec![fcdb::SetParam::SetEnabled(enabled)],
-            )
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::metadata::UpdateModFileCacheEnabled::SQL,
+                rusqlite::params![id, enabled],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app
             .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
@@ -400,14 +393,19 @@ impl ManagerRef<'_, InstanceManager> {
 
         let shortpath = &instance.shortpath;
 
-        let m = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .exec()
-            .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
+        let pool = self.app.db_pool.clone();
+        let id_clone = id.clone();
+        let m = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::metadata::FindModFileCache::SQL,
+                rusqlite::params![id_clone],
+                |row| models::ModFileCache::from_row(row),
+            )
+            .optional()
+        })
+        .await??
+        .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
         let mut disabled_path = {
             let instance_path = self
@@ -655,41 +653,37 @@ impl ManagerRef<'_, InstanceManager> {
 
         let mod_sources = self.instance_cfg_mod_sources(&config).await?;
 
-        let m = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::curseforge::fetch())
-                    .with(metadb::modrinth::fetch()),
+        let pool = self.app.db_pool.clone();
+        let id_clone = id.clone();
+        let m = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::metadata::FindModFileCacheWithMetadata::SQL,
+                rusqlite::params![id_clone],
+                |row| models::ModFileCacheWithMetadata::from_row(row),
             )
-            .exec()
-            .await?
-            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
+            .optional()
+        })
+        .await??
+        .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let metadata = m
-            .metadata
-            .expect("metadata must be associated with a ModFileCache entry");
+        let cf = m.cf_project_id.map(|_| {
+            (m.cf_project_id.unwrap(), m.cf_file_id.unwrap())
+        });
 
-        let cf = metadata
-            .curseforge
-            .expect("curseforge metadata was queried but not returned");
-
-        let mr = metadata
-            .modrinth
-            .expect("modrinth metadata was queried but not returned");
+        let mr = m.mr_project_id.clone().map(|project_id| {
+            (project_id, m.mr_version_id.clone().unwrap())
+        });
 
         let mut versions = Vec::new();
 
-        if let Some(cf) = &cf {
+        if let Some((cf_project_id, cf_file_id)) = &cf {
             let response = self
                 .app
                 .modplatforms_manager()
                 .curseforge
                 .get_mod_files(ModFilesParameters {
-                    mod_id: cf.project_id,
+                    mod_id: *cf_project_id,
                     query: ModFilesParametersQuery {
                         game_version: Some(version.release.clone()),
                         game_version_type_id: None,
@@ -708,13 +702,13 @@ impl ManagerRef<'_, InstanceManager> {
             );
         }
 
-        if let Some(mr) = &mr {
+        if let Some((mr_project_id, mr_version_id)) = &mr {
             let response = self
                 .app
                 .modplatforms_manager()
                 .modrinth
                 .get_project_versions(ProjectVersionsFilters {
-                    project_id: ProjectID(mr.project_id.clone()),
+                    project_id: ProjectID(mr_project_id.clone()),
                     game_versions: Some(vec![version.release.clone()]),
                     loaders: Some(
                         version
@@ -746,16 +740,16 @@ impl ManagerRef<'_, InstanceManager> {
 
                     match &version {
                         RemoteVersion::Curseforge(file) => {
-                            let cf = cf.expect("curseforge metadata must be present if operating on a curseforge version");
+                            let (_, cf_file_id) = cf.as_ref().expect("curseforge metadata must be present if operating on a curseforge version");
 
-                            if cf.file_id == file.id {
+                            if *cf_file_id == file.id {
                                 break 'select;
                             }
                         }
                         RemoteVersion::Modrinth(version) => {
-                            let mr = mr.expect("modrinth metadata must be present if operating on a modrinth version");
+                            let (_, mr_version_id) = mr.as_ref().expect("modrinth metadata must be present if operating on a modrinth version");
 
-                            if mr.version_id == version.id {
+                            if *mr_version_id == version.id {
                                 break 'select;
                             }
                         }
@@ -830,20 +824,22 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
-        let m = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
-            .exec()
-            .await?
-            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
+        let pool = self.app.db_pool.clone();
+        let id_clone = id.clone();
+        let m = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::metadata::FindModFileCacheWithMetadata::SQL,
+                rusqlite::params![id_clone],
+                |row| models::ModFileCacheWithMetadata::from_row(row),
+            )
+            .optional()
+        })
+        .await??
+        .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let cf = m.metadata
-            .expect("metadata must be associated with a ModFileCache entry")
-            .curseforge
-            .expect("curseforge metadata was queried but not returned")
+        let (cf_project_id, cf_file_id) = m.cf_project_id
+            .zip(m.cf_file_id)
             .ok_or_else(|| anyhow!("Attempted to use update_curseforge_mod to update a mod not availible on curseforge"))?;
 
         let mod_files = self
@@ -851,7 +847,7 @@ impl ManagerRef<'_, InstanceManager> {
             .modplatforms_manager()
             .curseforge
             .get_mod_files(ModFilesParameters {
-                mod_id: cf.project_id,
+                mod_id: cf_project_id,
                 query: ModFilesParametersQuery {
                     game_version: Some(version.release),
                     game_version_type_id: None,
@@ -868,7 +864,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("unable to find newer mod version");
         };
 
-        if version.id == cf.file_id {
+        if version.id == cf_file_id {
             bail!("unable to find newer mod version");
         }
 
@@ -907,21 +903,22 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
-        let m = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .with(fcdb::metadata::fetch().with(metadb::modrinth::fetch()))
-            .exec()
-            .await?
-            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
+        let pool = self.app.db_pool.clone();
+        let id_clone = id.clone();
+        let m = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::metadata::FindModFileCacheWithMetadata::SQL,
+                rusqlite::params![id_clone],
+                |row| models::ModFileCacheWithMetadata::from_row(row),
+            )
+            .optional()
+        })
+        .await??
+        .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let mr = m
-            .metadata
-            .expect("metadata must be associated with a ModFileCache entry")
-            .modrinth
-            .expect("curseforge metadata was queried but not returned")
+        let (mr_project_id, mr_version_id) = m.mr_project_id
+            .zip(m.mr_version_id)
             .ok_or_else(|| {
                 anyhow!(
                     "Attempted to use update_modrinth_mod to update a mod not availible on modrinth"
@@ -933,7 +930,7 @@ impl ManagerRef<'_, InstanceManager> {
             .modplatforms_manager()
             .modrinth
             .get_project_versions(ProjectVersionsFilters {
-                project_id: ProjectID(mr.project_id),
+                project_id: ProjectID(mr_project_id.clone()),
                 game_versions: Some(vec![version.release]),
                 loaders: Some(
                     version
@@ -953,7 +950,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("unable to find newer mod version");
         };
 
-        if version.id == mr.version_id {
+        if version.id == mr_version_id {
             bail!("unable to find newer mod version");
         }
 
@@ -972,44 +969,71 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let r = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(mod_id.clone()))
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::logo_image::fetch())
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
-            .exec()
-            .await?
-            .ok_or(InvalidModIdError(mod_id))?
-            .metadata
-            .ok_or_else(|| anyhow!("broken db state"))?;
+        let pool = self.app.db_pool.clone();
+        let mod_id_clone = mod_id.clone();
 
+        // First, get the metadata_id from the mod file cache
+        let metadata_id = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::metadata::FindModFileCache::SQL,
+                rusqlite::params![mod_id_clone],
+                |row| row.get::<_, String>("metadataId"),
+            )
+            .optional()
+        })
+        .await??
+        .ok_or(InvalidModIdError(mod_id))?;
+
+        let pool = self.app.db_pool.clone();
+        let metadata_id_clone = metadata_id.clone();
+
+        // Fetch the appropriate image based on platformid
         let logo_image = match platformid {
-            0 => r
-                .logo_image
-                .ok_or_else(|| anyhow!("broken db state"))?
-                .map(|m| m.data),
-            1 => r
-                .curseforge
-                .ok_or_else(|| anyhow!("broken db state"))?
-                .map(|cf| cf.logo_image.ok_or_else(|| anyhow!("broken db state")))
-                .transpose()?
-                .flatten()
-                .map(|img| img.data)
-                .flatten(),
-            2 => r
-                .modrinth
-                .ok_or_else(|| anyhow!("broken db state"))?
-                .map(|mr| mr.logo_image.ok_or_else(|| anyhow!("broken db state")))
-                .transpose()?
-                .flatten()
-                .map(|img| img.data)
-                .flatten(),
+            0 => {
+                // Local mod image
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.query_row(
+                        queries::metadata::FindLocalModImageCache::SQL,
+                        rusqlite::params![metadata_id_clone],
+                        |row| row.get::<_, Vec<u8>>("data"),
+                    )
+                    .optional()
+                    .map_err(anyhow::Error::from)
+                })
+                .await??
+            }
+            1 => {
+                // CurseForge image
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.query_row(
+                        queries::metadata::FindCurseForgeModImageCache::SQL,
+                        rusqlite::params![metadata_id_clone],
+                        |row| row.get::<_, Option<Vec<u8>>>("data"),
+                    )
+                    .optional()
+                    .map(|opt| opt.flatten())
+                    .map_err(anyhow::Error::from)
+                })
+                .await??
+            }
+            2 => {
+                // Modrinth image
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.query_row(
+                        queries::metadata::FindModrinthModImageCache::SQL,
+                        rusqlite::params![metadata_id_clone],
+                        |row| row.get::<_, Option<Vec<u8>>>("data"),
+                    )
+                    .optional()
+                    .map(|opt| opt.flatten())
+                    .map_err(anyhow::Error::from)
+                })
+                .await??
+            }
             _ => bail!("unsupported platform"),
         };
 

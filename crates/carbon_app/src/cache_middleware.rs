@@ -1,10 +1,7 @@
 use crate::managers::UnsafeAppRef;
 use anyhow::anyhow;
 use axum::http::Extensions;
-use carbon_repos::db::{
-    http_cache::{SetParam, WhereParam},
-    read_filters::StringFilter,
-};
+use carbon_repos::{models::HTTPCache, queries, OptionalExt};
 use chrono::{DateTime, Duration, Utc};
 use reqwest::{Method, Request, Response, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
@@ -53,14 +50,20 @@ impl Middleware for CacheMiddleware {
         let mut cached = if method != Method::GET {
             None
         } else {
-            app.prisma_client
-                .http_cache()
-                .find_first(vec![WhereParam::Url(StringFilter::Equals(
-                    req.url().to_string(),
-                ))])
-                .exec()
-                .await
-                .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?
+            let pool = app.db_pool.clone();
+            let url_str = req.url().to_string();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::cache::FindHttpCache::SQL,
+                    rusqlite::params![url_str],
+                    |row| HTTPCache::from_row(row),
+                )
+                .optional()
+            })
+            .await
+            .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?
+            .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?
         };
 
         // return the cached value if fresh
@@ -162,25 +165,26 @@ impl Middleware for CacheMiddleware {
                 let status = response.status().as_u16() as i32;
                 let body = response.bytes().await?;
 
-                let _ = app
-                    .prisma_client
-                    ._batch((
-                        app.prisma_client
-                            .http_cache()
-                            // will not fail when not found
-                            .delete_many(vec![WhereParam::Url(StringFilter::Equals(url.clone()))]),
-                        app.prisma_client.http_cache().create(
-                            url,
+                let pool = app.db_pool.clone();
+                let url_clone = url.clone();
+                let body_clone = body.to_vec();
+                let expires_str = expires.map(|dt| dt.to_rfc3339());
+                let _ = tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.execute(
+                        queries::cache::UpsertHttpCache::SQL,
+                        rusqlite::params![
+                            url_clone,
                             status,
-                            body.to_vec(),
-                            vec![
-                                SetParam::SetExpiresAt(expires.map(Into::into)),
-                                SetParam::SetLastModified(last_modified),
-                                SetParam::SetEtag(etag),
-                            ],
-                        ),
-                    ))
-                    .await;
+                            body_clone,
+                            expires_str,
+                            last_modified,
+                            etag
+                        ],
+                    )?;
+                    Ok::<_, anyhow::Error>(())
+                })
+                .await;
 
                 match build_cached(status, body.to_vec(), false) {
                     Ok(response) => return Ok(response),
@@ -265,7 +269,8 @@ mod test {
 
         assert!(!request_cached(&app, port).await);
         assert!(request_cached(&app, port).await);
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        // Sleep slightly longer than max-age to ensure cache expires
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
         assert!(!request_cached(&app, port).await);
     }
 

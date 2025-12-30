@@ -13,7 +13,7 @@ pub use app::AppInner;
 use crate::api::InvalidationEvent;
 use crate::api::keys::Key;
 use crate::managers::settings::SettingsManager;
-use carbon_repos::db::PrismaClient;
+use carbon_repos::DbPool;
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
@@ -23,6 +23,7 @@ use self::rich_presence::RichPresenceManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
+mod database;
 pub mod download;
 pub mod instance;
 pub mod java;
@@ -30,7 +31,6 @@ mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;
-mod prisma_client;
 pub mod rich_presence;
 mod settings;
 pub mod system_info;
@@ -53,7 +53,7 @@ mod app {
         api::{CoreModuleStatus, update_core_module_status},
         cache_middleware, domain,
         iridium_client::get_client,
-        managers::{prisma_client::DatabaseError, settings::terms_and_privacy::TermsAndPrivacy},
+        managers::{database::DatabaseError, settings::terms_and_privacy::TermsAndPrivacy},
     };
 
     use self::java::{
@@ -78,7 +78,8 @@ mod app {
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
-        pub(crate) prisma_client: Arc<PrismaClient>,
+        /// Database connection pool
+        pub(crate) db_pool: DbPool,
         task_manager: VisualTaskManager,
         system_info_manager: SystemInfoManager,
         rich_presence_manager: rich_presence::RichPresenceManager,
@@ -107,17 +108,16 @@ mod app {
                     .map_err(DatabaseError::TermsAndPrivacy)
                     .ok();
 
-            let db_client = match prisma_client::load_and_migrate(
+            // Initialize database pool
+            let db_pool = match database::load_and_migrate(
                 runtime_path.clone(),
                 latest_tos_privacy_checksum.clone(),
-            )
-            .await
-            {
-                Ok(client) => Arc::new(client),
+            ) {
+                Ok(pool) => pool,
                 Err(e) => {
                     // Check if this is a backwards migration error
-                    if e.downcast_ref::<DatabaseError>()
-                        .map(|e| matches!(e, DatabaseError::BackwardsMigration))
+                    if e.downcast_ref::<database::DatabaseError>()
+                        .map(|e| matches!(e, database::DatabaseError::BackwardsMigration))
                         .unwrap_or(false)
                     {
                         // Exit gracefully - the status message was already printed
@@ -156,13 +156,13 @@ mod app {
                     instance_manager: InstanceManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
                     metrics_manager: MetricsManager::new(
-                        Arc::clone(&db_client),
+                        db_pool.clone(),
                         http_client.clone(),
                         gdl_base_api.clone(),
                     ),
                     invalidation_channel,
                     reqwest_client: http_client.clone(),
-                    prisma_client: Arc::clone(&db_client),
+                    db_pool,
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
                     rich_presence_manager: rich_presence::RichPresenceManager::new(),

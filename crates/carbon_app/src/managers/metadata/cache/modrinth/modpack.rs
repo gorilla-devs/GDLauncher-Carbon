@@ -1,60 +1,104 @@
 use crate::{
     domain::instance::{
         InstanceModpackInfo,
-        info::{CurseforgeModpack, ModrinthModpack},
+        info::ModrinthModpack,
     },
     managers::{App, metadata::cache},
 };
-use carbon_platforms::{
-    curseforge::filters::{ModFileParameters, ModParameters},
-    modrinth::search::{ProjectID, VersionID},
-};
-use carbon_repos::db;
+use carbon_platforms::modrinth::search::{ProjectID, VersionID};
+use carbon_repos::queries;
 use tracing::error;
 
 pub async fn get_modpack_icon(app: &App, modrinth: ModrinthModpack) -> anyhow::Result<Vec<u8>> {
-    app.prisma_client
-        .modrinth_modpack_image_cache()
-        .find_unique(db::modrinth_modpack_image_cache::project_id_version_id(
-            modrinth.project_id,
-            modrinth.version_id,
-        ))
-        .exec()
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("No icon found for modpack"))?
-        .data
-        .ok_or_else(|| anyhow::anyhow!("No icon found for modpack"))
+    let pool = app.db_pool.clone();
+    let project_id = modrinth.project_id.clone();
+    let version_id = modrinth.version_id.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let conn = pool.get()?;
+        let result = conn.query_row(
+            queries::modpack::FindModrinthModpackImageCache::SQL,
+            rusqlite::params![project_id, version_id],
+            |row| {
+                let data: Option<Vec<u8>> = row.get("data")?;
+                Ok(data)
+            },
+        );
+
+        match result {
+            Ok(Some(data)) => Ok(data),
+            Ok(None) => Err(anyhow::anyhow!("No icon found for modpack")),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Err(anyhow::anyhow!("No icon found for modpack"))
+            }
+            Err(e) => Err(anyhow::Error::from(e)),
+        }
+    })
+    .await?
+}
+
+/// Cache entry with optional image data
+struct ModpackCacheEntry {
+    modpack_name: String,
+    version_name: String,
+    url_slug: String,
+    updated_at: String,
+    has_image_data: bool,
 }
 
 pub async fn get_modpack_metadata(
     app: &App,
     modrinth: ModrinthModpack,
 ) -> anyhow::Result<InstanceModpackInfo> {
-    let cache_entry = app
-        .prisma_client
-        .modrinth_modpack_cache()
-        .find_unique(db::modrinth_modpack_cache::project_id_version_id(
-            modrinth.project_id.clone(),
-            modrinth.version_id.clone(),
-        ))
-        .with(db::modrinth_modpack_cache::logo_image::fetch())
-        .exec()
-        .await?;
+    let pool = app.db_pool.clone();
+    let project_id = modrinth.project_id.clone();
+    let version_id = modrinth.version_id.clone();
 
-    let logo = cache_entry
-        .as_ref()
-        .and_then(|cache_entry| cache_entry.logo_image.as_ref())
-        .and_then(|logo_image| logo_image.as_ref().map(|logo_image| logo_image));
+    // Query cache entry with image
+    let cache_entry = tokio::task::spawn_blocking(move || {
+        let conn = pool.get()?;
+        let result = conn.query_row(
+            queries::modpack::FindModrinthModpackCacheWithImage::SQL,
+            rusqlite::params![project_id, version_id],
+            |row| {
+                let modpack_name: String = row.get("modpackName")?;
+                let version_name: String = row.get("versionName")?;
+                let url_slug: String = row.get("urlSlug")?;
+                let updated_at: String = row.get("updatedAt")?;
+                let img_data: Option<Vec<u8>> = row.get("img_data")?;
+                Ok(ModpackCacheEntry {
+                    modpack_name,
+                    version_name,
+                    url_slug,
+                    updated_at,
+                    has_image_data: img_data.is_some(),
+                })
+            },
+        );
+
+        match result {
+            Ok(entry) => Ok(Some(entry)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(anyhow::Error::from(e)),
+        }
+    })
+    .await??;
 
     let is_entry_up_to_date = cache_entry
         .as_ref()
         .map(|entry| {
-            entry.updated_at.timestamp() + 60 * 60 * 24 * 7 > chrono::Utc::now().timestamp()
+            // Parse updated_at timestamp and check if it's within 7 days
+            chrono::DateTime::parse_from_rfc3339(&entry.updated_at)
+                .map(|dt| dt.timestamp() + 60 * 60 * 24 * 7 > chrono::Utc::now().timestamp())
+                .unwrap_or(false)
         })
         .unwrap_or(false);
 
     let has_cached_entry = cache_entry.is_some();
-    let has_cached_logo = logo.is_some();
+    let has_cached_logo = cache_entry
+        .as_ref()
+        .map(|e| e.has_image_data)
+        .unwrap_or(false);
 
     if has_cached_entry && is_entry_up_to_date {
         let Some(cache_entry) = cache_entry else {
@@ -65,14 +109,11 @@ pub async fn get_modpack_metadata(
             name: cache_entry.modpack_name,
             version_name: cache_entry.version_name,
             url_slug: cache_entry.url_slug,
-            has_image: cache_entry
-                .logo_image
-                .flatten()
-                .map(|logo| logo.data.is_some())
-                .unwrap_or(false),
+            has_image: cache_entry.has_image_data,
         });
     } else {
         let app = app.clone();
+        let cache_entry_for_fallback = cache_entry;
         let runner = tokio::spawn(async move {
             let modplatform_manager = app.modplatforms_manager();
             let modpack = modplatform_manager
@@ -122,57 +163,41 @@ pub async fn get_modpack_metadata(
 
             let icon_bytes_is_some = icon_bytes.is_some();
 
-            app.prisma_client
-                .modrinth_modpack_cache()
-                .upsert(
-                    db::modrinth_modpack_cache::project_id_version_id(
-                        modrinth.project_id.clone(),
-                        modrinth.version_id.clone(),
-                    ),
-                    db::modrinth_modpack_cache::create(
-                        modrinth.project_id.clone(),
-                        modrinth.version_id.clone(),
-                        name.clone(),
-                        file_name.clone(),
-                        slug.clone(),
-                        vec![],
-                    ),
-                    vec![
-                        db::modrinth_modpack_cache::modpack_name::set(name.clone()),
-                        db::modrinth_modpack_cache::version_name::set(file_name.clone()),
-                        db::modrinth_modpack_cache::url_slug::set(slug.clone()),
-                    ],
-                )
-                .exec()
-                .await?;
+            // Upsert modpack cache
+            let pool = app.db_pool.clone();
+            let project_id = modrinth.project_id.clone();
+            let version_id = modrinth.version_id.clone();
+            let name_clone = name.clone();
+            let file_name_clone = file_name.clone();
+            let slug_clone = slug.clone();
 
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.execute(
+                    queries::modpack::UpsertModrinthModpackCache::SQL,
+                    rusqlite::params![project_id, version_id, name_clone, file_name_clone, slug_clone],
+                )?;
+                Ok::<_, anyhow::Error>(())
+            })
+            .await??;
+
+            // Upsert image cache if needed
             if icon_bytes_is_some || has_cached_logo {
-                app.prisma_client
-                    .modrinth_modpack_image_cache()
-                    .upsert(
-                        db::modrinth_modpack_image_cache::project_id_version_id(
-                            modrinth.project_id.clone(),
-                            modrinth.version_id.clone(),
-                        ),
-                        db::modrinth_modpack_image_cache::create(
-                            url.clone().unwrap_or_default(),
-                            db::modrinth_modpack_cache::project_id_version_id(
-                                modrinth.project_id.clone(),
-                                modrinth.version_id.clone(),
-                            ),
-                            vec![db::modrinth_modpack_image_cache::data::set(
-                                icon_bytes.clone().map(|icon_bytes| icon_bytes.to_vec()),
-                            )],
-                        ),
-                        vec![
-                            db::modrinth_modpack_image_cache::url::set(url.unwrap_or_default()),
-                            db::modrinth_modpack_image_cache::data::set(
-                                icon_bytes.map(|icon_bytes| icon_bytes.to_vec()),
-                            ),
-                        ],
-                    )
-                    .exec()
-                    .await?;
+                let pool = app.db_pool.clone();
+                let project_id = modrinth.project_id.clone();
+                let version_id = modrinth.version_id.clone();
+                let url_clone = url.clone().unwrap_or_default();
+                let icon_data = icon_bytes.clone();
+
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.execute(
+                        queries::modpack::UpsertModrinthModpackImageCache::SQL,
+                        rusqlite::params![project_id, version_id, url_clone, icon_data],
+                    )?;
+                    Ok::<_, anyhow::Error>(())
+                })
+                .await??;
             }
 
             Ok::<_, anyhow::Error>((modpack, version, icon_bytes_is_some))
@@ -184,16 +209,12 @@ pub async fn get_modpack_metadata(
             Err(e) => {
                 error!("Failed to get modpack metadata: {:?}", e);
 
-                if let Some(cache_entry) = cache_entry {
+                if let Some(cache_entry) = cache_entry_for_fallback {
                     return Ok(InstanceModpackInfo {
                         name: cache_entry.modpack_name,
                         version_name: cache_entry.version_name,
                         url_slug: cache_entry.url_slug,
-                        has_image: cache_entry
-                            .logo_image
-                            .flatten()
-                            .map(|logo| logo.data.is_some())
-                            .unwrap_or(false),
+                        has_image: cache_entry.has_image_data,
                     });
                 }
 

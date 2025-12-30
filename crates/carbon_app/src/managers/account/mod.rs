@@ -9,11 +9,7 @@ use anyhow::{Context, ensure};
 use anyhow::{anyhow, bail};
 use async_trait::async_trait;
 use axum::extract;
-use carbon_repos::db::app_configuration;
-use carbon_repos::db::{self, read_filters::StringFilter};
-use carbon_repos::pcr::{
-    Direction, QueryError, chrono::DateTime, prisma_errors::query_engine::RecordNotFound,
-};
+use carbon_repos::{models, queries, DbPool, OptionalExt};
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
     GDLAccountStatus, GDLAccountTask, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
@@ -23,6 +19,7 @@ use jwt::{Header, Token};
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::{
@@ -85,31 +82,36 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
-        use db::account::WhereParam::Uuid;
-        use db::app_configuration::SetParam::SetActiveAccountUuid;
-
-        if let Some(uuid) = uuid.clone() {
-            let account_entry = self
-                .app
-                .prisma_client
-                .account()
-                .find_first(vec![Uuid(StringFilter::Equals(uuid.clone()))])
-                .exec()
-                .await?;
+        if let Some(ref uuid_val) = uuid {
+            let pool = self.app.db_pool.clone();
+            let uuid_clone = uuid_val.clone();
+            let account_entry = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+                let conn = pool.get()?;
+                Ok(queries::account::FindAccountByUuid::query_row_optional(&conn, &uuid_clone)?)
+            })
+            .await??;
 
             // Setting the active account to one not in the DB does not make sense.
             ensure!(
                 account_entry.is_some(),
-                SetActiveUuidError::AccountDoesNotExist(uuid)
+                SetActiveUuidError::AccountDoesNotExist(uuid_val.clone())
             );
         }
 
         info!("Set active account to {uuid:?}");
 
-        self.app
-            .settings_manager()
-            .set(SetActiveAccountUuid(uuid))
-            .await?;
+        // Update settings using the settings manager
+        let pool = self.app.db_pool.clone();
+        let uuid_clone = uuid.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                "UPDATE AppConfiguration SET activeAccountUuid = ?1 WHERE id = 0",
+                params![uuid_clone],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_ACTIVE_UUID, None);
         Ok(())
@@ -119,35 +121,37 @@ impl<'s> ManagerRef<'s, AccountManager> {
     ///
     /// Not exposed to the frontend on purpose. Will NOT be invalidated.
     pub async fn get_active_account(&self) -> anyhow::Result<Option<FullAccount>> {
-        use db::account::WhereParam::Uuid;
-
         let Some(uuid) = self.get_active_uuid().await? else {
             return Ok(None);
         };
 
-        let account = self
-            .app
-            .prisma_client
-            .account()
-            .find_first(vec![Uuid(StringFilter::Equals(uuid))])
-            .exec()
-            .await?
-            .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
+        let pool = self.app.db_pool.clone();
+        let account = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::account::FindAccountByUuid::SQL,
+                params![uuid],
+                |row| models::Account::from_row(row),
+            )
+            .optional()
+        })
+        .await??
+        .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
 
         Ok(Some(account.try_into()?))
     }
 
-    async fn get_account_entries(self) -> anyhow::Result<Vec<db::account::Data>> {
-        use db::account::OrderByParam;
-
-        Ok(self
-            .app
-            .prisma_client
-            .account()
-            .find_many(Vec::new())
-            .order_by(OrderByParam::LastUsed(Direction::Desc))
-            .exec()
-            .await?)
+    async fn get_account_entries(self) -> anyhow::Result<Vec<models::Account>> {
+        let pool = self.app.db_pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let mut stmt = conn.prepare(queries::account::ListAccounts::SQL)?;
+            let accounts = stmt
+                .query_map([], |row| models::Account::from_row(row))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(accounts)
+        })
+        .await?
     }
 
     pub async fn get_account_list(self) -> anyhow::Result<Vec<AccountWithStatus>> {
@@ -165,15 +169,17 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     async fn get_account(self, uuid: String) -> anyhow::Result<Option<AccountWithStatus>> {
-        use db::account::UniqueWhereParam;
-
-        let account = self
-            .app
-            .prisma_client
-            .account()
-            .find_unique(UniqueWhereParam::UuidEquals(uuid))
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let account = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::account::FindAccountByUuid::SQL,
+                params![uuid],
+                |row| models::Account::from_row(row),
+            )
+            .optional()
+        })
+        .await??;
 
         let Some(account) = account else {
             return Ok(None);
@@ -320,13 +326,17 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn save_gdl_account(&self, uuid: Option<String>) -> anyhow::Result<()> {
-        use db::app_configuration::SetParam;
-        use db::app_configuration::UniqueWhereParam;
-
-        self.app
-            .settings_manager()
-            .set(SetParam::SetGdlAccountUuid(uuid.clone()))
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let uuid_clone = uuid.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                "UPDATE AppConfiguration SET gdlAccountUuid = ?1 WHERE id = 0",
+                params![uuid_clone],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_GDL_ACCOUNT, None);
         self.app.invalidate(GET_SETTINGS, None);
@@ -472,17 +482,16 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn remove_gdl_account(self) -> anyhow::Result<()> {
-        use db::app_configuration::SetParam;
-
-        self.app
-            .settings_manager()
-            .set(SetParam::SetGdlAccountUuid(None))
-            .await?;
-
-        self.app
-            .settings_manager()
-            .set(SetParam::SetGdlAccountStatus(None))
-            .await?;
+        let pool = self.app.db_pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                "UPDATE AppConfiguration SET gdlAccountUuid = NULL, gdlAccountStatus = NULL WHERE id = 0",
+                [],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_GDL_ACCOUNT, None);
         self.app.invalidate(GET_SETTINGS, None);
@@ -574,91 +583,145 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
     /// Add or update an account
     async fn add_account(self, account: FullAccount) -> anyhow::Result<()> {
-        use db::account::{SetParam, UniqueWhereParam};
+        let pool = self.app.db_pool.clone();
+        let uuid = account.uuid.clone();
 
-        let db_account = self
-            .app
-            .prisma_client
-            .account()
-            .find_unique(UniqueWhereParam::UuidEquals(account.uuid.clone()))
-            .exec()
-            .await?;
+        let db_account = {
+            let pool = pool.clone();
+            let uuid = uuid.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::account::FindAccountByUuid::SQL,
+                    params![uuid],
+                    |row| models::Account::from_row(row),
+                )
+                .optional()
+            })
+            .await??
+        };
 
         if db_account.is_some() {
             // don't change lastUsed
-            let mut set_params = vec![SetParam::SetUsername(account.username)];
+            info!("Updating account information for {:?}", &account.uuid);
 
             match account.type_ {
-                FullAccountType::Offline => set_params.extend([
-                    SetParam::SetAccessToken(None),
-                    SetParam::SetMsRefreshToken(None),
-                    SetParam::SetTokenExpires(None),
-                ]),
+                FullAccountType::Offline => {
+                    let pool = pool.clone();
+                    let uuid = account.uuid.clone();
+                    let username = account.username.clone();
+                    tokio::task::spawn_blocking(move || {
+                        let conn = pool.get()?;
+                        conn.execute(
+                            queries::account::UpdateAccountFull::SQL,
+                            params![
+                                uuid,
+                                username,
+                                Option::<String>::None,  // accessToken
+                                Option::<String>::None,  // msRefreshToken
+                                Option::<String>::None,  // tokenExpires
+                                Option::<String>::None,  // idToken
+                                Option::<String>::None,  // skinId
+                            ],
+                        )?;
+                        Ok::<_, anyhow::Error>(())
+                    })
+                    .await??;
+                }
                 FullAccountType::Microsoft {
                     access_token,
                     refresh_token,
                     token_expires,
                     id_token,
-                    email,
+                    email: _,
                     skin_id,
-                } => set_params.extend([
-                    SetParam::SetAccessToken(Some(access_token)),
-                    SetParam::SetMsRefreshToken(refresh_token),
-                    SetParam::SetTokenExpires(Some(
-                        token_expires.with_timezone(&FixedOffset::east(0)),
-                    )),
-                    SetParam::SetIdToken(id_token),
-                    SetParam::SetSkinId(skin_id),
-                ]),
+                } => {
+                    let pool = pool.clone();
+                    let uuid = account.uuid.clone();
+                    let username = account.username.clone();
+                    let token_expires_str = token_expires.to_rfc3339();
+                    tokio::task::spawn_blocking(move || {
+                        let conn = pool.get()?;
+                        conn.execute(
+                            queries::account::UpdateAccountFull::SQL,
+                            params![
+                                uuid,
+                                username,
+                                Some(access_token),
+                                refresh_token,
+                                Some(token_expires_str),
+                                id_token,
+                                skin_id,
+                            ],
+                        )?;
+                        Ok::<_, anyhow::Error>(())
+                    })
+                    .await??;
+                }
             }
-
-            info!("Updating account information for {:?}", &account.uuid);
-
-            self.app
-                .prisma_client
-                .account()
-                .update(
-                    UniqueWhereParam::UuidEquals(account.uuid.clone()),
-                    set_params,
-                )
-                .exec()
-                .await?;
 
             self.app.invalidate(GET_ACCOUNTS, Some(account.uuid.into()));
         } else {
-            let set_params = match account.type_ {
-                FullAccountType::Offline => Vec::new(),
+            info!("Creating account {:?}", &account.uuid);
+
+            let now = Utc::now().to_rfc3339();
+
+            match account.type_ {
+                FullAccountType::Offline => {
+                    let pool = pool.clone();
+                    let uuid = account.uuid.clone();
+                    let username = account.username.clone();
+                    tokio::task::spawn_blocking(move || {
+                        let conn = pool.get()?;
+                        conn.execute(
+                            queries::account::CreateAccount::SQL,
+                            params![
+                                uuid,
+                                username,
+                                now,
+                                Option::<String>::None,  // accessToken
+                                Option::<String>::None,  // msRefreshToken
+                                Option::<String>::None,  // tokenExpires
+                                Option::<String>::None,  // idToken
+                                Option::<String>::None,  // skinId
+                            ],
+                        )?;
+                        Ok::<_, anyhow::Error>(())
+                    })
+                    .await??;
+                }
                 FullAccountType::Microsoft {
                     access_token,
                     refresh_token,
                     token_expires,
                     id_token,
-                    email,
+                    email: _,
                     skin_id,
-                } => vec![
-                    SetParam::SetAccessToken(Some(access_token)),
-                    SetParam::SetMsRefreshToken(refresh_token),
-                    SetParam::SetTokenExpires(Some(
-                        token_expires.with_timezone(&FixedOffset::east(0)),
-                    )),
-                    SetParam::SetIdToken(id_token),
-                    SetParam::SetSkinId(skin_id),
-                ],
-            };
-
-            info!("Creating account {:?}", &account.uuid);
-
-            self.app
-                .prisma_client
-                .account()
-                .create(
-                    account.uuid,
-                    account.username,
-                    Utc::now().into(),
-                    set_params,
-                )
-                .exec()
-                .await?;
+                } => {
+                    let pool = pool.clone();
+                    let uuid = account.uuid.clone();
+                    let username = account.username.clone();
+                    let token_expires_str = token_expires.to_rfc3339();
+                    tokio::task::spawn_blocking(move || {
+                        let conn = pool.get()?;
+                        conn.execute(
+                            queries::account::CreateAccount::SQL,
+                            params![
+                                uuid,
+                                username,
+                                now,
+                                Some(access_token),
+                                refresh_token,
+                                Some(token_expires_str),
+                                id_token,
+                                skin_id,
+                            ],
+                        )?;
+                        Ok::<_, anyhow::Error>(())
+                    })
+                    .await??;
+                }
+            }
 
             self.app.invalidate(GET_ACCOUNTS, None);
         }
@@ -670,18 +733,21 @@ impl<'s> ManagerRef<'s, AccountManager> {
         self,
         uuid: String,
     ) -> anyhow::Result<tokio::task::JoinHandle<Result<(), futures::future::Aborted>>> {
-        use db::account::UniqueWhereParam;
-
         info!("Refreshing account {uuid}");
 
-        let account = self
-            .app
-            .prisma_client
-            .account()
-            .find_unique(UniqueWhereParam::UuidEquals(uuid.clone()))
-            .exec()
-            .await?
-            .ok_or(RefreshAccountError::NoAccount)?;
+        let pool = self.app.db_pool.clone();
+        let uuid_clone = uuid.clone();
+        let account = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::account::FindAccountByUuid::SQL,
+                params![uuid_clone],
+                |row| models::Account::from_row(row),
+            )
+            .optional()
+        })
+        .await??
+        .ok_or(RefreshAccountError::NoAccount)?;
 
         let Some(refresh_token) = &account.ms_refresh_token else {
             warn!("No refresh token, aborting refresh for {uuid}");
@@ -790,8 +856,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
-        use db::account::{OrderByParam, UniqueWhereParam};
-
         let settings = self.app.settings_manager().get_settings().await?;
 
         let active_account = settings.active_account_uuid;
@@ -799,15 +863,18 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         if let Some(active_account) = active_account {
             if active_account == uuid {
-                let next_account = self
-                    .app
-                    .prisma_client
-                    .account()
-                    .find_first(vec![db::account::uuid::not(uuid.clone())])
-                    .order_by(OrderByParam::LastUsed(Direction::Desc))
-                    .exec()
-                    .await?
-                    .map(|data| data.uuid);
+                let pool = self.app.db_pool.clone();
+                let uuid_clone = uuid.clone();
+                let next_account = tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.query_row(
+                        queries::account::FindNextAccount::SQL,
+                        params![uuid_clone],
+                        |row| Ok(row.get::<_, String>("uuid")?),
+                    )
+                    .optional()
+                })
+                .await??;
 
                 self.set_active_uuid(next_account).await?;
             }
@@ -825,30 +892,26 @@ impl<'s> ManagerRef<'s, AccountManager> {
             _ => {}
         }
 
-        let result = self
-            .app
-            .prisma_client
-            .account()
-            .delete(UniqueWhereParam::UuidEquals(uuid.clone()))
-            .exec()
-            .await;
+        let pool = self.app.db_pool.clone();
+        let uuid_clone = uuid.clone();
+        let rows_affected = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let rows = conn.execute(
+                queries::account::DeleteAccount::SQL,
+                params![uuid_clone],
+            )?;
+            Ok::<_, anyhow::Error>(rows)
+        })
+        .await??;
 
-        match result {
-            Ok(_) => {
-                info!("Deleted account {uuid}");
-
-                self.app.invalidate(GET_ACCOUNTS, None);
-
-                Ok(())
-            }
-            Err(e) => {
-                if e.is_prisma_error::<RecordNotFound>() {
-                    bail!(DeleteAccountError::AccountDoesNotExist(uuid))
-                } else {
-                    bail!(e)
-                }
-            }
+        if rows_affected == 0 {
+            bail!(DeleteAccountError::AccountDoesNotExist(uuid))
         }
+
+        info!("Deleted account {uuid}");
+        self.app.invalidate(GET_ACCOUNTS, None);
+
+        Ok(())
     }
 
     pub async fn begin_enrollment(self) -> anyhow::Result<()> {
@@ -1075,8 +1138,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
         uuid: String,
         lock_refresh: bool,
     ) -> anyhow::Result<()> {
-        use db::account::{SetParam, UniqueWhereParam};
-
         info!("Checking account status");
 
         let mut refresh_lock = match lock_refresh {
@@ -1113,15 +1174,18 @@ impl<'s> ManagerRef<'s, AccountManager> {
             Ok(Err(GetProfileError::AuthTokenInvalid)) => {
                 info!("Auth token was invalid");
                 // the account was expired prematurely
-                self.app
-                    .prisma_client
-                    .account()
-                    .update(
-                        UniqueWhereParam::UuidEquals(uuid.clone()),
-                        vec![SetParam::SetTokenExpires(Some(Utc::now().into()))],
-                    )
-                    .exec()
-                    .await?;
+                let pool = self.app.db_pool.clone();
+                let uuid_clone = uuid.clone();
+                let now = Utc::now().to_rfc3339();
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.execute(
+                        queries::account::UpdateAccountTokenExpires::SQL,
+                        params![uuid_clone, now],
+                    )?;
+                    Ok::<_, anyhow::Error>(())
+                })
+                .await??;
 
                 self.app.invalidate(GET_ACCOUNTS, None);
                 return Ok(());
@@ -1136,18 +1200,19 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let skin_changed = account.account.skin_id.as_ref().map(|s| s as &str)
             != profile.skin.as_ref().map(|skin| &skin.id as &str);
 
-        self.app
-            .prisma_client
-            .account()
-            .update(
-                UniqueWhereParam::UuidEquals(uuid.clone()),
-                vec![
-                    SetParam::SetUsername(profile.username),
-                    SetParam::SetSkinId(profile.skin.map(|skin| skin.id)),
-                ],
-            )
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let uuid_clone = uuid.clone();
+        let username = profile.username;
+        let skin_id = profile.skin.map(|skin| skin.id);
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::account::UpdateAccountUsernameAndSkin::SQL,
+                params![uuid_clone, username, skin_id],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         if skin_changed {
             self.app.invalidate(GET_HEAD, Some(uuid.clone().into()));
@@ -1409,9 +1474,6 @@ pub enum RefreshAccountError {
 
     #[error("loading account from db: {0}")]
     DbLoad(#[from] FullAccountLoadError),
-
-    #[error("query error")]
-    Query(#[from] QueryError),
 }
 
 #[derive(Error, Debug)]
@@ -1457,7 +1519,7 @@ pub struct FullAccount {
     pub username: String,
     pub uuid: String,
     pub type_: FullAccountType,
-    pub last_used: DateTime<FixedOffset>,
+    pub last_used: chrono::DateTime<FixedOffset>,
 }
 
 #[derive(Debug, Clone)]
@@ -1468,7 +1530,7 @@ pub enum FullAccountType {
         refresh_token: Option<String>,
         id_token: Option<String>,
         email: Option<String>,
-        token_expires: DateTime<Utc>,
+        token_expires: chrono::DateTime<Utc>,
         skin_id: Option<String>,
     },
 }
@@ -1485,32 +1547,10 @@ fn extract_email(token: Option<&String>) -> Option<String> {
     })
 }
 
-/*impl From<FullAccount> for db::account::Data {
-    fn from(value: FullAccount) -> Self {
-        let (access_token, refresh_token, token_expires) = match value.type_ {
-            FullAccountType::Offline => (None, None, None),
-            FullAccountType::Microsoft {
-                access_token,
-                refresh_token,
-                token_expires,
-            } => (Some(access_token), refresh_token, Some(token_expires)),
-        };
-
-        Self {
-            username: value.username,
-            uuid: value.uuid,
-            access_token,
-            ms_refresh_token: refresh_token,
-            token_expires,
-            last_used: value.last_used,
-        }
-    }
-}*/
-
-impl TryFrom<db::account::Data> for FullAccount {
+impl TryFrom<models::Account> for FullAccount {
     type Error = FullAccountLoadError;
 
-    fn try_from(value: db::account::Data) -> Result<Self, Self::Error> {
+    fn try_from(value: models::Account) -> Result<Self, Self::Error> {
         Ok(Self {
             type_: match value.access_token {
                 Some(access_token) => FullAccountType::Microsoft {
@@ -1520,7 +1560,6 @@ impl TryFrom<db::account::Data> for FullAccount {
                     id_token: value.id_token,
                     token_expires: value
                         .token_expires
-                        .map(|time| time.with_timezone(&Utc))
                         .ok_or_else(|| {
                             FullAccountLoadError::MissingExpiration(value.uuid.clone())
                         })?,
@@ -1528,7 +1567,7 @@ impl TryFrom<db::account::Data> for FullAccount {
                 },
                 None => FullAccountType::Offline,
             },
-            last_used: value.last_used,
+            last_used: value.last_used.with_timezone(&FixedOffset::east_opt(0).unwrap()),
             uuid: value.uuid,
             username: value.username,
         })
@@ -1565,7 +1604,7 @@ impl From<FullAccount> for AccountWithStatus {
                     id_token: Some(_),
                     email: Some(_),
                     skin_id: _,
-                } => match Utc::now() > DateTime::<Utc>::from(token_expires) {
+                } => match Utc::now() > chrono::DateTime::<Utc>::from(token_expires) {
                     true => AccountStatus::Expired,
                     false => AccountStatus::Ok {
                         access_token: Some(access_token),
@@ -1587,7 +1626,7 @@ impl From<api::FullAccount> for FullAccount {
                 refresh_token: Some(value.ms.refresh_token),
                 id_token: Some(value.ms.id_token.clone()),
                 email: extract_email(Some(&value.ms.id_token)),
-                token_expires: DateTime::<Utc>::from(value.mc.auth.expires_at),
+                token_expires: chrono::DateTime::<Utc>::from(value.mc.auth.expires_at),
                 skin_id: value.mc.profile.skin.map(|skin| skin.id),
             },
             last_used: Utc::now().into(),

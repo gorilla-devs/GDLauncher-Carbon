@@ -12,11 +12,7 @@ use carbon_platforms::modrinth::{
     search::{ProjectIDs, TeamIDs, VersionHashesQuery},
     version::HashAlgorithm,
 };
-use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter};
-use carbon_repos::db::{
-    mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-    modrinth_mod_image_cache as mrimgdb,
-};
+use carbon_repos::queries;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
@@ -43,36 +39,32 @@ impl ModplatformCacher for ModrinthModCacher {
         instance_id: InstanceId,
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()> {
-        let modlist = app
-            .prisma_client
-            .mod_file_cache()
-            .find_many(vec![
-                fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
-                    mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                        (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                    )),
-                ])]),
-            ])
-            .with(fcdb::metadata::fetch())
-            .exec()
-            .await?
-            .into_iter()
-            .map(|m| {
-                let metadata = m
-                    .metadata
-                    .expect("metadata was queried with mod cache yet is not present");
-                let sha512 = hex::encode(&metadata.sha_512);
-
-                (sha512.clone(), (metadata.id, sha512))
-            });
+        // Query mod files needing Modrinth update
+        let pool = app.db_pool.clone();
+        let id = *instance_id;
+        let modlist_result = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let mut stmt = conn.prepare(queries::metadata::ListModFilesNeedingModrinthUpdate::SQL)?;
+            let results = stmt.query_map(rusqlite::params![id], |row| {
+                let metadata_id: String = row.get(0)?;
+                let sha512: Vec<u8> = row.get(1)?;
+                let sha512_hex = hex::encode(&sha512);
+                Ok((metadata_id, sha512_hex))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+            Ok::<_, anyhow::Error>(results)
+        }).await??;
 
         let mcm = app.meta_cache_manager();
         let ignored_hashes = mcm.ignored_remote_mr_hashes.read().await;
 
-        let mut modlist = modlist
-            .filter(|(_, (_, sha512))| !ignored_hashes.contains(sha512))
+        let mut modlist = modlist_result
+            .into_iter()
+            .filter(|(_, sha512)| !ignored_hashes.contains(sha512))
+            .map(|(metadata_id, sha512)| (sha512.clone(), (metadata_id, sha512)))
             .collect::<VecDeque<_>>();
+
+        drop(ignored_hashes);
 
         if modlist.is_empty() {
             return Ok(());
@@ -188,14 +180,14 @@ impl ModplatformCacher for ModrinthModCacher {
         if let Err(e) = fut.await {
             error!({ error = ?e }, "Error occured while caching modrinth mods for instance {instance_id}");
 
-            let mut failed_instances = mcm.failed_cf_instances.write().await;
+            let mut failed_instances = mcm.failed_mr_instances.write().await;
             let entry = failed_instances
                 .entry(instance_id)
                 .or_insert((Instant::now(), 0));
             entry.0 = Instant::now() + Duration::from_secs(u64::pow(2, entry.1));
             entry.1 += 1;
         } else {
-            let mut failed_instances = mcm.failed_cf_instances.write().await;
+            let mut failed_instances = mcm.failed_mr_instances.write().await;
             failed_instances.remove(&instance_id);
         }
 
@@ -275,52 +267,40 @@ impl ModplatformCacher for ModrinthModCacher {
     }
 
     async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier) {
-        let modlist = app
-            .prisma_client
-            .mod_file_cache()
-            .find_many(vec![
-                fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(vec![
-                    mrdb::WhereParam::LogoImageIs(vec![mrimgdb::WhereParam::UpToDate(
-                        IntFilter::Equals(0),
-                    )]),
-                ])]),
-            ])
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
-            .exec()
-            .await;
+        // Query mod files with outdated Modrinth icons
+        let pool = app.db_pool.clone();
+        let id = *instance_id;
+        let modlist = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let mut stmt = conn.prepare(queries::metadata::ListModFilesWithOutdatedModrinthIcons::SQL)?;
+            let results = stmt.query_map(rusqlite::params![id], |row| {
+                let filename: String = row.get(0)?;
+                let project_id: String = row.get(1)?;
+                let version_id: String = row.get(2)?;
+                let metadata_id: String = row.get(3)?;
+                let url: String = row.get(4)?;
+                Ok((filename, project_id, version_id, metadata_id, url))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+            Ok::<_, anyhow::Error>(results)
+        }).await;
 
         let modlist = match modlist {
-            Ok(modlist) => modlist,
+            Ok(Ok(modlist)) => modlist,
+            Ok(Err(e)) => {
+                error!({ error = ?e }, "error querying database for updated modrinth mod icons list");
+                return;
+            }
             Err(e) => {
-                error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
+                error!({ error = ?e }, "error spawning blocking task for modrinth mod icons list query");
                 return;
             }
         };
 
-        let modlist = modlist.into_iter().map(|file| {
-            let meta = file
-                .metadata
-                .expect("metadata was ensured present but not returned");
-            let mr = meta
-                .modrinth
-                .flatten()
-                .expect("modrinth was ensured present but not returned");
-            let row = mr
-                .logo_image
-                .flatten()
-                .expect("mod image was ensured present but not returned");
-
-            (file.filename, mr.project_id, mr.version_id, row)
-        });
-
         let app = &app;
         let futures = modlist
             .into_iter()
-            .map(|(filename, project_id, version_id, row)| async move {
+            .map(|(filename, project_id, version_id, metadata_id, url)| async move {
                 let mcm = app.meta_cache_manager();
 
                 {
@@ -343,7 +323,7 @@ impl ModplatformCacher for ModrinthModCacher {
 
 
                     let icon = app.reqwest_client
-                        .get(&row.url)
+                        .get(&url)
                         .header("avoid-caching", "")
                         .send()
                         .await?
@@ -367,24 +347,24 @@ impl ModplatformCacher for ModrinthModCacher {
 
                     drop(scale_guard);
 
-                    app.prisma_client.modrinth_mod_image_cache()
-                        .update(
-                            mrimgdb::UniqueWhereParam::MetadataIdEquals(row.metadata_id.clone()),
-                            vec![
-                                mrimgdb::SetParam::SetUpToDate(1),
-                                mrimgdb::SetParam::SetData(Some(image))
-                            ]
-                        )
-                        .exec()
-                        .await?;
-
+                    // Update image cache
+                    let pool = app.db_pool.clone();
+                    let metadata_id_clone = metadata_id.clone();
+                    tokio::task::spawn_blocking(move || {
+                        let conn = pool.get()?;
+                        conn.execute(
+                            queries::metadata::UpdateModrinthModImageCacheData::SQL,
+                            rusqlite::params![metadata_id_clone, image, 1],
+                        )?;
+                        Ok::<_, anyhow::Error>(())
+                    }).await??;
 
                     let _ = update_notifier.send(instance_id);
                     Ok::<_, anyhow::Error>(())
                 }.await;
 
                 if let Err(e) = r {
-                    error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, version: {version_id}, image url: {})", row.url);
+                    error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, version: {version_id}, image url: {})", url);
 
                     let mut fails = mcm.failed_mr_thumbs.write().await;
                     fails.entry(project_id)
@@ -457,89 +437,98 @@ async fn cache_modrinth_meta_unchecked(
         })
         .join(";");
 
-    if let Ok(Some(existing_entry)) = app
-        .prisma_client
-        .modrinth_mod_cache()
-        .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
-            metadata_id.clone(),
-        ))
-        .exec()
-        .await
-    {
-        if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
-            return Ok(());
+    // Check if entry exists and is recent
+    let pool = app.db_pool.clone();
+    let metadata_id_clone = metadata_id.clone();
+    let existing_entry = tokio::task::spawn_blocking(move || {
+        let conn = pool.get()?;
+        let result = conn.query_row(
+            queries::metadata::FindModrinthModCache::SQL,
+            rusqlite::params![metadata_id_clone],
+            |row| {
+                let cached_at: String = row.get("cachedAt")?;
+                Ok(cached_at)
+            },
+        );
+        match result {
+            Ok(cached_at) => Ok(Some(cached_at)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(anyhow::Error::from(e)),
+        }
+    }).await??;
+
+    if let Some(cached_at) = existing_entry {
+        // Parse the cached_at timestamp and check if it's recent
+        if let Ok(cached_time) = chrono::DateTime::parse_from_rfc3339(&cached_at) {
+            if cached_time > (chrono::Utc::now() - chrono::Duration::days(1)) {
+                return Ok(());
+            }
         }
     }
 
-    let cache_result = app
-        .prisma_client
-        .modrinth_mod_cache()
-        .upsert(
-            mrdb::UniqueWhereParam::ProjectIdVersionIdEquals(
-                project.id.clone(),
-                version.id.clone(),
-            ),
-            mrdb::create(
-                sha512.clone(),
-                project.id.clone(),
-                version.id.clone(),
-                project.title.clone(),
-                version.name.clone(),
-                project.slug.clone(),
-                project.description.clone(),
-                authors.clone(),
-                ModChannel::from(version.version_type) as i32,
-                update_paths.clone(),
-                filename.clone(),
-                file_url.clone(),
-                chrono::Utc::now().into(),
-                metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
-                Vec::new(),
-            ),
-            vec![
-                mrdb::SetParam::SetSha512(sha512.clone()),
-                mrdb::SetParam::SetProjectId(project.id.clone()),
-                mrdb::SetParam::SetVersionId(version.id.clone()),
-                mrdb::SetParam::SetTitle(project.title.clone()),
-                mrdb::SetParam::SetVersion(version.name.clone()),
-                mrdb::SetParam::SetUrlslug(project.slug.clone()),
-                mrdb::SetParam::SetDescription(project.description.clone()),
-                mrdb::SetParam::SetAuthors(authors.clone()),
-                mrdb::SetParam::SetReleaseType(ModChannel::from(version.version_type) as i32),
-                mrdb::SetParam::SetUpdatePaths(update_paths.clone()),
-                mrdb::SetParam::SetFilename(filename.clone()),
-                mrdb::SetParam::SetFileUrl(file_url.clone()),
-                mrdb::SetParam::SetCachedAt(chrono::Utc::now().into()),
-            ],
-        )
-        .exec()
-        .await?;
+    // Upsert Modrinth mod cache
+    let pool = app.db_pool.clone();
+    let metadata_id_clone = metadata_id.clone();
+    let sha512_clone = sha512.clone();
+    let project_id = project.id.clone();
+    let version_id = version.id.clone();
+    let title = project.title.clone();
+    let version_name = version.name.clone();
+    let urlslug = project.slug.clone();
+    let description = project.description.clone();
+    let authors_clone = authors.clone();
+    let release_type = ModChannel::from(version.version_type) as i32;
+    let update_paths_clone = update_paths.clone();
+    let filename_clone = filename.clone();
+    let file_url_clone = file_url.clone();
+    let cached_at = chrono::Utc::now().to_rfc3339();
 
+    tokio::task::spawn_blocking(move || {
+        let conn = pool.get()?;
+        conn.execute(
+            queries::metadata::UpsertModrinthModCache::SQL,
+            rusqlite::params![
+                metadata_id_clone,
+                sha512_clone,
+                project_id,
+                version_id,
+                title,
+                version_name,
+                urlslug,
+                description,
+                authors_clone,
+                release_type,
+                update_paths_clone,
+                filename_clone,
+                file_url_clone,
+                cached_at
+            ],
+        )?;
+        Ok::<_, anyhow::Error>(())
+    }).await??;
+
+    // Handle icon image cache
     if let Some(icon_url) = &project.icon_url {
-        if let Err(e) = app
-            .prisma_client
-            .modrinth_mod_image_cache()
-            .upsert(
-                mrimgdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
-                mrimgdb::create(
-                    icon_url.clone(),
-                    mrdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
-                    vec![
-                        mrimgdb::SetParam::SetUpToDate(0), // Mark as needing download
-                        mrimgdb::SetParam::SetData(None),
-                    ],
-                ),
-                vec![
-                    mrimgdb::SetParam::SetUrl(icon_url.clone()),
-                    mrimgdb::SetParam::SetUpToDate(0), // Mark as needing download on update
+        let pool = app.db_pool.clone();
+        let metadata_id_clone = metadata_id.clone();
+        let icon_url_clone = icon_url.clone();
+
+        if let Err(e) = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::metadata::UpsertModrinthModImageCache::SQL,
+                rusqlite::params![
+                    metadata_id_clone,
+                    icon_url_clone,
+                    Option::<Vec<u8>>::None,
+                    0  // upToDate = 0, mark as needing download
                 ],
-            )
-            .exec()
-            .await
-        {
+            )?;
+            Ok::<_, anyhow::Error>(())
+        }).await? {
             warn!(
                 "Failed to upsert modrinth image for metadata_id {}: {:?}",
-                cache_result.metadata_id, e
+                metadata_id, e
             );
         }
     }

@@ -1,82 +1,98 @@
-#![allow(warnings)]
-#![allow(dead_code)]
+//! Database access layer for GDLauncher.
+//!
+//! This crate provides:
+//! - Connection pooling via r2d2-sqlite
+//! - Database migrations via rusqlite_migration
+//! - Type-safe model structs with `FromRow` derive macro
+//! - Validated SQL queries
+//!
+//! # Example
+//!
+//! ```ignore
+//! use carbon_repos::{create_pool_default, migrations, queries, models};
+//! use std::path::Path;
+//!
+//! // Create connection pool
+//! let pool = create_pool_default(Path::new("gdl_conf.db"))?;
+//!
+//! // Run migrations
+//! let mut conn = pool.get()?;
+//! migrations::run_migrations(&mut conn)?;
+//!
+//! // Query data
+//! let settings = conn.query_row(
+//!     queries::settings::GetSettings::SQL,
+//!     [],
+//!     |row| models::AppConfiguration::from_row(row),
+//! )?;
+//! ```
 
-use rusqlite_migration::{M, Migrations};
+pub mod connection;
+pub mod context;
+pub mod error;
+pub mod migrations;
+pub mod models;
+pub mod queries;
 
-pub mod db;
-pub mod pcr; // wip
+// Re-export commonly used types at crate root
+pub use connection::{
+    create_pool, create_pool_default, with_transaction, batch_execute,
+    DbPool, DbConn, PoolConfig, OptionalExt,
+};
+pub use context::DbContext;
+pub use error::DatabaseError;
+pub use migrations::{
+    get_migrations, run_migrations, migration_count,
+    get_current_version, has_pending_migrations,
+};
 
-pub fn get_migrations() -> (Migrations<'static>, i32) {
-    let migration_list = vec![
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240120134904_init/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240123180711_launcher_action_on_game_launch_game_resolution/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240126072544_update_modpacks/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240127230211_add_meta_cache/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240204033019_add_instances_settings/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240206064454_downloaddeps/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240206225900_add_hooks/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240212215946_fix_java_profiles/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240220223507_rename_auto_manage_java_for_system_profiles/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240403131726_add_show_app_close_warning_option/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240410205605_add_last_app_version_and_updated_at/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20241124163738_gdl_accounts/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20250608012843_add_addon_type_to_mod_file_cache/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20250902113747_remove_show_news_setting/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20251024094741_hashed_email/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20251122000000_remove_hashed_email_accepted/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20251207000000_default_sort_by_created_desc/migration.sql"
-        ))),
-    ];
-    let count = migration_list.len() as i32;
-    (Migrations::new(migration_list), count)
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    #[test]
+    fn test_full_database_setup() {
+        // Create in-memory database
+        let mut conn = Connection::open_in_memory().unwrap();
+
+        // Run migrations
+        run_migrations(&mut conn).unwrap();
+
+        // Verify version
+        assert_eq!(get_current_version(&conn), migration_count());
+
+        // Verify we can query
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM AppConfiguration", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0); // No data seeded yet
+    }
+
+    #[test]
+    fn test_models_and_queries_integration() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        run_migrations(&mut conn).unwrap();
+
+        // Seed a settings row
+        conn.execute(
+            "INSERT INTO AppConfiguration (id, releaseChannel, xmx) VALUES (0, 'stable', 4096)",
+            [],
+        )
+        .unwrap();
+
+        // Query using our defined query
+        let settings = conn
+            .query_row(
+                queries::settings::GetSettings::SQL,
+                [],
+                |row| models::AppConfiguration::from_row(row),
+            )
+            .unwrap();
+
+        assert_eq!(settings.id, 0);
+        assert_eq!(settings.release_channel, "stable");
+        assert_eq!(settings.xmx, 4096);
+    }
 }

@@ -21,13 +21,10 @@ use anyhow::{Context, anyhow};
 use carbon_platforms::ModPlatform;
 use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
 use carbon_platforms::modrinth::search::{ProjectID, VersionID};
-use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::db::{self, read_filters::IntFilter};
-use carbon_repos::pcr::Direction;
+use carbon_repos::{models, queries, DbPool, OptionalExt};
 use chrono::{DateTime, Utc};
 use daedalus::minecraft::MinecraftJavaProfile;
 use dashmap::DashMap;
-use db::instance::Data as CachedInstance;
 use domain::info;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
@@ -171,13 +168,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn scan_instances(self) -> anyhow::Result<()> {
-        let instance_cache = self
-            .app
-            .prisma_client
-            .instance()
-            .find_many(vec![])
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let instance_cache = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let mut stmt = conn.prepare(queries::instance::ListInstances::SQL)?;
+            let instances = stmt
+                .query_map([], |row| models::Instance::from_row(row))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok::<_, anyhow::Error>(instances)
+        })
+        .await??;
 
         let instance_path = self
             .app
@@ -280,7 +280,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self,
         shortpath: String,
         path: PathBuf,
-        cached: Option<&CachedInstance>,
+        cached: Option<&models::Instance>,
     ) -> anyhow::Result<Option<Instance>> {
         let config_path = path.join("instance.json");
 
@@ -354,30 +354,53 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn list_groups(self) -> anyhow::Result<Vec<ListGroup>> {
-        use db::{instance, instance_group};
+        let pool = self.app.db_pool.clone();
 
-        let groups = self
-            .app
-            .prisma_client
-            .instance_group()
-            .find_many(vec![])
-            .order_by(instance_group::OrderByParam::GroupIndex(Direction::Asc))
-            .with(
-                db::instance_group::instances::fetch(vec![])
-                    .order_by(instance::OrderByParam::Index(Direction::Asc)),
-            )
-            .exec()
-            .await?;
+        // Fetch groups and instances, then build the hierarchy
+        let (groups_data, instances_data) = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+
+            // Fetch all groups ordered by groupIndex
+            let mut stmt = conn.prepare(queries::instance::ListInstanceGroups::SQL)?;
+            let groups: Vec<models::InstanceGroup> = stmt
+                .query_map([], |row| models::InstanceGroup::from_row(row))?
+                .collect::<Result<Vec<_>, _>>()?;
+
+            // Fetch all instances ordered by groupId, index
+            let mut stmt = conn.prepare(queries::instance::ListInstances::SQL)?;
+            let instances: Vec<models::Instance> = stmt
+                .query_map([], |row| models::Instance::from_row(row))?
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok::<_, anyhow::Error>((groups, instances))
+        })
+        .await??;
+
+        // Build a map of group_id -> instances
+        let mut instances_by_group: HashMap<i32, Vec<models::Instance>> = HashMap::new();
+        for instance in instances_data {
+            instances_by_group
+                .entry(instance.group_id)
+                .or_default()
+                .push(instance);
+        }
+
+        // Build groups with their instances
+        let groups: Vec<(models::InstanceGroup, Vec<models::Instance>)> = groups_data
+            .into_iter()
+            .map(|group| {
+                let instances = instances_by_group.remove(&group.id).unwrap_or_default();
+                (group, instances)
+            })
+            .collect();
 
         let active_instances = self.instances.read().await;
         Ok(groups
             .into_iter()
-            .map(|group| ListGroup {
+            .map(|(group, group_instances)| ListGroup {
                 id: GroupId(group.id),
                 name: group.name,
-                instances: group
-                    .instances
-                    .expect("instance groups were requested with group list yet are not present")
+                instances: group_instances
                     .into_iter()
                     .filter_map(
                         |instance| match active_instances.get(&InstanceId(instance.id)) {
@@ -388,7 +411,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .map(|(instance, status)| ListInstance {
                         id: InstanceId(instance.id),
                         group_id: GroupId(instance.group_id),
-                        name: instance.name,
+                        name: instance.name.clone(),
                         favorite: instance.favorite,
                         icon_revision: match &status {
                             InstanceType::Valid(data) => data.icon_revision,
@@ -483,76 +506,75 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     /// Move the given group to the index directly before `before`.
     /// If `before` is None, move to the end of the list.
     pub async fn move_group(self, group: GroupId, before: Option<GroupId>) -> anyhow::Result<()> {
-        use db::instance_group::{SetParam, UniqueWhereParam, WhereParam};
-
         // lock indexes while we're changing them
         let _index_lock = self.index_lock.lock().await;
 
-        let start_idx = self
-            .app
-            .prisma_client
-            .instance_group()
-            .find_unique(UniqueWhereParam::IdEquals(*group))
-            .exec()
-            .await?
-            .ok_or_else(|| anyhow!("GroupId is not in database, this should never happen"))?
-            .group_index;
+        let pool = self.app.db_pool.clone();
+        let group_id = *group;
+        let before_id = before.map(|b| *b);
 
-        let target_idx = match before {
-            Some(target) => {
-                self.app
-                    .prisma_client
-                    .instance_group()
-                    .find_unique(UniqueWhereParam::IdEquals(*target))
-                    .exec()
-                    .await?
-                    .ok_or_else(|| anyhow!("GroupId is not in database, this should never happen"))?
-                    .group_index
-            }
-            None => {
-                self.app
-                    .prisma_client
-                    .instance_group()
-                    .count(vec![])
-                    .exec()
-                    .await? as i32
-            }
-        };
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get()?;
 
-        let (reamining_query, target_idx) = match (start_idx, target_idx) {
-            (start, target) if start < target => (
-                self.app.prisma_client.instance_group().update_many(
-                    vec![
-                        WhereParam::GroupIndex(IntFilter::Gt(start)),
-                        WhereParam::GroupIndex(IntFilter::Lt(target)),
-                    ],
-                    vec![SetParam::DecrementGroupIndex(1)],
-                ),
-                target - 1,
-            ),
-            (start, target) if start > target => (
-                self.app.prisma_client.instance_group().update_many(
-                    vec![
-                        WhereParam::GroupIndex(IntFilter::Gte(target)),
-                        WhereParam::GroupIndex(IntFilter::Lt(start)),
-                    ],
-                    vec![SetParam::IncrementGroupIndex(1)],
-                ),
-                target,
-            ),
-            _ => return Ok(()),
-        };
+            // Get start index
+            let start_idx: i32 = conn
+                .query_row(
+                    queries::instance::FindInstanceGroupById::SQL,
+                    rusqlite::params![group_id],
+                    |row| row.get("groupIndex"),
+                )
+                .map_err(|_| anyhow!("GroupId is not in database, this should never happen"))?;
 
-        self.app
-            .prisma_client
-            ._batch((
-                reamining_query,
-                self.app.prisma_client.instance_group().update(
-                    UniqueWhereParam::IdEquals(*group),
-                    vec![SetParam::SetGroupIndex(target_idx)],
-                ),
-            ))
-            .await?;
+            // Get target index
+            let target_idx: i32 = match before_id {
+                Some(target_id) => conn
+                    .query_row(
+                        queries::instance::FindInstanceGroupById::SQL,
+                        rusqlite::params![target_id],
+                        |row| row.get("groupIndex"),
+                    )
+                    .map_err(|_| anyhow!("GroupId is not in database, this should never happen"))?,
+                None => {
+                    conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
+                        row.get(0)
+                    })?
+                }
+            };
+
+            // Perform the index shifts in a transaction
+            carbon_repos::with_transaction(&mut conn, |tx| {
+                let final_target_idx = match (start_idx, target_idx) {
+                    (start, target) if start < target => {
+                        // Moving down: decrement indices between start and target
+                        tx.execute(
+                            "UPDATE InstanceGroup SET groupIndex = groupIndex - 1 WHERE groupIndex > ?1 AND groupIndex < ?2",
+                            rusqlite::params![start, target],
+                        )?;
+                        target - 1
+                    }
+                    (start, target) if start > target => {
+                        // Moving up: increment indices between target and start
+                        tx.execute(
+                            "UPDATE InstanceGroup SET groupIndex = groupIndex + 1 WHERE groupIndex >= ?1 AND groupIndex < ?2",
+                            rusqlite::params![target, start],
+                        )?;
+                        target
+                    }
+                    _ => return Ok(()), // No movement needed
+                };
+
+                // Update the group's index
+                tx.execute(
+                    queries::instance::UpdateInstanceGroupIndex::SQL,
+                    rusqlite::params![group_id, final_target_idx],
+                )?;
+
+                Ok(())
+            })?;
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -566,107 +588,119 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         instance: InstanceId,
         target: InstanceMoveTarget,
     ) -> anyhow::Result<()> {
-        use db::instance::{SetParam, UniqueWhereParam, WhereParam};
-
         // lock indexes while we're changing them
         let _index_lock = self.index_lock.lock().await;
 
+        let pool = self.app.db_pool.clone();
+        let instance_id = *instance;
+
+        // First, get the start position
         let (start_group, start_idx) = {
-            let instance = self
-                .app
-                .prisma_client
-                .instance()
-                .find_unique(UniqueWhereParam::IdEquals(*instance))
-                .exec()
-                .await?
-                .ok_or_else(|| {
-                    anyhow!("InstanceId is not in database, this should never happen")
-                })?;
-
-            (GroupId(instance.group_id), instance.index)
-        };
-
-        let (target_group, target_idx) = match target {
-            InstanceMoveTarget::Before(target) => {
-                let instance = self
-                    .app
-                    .prisma_client
-                    .instance()
-                    .find_unique(UniqueWhereParam::IdEquals(*target))
-                    .exec()
-                    .await?
-                    .ok_or_else(|| {
+            let pool = pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                let instance: models::Instance = conn
+                    .query_row(
+                        queries::instance::FindInstanceById::SQL,
+                        rusqlite::params![instance_id],
+                        |row| models::Instance::from_row(row),
+                    )
+                    .map_err(|_| {
                         anyhow!("InstanceId is not in database, this should never happen")
                     })?;
+                Ok::<_, anyhow::Error>((GroupId(instance.group_id), instance.index))
+            })
+            .await??
+        };
 
-                (GroupId(instance.group_id), instance.index)
+        // Get target position based on target type
+        let (target_group, target_idx) = match target {
+            InstanceMoveTarget::Before(target_instance) => {
+                let pool = pool.clone();
+                let target_id = *target_instance;
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    let instance: models::Instance = conn
+                        .query_row(
+                            queries::instance::FindInstanceById::SQL,
+                            rusqlite::params![target_id],
+                            |row| models::Instance::from_row(row),
+                        )
+                        .map_err(|_| {
+                            anyhow!("InstanceId is not in database, this should never happen")
+                        })?;
+                    Ok::<_, anyhow::Error>((GroupId(instance.group_id), instance.index))
+                })
+                .await??
             }
             InstanceMoveTarget::BeginningOfGroup(group) => (group, 0),
             InstanceMoveTarget::EndOfGroup(group) => {
-                let target_idx = self
-                    .app
-                    .prisma_client
-                    .instance()
-                    .count(vec![WhereParam::GroupId(IntFilter::Equals(*group))])
-                    .exec()
-                    .await? as i32;
-
+                let pool = pool.clone();
+                let group_id = *group;
+                let target_idx = tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    let count: i32 = conn.query_row(
+                        queries::instance::CountInstancesByGroup::SQL,
+                        rusqlite::params![group_id],
+                        |row| row.get(0),
+                    )?;
+                    Ok::<_, anyhow::Error>(count)
+                })
+                .await??;
                 (group, target_idx)
             }
         };
 
-        let index_shifts = if start_group == target_group {
-            vec![match (start_idx, target_idx) {
-                (start, target) if start < target => self.app.prisma_client.instance().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(*target_group)),
-                        WhereParam::Index(IntFilter::Gt(start)),
-                        WhereParam::Index(IntFilter::Lte(target)),
-                    ],
-                    vec![SetParam::DecrementIndex(1)],
-                ),
-                (start, target) if start > target => self.app.prisma_client.instance().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(*target_group)),
-                        WhereParam::Index(IntFilter::Gte(target)),
-                        WhereParam::Index(IntFilter::Lt(start)),
-                    ],
-                    vec![SetParam::IncrementIndex(1)],
-                ),
-                _ => return Ok(()),
-            }]
-        } else {
-            vec![
-                self.app.prisma_client.instance().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(*start_group)),
-                        WhereParam::Index(IntFilter::Gt(start_idx)),
-                    ],
-                    vec![SetParam::DecrementIndex(1)],
-                ),
-                self.app.prisma_client.instance().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(*target_group)),
-                        WhereParam::Index(IntFilter::Gte(target_idx)),
-                    ],
-                    vec![SetParam::IncrementIndex(1)],
-                ),
-            ]
-        };
+        // Perform the index shifts in a transaction
+        let pool = self.app.db_pool.clone();
+        let start_group_id = *start_group;
+        let target_group_id = *target_group;
 
-        self.app
-            .prisma_client
-            ._batch((
-                index_shifts,
-                self.app.prisma_client.instance().update(
-                    UniqueWhereParam::IdEquals(*instance),
-                    vec![
-                        SetParam::SetGroupId(*target_group),
-                        SetParam::SetIndex(target_idx),
-                    ],
-                ),
-            ))
-            .await?;
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get()?;
+
+            carbon_repos::with_transaction(&mut conn, |tx| {
+                if start_group_id == target_group_id {
+                    // Same group movement
+                    match (start_idx, target_idx) {
+                        (start, target) if start < target => {
+                            tx.execute(
+                                "UPDATE Instance SET `index` = `index` - 1 WHERE groupId = ?1 AND `index` > ?2 AND `index` <= ?3",
+                                rusqlite::params![target_group_id, start, target],
+                            )?;
+                        }
+                        (start, target) if start > target => {
+                            tx.execute(
+                                "UPDATE Instance SET `index` = `index` + 1 WHERE groupId = ?1 AND `index` >= ?2 AND `index` < ?3",
+                                rusqlite::params![target_group_id, target, start],
+                            )?;
+                        }
+                        _ => return Ok(()), // No movement needed
+                    }
+                } else {
+                    // Cross-group movement
+                    tx.execute(
+                        "UPDATE Instance SET `index` = `index` - 1 WHERE groupId = ?1 AND `index` > ?2",
+                        rusqlite::params![start_group_id, start_idx],
+                    )?;
+                    tx.execute(
+                        "UPDATE Instance SET `index` = `index` + 1 WHERE groupId = ?1 AND `index` >= ?2",
+                        rusqlite::params![target_group_id, target_idx],
+                    )?;
+                }
+
+                // Update the instance's group and index
+                tx.execute(
+                    queries::instance::UpdateInstanceGroupAndIndex::SQL,
+                    rusqlite::params![instance_id, target_group_id, target_idx],
+                )?;
+
+                Ok(())
+            })?;
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -675,8 +709,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     pub fn get_default_group(self) -> BoxFuture<'s, anyhow::Result<GroupId>> {
         Box::pin(async move {
-            use db::instance_group::WhereParam;
-
             static DEFAULT_MUTEX: Mutex<()> = Mutex::const_new(());
 
             let groupid = self
@@ -688,13 +720,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             match groupid {
                 Some(groupid) => {
-                    let group = self
-                        .app
-                        .prisma_client
-                        .instance_group()
-                        .find_first(vec![WhereParam::Id(IntFilter::Equals(groupid))])
-                        .exec()
-                        .await?;
+                    let pool = self.app.db_pool.clone();
+                    let group = tokio::task::spawn_blocking(move || {
+                        let conn = pool.get()?;
+                        conn.query_row(
+                            queries::instance::FindInstanceGroupById::SQL,
+                            rusqlite::params![groupid],
+                            |row| models::InstanceGroup::from_row(row),
+                        )
+                        .optional()
+                    })
+                    .await??;
 
                     match group {
                         Some(x) => Ok(GroupId(x.id)),
@@ -707,35 +743,31 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     match DEFAULT_MUTEX.try_lock() {
                         Ok(_lock) => {
                             let index = self.next_group_index().await?;
+                            let pool = self.app.db_pool.clone();
 
-                            self.app
-                                .prisma_client
-                                ._transaction()
-                                .run(|prisma| async move {
-                                    let group = prisma
-                                        .instance_group()
-                                        .create(
-                                            String::from("localize➽default"),
-                                            index.value,
-                                            vec![],
-                                        )
-                                        .exec()
-                                        .await?;
+                            let group_id = tokio::task::spawn_blocking(move || {
+                                let mut conn = pool.get()?;
 
-                                    use db::app_configuration::{SetParam, UniqueWhereParam};
+                                carbon_repos::with_transaction(&mut conn, |tx| {
+                                    // Create the group
+                                    tx.execute(
+                                        queries::instance::CreateInstanceGroup::SQL,
+                                        rusqlite::params!["localize➽default", index.value],
+                                    )?;
+                                    let group_id = tx.last_insert_rowid() as i32;
 
-                                    prisma
-                                        .app_configuration()
-                                        .update(
-                                            UniqueWhereParam::IdEquals(0),
-                                            vec![SetParam::SetDefaultInstanceGroup(Some(group.id))],
-                                        )
-                                        .exec()
-                                        .await?;
+                                    // Update settings
+                                    tx.execute(
+                                        queries::settings::UpdateDefaultInstanceGroup::SQL,
+                                        rusqlite::params![group_id],
+                                    )?;
 
-                                    Ok(GroupId(group.id))
+                                    Ok(GroupId(group_id))
                                 })
-                                .await
+                            })
+                            .await??;
+
+                            Ok(group_id)
                         }
                         Err(_) => {
                             // Wait for the lock to finish, some other thread probably
@@ -750,33 +782,43 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn create_group(self, name: String) -> anyhow::Result<GroupId> {
-        use db::instance_group::WhereParam;
         let index = self.next_group_index().await?;
 
-        let group = self
-            .app
-            .prisma_client
-            .instance_group()
-            .find_first(vec![WhereParam::Name(StringFilter::Equals(name.clone()))])
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let name_clone = name.clone();
 
-        if let Some(group) = group {
+        // Check if group with this name already exists
+        let existing = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::instance::FindInstanceGroupByName::SQL,
+                rusqlite::params![name_clone],
+                |row| models::InstanceGroup::from_row(row),
+            )
+            .optional()
+        })
+        .await??;
+
+        if let Some(group) = existing {
             return Ok(GroupId(group.id));
         }
 
-        let group = self
-            .app
-            .prisma_client
-            .instance_group()
-            .create(name, index.value, vec![])
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let index_value = index.value;
+        let group_id = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::instance::CreateInstanceGroup::SQL,
+                rusqlite::params![name, index_value],
+            )?;
+            Ok::<_, anyhow::Error>(conn.last_insert_rowid() as i32)
+        })
+        .await??;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
 
-        Ok(GroupId(group.id))
+        Ok(GroupId(group_id))
     }
 
     /// Add an instance to the database without checking if it exists.
@@ -787,45 +829,51 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         shortpath: String,
         group: GroupId,
     ) -> anyhow::Result<InstanceId> {
-        use db::instance::WhereParam;
-        use db::instance_group::UniqueWhereParam;
         let index = self.next_instance_index(group).await?;
 
-        let (_, instance) = self
-            .app
-            .prisma_client
-            ._batch((
-                // delete any existing entry at the same shortpath
-                self.app
-                    .prisma_client
-                    .instance()
-                    .delete_many(vec![WhereParam::Shortpath(StringFilter::Contains(
-                        shortpath.clone(),
-                    ))]),
-                self.app.prisma_client.instance().create(
-                    name,
-                    shortpath,
-                    index.value,
-                    UniqueWhereParam::IdEquals(*group),
-                    vec![],
-                ),
-            ))
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let group_id = *group;
+        let index_value = index.value;
 
-        Ok(InstanceId(instance.id))
+        let instance_id = tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get()?;
+
+            carbon_repos::with_transaction(&mut conn, |tx| {
+                // Delete any existing entry with the same shortpath
+                tx.execute(
+                    queries::instance::DeleteInstanceByShortpath::SQL,
+                    rusqlite::params![shortpath.clone()],
+                )?;
+
+                // Create the new instance
+                tx.execute(
+                    queries::instance::CreateInstance::SQL,
+                    rusqlite::params![name, shortpath, false, false, index_value, group_id],
+                )?;
+
+                Ok(tx.last_insert_rowid() as i32)
+            })
+        })
+        .await??;
+
+        Ok(InstanceId(instance_id))
     }
 
     /// Remove an instance from the database without checking if it exists.
     /// Does not invalidate.
     async fn remove_instance(self, instance: InstanceId) -> anyhow::Result<()> {
-        use db::instance::UniqueWhereParam;
+        let pool = self.app.db_pool.clone();
+        let instance_id = *instance;
 
-        self.app
-            .prisma_client
-            .instance()
-            .delete(UniqueWhereParam::IdEquals(*instance))
-            .exec()
-            .await?;
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::instance::DeleteInstance::SQL,
+                rusqlite::params![instance_id],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.meta_cache_manager().gc_mod_metadata().await;
 
@@ -833,8 +881,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn set_favorite(self, instance_id: InstanceId, favorite: bool) -> anyhow::Result<()> {
-        use db::instance::{SetParam, UniqueWhereParam};
-
         let mut instances = self.instances.write().await;
         let instance = instances
             .get_mut(&instance_id)
@@ -845,15 +891,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         data.favorite = favorite;
         drop(instances);
 
-        self.app
-            .prisma_client
-            .instance()
-            .update(
-                UniqueWhereParam::IdEquals(*instance_id),
-                vec![SetParam::SetFavorite(favorite)],
-            )
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let id = *instance_id;
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.execute(
+                queries::instance::UpdateInstanceFavorite::SQL,
+                rusqlite::params![id, favorite],
+            )?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -1118,8 +1166,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self,
         update: domain::InstanceSettingsUpdate,
     ) -> anyhow::Result<()> {
-        use db::instance::{SetParam, UniqueWhereParam};
-
         // Acquire per-instance operation lock to prevent concurrent updates to same instance
         // while allowing parallel updates to different instances
         let op_lock = self
@@ -1300,18 +1346,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let (new_shortpath, new_path) = self.next_folder(&name)?;
                 tokio::fs::rename(&path, &new_path).await?;
 
-                self.app
-                    .prisma_client
-                    .instance()
-                    .update(
-                        UniqueWhereParam::IdEquals(*update.instance_id),
-                        vec![
-                            SetParam::SetName(name),
-                            SetParam::SetShortpath(new_shortpath.clone()),
-                        ],
-                    )
-                    .exec()
-                    .await?;
+                let pool = self.app.db_pool.clone();
+                let instance_id = *update.instance_id;
+                let name_clone = name.clone();
+                let shortpath_clone = new_shortpath.clone();
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    conn.execute(
+                        queries::instance::UpdateInstanceNameAndShortpath::SQL,
+                        rusqlite::params![instance_id, name_clone, shortpath_clone],
+                    )?;
+                    Ok::<_, anyhow::Error>(())
+                })
+                .await??;
 
                 shortpath = new_shortpath;
                 path = new_path;
@@ -1491,19 +1538,24 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let group_id = self
-            .app
-            .prisma_client
-            .instance()
-            .find_unique(db::instance::UniqueWhereParam::IdEquals(*instance_id))
-            .exec()
-            .await?
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "instance was not listed in db while being present in internal list"
+        let pool = self.app.db_pool.clone();
+        let id = *instance_id;
+        let group_id = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let instance: models::Instance = conn
+                .query_row(
+                    queries::instance::FindInstanceById::SQL,
+                    rusqlite::params![id],
+                    |row| models::Instance::from_row(row),
                 )
-            })?
-            .group_id;
+                .map_err(|_| {
+                    anyhow::anyhow!(
+                        "instance was not listed in db while being present in internal list"
+                    )
+                })?;
+            Ok::<_, anyhow::Error>(instance.group_id)
+        })
+        .await??;
 
         let mut new_info = instance.data()?.config.clone();
         let (new_shortpath, new_path) = self.next_folder(&instance.shortpath)?;
@@ -1623,63 +1675,71 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     /// Delete an instance group and move all contained instances into the default group.
     // TODO: handle deleting the default group while it has instances.
     pub async fn delete_group(self, group: GroupId) -> anyhow::Result<()> {
-        use db::{instance, instance_group};
-
         // lock indexes before checking for instances to make sure none can be moved or created.
         let _index_lock = self.index_lock.lock().await;
 
-        let any_instances = self
-            .app
-            .prisma_client
-            .instance()
-            .count(vec![instance::WhereParam::GroupId(IntFilter::Equals(
-                *group,
-            ))])
-            .exec()
-            .await?
-            != 0;
+        let pool = self.app.db_pool.clone();
+        let group_id = *group;
+
+        let instance_count: i32 = {
+            let pool = pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::instance::CountInstancesByGroup::SQL,
+                    rusqlite::params![group_id],
+                    |row| row.get(0),
+                )
+                .map_err(anyhow::Error::from)
+            })
+            .await??
+        };
+
+        let any_instances = instance_count != 0;
 
         // a default group will be created if get_default_group is called, so
         // we check if any instances exist before creating it to avoid making an
         // empty group every time a group is deleted.
         if any_instances {
             let default_group = self.get_default_group().await?;
+            let default_group_id = *default_group;
 
             // next_instance_index can't be used due to _index_lock, and dropping it
             // first would be a race condition.
-            let base_index = self
-                .app
-                .prisma_client
-                .instance()
-                .count(vec![instance::WhereParam::GroupId(IntFilter::Equals(
-                    *group,
-                ))])
-                .exec()
-                .await?;
+            let base_index = instance_count;
 
-            self.app
-                .prisma_client
-                ._batch((
-                    self.app.prisma_client.instance().update_many(
-                        vec![instance::WhereParam::GroupId(IntFilter::Equals(*group))],
-                        vec![
-                            instance::SetParam::SetGroupId(*default_group),
-                            instance::SetParam::IncrementIndex(base_index as i32),
-                        ],
-                    ),
-                    self.app
-                        .prisma_client
-                        .instance_group()
-                        .delete(instance_group::UniqueWhereParam::IdEquals(*group)),
-                ))
-                .await?;
+            let pool = self.app.db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let mut conn = pool.get()?;
+
+                carbon_repos::with_transaction(&mut conn, |tx| {
+                    // Move instances to default group with incremented indices
+                    tx.execute(
+                        "UPDATE Instance SET groupId = ?1, `index` = `index` + ?2 WHERE groupId = ?3",
+                        rusqlite::params![default_group_id, base_index, group_id],
+                    )?;
+
+                    // Delete the group
+                    tx.execute(
+                        queries::instance::DeleteInstanceGroup::SQL,
+                        rusqlite::params![group_id],
+                    )?;
+
+                    Ok(())
+                })
+            })
+            .await??;
         } else {
-            self.app
-                .prisma_client
-                .instance_group()
-                .delete(instance_group::UniqueWhereParam::IdEquals(*group))
-                .exec()
-                .await?;
+            let pool = self.app.db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.execute(
+                    queries::instance::DeleteInstanceGroup::SQL,
+                    rusqlite::params![group_id],
+                )?;
+                Ok::<_, anyhow::Error>(())
+            })
+            .await??;
         }
 
         self.app.invalidate(GET_GROUPS, None);
@@ -1879,35 +1939,40 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     async fn next_group_index(self) -> anyhow::Result<IdLock<'s, i32>> {
         let guard = self.manager.index_lock.lock().await;
 
-        let count = self
-            .app
-            .prisma_client
-            .instance_group()
-            .count(vec![])
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let count = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
+                row.get::<_, i32>(0)
+            })
+            .map_err(anyhow::Error::from)
+        })
+        .await??;
 
         Ok(IdLock {
-            value: count as i32,
+            value: count,
             guard,
         })
     }
 
     async fn next_instance_index(self, group: GroupId) -> anyhow::Result<IdLock<'s, i32>> {
-        use db::instance::WhereParam;
-
         let guard = self.manager.index_lock.lock().await;
 
-        let count = self
-            .app
-            .prisma_client
-            .instance()
-            .count(vec![WhereParam::GroupId(IntFilter::Equals(*group))])
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let group_id = *group;
+        let count = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::instance::CountInstancesByGroup::SQL,
+                rusqlite::params![group_id],
+                |row| row.get::<_, i32>(0),
+            )
+            .map_err(anyhow::Error::from)
+        })
+        .await??;
 
         Ok(IdLock {
-            value: count as i32,
+            value: count,
             guard,
         })
     }
@@ -2109,10 +2174,7 @@ mod test {
     use std::{collections::HashSet, time::Duration};
 
     use super::domain;
-    use carbon_repos::{
-        db::{PrismaClient, read_filters::IntFilter},
-        pcr::Direction,
-    };
+    use carbon_repos::{DbPool, queries, models};
     use unicode_segmentation::UnicodeSegmentation;
 
     use crate::{
@@ -2129,18 +2191,17 @@ mod test {
     async fn move_groups() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
-        async fn get_ordered_groups(prisma_client: &PrismaClient) -> anyhow::Result<Vec<GroupId>> {
-            use carbon_repos::db::instance_group::OrderByParam;
-
-            Ok(prisma_client
-                .instance_group()
-                .find_many(vec![])
-                .order_by(OrderByParam::GroupIndex(Direction::Asc))
-                .exec()
-                .await?
-                .into_iter()
-                .map(|group| GroupId(group.id))
-                .collect())
+        async fn get_ordered_groups(db_pool: &DbPool) -> anyhow::Result<Vec<GroupId>> {
+            let pool = db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                let mut stmt = conn.prepare(queries::instance::ListInstanceGroups::SQL)?;
+                let groups = stmt
+                    .query_map([], |row| Ok(GroupId(row.get::<_, i32>("id")?)))?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok::<_, anyhow::Error>(groups)
+            })
+            .await?
         }
 
         let mut groups = [
@@ -2167,7 +2228,7 @@ mod test {
             .await?;
         assert_eq!(
             groups[..],
-            get_ordered_groups(&app.prisma_client).await?[..]
+            get_ordered_groups(&app.db_pool).await?[..]
         );
 
         // move 1 to 3 as if dragged
@@ -2177,7 +2238,7 @@ mod test {
         groups = [groups[0], groups[2], groups[1], groups[3], groups[4]];
         assert_eq!(
             groups[..],
-            get_ordered_groups(&app.prisma_client).await?[..]
+            get_ordered_groups(&app.db_pool).await?[..]
         );
 
         // move 3 back to 1
@@ -2187,7 +2248,7 @@ mod test {
         groups = [groups[0], groups[3], groups[1], groups[2], groups[4]];
         assert_eq!(
             groups[..],
-            get_ordered_groups(&app.prisma_client).await?[..]
+            get_ordered_groups(&app.db_pool).await?[..]
         );
 
         // move 1 to end of list
@@ -2195,7 +2256,7 @@ mod test {
         groups = [groups[0], groups[2], groups[3], groups[4], groups[1]];
         assert_eq!(
             groups[..],
-            get_ordered_groups(&app.prisma_client).await?[..]
+            get_ordered_groups(&app.db_pool).await?[..]
         );
 
         // move 4 to beginning of list
@@ -2205,7 +2266,7 @@ mod test {
         groups = [groups[4], groups[0], groups[1], groups[2], groups[3]];
         assert_eq!(
             groups[..],
-            get_ordered_groups(&app.prisma_client).await?[..]
+            get_ordered_groups(&app.db_pool).await?[..]
         );
 
         Ok(())
@@ -2216,20 +2277,20 @@ mod test {
         let app = crate::setup_managers_for_test().await;
 
         async fn get_ordered_instances(
-            prisma_client: &PrismaClient,
+            db_pool: &DbPool,
             group: GroupId,
         ) -> anyhow::Result<Vec<InstanceId>> {
-            use carbon_repos::db::instance::{OrderByParam, WhereParam};
-
-            Ok(prisma_client
-                .instance()
-                .find_many(vec![WhereParam::GroupId(IntFilter::Equals(*group))])
-                .order_by(OrderByParam::Index(Direction::Asc))
-                .exec()
-                .await?
-                .into_iter()
-                .map(|instance| InstanceId(instance.id))
-                .collect())
+            let pool = db_pool.clone();
+            let group_id = *group;
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                let mut stmt = conn.prepare(queries::instance::ListInstancesByGroup::SQL)?;
+                let instances = stmt
+                    .query_map([group_id], |row| Ok(InstanceId(row.get::<_, i32>("id")?)))?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok::<_, anyhow::Error>(instances)
+            })
+            .await?
         }
 
         let [group0, group1] = [
@@ -2274,7 +2335,7 @@ mod test {
 
         assert_eq!(
             group0_instances[..],
-            get_ordered_instances(&app.prisma_client, group0).await?[..],
+            get_ordered_instances(&app.db_pool, group0).await?[..],
         );
 
         // move 1 to end of list
@@ -2290,7 +2351,7 @@ mod test {
 
         assert_eq!(
             group0_instances[..],
-            get_ordered_instances(&app.prisma_client, group0).await?[..],
+            get_ordered_instances(&app.db_pool, group0).await?[..],
         );
 
         // move 0 to end of list
@@ -2306,7 +2367,7 @@ mod test {
 
         assert_eq!(
             group0_instances[..],
-            get_ordered_instances(&app.prisma_client, group0).await?[..],
+            get_ordered_instances(&app.db_pool, group0).await?[..],
         );
 
         // move 2 back to 0
@@ -2325,7 +2386,7 @@ mod test {
 
         assert_eq!(
             group0_instances[..],
-            get_ordered_instances(&app.prisma_client, group0).await?[..],
+            get_ordered_instances(&app.db_pool, group0).await?[..],
         );
 
         app.instance_manager()
@@ -2343,7 +2404,7 @@ mod test {
 
         assert_eq!(
             group0_instances[..],
-            get_ordered_instances(&app.prisma_client, group0).await?[..],
+            get_ordered_instances(&app.db_pool, group0).await?[..],
         );
 
         // move 0:1 to 1:1
@@ -2364,12 +2425,12 @@ mod test {
 
         assert_eq!(
             group0_instances[..],
-            get_ordered_instances(&app.prisma_client, group0).await?[..],
+            get_ordered_instances(&app.db_pool, group0).await?[..],
         );
 
         assert_eq!(
             group1_instances[..],
-            get_ordered_instances(&app.prisma_client, group1).await?[..],
+            get_ordered_instances(&app.db_pool, group1).await?[..],
         );
 
         // move 0:0 to end of group 1
@@ -2388,12 +2449,12 @@ mod test {
 
         assert_eq!(
             group0_instances[..],
-            get_ordered_instances(&app.prisma_client, group0).await?[..],
+            get_ordered_instances(&app.db_pool, group0).await?[..],
         );
 
         assert_eq!(
             group1_instances[..],
-            get_ordered_instances(&app.prisma_client, group1).await?[..],
+            get_ordered_instances(&app.db_pool, group1).await?[..],
         );
 
         Ok(())
@@ -2401,8 +2462,6 @@ mod test {
 
     #[tokio::test]
     async fn delete_group() -> anyhow::Result<()> {
-        use carbon_repos::db::instance::UniqueWhereParam::ShortpathEquals;
-
         let app = crate::setup_managers_for_test().await;
 
         let default_group = app.instance_manager().get_default_group().await?;
@@ -2417,26 +2476,38 @@ mod test {
             .add_instance(String::from("bar"), String::from("bar"), group)
             .await?;
 
-        let instance = app
-            .prisma_client
-            .instance()
-            .find_unique(ShortpathEquals(String::from("bar")))
-            .exec()
-            .await?
-            .unwrap();
+        let instance = {
+            let pool = app.db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::instance::FindInstanceByShortpath::SQL,
+                    ["bar"],
+                    |row| models::Instance::from_row(row),
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to find instance: {}", e))
+            })
+            .await??
+        };
 
         assert_eq!(instance.index, 0);
         assert_eq!(instance.group_id, *group);
 
         app.instance_manager().delete_group(group).await?;
 
-        let instance = app
-            .prisma_client
-            .instance()
-            .find_unique(ShortpathEquals(String::from("bar")))
-            .exec()
-            .await?
-            .unwrap();
+        let instance = {
+            let pool = app.db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(
+                    queries::instance::FindInstanceByShortpath::SQL,
+                    ["bar"],
+                    |row| models::Instance::from_row(row),
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to find instance: {}", e))
+            })
+            .await??
+        };
 
         // index should be `1` due to instance already present in default group.
         assert_eq!(instance.index, 1);
@@ -2452,12 +2523,17 @@ mod test {
     async fn delete_group_empty() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
-        let group_count = app
-            .prisma_client
-            .instance_group()
-            .count(vec![])
-            .exec()
-            .await?;
+        let group_count: i64 = {
+            let pool = app.db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
+                    row.get(0)
+                })
+                .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
+            })
+            .await??
+        };
 
         // assert no default group exists
         assert_eq!(group_count, 0);
@@ -2467,24 +2543,34 @@ mod test {
             .create_group(String::from("foo"))
             .await?;
 
-        let group_count = app
-            .prisma_client
-            .instance_group()
-            .count(vec![])
-            .exec()
-            .await?;
+        let group_count: i64 = {
+            let pool = app.db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
+                    row.get(0)
+                })
+                .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
+            })
+            .await??
+        };
 
         // assert only the created group exists
         assert_eq!(group_count, 1);
 
         app.instance_manager().delete_group(group).await?;
 
-        let group_count = app
-            .prisma_client
-            .instance_group()
-            .count(vec![])
-            .exec()
-            .await?;
+        let group_count: i64 = {
+            let pool = app.db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
+                    row.get(0)
+                })
+                .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
+            })
+            .await??
+        };
 
         // assert the default group was not created while deleting the new group
         assert_eq!(group_count, 0);
@@ -2609,10 +2695,10 @@ mod test {
 
     #[tokio::test]
     async fn test_modpack_info() -> anyhow::Result<()> {
-        let mut app = crate::setup_managers_for_test().await;
+        let app = crate::setup_managers_for_test().await;
 
         let default_group_id = app.instance_manager().get_default_group().await?;
-        let default_group = &app.instance_manager().list_groups().await?[0];
+        let _default_group = &app.instance_manager().list_groups().await?[0];
         let curseforge_instance_id = app
             .instance_manager()
             .create_instance(
@@ -2649,23 +2735,24 @@ mod test {
             )
             .await?;
 
+        // Helper to get count from db
+        async fn get_count(db_pool: &DbPool, sql: &'static str) -> anyhow::Result<i64> {
+            let pool = db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                conn.query_row(sql, [], |row| row.get(0))
+                    .map_err(|e| anyhow::anyhow!("Failed to count: {}", e))
+            })
+            .await?
+        }
+
         assert_eq!(
-            app.prisma_client
-                .curse_forge_modpack_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
+            get_count(&app.db_pool, queries::modpack::CountCurseForgeModpackCache::SQL).await?,
             0
         );
 
         assert_eq!(
-            app.prisma_client
-                .modrinth_modpack_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
+            get_count(&app.db_pool, queries::modpack::CountModrinthModpackCache::SQL).await?,
             0
         );
 
@@ -2678,42 +2765,22 @@ mod test {
             .await?;
 
         assert_eq!(
-            app.prisma_client
-                .curse_forge_modpack_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
+            get_count(&app.db_pool, queries::modpack::CountCurseForgeModpackCache::SQL).await?,
             1
         );
 
         assert_eq!(
-            app.prisma_client
-                .modrinth_modpack_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
+            get_count(&app.db_pool, queries::modpack::CountModrinthModpackCache::SQL).await?,
             1
         );
 
         assert_eq!(
-            app.prisma_client
-                .curse_forge_modpack_image_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
+            get_count(&app.db_pool, queries::modpack::CountCurseForgeModpackImageCache::SQL).await?,
             1
         );
 
         assert_eq!(
-            app.prisma_client
-                .modrinth_modpack_image_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
+            get_count(&app.db_pool, queries::modpack::CountModrinthModpackImageCache::SQL).await?,
             1
         );
 
@@ -2722,12 +2789,12 @@ mod test {
 
     #[tokio::test]
     async fn test_next_folder_ascii() -> anyhow::Result<()> {
-        let mut app = crate::setup_managers_for_test().await;
+        let app = crate::setup_managers_for_test().await;
 
         let (instance_name, _) = app.instance_manager().next_folder("some_instance")?;
 
         let default_group_id = app.instance_manager().get_default_group().await?;
-        let default_group = &app.instance_manager().list_groups().await?[0];
+        let _default_group = &app.instance_manager().list_groups().await?[0];
         app.instance_manager()
             .create_instance(
                 default_group_id,
@@ -2788,10 +2855,10 @@ mod test {
 
     #[tokio::test]
     async fn text_next_folder_basic_unicode() -> anyhow::Result<()> {
-        let mut app = crate::setup_managers_for_test().await;
+        let app = crate::setup_managers_for_test().await;
 
         let default_group_id = app.instance_manager().get_default_group().await?;
-        let default_group = &app.instance_manager().list_groups().await?[0];
+        let _default_group = &app.instance_manager().list_groups().await?[0];
 
         let (instance_name, _) = app.instance_manager().next_folder("ɀɃɏɔɮ˞˳̸")?;
 
@@ -2823,10 +2890,10 @@ mod test {
 
     #[tokio::test]
     async fn test_next_folder_unicode() -> anyhow::Result<()> {
-        let mut app = crate::setup_managers_for_test().await;
+        let app = crate::setup_managers_for_test().await;
 
         let default_group_id = app.instance_manager().get_default_group().await?;
-        let default_group = &app.instance_manager().list_groups().await?[0];
+        let _default_group = &app.instance_manager().list_groups().await?[0];
 
         // Although the following two strings look the same, they are not.
         // Different filesystems handle it differently
@@ -2886,7 +2953,7 @@ mod test {
     async fn test_next_folder_long_input() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
         let default_group_id = app.instance_manager().get_default_group().await?;
-        let default_group = &app.instance_manager().list_groups().await?[0];
+        let _default_group = &app.instance_manager().list_groups().await?[0];
 
         let e_with_2_bytes = "é"; // decomposed (U+0065 U+0301)
 

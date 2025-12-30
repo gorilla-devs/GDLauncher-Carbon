@@ -89,7 +89,7 @@ pub async fn process_minecraft(
                 }
 
                 let forge_version = crate::managers::minecraft::forge::get_version(
-                    app.prisma_client.clone(),
+                    app.db_pool.clone(),
                     &app.reqwest_client,
                     &*forge_version,
                     &app.minecraft_manager().meta_base_url,
@@ -107,7 +107,7 @@ pub async fn process_minecraft(
                 }
 
                 let neoforge_version = crate::managers::minecraft::neoforge::get_version(
-                    app.prisma_client.clone(),
+                    app.db_pool.clone(),
                     &app.reqwest_client,
                     &*neoforge_version,
                     &app.minecraft_manager().meta_base_url,
@@ -127,7 +127,7 @@ pub async fn process_minecraft(
 
                 let fabric_version = crate::managers::minecraft::fabric::replace_template(
                     &crate::managers::minecraft::fabric::get_version(
-                        app.prisma_client.clone(),
+                        app.db_pool.clone(),
                         &app.reqwest_client,
                         &fabric_version,
                         &app.minecraft_manager().meta_base_url,
@@ -150,7 +150,7 @@ pub async fn process_minecraft(
 
                 let quilt_version = crate::managers::minecraft::quilt::replace_template(
                     &crate::managers::minecraft::quilt::get_version(
-                        app.prisma_client.clone(),
+                        app.db_pool.clone(),
                         &app.reqwest_client,
                         &quilt_version,
                         &app.minecraft_manager().meta_base_url,
@@ -284,7 +284,7 @@ pub async fn process_minecraft(
 
     t_subtasks.t_reconstruct_assets.start_opaque();
     managers::minecraft::assets::reconstruct_assets(
-        Arc::clone(&app.prisma_client),
+        app.db_pool.clone(),
         app.reqwest_client.clone(),
         &version_info.asset_index,
         runtime_path.get_assets(),
@@ -302,7 +302,7 @@ pub async fn process_minecraft(
             .unwrap_or(&version_info.id),
     );
     let assets_dir = get_assets_dir(
-        app.prisma_client.clone(),
+        app.db_pool.clone(),
         app.reqwest_client.clone(),
         &version_info.asset_index,
         runtime_path.get_assets(),

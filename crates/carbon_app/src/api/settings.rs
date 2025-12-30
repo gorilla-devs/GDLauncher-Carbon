@@ -12,6 +12,7 @@ use crate::{
     managers::App,
     mirror_into,
 };
+use carbon_repos::models::AppConfiguration;
 use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -236,10 +237,10 @@ struct FESettings {
     gdl_account_id: Option<String>,
 }
 
-impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
+impl TryFrom<AppConfiguration> for FESettings {
     type Error = anyhow::Error;
 
-    fn try_from(data: carbon_repos::db::app_configuration::Data) -> Result<Self, Self::Error> {
+    fn try_from(data: AppConfiguration) -> Result<Self, Self::Error> {
         Ok(Self {
             theme: data.theme,
             language: data.language,

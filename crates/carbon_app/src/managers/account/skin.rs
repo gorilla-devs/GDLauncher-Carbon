@@ -1,8 +1,9 @@
 use super::api::McSkin as ApiSkin;
 use crate::managers::ManagerRef;
 use anyhow::ensure;
-use carbon_repos::db::{self, read_filters::StringFilter};
+use carbon_repos::{models, queries, OptionalExt};
 use image::{GenericImageView, ImageFormat};
+use rusqlite::params;
 use std::io::Cursor;
 use thiserror::Error;
 
@@ -11,33 +12,41 @@ pub struct SkinManager {}
 impl ManagerRef<'_, SkinManager> {
     /// Load an account skin from the DB, or download it if not cached.
     pub async fn get_skin(self, uuid: String) -> anyhow::Result<Skin> {
-        use db::skin::{UniqueWhereParam, WhereParam};
-
-        let account = self
-            .app
-            .prisma_client
-            .account()
-            .find_unique(db::account::UniqueWhereParam::UuidEquals(uuid.clone()))
-            .exec()
-            .await?
-            .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
+        let pool = self.app.db_pool.clone();
+        let uuid_clone = uuid.clone();
+        let account = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::account::FindAccountByUuid::SQL,
+                params![uuid_clone],
+                |row| models::Account::from_row(row),
+            )
+            .optional()
+        })
+        .await??
+        .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
 
         let skin_id = match account.skin_id.as_ref() {
-            Some(x) => x,
-            None => DefaultSkin::from_uuid(uuid.clone()).skin_id(),
+            Some(x) => x.clone(),
+            None => DefaultSkin::from_uuid(uuid.clone()).skin_id().to_string(),
         };
 
-        let cached_skin = self
-            .app
-            .prisma_client
-            .skin()
-            .find_unique(UniqueWhereParam::IdEquals(skin_id.to_string()))
-            .exec()
-            .await?;
+        let pool = self.app.db_pool.clone();
+        let skin_id_clone = skin_id.clone();
+        let cached_skin = tokio::task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            conn.query_row(
+                queries::account::FindSkinById::SQL,
+                params![skin_id_clone],
+                |row| models::Skin::from_row(row),
+            )
+            .optional()
+        })
+        .await??;
 
         Ok(match cached_skin {
             Some(skin) => Skin {
-                data: skin.skin.into(),
+                data: skin.skin,
             },
             None => {
                 let skin = match account.access_token.as_ref() {
@@ -62,27 +71,32 @@ impl ManagerRef<'_, SkinManager> {
                     .bytes()
                     .await?;
 
-                self.app
-                    .prisma_client
-                    ._batch((
-                        // won't error on 0 deleted
-                        self.app
-                            .prisma_client
-                            .skin()
-                            .delete_many(vec![WhereParam::Id(StringFilter::Equals(
-                                skin.id.clone(),
-                            ))]),
-                        self.app.prisma_client.skin().create(
-                            skin.id.clone(),
-                            skin_data.to_vec(),
-                            vec![],
-                        ),
-                        self.app.prisma_client.account().update(
-                            db::account::UniqueWhereParam::UuidEquals(uuid),
-                            vec![db::account::SetParam::SetSkinId(Some(skin.id.clone()))],
-                        ),
-                    ))
-                    .await?;
+                // Upsert the skin and update account's skin_id
+                let pool = self.app.db_pool.clone();
+                let skin_id = skin.id.clone();
+                let skin_data_clone = skin_data.to_vec();
+                let uuid_clone = uuid.clone();
+                tokio::task::spawn_blocking(move || {
+                    let conn = pool.get()?;
+                    // Use transaction for atomicity
+                    let tx = conn.unchecked_transaction()?;
+
+                    // Upsert skin (INSERT OR REPLACE)
+                    tx.execute(
+                        queries::account::UpsertSkin::SQL,
+                        params![skin_id, skin_data_clone],
+                    )?;
+
+                    // Update account's skin_id
+                    tx.execute(
+                        queries::account::UpdateAccountSkinId::SQL,
+                        params![uuid_clone, skin_id],
+                    )?;
+
+                    tx.commit()?;
+                    Ok::<_, anyhow::Error>(())
+                })
+                .await??;
 
                 Skin {
                     data: skin_data.to_vec(),
