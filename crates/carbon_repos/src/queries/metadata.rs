@@ -27,7 +27,7 @@ define_query!(
 define_query!(
     CountModFileCacheByInstance,
     "SELECT COUNT(*) FROM ModFileCache WHERE instanceId = ?1",
-    (instance_id: i32)
+    (instance_id: i32) => i32
 );
 
 define_query!(
