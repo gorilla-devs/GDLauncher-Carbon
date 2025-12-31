@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::bail;
-use carbon_repos::{models::ActiveDownload, queries, DatabaseError, OptionalExt};
+use carbon_repos::{DatabaseError, OptionalExt, models::ActiveDownload, queries};
 use reqwest::Response;
 use reqwest_middleware::ClientWithMiddleware;
 use thiserror::Error;

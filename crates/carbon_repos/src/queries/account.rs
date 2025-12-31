@@ -20,7 +20,6 @@ define_query!(
     "SELECT * FROM Account WHERE uuid != ?1 ORDER BY lastUsed DESC LIMIT 1",
     query_row(exclude_uuid: &str) -> Account
 );
-
 // Create queries
 define_query!(
     CreateAccount,

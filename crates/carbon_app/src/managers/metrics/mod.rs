@@ -1,5 +1,5 @@
 use crate::domain::metrics::GDLMetricsEvent;
-use carbon_repos::{DbPool, queries, models::AppConfiguration};
+use carbon_repos::{DbPool, models::AppConfiguration, queries};
 use display_info::DisplayInfo;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
@@ -17,11 +17,7 @@ pub(crate) struct MetricsManager {
 }
 
 impl MetricsManager {
-    pub fn new(
-        db_pool: DbPool,
-        http_client: ClientWithMiddleware,
-        gdl_base_api: String,
-    ) -> Self {
+    pub fn new(db_pool: DbPool, http_client: ClientWithMiddleware, gdl_base_api: String) -> Self {
         let random_session_uuid = Uuid::new_v4();
 
         Self {
@@ -42,21 +38,18 @@ impl ManagerRef<'_, MetricsManager> {
         let random_session_uuid = self.random_session_uuid;
         let terms_accepted = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let result = conn.query_row(
-                queries::settings::GetSettings::SQL,
-                [],
-                |row| {
-                    let config = AppConfiguration::from_row(row)?;
-                    Ok(config.terms_and_privacy_accepted)
-                },
-            );
+            let result = conn.query_row(queries::settings::GetSettings::SQL, [], |row| {
+                let config = AppConfiguration::from_row(row)?;
+                Ok(config.terms_and_privacy_accepted)
+            });
 
             match result {
                 Ok(accepted) => Ok(accepted),
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
                 Err(e) => Err(anyhow::Error::from(e)),
             }
-        }).await??;
+        })
+        .await??;
 
         // TODO: Keep a backlog of events if the user has not accepted the terms yet
         if !terms_accepted {

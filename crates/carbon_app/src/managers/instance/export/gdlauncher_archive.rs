@@ -104,7 +104,9 @@ pub async fn export_gdlauncher(
                     let inst_id = *instance_id;
                     let mods2 = tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        let mut stmt = conn.prepare(queries::metadata::ListModFileCacheWithCurseforgeByInstance::SQL)?;
+                        let mut stmt = conn.prepare(
+                            queries::metadata::ListModFileCacheWithCurseforgeByInstance::SQL,
+                        )?;
                         let mods: Vec<models::ModFileCacheWithCurseforge> = stmt
                             .query_map(rusqlite::params![inst_id], |row| {
                                 models::ModFileCacheWithCurseforge::from_row(row)
@@ -114,14 +116,13 @@ pub async fn export_gdlauncher(
                     })
                     .await??;
 
-                    let mods2 = mods2
-                        .into_iter()
-                        .filter_map(|m| {
-                            match mods_filter.remove(&m.filename) {
+                    let mods2 =
+                        mods2
+                            .into_iter()
+                            .filter_map(|m| match mods_filter.remove(&m.filename) {
                                 Some(_) => Some((m.cf_project_id, m.cf_file_id)),
                                 None => None,
-                            }
-                        });
+                            });
 
                     mods.extend(mods2);
                     t_scan.complete_opaque();

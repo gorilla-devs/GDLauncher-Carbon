@@ -44,16 +44,19 @@ impl ModplatformCacher for ModrinthModCacher {
         let id = *instance_id;
         let modlist_result = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(queries::metadata::ListModFilesNeedingModrinthUpdate::SQL)?;
-            let results = stmt.query_map(rusqlite::params![id], |row| {
-                let metadata_id: String = row.get(0)?;
-                let sha512: Vec<u8> = row.get(1)?;
-                let sha512_hex = hex::encode(&sha512);
-                Ok((metadata_id, sha512_hex))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            let mut stmt =
+                conn.prepare(queries::metadata::ListModFilesNeedingModrinthUpdate::SQL)?;
+            let results = stmt
+                .query_map(rusqlite::params![id], |row| {
+                    let metadata_id: String = row.get(0)?;
+                    let sha512: Vec<u8> = row.get(1)?;
+                    let sha512_hex = hex::encode(&sha512);
+                    Ok((metadata_id, sha512_hex))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
             Ok::<_, anyhow::Error>(results)
-        }).await??;
+        })
+        .await??;
 
         let mcm = app.meta_cache_manager();
         let ignored_hashes = mcm.ignored_remote_mr_hashes.read().await;
@@ -272,18 +275,21 @@ impl ModplatformCacher for ModrinthModCacher {
         let id = *instance_id;
         let modlist = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(queries::metadata::ListModFilesWithOutdatedModrinthIcons::SQL)?;
-            let results = stmt.query_map(rusqlite::params![id], |row| {
-                let filename: String = row.get(0)?;
-                let project_id: String = row.get(1)?;
-                let version_id: String = row.get(2)?;
-                let metadata_id: String = row.get(3)?;
-                let url: String = row.get(4)?;
-                Ok((filename, project_id, version_id, metadata_id, url))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            let mut stmt =
+                conn.prepare(queries::metadata::ListModFilesWithOutdatedModrinthIcons::SQL)?;
+            let results = stmt
+                .query_map(rusqlite::params![id], |row| {
+                    let filename: String = row.get(0)?;
+                    let project_id: String = row.get(1)?;
+                    let version_id: String = row.get(2)?;
+                    let metadata_id: String = row.get(3)?;
+                    let url: String = row.get(4)?;
+                    Ok((filename, project_id, version_id, metadata_id, url))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
             Ok::<_, anyhow::Error>(results)
-        }).await;
+        })
+        .await;
 
         let modlist = match modlist {
             Ok(Ok(modlist)) => modlist,
@@ -445,17 +451,15 @@ async fn cache_modrinth_meta_unchecked(
         let result = conn.query_row(
             queries::metadata::FindModrinthModCache::SQL,
             rusqlite::params![metadata_id_clone],
-            |row| {
-                let cached_at: String = row.get("cachedAt")?;
-                Ok(cached_at)
-            },
+            |row| super::read_datetime_column(row, "cachedAt"),
         );
         match result {
             Ok(cached_at) => Ok(Some(cached_at)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(anyhow::Error::from(e)),
         }
-    }).await??;
+    })
+    .await??;
 
     if let Some(cached_at) = existing_entry {
         // Parse the cached_at timestamp and check if it's recent
@@ -505,7 +509,8 @@ async fn cache_modrinth_meta_unchecked(
             ],
         )?;
         Ok::<_, anyhow::Error>(())
-    }).await??;
+    })
+    .await??;
 
     // Handle icon image cache
     if let Some(icon_url) = &project.icon_url {
@@ -521,11 +526,13 @@ async fn cache_modrinth_meta_unchecked(
                     metadata_id_clone,
                     icon_url_clone,
                     Option::<Vec<u8>>::None,
-                    0  // upToDate = 0, mark as needing download
+                    0 // upToDate = 0, mark as needing download
                 ],
             )?;
             Ok::<_, anyhow::Error>(())
-        }).await? {
+        })
+        .await?
+        {
             warn!(
                 "Failed to upsert modrinth image for metadata_id {}: {:?}",
                 metadata_id, e

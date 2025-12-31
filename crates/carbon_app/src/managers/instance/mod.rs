@@ -21,7 +21,7 @@ use anyhow::{Context, anyhow};
 use carbon_platforms::ModPlatform;
 use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
 use carbon_platforms::modrinth::search::{ProjectID, VersionID};
-use carbon_repos::{models, queries, DbPool, OptionalExt};
+use carbon_repos::{DbPool, OptionalExt, models, queries};
 use chrono::{DateTime, Utc};
 use daedalus::minecraft::MinecraftJavaProfile;
 use dashmap::DashMap;
@@ -2174,7 +2174,7 @@ mod test {
     use std::{collections::HashSet, time::Duration};
 
     use super::domain;
-    use carbon_repos::{DbPool, queries, models};
+    use carbon_repos::{DbPool, models, queries};
     use unicode_segmentation::UnicodeSegmentation;
 
     use crate::{
@@ -2226,48 +2226,33 @@ mod test {
         app.instance_manager()
             .move_group(groups[1], Some(groups[1]))
             .await?;
-        assert_eq!(
-            groups[..],
-            get_ordered_groups(&app.db_pool).await?[..]
-        );
+        assert_eq!(groups[..], get_ordered_groups(&app.db_pool).await?[..]);
 
         // move 1 to 3 as if dragged
         app.instance_manager()
             .move_group(groups[1], Some(groups[3]))
             .await?;
         groups = [groups[0], groups[2], groups[1], groups[3], groups[4]];
-        assert_eq!(
-            groups[..],
-            get_ordered_groups(&app.db_pool).await?[..]
-        );
+        assert_eq!(groups[..], get_ordered_groups(&app.db_pool).await?[..]);
 
         // move 3 back to 1
         app.instance_manager()
             .move_group(groups[3], Some(groups[1]))
             .await?;
         groups = [groups[0], groups[3], groups[1], groups[2], groups[4]];
-        assert_eq!(
-            groups[..],
-            get_ordered_groups(&app.db_pool).await?[..]
-        );
+        assert_eq!(groups[..], get_ordered_groups(&app.db_pool).await?[..]);
 
         // move 1 to end of list
         app.instance_manager().move_group(groups[1], None).await?;
         groups = [groups[0], groups[2], groups[3], groups[4], groups[1]];
-        assert_eq!(
-            groups[..],
-            get_ordered_groups(&app.db_pool).await?[..]
-        );
+        assert_eq!(groups[..], get_ordered_groups(&app.db_pool).await?[..]);
 
         // move 4 to beginning of list
         app.instance_manager()
             .move_group(groups[4], Some(groups[0]))
             .await?;
         groups = [groups[4], groups[0], groups[1], groups[2], groups[3]];
-        assert_eq!(
-            groups[..],
-            get_ordered_groups(&app.db_pool).await?[..]
-        );
+        assert_eq!(groups[..], get_ordered_groups(&app.db_pool).await?[..]);
 
         Ok(())
     }
@@ -2747,12 +2732,20 @@ mod test {
         }
 
         assert_eq!(
-            get_count(&app.db_pool, queries::modpack::CountCurseForgeModpackCache::SQL).await?,
+            get_count(
+                &app.db_pool,
+                queries::modpack::CountCurseForgeModpackCache::SQL
+            )
+            .await?,
             0
         );
 
         assert_eq!(
-            get_count(&app.db_pool, queries::modpack::CountModrinthModpackCache::SQL).await?,
+            get_count(
+                &app.db_pool,
+                queries::modpack::CountModrinthModpackCache::SQL
+            )
+            .await?,
             0
         );
 
@@ -2765,22 +2758,38 @@ mod test {
             .await?;
 
         assert_eq!(
-            get_count(&app.db_pool, queries::modpack::CountCurseForgeModpackCache::SQL).await?,
+            get_count(
+                &app.db_pool,
+                queries::modpack::CountCurseForgeModpackCache::SQL
+            )
+            .await?,
             1
         );
 
         assert_eq!(
-            get_count(&app.db_pool, queries::modpack::CountModrinthModpackCache::SQL).await?,
+            get_count(
+                &app.db_pool,
+                queries::modpack::CountModrinthModpackCache::SQL
+            )
+            .await?,
             1
         );
 
         assert_eq!(
-            get_count(&app.db_pool, queries::modpack::CountCurseForgeModpackImageCache::SQL).await?,
+            get_count(
+                &app.db_pool,
+                queries::modpack::CountCurseForgeModpackImageCache::SQL
+            )
+            .await?,
             1
         );
 
         assert_eq!(
-            get_count(&app.db_pool, queries::modpack::CountModrinthModpackImageCache::SQL).await?,
+            get_count(
+                &app.db_pool,
+                queries::modpack::CountModrinthModpackImageCache::SQL
+            )
+            .await?,
             1
         );
 

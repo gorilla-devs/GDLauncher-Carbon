@@ -3,30 +3,29 @@
 //! These structs map directly to the SQLite database tables and provide
 //! type-safe representations of database rows.
 
-pub mod settings;
 pub mod account;
-pub mod java;
-pub mod instance;
 pub mod cache;
+pub mod instance;
+pub mod java;
 pub mod metadata;
 pub mod modpack;
+pub mod settings;
 
 // Re-export commonly used types
-pub use settings::AppConfiguration;
 pub use account::{Account, Skin};
-pub use java::{Java, JavaProfile, JavaProfileWithPath};
-pub use instance::{Instance, InstanceGroup};
 pub use cache::{
-    HTTPCache, ActiveDownload, VersionInfoCache, PartialVersionInfoCache,
-    LwjglMetaCache, AssetsMetaCache,
+    ActiveDownload, AssetsMetaCache, HTTPCache, LwjglMetaCache, PartialVersionInfoCache,
+    VersionInfoCache,
 };
+pub use instance::{Instance, InstanceGroup};
+pub use java::{Java, JavaProfile, JavaProfileWithPath};
 pub use metadata::{
-    ModFileCache, ModMetadata, CurseForgeModCache, ModrinthModCache,
-    LocalModImageCache, CurseForgeModImageCache, ModrinthModImageCache,
-    ModFileCacheWithMetadata, ModFileCacheWithMetadataAndImages,
-    ModFileCacheWithCurseforge, ModFileCacheWithModrinth,
+    CurseForgeModCache, CurseForgeModImageCache, LocalModImageCache, ModFileCache,
+    ModFileCacheWithCurseforge, ModFileCacheWithMetadata, ModFileCacheWithMetadataAndImages,
+    ModFileCacheWithModrinth, ModMetadata, ModrinthModCache, ModrinthModImageCache,
 };
 pub use modpack::{
-    CurseForgeModpackCache, ModrinthModpackCache,
-    CurseForgeModpackImageCache, ModrinthModpackImageCache,
+    CurseForgeModpackCache, CurseForgeModpackImageCache, ModrinthModpackCache,
+    ModrinthModpackImageCache,
 };
+pub use settings::AppConfiguration;

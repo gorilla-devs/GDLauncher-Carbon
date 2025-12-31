@@ -5,7 +5,7 @@
 
 use crate::app_version::APP_VERSION;
 use carbon_repos::{
-    create_pool, migrations, models::AppConfiguration, queries, DbPool, PoolConfig,
+    DbPool, PoolConfig, create_pool, migrations, models::AppConfiguration, queries,
 };
 use std::path::PathBuf;
 use sysinfo::System;
@@ -71,7 +71,10 @@ pub fn load_and_migrate(
             return Err(DatabaseError::BackwardsMigration.into());
         }
 
-        debug!("Running migrations (current: {}, target: {})", current_version, expected_version);
+        debug!(
+            "Running migrations (current: {}, target: {})",
+            current_version, expected_version
+        );
         migrations::run_migrations(&mut conn)?;
         debug!("Migrations complete");
     }
@@ -132,16 +135,16 @@ fn seed_init_db(pool: &DbPool, latest_consent_sha: Option<String>) -> Result<(),
         .map(|last_version| last_version == APP_VERSION)
         .unwrap_or(false);
 
-    let should_force_release_channel = if APP_VERSION.contains("alpha") && !is_equal_to_current_version
-    {
-        true // Always force to alpha if running alpha
-    } else if APP_VERSION.contains("beta") && !is_equal_to_current_version {
-        // Only force to beta if current channel is stable
-        // Don't force down from alpha to beta
-        app_config.release_channel == "stable"
-    } else {
-        false
-    };
+    let should_force_release_channel =
+        if APP_VERSION.contains("alpha") && !is_equal_to_current_version {
+            true // Always force to alpha if running alpha
+        } else if APP_VERSION.contains("beta") && !is_equal_to_current_version {
+            // Only force to beta if current channel is stable
+            // Don't force down from alpha to beta
+            app_config.release_channel == "stable"
+        } else {
+            false
+        };
 
     // Apply updates if needed
     if should_force_release_channel {
@@ -160,9 +163,7 @@ fn seed_init_db(pool: &DbPool, latest_consent_sha: Option<String>) -> Result<(),
 
         info!(
             "Should empty tos_privacy: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
-            should_empty_tos_privacy,
-            latest_sha,
-            app_config.terms_and_privacy_accepted_checksum
+            should_empty_tos_privacy, latest_sha, app_config.terms_and_privacy_accepted_checksum
         );
 
         if should_empty_tos_privacy {
@@ -254,7 +255,9 @@ mod tests {
 
         // Verify app configuration was seeded
         let count: i32 = conn
-            .query_row("SELECT COUNT(*) FROM AppConfiguration", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM AppConfiguration", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(count, 1);
 
@@ -280,7 +283,9 @@ mod tests {
         // Verify still just one app configuration
         let conn = pool2.get().unwrap();
         let count: i32 = conn
-            .query_row("SELECT COUNT(*) FROM AppConfiguration", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM AppConfiguration", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(count, 1);
     }

@@ -162,11 +162,8 @@ mod tests {
         let pool = create_pool_default(&db_path).unwrap();
         let mut conn = pool.get().unwrap();
 
-        conn.execute(
-            "CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)",
-            [],
-        )
-        .unwrap();
+        conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)", [])
+            .unwrap();
 
         with_transaction(&mut conn, |tx| {
             tx.execute("INSERT INTO test (value) VALUES (?1)", ["hello"])
@@ -189,11 +186,8 @@ mod tests {
         let pool = create_pool_default(&db_path).unwrap();
         let mut conn = pool.get().unwrap();
 
-        conn.execute(
-            "CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)",
-            [],
-        )
-        .unwrap();
+        conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)", [])
+            .unwrap();
 
         let result: Result<(), DatabaseError> = with_transaction(&mut conn, |tx| {
             tx.execute("INSERT INTO test (value) VALUES (?1)", ["hello"])

@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use anyhow::Context;
-use carbon_repos::{models, queries, DatabaseError, DbPool, OptionalExt};
+use carbon_repos::{DatabaseError, DbPool, OptionalExt, models, queries};
 use carbon_rt_path::{InstancePath, RuntimePath};
 use daedalus::minecraft::{
     Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,

@@ -1,7 +1,7 @@
 use super::api::McSkin as ApiSkin;
 use crate::managers::ManagerRef;
 use anyhow::ensure;
-use carbon_repos::{models, queries, OptionalExt};
+use carbon_repos::{OptionalExt, models, queries};
 use image::{GenericImageView, ImageFormat};
 use rusqlite::params;
 use std::io::Cursor;
@@ -45,9 +45,7 @@ impl ManagerRef<'_, SkinManager> {
         .await??;
 
         Ok(match cached_skin {
-            Some(skin) => Skin {
-                data: skin.skin,
-            },
+            Some(skin) => Skin { data: skin.skin },
             None => {
                 let skin = match account.access_token.as_ref() {
                     Some(token) => super::api::get_profile(&self.app.reqwest_client, token)

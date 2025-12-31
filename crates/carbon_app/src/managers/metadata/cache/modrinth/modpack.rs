@@ -1,8 +1,5 @@
 use crate::{
-    domain::instance::{
-        InstanceModpackInfo,
-        info::ModrinthModpack,
-    },
+    domain::instance::{InstanceModpackInfo, info::ModrinthModpack},
     managers::{App, metadata::cache},
 };
 use carbon_platforms::modrinth::search::{ProjectID, VersionID};
@@ -64,7 +61,7 @@ pub async fn get_modpack_metadata(
                 let modpack_name: String = row.get("modpackName")?;
                 let version_name: String = row.get("versionName")?;
                 let url_slug: String = row.get("urlSlug")?;
-                let updated_at: String = row.get("updatedAt")?;
+                let updated_at = cache::read_datetime_column(row, "updatedAt")?;
                 let img_data: Option<Vec<u8>> = row.get("img_data")?;
                 Ok(ModpackCacheEntry {
                     modpack_name,
@@ -175,7 +172,13 @@ pub async fn get_modpack_metadata(
                 let conn = pool.get()?;
                 conn.execute(
                     queries::modpack::UpsertModrinthModpackCache::SQL,
-                    rusqlite::params![project_id, version_id, name_clone, file_name_clone, slug_clone],
+                    rusqlite::params![
+                        project_id,
+                        version_id,
+                        name_clone,
+                        file_name_clone,
+                        slug_clone
+                    ],
                 )?;
                 Ok::<_, anyhow::Error>(())
             })

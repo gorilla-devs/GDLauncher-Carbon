@@ -47,15 +47,18 @@ impl ModplatformCacher for CurseforgeModCacher {
         let id = *instance_id;
         let modlist_result = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(queries::metadata::ListModFilesNeedingCurseForgeUpdate::SQL)?;
-            let results = stmt.query_map(rusqlite::params![id], |row| {
-                let metadata_id: String = row.get(0)?;
-                let murmur2: i32 = row.get(1)?;
-                Ok((metadata_id, murmur2 as u32))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            let mut stmt =
+                conn.prepare(queries::metadata::ListModFilesNeedingCurseForgeUpdate::SQL)?;
+            let results = stmt
+                .query_map(rusqlite::params![id], |row| {
+                    let metadata_id: String = row.get(0)?;
+                    let murmur2: i32 = row.get(1)?;
+                    Ok((metadata_id, murmur2 as u32))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
             Ok::<_, anyhow::Error>(results)
-        }).await??;
+        })
+        .await??;
 
         let mcm = app.meta_cache_manager();
         let ignored_hashes = mcm.ignored_remote_cf_hashes.read().await;
@@ -217,18 +220,21 @@ impl ModplatformCacher for CurseforgeModCacher {
         let id = *instance_id;
         let modlist = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(queries::metadata::ListModFilesWithOutdatedCurseForgeIcons::SQL)?;
-            let results = stmt.query_map(rusqlite::params![id], |row| {
-                let filename: String = row.get(0)?;
-                let project_id: i32 = row.get(1)?;
-                let file_id: i32 = row.get(2)?;
-                let metadata_id: String = row.get(3)?;
-                let url: String = row.get(4)?;
-                Ok((filename, project_id, file_id, metadata_id, url))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            let mut stmt =
+                conn.prepare(queries::metadata::ListModFilesWithOutdatedCurseForgeIcons::SQL)?;
+            let results = stmt
+                .query_map(rusqlite::params![id], |row| {
+                    let filename: String = row.get(0)?;
+                    let project_id: i32 = row.get(1)?;
+                    let file_id: i32 = row.get(2)?;
+                    let metadata_id: String = row.get(3)?;
+                    let url: String = row.get(4)?;
+                    Ok((filename, project_id, file_id, metadata_id, url))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
             Ok::<_, anyhow::Error>(results)
-        }).await;
+        })
+        .await;
 
         let modlist = match modlist {
             Ok(Ok(modlist)) => modlist,
@@ -414,17 +420,15 @@ async fn cache_curseforge_meta_unchecked(
         let result = conn.query_row(
             queries::metadata::FindCurseForgeModCache::SQL,
             rusqlite::params![metadata_id_clone],
-            |row| {
-                let cached_at: String = row.get("cachedAt")?;
-                Ok(cached_at)
-            },
+            |row| super::read_datetime_column(row, "cachedAt"),
         );
         match result {
             Ok(cached_at) => Ok(Some(cached_at)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(anyhow::Error::from(e)),
         }
-    }).await??;
+    })
+    .await??;
 
     if let Some(cached_at) = existing_entry {
         // Parse the cached_at timestamp and check if it's recent
@@ -470,7 +474,8 @@ async fn cache_curseforge_meta_unchecked(
             ],
         )?;
         Ok::<_, anyhow::Error>(())
-    }).await??;
+    })
+    .await??;
 
     // Handle logo image cache
     if let Some(logo) = &modinfo.logo {
@@ -486,11 +491,13 @@ async fn cache_curseforge_meta_unchecked(
                     metadata_id_clone,
                     logo_url,
                     Option::<Vec<u8>>::None,
-                    0  // upToDate = 0, mark as needing download
+                    0 // upToDate = 0, mark as needing download
                 ],
             )?;
             Ok::<_, anyhow::Error>(())
-        }).await? {
+        })
+        .await?
+        {
             warn!(
                 "Failed to upsert curseforge image for metadata_id {}: {:?}",
                 metadata_id, e

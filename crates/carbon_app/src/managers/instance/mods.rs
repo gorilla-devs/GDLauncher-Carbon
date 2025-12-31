@@ -19,7 +19,7 @@ use carbon_platforms::modrinth::version::VersionType;
 use carbon_platforms::{
     ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion, curseforge, modrinth,
 };
-use carbon_repos::{models, queries, OptionalExt};
+use carbon_repos::{OptionalExt, models, queries};
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::Future;
 use std::borrow::Cow;
@@ -115,14 +115,21 @@ impl ManagerRef<'_, InstanceManager> {
         let mods = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
 
-            let mods: Vec<models::ModFileCacheWithMetadataAndImages> = if let Some(ref addon_type_str) = addon_type_filter {
-                let mut stmt = conn.prepare(queries::metadata::ListModFileCacheWithMetadataAndImagesByInstanceAndType::SQL)?;
+            let mods: Vec<models::ModFileCacheWithMetadataAndImages> = if let Some(
+                ref addon_type_str,
+            ) = addon_type_filter
+            {
+                let mut stmt = conn.prepare(
+                    queries::metadata::ListModFileCacheWithMetadataAndImagesByInstanceAndType::SQL,
+                )?;
                 stmt.query_map(rusqlite::params![instance_id_val, addon_type_str], |row| {
                     models::ModFileCacheWithMetadataAndImages::from_row(row)
                 })?
                 .collect::<Result<Vec<_>, _>>()?
             } else {
-                let mut stmt = conn.prepare(queries::metadata::ListModFileCacheWithMetadataAndImagesByInstance::SQL)?;
+                let mut stmt = conn.prepare(
+                    queries::metadata::ListModFileCacheWithMetadataAndImagesByInstance::SQL,
+                )?;
                 stmt.query_map(rusqlite::params![instance_id_val], |row| {
                     models::ModFileCacheWithMetadataAndImages::from_row(row)
                 })?
@@ -156,7 +163,9 @@ impl ManagerRef<'_, InstanceManager> {
             let has_cf = m.cf_project_id.is_some();
             let has_mr = m.mr_project_id.is_some();
 
-            let has_curseforge_update = if let (Some(release_type), Some(update_paths)) = (m.cf_release_type, &m.cf_update_paths) {
+            let has_curseforge_update = if let (Some(release_type), Some(update_paths)) =
+                (m.cf_release_type, &m.cf_update_paths)
+            {
                 match ModChannel::try_from(release_type) {
                     Ok(channel) => {
                         !mod_sources
@@ -177,7 +186,9 @@ impl ManagerRef<'_, InstanceManager> {
                 false
             };
 
-            let has_modrinth_update = if let (Some(release_type), Some(update_paths)) = (m.mr_release_type, &m.mr_update_paths) {
+            let has_modrinth_update = if let (Some(release_type), Some(update_paths)) =
+                (m.mr_release_type, &m.mr_update_paths)
+            {
                 match ModChannel::try_from(release_type) {
                     Ok(channel) => {
                         !mod_sources
@@ -211,7 +222,8 @@ impl ManagerRef<'_, InstanceManager> {
                     version: m.version.clone(),
                     description: m.description.clone(),
                     authors: m.authors.clone(),
-                    modloaders: m.modloaders
+                    modloaders: m
+                        .modloaders
                         .split(',')
                         .flat_map(|loader| ModLoaderType::try_from(loader).ok())
                         .collect::<Vec<_>>(),
@@ -667,13 +679,14 @@ impl ManagerRef<'_, InstanceManager> {
         .await??
         .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let cf = m.cf_project_id.map(|_| {
-            (m.cf_project_id.unwrap(), m.cf_file_id.unwrap())
-        });
+        let cf = m
+            .cf_project_id
+            .map(|_| (m.cf_project_id.unwrap(), m.cf_file_id.unwrap()));
 
-        let mr = m.mr_project_id.clone().map(|project_id| {
-            (project_id, m.mr_version_id.clone().unwrap())
-        });
+        let mr = m
+            .mr_project_id
+            .clone()
+            .map(|project_id| (project_id, m.mr_version_id.clone().unwrap()));
 
         let mut versions = Vec::new();
 
@@ -838,9 +851,11 @@ impl ManagerRef<'_, InstanceManager> {
         .await??
         .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let (cf_project_id, cf_file_id) = m.cf_project_id
-            .zip(m.cf_file_id)
-            .ok_or_else(|| anyhow!("Attempted to use update_curseforge_mod to update a mod not availible on curseforge"))?;
+        let (cf_project_id, cf_file_id) = m.cf_project_id.zip(m.cf_file_id).ok_or_else(|| {
+            anyhow!(
+                "Attempted to use update_curseforge_mod to update a mod not availible on curseforge"
+            )
+        })?;
 
         let mod_files = self
             .app
@@ -917,9 +932,8 @@ impl ManagerRef<'_, InstanceManager> {
         .await??
         .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let (mr_project_id, mr_version_id) = m.mr_project_id
-            .zip(m.mr_version_id)
-            .ok_or_else(|| {
+        let (mr_project_id, mr_version_id) =
+            m.mr_project_id.zip(m.mr_version_id).ok_or_else(|| {
                 anyhow!(
                     "Attempted to use update_modrinth_mod to update a mod not availible on modrinth"
                 )

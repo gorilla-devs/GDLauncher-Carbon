@@ -4,10 +4,22 @@ use crate::define_query;
 
 // ModFileCache queries
 define_query!(FindModFileCache, "SELECT * FROM ModFileCache WHERE id = ?1");
-define_query!(FindModFileCacheByInstanceAndFilename, "SELECT * FROM ModFileCache WHERE instanceId = ?1 AND filename = ?2");
-define_query!(ListModFileCacheByInstance, "SELECT * FROM ModFileCache WHERE instanceId = ?1 ORDER BY filename");
-define_query!(ListModFileCacheByInstanceAndType, "SELECT * FROM ModFileCache WHERE instanceId = ?1 AND addonType = ?2 ORDER BY filename");
-define_query!(CountModFileCacheByInstance, "SELECT COUNT(*) FROM ModFileCache WHERE instanceId = ?1");
+define_query!(
+    FindModFileCacheByInstanceAndFilename,
+    "SELECT * FROM ModFileCache WHERE instanceId = ?1 AND filename = ?2"
+);
+define_query!(
+    ListModFileCacheByInstance,
+    "SELECT * FROM ModFileCache WHERE instanceId = ?1 ORDER BY filename"
+);
+define_query!(
+    ListModFileCacheByInstanceAndType,
+    "SELECT * FROM ModFileCache WHERE instanceId = ?1 AND addonType = ?2 ORDER BY filename"
+);
+define_query!(
+    CountModFileCacheByInstance,
+    "SELECT COUNT(*) FROM ModFileCache WHERE instanceId = ?1"
+);
 
 define_query!(
     CreateModFileCache,
@@ -21,15 +33,30 @@ define_query!(
     VALUES (?1, datetime('now'), ?2, ?3, ?4, ?5, ?6, ?7)"#
 );
 
-define_query!(UpdateModFileCacheEnabled, "UPDATE ModFileCache SET enabled = ?2, lastUpdatedAt = datetime('now') WHERE id = ?1");
-define_query!(UpdateModFileCacheFilename, "UPDATE ModFileCache SET filename = ?2, lastUpdatedAt = datetime('now') WHERE id = ?1");
+define_query!(
+    UpdateModFileCacheEnabled,
+    "UPDATE ModFileCache SET enabled = ?2, lastUpdatedAt = datetime('now') WHERE id = ?1"
+);
+define_query!(
+    UpdateModFileCacheFilename,
+    "UPDATE ModFileCache SET filename = ?2, lastUpdatedAt = datetime('now') WHERE id = ?1"
+);
 define_query!(DeleteModFileCache, "DELETE FROM ModFileCache WHERE id = ?1");
-define_query!(DeleteModFileCacheByInstance, "DELETE FROM ModFileCache WHERE instanceId = ?1");
-define_query!(DeleteModFileCacheByInstanceAndFilename, "DELETE FROM ModFileCache WHERE instanceId = ?1 AND filename = ?2");
+define_query!(
+    DeleteModFileCacheByInstance,
+    "DELETE FROM ModFileCache WHERE instanceId = ?1"
+);
+define_query!(
+    DeleteModFileCacheByInstanceAndFilename,
+    "DELETE FROM ModFileCache WHERE instanceId = ?1 AND filename = ?2"
+);
 
 // ModMetadata queries
 define_query!(FindModMetadata, "SELECT * FROM ModMetadata WHERE id = ?1");
-define_query!(FindModMetadataByMurmur2, "SELECT * FROM ModMetadata WHERE murmur2 = ?1");
+define_query!(
+    FindModMetadataByMurmur2,
+    "SELECT * FROM ModMetadata WHERE murmur2 = ?1"
+);
 define_query!(ListModMetadata, "SELECT * FROM ModMetadata ORDER BY name");
 
 define_query!(
@@ -55,9 +82,18 @@ define_query!(
 );
 
 // CurseForgeModCache queries
-define_query!(FindCurseForgeModCache, "SELECT * FROM CurseForgeModCache WHERE metadataId = ?1");
-define_query!(FindCurseForgeModCacheByProjectFile, "SELECT * FROM CurseForgeModCache WHERE projectId = ?1 AND fileId = ?2");
-define_query!(FindCurseForgeModCacheByMurmur2, "SELECT * FROM CurseForgeModCache WHERE murmur2 = ?1");
+define_query!(
+    FindCurseForgeModCache,
+    "SELECT * FROM CurseForgeModCache WHERE metadataId = ?1"
+);
+define_query!(
+    FindCurseForgeModCacheByProjectFile,
+    "SELECT * FROM CurseForgeModCache WHERE projectId = ?1 AND fileId = ?2"
+);
+define_query!(
+    FindCurseForgeModCacheByMurmur2,
+    "SELECT * FROM CurseForgeModCache WHERE murmur2 = ?1"
+);
 
 define_query!(
     UpsertCurseForgeModCache,
@@ -66,12 +102,24 @@ define_query!(
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"#
 );
 
-define_query!(DeleteCurseForgeModCache, "DELETE FROM CurseForgeModCache WHERE metadataId = ?1");
+define_query!(
+    DeleteCurseForgeModCache,
+    "DELETE FROM CurseForgeModCache WHERE metadataId = ?1"
+);
 
 // ModrinthModCache queries
-define_query!(FindModrinthModCache, "SELECT * FROM ModrinthModCache WHERE metadataId = ?1");
-define_query!(FindModrinthModCacheByProjectVersion, "SELECT * FROM ModrinthModCache WHERE projectId = ?1 AND versionId = ?2");
-define_query!(FindModrinthModCacheBySha512, "SELECT * FROM ModrinthModCache WHERE sha512 = ?1");
+define_query!(
+    FindModrinthModCache,
+    "SELECT * FROM ModrinthModCache WHERE metadataId = ?1"
+);
+define_query!(
+    FindModrinthModCacheByProjectVersion,
+    "SELECT * FROM ModrinthModCache WHERE projectId = ?1 AND versionId = ?2"
+);
+define_query!(
+    FindModrinthModCacheBySha512,
+    "SELECT * FROM ModrinthModCache WHERE sha512 = ?1"
+);
 
 define_query!(
     UpsertModrinthModCache,
@@ -80,7 +128,10 @@ define_query!(
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)"#
 );
 
-define_query!(DeleteModrinthModCache, "DELETE FROM ModrinthModCache WHERE metadataId = ?1");
+define_query!(
+    DeleteModrinthModCache,
+    "DELETE FROM ModrinthModCache WHERE metadataId = ?1"
+);
 
 // Queries for checking if a mod from a specific platform exists in an instance
 define_query!(
@@ -165,27 +216,54 @@ define_query!(
 );
 
 // LocalModImageCache queries
-define_query!(FindLocalModImageCache, "SELECT * FROM LocalModImageCache WHERE metadataId = ?1");
-define_query!(UpsertLocalModImageCache, "INSERT OR REPLACE INTO LocalModImageCache (metadataId, data) VALUES (?1, ?2)");
-define_query!(DeleteLocalModImageCache, "DELETE FROM LocalModImageCache WHERE metadataId = ?1");
+define_query!(
+    FindLocalModImageCache,
+    "SELECT * FROM LocalModImageCache WHERE metadataId = ?1"
+);
+define_query!(
+    UpsertLocalModImageCache,
+    "INSERT OR REPLACE INTO LocalModImageCache (metadataId, data) VALUES (?1, ?2)"
+);
+define_query!(
+    DeleteLocalModImageCache,
+    "DELETE FROM LocalModImageCache WHERE metadataId = ?1"
+);
 
 // CurseForgeModImageCache queries
-define_query!(FindCurseForgeModImageCache, "SELECT * FROM CurseForgeModImageCache WHERE metadataId = ?1");
+define_query!(
+    FindCurseForgeModImageCache,
+    "SELECT * FROM CurseForgeModImageCache WHERE metadataId = ?1"
+);
 define_query!(
     UpsertCurseForgeModImageCache,
     "INSERT OR REPLACE INTO CurseForgeModImageCache (metadataId, url, data, upToDate) VALUES (?1, ?2, ?3, ?4)"
 );
-define_query!(UpdateCurseForgeModImageCacheData, "UPDATE CurseForgeModImageCache SET data = ?2, upToDate = ?3 WHERE metadataId = ?1");
-define_query!(DeleteCurseForgeModImageCache, "DELETE FROM CurseForgeModImageCache WHERE metadataId = ?1");
+define_query!(
+    UpdateCurseForgeModImageCacheData,
+    "UPDATE CurseForgeModImageCache SET data = ?2, upToDate = ?3 WHERE metadataId = ?1"
+);
+define_query!(
+    DeleteCurseForgeModImageCache,
+    "DELETE FROM CurseForgeModImageCache WHERE metadataId = ?1"
+);
 
 // ModrinthModImageCache queries
-define_query!(FindModrinthModImageCache, "SELECT * FROM ModrinthModImageCache WHERE metadataId = ?1");
+define_query!(
+    FindModrinthModImageCache,
+    "SELECT * FROM ModrinthModImageCache WHERE metadataId = ?1"
+);
 define_query!(
     UpsertModrinthModImageCache,
     "INSERT OR REPLACE INTO ModrinthModImageCache (metadataId, url, data, upToDate) VALUES (?1, ?2, ?3, ?4)"
 );
-define_query!(UpdateModrinthModImageCacheData, "UPDATE ModrinthModImageCache SET data = ?2, upToDate = ?3 WHERE metadataId = ?1");
-define_query!(DeleteModrinthModImageCache, "DELETE FROM ModrinthModImageCache WHERE metadataId = ?1");
+define_query!(
+    UpdateModrinthModImageCacheData,
+    "UPDATE ModrinthModImageCache SET data = ?2, upToDate = ?3 WHERE metadataId = ?1"
+);
+define_query!(
+    DeleteModrinthModImageCache,
+    "DELETE FROM ModrinthModImageCache WHERE metadataId = ?1"
+);
 
 // Complex join queries for fetching mod files with all metadata
 define_query!(
@@ -305,4 +383,3 @@ define_query!(
     WHERE mfc.instanceId = ?1 AND mfc.addonType = ?2
     ORDER BY mfc.filename"#
 );
-

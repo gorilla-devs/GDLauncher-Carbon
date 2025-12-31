@@ -5,7 +5,9 @@ use crate::managers::App;
 use crate::managers::ManagerRef;
 use crate::managers::vtask::VisualTask;
 use anyhow::anyhow;
-use carbon_repos::{queries, models::ModFileCache as DbModFileCache, models::ModMetadata as DbModMetadata, DbPool};
+use carbon_repos::{
+    DbPool, models::ModFileCache as DbModFileCache, models::ModMetadata as DbModMetadata, queries,
+};
 use carbon_rt_path::InstancesPath;
 use curseforge::CurseforgeModCacher;
 use futures::Future;
@@ -701,9 +703,13 @@ impl ManagerRef<'_, MetaCacheManager> {
         let id = *instance_id;
         let delete_result = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(queries::metadata::DeleteModFileCacheByInstance::SQL, rusqlite::params![id])?;
+            conn.execute(
+                queries::metadata::DeleteModFileCacheByInstance::SQL,
+                rusqlite::params![id],
+            )?;
             Ok::<_, anyhow::Error>(())
-        }).await;
+        })
+        .await;
 
         if let Err(e) = delete_result {
             error!({ error = ?e }, "Failed to delete mod file cache for instance {instance_id}");
@@ -719,7 +725,8 @@ impl ManagerRef<'_, MetaCacheManager> {
             let conn = pool.get()?;
             conn.execute(queries::metadata::DeleteOrphanedModMetadata::SQL, [])?;
             Ok::<_, anyhow::Error>(())
-        }).await;
+        })
+        .await;
 
         if let Err(e) = result {
             error!({ error = ?e }, "Failed to garbage collect mod metadata");
@@ -1077,9 +1084,11 @@ impl ManagerRef<'_, MetaCacheManager> {
                     queries::metadata::FindModMetadataBySha512AndMurmur2::SQL,
                     rusqlite::params![sha512_vec, murmur2_i32],
                     |row| DbModMetadata::from_row(row),
-                ).optional()
+                )
+                .optional()
             }
-        }).await??;
+        })
+        .await??;
 
         let (meta_id, meta_insert, logo_insert) = match dbmeta {
             Some(meta) => (meta.id, false, false),
@@ -1119,7 +1128,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                 let meta_id_clone = meta_id.clone();
                 let sha512_vec_clone = sha512_vec.clone();
                 let sha1_vec = Vec::from(sha1);
-                let modloaders = meta.as_ref()
+                let modloaders = meta
+                    .as_ref()
                     .map(|meta| &meta.modloaders)
                     .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
                     .unwrap_or(String::new());
@@ -1147,7 +1157,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                         ],
                     )?;
                     Ok::<_, anyhow::Error>(())
-                }).await??;
+                })
+                .await??;
 
                 // Insert logo if present
                 let has_logo = logo_data.is_some();
@@ -1161,7 +1172,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                             rusqlite::params![meta_id_clone, logo_data],
                         )?;
                         Ok::<_, anyhow::Error>(())
-                    }).await??;
+                    })
+                    .await??;
                 }
 
                 (meta_id, true, has_logo)
@@ -1190,7 +1202,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                 ],
             )?;
             Ok::<_, anyhow::Error>(())
-        }).await??;
+        })
+        .await??;
 
         Ok(meta_id)
     }
@@ -1248,11 +1261,14 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             let cached_entries = tokio::spawn(async move {
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    let mut stmt = conn.prepare(queries::metadata::ListModFileCacheByInstance::SQL)?;
-                    let entries = stmt.query_map(rusqlite::params![id], |row| DbModFileCache::from_row(row))?
+                    let mut stmt =
+                        conn.prepare(queries::metadata::ListModFileCacheByInstance::SQL)?;
+                    let entries = stmt
+                        .query_map(rusqlite::params![id], |row| DbModFileCache::from_row(row))?
                         .collect::<Result<Vec<_>, _>>()?;
                     Ok::<_, anyhow::Error>(entries)
-                }).await?
+                })
+                .await?
             });
 
             let instance_manager = app.instance_manager();
@@ -1418,7 +1434,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                                 rusqlite::params![id, filename],
                             )?;
                             Ok::<_, anyhow::Error>(())
-                        }).await;
+                        })
+                        .await;
                     }
 
                     has_outdated_entries = true;
@@ -1603,5 +1620,46 @@ impl<T> OptionalExt<T> for rusqlite::Result<T> {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
+    }
+}
+
+/// Helper function to read a datetime column that may be stored as either:
+/// - INTEGER (Unix timestamp in milliseconds, from Prisma's DateTime)
+/// - TEXT (RFC3339 string, from new code)
+/// Returns the datetime as an RFC3339 string for consistency.
+pub(crate) fn read_datetime_column(
+    row: &rusqlite::Row,
+    column_name: &str,
+) -> rusqlite::Result<String> {
+    use rusqlite::types::ValueRef;
+
+    match row.get_ref(column_name)? {
+        ValueRef::Text(bytes) => {
+            // Already a string, return as-is
+            Ok(String::from_utf8_lossy(bytes).into_owned())
+        }
+        ValueRef::Integer(timestamp_ms) => {
+            // Convert Unix timestamp (milliseconds) to RFC3339
+            let timestamp_secs = timestamp_ms / 1000;
+            let datetime = chrono::DateTime::from_timestamp(timestamp_secs, 0)
+                .unwrap_or_else(chrono::Utc::now);
+            Ok(datetime.to_rfc3339())
+        }
+        ValueRef::Real(timestamp_f64) => {
+            // Handle REAL type (some SQLite datetime representations)
+            let timestamp_secs = timestamp_f64 as i64;
+            let datetime = chrono::DateTime::from_timestamp(timestamp_secs, 0)
+                .unwrap_or_else(chrono::Utc::now);
+            Ok(datetime.to_rfc3339())
+        }
+        ValueRef::Null => {
+            // Return current time for null values
+            Ok(chrono::Utc::now().to_rfc3339())
+        }
+        ValueRef::Blob(_) => Err(rusqlite::Error::InvalidColumnType(
+            row.as_ref().column_index(column_name).unwrap_or(0),
+            column_name.to_string(),
+            rusqlite::types::Type::Blob,
+        )),
     }
 }

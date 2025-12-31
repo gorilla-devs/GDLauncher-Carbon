@@ -61,7 +61,7 @@ pub async fn get_modpack_metadata(
                 let modpack_name: String = row.get("modpackName")?;
                 let version_name: String = row.get("versionName")?;
                 let url_slug: String = row.get("urlSlug")?;
-                let updated_at: String = row.get("updatedAt")?;
+                let updated_at = cache::read_datetime_column(row, "updatedAt")?;
                 let img_data: Option<Vec<u8>> = row.get("img_data")?;
                 Ok(ModpackCacheEntry {
                     modpack_name,

@@ -2,7 +2,7 @@ use super::{discovery::Discovery, java_checker::JavaChecker};
 use crate::domain::java::{
     JavaArch, JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName,
 };
-use carbon_repos::{models, queries, DbPool};
+use carbon_repos::{DbPool, models, queries};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 use tracing::{info, trace, warn};
@@ -245,9 +245,10 @@ where
         let conn = pool.get()?;
         let mut stmt = conn.prepare("SELECT * FROM Java WHERE type = ?1")?;
         let javas = stmt
-            .query_map(rusqlite::params![JavaComponentType::Local.to_string()], |row| {
-                models::Java::from_row(row)
-            })?
+            .query_map(
+                rusqlite::params![JavaComponentType::Local.to_string()],
+                |row| models::Java::from_row(row),
+            )?
             .collect::<Result<Vec<_>, _>>()?;
         Ok::<_, anyhow::Error>(javas)
     })
@@ -266,15 +267,13 @@ where
             continue;
         }
 
-        let is_used_in_profile = java_profiles_with_paths
-            .iter()
-            .any(|profile| {
-                profile
-                    .java_path
-                    .as_ref()
-                    .map(|p| p == &local_java_from_db.path)
-                    .unwrap_or(false)
-            });
+        let is_used_in_profile = java_profiles_with_paths.iter().any(|profile| {
+            profile
+                .java_path
+                .as_ref()
+                .map(|p| p == &local_java_from_db.path)
+                .unwrap_or(false)
+        });
 
         if is_used_in_profile {
             update_java_component_in_db_to_invalid(db_pool, local_java_from_db.path).await?;
@@ -283,7 +282,10 @@ where
             let path = local_java_from_db.path;
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.execute(queries::java::DeleteJavaByPath::SQL, rusqlite::params![&path])?;
+                conn.execute(
+                    queries::java::DeleteJavaByPath::SQL,
+                    rusqlite::params![&path],
+                )?;
                 Ok::<_, anyhow::Error>(())
             })
             .await??;
@@ -303,9 +305,10 @@ where
         let conn = pool.get()?;
         let mut stmt = conn.prepare("SELECT * FROM Java WHERE type = ?1")?;
         let javas = stmt
-            .query_map(rusqlite::params![JavaComponentType::Custom.to_string()], |row| {
-                models::Java::from_row(row)
-            })?
+            .query_map(
+                rusqlite::params![JavaComponentType::Custom.to_string()],
+                |row| models::Java::from_row(row),
+            )?
             .collect::<Result<Vec<_>, _>>()?;
         Ok::<_, anyhow::Error>(javas)
     })
@@ -342,9 +345,10 @@ where
         let conn = pool.get()?;
         let mut stmt = conn.prepare("SELECT * FROM Java WHERE type = ?1")?;
         let javas = stmt
-            .query_map(rusqlite::params![JavaComponentType::Managed.to_string()], |row| {
-                models::Java::from_row(row)
-            })?
+            .query_map(
+                rusqlite::params![JavaComponentType::Managed.to_string()],
+                |row| models::Java::from_row(row),
+            )?
             .collect::<Result<Vec<_>, _>>()?;
         Ok::<_, anyhow::Error>(javas)
     })

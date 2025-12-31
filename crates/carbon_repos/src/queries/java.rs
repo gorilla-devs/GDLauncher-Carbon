@@ -5,8 +5,14 @@ use crate::define_query;
 // Java read queries
 define_query!(FindJavaById, "SELECT * FROM Java WHERE id = ?1");
 define_query!(FindJavaByPath, "SELECT * FROM Java WHERE path = ?1");
-define_query!(ListJavas, "SELECT * FROM Java ORDER BY major DESC, fullVersion DESC");
-define_query!(ListValidJavas, "SELECT * FROM Java WHERE isValid = 1 ORDER BY major DESC, fullVersion DESC");
+define_query!(
+    ListJavas,
+    "SELECT * FROM Java ORDER BY major DESC, fullVersion DESC"
+);
+define_query!(
+    ListValidJavas,
+    "SELECT * FROM Java WHERE isValid = 1 ORDER BY major DESC, fullVersion DESC"
+);
 define_query!(CountJavas, "SELECT COUNT(*) FROM Java");
 
 // Java create/update queries
@@ -22,15 +28,27 @@ define_query!(
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"#
 );
 
-define_query!(UpdateJavaValid, "UPDATE Java SET isValid = ?2 WHERE id = ?1");
+define_query!(
+    UpdateJavaValid,
+    "UPDATE Java SET isValid = ?2 WHERE id = ?1"
+);
 define_query!(DeleteJava, "DELETE FROM Java WHERE id = ?1");
 define_query!(DeleteJavaByPath, "DELETE FROM Java WHERE path = ?1");
 
 // JavaProfile read queries
-define_query!(FindJavaProfileByName, "SELECT * FROM JavaProfile WHERE name = ?1");
+define_query!(
+    FindJavaProfileByName,
+    "SELECT * FROM JavaProfile WHERE name = ?1"
+);
 define_query!(ListJavaProfiles, "SELECT * FROM JavaProfile ORDER BY name");
-define_query!(ListSystemJavaProfiles, "SELECT * FROM JavaProfile WHERE isSystemProfile = 1 ORDER BY name");
-define_query!(ListUserJavaProfiles, "SELECT * FROM JavaProfile WHERE isSystemProfile = 0 ORDER BY name");
+define_query!(
+    ListSystemJavaProfiles,
+    "SELECT * FROM JavaProfile WHERE isSystemProfile = 1 ORDER BY name"
+);
+define_query!(
+    ListUserJavaProfiles,
+    "SELECT * FROM JavaProfile WHERE isSystemProfile = 0 ORDER BY name"
+);
 
 // JavaProfile with Java join
 define_query!(
@@ -73,7 +91,12 @@ define_query!(
     "INSERT OR REPLACE INTO JavaProfile (name, isSystemProfile, javaId) VALUES (?1, ?2, ?3)"
 );
 
-define_query!(UpdateJavaProfileJavaId, "UPDATE JavaProfile SET javaId = ?2 WHERE name = ?1");
+define_query!(
+    UpdateJavaProfileJavaId,
+    "UPDATE JavaProfile SET javaId = ?2 WHERE name = ?1"
+);
 define_query!(DeleteJavaProfile, "DELETE FROM JavaProfile WHERE name = ?1");
-define_query!(DeleteSystemJavaProfiles, "DELETE FROM JavaProfile WHERE isSystemProfile = 1");
-
+define_query!(
+    DeleteSystemJavaProfiles,
+    "DELETE FROM JavaProfile WHERE isSystemProfile = 1"
+);

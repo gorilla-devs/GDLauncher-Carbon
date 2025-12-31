@@ -1,7 +1,7 @@
 use super::META_VERSION;
 use crate::managers::java::utils::PATH_SEPARATOR;
 use anyhow::{Context, bail};
-use carbon_repos::{models, queries, DatabaseError, DbPool, OptionalExt};
+use carbon_repos::{DatabaseError, DbPool, OptionalExt, models, queries};
 use carbon_rt_path::{InstancePath, LibrariesPath};
 use daedalus::{
     GradleSpecifier,

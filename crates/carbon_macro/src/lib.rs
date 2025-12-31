@@ -121,27 +121,68 @@ pub fn derive_from_row(input: TokenStream) -> TokenStream {
                 let struct_name_str = struct_name.to_string();
                 let field_name_str = field_name.to_string();
                 if is_optional {
-                    // Option<DateTime<Utc>> - parse with .and_then(), None on failure
-                    quote! {
-                        #field_name: row.get::<_, Option<String>>(#column_name)?
-                            .and_then(|s| s.parse().ok())
-                    }
-                } else {
-                    // DateTime<Utc> - parse with fallback to Utc::now(), but log warning
+                    // Option<DateTime<Utc>> - handle both INTEGER (timestamp) and TEXT (RFC3339)
                     quote! {
                         #field_name: {
-                            let raw_value = row.get::<_, String>(#column_name)?;
-                            raw_value.parse().unwrap_or_else(|e| {
-                                tracing::warn!(
-                                    struct_name = #struct_name_str,
-                                    field = #field_name_str,
-                                    column = #column_name,
-                                    raw_value = %raw_value,
-                                    error = %e,
-                                    "DateTime parse failed, using Utc::now() as fallback"
-                                );
-                                chrono::Utc::now()
-                            })
+                            use rusqlite::types::ValueRef;
+                            match row.get_ref(#column_name)? {
+                                ValueRef::Text(bytes) => {
+                                    let s = String::from_utf8_lossy(bytes);
+                                    s.parse().ok()
+                                }
+                                ValueRef::Integer(timestamp_ms) => {
+                                    let timestamp_secs = timestamp_ms / 1000;
+                                    chrono::DateTime::from_timestamp(timestamp_secs, 0)
+                                }
+                                ValueRef::Null => None,
+                                _ => None,
+                            }
+                        }
+                    }
+                } else {
+                    // DateTime<Utc> - handle both INTEGER (timestamp) and TEXT (RFC3339), fallback to Utc::now()
+                    quote! {
+                        #field_name: {
+                            use rusqlite::types::ValueRef;
+                            match row.get_ref(#column_name)? {
+                                ValueRef::Text(bytes) => {
+                                    let s = String::from_utf8_lossy(bytes);
+                                    s.parse().unwrap_or_else(|e| {
+                                        tracing::warn!(
+                                            struct_name = #struct_name_str,
+                                            field = #field_name_str,
+                                            column = #column_name,
+                                            raw_value = %s,
+                                            error = %e,
+                                            "DateTime parse failed, using Utc::now() as fallback"
+                                        );
+                                        chrono::Utc::now()
+                                    })
+                                }
+                                ValueRef::Integer(timestamp_ms) => {
+                                    let timestamp_secs = timestamp_ms / 1000;
+                                    chrono::DateTime::from_timestamp(timestamp_secs, 0)
+                                        .unwrap_or_else(chrono::Utc::now)
+                                }
+                                ValueRef::Null => {
+                                    tracing::warn!(
+                                        struct_name = #struct_name_str,
+                                        field = #field_name_str,
+                                        column = #column_name,
+                                        "DateTime column is NULL, using Utc::now() as fallback"
+                                    );
+                                    chrono::Utc::now()
+                                }
+                                other => {
+                                    tracing::warn!(
+                                        struct_name = #struct_name_str,
+                                        field = #field_name_str,
+                                        column = #column_name,
+                                        "Unexpected column type for DateTime, using Utc::now() as fallback"
+                                    );
+                                    chrono::Utc::now()
+                                }
+                            }
                         }
                     }
                 }
@@ -185,14 +226,18 @@ fn get_rename_all(attrs: &[syn::Attribute]) -> RenameAll {
         if attr.path().is_ident("serde") {
             // Parse the attribute arguments as MetaNameValue (e.g., rename_all = "camelCase")
             let nested = attr.parse_args_with(
-                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated
+                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
             );
 
             if let Ok(nested) = nested {
                 for meta in nested {
                     if let syn::Meta::NameValue(nv) = meta {
                         if nv.path.is_ident("rename_all") {
-                            if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit_str), .. }) = &nv.value {
+                            if let syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Str(lit_str),
+                                ..
+                            }) = &nv.value
+                            {
                                 let value = lit_str.value();
                                 return match value.as_str() {
                                     "snake_case" => RenameAll::SnakeCase,
@@ -219,14 +264,18 @@ fn get_serde_rename(attrs: &[syn::Attribute]) -> Option<String> {
     for attr in attrs {
         if attr.path().is_ident("serde") {
             let nested = attr.parse_args_with(
-                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated
+                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
             );
 
             if let Ok(nested) = nested {
                 for meta in nested {
                     if let syn::Meta::NameValue(nv) = meta {
                         if nv.path.is_ident("rename") {
-                            if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit_str), .. }) = &nv.value {
+                            if let syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Str(lit_str),
+                                ..
+                            }) = &nv.value
+                            {
                                 return Some(lit_str.value());
                             }
                         }

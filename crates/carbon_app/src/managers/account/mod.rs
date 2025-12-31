@@ -9,7 +9,7 @@ use anyhow::{Context, ensure};
 use anyhow::{anyhow, bail};
 use async_trait::async_trait;
 use axum::extract;
-use carbon_repos::{models, queries, DbPool, OptionalExt};
+use carbon_repos::{DbPool, OptionalExt, models, queries};
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
     GDLAccountStatus, GDLAccountTask, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
@@ -87,7 +87,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
             let uuid_clone = uuid_val.clone();
             let account_entry = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
                 let conn = pool.get()?;
-                Ok(queries::account::FindAccountByUuid::query_row_optional(&conn, &uuid_clone)?)
+                Ok(queries::account::FindAccountByUuid::query_row_optional(
+                    &conn,
+                    &uuid_clone,
+                )?)
             })
             .await??;
 
@@ -617,11 +620,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
                             params![
                                 uuid,
                                 username,
-                                Option::<String>::None,  // accessToken
-                                Option::<String>::None,  // msRefreshToken
-                                Option::<String>::None,  // tokenExpires
-                                Option::<String>::None,  // idToken
-                                Option::<String>::None,  // skinId
+                                Option::<String>::None, // accessToken
+                                Option::<String>::None, // msRefreshToken
+                                Option::<String>::None, // tokenExpires
+                                Option::<String>::None, // idToken
+                                Option::<String>::None, // skinId
                             ],
                         )?;
                         Ok::<_, anyhow::Error>(())
@@ -679,11 +682,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
                                 uuid,
                                 username,
                                 now,
-                                Option::<String>::None,  // accessToken
-                                Option::<String>::None,  // msRefreshToken
-                                Option::<String>::None,  // tokenExpires
-                                Option::<String>::None,  // idToken
-                                Option::<String>::None,  // skinId
+                                Option::<String>::None, // accessToken
+                                Option::<String>::None, // msRefreshToken
+                                Option::<String>::None, // tokenExpires
+                                Option::<String>::None, // idToken
+                                Option::<String>::None, // skinId
                             ],
                         )?;
                         Ok::<_, anyhow::Error>(())
@@ -896,10 +899,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let uuid_clone = uuid.clone();
         let rows_affected = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let rows = conn.execute(
-                queries::account::DeleteAccount::SQL,
-                params![uuid_clone],
-            )?;
+            let rows = conn.execute(queries::account::DeleteAccount::SQL, params![uuid_clone])?;
             Ok::<_, anyhow::Error>(rows)
         })
         .await??;
@@ -1558,16 +1558,16 @@ impl TryFrom<models::Account> for FullAccount {
                     access_token,
                     refresh_token: value.ms_refresh_token,
                     id_token: value.id_token,
-                    token_expires: value
-                        .token_expires
-                        .ok_or_else(|| {
-                            FullAccountLoadError::MissingExpiration(value.uuid.clone())
-                        })?,
+                    token_expires: value.token_expires.ok_or_else(|| {
+                        FullAccountLoadError::MissingExpiration(value.uuid.clone())
+                    })?,
                     skin_id: value.skin_id,
                 },
                 None => FullAccountType::Offline,
             },
-            last_used: value.last_used.with_timezone(&FixedOffset::east_opt(0).unwrap()),
+            last_used: value
+                .last_used
+                .with_timezone(&FixedOffset::east_opt(0).unwrap()),
             uuid: value.uuid,
             username: value.username,
         })

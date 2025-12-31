@@ -34,13 +34,13 @@
 //! let accounts: Vec<Account> = ListAccounts::query_vec(&conn)?;
 //! ```
 
-pub mod settings;
 pub mod account;
-pub mod java;
-pub mod instance;
 pub mod cache;
+pub mod instance;
+pub mod java;
 pub mod metadata;
 pub mod modpack;
+pub mod settings;
 
 /// Macro for defining SQL queries with automatic test-time validation.
 ///

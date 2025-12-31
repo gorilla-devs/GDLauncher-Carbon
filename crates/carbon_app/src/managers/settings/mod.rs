@@ -6,7 +6,7 @@ use carbon_platforms::{ModChannelWithUsage, ModPlatform};
 use carbon_repos::{models::AppConfiguration, queries};
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
-use rusqlite::params;  // Still needed for non-migrated queries
+use rusqlite::params; // Still needed for non-migrated queries
 use std::path::PathBuf;
 
 pub mod terms_and_privacy;
@@ -61,8 +61,14 @@ impl ManagerRef<'_, SettingsManager> {
         let launcher_action_on_game_launch = incoming_settings
             .launcher_action_on_game_launch
             .map(|s| -> String { s.inner().into() });
-        let show_app_close_warning = incoming_settings.show_app_close_warning.clone().map(|s| s.inner());
-        let last_app_version = incoming_settings.last_app_version.clone().map(|s| s.inner());
+        let show_app_close_warning = incoming_settings
+            .show_app_close_warning
+            .clone()
+            .map(|s| s.inner());
+        let last_app_version = incoming_settings
+            .last_app_version
+            .clone()
+            .map(|s| s.inner());
         let concurrent_downloads = incoming_settings.concurrent_downloads.map(|s| s.inner());
         let download_dependencies = incoming_settings.download_dependencies.map(|s| s.inner());
         let show_featured = incoming_settings.show_featured.map(|s| s.inner());
@@ -75,7 +81,9 @@ impl ManagerRef<'_, SettingsManager> {
             .map(|s| -> String { s.inner().into() });
         let instances_group_by_asc = incoming_settings.instances_group_by_asc.map(|s| s.inner());
         let instances_tile_size = incoming_settings.instances_tile_size.map(|s| s.inner());
-        let deletion_through_recycle_bin = incoming_settings.deletion_through_recycle_bin.map(|s| s.inner());
+        let deletion_through_recycle_bin = incoming_settings
+            .deletion_through_recycle_bin
+            .map(|s| s.inner());
         let xmx = incoming_settings.xmx.map(|s| s.inner());
         let xms = incoming_settings.xms.map(|s| s.inner());
         let is_first_launch = incoming_settings.is_first_launch.map(|s| s.inner());
@@ -90,7 +98,9 @@ impl ManagerRef<'_, SettingsManager> {
             .auto_manage_java_system_profiles
             .as_ref()
             .map(|s| s.clone().inner());
-        let terms_and_privacy_accepted = incoming_settings.terms_and_privacy_accepted.map(|s| s.inner());
+        let terms_and_privacy_accepted = incoming_settings
+            .terms_and_privacy_accepted
+            .map(|s| s.inner());
 
         // Process mod_sources
         let mod_sources = incoming_settings.mod_sources.map(|s| {
@@ -364,7 +374,9 @@ impl ManagerRef<'_, SettingsManager> {
             if auto_manage_java_system_profiles.inner() {
                 // TODO: Migrate Java domain to rusqlite, then re-enable this call
                 // super::java::scan_and_sync::sync_system_java_profiles(db).await?;
-                tracing::warn!("sync_system_java_profiles is temporarily disabled during rusqlite migration");
+                tracing::warn!(
+                    "sync_system_java_profiles is temporarily disabled during rusqlite migration"
+                );
             }
         }
 
@@ -440,7 +452,10 @@ impl ManagerRef<'_, SettingsManager> {
         Ok(())
     }
 
-    pub async fn set_last_app_version(self, last_app_version: Option<String>) -> anyhow::Result<()> {
+    pub async fn set_last_app_version(
+        self,
+        last_app_version: Option<String>,
+    ) -> anyhow::Result<()> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
@@ -546,10 +561,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateGdlAccountUuid::SQL,
-                params![uuid],
-            )?;
+            conn.execute(queries::settings::UpdateGdlAccountUuid::SQL, params![uuid])?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;

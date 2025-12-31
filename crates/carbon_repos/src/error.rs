@@ -24,7 +24,9 @@ pub enum DatabaseError {
     /// Database version is newer than the application supports.
     /// This happens when trying to run an older app version against a
     /// database that was migrated by a newer version.
-    #[error("database version {db_version} is newer than app version {app_version} (backwards migration not supported)")]
+    #[error(
+        "database version {db_version} is newer than app version {app_version} (backwards migration not supported)"
+    )]
     BackwardsMigration { db_version: i32, app_version: i32 },
 
     /// Custom error for application-specific database errors.
@@ -55,8 +57,7 @@ impl DatabaseError {
     pub fn is_not_found(&self) -> bool {
         matches!(
             self,
-            DatabaseError::NotFound(_)
-                | DatabaseError::Query(rusqlite::Error::QueryReturnedNoRows)
+            DatabaseError::NotFound(_) | DatabaseError::Query(rusqlite::Error::QueryReturnedNoRows)
         )
     }
 

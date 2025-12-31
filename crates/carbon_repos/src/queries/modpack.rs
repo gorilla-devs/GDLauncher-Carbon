@@ -102,4 +102,3 @@ define_query!(
     LEFT JOIN ModrinthModpackImageCache img ON mpc.projectId = img.projectId AND mpc.versionId = img.versionId
     WHERE mpc.projectId = ?1 AND mpc.versionId = ?2"#
 );
-

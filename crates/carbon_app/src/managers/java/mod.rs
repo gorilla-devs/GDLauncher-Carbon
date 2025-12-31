@@ -16,7 +16,7 @@ use crate::{
     managers::java::java_checker::RealJavaChecker,
 };
 use anyhow::bail;
-use carbon_repos::{models, queries, DbPool};
+use carbon_repos::{DbPool, models, queries};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -489,9 +489,8 @@ impl ManagerRef<'_, JavaManager> {
                             let conn = pool.get()?;
 
                             // Find all profiles using this java
-                            let mut stmt = conn.prepare(
-                                "SELECT * FROM JavaProfile WHERE javaId = ?1",
-                            )?;
+                            let mut stmt =
+                                conn.prepare("SELECT * FROM JavaProfile WHERE javaId = ?1")?;
                             let profiles: Vec<models::JavaProfile> = stmt
                                 .query_map(rusqlite::params![&java_id], |row| {
                                     models::JavaProfile::from_row(row)

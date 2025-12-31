@@ -32,7 +32,7 @@ use carbon_platforms::{
         search::{ProjectID, VersionID},
     },
 };
-use carbon_repos::{models, queries, OptionalExt};
+use carbon_repos::{OptionalExt, models, queries};
 use carbon_rt_path::InstancePath;
 use futures::future::Future;
 use std::{ops::Deref, path::PathBuf, pin::Pin, sync::Arc, time::Duration};

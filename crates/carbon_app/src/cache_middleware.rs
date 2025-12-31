@@ -1,7 +1,7 @@
 use crate::managers::UnsafeAppRef;
 use anyhow::anyhow;
 use axum::http::Extensions;
-use carbon_repos::{models::HTTPCache, queries, OptionalExt};
+use carbon_repos::{OptionalExt, models::HTTPCache, queries};
 use chrono::{DateTime, Duration, Utc};
 use reqwest::{Method, Request, Response, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};

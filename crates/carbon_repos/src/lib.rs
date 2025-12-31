@@ -36,16 +36,14 @@ pub mod queries;
 
 // Re-export commonly used types at crate root
 pub use connection::{
-    create_pool, create_pool_default, with_transaction, batch_execute,
-    DbPool, DbConn, PoolConfig, OptionalExt,
+    DbConn, DbPool, OptionalExt, PoolConfig, batch_execute, create_pool, create_pool_default,
+    with_transaction,
 };
 pub use context::DbContext;
 pub use error::DatabaseError;
 pub use migrations::{
-    get_migrations, run_migrations, migration_count,
-    get_current_version, has_pending_migrations,
+    get_current_version, get_migrations, has_pending_migrations, migration_count, run_migrations,
 };
-
 
 #[cfg(test)]
 mod tests {
@@ -65,7 +63,9 @@ mod tests {
 
         // Verify we can query
         let count: i32 = conn
-            .query_row("SELECT COUNT(*) FROM AppConfiguration", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM AppConfiguration", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(count, 0); // No data seeded yet
     }
@@ -84,11 +84,9 @@ mod tests {
 
         // Query using our defined query
         let settings = conn
-            .query_row(
-                queries::settings::GetSettings::SQL,
-                [],
-                |row| models::AppConfiguration::from_row(row),
-            )
+            .query_row(queries::settings::GetSettings::SQL, [], |row| {
+                models::AppConfiguration::from_row(row)
+            })
             .unwrap();
 
         assert_eq!(settings.id, 0);
