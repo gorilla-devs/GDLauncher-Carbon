@@ -693,12 +693,11 @@ impl ResourceInstaller for CurseforgeModInstaller {
                         let inst_id = *instance_id;
                         let existing = tokio::task::spawn_blocking(move || {
                             let conn = pool.get()?;
-                            conn.query_row(
-                                queries::metadata::FindModFileCacheByInstanceAndCfProject::SQL,
-                                rusqlite::params![inst_id, mod_id],
-                                |row| models::ModFileCache::from_row(row),
+                            Ok::<_, anyhow::Error>(
+                                queries::metadata::FindModFileCacheByInstanceAndCfProject::fetch_optional(
+                                    &conn, inst_id, mod_id,
+                                )?,
                             )
-                            .optional()
                         })
                         .await
                         .ok()
@@ -822,13 +821,12 @@ impl ResourceInstaller for CurseforgeModInstaller {
 
         let is_installed = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::metadata::FindModFileCacheByInstanceAndFilename::SQL,
-                rusqlite::params![inst_id, filename],
-                |row| models::ModFileCache::from_row(row),
+            Ok::<_, anyhow::Error>(
+                queries::metadata::FindModFileCacheByInstanceAndFilename::fetch_optional(
+                    &conn, inst_id, &filename,
+                )?
+                .is_some(),
             )
-            .optional()
-            .map(|opt| opt.is_some())
         })
         .await??;
 
@@ -1015,12 +1013,11 @@ impl ResourceInstaller for ModrinthModInstaller {
                             let proj_id = project_id.clone();
                             let existing = tokio::task::spawn_blocking(move || {
                                 let conn = pool.get()?;
-                                conn.query_row(
-                                    queries::metadata::FindModFileCacheByInstanceAndMrProject::SQL,
-                                    rusqlite::params![inst_id, proj_id],
-                                    |row| models::ModFileCache::from_row(row),
+                                Ok::<_, anyhow::Error>(
+                                    queries::metadata::FindModFileCacheByInstanceAndMrProject::fetch_optional(
+                                        &conn, inst_id, &proj_id,
+                                    )?,
                                 )
-                                .optional()
                             })
                             .await
                             .ok()
@@ -1164,13 +1161,12 @@ impl ResourceInstaller for ModrinthModInstaller {
 
         let is_installed = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::metadata::FindModFileCacheByInstanceAndFilename::SQL,
-                rusqlite::params![inst_id, filename],
-                |row| models::ModFileCache::from_row(row),
+            Ok::<_, anyhow::Error>(
+                queries::metadata::FindModFileCacheByInstanceAndFilename::fetch_optional(
+                    &conn, inst_id, &filename,
+                )?
+                .is_some(),
             )
-            .optional()
-            .map(|opt| opt.is_some())
         })
         .await??;
 

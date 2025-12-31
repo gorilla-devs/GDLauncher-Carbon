@@ -1,5 +1,5 @@
 use crate::domain::metrics::GDLMetricsEvent;
-use carbon_repos::{DbPool, models::AppConfiguration, queries};
+use carbon_repos::{DbPool, queries};
 use display_info::DisplayInfo;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
@@ -38,14 +38,11 @@ impl ManagerRef<'_, MetricsManager> {
         let random_session_uuid = self.random_session_uuid;
         let terms_accepted = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let result = conn.query_row(queries::settings::GetSettings::SQL, [], |row| {
-                let config = AppConfiguration::from_row(row)?;
-                Ok(config.terms_and_privacy_accepted)
-            });
+            let result = queries::settings::GetSettings::fetch_optional(&conn);
 
             match result {
-                Ok(accepted) => Ok(accepted),
-                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+                Ok(Some(config)) => Ok(config.terms_and_privacy_accepted),
+                Ok(None) => Ok(false),
                 Err(e) => Err(anyhow::Error::from(e)),
             }
         })

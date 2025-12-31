@@ -1,5 +1,5 @@
 use anyhow::Context;
-use carbon_repos::{DatabaseError, DbPool, OptionalExt, models, queries};
+use carbon_repos::{DatabaseError, DbPool, queries};
 use carbon_rt_path::AssetsPath;
 use daedalus::minecraft::{AssetIndex, AssetsIndex};
 use std::{collections::HashSet, path::PathBuf};
@@ -52,9 +52,10 @@ pub async fn get_meta(
         let asset_index_vec = asset_index.to_vec();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::cache::UpsertAssetsMetaCache::SQL,
-                rusqlite::params![asset_id_clone, asset_index_vec],
+            queries::cache::UpsertAssetsMetaCache::execute(
+                &conn,
+                &asset_id_clone,
+                &asset_index_vec,
             )?;
             Ok::<_, DatabaseError>(())
         })
@@ -72,12 +73,9 @@ pub async fn get_meta(
             let asset_id_clone = asset_id.clone();
             let db_cache = tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::cache::FindAssetsMetaCache::SQL,
-                    rusqlite::params![asset_id_clone],
-                    |row| models::AssetsMetaCache::from_row(row),
-                )
-                .optional()
+                let result =
+                    queries::cache::FindAssetsMetaCache::fetch_optional(&conn, &asset_id_clone)?;
+                Ok::<_, anyhow::Error>(result)
             })
             .await
             .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?

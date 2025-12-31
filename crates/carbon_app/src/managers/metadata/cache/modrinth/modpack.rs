@@ -13,34 +13,18 @@ pub async fn get_modpack_icon(app: &App, modrinth: ModrinthModpack) -> anyhow::R
 
     tokio::task::spawn_blocking(move || {
         let conn = pool.get()?;
-        let result = conn.query_row(
-            queries::modpack::FindModrinthModpackImageCache::SQL,
-            rusqlite::params![project_id, version_id],
-            |row| {
-                let data: Option<Vec<u8>> = row.get("data")?;
-                Ok(data)
-            },
-        );
+        let result = queries::modpack::FindModrinthModpackImageCache::fetch_optional(
+            &conn,
+            &project_id,
+            &version_id,
+        )?;
 
-        match result {
-            Ok(Some(data)) => Ok(data),
-            Ok(None) => Err(anyhow::anyhow!("No icon found for modpack")),
-            Err(rusqlite::Error::QueryReturnedNoRows) => {
-                Err(anyhow::anyhow!("No icon found for modpack"))
-            }
-            Err(e) => Err(anyhow::Error::from(e)),
+        match result.and_then(|r| r.data) {
+            Some(data) => Ok(data),
+            None => Err(anyhow::anyhow!("No icon found for modpack")),
         }
     })
     .await?
-}
-
-/// Cache entry with optional image data
-struct ModpackCacheEntry {
-    modpack_name: String,
-    version_name: String,
-    url_slug: String,
-    updated_at: String,
-    has_image_data: bool,
 }
 
 pub async fn get_modpack_metadata(
@@ -51,33 +35,16 @@ pub async fn get_modpack_metadata(
     let project_id = modrinth.project_id.clone();
     let version_id = modrinth.version_id.clone();
 
-    // Query cache entry with image
+    // Query cache entry with image availability
     let cache_entry = tokio::task::spawn_blocking(move || {
         let conn = pool.get()?;
-        let result = conn.query_row(
-            queries::modpack::FindModrinthModpackCacheWithImage::SQL,
-            rusqlite::params![project_id, version_id],
-            |row| {
-                let modpack_name: String = row.get("modpackName")?;
-                let version_name: String = row.get("versionName")?;
-                let url_slug: String = row.get("urlSlug")?;
-                let updated_at = cache::read_datetime_column(row, "updatedAt")?;
-                let img_data: Option<Vec<u8>> = row.get("img_data")?;
-                Ok(ModpackCacheEntry {
-                    modpack_name,
-                    version_name,
-                    url_slug,
-                    updated_at,
-                    has_image_data: img_data.is_some(),
-                })
-            },
-        );
-
-        match result {
-            Ok(entry) => Ok(Some(entry)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(anyhow::Error::from(e)),
-        }
+        Ok::<_, anyhow::Error>(
+            queries::modpack::FindModrinthModpackCacheWithImage::fetch_optional(
+                &conn,
+                &project_id,
+                &version_id,
+            )?,
+        )
     })
     .await??;
 
@@ -92,10 +59,7 @@ pub async fn get_modpack_metadata(
         .unwrap_or(false);
 
     let has_cached_entry = cache_entry.is_some();
-    let has_cached_logo = cache_entry
-        .as_ref()
-        .map(|e| e.has_image_data)
-        .unwrap_or(false);
+    let has_cached_logo = cache_entry.as_ref().map(|e| e.has_image).unwrap_or(false);
 
     if has_cached_entry && is_entry_up_to_date {
         let Some(cache_entry) = cache_entry else {
@@ -106,7 +70,7 @@ pub async fn get_modpack_metadata(
             name: cache_entry.modpack_name,
             version_name: cache_entry.version_name,
             url_slug: cache_entry.url_slug,
-            has_image: cache_entry.has_image_data,
+            has_image: cache_entry.has_image,
         });
     } else {
         let app = app.clone();
@@ -170,15 +134,13 @@ pub async fn get_modpack_metadata(
 
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.execute(
-                    queries::modpack::UpsertModrinthModpackCache::SQL,
-                    rusqlite::params![
-                        project_id,
-                        version_id,
-                        name_clone,
-                        file_name_clone,
-                        slug_clone
-                    ],
+                queries::modpack::UpsertModrinthModpackCache::execute(
+                    &conn,
+                    &project_id,
+                    &version_id,
+                    &name_clone,
+                    &file_name_clone,
+                    &slug_clone,
                 )?;
                 Ok::<_, anyhow::Error>(())
             })
@@ -194,9 +156,12 @@ pub async fn get_modpack_metadata(
 
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.execute(
-                        queries::modpack::UpsertModrinthModpackImageCache::SQL,
-                        rusqlite::params![project_id, version_id, url_clone, icon_data],
+                    queries::modpack::UpsertModrinthModpackImageCache::execute(
+                        &conn,
+                        &project_id,
+                        &version_id,
+                        &url_clone,
+                        icon_data.as_deref(),
                     )?;
                     Ok::<_, anyhow::Error>(())
                 })
@@ -217,7 +182,7 @@ pub async fn get_modpack_metadata(
                         name: cache_entry.modpack_name,
                         version_name: cache_entry.version_name,
                         url_slug: cache_entry.url_slug,
-                        has_image: cache_entry.has_image_data,
+                        has_image: cache_entry.has_image,
                     });
                 }
 

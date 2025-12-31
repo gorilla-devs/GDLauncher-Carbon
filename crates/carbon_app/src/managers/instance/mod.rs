@@ -21,7 +21,7 @@ use anyhow::{Context, anyhow};
 use carbon_platforms::ModPlatform;
 use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
 use carbon_platforms::modrinth::search::{ProjectID, VersionID};
-use carbon_repos::{DbPool, OptionalExt, models, queries};
+use carbon_repos::{AsConnection, DbPool, OptionalExt, models, queries};
 use chrono::{DateTime, Utc};
 use daedalus::minecraft::MinecraftJavaProfile;
 use dashmap::DashMap;
@@ -171,10 +171,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let pool = self.app.db_pool.clone();
         let instance_cache = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(queries::instance::ListInstances::SQL)?;
-            let instances = stmt
-                .query_map([], |row| models::Instance::from_row(row))?
-                .collect::<Result<Vec<_>, _>>()?;
+            let instances = queries::instance::ListInstances::fetch_all(&conn)?;
             Ok::<_, anyhow::Error>(instances)
         })
         .await??;
@@ -361,16 +358,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let conn = pool.get()?;
 
             // Fetch all groups ordered by groupIndex
-            let mut stmt = conn.prepare(queries::instance::ListInstanceGroups::SQL)?;
-            let groups: Vec<models::InstanceGroup> = stmt
-                .query_map([], |row| models::InstanceGroup::from_row(row))?
-                .collect::<Result<Vec<_>, _>>()?;
+            let groups = queries::instance::ListInstanceGroups::fetch_all(&conn)?;
 
             // Fetch all instances ordered by groupId, index
-            let mut stmt = conn.prepare(queries::instance::ListInstances::SQL)?;
-            let instances: Vec<models::Instance> = stmt
-                .query_map([], |row| models::Instance::from_row(row))?
-                .collect::<Result<Vec<_>, _>>()?;
+            let instances = queries::instance::ListInstances::fetch_all(&conn)?;
 
             Ok::<_, anyhow::Error>((groups, instances))
         })
@@ -517,28 +508,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let mut conn = pool.get()?;
 
             // Get start index
-            let start_idx: i32 = conn
-                .query_row(
-                    queries::instance::FindInstanceGroupById::SQL,
-                    rusqlite::params![group_id],
-                    |row| row.get("groupIndex"),
-                )
-                .map_err(|_| anyhow!("GroupId is not in database, this should never happen"))?;
+            let start_idx = queries::instance::FindInstanceGroupById::fetch_one(&conn, group_id)
+                .map_err(|_| anyhow!("GroupId is not in database, this should never happen"))?
+                .group_index;
 
             // Get target index
-            let target_idx: i32 = match before_id {
-                Some(target_id) => conn
-                    .query_row(
-                        queries::instance::FindInstanceGroupById::SQL,
-                        rusqlite::params![target_id],
-                        |row| row.get("groupIndex"),
-                    )
-                    .map_err(|_| anyhow!("GroupId is not in database, this should never happen"))?,
-                None => {
-                    conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
-                        row.get(0)
-                    })?
-                }
+            let target_idx = match before_id {
+                Some(target_id) => queries::instance::FindInstanceGroupById::fetch_one(&conn, target_id)
+                    .map_err(|_| anyhow!("GroupId is not in database, this should never happen"))?
+                    .group_index,
+                None => queries::instance::CountInstanceGroups::fetch_scalar(&conn)?
             };
 
             // Perform the index shifts in a transaction
@@ -564,10 +543,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 };
 
                 // Update the group's index
-                tx.execute(
-                    queries::instance::UpdateInstanceGroupIndex::SQL,
-                    rusqlite::params![group_id, final_target_idx],
-                )?;
+                queries::instance::UpdateInstanceGroupIndex::execute(tx, group_id, final_target_idx)?;
 
                 Ok(())
             })?;
@@ -599,15 +575,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let pool = pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                let instance: models::Instance = conn
-                    .query_row(
-                        queries::instance::FindInstanceById::SQL,
-                        rusqlite::params![instance_id],
-                        |row| models::Instance::from_row(row),
-                    )
+                let instance = queries::instance::FindInstanceById::fetch_one(&conn, instance_id)
                     .map_err(|_| {
-                        anyhow!("InstanceId is not in database, this should never happen")
-                    })?;
+                    anyhow!("InstanceId is not in database, this should never happen")
+                })?;
                 Ok::<_, anyhow::Error>((GroupId(instance.group_id), instance.index))
             })
             .await??
@@ -620,12 +591,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let target_id = *target_instance;
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    let instance: models::Instance = conn
-                        .query_row(
-                            queries::instance::FindInstanceById::SQL,
-                            rusqlite::params![target_id],
-                            |row| models::Instance::from_row(row),
-                        )
+                    let instance = queries::instance::FindInstanceById::fetch_one(&conn, target_id)
                         .map_err(|_| {
                             anyhow!("InstanceId is not in database, this should never happen")
                         })?;
@@ -639,11 +605,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let group_id = *group;
                 let target_idx = tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    let count: i32 = conn.query_row(
-                        queries::instance::CountInstancesByGroup::SQL,
-                        rusqlite::params![group_id],
-                        |row| row.get(0),
-                    )?;
+                    let count =
+                        queries::instance::CountInstancesByGroup::fetch_scalar(&conn, group_id)?;
                     Ok::<_, anyhow::Error>(count)
                 })
                 .await??;
@@ -690,10 +653,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 }
 
                 // Update the instance's group and index
-                tx.execute(
-                    queries::instance::UpdateInstanceGroupAndIndex::SQL,
-                    rusqlite::params![instance_id, target_group_id, target_idx],
-                )?;
+                queries::instance::UpdateInstanceGroupAndIndex::execute(tx, instance_id, target_group_id, target_idx)?;
 
                 Ok(())
             })?;
@@ -723,12 +683,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     let pool = self.app.db_pool.clone();
                     let group = tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.query_row(
-                            queries::instance::FindInstanceGroupById::SQL,
-                            rusqlite::params![groupid],
-                            |row| models::InstanceGroup::from_row(row),
+                        Ok::<_, anyhow::Error>(
+                            queries::instance::FindInstanceGroupById::fetch_optional(
+                                &conn, groupid,
+                            )?,
                         )
-                        .optional()
                     })
                     .await??;
 
@@ -750,16 +709,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                                 carbon_repos::with_transaction(&mut conn, |tx| {
                                     // Create the group
-                                    tx.execute(
-                                        queries::instance::CreateInstanceGroup::SQL,
-                                        rusqlite::params!["localize➽default", index.value],
+                                    queries::instance::CreateInstanceGroup::execute(
+                                        tx,
+                                        "localize➽default",
+                                        index.value,
                                     )?;
-                                    let group_id = tx.last_insert_rowid() as i32;
+                                    let group_id = tx.as_connection().last_insert_rowid() as i32;
 
                                     // Update settings
-                                    tx.execute(
-                                        queries::settings::UpdateDefaultInstanceGroup::SQL,
-                                        rusqlite::params![group_id],
+                                    queries::settings::UpdateDefaultInstanceGroup::execute(
+                                        tx,
+                                        Some(group_id),
                                     )?;
 
                                     Ok(GroupId(group_id))
@@ -790,12 +750,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // Check if group with this name already exists
         let existing = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::instance::FindInstanceGroupByName::SQL,
-                rusqlite::params![name_clone],
-                |row| models::InstanceGroup::from_row(row),
-            )
-            .optional()
+            Ok::<_, anyhow::Error>(queries::instance::FindInstanceGroupByName::fetch_optional(
+                &conn,
+                &name_clone,
+            )?)
         })
         .await??;
 
@@ -807,10 +765,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let index_value = index.value;
         let group_id = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::instance::CreateInstanceGroup::SQL,
-                rusqlite::params![name, index_value],
-            )?;
+            queries::instance::CreateInstanceGroup::execute(&conn, &name, index_value)?;
             Ok::<_, anyhow::Error>(conn.last_insert_rowid() as i32)
         })
         .await??;
@@ -840,18 +795,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             carbon_repos::with_transaction(&mut conn, |tx| {
                 // Delete any existing entry with the same shortpath
-                tx.execute(
-                    queries::instance::DeleteInstanceByShortpath::SQL,
-                    rusqlite::params![shortpath.clone()],
-                )?;
+                queries::instance::DeleteInstanceByShortpath::execute(tx, &shortpath)?;
 
                 // Create the new instance
-                tx.execute(
-                    queries::instance::CreateInstance::SQL,
-                    rusqlite::params![name, shortpath, false, false, index_value, group_id],
+                queries::instance::CreateInstance::execute(
+                    tx,
+                    &name,
+                    &shortpath,
+                    false,
+                    false,
+                    index_value,
+                    group_id,
                 )?;
 
-                Ok(tx.last_insert_rowid() as i32)
+                Ok(tx.as_connection().last_insert_rowid() as i32)
             })
         })
         .await??;
@@ -867,10 +824,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::instance::DeleteInstance::SQL,
-                rusqlite::params![instance_id],
-            )?;
+            queries::instance::DeleteInstance::execute(&conn, instance_id)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -895,10 +849,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let id = *instance_id;
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::instance::UpdateInstanceFavorite::SQL,
-                rusqlite::params![id, favorite],
-            )?;
+            queries::instance::UpdateInstanceFavorite::execute(&conn, id, favorite)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -1352,9 +1303,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let shortpath_clone = new_shortpath.clone();
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.execute(
-                        queries::instance::UpdateInstanceNameAndShortpath::SQL,
-                        rusqlite::params![instance_id, name_clone, shortpath_clone],
+                    queries::instance::UpdateInstanceNameAndShortpath::execute(
+                        &conn,
+                        instance_id,
+                        &name_clone,
+                        &shortpath_clone,
                     )?;
                     Ok::<_, anyhow::Error>(())
                 })
@@ -1542,13 +1495,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let id = *instance_id;
         let group_id = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let instance: models::Instance = conn
-                .query_row(
-                    queries::instance::FindInstanceById::SQL,
-                    rusqlite::params![id],
-                    |row| models::Instance::from_row(row),
-                )
-                .map_err(|_| {
+            let instance =
+                queries::instance::FindInstanceById::fetch_one(&conn, id).map_err(|_| {
                     anyhow::anyhow!(
                         "instance was not listed in db while being present in internal list"
                     )
@@ -1685,12 +1633,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let pool = pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::instance::CountInstancesByGroup::SQL,
-                    rusqlite::params![group_id],
-                    |row| row.get(0),
-                )
-                .map_err(anyhow::Error::from)
+                queries::instance::CountInstancesByGroup::fetch_scalar(&conn, group_id)
+                    .map_err(anyhow::Error::from)
             })
             .await??
         };
@@ -1720,10 +1664,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     )?;
 
                     // Delete the group
-                    tx.execute(
-                        queries::instance::DeleteInstanceGroup::SQL,
-                        rusqlite::params![group_id],
-                    )?;
+                    queries::instance::DeleteInstanceGroup::execute(tx, group_id)?;
 
                     Ok(())
                 })
@@ -1733,10 +1674,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let pool = self.app.db_pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.execute(
-                    queries::instance::DeleteInstanceGroup::SQL,
-                    rusqlite::params![group_id],
-                )?;
+                queries::instance::DeleteInstanceGroup::execute(&conn, group_id)?;
                 Ok::<_, anyhow::Error>(())
             })
             .await??;
@@ -1942,10 +1880,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let pool = self.app.db_pool.clone();
         let count = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
-                row.get::<_, i32>(0)
-            })
-            .map_err(anyhow::Error::from)
+            queries::instance::CountInstanceGroups::fetch_scalar(&conn).map_err(anyhow::Error::from)
         })
         .await??;
 
@@ -1962,12 +1897,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let group_id = *group;
         let count = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::instance::CountInstancesByGroup::SQL,
-                rusqlite::params![group_id],
-                |row| row.get::<_, i32>(0),
-            )
-            .map_err(anyhow::Error::from)
+            queries::instance::CountInstancesByGroup::fetch_scalar(&conn, group_id)
+                .map_err(anyhow::Error::from)
         })
         .await??;
 
@@ -2195,10 +2126,10 @@ mod test {
             let pool = db_pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                let mut stmt = conn.prepare(queries::instance::ListInstanceGroups::SQL)?;
-                let groups = stmt
-                    .query_map([], |row| Ok(GroupId(row.get::<_, i32>("id")?)))?
-                    .collect::<Result<Vec<_>, _>>()?;
+                let groups = queries::instance::ListInstanceGroups::fetch_all(&conn)?
+                    .into_iter()
+                    .map(|g| GroupId(g.id))
+                    .collect();
                 Ok::<_, anyhow::Error>(groups)
             })
             .await?
@@ -2269,10 +2200,11 @@ mod test {
             let group_id = *group;
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                let mut stmt = conn.prepare(queries::instance::ListInstancesByGroup::SQL)?;
-                let instances = stmt
-                    .query_map([group_id], |row| Ok(InstanceId(row.get::<_, i32>("id")?)))?
-                    .collect::<Result<Vec<_>, _>>()?;
+                let instances =
+                    queries::instance::ListInstancesByGroup::fetch_all(&conn, group_id)?
+                        .into_iter()
+                        .map(|i| InstanceId(i.id))
+                        .collect();
                 Ok::<_, anyhow::Error>(instances)
             })
             .await?
@@ -2465,12 +2397,8 @@ mod test {
             let pool = app.db_pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::instance::FindInstanceByShortpath::SQL,
-                    ["bar"],
-                    |row| models::Instance::from_row(row),
-                )
-                .map_err(|e| anyhow::anyhow!("Failed to find instance: {}", e))
+                queries::instance::FindInstanceByShortpath::fetch_one(&conn, "bar")
+                    .map_err(|e| anyhow::anyhow!("Failed to find instance: {}", e))
             })
             .await??
         };
@@ -2484,12 +2412,8 @@ mod test {
             let pool = app.db_pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::instance::FindInstanceByShortpath::SQL,
-                    ["bar"],
-                    |row| models::Instance::from_row(row),
-                )
-                .map_err(|e| anyhow::anyhow!("Failed to find instance: {}", e))
+                queries::instance::FindInstanceByShortpath::fetch_one(&conn, "bar")
+                    .map_err(|e| anyhow::anyhow!("Failed to find instance: {}", e))
             })
             .await??
         };
@@ -2508,14 +2432,12 @@ mod test {
     async fn delete_group_empty() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
-        let group_count: i64 = {
+        let group_count = {
             let pool = app.db_pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
-                    row.get(0)
-                })
-                .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
+                queries::instance::CountInstanceGroups::fetch_scalar(&conn)
+                    .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
             })
             .await??
         };
@@ -2528,14 +2450,12 @@ mod test {
             .create_group(String::from("foo"))
             .await?;
 
-        let group_count: i64 = {
+        let group_count = {
             let pool = app.db_pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
-                    row.get(0)
-                })
-                .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
+                queries::instance::CountInstanceGroups::fetch_scalar(&conn)
+                    .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
             })
             .await??
         };
@@ -2545,14 +2465,12 @@ mod test {
 
         app.instance_manager().delete_group(group).await?;
 
-        let group_count: i64 = {
+        let group_count = {
             let pool = app.db_pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(queries::instance::CountInstanceGroups::SQL, [], |row| {
-                    row.get(0)
-                })
-                .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
+                queries::instance::CountInstanceGroups::fetch_scalar(&conn)
+                    .map_err(|e| anyhow::anyhow!("Failed to count groups: {}", e))
             })
             .await??
         };
@@ -2721,33 +2639,48 @@ mod test {
             .await?;
 
         // Helper to get count from db
-        async fn get_count(db_pool: &DbPool, sql: &'static str) -> anyhow::Result<i64> {
+        async fn get_cf_modpack_count(db_pool: &DbPool) -> anyhow::Result<i32> {
             let pool = db_pool.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(sql, [], |row| row.get(0))
+                queries::modpack::CountCurseForgeModpackCache::fetch_scalar(&conn)
                     .map_err(|e| anyhow::anyhow!("Failed to count: {}", e))
             })
             .await?
         }
 
-        assert_eq!(
-            get_count(
-                &app.db_pool,
-                queries::modpack::CountCurseForgeModpackCache::SQL
-            )
-            .await?,
-            0
-        );
+        async fn get_mr_modpack_count(db_pool: &DbPool) -> anyhow::Result<i32> {
+            let pool = db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                queries::modpack::CountModrinthModpackCache::fetch_scalar(&conn)
+                    .map_err(|e| anyhow::anyhow!("Failed to count: {}", e))
+            })
+            .await?
+        }
 
-        assert_eq!(
-            get_count(
-                &app.db_pool,
-                queries::modpack::CountModrinthModpackCache::SQL
-            )
-            .await?,
-            0
-        );
+        async fn get_cf_modpack_image_count(db_pool: &DbPool) -> anyhow::Result<i32> {
+            let pool = db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                queries::modpack::CountCurseForgeModpackImageCache::fetch_scalar(&conn)
+                    .map_err(|e| anyhow::anyhow!("Failed to count: {}", e))
+            })
+            .await?
+        }
+
+        async fn get_mr_modpack_image_count(db_pool: &DbPool) -> anyhow::Result<i32> {
+            let pool = db_pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                queries::modpack::CountModrinthModpackImageCache::fetch_scalar(&conn)
+                    .map_err(|e| anyhow::anyhow!("Failed to count: {}", e))
+            })
+            .await?
+        }
+
+        assert_eq!(get_cf_modpack_count(&app.db_pool).await?, 0);
+        assert_eq!(get_mr_modpack_count(&app.db_pool).await?, 0);
 
         app.instance_manager()
             .get_modpack_info(curseforge_instance_id)
@@ -2757,41 +2690,10 @@ mod test {
             .get_modpack_info(modrinth_instance_id)
             .await?;
 
-        assert_eq!(
-            get_count(
-                &app.db_pool,
-                queries::modpack::CountCurseForgeModpackCache::SQL
-            )
-            .await?,
-            1
-        );
-
-        assert_eq!(
-            get_count(
-                &app.db_pool,
-                queries::modpack::CountModrinthModpackCache::SQL
-            )
-            .await?,
-            1
-        );
-
-        assert_eq!(
-            get_count(
-                &app.db_pool,
-                queries::modpack::CountCurseForgeModpackImageCache::SQL
-            )
-            .await?,
-            1
-        );
-
-        assert_eq!(
-            get_count(
-                &app.db_pool,
-                queries::modpack::CountModrinthModpackImageCache::SQL
-            )
-            .await?,
-            1
-        );
+        assert_eq!(get_cf_modpack_count(&app.db_pool).await?, 1);
+        assert_eq!(get_mr_modpack_count(&app.db_pool).await?, 1);
+        assert_eq!(get_cf_modpack_image_count(&app.db_pool).await?, 1);
+        assert_eq!(get_mr_modpack_image_count(&app.db_pool).await?, 1);
 
         Ok(())
     }

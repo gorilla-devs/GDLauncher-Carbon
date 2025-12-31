@@ -106,14 +106,10 @@ pub async fn export_curseforge(
                     let inst_id = *instance_id;
                     let mods2 = tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        let mut stmt = conn.prepare(
-                            queries::metadata::ListModFileCacheWithCurseforgeByInstance::SQL,
-                        )?;
-                        let mods: Vec<models::ModFileCacheWithCurseforge> = stmt
-                            .query_map(rusqlite::params![inst_id], |row| {
-                                models::ModFileCacheWithCurseforge::from_row(row)
-                            })?
-                            .collect::<Result<Vec<_>, _>>()?;
+                        let mods =
+                            queries::metadata::ListModFileCacheWithCurseforgeByInstance::fetch_all(
+                                &conn, inst_id,
+                            )?;
                         Ok::<_, anyhow::Error>(mods)
                     })
                     .await??;

@@ -358,9 +358,11 @@ impl ModplatformCacher for ModrinthModCacher {
                     let metadata_id_clone = metadata_id.clone();
                     tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.execute(
-                            queries::metadata::UpdateModrinthModImageCacheData::SQL,
-                            rusqlite::params![metadata_id_clone, image, 1],
+                        queries::metadata::UpdateModrinthModImageCacheData::execute(
+                            &conn,
+                            &metadata_id_clone,
+                            Some(&image[..]),
+                            1,
                         )?;
                         Ok::<_, anyhow::Error>(())
                     }).await??;
@@ -448,25 +450,16 @@ async fn cache_modrinth_meta_unchecked(
     let metadata_id_clone = metadata_id.clone();
     let existing_entry = tokio::task::spawn_blocking(move || {
         let conn = pool.get()?;
-        let result = conn.query_row(
-            queries::metadata::FindModrinthModCache::SQL,
-            rusqlite::params![metadata_id_clone],
-            |row| super::read_datetime_column(row, "cachedAt"),
-        );
-        match result {
-            Ok(cached_at) => Ok(Some(cached_at)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(anyhow::Error::from(e)),
-        }
+        let result =
+            queries::metadata::FindModrinthModCache::fetch_optional(&conn, &metadata_id_clone)?;
+        Ok::<_, anyhow::Error>(result)
     })
     .await??;
 
-    if let Some(cached_at) = existing_entry {
-        // Parse the cached_at timestamp and check if it's recent
-        if let Ok(cached_time) = chrono::DateTime::parse_from_rfc3339(&cached_at) {
-            if cached_time > (chrono::Utc::now() - chrono::Duration::days(1)) {
-                return Ok(());
-            }
+    if let Some(cache) = existing_entry {
+        // Check if the cached entry is recent (within 1 day)
+        if cache.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
+            return Ok(());
         }
     }
 
@@ -489,24 +482,22 @@ async fn cache_modrinth_meta_unchecked(
 
     tokio::task::spawn_blocking(move || {
         let conn = pool.get()?;
-        conn.execute(
-            queries::metadata::UpsertModrinthModCache::SQL,
-            rusqlite::params![
-                metadata_id_clone,
-                sha512_clone,
-                project_id,
-                version_id,
-                title,
-                version_name,
-                urlslug,
-                description,
-                authors_clone,
-                release_type,
-                update_paths_clone,
-                filename_clone,
-                file_url_clone,
-                cached_at
-            ],
+        queries::metadata::UpsertModrinthModCache::execute(
+            &conn,
+            &metadata_id_clone,
+            &sha512_clone,
+            &project_id,
+            &version_id,
+            &title,
+            &version_name,
+            &urlslug,
+            &description,
+            &authors_clone,
+            release_type,
+            &update_paths_clone,
+            &filename_clone,
+            &file_url_clone,
+            &cached_at,
         )?;
         Ok::<_, anyhow::Error>(())
     })
@@ -520,14 +511,12 @@ async fn cache_modrinth_meta_unchecked(
 
         if let Err(e) = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::metadata::UpsertModrinthModImageCache::SQL,
-                rusqlite::params![
-                    metadata_id_clone,
-                    icon_url_clone,
-                    Option::<Vec<u8>>::None,
-                    0 // upToDate = 0, mark as needing download
-                ],
+            queries::metadata::UpsertModrinthModImageCache::execute(
+                &conn,
+                &metadata_id_clone,
+                &icon_url_clone,
+                None, // upToDate = 0, mark as needing download
+                0,
             )?;
             Ok::<_, anyhow::Error>(())
         })

@@ -81,3 +81,20 @@ pub struct ModrinthModpackCacheWithImage {
     pub modpack: ModrinthModpackCache,
     pub image: Option<ModrinthModpackImageCache>,
 }
+
+/// Modpack cache entry with image availability flag.
+///
+/// Used by JOIN queries that check if an image exists without fetching the blob.
+#[derive(Debug, Clone, FromRow)]
+pub struct ModpackCacheEntry {
+    /// Modpack name.
+    pub modpack_name: String,
+    /// Version name.
+    pub version_name: String,
+    /// URL slug.
+    pub url_slug: String,
+    /// Last update timestamp as RFC3339 string.
+    pub updated_at: String,
+    /// Whether an image exists in the cache.
+    pub has_image: bool,
+}

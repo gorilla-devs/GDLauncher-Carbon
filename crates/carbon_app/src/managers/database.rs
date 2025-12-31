@@ -109,24 +109,19 @@ fn seed_init_db(pool: &DbPool, latest_consent_sha: Option<String>) -> Result<(),
     };
 
     // Check if app configuration exists
-    let count: i32 = conn.query_row(queries::settings::CountSettings::SQL, [], |row| row.get(0))?;
+    let count = queries::settings::CountSettings::fetch_scalar(&conn)?;
 
     if count == 0 {
         trace!("No app configuration found. Creating default one");
 
         let xmx = find_appropriate_default_xmx();
-        conn.execute(
-            queries::settings::CreateSettings::SQL,
-            rusqlite::params![release_channel, xmx, APP_VERSION],
-        )?;
+        queries::settings::CreateSettings::execute(&conn, release_channel, xmx, Some(APP_VERSION))?;
 
         trace!("Created default app configuration");
     }
 
     // Get current app configuration
-    let app_config = conn.query_row(queries::settings::GetSettings::SQL, [], |row| {
-        AppConfiguration::from_row(row)
-    })?;
+    let app_config = queries::settings::GetSettings::fetch_one(&conn)?;
 
     // Determine what updates are needed
     let is_equal_to_current_version = app_config
@@ -148,10 +143,7 @@ fn seed_init_db(pool: &DbPool, latest_consent_sha: Option<String>) -> Result<(),
 
     // Apply updates if needed
     if should_force_release_channel {
-        conn.execute(
-            queries::settings::UpdateReleaseChannel::SQL,
-            [release_channel],
-        )?;
+        queries::settings::UpdateReleaseChannel::execute(&conn, release_channel)?;
     }
 
     // Emit status for frontend progress tracking
@@ -167,14 +159,8 @@ fn seed_init_db(pool: &DbPool, latest_consent_sha: Option<String>) -> Result<(),
         );
 
         if should_empty_tos_privacy {
-            conn.execute(
-                queries::settings::UpdateTermsAndPrivacyAccepted::SQL,
-                [false],
-            )?;
-            conn.execute(
-                queries::settings::UpdateTermsAndPrivacyAcceptedChecksum::SQL,
-                [Option::<String>::None],
-            )?;
+            queries::settings::UpdateTermsAndPrivacyAccepted::execute(&conn, false)?;
+            queries::settings::UpdateTermsAndPrivacyAcceptedChecksum::execute(&conn, None)?;
         }
     }
 
@@ -210,10 +196,7 @@ fn ensure_java_profiles_in_db(conn: &rusqlite::Connection) -> Result<(), anyhow:
 
         if !exists {
             trace!("Creating Java profile: {}", name);
-            conn.execute(
-                java::CreateJavaProfile::SQL,
-                rusqlite::params![name, is_system, Option::<String>::None],
-            )?;
+            java::CreateJavaProfile::execute(&conn, name, *is_system, None)?;
         }
     }
 
@@ -230,10 +213,7 @@ fn ensure_java_profiles_in_db(conn: &rusqlite::Connection) -> Result<(), anyhow:
 
         if !exists {
             trace!("Creating system Java profile: {}", profile_name);
-            conn.execute(
-                java::CreateJavaProfile::SQL,
-                rusqlite::params![&profile_name, true, Option::<String>::None],
-            )?;
+            java::CreateJavaProfile::execute(&conn, &profile_name, true, None)?;
         }
     }
 

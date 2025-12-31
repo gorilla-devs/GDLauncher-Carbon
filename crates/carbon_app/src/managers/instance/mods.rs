@@ -119,21 +119,16 @@ impl ManagerRef<'_, InstanceManager> {
                 ref addon_type_str,
             ) = addon_type_filter
             {
-                let mut stmt = conn.prepare(
-                    queries::metadata::ListModFileCacheWithMetadataAndImagesByInstanceAndType::SQL,
-                )?;
-                stmt.query_map(rusqlite::params![instance_id_val, addon_type_str], |row| {
-                    models::ModFileCacheWithMetadataAndImages::from_row(row)
-                })?
-                .collect::<Result<Vec<_>, _>>()?
+                queries::metadata::ListModFileCacheWithMetadataAndImagesByInstanceAndType::fetch_all(
+                    &conn,
+                    instance_id_val,
+                    addon_type_str,
+                )?
             } else {
-                let mut stmt = conn.prepare(
-                    queries::metadata::ListModFileCacheWithMetadataAndImagesByInstance::SQL,
-                )?;
-                stmt.query_map(rusqlite::params![instance_id_val], |row| {
-                    models::ModFileCacheWithMetadataAndImages::from_row(row)
-                })?
-                .collect::<Result<Vec<_>, _>>()?
+                queries::metadata::ListModFileCacheWithMetadataAndImagesByInstance::fetch_all(
+                    &conn,
+                    instance_id_val,
+                )?
             };
 
             Ok::<_, anyhow::Error>(mods)
@@ -333,12 +328,9 @@ impl ManagerRef<'_, InstanceManager> {
         let id_clone = id.clone();
         let m = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::metadata::FindModFileCache::SQL,
-                rusqlite::params![id_clone],
-                |row| models::ModFileCache::from_row(row),
-            )
-            .optional()
+            Ok::<_, anyhow::Error>(queries::metadata::FindModFileCache::fetch_optional(
+                &conn, &id_clone,
+            )?)
         })
         .await??
         .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
@@ -382,10 +374,7 @@ impl ManagerRef<'_, InstanceManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::metadata::UpdateModFileCacheEnabled::SQL,
-                rusqlite::params![id, enabled],
-            )?;
+            queries::metadata::UpdateModFileCacheEnabled::execute(&conn, &id, enabled)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -409,12 +398,9 @@ impl ManagerRef<'_, InstanceManager> {
         let id_clone = id.clone();
         let m = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::metadata::FindModFileCache::SQL,
-                rusqlite::params![id_clone],
-                |row| models::ModFileCache::from_row(row),
-            )
-            .optional()
+            Ok::<_, anyhow::Error>(queries::metadata::FindModFileCache::fetch_optional(
+                &conn, &id_clone,
+            )?)
         })
         .await??
         .ok_or(InvalidInstanceModIdError(instance_id, id))?;
@@ -669,12 +655,9 @@ impl ManagerRef<'_, InstanceManager> {
         let id_clone = id.clone();
         let m = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::metadata::FindModFileCacheWithMetadata::SQL,
-                rusqlite::params![id_clone],
-                |row| models::ModFileCacheWithMetadata::from_row(row),
+            Ok::<_, anyhow::Error>(
+                queries::metadata::FindModFileCacheWithMetadata::fetch_optional(&conn, &id_clone)?,
             )
-            .optional()
         })
         .await??
         .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
@@ -841,12 +824,9 @@ impl ManagerRef<'_, InstanceManager> {
         let id_clone = id.clone();
         let m = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::metadata::FindModFileCacheWithMetadata::SQL,
-                rusqlite::params![id_clone],
-                |row| models::ModFileCacheWithMetadata::from_row(row),
+            Ok::<_, anyhow::Error>(
+                queries::metadata::FindModFileCacheWithMetadata::fetch_optional(&conn, &id_clone)?,
             )
-            .optional()
         })
         .await??
         .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
@@ -922,12 +902,9 @@ impl ManagerRef<'_, InstanceManager> {
         let id_clone = id.clone();
         let m = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::metadata::FindModFileCacheWithMetadata::SQL,
-                rusqlite::params![id_clone],
-                |row| models::ModFileCacheWithMetadata::from_row(row),
+            Ok::<_, anyhow::Error>(
+                queries::metadata::FindModFileCacheWithMetadata::fetch_optional(&conn, &id_clone)?,
             )
-            .optional()
         })
         .await??
         .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
@@ -989,12 +966,10 @@ impl ManagerRef<'_, InstanceManager> {
         // First, get the metadata_id from the mod file cache
         let metadata_id = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::metadata::FindModFileCache::SQL,
-                rusqlite::params![mod_id_clone],
-                |row| row.get::<_, String>("metadataId"),
+            Ok::<_, anyhow::Error>(
+                queries::metadata::FindModFileCache::fetch_optional(&conn, &mod_id_clone)?
+                    .map(|m| m.metadata_id),
             )
-            .optional()
         })
         .await??
         .ok_or(InvalidModIdError(mod_id))?;
@@ -1008,13 +983,13 @@ impl ManagerRef<'_, InstanceManager> {
                 // Local mod image
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.query_row(
-                        queries::metadata::FindLocalModImageCache::SQL,
-                        rusqlite::params![metadata_id_clone],
-                        |row| row.get::<_, Vec<u8>>("data"),
+                    Ok::<_, anyhow::Error>(
+                        queries::metadata::FindLocalModImageCache::fetch_optional(
+                            &conn,
+                            &metadata_id_clone,
+                        )?
+                        .map(|m| m.data),
                     )
-                    .optional()
-                    .map_err(anyhow::Error::from)
                 })
                 .await??
             }
@@ -1022,14 +997,13 @@ impl ManagerRef<'_, InstanceManager> {
                 // CurseForge image
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.query_row(
-                        queries::metadata::FindCurseForgeModImageCache::SQL,
-                        rusqlite::params![metadata_id_clone],
-                        |row| row.get::<_, Option<Vec<u8>>>("data"),
+                    Ok::<_, anyhow::Error>(
+                        queries::metadata::FindCurseForgeModImageCache::fetch_optional(
+                            &conn,
+                            &metadata_id_clone,
+                        )?
+                        .and_then(|m| m.data),
                     )
-                    .optional()
-                    .map(|opt| opt.flatten())
-                    .map_err(anyhow::Error::from)
                 })
                 .await??
             }
@@ -1037,14 +1011,13 @@ impl ManagerRef<'_, InstanceManager> {
                 // Modrinth image
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.query_row(
-                        queries::metadata::FindModrinthModImageCache::SQL,
-                        rusqlite::params![metadata_id_clone],
-                        |row| row.get::<_, Option<Vec<u8>>>("data"),
+                    Ok::<_, anyhow::Error>(
+                        queries::metadata::FindModrinthModImageCache::fetch_optional(
+                            &conn,
+                            &metadata_id_clone,
+                        )?
+                        .and_then(|m| m.data),
                     )
-                    .optional()
-                    .map(|opt| opt.flatten())
-                    .map_err(anyhow::Error::from)
                 })
                 .await??
             }

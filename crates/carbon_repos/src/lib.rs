@@ -36,8 +36,8 @@ pub mod queries;
 
 // Re-export commonly used types at crate root
 pub use connection::{
-    DbConn, DbPool, OptionalExt, PoolConfig, batch_execute, create_pool, create_pool_default,
-    with_transaction,
+    AsConnection, DbConn, DbPool, OptionalExt, PoolConfig, batch_execute, create_pool,
+    create_pool_default, with_transaction,
 };
 pub use context::DbContext;
 pub use error::DatabaseError;
@@ -82,12 +82,8 @@ mod tests {
         )
         .unwrap();
 
-        // Query using our defined query
-        let settings = conn
-            .query_row(queries::settings::GetSettings::SQL, [], |row| {
-                models::AppConfiguration::from_row(row)
-            })
-            .unwrap();
+        // Query using our typed query
+        let settings = queries::settings::GetSettings::fetch_one(&conn).unwrap();
 
         assert_eq!(settings.id, 0);
         assert_eq!(settings.release_channel, "stable");

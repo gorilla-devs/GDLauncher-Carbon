@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::bail;
-use carbon_repos::{DatabaseError, OptionalExt, models::ActiveDownload, queries};
+use carbon_repos::{DatabaseError, queries};
 use reqwest::Response;
 use reqwest_middleware::ClientWithMiddleware;
 use thiserror::Error;
@@ -88,10 +88,7 @@ impl ManagerRef<'_, DownloadManager> {
         let file_id = handle.id.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::cache::DeleteActiveDownloadByFileId::SQL,
-                rusqlite::params![file_id],
-            )?;
+            queries::cache::DeleteActiveDownloadByFileId::execute(&conn, &file_id)?;
             Ok::<_, DatabaseError>(())
         })
         .await
@@ -130,10 +127,7 @@ impl ManagerRef<'_, DownloadManager> {
         let file_id = handle.id.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::cache::DeleteActiveDownloadByFileId::SQL,
-                rusqlite::params![file_id],
-            )?;
+            queries::cache::DeleteActiveDownloadByFileId::execute(&conn, &file_id)?;
             Ok::<_, DatabaseError>(())
         })
         .await
@@ -157,12 +151,8 @@ impl ManagerRef<'_, DownloadManager> {
         let url_clone = url.clone();
         let active_download = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::cache::FindActiveDownload::SQL,
-                rusqlite::params![url_clone],
-                |row| ActiveDownload::from_row(row),
-            )
-            .optional()
+            let result = queries::cache::FindActiveDownload::fetch_optional(&conn, &url_clone)?;
+            Ok::<_, DatabaseError>(result)
         })
         .await
         .map_err(|e| DownloadStartError::Query(DatabaseError::Custom(e.to_string())))??;
@@ -177,10 +167,7 @@ impl ManagerRef<'_, DownloadManager> {
                 let id_clone = id.clone();
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.execute(
-                        queries::cache::CreateActiveDownload::SQL,
-                        rusqlite::params![url_clone, id_clone],
-                    )?;
+                    queries::cache::CreateActiveDownload::execute(&conn, &url_clone, &id_clone)?;
                     Ok::<_, DatabaseError>(())
                 })
                 .await

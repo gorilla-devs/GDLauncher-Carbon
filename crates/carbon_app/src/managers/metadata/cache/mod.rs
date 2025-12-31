@@ -5,9 +5,7 @@ use crate::managers::App;
 use crate::managers::ManagerRef;
 use crate::managers::vtask::VisualTask;
 use anyhow::anyhow;
-use carbon_repos::{
-    DbPool, models::ModFileCache as DbModFileCache, models::ModMetadata as DbModMetadata, queries,
-};
+use carbon_repos::{DbPool, queries};
 use carbon_rt_path::InstancesPath;
 use curseforge::CurseforgeModCacher;
 use futures::Future;
@@ -703,10 +701,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         let id = *instance_id;
         let delete_result = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::metadata::DeleteModFileCacheByInstance::SQL,
-                rusqlite::params![id],
-            )?;
+            queries::metadata::DeleteModFileCacheByInstance::execute(&conn, id)?;
             Ok::<_, anyhow::Error>(())
         })
         .await;
@@ -723,7 +718,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         let pool = self.app.db_pool.clone();
         let result = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(queries::metadata::DeleteOrphanedModMetadata::SQL, [])?;
+            queries::metadata::DeleteOrphanedModMetadata::execute(&conn)?;
             Ok::<_, anyhow::Error>(())
         })
         .await;
@@ -1080,12 +1075,12 @@ impl ManagerRef<'_, MetaCacheManager> {
             let sha512_vec = sha512_vec.clone();
             move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::metadata::FindModMetadataBySha512AndMurmur2::SQL,
-                    rusqlite::params![sha512_vec, murmur2_i32],
-                    |row| DbModMetadata::from_row(row),
-                )
-                .optional()
+                let result = queries::metadata::FindModMetadataBySha512AndMurmur2::fetch_optional(
+                    &conn,
+                    &sha512_vec,
+                    murmur2_i32,
+                )?;
+                Ok::<_, anyhow::Error>(result)
             }
         })
         .await??;
@@ -1141,20 +1136,18 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.execute(
-                        queries::metadata::CreateModMetadata::SQL,
-                        rusqlite::params![
-                            meta_id_clone,
-                            murmur2_i32,
-                            sha512_vec_clone,
-                            sha1_vec,
-                            name,
-                            modid,
-                            version,
-                            description,
-                            authors,
-                            modloaders
-                        ],
+                    queries::metadata::CreateModMetadata::execute(
+                        &conn,
+                        &meta_id_clone,
+                        murmur2_i32,
+                        &sha512_vec_clone,
+                        &sha1_vec,
+                        name.as_deref(),
+                        modid.as_deref(),
+                        version.as_deref(),
+                        description.as_deref(),
+                        authors.as_deref(),
+                        &modloaders,
                     )?;
                     Ok::<_, anyhow::Error>(())
                 })
@@ -1167,9 +1160,10 @@ impl ManagerRef<'_, MetaCacheManager> {
                     let meta_id_clone = meta_id.clone();
                     tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.execute(
-                            queries::metadata::UpsertLocalModImageCache::SQL,
-                            rusqlite::params![meta_id_clone, logo_data],
+                        queries::metadata::UpsertLocalModImageCache::execute(
+                            &conn,
+                            &meta_id_clone,
+                            &logo_data,
                         )?;
                         Ok::<_, anyhow::Error>(())
                     })
@@ -1189,17 +1183,15 @@ impl ManagerRef<'_, MetaCacheManager> {
         let addon_type_clone = addon_type.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::metadata::UpsertModFileCache::SQL,
-                rusqlite::params![
-                    file_id,
-                    instance_id_i32,
-                    mod_filename_clone,
-                    content_len as i32,
-                    enabled,
-                    addon_type_clone,
-                    meta_id_clone
-                ],
+            queries::metadata::UpsertModFileCache::execute(
+                &conn,
+                &file_id,
+                instance_id_i32,
+                &mod_filename_clone,
+                content_len as i32,
+                enabled,
+                &addon_type_clone,
+                &meta_id_clone,
             )?;
             Ok::<_, anyhow::Error>(())
         })
@@ -1261,11 +1253,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             let cached_entries = tokio::spawn(async move {
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    let mut stmt =
-                        conn.prepare(queries::metadata::ListModFileCacheByInstance::SQL)?;
-                    let entries = stmt
-                        .query_map(rusqlite::params![id], |row| DbModFileCache::from_row(row))?
-                        .collect::<Result<Vec<_>, _>>()?;
+                    let entries =
+                        queries::metadata::ListModFileCacheByInstance::fetch_all(&conn, id)?;
                     Ok::<_, anyhow::Error>(entries)
                 })
                 .await?
@@ -1429,9 +1418,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                         let filename = entry.filename.clone();
                         let _ = tokio::task::spawn_blocking(move || {
                             let conn = pool.get()?;
-                            conn.execute(
-                                queries::metadata::DeleteModFileCacheByInstanceAndFilename::SQL,
-                                rusqlite::params![id, filename],
+                            queries::metadata::DeleteModFileCacheByInstanceAndFilename::execute(
+                                &conn, id, &filename,
                             )?;
                             Ok::<_, anyhow::Error>(())
                         })

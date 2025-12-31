@@ -25,7 +25,7 @@ pub use metadata::{
     ModFileCacheWithModrinth, ModMetadata, ModrinthModCache, ModrinthModImageCache,
 };
 pub use modpack::{
-    CurseForgeModpackCache, CurseForgeModpackImageCache, ModrinthModpackCache,
+    CurseForgeModpackCache, CurseForgeModpackImageCache, ModpackCacheEntry, ModrinthModpackCache,
     ModrinthModpackImageCache,
 };
 pub use settings::AppConfiguration;

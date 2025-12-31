@@ -6,7 +6,6 @@ use carbon_platforms::{ModChannelWithUsage, ModPlatform};
 use carbon_repos::{models::AppConfiguration, queries};
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
-use rusqlite::params; // Still needed for non-migrated queries
 use std::path::PathBuf;
 
 pub mod terms_and_privacy;
@@ -39,7 +38,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            queries::settings::GetSettings::query_row(&conn)
+            queries::settings::GetSettings::fetch_one(&conn)
                 .map_err(|e| anyhow!("Failed to get settings: {}", e))
         })
         .await?
@@ -168,175 +167,155 @@ impl ManagerRef<'_, SettingsManager> {
                 }
 
                 if let Some(language) = language {
-                    conn.execute(queries::settings::UpdateLanguage::SQL, params![language])?;
+                    queries::settings::UpdateLanguage::execute(&conn, &language)?;
                 }
 
                 if let Some(reduced_motion) = reduced_motion {
-                    conn.execute(
-                        queries::settings::UpdateReducedMotion::SQL,
-                        params![reduced_motion],
-                    )?;
+                    queries::settings::UpdateReducedMotion::execute(&conn, reduced_motion)?;
                 }
 
                 if let Some(discord_integration) = discord_integration {
-                    conn.execute(
-                        queries::settings::UpdateDiscordIntegration::SQL,
-                        params![discord_integration],
+                    queries::settings::UpdateDiscordIntegration::execute(
+                        &conn,
+                        discord_integration,
                     )?;
                 }
 
                 if let Some(release_channel) = release_channel {
-                    conn.execute(
-                        queries::settings::UpdateReleaseChannel::SQL,
-                        params![release_channel],
-                    )?;
+                    queries::settings::UpdateReleaseChannel::execute(&conn, &release_channel)?;
                 }
 
                 if let Some(launcher_action_on_game_launch) = launcher_action_on_game_launch {
-                    conn.execute(
-                        queries::settings::UpdateLauncherActionOnGameLaunch::SQL,
-                        params![launcher_action_on_game_launch],
+                    queries::settings::UpdateLauncherActionOnGameLaunch::execute(
+                        &conn,
+                        &launcher_action_on_game_launch,
                     )?;
                 }
 
-                if let Some(show_app_close_warning) = &show_app_close_warning {
-                    conn.execute(
-                        queries::settings::UpdateShowAppCloseWarning::SQL,
-                        params![show_app_close_warning],
+                if let Some(show_app_close_warning) = show_app_close_warning {
+                    queries::settings::UpdateShowAppCloseWarning::execute(
+                        &conn,
+                        show_app_close_warning,
                     )?;
                 }
 
                 if let Some(last_app_version) = last_app_version {
-                    conn.execute(
-                        queries::settings::UpdateLastAppVersion::SQL,
-                        params![last_app_version],
+                    queries::settings::UpdateLastAppVersion::execute(
+                        &conn,
+                        last_app_version.as_deref(),
                     )?;
                 }
 
                 if let Some(concurrent_downloads) = concurrent_downloads {
-                    conn.execute(
-                        queries::settings::UpdateConcurrentDownloads::SQL,
-                        params![concurrent_downloads],
+                    queries::settings::UpdateConcurrentDownloads::execute(
+                        &conn,
+                        concurrent_downloads,
                     )?;
                 }
 
                 if let Some(download_dependencies) = download_dependencies {
-                    conn.execute(
-                        queries::settings::UpdateDownloadDependencies::SQL,
-                        params![download_dependencies],
+                    queries::settings::UpdateDownloadDependencies::execute(
+                        &conn,
+                        download_dependencies,
                     )?;
                 }
 
                 if let Some(show_featured) = show_featured {
-                    conn.execute(
-                        queries::settings::UpdateShowFeatured::SQL,
-                        params![show_featured],
-                    )?;
+                    queries::settings::UpdateShowFeatured::execute(&conn, show_featured)?;
                 }
 
                 if let Some(instances_sort_by) = instances_sort_by {
-                    conn.execute(
-                        queries::settings::UpdateInstancesSortBy::SQL,
-                        params![instances_sort_by],
-                    )?;
+                    queries::settings::UpdateInstancesSortBy::execute(&conn, &instances_sort_by)?;
                 }
 
                 if let Some(instances_sort_by_asc) = instances_sort_by_asc {
-                    conn.execute(
-                        queries::settings::UpdateInstancesSortByAsc::SQL,
-                        params![instances_sort_by_asc],
+                    queries::settings::UpdateInstancesSortByAsc::execute(
+                        &conn,
+                        instances_sort_by_asc,
                     )?;
                 }
 
                 if let Some(instances_group_by) = instances_group_by {
-                    conn.execute(
-                        queries::settings::UpdateInstancesGroupBy::SQL,
-                        params![instances_group_by],
-                    )?;
+                    queries::settings::UpdateInstancesGroupBy::execute(&conn, &instances_group_by)?;
                 }
 
                 if let Some(instances_group_by_asc) = instances_group_by_asc {
-                    conn.execute(
-                        queries::settings::UpdateInstancesGroupByAsc::SQL,
-                        params![instances_group_by_asc],
+                    queries::settings::UpdateInstancesGroupByAsc::execute(
+                        &conn,
+                        instances_group_by_asc,
                     )?;
                 }
 
                 if let Some(instances_tile_size) = instances_tile_size {
-                    conn.execute(
-                        queries::settings::UpdateInstancesTileSize::SQL,
-                        params![instances_tile_size],
+                    queries::settings::UpdateInstancesTileSize::execute(
+                        &conn,
+                        instances_tile_size,
                     )?;
                 }
 
                 if let Some(deletion_through_recycle_bin) = deletion_through_recycle_bin {
-                    conn.execute(
-                        queries::settings::UpdateDeletionThroughRecycleBin::SQL,
-                        params![deletion_through_recycle_bin],
+                    queries::settings::UpdateDeletionThroughRecycleBin::execute(
+                        &conn,
+                        deletion_through_recycle_bin,
                     )?;
                 }
 
                 if let Some(xmx) = xmx {
-                    conn.execute(queries::settings::UpdateXmx::SQL, params![xmx])?;
+                    queries::settings::UpdateXmx::execute(&conn, xmx)?;
                 }
 
                 if let Some(xms) = xms {
-                    conn.execute(queries::settings::UpdateXms::SQL, params![xms])?;
+                    queries::settings::UpdateXms::execute(&conn, xms)?;
                 }
 
                 if let Some(is_first_launch) = is_first_launch {
-                    conn.execute(
-                        queries::settings::UpdateIsFirstLaunch::SQL,
-                        params![is_first_launch],
-                    )?;
+                    queries::settings::UpdateIsFirstLaunch::execute(&conn, is_first_launch)?;
                 }
 
                 if let Some(game_resolution) = game_resolution {
-                    conn.execute(
-                        queries::settings::UpdateGameResolution::SQL,
-                        params![game_resolution],
+                    queries::settings::UpdateGameResolution::execute(
+                        &conn,
+                        game_resolution.as_deref(),
                     )?;
                 }
 
                 if let Some(java_custom_args) = java_custom_args {
-                    conn.execute(
-                        queries::settings::UpdateJavaCustomArgs::SQL,
-                        params![java_custom_args],
-                    )?;
+                    queries::settings::UpdateJavaCustomArgs::execute(&conn, &java_custom_args)?;
                 }
 
                 if let Some(pre_launch_hook) = pre_launch_hook {
-                    conn.execute(
-                        queries::settings::UpdatePreLaunchHook::SQL,
-                        params![pre_launch_hook],
+                    queries::settings::UpdatePreLaunchHook::execute(
+                        &conn,
+                        pre_launch_hook.as_deref(),
                     )?;
                 }
 
                 if let Some(post_exit_hook) = post_exit_hook {
-                    conn.execute(
-                        queries::settings::UpdatePostExitHook::SQL,
-                        params![post_exit_hook],
+                    queries::settings::UpdatePostExitHook::execute(
+                        &conn,
+                        post_exit_hook.as_deref(),
                     )?;
                 }
 
                 if let Some(wrapper_command) = wrapper_command {
-                    conn.execute(
-                        queries::settings::UpdateWrapperCommand::SQL,
-                        params![wrapper_command],
+                    queries::settings::UpdateWrapperCommand::execute(
+                        &conn,
+                        wrapper_command.as_deref(),
                     )?;
                 }
 
-                if let Some(auto_manage_java_system_profiles) = &auto_manage_java_system_profiles {
-                    conn.execute(
-                        queries::settings::UpdateAutoManageJavaSystemProfiles::SQL,
-                        params![auto_manage_java_system_profiles],
+                if let Some(auto_manage_java_system_profiles) = auto_manage_java_system_profiles {
+                    queries::settings::UpdateAutoManageJavaSystemProfiles::execute(
+                        &conn,
+                        auto_manage_java_system_profiles,
                     )?;
                 }
 
                 if let Some((platform_blacklist, channels_str)) = mod_sources {
-                    conn.execute(
-                        queries::settings::UpdateModSources::SQL,
-                        params![platform_blacklist, channels_str],
+                    queries::settings::UpdateModSources::execute(
+                        &conn,
+                        &platform_blacklist,
+                        &channels_str,
                     )?;
                 }
 
@@ -348,9 +327,10 @@ impl ManagerRef<'_, SettingsManager> {
                         .map(|v| v.to_string())
                         .unwrap_or_default();
 
-                    conn.execute(
-                        queries::settings::UpdateTermsAndPrivacyFull::SQL,
-                        params![true, latest_consent_sha],
+                    queries::settings::UpdateTermsAndPrivacyFull::execute(
+                        &conn,
+                        true,
+                        Some(latest_consent_sha.as_str()),
                     )?;
                 }
 
@@ -399,7 +379,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(queries::settings::UpdateLanguage::SQL, params![language])?;
+            queries::settings::UpdateLanguage::execute(&conn, &language)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -411,10 +391,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateReducedMotion::SQL,
-                params![reduced_motion],
-            )?;
+            queries::settings::UpdateReducedMotion::execute(&conn, reduced_motion)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -426,10 +403,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateDiscordIntegration::SQL,
-                params![discord_integration],
-            )?;
+            queries::settings::UpdateDiscordIntegration::execute(&conn, discord_integration)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -441,10 +415,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateReleaseChannel::SQL,
-                params![release_channel],
-            )?;
+            queries::settings::UpdateReleaseChannel::execute(&conn, &release_channel)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -459,10 +430,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateLastAppVersion::SQL,
-                params![last_app_version],
-            )?;
+            queries::settings::UpdateLastAppVersion::execute(&conn, last_app_version.as_deref())?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -474,10 +442,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateConcurrentDownloads::SQL,
-                params![concurrent_downloads],
-            )?;
+            queries::settings::UpdateConcurrentDownloads::execute(&conn, concurrent_downloads)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -489,7 +454,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(queries::settings::UpdateXmx::SQL, params![xmx])?;
+            queries::settings::UpdateXmx::execute(&conn, xmx)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -501,7 +466,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(queries::settings::UpdateXms::SQL, params![xms])?;
+            queries::settings::UpdateXms::execute(&conn, xms)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -513,10 +478,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateIsFirstLaunch::SQL,
-                params![is_first_launch],
-            )?;
+            queries::settings::UpdateIsFirstLaunch::execute(&conn, is_first_launch)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -531,9 +493,9 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateAutoManageJavaSystemProfiles::SQL,
-                params![auto_manage_java_system_profiles],
+            queries::settings::UpdateAutoManageJavaSystemProfiles::execute(
+                &conn,
+                auto_manage_java_system_profiles,
             )?;
             Ok::<_, anyhow::Error>(())
         })
@@ -546,10 +508,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateActiveAccountUuid::SQL,
-                params![uuid],
-            )?;
+            queries::settings::UpdateActiveAccountUuid::execute(&conn, uuid.as_deref())?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -561,7 +520,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(queries::settings::UpdateGdlAccountUuid::SQL, params![uuid])?;
+            queries::settings::UpdateGdlAccountUuid::execute(&conn, uuid.as_deref())?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -573,10 +532,7 @@ impl ManagerRef<'_, SettingsManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::settings::UpdateGdlAccountStatus::SQL,
-                params![status],
-            )?;
+            queries::settings::UpdateGdlAccountStatus::execute(&conn, status.as_deref())?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;

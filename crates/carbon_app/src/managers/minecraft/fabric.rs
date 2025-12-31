@@ -1,5 +1,5 @@
 use anyhow::Context;
-use carbon_repos::{DatabaseError, DbPool, OptionalExt, models, queries};
+use carbon_repos::{DatabaseError, DbPool, queries};
 use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -72,9 +72,10 @@ pub async fn get_version(
         let version_bytes_vec = version_bytes.to_vec();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::cache::UpsertPartialVersionInfoCache::SQL,
-                rusqlite::params![db_entry_name_clone, version_bytes_vec],
+            queries::cache::UpsertPartialVersionInfoCache::execute(
+                &conn,
+                &db_entry_name_clone,
+                &version_bytes_vec,
             )?;
             Ok::<_, DatabaseError>(())
         })
@@ -90,12 +91,11 @@ pub async fn get_version(
             let db_entry_name_clone = db_entry_name.clone();
             let db_cache = tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::cache::FindPartialVersionInfoCache::SQL,
-                    rusqlite::params![db_entry_name_clone],
-                    |row| models::PartialVersionInfoCache::from_row(row),
-                )
-                .optional()
+                let result = queries::cache::FindPartialVersionInfoCache::fetch_optional(
+                    &conn,
+                    &db_entry_name_clone,
+                )?;
+                Ok::<_, anyhow::Error>(result)
             })
             .await
             .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?

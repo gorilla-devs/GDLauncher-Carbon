@@ -15,13 +15,7 @@ async fn get_java_component_from_db(
     let pool = db_pool.clone();
     tokio::task::spawn_blocking(move || {
         let conn = pool.get()?;
-        let java: Option<models::Java> = conn
-            .query_row(
-                queries::java::FindJavaByPath::SQL,
-                rusqlite::params![&path],
-                |row| models::Java::from_row(row),
-            )
-            .ok();
+        let java = queries::java::FindJavaByPath::fetch_optional(&conn, &path)?;
         Ok(java)
     })
     .await?
@@ -58,10 +52,7 @@ pub async fn upsert_java_component_to_db(
             let id_clone = id.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.execute(
-                    queries::java::UpdateJavaValid::SQL,
-                    rusqlite::params![&id_clone, true],
-                )?;
+                queries::java::UpdateJavaValid::execute(&conn, &id_clone, true)?;
                 Ok::<_, anyhow::Error>(())
             })
             .await??;
@@ -99,19 +90,17 @@ pub async fn upsert_java_component_to_db(
 
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::java::CreateJava::SQL,
-                rusqlite::params![
-                    &id_clone,
-                    &java_component.path,
-                    java_component.version.major as i32,
-                    &java_component.version.to_string(),
-                    &java_component._type.to_string(),
-                    &java_component.os.to_string(),
-                    &java_component.arch.to_string(),
-                    &java_component.vendor,
-                    true
-                ],
+            queries::java::CreateJava::execute(
+                &conn,
+                &id_clone,
+                &java_component.path,
+                java_component.version.major as i32,
+                &java_component.version.to_string(),
+                &java_component._type.to_string(),
+                &java_component.os.to_string(),
+                &java_component.arch.to_string(),
+                &java_component.vendor,
+                true,
             )?;
             Ok::<_, anyhow::Error>(())
         })
@@ -157,10 +146,7 @@ where
     let java_profiles_with_paths: Vec<models::JavaProfileWithPath> =
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(queries::java::ListJavaProfilesWithJavaPath::SQL)?;
-            let results = stmt
-                .query_map([], models::JavaProfileWithPath::from_row)?
-                .collect::<Result<Vec<_>, _>>()?;
+            let results = queries::java::ListJavaProfilesWithJavaPath::fetch_all(&conn)?;
             Ok::<_, anyhow::Error>(results)
         })
         .await??;
@@ -226,10 +212,7 @@ where
                         let path = resolved_java_path.display().to_string();
                         tokio::task::spawn_blocking(move || {
                             let conn = pool.get()?;
-                            conn.execute(
-                                queries::java::DeleteJavaByPath::SQL,
-                                rusqlite::params![&path],
-                            )?;
+                            queries::java::DeleteJavaByPath::execute(&conn, &path)?;
                             Ok::<_, anyhow::Error>(())
                         })
                         .await??;
@@ -282,10 +265,7 @@ where
             let path = local_java_from_db.path;
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.execute(
-                    queries::java::DeleteJavaByPath::SQL,
-                    rusqlite::params![&path],
-                )?;
+                queries::java::DeleteJavaByPath::execute(&conn, &path)?;
                 Ok::<_, anyhow::Error>(())
             })
             .await??;
@@ -359,10 +339,7 @@ where
     let java_profiles_with_paths: Vec<models::JavaProfileWithPath> =
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(queries::java::ListJavaProfilesWithJavaPath::SQL)?;
-            let results = stmt
-                .query_map([], models::JavaProfileWithPath::from_row)?
-                .collect::<Result<Vec<_>, _>>()?;
+            let results = queries::java::ListJavaProfilesWithJavaPath::fetch_all(&conn)?;
             Ok::<_, anyhow::Error>(results)
         })
         .await??;
@@ -402,10 +379,7 @@ where
                     let path = managed_java.path.clone();
                     tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.execute(
-                            queries::java::DeleteJavaByPath::SQL,
-                            rusqlite::params![&path],
-                        )?;
+                        queries::java::DeleteJavaByPath::execute(&conn, &path)?;
                         Ok::<_, anyhow::Error>(())
                     })
                     .await??;
@@ -417,10 +391,7 @@ where
                     let path = managed_java.path.clone();
                     tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.execute(
-                            queries::java::DeleteJavaByPath::SQL,
-                            rusqlite::params![&path],
-                        )?;
+                        queries::java::DeleteJavaByPath::execute(&conn, &path)?;
                         Ok::<_, anyhow::Error>(())
                     })
                     .await??;
@@ -453,10 +424,7 @@ pub async fn sync_system_java_profiles(db_pool: &DbPool) -> anyhow::Result<()> {
     let pool = db_pool.clone();
     let all_javas: Vec<models::Java> = tokio::task::spawn_blocking(move || {
         let conn = pool.get()?;
-        let mut stmt = conn.prepare(queries::java::ListJavas::SQL)?;
-        let javas = stmt
-            .query_map([], |row| models::Java::from_row(row))?
-            .collect::<Result<Vec<_>, _>>()?;
+        let javas = queries::java::ListJavas::fetch_all(&conn)?;
         Ok::<_, anyhow::Error>(javas)
     })
     .await??;
@@ -470,12 +438,7 @@ pub async fn sync_system_java_profiles(db_pool: &DbPool) -> anyhow::Result<()> {
         let profile_name = profile.to_string();
         let java_in_profile: Option<String> = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let profile: models::JavaProfile = conn
-                .query_row(
-                    queries::java::FindJavaProfileByName::SQL,
-                    rusqlite::params![&profile_name],
-                    |row| models::JavaProfile::from_row(row),
-                )
+            let profile = queries::java::FindJavaProfileByName::fetch_one(&conn, &profile_name)
                 .map_err(|_| {
                     anyhow::anyhow!("Java system profile {} not found in DB", profile_name)
                 })?;
@@ -519,9 +482,10 @@ pub async fn sync_system_java_profiles(db_pool: &DbPool) -> anyhow::Result<()> {
                 let java_id = java.id.clone();
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.execute(
-                        queries::java::UpdateJavaProfileJavaId::SQL,
-                        rusqlite::params![&profile_name, Some(&java_id)],
+                    queries::java::UpdateJavaProfileJavaId::execute(
+                        &conn,
+                        &profile_name,
+                        Some(&java_id),
                     )?;
                     Ok::<_, anyhow::Error>(())
                 })
@@ -557,12 +521,11 @@ mod test {
     };
 
     // Helper function to get java count
-    async fn get_java_count(pool: &DbPool) -> i64 {
+    async fn get_java_count(pool: &DbPool) -> i32 {
         let pool = pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            conn.query_row(queries::java::CountJavas::SQL, [], |row| row.get(0))
-                .unwrap()
+            queries::java::CountJavas::fetch_scalar(&conn).unwrap()
         })
         .await
         .unwrap()
@@ -573,11 +536,7 @@ mod test {
         let pool = pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            let mut stmt = conn.prepare(queries::java::ListJavas::SQL).unwrap();
-            stmt.query_map([], |row| models::Java::from_row(row))
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap()
+            queries::java::ListJavas::fetch_all(&conn).unwrap()
         })
         .await
         .unwrap()
@@ -590,9 +549,10 @@ mod test {
         let java_id = java_id.map(|s| s.to_string());
         tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            conn.execute(
-                queries::java::UpdateJavaProfileJavaId::SQL,
-                rusqlite::params![&profile_name, &java_id],
+            queries::java::UpdateJavaProfileJavaId::execute(
+                &conn,
+                &profile_name,
+                java_id.as_deref(),
             )
             .unwrap();
         })
@@ -907,49 +867,43 @@ mod test {
         let pool = db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            conn.execute(
-                queries::java::CreateJava::SQL,
-                rusqlite::params![
-                    uuid::Uuid::new_v4().to_string(),
-                    "my_path1",
-                    8,
-                    "1.8.0_282",
-                    "local",
-                    "linux",
-                    "x86_64",
-                    "Azul Systems, Inc.",
-                    true
-                ],
+            queries::java::CreateJava::execute(
+                &conn,
+                &uuid::Uuid::new_v4().to_string(),
+                "my_path1",
+                8,
+                "1.8.0_282",
+                "local",
+                "linux",
+                "x86_64",
+                "Azul Systems, Inc.",
+                true,
             )
             .unwrap();
-            conn.execute(
-                queries::java::CreateJava::SQL,
-                rusqlite::params![
-                    uuid::Uuid::new_v4().to_string(),
-                    "my_path2",
-                    17,
-                    "17.0.1",
-                    "local",
-                    "linux",
-                    "x86_64",
-                    "Azul Systems, Inc.",
-                    true
-                ],
+            queries::java::CreateJava::execute(
+                &conn,
+                &uuid::Uuid::new_v4().to_string(),
+                "my_path2",
+                17,
+                "17.0.1",
+                "local",
+                "linux",
+                "x86_64",
+                "Azul Systems, Inc.",
+                true,
             )
             .unwrap();
-            conn.execute(
-                queries::java::CreateJava::SQL,
-                rusqlite::params![
-                    uuid::Uuid::new_v4().to_string(),
-                    "my_path3",
-                    14,
-                    "14.0.1",
-                    "local",
-                    "linux",
-                    "x86_64",
-                    "Azul Systems, Inc.",
-                    false
-                ],
+            queries::java::CreateJava::execute(
+                &conn,
+                &uuid::Uuid::new_v4().to_string(),
+                "my_path3",
+                14,
+                "14.0.1",
+                "local",
+                "linux",
+                "x86_64",
+                "Azul Systems, Inc.",
+                false,
             )
             .unwrap();
         })
@@ -962,11 +916,7 @@ mod test {
         let pool = db_pool.clone();
         let all_profiles: Vec<models::JavaProfile> = tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            let mut stmt = conn.prepare(queries::java::ListJavaProfiles::SQL).unwrap();
-            stmt.query_map([], |row| models::JavaProfile::from_row(row))
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap()
+            queries::java::ListJavaProfiles::fetch_all(&conn).unwrap()
         })
         .await
         .unwrap();
@@ -977,10 +927,9 @@ mod test {
         let pool = db_pool.clone();
         let legacy_profile: models::JavaProfile = tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            conn.query_row(
-                queries::java::FindJavaProfileByName::SQL,
-                rusqlite::params![&SystemJavaProfileName::Legacy.to_string()],
-                |row| models::JavaProfile::from_row(row),
+            queries::java::FindJavaProfileByName::fetch_one(
+                &conn,
+                &SystemJavaProfileName::Legacy.to_string(),
             )
             .unwrap()
         })
@@ -994,10 +943,9 @@ mod test {
         let pool = db_pool.clone();
         let alpha_profile: models::JavaProfile = tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            conn.query_row(
-                queries::java::FindJavaProfileByName::SQL,
-                rusqlite::params![&SystemJavaProfileName::Alpha.to_string()],
-                |row| models::JavaProfile::from_row(row),
+            queries::java::FindJavaProfileByName::fetch_one(
+                &conn,
+                &SystemJavaProfileName::Alpha.to_string(),
             )
             .unwrap()
         })
@@ -1009,10 +957,9 @@ mod test {
         let pool = db_pool.clone();
         let beta_profile: models::JavaProfile = tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            conn.query_row(
-                queries::java::FindJavaProfileByName::SQL,
-                rusqlite::params![&SystemJavaProfileName::Beta.to_string()],
-                |row| models::JavaProfile::from_row(row),
+            queries::java::FindJavaProfileByName::fetch_one(
+                &conn,
+                &SystemJavaProfileName::Beta.to_string(),
             )
             .unwrap()
         })
@@ -1024,10 +971,9 @@ mod test {
         let pool = db_pool.clone();
         let gamma_profile: models::JavaProfile = tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            conn.query_row(
-                queries::java::FindJavaProfileByName::SQL,
-                rusqlite::params![&SystemJavaProfileName::Gamma.to_string()],
-                |row| models::JavaProfile::from_row(row),
+            queries::java::FindJavaProfileByName::fetch_one(
+                &conn,
+                &SystemJavaProfileName::Gamma.to_string(),
             )
             .unwrap()
         })
@@ -1039,10 +985,9 @@ mod test {
         let pool = db_pool.clone();
         let minecraft_exe_profile: models::JavaProfile = tokio::task::spawn_blocking(move || {
             let conn = pool.get().unwrap();
-            conn.query_row(
-                queries::java::FindJavaProfileByName::SQL,
-                rusqlite::params![&SystemJavaProfileName::MinecraftJavaExe.to_string()],
-                |row| models::JavaProfile::from_row(row),
+            queries::java::FindJavaProfileByName::fetch_one(
+                &conn,
+                &SystemJavaProfileName::MinecraftJavaExe.to_string(),
             )
             .unwrap()
         })

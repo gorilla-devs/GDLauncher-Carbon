@@ -19,7 +19,6 @@ use jwt::{Header, Token};
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
-use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::{
@@ -87,7 +86,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             let uuid_clone = uuid_val.clone();
             let account_entry = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
                 let conn = pool.get()?;
-                Ok(queries::account::FindAccountByUuid::query_row_optional(
+                Ok(queries::account::FindAccountByUuid::fetch_optional(
                     &conn,
                     &uuid_clone,
                 )?)
@@ -108,10 +107,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let uuid_clone = uuid.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                "UPDATE AppConfiguration SET activeAccountUuid = ?1 WHERE id = 0",
-                params![uuid_clone],
-            )?;
+            queries::settings::UpdateActiveAccountUuid::execute(&conn, uuid_clone.as_deref())?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -131,12 +127,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let pool = self.app.db_pool.clone();
         let account = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::account::FindAccountByUuid::SQL,
-                params![uuid],
-                |row| models::Account::from_row(row),
-            )
-            .optional()
+            Ok::<_, anyhow::Error>(queries::account::FindAccountByUuid::fetch_optional(
+                &conn, &uuid,
+            )?)
         })
         .await??
         .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
@@ -148,10 +141,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(queries::account::ListAccounts::SQL)?;
-            let accounts = stmt
-                .query_map([], |row| models::Account::from_row(row))?
-                .collect::<Result<Vec<_>, _>>()?;
+            let accounts = queries::account::ListAccounts::fetch_all(&conn)?;
             Ok(accounts)
         })
         .await?
@@ -175,12 +165,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let pool = self.app.db_pool.clone();
         let account = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::account::FindAccountByUuid::SQL,
-                params![uuid],
-                |row| models::Account::from_row(row),
-            )
-            .optional()
+            Ok::<_, anyhow::Error>(queries::account::FindAccountByUuid::fetch_optional(
+                &conn, &uuid,
+            )?)
         })
         .await??;
 
@@ -333,10 +320,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let uuid_clone = uuid.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                "UPDATE AppConfiguration SET gdlAccountUuid = ?1 WHERE id = 0",
-                params![uuid_clone],
-            )?;
+            queries::settings::UpdateGdlAccountUuid::execute(&conn, uuid_clone.as_deref())?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -488,10 +472,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let pool = self.app.db_pool.clone();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                "UPDATE AppConfiguration SET gdlAccountUuid = NULL, gdlAccountStatus = NULL WHERE id = 0",
-                [],
-            )?;
+            queries::settings::UpdateGdlAccountUuid::execute(&conn, None)?;
+            queries::settings::UpdateGdlAccountStatus::execute(&conn, None)?;
             Ok::<_, anyhow::Error>(())
         })
         .await??;
@@ -594,12 +576,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             let uuid = uuid.clone();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::account::FindAccountByUuid::SQL,
-                    params![uuid],
-                    |row| models::Account::from_row(row),
-                )
-                .optional()
+                Ok::<_, anyhow::Error>(queries::account::FindAccountByUuid::fetch_optional(
+                    &conn, &uuid,
+                )?)
             })
             .await??
         };
@@ -615,17 +594,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     let username = account.username.clone();
                     tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.execute(
-                            queries::account::UpdateAccountFull::SQL,
-                            params![
-                                uuid,
-                                username,
-                                Option::<String>::None, // accessToken
-                                Option::<String>::None, // msRefreshToken
-                                Option::<String>::None, // tokenExpires
-                                Option::<String>::None, // idToken
-                                Option::<String>::None, // skinId
-                            ],
+                        queries::account::UpdateAccountFull::execute(
+                            &conn, &uuid, &username, None, // accessToken
+                            None, // msRefreshToken
+                            None, // tokenExpires
+                            None, // idToken
+                            None, // skinId
                         )?;
                         Ok::<_, anyhow::Error>(())
                     })
@@ -645,17 +619,15 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     let token_expires_str = token_expires.to_rfc3339();
                     tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.execute(
-                            queries::account::UpdateAccountFull::SQL,
-                            params![
-                                uuid,
-                                username,
-                                Some(access_token),
-                                refresh_token,
-                                Some(token_expires_str),
-                                id_token,
-                                skin_id,
-                            ],
+                        queries::account::UpdateAccountFull::execute(
+                            &conn,
+                            &uuid,
+                            &username,
+                            Some(&access_token),
+                            refresh_token.as_deref(),
+                            Some(&token_expires_str),
+                            id_token.as_deref(),
+                            skin_id.as_deref(),
                         )?;
                         Ok::<_, anyhow::Error>(())
                     })
@@ -676,18 +648,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     let username = account.username.clone();
                     tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.execute(
-                            queries::account::CreateAccount::SQL,
-                            params![
-                                uuid,
-                                username,
-                                now,
-                                Option::<String>::None, // accessToken
-                                Option::<String>::None, // msRefreshToken
-                                Option::<String>::None, // tokenExpires
-                                Option::<String>::None, // idToken
-                                Option::<String>::None, // skinId
-                            ],
+                        queries::account::CreateAccount::execute(
+                            &conn, &uuid, &username, &now, None, // accessToken
+                            None, // msRefreshToken
+                            None, // tokenExpires
+                            None, // idToken
+                            None, // skinId
                         )?;
                         Ok::<_, anyhow::Error>(())
                     })
@@ -707,18 +673,16 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     let token_expires_str = token_expires.to_rfc3339();
                     tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        conn.execute(
-                            queries::account::CreateAccount::SQL,
-                            params![
-                                uuid,
-                                username,
-                                now,
-                                Some(access_token),
-                                refresh_token,
-                                Some(token_expires_str),
-                                id_token,
-                                skin_id,
-                            ],
+                        queries::account::CreateAccount::execute(
+                            &conn,
+                            &uuid,
+                            &username,
+                            &now,
+                            Some(&access_token),
+                            refresh_token.as_deref(),
+                            Some(&token_expires_str),
+                            id_token.as_deref(),
+                            skin_id.as_deref(),
                         )?;
                         Ok::<_, anyhow::Error>(())
                     })
@@ -742,12 +706,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let uuid_clone = uuid.clone();
         let account = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::account::FindAccountByUuid::SQL,
-                params![uuid_clone],
-                |row| models::Account::from_row(row),
-            )
-            .optional()
+            Ok::<_, anyhow::Error>(queries::account::FindAccountByUuid::fetch_optional(
+                &conn,
+                &uuid_clone,
+            )?)
         })
         .await??
         .ok_or(RefreshAccountError::NoAccount)?;
@@ -870,12 +832,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 let uuid_clone = uuid.clone();
                 let next_account = tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.query_row(
-                        queries::account::FindNextAccount::SQL,
-                        params![uuid_clone],
-                        |row| Ok(row.get::<_, String>("uuid")?),
+                    Ok::<_, anyhow::Error>(
+                        queries::account::FindNextAccount::fetch_optional(&conn, &uuid_clone)?
+                            .map(|acc| acc.uuid),
                     )
-                    .optional()
                 })
                 .await??;
 
@@ -899,7 +859,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let uuid_clone = uuid.clone();
         let rows_affected = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let rows = conn.execute(queries::account::DeleteAccount::SQL, params![uuid_clone])?;
+            let rows = queries::account::DeleteAccount::execute(&conn, &uuid_clone)?;
             Ok::<_, anyhow::Error>(rows)
         })
         .await??;
@@ -1179,9 +1139,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 let now = Utc::now().to_rfc3339();
                 tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.execute(
-                        queries::account::UpdateAccountTokenExpires::SQL,
-                        params![uuid_clone, now],
+                    queries::account::UpdateAccountTokenExpires::execute(
+                        &conn,
+                        &uuid_clone,
+                        Some(&now),
                     )?;
                     Ok::<_, anyhow::Error>(())
                 })
@@ -1206,9 +1167,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let skin_id = profile.skin.map(|skin| skin.id);
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::account::UpdateAccountUsernameAndSkin::SQL,
-                params![uuid_clone, username, skin_id],
+            queries::account::UpdateAccountUsernameAndSkin::execute(
+                &conn,
+                &uuid_clone,
+                &username,
+                skin_id.as_deref(),
             )?;
             Ok::<_, anyhow::Error>(())
         })

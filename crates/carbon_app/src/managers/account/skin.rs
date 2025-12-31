@@ -1,9 +1,8 @@
 use super::api::McSkin as ApiSkin;
 use crate::managers::ManagerRef;
 use anyhow::ensure;
-use carbon_repos::{OptionalExt, models, queries};
+use carbon_repos::queries;
 use image::{GenericImageView, ImageFormat};
-use rusqlite::params;
 use std::io::Cursor;
 use thiserror::Error;
 
@@ -16,12 +15,10 @@ impl ManagerRef<'_, SkinManager> {
         let uuid_clone = uuid.clone();
         let account = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::account::FindAccountByUuid::SQL,
-                params![uuid_clone],
-                |row| models::Account::from_row(row),
-            )
-            .optional()
+            Ok::<_, anyhow::Error>(queries::account::FindAccountByUuid::fetch_optional(
+                &conn,
+                &uuid_clone,
+            )?)
         })
         .await??
         .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
@@ -35,12 +32,10 @@ impl ManagerRef<'_, SkinManager> {
         let skin_id_clone = skin_id.clone();
         let cached_skin = tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.query_row(
-                queries::account::FindSkinById::SQL,
-                params![skin_id_clone],
-                |row| models::Skin::from_row(row),
-            )
-            .optional()
+            Ok::<_, anyhow::Error>(queries::account::FindSkinById::fetch_optional(
+                &conn,
+                &skin_id_clone,
+            )?)
         })
         .await??;
 
@@ -80,15 +75,13 @@ impl ManagerRef<'_, SkinManager> {
                     let tx = conn.unchecked_transaction()?;
 
                     // Upsert skin (INSERT OR REPLACE)
-                    tx.execute(
-                        queries::account::UpsertSkin::SQL,
-                        params![skin_id, skin_data_clone],
-                    )?;
+                    queries::account::UpsertSkin::execute(&tx, &skin_id, &skin_data_clone)?;
 
                     // Update account's skin_id
-                    tx.execute(
-                        queries::account::UpdateAccountSkinId::SQL,
-                        params![uuid_clone, skin_id],
+                    queries::account::UpdateAccountSkinId::execute(
+                        &tx,
+                        &uuid_clone,
+                        Some(&skin_id),
                     )?;
 
                     tx.commit()?;

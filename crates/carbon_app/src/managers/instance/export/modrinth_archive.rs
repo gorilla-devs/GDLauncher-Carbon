@@ -111,14 +111,10 @@ pub async fn export_modrinth(
                     let inst_id = *instance_id;
                     let mods2 = tokio::task::spawn_blocking(move || {
                         let conn = pool.get()?;
-                        let mut stmt = conn.prepare(
-                            queries::metadata::ListModFileCacheWithModrinthByInstance::SQL,
-                        )?;
-                        let mods: Vec<models::ModFileCacheWithModrinth> = stmt
-                            .query_map(rusqlite::params![inst_id], |row| {
-                                models::ModFileCacheWithModrinth::from_row(row)
-                            })?
-                            .collect::<Result<Vec<_>, _>>()?;
+                        let mods =
+                            queries::metadata::ListModFileCacheWithModrinthByInstance::fetch_all(
+                                &conn, inst_id,
+                            )?;
                         Ok::<_, anyhow::Error>(mods)
                     })
                     .await??;

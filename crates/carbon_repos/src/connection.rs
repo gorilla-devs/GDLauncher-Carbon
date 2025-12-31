@@ -17,6 +17,56 @@ pub type DbPool = Pool<SqliteConnectionManager>;
 /// Type alias for a pooled database connection.
 pub type DbConn = PooledConnection<SqliteConnectionManager>;
 
+/// Trait for types that can be used as a database connection.
+///
+/// This allows query methods to accept both `&Connection` and `&Transaction`,
+/// as well as pooled connections.
+///
+/// # Example
+///
+/// ```ignore
+/// fn do_query(conn: &impl AsConnection) -> rusqlite::Result<i32> {
+///     conn.as_connection().query_row("SELECT 1", [], |r| r.get(0))
+/// }
+///
+/// // Works with Connection
+/// do_query(&conn)?;
+///
+/// // Works with Transaction
+/// with_transaction(&mut conn, |tx| {
+///     do_query(tx)?;
+///     Ok(())
+/// })?;
+/// ```
+pub trait AsConnection {
+    /// Returns a reference to the underlying connection.
+    fn as_connection(&self) -> &Connection;
+}
+
+impl AsConnection for Connection {
+    fn as_connection(&self) -> &Connection {
+        self
+    }
+}
+
+impl AsConnection for rusqlite::Transaction<'_> {
+    fn as_connection(&self) -> &Connection {
+        self // Transaction derefs to Connection
+    }
+}
+
+impl AsConnection for PooledConnection<SqliteConnectionManager> {
+    fn as_connection(&self) -> &Connection {
+        self // PooledConnection derefs to Connection
+    }
+}
+
+impl<T: AsConnection + ?Sized> AsConnection for &T {
+    fn as_connection(&self) -> &Connection {
+        (*self).as_connection()
+    }
+}
+
 /// Configuration for the database pool.
 #[derive(Debug, Clone)]
 pub struct PoolConfig {

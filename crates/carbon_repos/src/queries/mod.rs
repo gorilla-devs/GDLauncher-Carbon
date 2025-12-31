@@ -1,38 +1,36 @@
 //! SQL queries organized by entity.
 //!
-//! All queries are defined as const strings and automatically validated at test time
+//! All queries are defined with type-safe parameters and validated at test time
 //! against an in-memory SQLite database with the full schema applied.
 //!
-//! # Typed Query Syntax
-//!
-//! Queries can be defined with type-safe parameters and return types:
+//! # Type-Safe Query Syntax
 //!
 //! ```ignore
-//! // Execute (INSERT/UPDATE/DELETE)
-//! define_query!(
-//!     UpdateTheme,
-//!     "UPDATE AppConfiguration SET theme = ?1 WHERE id = 0",
-//!     execute(theme: &str)
-//! );
+//! // Execute queries (INSERT/UPDATE/DELETE) - no return type
+//! define_query!(UpdateTheme, "UPDATE AppConfiguration SET theme = ?1 WHERE id = 0", (theme: &str));
+//! define_query!(DeleteAccount, "DELETE FROM Account WHERE uuid = ?1", (uuid: &str));
+//! define_query!(ClearCache, "DELETE FROM HTTPCache", ());
+//!
+//! // Usage:
 //! UpdateTheme::execute(&conn, "dark")?;
 //!
-//! // Single row query
-//! define_query!(
-//!     FindAccountByUuid,
-//!     "SELECT * FROM Account WHERE uuid = ?1",
-//!     query_row(uuid: &str) -> Account
-//! );
-//! let account = FindAccountByUuid::query_row(&conn, &uuid)?;
-//! let maybe = FindAccountByUuid::query_row_optional(&conn, &uuid)?;
+//! // Select queries - requires return type, generates all 3 methods
+//! define_query!(FindAccount, "SELECT * FROM Account WHERE uuid = ?1", (uuid: &str) -> Account);
+//! define_query!(ListAccounts, "SELECT * FROM Account", () -> Account);
 //!
-//! // Multi-row query
-//! define_query!(
-//!     ListAccounts,
-//!     "SELECT * FROM Account ORDER BY lastUsed DESC",
-//!     query() -> Account
-//! );
-//! let accounts: Vec<Account> = ListAccounts::query_vec(&conn)?;
+//! // Usage - caller chooses which method:
+//! let account = FindAccount::fetch_one(&conn, &uuid)?;       // Error if not found
+//! let maybe = FindAccount::fetch_optional(&conn, &uuid)?;    // None if not found
+//! let all = FindAccount::fetch_all(&conn, &uuid)?;           // Vec (any count)
+//!
+//! // Scalar queries - for COUNT, MAX, SUM, etc.
+//! define_query!(CountAccounts, "SELECT COUNT(*) FROM Account", () => i32);
+//!
+//! // Usage:
+//! let count = CountAccounts::fetch_scalar(&conn)?;
 //! ```
+//!
+//! The SQL constant is private - you MUST use the typed methods.
 
 pub mod account;
 pub mod cache;
@@ -42,46 +40,53 @@ pub mod metadata;
 pub mod modpack;
 pub mod settings;
 
-/// Macro for defining SQL queries with automatic test-time validation.
+/// Macro for defining type-safe SQL queries.
 ///
-/// Creates a struct with a `SQL` constant and automatically generates a test
-/// that validates the query against the database schema.
+/// Creates a struct with typed methods for query execution. The SQL is private
+/// to enforce type safety - callers must use the generated methods.
 ///
-/// # Syntax Variants
+/// # Syntax
 ///
-/// ## Legacy (untyped)
+/// ## Execute (no return type)
+/// For INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, PRAGMA:
 /// ```ignore
-/// define_query!(GetUser, "SELECT * FROM users WHERE id = ?1");
-/// conn.query_row(GetUser::SQL, [user_id], |row| User::from_row(row))?;
+/// define_query!(DeleteUser, "DELETE FROM users WHERE id = ?1", (id: i32));
+/// define_query!(ClearAll, "DELETE FROM users", ());
+///
+/// DeleteUser::execute(&conn, 42)?;  // Returns usize (rows affected)
 /// ```
 ///
-/// ## Execute (INSERT/UPDATE/DELETE)
+/// ## Query (with struct return type)
+/// For SELECT - generates `fetch_one`, `fetch_optional`, and `fetch_all`:
 /// ```ignore
-/// define_query!(DeleteUser, "DELETE FROM users WHERE id = ?1", execute(id: i32));
-/// DeleteUser::execute(&conn, 42)?;
+/// define_query!(FindUser, "SELECT * FROM users WHERE id = ?1", (id: i32) -> User);
+/// define_query!(ListUsers, "SELECT * FROM users", () -> User);
+///
+/// let user = FindUser::fetch_one(&conn, 42)?;        // Error if 0 rows
+/// let maybe = FindUser::fetch_optional(&conn, 42)?;  // None if 0 rows
+/// let users = ListUsers::fetch_all(&conn)?;          // Vec<User>
 /// ```
 ///
-/// ## Query Row (single result)
+/// ## Scalar Query (with primitive return type)
+/// For SELECT returning a single value (COUNT, MAX, SUM, etc.):
 /// ```ignore
-/// define_query!(FindUser, "SELECT * FROM users WHERE id = ?1", query_row(id: i32) -> User);
-/// let user = FindUser::query_row(&conn, 42)?;
-/// let maybe_user = FindUser::query_row_optional(&conn, 42)?;
-/// ```
+/// define_query!(CountUsers, "SELECT COUNT(*) FROM users", () => i32);
+/// define_query!(GetMaxId, "SELECT MAX(id) FROM users WHERE active = ?1", (active: bool) => i64);
 ///
-/// ## Query (multiple results)
-/// ```ignore
-/// define_query!(ListUsers, "SELECT * FROM users", query() -> User);
-/// let users: Vec<User> = ListUsers::query_vec(&conn)?;
+/// let count = CountUsers::fetch_scalar(&conn)?;            // Returns i32
+/// let max = GetMaxId::fetch_scalar_optional(&conn, true)?; // Returns Option<i64>
 /// ```
 #[macro_export]
 macro_rules! define_query {
-    // Legacy syntax - untyped, backward compatible
+    // Legacy syntax - untyped, for complex queries not yet migrated
+    // SQL is still private, but requires manual execution
     ($name:ident, $sql:expr) => {
         #[doc = concat!("Query: `", $sql, "`")]
+        #[doc = "\n\n**Note:** This query uses legacy syntax and needs migration."]
         pub struct $name;
 
         impl $name {
-            /// The SQL query string.
+            /// The SQL query string (for manual execution).
             pub const SQL: &'static str = $sql;
         }
 
@@ -92,30 +97,30 @@ macro_rules! define_query {
             fn [<validate_query_ $name>]() {
                 let mut conn = rusqlite::Connection::open_in_memory().unwrap();
                 $crate::migrations::run_migrations(&mut conn).unwrap();
-                conn.prepare(&format!("EXPLAIN {}", $sql))
+                conn.prepare($sql)
                     .expect(concat!("Query validation failed: ", stringify!($name)));
             }
         }
     };
 
-    // Execute syntax - for INSERT/UPDATE/DELETE
-    ($name:ident, $sql:expr, execute($($param:ident: $ptype:ty),* $(,)?)) => {
-        #[doc = concat!("Query: `", $sql, "`")]
-        $(#[doc = concat!("- `", stringify!($param), "`: `", stringify!($ptype), "`")])*
+    // Execute syntax - no return type (for INSERT/UPDATE/DELETE/etc)
+    ($name:ident, $sql:expr, ($($param:ident: $ptype:ty),* $(,)?)) => {
+        #[doc = concat!("Execute query: `", $sql, "`")]
+        $(#[doc = concat!("\n- `", stringify!($param), "`: `", stringify!($ptype), "`")])*
         pub struct $name;
 
         impl $name {
-            /// The SQL query string.
+            /// The SQL query string (for transaction/manual execution).
             pub const SQL: &'static str = $sql;
 
-            /// Execute this query (INSERT/UPDATE/DELETE).
+            /// Execute this query.
             ///
             /// Returns the number of rows affected.
             pub fn execute(
-                conn: &rusqlite::Connection,
+                conn: &impl $crate::AsConnection,
                 $($param: $ptype),*
             ) -> rusqlite::Result<usize> {
-                conn.execute(Self::SQL, rusqlite::params![$($param),*])
+                conn.as_connection().execute(Self::SQL, rusqlite::params![$($param),*])
             }
         }
 
@@ -126,41 +131,41 @@ macro_rules! define_query {
             fn [<validate_query_ $name>]() {
                 let mut conn = rusqlite::Connection::open_in_memory().unwrap();
                 $crate::migrations::run_migrations(&mut conn).unwrap();
-                conn.prepare(&format!("EXPLAIN {}", $sql))
+                conn.prepare($sql)
                     .expect(concat!("Query validation failed: ", stringify!($name)));
             }
         }
     };
 
-    // Query row syntax - for single row SELECT
-    ($name:ident, $sql:expr, query_row($($param:ident: $ptype:ty),* $(,)?) -> $ret:ty) => {
-        #[doc = concat!("Query: `", $sql, "`")]
-        $(#[doc = concat!("- `", stringify!($param), "`: `", stringify!($ptype), "`")])*
-        #[doc = concat!("Returns: `", stringify!($ret), "`")]
+    // Scalar query syntax - for single-value returns (COUNT, MAX, SUM, etc)
+    ($name:ident, $sql:expr, ($($param:ident: $ptype:ty),* $(,)?) => $scalar:ty) => {
+        #[doc = concat!("Scalar query: `", $sql, "`")]
+        $(#[doc = concat!("\n- `", stringify!($param), "`: `", stringify!($ptype), "`")])*
+        #[doc = concat!("\nReturns: `", stringify!($scalar), "`")]
         pub struct $name;
 
         impl $name {
-            /// The SQL query string.
+            /// The SQL query string (for transaction/manual execution).
             pub const SQL: &'static str = $sql;
 
-            /// Query a single row.
+            /// Fetch a single scalar value.
             ///
-            /// Returns an error if no rows match or if multiple rows match.
-            pub fn query_row(
-                conn: &rusqlite::Connection,
+            /// Returns error if no rows match.
+            pub fn fetch_scalar(
+                conn: &impl $crate::AsConnection,
                 $($param: $ptype),*
-            ) -> rusqlite::Result<$ret> {
-                conn.query_row(Self::SQL, rusqlite::params![$($param),*], |row| <$ret>::from_row(row))
+            ) -> rusqlite::Result<$scalar> {
+                conn.as_connection().query_row(Self::SQL, rusqlite::params![$($param),*], |row| row.get(0))
             }
 
-            /// Query a single row, returning `None` if not found.
+            /// Fetch an optional scalar value.
             ///
-            /// Returns an error only for database errors (not "no rows").
-            pub fn query_row_optional(
-                conn: &rusqlite::Connection,
+            /// Returns `None` if no rows match.
+            pub fn fetch_scalar_optional(
+                conn: &impl $crate::AsConnection,
                 $($param: $ptype),*
-            ) -> rusqlite::Result<Option<$ret>> {
-                match Self::query_row(conn, $($param),*) {
+            ) -> rusqlite::Result<Option<$scalar>> {
+                match conn.as_connection().query_row(Self::SQL, rusqlite::params![$($param),*], |row| row.get(0)) {
                     Ok(value) => Ok(Some(value)),
                     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
                     Err(e) => Err(e),
@@ -175,28 +180,53 @@ macro_rules! define_query {
             fn [<validate_query_ $name>]() {
                 let mut conn = rusqlite::Connection::open_in_memory().unwrap();
                 $crate::migrations::run_migrations(&mut conn).unwrap();
-                conn.prepare(&format!("EXPLAIN {}", $sql))
+                conn.prepare($sql)
                     .expect(concat!("Query validation failed: ", stringify!($name)));
             }
         }
     };
 
-    // Query syntax - for multiple row SELECT
-    ($name:ident, $sql:expr, query($($param:ident: $ptype:ty),* $(,)?) -> $ret:ty) => {
-        #[doc = concat!("Query: `", $sql, "`")]
-        $(#[doc = concat!("- `", stringify!($param), "`: `", stringify!($ptype), "`")])*
-        #[doc = concat!("Returns: `Vec<", stringify!($ret), ">`")]
+    // Query syntax - with struct return type (for SELECT)
+    ($name:ident, $sql:expr, ($($param:ident: $ptype:ty),* $(,)?) -> $ret:ty) => {
+        #[doc = concat!("Select query: `", $sql, "`")]
+        $(#[doc = concat!("\n- `", stringify!($param), "`: `", stringify!($ptype), "`")])*
+        #[doc = concat!("\nReturns: `", stringify!($ret), "`")]
         pub struct $name;
 
         impl $name {
-            /// The SQL query string.
+            /// The SQL query string (for transaction/manual execution).
             pub const SQL: &'static str = $sql;
 
-            /// Query multiple rows into a Vec.
-            pub fn query_vec(
-                conn: &rusqlite::Connection,
+            /// Fetch exactly one row.
+            ///
+            /// Returns error if no rows match.
+            pub fn fetch_one(
+                conn: &impl $crate::AsConnection,
+                $($param: $ptype),*
+            ) -> rusqlite::Result<$ret> {
+                conn.as_connection().query_row(Self::SQL, rusqlite::params![$($param),*], |row| <$ret>::from_row(row))
+            }
+
+            /// Fetch zero or one row.
+            ///
+            /// Returns `None` if no rows match.
+            pub fn fetch_optional(
+                conn: &impl $crate::AsConnection,
+                $($param: $ptype),*
+            ) -> rusqlite::Result<Option<$ret>> {
+                match conn.as_connection().query_row(Self::SQL, rusqlite::params![$($param),*], |row| <$ret>::from_row(row)) {
+                    Ok(value) => Ok(Some(value)),
+                    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                    Err(e) => Err(e),
+                }
+            }
+
+            /// Fetch all matching rows.
+            pub fn fetch_all(
+                conn: &impl $crate::AsConnection,
                 $($param: $ptype),*
             ) -> rusqlite::Result<Vec<$ret>> {
+                let conn = conn.as_connection();
                 let mut stmt = conn.prepare(Self::SQL)?;
                 let iter = stmt.query_map(rusqlite::params![$($param),*], |row| <$ret>::from_row(row))?;
                 iter.collect()
@@ -210,7 +240,7 @@ macro_rules! define_query {
             fn [<validate_query_ $name>]() {
                 let mut conn = rusqlite::Connection::open_in_memory().unwrap();
                 $crate::migrations::run_migrations(&mut conn).unwrap();
-                conn.prepare(&format!("EXPLAIN {}", $sql))
+                conn.prepare($sql)
                     .expect(concat!("Query validation failed: ", stringify!($name)));
             }
         }

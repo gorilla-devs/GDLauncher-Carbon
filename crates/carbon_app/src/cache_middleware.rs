@@ -1,7 +1,7 @@
 use crate::managers::UnsafeAppRef;
 use anyhow::anyhow;
 use axum::http::Extensions;
-use carbon_repos::{OptionalExt, models::HTTPCache, queries};
+use carbon_repos::queries;
 use chrono::{DateTime, Duration, Utc};
 use reqwest::{Method, Request, Response, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
@@ -54,12 +54,8 @@ impl Middleware for CacheMiddleware {
             let url_str = req.url().to_string();
             tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::cache::FindHttpCache::SQL,
-                    rusqlite::params![url_str],
-                    |row| HTTPCache::from_row(row),
-                )
-                .optional()
+                let result = queries::cache::FindHttpCache::fetch_optional(&conn, &url_str)?;
+                Ok::<_, anyhow::Error>(result)
             })
             .await
             .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?
@@ -171,16 +167,14 @@ impl Middleware for CacheMiddleware {
                 let expires_str = expires.map(|dt| dt.to_rfc3339());
                 let _ = tokio::task::spawn_blocking(move || {
                     let conn = pool.get()?;
-                    conn.execute(
-                        queries::cache::UpsertHttpCache::SQL,
-                        rusqlite::params![
-                            url_clone,
-                            status,
-                            body_clone,
-                            expires_str,
-                            last_modified,
-                            etag
-                        ],
+                    queries::cache::UpsertHttpCache::execute(
+                        &conn,
+                        &url_clone,
+                        status,
+                        &body_clone,
+                        expires_str.as_deref(),
+                        last_modified.as_deref(),
+                        etag.as_deref(),
                     )?;
                     Ok::<_, anyhow::Error>(())
                 })

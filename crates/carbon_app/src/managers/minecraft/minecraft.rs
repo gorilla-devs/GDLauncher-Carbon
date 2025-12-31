@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use anyhow::Context;
-use carbon_repos::{DatabaseError, DbPool, OptionalExt, models, queries};
+use carbon_repos::{DatabaseError, DbPool, queries};
 use carbon_rt_path::{InstancePath, RuntimePath};
 use daedalus::minecraft::{
     Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
@@ -108,9 +108,10 @@ pub async fn get_version(
         let version_meta_vec = version_meta.to_vec();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::cache::UpsertVersionInfoCache::SQL,
-                rusqlite::params![mc_version_str, version_meta_vec],
+            queries::cache::UpsertVersionInfoCache::execute(
+                &conn,
+                &mc_version_str,
+                &version_meta_vec,
             )?;
             Ok::<_, DatabaseError>(())
         })
@@ -126,12 +127,9 @@ pub async fn get_version(
             let mc_version_str = mc_version.to_string();
             let db_cache = tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::cache::FindVersionInfoCache::SQL,
-                    rusqlite::params![mc_version_str],
-                    |row| models::VersionInfoCache::from_row(row),
-                )
-                .optional()
+                let result =
+                    queries::cache::FindVersionInfoCache::fetch_optional(&conn, &mc_version_str)?;
+                Ok::<_, anyhow::Error>(result)
             })
             .await
             .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?
@@ -223,10 +221,7 @@ pub async fn get_lwjgl_meta(
         let lwjgl_vec = lwjgl.to_vec();
         tokio::task::spawn_blocking(move || {
             let conn = pool.get()?;
-            conn.execute(
-                queries::cache::UpsertLwjglMetaCache::SQL,
-                rusqlite::params![db_entry_name_clone, lwjgl_vec],
-            )?;
+            queries::cache::UpsertLwjglMetaCache::execute(&conn, &db_entry_name_clone, &lwjgl_vec)?;
             Ok::<_, DatabaseError>(())
         })
         .await??;
@@ -241,12 +236,11 @@ pub async fn get_lwjgl_meta(
             let db_entry_name_clone = db_entry_name.clone();
             let db_cache = tokio::task::spawn_blocking(move || {
                 let conn = pool.get()?;
-                conn.query_row(
-                    queries::cache::FindLwjglMetaCache::SQL,
-                    rusqlite::params![db_entry_name_clone],
-                    |row| models::LwjglMetaCache::from_row(row),
-                )
-                .optional()
+                let result = queries::cache::FindLwjglMetaCache::fetch_optional(
+                    &conn,
+                    &db_entry_name_clone,
+                )?;
+                Ok::<_, anyhow::Error>(result)
             })
             .await
             .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?
