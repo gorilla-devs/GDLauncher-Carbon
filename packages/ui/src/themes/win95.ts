@@ -117,8 +117,8 @@ const win95: Theme = {
   "brands-discord": "88 101 242",
   "brands-bisecthosting": "4 203 235",
 
-  font: "W95FA",
-  "font-mono": "W95FA",
+  font: '"W95FA", "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif',
+  "font-mono": '"W95FA", "Noto Sans Mono CJK JP", monospace',
   "additional-styles": additionalStyles
 }
 
