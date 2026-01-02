@@ -499,14 +499,14 @@ const General = () => {
                     </div>
                   </div>
                 </Button>
-                <Button type="secondary">
+                {/* <Button type="secondary">
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:delete-02 h-5 w-5" />
                     <div>
                       <Trans key="settings:_trn_reset_all_data" />
                     </div>
                   </div>
-                </Button>
+                </Button> */}
               </div>
               <div class="text-darkSlate-300 text-4 mt-4">
                 {"v"} {__APP_VERSION__}

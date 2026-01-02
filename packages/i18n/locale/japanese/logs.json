@@ -1,0 +1,22 @@
+{
+"_trn_no_logs": "ログはありません",
+"_trn_all_sessions": "全セッション",
+"_trn_no_log_sessions_available": "利用可能なログセッションはありません",
+"_trn_copy": "ログをコピー",
+"_trn_new_logs": "{{logsCount}} 件の新しいログ",
+"_trn_see_new_logs": "新しいログを見る",
+"_trn_logs_paused_due_to_scroll": "スクロール中のためログを一時停止しました",
+"_trn_autofollow": "新しいログに合わせて自動スクロール",
+"_trn_start_log_message_on_new_line": "ログメッセージを新しい行で開始する",
+"_trn_logs_density": "ログの密度",
+"_trn_logs_density.low": "低",
+"_trn_logs_density.comfortable": "中（快適）",
+"_trn_logs_density.compact": "高（コンパクト）",
+"_trn_columns": "列",
+"_trn_columns.timestamp": "タイムスタンプ",
+"_trn_columns.logger": "ロガー",
+"_trn_columns.source_kind": "ソースの種類",
+"_trn_columns.thread_name": "スレッド名",
+"_trn_columns.level": "ログレベル",
+"_trn_font_size": "フォントサイズ"
+}

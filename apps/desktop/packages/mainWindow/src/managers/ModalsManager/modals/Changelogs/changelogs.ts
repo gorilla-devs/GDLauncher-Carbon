@@ -13,6 +13,13 @@ export interface Changelog {
 const changelogs: Changelog = {
   new: [
     {
+      title: "Redesigned Addons Browser",
+      description:
+        "Completely rethought and redesigned addons browser with support for mods, resource packs, shaders, modpacks, data packs, and worlds. Features a unified search experience, enhanced filtering, type-aware installation, and a modern interface that replaces the old separate mod and modpack pages.",
+      media:
+        "https://cdn.gdl.gg/launcher/changelog/2.0.26/addons-browser-overhaul.mp4"
+    },
+    {
       title: "Addons Grid View Mode",
       description:
         "New grid view mode for browsing addons with a visual card-based layout as an alternative to the list view."
@@ -31,13 +38,6 @@ const changelogs: Changelog = {
       title: "Release Channel Branding",
       description:
         "Alpha and beta versions now display distinct logos to clearly indicate which release channel you're using."
-    },
-    {
-      title: "Redesigned Addons Browser",
-      description:
-        "Completely rethought and redesigned addons browser with support for mods, resource packs, shaders, modpacks, data packs, and worlds. Features a unified search experience, enhanced filtering, type-aware installation, and a modern interface that replaces the old separate mod and modpack pages.",
-      media:
-        "https://cdn.gdl.gg/launcher/changelog/2.0.26/addons-browser-overhaul.mp4"
     },
     {
       title: "Redesigned Authentication Flow",

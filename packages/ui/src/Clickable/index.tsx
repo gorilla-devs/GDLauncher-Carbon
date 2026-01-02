@@ -1,6 +1,8 @@
 /** Press effect classes as a string (for use with cn() or class attribute) */
 export const PRESS_CLASSES =
   "transition-all duration-100 ease-spring active:scale-95"
+export const PRESS_CLASSES_LIGHT =
+  "transition-all duration-100 ease-spring active:scale-98"
 export const PRESS_CLASSES_DISABLED = "transition-all duration-100 ease-spring"
 
 /**

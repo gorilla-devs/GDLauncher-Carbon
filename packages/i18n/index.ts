@@ -12,6 +12,7 @@ import languagesData from "./languages.json" with { type: "json" }
 export const supportedLanguages = {
   english: "united-states",
   italian: "italy",
+  japanese: "japan",
   spanish: "spain"
 }
 

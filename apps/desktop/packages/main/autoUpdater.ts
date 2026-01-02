@@ -49,6 +49,11 @@ export default function initAutoUpdater() {
   autoUpdater.logger = log
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
+  // Disable differential download - the CDN doesn't support HTTP range requests
+  // (returns application/octet-stream instead of multipart/byteranges), which causes
+  // the fallback to full download to not emit progress events properly
+  autoUpdater.disableDifferentialDownload = true
+  autoUpdater.disableWebInstaller = true
 
   ipcMain.handle(
     "checkForUpdates",

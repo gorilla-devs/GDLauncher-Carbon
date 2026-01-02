@@ -105,8 +105,8 @@ const frost: Theme = {
   "brands-discord": "88 101 242",
   "brands-bisecthosting": "4 203 235",
 
-  font: "Monocraft",
-  "font-mono": "Monocraft",
+  font: '"Monocraft", "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif',
+  "font-mono": '"Monocraft", "Noto Sans Mono CJK JP", monospace',
   "additional-styles": additionalStyles
 }
 
