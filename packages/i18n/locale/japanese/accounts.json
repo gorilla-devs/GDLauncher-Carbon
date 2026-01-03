@@ -39,5 +39,11 @@
 "_trn_change_recovery_email_title": "復旧用メールアドレスの変更",
 "_trn_change_recovery_email_description": "GDLauncherアカウントの新しい復旧用メールアドレスを入力してください",
 "_trn_cancel": "キャンセル",
-"_trn_confirm": "確認"
+"_trn_confirm": "確認",
+"_trn_change_avatar": "アバターを変更",
+"_trn_select_avatar_image": "アバター画像を選択",
+"_trn_click_to_select_image": "クリックして画像を選択",
+"_trn_upload": "アップロード",
+"_trn_avatar_upload_failed": "アバターのアップロードに失敗しました",
+"_trn_avatar_delete_failed": "アバターの削除に失敗しました"
 }
