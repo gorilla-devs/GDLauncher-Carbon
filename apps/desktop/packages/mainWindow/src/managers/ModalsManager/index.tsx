@@ -134,6 +134,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
   duplicatedModsResolution: {
     component: lazy(() => import("./modals/DuplicatedModsResolution")),
     title: t("content:_trn_duplicated_mods_detected")
+  },
+  betaPrompt: {
+    component: lazy(() => import("./modals/BetaPrompt")),
+    title: t("modals:_trn_beta_prompt_title")
   }
 })
 

@@ -1,7 +1,7 @@
 use super::{java::JavaManager, settings::terms_and_privacy::TermsAndPrivacy};
 use crate::app_version::APP_VERSION;
 use carbon_repos::db::PrismaClient;
-use carbon_repos::db::{self, app_configuration};
+use carbon_repos::db::{self, app_configuration, frontend_preference};
 use carbon_repos::db::{
     http_cache::{SetParam, WhereParam},
     read_filters::StringFilter,
@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use sysinfo::System;
 use thiserror::Error;
 use tracing::{debug, error, instrument, trace};
+use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
@@ -144,6 +145,27 @@ async fn find_appropriate_default_xmx() -> i32 {
     }
 }
 
+/// Checks if an installation ID falls within the beta prompt cohort.
+/// Uses the same approach as electron-updater's staged rollouts:
+/// converts the first 8 hex chars of the UUID to a percentage (0-1).
+pub fn is_in_beta_prompt_cohort(installation_id: &str, percentage: f64) -> bool {
+    // Parse the first 8 hex characters of the UUID as a u32
+    let hex_prefix = installation_id
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .take(8)
+        .collect::<String>();
+
+    if hex_prefix.len() < 8 {
+        return false;
+    }
+
+    let value = u32::from_str_radix(&hex_prefix, 16).unwrap_or(u32::MAX);
+    let normalized = value as f64 / u32::MAX as f64;
+
+    normalized < percentage
+}
+
 async fn seed_init_db(
     db_client: &PrismaClient,
     latest_consent_sha: Option<String>,
@@ -159,13 +181,15 @@ async fn seed_init_db(
     if db_client.app_configuration().count(vec![]).exec().await? == 0 {
         trace!("No app configuration found. Creating default one");
 
+        let installation_id = Uuid::new_v4().to_string();
+
         db_client
             .app_configuration()
             .create(
                 release_channel.clone(),
                 find_appropriate_default_xmx().await,
-                vec![app_configuration::last_app_version::set(Some(
-                    APP_VERSION.to_string(),
+                vec![app_configuration::installation_id::set(Some(
+                    installation_id,
                 ))],
             )
             .exec()
@@ -184,8 +208,31 @@ async fn seed_init_db(
 
     let mut updates = vec![];
 
-    let is_equal_to_current_version = app_config
-        .last_app_version
+    // Ensure installation ID exists and is a valid UUID (migration path)
+    let needs_new_installation_id = match &app_config.installation_id {
+        None => true,
+        Some(id) => Uuid::parse_str(id).is_err(), // Regenerate if not a valid UUID
+    };
+
+    if needs_new_installation_id {
+        let installation_id = Uuid::new_v4().to_string();
+        updates.push(app_configuration::installation_id::set(Some(
+            installation_id,
+        )));
+        trace!("Generated installation ID for existing configuration");
+    }
+
+    // Check last seen version from FrontendPreference
+    let last_seen_version = db_client
+        .frontend_preference()
+        .find_unique(frontend_preference::key::equals(
+            "last_seen_version".to_string(),
+        ))
+        .exec()
+        .await?
+        .map(|pref| pref.value);
+
+    let is_equal_to_current_version = last_seen_version
         .as_ref()
         .map(|last_version| last_version == APP_VERSION)
         .unwrap_or(false);

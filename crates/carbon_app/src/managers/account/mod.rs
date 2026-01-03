@@ -540,9 +540,47 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ));
         };
 
-        self.gdl_account_task
+        let request = self
+            .gdl_account_task
             .upload_profile_icon(id_token, icon_path)
-            .await
+            .await;
+
+        // Invalidate caches so UI refreshes with new avatar
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        request?;
+
+        Ok(())
+    }
+
+    pub async fn delete_profile_icon(self, uuid: String) -> anyhow::Result<()> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to delete profile icon for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            return Err(anyhow::anyhow!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+            ));
+        };
+
+        let request = self.gdl_account_task.delete_profile_icon(id_token).await;
+
+        // Invalidate caches so UI refreshes with generated avatar
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        request?;
+
+        Ok(())
     }
 
     pub async fn check_username_available(

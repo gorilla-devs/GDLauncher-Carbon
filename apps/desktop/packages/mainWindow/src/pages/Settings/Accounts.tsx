@@ -21,9 +21,18 @@ import Row from "./components/Row"
 import Title from "./components/Title"
 import RowsContainer from "./components/RowsContainer"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
-import { For, JSX, Match, Show, Switch } from "solid-js"
+import {
+  createEffect,
+  createSignal,
+  For,
+  JSX,
+  Match,
+  Show,
+  Switch
+} from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { convertSecondsToHumanTime } from "@/utils/helpers"
+import { blobToBase64, convertSecondsToHumanTime } from "@/utils/helpers"
+import ImagePicker from "@/components/ImagePicker"
 import { useModal } from "@/managers/ModalsManager"
 import { AccountEntry } from "@gd/core_module/bindings"
 import { getAccountImageUuid } from "@/utils/showcaseHelpers"
@@ -195,12 +204,75 @@ const Accounts = () => {
     mutationKey: ["account.setActiveUuid"]
   }))
 
+  // Avatar state and mutations
+  const [avatarLoading, setAvatarLoading] = createSignal(false)
+  const [avatarPreview, setAvatarPreview] = createSignal<string | null>(null)
+
+  const uploadAvatarMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.uploadProfileIcon"]
+  }))
+  const deleteAvatarMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.deleteProfileIcon"]
+  }))
+
   const validGDLUser = () =>
     globalStore.gdlAccount.data?.status === "valid"
       ? globalStore.gdlAccount.data?.value
       : undefined
 
   const invalidGDLUser = () => globalStore.gdlAccount.data?.status === "invalid"
+
+  // Initialize avatar preview from GDL account
+  createEffect(() => {
+    const url = validGDLUser()?.profileIconUrl
+    if (url) {
+      setAvatarPreview(url)
+    } else {
+      setAvatarPreview(null)
+    }
+  })
+
+  const handleAvatarSelect = async (filePath: string) => {
+    // Load preview
+    const response = await fetch(
+      `http://127.0.0.1:${port}/loadImage?path=${encodeURIComponent(filePath)}`
+    )
+    const blob = await response.blob()
+    const b64 = (await blobToBase64(blob)) as string
+    setAvatarPreview(
+      `data:image/png;base64,${b64.substring(b64.indexOf(",") + 1)}`
+    )
+
+    // Upload immediately
+    const uuid = globalStore?.currentlySelectedAccountUuid?.data
+    if (uuid) {
+      setAvatarLoading(true)
+      try {
+        await uploadAvatarMutation.mutateAsync({ uuid, iconPath: filePath })
+      } catch (err) {
+        console.error("Avatar upload failed:", err)
+        toast.error(t("accounts:_trn_avatar_upload_failed"))
+      } finally {
+        setAvatarLoading(false)
+      }
+    }
+  }
+
+  const handleAvatarDelete = async () => {
+    const uuid = globalStore?.currentlySelectedAccountUuid?.data
+    if (!uuid) return
+
+    setAvatarLoading(true)
+    try {
+      await deleteAvatarMutation.mutateAsync(uuid)
+      setAvatarPreview(null)
+    } catch (err) {
+      console.error("Avatar deletion failed:", err)
+      toast.error(t("accounts:_trn_avatar_delete_failed"))
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
 
   const deleteAccountContent = () => {
     if (validGDLUser()?.deletionTimeout) {
@@ -329,9 +401,16 @@ const Accounts = () => {
                   </Show>
                   <div class="grid grid-cols-2 gap-4">
                     <div class="flex items-center gap-4">
-                      <img
-                        src={validGDLUser()?.profileIconUrl}
-                        class="h-12 w-12 rounded-md"
+                      <ImagePicker
+                        imageUrl={avatarPreview}
+                        onSelect={handleAvatarSelect}
+                        onDelete={handleAvatarDelete}
+                        isLoading={avatarLoading}
+                        deletable={!!validGDLUser()?.hasCustomAvatar}
+                        confirmDelete={true}
+                        sizeClass="h-12 w-12"
+                        class="rounded-md"
+                        dialogTitle={t("accounts:_trn_select_avatar_image")}
                       />
                       {validGDLUser()?.nickname}
                     </div>

@@ -49,6 +49,11 @@ import { ErrorStep } from "./steps/ErrorStep"
 export function AuthFlow() {
   const globalStore = useGlobalStore()
 
+  // Query for first launch status (used for welcome animations)
+  const isFirstLaunchQuery = rspc.createQuery(() => ({
+    queryKey: ["settings.isFirstLaunch"]
+  }))
+
   return (
     <Suspense
       fallback={
@@ -61,16 +66,21 @@ export function AuthFlow() {
         when={
           globalStore.accounts.data &&
           globalStore.settings.data &&
-          globalStore.currentlySelectedAccountUuid.data !== undefined
+          globalStore.currentlySelectedAccountUuid.data !== undefined &&
+          isFirstLaunchQuery.data !== undefined
         }
       >
-        <AuthFlowInner />
+        <AuthFlowInner isFirstLaunch={isFirstLaunchQuery.data!} />
       </Show>
     </Suspense>
   )
 }
 
-function AuthFlowInner() {
+interface AuthFlowInnerProps {
+  isFirstLaunch: boolean
+}
+
+function AuthFlowInner(props: AuthFlowInnerProps) {
   const globalStore = useGlobalStore()
   const [searchParams] = useSearchParams()
   const rspcContext = rspc.useContext()
@@ -79,7 +89,7 @@ function AuthFlowInner() {
   const config: AuthFlowConfig = {
     activeUuid: globalStore.currentlySelectedAccountUuid.data!,
     accounts: globalStore.accounts.data!,
-    isFirstLaunch: globalStore.settings.data!.isFirstLaunch,
+    isFirstLaunch: props.isFirstLaunch,
     termsAndPrivacyAccepted: globalStore.settings.data!.termsAndPrivacyAccepted,
     gdlAccountId: globalStore.settings.data!.gdlAccountId,
     reducedMotion: globalStore.settings.data!.reducedMotion,

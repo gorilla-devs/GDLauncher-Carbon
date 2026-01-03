@@ -4,6 +4,7 @@ import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { logoUrl } from "@/utils/logos"
+import { HeroIcon } from "@/components/HeroIcon"
 
 const WhyAreAdsNeeded = (props: ModalProps) => {
   const modalsContext = useModal()
@@ -46,9 +47,13 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
             <div class="grid grid-cols-3 gap-6">
               {/* Card 1 - Minecraft Updates */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-emerald-500/30">
-                <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-emerald-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:rocket-01 text-emerald-500 text-[2rem]" />
-                </div>
+                <HeroIcon
+                  icon="i-hugeicons:rocket-01"
+                  color="emerald"
+                  variant="subtle"
+                  size="sm"
+                  class="transition-transform duration-200 group-hover:scale-110"
+                />
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads:_trn_paragraph-2-list-element-1" />
                 </p>
@@ -56,9 +61,13 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
 
               {/* Card 2 - Compatibility */}
               <div class="bg-darkSlate-800 border-darkSlate-600 hover:border-primary-500/30 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300">
-                <div class="bg-darkSlate-700 border-primary-500/30 flex h-14 w-14 items-center justify-center rounded-xl border transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:tick-02 text-primary-500 text-[2rem]" />
-                </div>
+                <HeroIcon
+                  icon="i-hugeicons:tick-02"
+                  color="primary"
+                  variant="subtle"
+                  size="sm"
+                  class="transition-transform duration-200 group-hover:scale-110"
+                />
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads:_trn_paragraph-2-list-element-2" />
                 </p>
@@ -66,9 +75,13 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
 
               {/* Card 3 - Enhancement */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-blue-500/30">
-                <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-blue-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:sparkles text-blue-500 text-[2rem]" />
-                </div>
+                <HeroIcon
+                  icon="i-hugeicons:sparkles"
+                  color="blue"
+                  variant="subtle"
+                  size="sm"
+                  class="transition-transform duration-200 group-hover:scale-110"
+                />
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads:_trn_paragraph-2-list-element-3" />
                 </p>
@@ -85,9 +98,13 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
             <div class="grid grid-cols-3 gap-6">
               {/* Card 1 - Team Support */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-purple-500/30">
-                <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-purple-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:user-multiple-02 text-purple-500 text-[2rem]" />
-                </div>
+                <HeroIcon
+                  icon="i-hugeicons:user-multiple-02"
+                  color="purple"
+                  variant="subtle"
+                  size="sm"
+                  class="transition-transform duration-200 group-hover:scale-110"
+                />
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads:_trn_paragraph-3-list-element-1" />
                 </p>
@@ -95,9 +112,13 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
 
               {/* Card 2 - Research & Innovation */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-cyan-500/30">
-                <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-cyan-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:bulb text-cyan-500 text-[2rem]" />
-                </div>
+                <HeroIcon
+                  icon="i-hugeicons:bulb"
+                  color="cyan"
+                  variant="subtle"
+                  size="sm"
+                  class="transition-transform duration-200 group-hover:scale-110"
+                />
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads:_trn_paragraph-3-list-element-2" />
                 </p>
@@ -105,9 +126,13 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
 
               {/* Card 3 - Full-time Development */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-pink-500/30">
-                <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-pink-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:clock-01 text-pink-500 text-[2rem]" />
-                </div>
+                <HeroIcon
+                  icon="i-hugeicons:clock-01"
+                  color="pink"
+                  variant="subtle"
+                  size="sm"
+                  class="transition-transform duration-200 group-hover:scale-110"
+                />
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads:_trn_paragraph-3-list-element-3" />
                 </p>

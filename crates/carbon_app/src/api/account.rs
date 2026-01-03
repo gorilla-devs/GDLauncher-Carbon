@@ -147,6 +147,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.account_manager().upload_profile_icon(args.uuid, args.icon_path).await
         }
 
+        mutation DELETE_PROFILE_ICON[app, uuid: String] {
+            app.account_manager().delete_profile_icon(uuid).await
+        }
+
         mutation CHECK_USERNAME_AVAILABLE[app, args: FECheckUsernameAvailability] {
             app.account_manager()
                 .check_username_available(args.access_token, args.username)
@@ -473,6 +477,7 @@ struct FEGDLAccount {
     nickname: String,
     friend_code: String,
     profile_icon_url: String,
+    has_custom_avatar: bool,
     microsoft_email: Option<String>,
     is_email_verified: bool,
     has_pending_verification: bool,
@@ -490,6 +495,7 @@ impl From<GDLUser> for FEGDLAccount {
             nickname: value.nickname,
             friend_code: value.friend_code,
             profile_icon_url: value.profile_icon_url,
+            has_custom_avatar: value.has_custom_avatar,
             microsoft_email: value.microsoft_email,
             is_email_verified: value.is_verified,
             has_pending_verification: value.has_pending_verification,

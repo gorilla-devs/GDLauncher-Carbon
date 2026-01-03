@@ -66,6 +66,8 @@ pub struct GDLUser {
     pub nickname: String,
     pub friend_code: String,
     pub profile_icon_url: String,
+    #[serde(default)]
+    pub has_custom_avatar: bool,
     pub microsoft_email: Option<String>,
     pub is_verified: bool,
     pub has_pending_verification: bool,
@@ -325,19 +327,33 @@ impl GDLAccountTask {
 
         let url = format!("{}/v1/users/user/avatar", self.base_api);
 
-        let mut form = Form::new().file("avatar", icon_path).await?;
+        let form = Form::new().file("avatar", icon_path).await?;
+
+        let authorization = format!("Bearer {}", id_token);
+
+        let resp = client
+            .put(url)
+            .header(AUTHORIZATION, authorization)
+            // Don't set Content-Type manually - reqwest sets it with the correct boundary
+            .multipart(form)
+            .send()
+            .await?;
+
+        resp.error_for_status()?;
+
+        Ok(())
+    }
+
+    pub async fn delete_profile_icon(&self, id_token: String) -> anyhow::Result<()> {
+        let url = format!("{}/v1/users/user/avatar", self.base_api);
 
         let authorization = format!("Bearer {}", id_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
-        headers.insert(CONTENT_TYPE, "multipart/form-data".parse()?);
 
-        let resp = client
-            .post(url)
-            .headers(headers)
-            .multipart(form)
-            .send()
-            .await?;
+        let resp = self.client.delete(url).headers(headers).send().await?;
+
+        resp.error_for_status()?;
 
         Ok(())
     }

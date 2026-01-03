@@ -32,29 +32,43 @@ const App = (props: Props) => {
 
   checkForUpdates()
 
-  const setIsFirstRun = rspc.createMutation(() => ({
-    mutationKey: "settings.setSettings"
+  // First launch detection using semantic query
+  const isFirstLaunch = rspc.createQuery(() => ({
+    queryKey: ["settings.isFirstLaunch"]
   }))
 
-  const isFirstRun = rspc.createQuery(() => ({
-    queryKey: ["settings.getSettings"]
+  const completeFirstLaunch = rspc.createMutation(() => ({
+    mutationKey: ["settings.completeFirstLaunch"]
   }))
 
   createEffect(() => {
     if (
-      isFirstRun.data?.isFirstLaunch &&
+      isFirstLaunch.data === true &&
       currentRoute.pathname !== "/" &&
       runItOnce()
     ) {
       untrack(() => {
         modalsContext?.openModal({ name: "onBoarding" })
-        setIsFirstRun.mutate({
-          isFirstLaunch: {
-            Set: false
-          }
-        })
+        completeFirstLaunch.mutate(undefined)
       })
       setRunItOnce(false)
+    }
+  })
+
+  // Beta prompt for stable channel users
+  const [betaPromptChecked, setBetaPromptChecked] = createSignal(false)
+  const shouldShowBetaPrompt = rspc.createQuery(() => ({
+    queryKey: ["settings.shouldShowBetaPrompt"]
+  }))
+
+  createEffect(() => {
+    // Only show if not first run, not already checked, and API says we should
+    // Note: shouldShowBetaPrompt already checks first launch status internally
+    if (!betaPromptChecked() && shouldShowBetaPrompt.data === true) {
+      setBetaPromptChecked(true)
+      untrack(() => {
+        modalsContext?.openModal({ name: "betaPrompt" })
+      })
     }
   })
 

@@ -31,6 +31,7 @@ import {
 } from "@gd/core_module/bindings"
 import { blobToBase64 } from "@/utils/helpers"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import ImagePicker from "@/components/ImagePicker"
 import { ReactiveMap } from "@solid-primitives/map"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { getModloaderIcon } from "@/utils/sidebar"
@@ -355,17 +356,27 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     )
   }
 
-  const loadIcon = (filePaths: string) => {
-    fetch(`http://127.0.0.1:${port}/instance/loadIcon?path=${filePaths}`).then(
-      async (img) => {
-        const blob = await img.blob()
-        const b64 = (await blobToBase64(blob)) as string
+  const [iconPath, setIconPath] = createSignal<string | null>(null)
 
-        setBgPreview(
-          `data:image/png;base64, ${b64.substring(b64.indexOf(",") + 1)}`
-        )
-      }
+  // Load preview without side effects - just for display
+  const loadPreview = async (filePath: string) => {
+    const response = await fetch(
+      `http://127.0.0.1:${port}/loadImage?path=${encodeURIComponent(filePath)}`
     )
+    const blob = await response.blob()
+    const b64 = (await blobToBase64(blob)) as string
+    setBgPreview(`data:image/png;base64,${b64.substring(b64.indexOf(",") + 1)}`)
+    setIconPath(filePath)
+  }
+
+  // Store icon in backend before create/update
+  const storeIconForBackend = async () => {
+    const path = iconPath()
+    if (path) {
+      await fetch(
+        `http://127.0.0.1:${port}/instance/loadIcon?path=${encodeURIComponent(path)}`
+      )
+    }
   }
 
   const isNameDiff = () => title() && title() !== instanceData()?.title
@@ -395,6 +406,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       setError("")
 
       try {
+        // Store icon in backend before creating instance
+        await storeIconForBackend()
+
         const instanceId = await createInstanceMutation.mutateAsync({
           group: defaultGroup.data || 1,
           use_loaded_icon: true,
@@ -447,6 +461,11 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       setError("")
 
       try {
+        // Store icon in backend before updating instance
+        if (isIconDiff() && iconPath()) {
+          await storeIconForBackend()
+        }
+
         await updateInstanceMutation.mutateAsync({
           instance: parseInt(instanceData()!.id, 10),
           useLoadedIcon: isIconDiff() ? { Set: Boolean(bgPreview()) } : null,
@@ -515,50 +534,19 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
           </div>
           <div class="flex w-full items-start gap-4">
-            <div
-              class="bg-darkSlate-800 hover:outline-darkSlate-600 group relative box-border flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-cover bg-center outline-none transition-all"
-              style={{
-                ...(bgPreview() && {
-                  "background-image": `url("${bgPreview()}")`
-                })
+            <ImagePicker
+              imageUrl={bgPreview}
+              onSelect={loadPreview}
+              onDelete={() => {
+                setBgPreview(null)
+                setIconPath(null)
               }}
-              onClick={() => {
-                window
-                  .openFileDialog({
-                    title: "Select Icon",
-                    filters: [
-                      { name: "Image", extensions: ["png", "jpg", "jpeg"] }
-                    ]
-                  })
-                  .then((files) => {
-                    if (!files.filePaths[0]) return
-                    loadIcon(files.filePaths[0])
-                  })
-              }}
-            >
-              <Switch>
-                <Match when={!bgPreview()}>
-                  <div class="flex flex-col items-center gap-0.5">
-                    <div class="i-hugeicons:image-01 text-lightSlate-600 group-hover:text-lightSlate-400 transition-colors text-2xl" />
-                    <span class="text-lightSlate-600 group-hover:text-lightSlate-400 text-[10px] transition-colors">
-                      <Trans key="instances:_trn_add_icon" />
-                    </span>
-                  </div>
-                </Match>
-                <Match when={bgPreview()}>
-                  <div class="bg-darkSlate-900/90 absolute right-1 top-1 rounded-lg p-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <div
-                      class="i-hugeicons:cancel-circle text-lightSlate-50 transition-all hover:text-red-500 text-base"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setBgPreview(null)
-                      }}
-                    />
-                  </div>
-                </Match>
-              </Switch>
-            </div>
+              deletable={true}
+              confirmDelete={false}
+              sizeClass="h-20 w-20"
+              dialogTitle={t("instances:_trn_select_icon")}
+              placeholderIcon="i-hugeicons:image-01"
+            />
             <div class="flex flex-1 flex-col gap-2">
               <label class="text-lightSlate-400 text-xs font-medium">
                 <Trans key="instances:_trn_instance_name" />

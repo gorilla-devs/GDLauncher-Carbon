@@ -339,13 +339,18 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let mut disabled_path = self
-            .app
-            .settings_manager()
-            .runtime_path
-            .get_instances()
-            .get_instance_path(shortpath)
-            .get_mods_path();
+        let mut disabled_path = {
+            let instance_path = self
+                .app
+                .settings_manager()
+                .runtime_path
+                .get_instances()
+                .get_instance_path(shortpath);
+
+            domain::AddonType::from_db_string(&m.addon_type)
+                .unwrap_or(domain::AddonType::Mods)
+                .get_folder_path(&instance_path)
+        };
 
         let enabled_path = disabled_path.join(&m.filename);
 

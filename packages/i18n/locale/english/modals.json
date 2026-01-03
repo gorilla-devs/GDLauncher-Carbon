@@ -48,5 +48,11 @@
   "_trn_mod_details.sha1": "SHA-1",
   "_trn_mod_details.sha512": "SHA-512",
   "_trn_mod_details.murmur2_signed": "Murmur2 (Signed)",
-  "_trn_mod_details.murmur2_unsigned": "Murmur2 (Unsigned)"
+  "_trn_mod_details.murmur2_unsigned": "Murmur2 (Unsigned)",
+  "_trn_beta_prompt_title": "Help Us Improve GDLauncher",
+  "_trn_beta_prompt_body": "Would you like to join our beta program?",
+  "_trn_beta_prompt_description": "Beta users get early access to new features and help us identify issues before they reach everyone. You may encounter occasional bugs, but your feedback helps make GDLauncher better for everyone.",
+  "_trn_beta_prompt_switch": "Switch to Beta",
+  "_trn_beta_prompt_later": "Maybe Later",
+  "_trn_beta_prompt_never": "Don't Ask Again"
 }

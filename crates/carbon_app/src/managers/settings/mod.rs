@@ -1,10 +1,9 @@
 use self::terms_and_privacy::TermsAndPrivacy;
 use super::ManagerRef;
 use crate::api::{keys::settings::*, settings::FESettingsUpdate};
-use anyhow::{Context, anyhow};
+use anyhow::anyhow;
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
-use carbon_repos::db::app_configuration::{self, last_app_version};
-use chrono::Utc;
+use carbon_repos::db::app_configuration;
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
 use std::path::PathBuf;
@@ -111,15 +110,6 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
-        if let Some(last_app_version) = incoming_settings.last_app_version.clone() {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::last_app_version::set(
-                    last_app_version.inner(),
-                )],
-            ));
-        }
-
         if let Some(concurrent_downloads) = incoming_settings.concurrent_downloads {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
@@ -210,15 +200,6 @@ impl ManagerRef<'_, SettingsManager> {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::xms::set(xms.inner())],
-            ));
-        }
-
-        if let Some(is_first_launch) = incoming_settings.is_first_launch {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::is_first_launch::set(
-                    is_first_launch.inner(),
-                )],
             ));
         }
 

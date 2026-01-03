@@ -59,6 +59,7 @@ keys! {
         REQUEST_GDL_ACCOUNT_DELETION                = "requestGdlAccountDeletion";
         CHANGE_GDL_ACCOUNT_NICKNAME                 = "changeGdlAccountNickname";
         UPLOAD_PROFILE_ICON                         = "uploadProfileIcon";
+        DELETE_PROFILE_ICON                         = "deleteProfileIcon";
         CHECK_USERNAME_AVAILABLE                    = "checkUsernameAvailable";
         CREATE_PROFILE                              = "createProfile";
     }
@@ -144,6 +145,16 @@ keys! {
         SET_SETTINGS                                = "setSettings";
         GET_TERMS_OF_SERVICE_BODY                   = "getTermsOfServiceBody";
         GET_PRIVACY_STATEMENT_BODY                  = "getPrivacyStatementBody";
+        // First launch
+        IS_FIRST_LAUNCH                             = "isFirstLaunch";
+        COMPLETE_FIRST_LAUNCH                       = "completeFirstLaunch";
+        // Changelog
+        SHOULD_SHOW_CHANGELOG                       = "shouldShowChangelog";
+        MARK_CHANGELOG_SEEN                         = "markChangelogSeen";
+        // Beta prompt
+        SHOULD_SHOW_BETA_PROMPT                     = "shouldShowBetaPrompt";
+        DISMISS_BETA_PROMPT_PERMANENTLY             = "dismissBetaPromptPermanently";
+        REMIND_BETA_PROMPT_LATER                    = "remindBetaPromptLater";
     }
 
     metrics {

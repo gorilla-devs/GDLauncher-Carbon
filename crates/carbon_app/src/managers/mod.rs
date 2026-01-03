@@ -30,7 +30,7 @@ mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;
-mod prisma_client;
+pub(crate) mod prisma_client;
 pub mod rich_presence;
 mod settings;
 pub mod system_info;

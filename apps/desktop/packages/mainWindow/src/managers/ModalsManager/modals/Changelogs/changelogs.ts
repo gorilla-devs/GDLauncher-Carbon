@@ -20,6 +20,11 @@ const changelogs: Changelog = {
         "https://cdn.gdl.gg/launcher/changelog/2.0.26/addons-browser-overhaul.mp4"
     },
     {
+      title: "Japanese Language Support",
+      description:
+        "Added Japanese translations for the entire interface, making GDLauncher accessible to Japanese-speaking users."
+    },
+    {
       title: "Addons Grid View Mode",
       description:
         "New grid view mode for browsing addons with a visual card-based layout as an alternative to the list view."
@@ -90,6 +95,11 @@ const changelogs: Changelog = {
     }
   ],
   fixed: [
+    {
+      title: "Fixed mod installation path",
+      description:
+        "Resolved an issue where mods could be installed to incorrect paths."
+    },
     {
       title: "Fixed navbar crash",
       description:
@@ -165,6 +175,26 @@ const changelogs: Changelog = {
     }
   ],
   improved: [
+    {
+      title: "Fallback Font Support",
+      description:
+        "Added fallback font support for better text rendering across different languages and character sets."
+    },
+    {
+      title: "Improved Toast Animations",
+      description:
+        "Enhanced toast notification animations for smoother visual feedback during updates and notifications."
+    },
+    {
+      title: "Backwards Database Migration Support",
+      description:
+        "Added support for backwards database migration, improving compatibility when switching between launcher versions."
+    },
+    {
+      title: "Enhanced UI Clickable Feedback",
+      description:
+        "Improved visual feedback for interactive elements throughout the interface for a more responsive feel."
+    },
     {
       title: "Redesigned Instance Creation Modal",
       description:

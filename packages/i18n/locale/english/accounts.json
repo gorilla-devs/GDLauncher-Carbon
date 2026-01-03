@@ -39,5 +39,11 @@
   "_trn_change_recovery_email_title": "Change Recovery Email",
   "_trn_change_recovery_email_description": "Enter the new recovery email for your GDLauncher account",
   "_trn_cancel": "Cancel",
-  "_trn_confirm": "Confirm"
+  "_trn_confirm": "Confirm",
+  "_trn_change_avatar": "Change Avatar",
+  "_trn_select_avatar_image": "Select Avatar Image",
+  "_trn_click_to_select_image": "Click to select an image",
+  "_trn_upload": "Upload",
+  "_trn_avatar_upload_failed": "Failed to upload avatar",
+  "_trn_avatar_delete_failed": "Failed to delete avatar"
 }

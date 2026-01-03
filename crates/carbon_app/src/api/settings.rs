@@ -4,18 +4,32 @@ use crate::{
         keys::{
             self,
             settings::{
-                GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+                COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY, GET_PRIVACY_STATEMENT_BODY,
+                GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, IS_FIRST_LAUNCH, MARK_CHANGELOG_SEEN,
+                REMIND_BETA_PROMPT_LATER, SET_SETTINGS, SHOULD_SHOW_BETA_PROMPT,
+                SHOULD_SHOW_CHANGELOG,
             },
         },
         router::router,
     },
-    managers::App,
+    app_version::APP_VERSION,
+    managers::{App, prisma_client::is_in_beta_prompt_cohort},
     mirror_into,
 };
+use carbon_repos::db::frontend_preference;
+use chrono::{DateTime, Duration, Utc};
 use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::str::FromStr;
+
+/// Internal preference keys - not exposed to frontend
+mod preference_keys {
+    pub const FIRST_LAUNCH_COMPLETED: &str = "first_launch_completed";
+    pub const LAST_SEEN_VERSION: &str = "last_seen_version";
+    pub const BETA_PROMPT_DISMISSED: &str = "beta_prompt_dismissed_permanently";
+    pub const BETA_PROMPT_LAST_SHOWN: &str = "beta_prompt_last_shown";
+}
 
 pub(super) fn mount() -> RouterBuilder<App> {
     router! {
@@ -45,6 +59,206 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .terms_and_privacy
                 .fetch_privacy_statement_body()
                 .await
+        }
+
+        // First Launch endpoints
+        query IS_FIRST_LAUNCH[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            let pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::FIRST_LAUNCH_COMPLETED.to_string()
+                ))
+                .exec()
+                .await?;
+
+            // First launch is true if the key is absent (not completed yet)
+            Ok(pref.is_none())
+        }
+
+        mutation COMPLETE_FIRST_LAUNCH[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::FIRST_LAUNCH_COMPLETED.to_string()),
+                    frontend_preference::create(
+                        preference_keys::FIRST_LAUNCH_COMPLETED.to_string(),
+                        "true".to_string(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set("true".to_string())],
+                )
+                .exec()
+                .await?;
+
+            // Invalidate related queries
+            app.invalidate(IS_FIRST_LAUNCH, None);
+            app.invalidate(SHOULD_SHOW_BETA_PROMPT, None);
+
+            Ok(())
+        }
+
+        // Changelog endpoints
+        query SHOULD_SHOW_CHANGELOG[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            let pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::LAST_SEEN_VERSION.to_string()
+                ))
+                .exec()
+                .await?;
+
+            // Show changelog if no version stored or version differs from current
+            match pref {
+                Some(p) => Ok(p.value != APP_VERSION),
+                None => Ok(true),
+            }
+        }
+
+        mutation MARK_CHANGELOG_SEEN[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::LAST_SEEN_VERSION.to_string()),
+                    frontend_preference::create(
+                        preference_keys::LAST_SEEN_VERSION.to_string(),
+                        APP_VERSION.to_string(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(APP_VERSION.to_string())],
+                )
+                .exec()
+                .await?;
+
+            // Invalidate so the query returns fresh data
+            app.invalidate(SHOULD_SHOW_CHANGELOG, None);
+
+            Ok(())
+        }
+
+        // Beta Prompt endpoints
+        query SHOULD_SHOW_BETA_PROMPT[app, _args: ()] {
+            // TODO: Change back to 0.03 (3%) after testing
+            const BETA_PROMPT_PERCENTAGE: f64 = 1.0; // 100% for testing
+            const REMIND_AFTER_DAYS: i64 = 7;
+
+            let db = &app.prisma_client;
+            let config = app.settings_manager().get_settings().await?;
+
+            tracing::info!("Beta prompt check - release_channel: {}", config.release_channel);
+
+            // Only show to stable channel users
+            if config.release_channel != "stable" {
+                tracing::info!("Beta prompt: skipping, not on stable channel");
+                return Ok(false);
+            }
+
+            // Don't show on first launch (let them complete onboarding first)
+            let first_launch_pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::FIRST_LAUNCH_COMPLETED.to_string()
+                ))
+                .exec()
+                .await?;
+
+            tracing::info!("Beta prompt check - first_launch_completed exists: {}", first_launch_pref.is_some());
+
+            if first_launch_pref.is_none() {
+                tracing::info!("Beta prompt: skipping, first launch not completed");
+                return Ok(false);
+            }
+
+            // Check if permanently dismissed
+            let dismissed_pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::BETA_PROMPT_DISMISSED.to_string()
+                ))
+                .exec()
+                .await?;
+
+            if dismissed_pref.map(|p| p.value == "true").unwrap_or(false) {
+                tracing::info!("Beta prompt: skipping, permanently dismissed");
+                return Ok(false);
+            }
+
+            // Check if installation ID exists and is in cohort
+            let Some(installation_id) = config.installation_id.clone() else {
+                tracing::info!("Beta prompt: skipping, no installation ID");
+                return Ok(false);
+            };
+
+            if !is_in_beta_prompt_cohort(&installation_id, BETA_PROMPT_PERCENTAGE) {
+                tracing::info!("Beta prompt: skipping, not in cohort (id: {})", installation_id);
+                return Ok(false);
+            }
+
+            // Check if recently shown (remind after X days)
+            let last_shown_pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::BETA_PROMPT_LAST_SHOWN.to_string()
+                ))
+                .exec()
+                .await?;
+
+            if let Some(pref) = last_shown_pref {
+                if let Ok(last_shown) = DateTime::parse_from_rfc3339(&pref.value) {
+                    let remind_after = last_shown + Duration::days(REMIND_AFTER_DAYS);
+                    if Utc::now() < remind_after {
+                        tracing::info!("Beta prompt: skipping, shown recently");
+                        return Ok(false);
+                    }
+                }
+            }
+
+            tracing::info!("Beta prompt: SHOWING");
+            Ok(true)
+        }
+
+        mutation DISMISS_BETA_PROMPT_PERMANENTLY[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::BETA_PROMPT_DISMISSED.to_string()),
+                    frontend_preference::create(
+                        preference_keys::BETA_PROMPT_DISMISSED.to_string(),
+                        "true".to_string(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set("true".to_string())],
+                )
+                .exec()
+                .await?;
+
+            Ok(())
+        }
+
+        mutation REMIND_BETA_PROMPT_LATER[app, _args: ()] {
+            let db = &app.prisma_client;
+            let now = Utc::now().to_rfc3339();
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::BETA_PROMPT_LAST_SHOWN.to_string()),
+                    frontend_preference::create(
+                        preference_keys::BETA_PROMPT_LAST_SHOWN.to_string(),
+                        now.clone(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(now)],
+                )
+                .exec()
+                .await?;
+
+            Ok(())
         }
     }
 }
@@ -210,7 +424,6 @@ struct FESettings {
     reduced_motion: bool,
     discord_integration: bool,
     release_channel: FEReleaseChannel,
-    last_app_version: Option<String>,
     concurrent_downloads: i32,
     download_dependencies: bool,
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
@@ -227,7 +440,6 @@ struct FESettings {
     pre_launch_hook: Option<String>,
     wrapper_command: Option<String>,
     post_exit_hook: Option<String>,
-    is_first_launch: bool,
     game_resolution: Option<GameResolution>,
     java_custom_args: String,
     auto_manage_java_system_profiles: bool,
@@ -246,7 +458,6 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             reduced_motion: data.reduced_motion,
             discord_integration: data.discord_integration,
             release_channel: data.release_channel.try_into()?,
-            last_app_version: data.last_app_version,
             concurrent_downloads: data.concurrent_downloads,
             download_dependencies: data.download_dependencies,
             show_featured: data.show_featured,
@@ -261,7 +472,6 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             pre_launch_hook: data.pre_launch_hook,
             wrapper_command: data.wrapper_command,
             post_exit_hook: data.post_exit_hook,
-            is_first_launch: data.is_first_launch,
             launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
             show_app_close_warning: data.show_app_close_warning,
             game_resolution: data
@@ -348,8 +558,6 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub release_channel: Option<Set<FEReleaseChannel>>,
     #[specta(optional)]
-    pub last_app_version: Option<Set<Option<String>>>,
-    #[specta(optional)]
     pub concurrent_downloads: Option<Set<i32>>,
     #[specta(optional)]
     pub download_dependencies: Option<Set<bool>>,
@@ -377,8 +585,6 @@ pub struct FESettingsUpdate {
     pub wrapper_command: Option<Set<Option<String>>>,
     #[specta(optional)]
     pub post_exit_hook: Option<Set<Option<String>>>,
-    #[specta(optional)]
-    pub is_first_launch: Option<Set<bool>>,
     #[specta(optional)]
     pub launcher_action_on_game_launch: Option<Set<FELauncherActionOnGameLaunch>>,
     #[specta(optional)]

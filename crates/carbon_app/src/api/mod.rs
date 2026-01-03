@@ -182,6 +182,12 @@ pub fn build_rspc_router(gdl_base_api: String) -> RouterBuilder<App> {
         .merge(keys::systeminfo::GROUP_PREFIX, system_info::mount())
 }
 
+/// Query params for loading a local image file
+#[derive(Deserialize)]
+struct LoadImageQuery {
+    path: String,
+}
+
 pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new()
         .route("/", axum::routing::get(|| async { "Hello 'rspc'!" }))
@@ -190,6 +196,17 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
             axum::routing::get(invalidation_ws_handler),
         )
         .route("/health", axum::routing::get(|| async { "OK" }))
+        .route(
+            "/loadImage",
+            axum::routing::get(
+                |axum::extract::Query(query): axum::extract::Query<LoadImageQuery>| async move {
+                    let data = tokio::fs::read(&query.path)
+                        .await
+                        .map_err(|e| crate::error::FeError::from_anyhow(&e.into()).make_axum())?;
+                    Ok::<_, crate::error::AxumError>(data)
+                },
+            ),
+        )
         .nest("/account", account::mount_axum_router())
         .nest("/instance", instance::mount_axum_router())
 }
