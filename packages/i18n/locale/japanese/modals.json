@@ -48,5 +48,11 @@
 "_trn_mod_details.sha1": "SHA-1",
 "_trn_mod_details.sha512": "SHA-512",
 "_trn_mod_details.murmur2_signed": "Murmur2 (署名付き)",
-"_trn_mod_details.murmur2_unsigned": "Murmur2 (署名なし)"
+"_trn_mod_details.murmur2_unsigned": "Murmur2 (符号なし)",
+"_trn_beta_prompt_title": "GDLauncherの改善にご協力ください",
+"_trn_beta_prompt_body": "ベータプログラムに参加しませんか？",
+"_trn_beta_prompt_description": "ベータユーザーは新機能をいち早く利用でき、一般公開される前に問題の特定にご協力いただけます。時折バグに遭遇する可能性はありますが、皆様からのフィードバックはGDLauncherの品質向上に大きく貢献します。",
+"_trn_beta_prompt_switch": "ベータ版に切り替える",
+"_trn_beta_prompt_later": "後で",
+"_trn_beta_prompt_never": "今後は表示しない"
 }
