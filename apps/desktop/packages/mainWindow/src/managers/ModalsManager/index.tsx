@@ -123,6 +123,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ChangeGDLAccountRecoveryEmail")),
     title: t("modals:_trn_change_recovery_email")
   },
+  changeGDLAccountNickname: {
+    component: lazy(() => import("./modals/ChangeGDLAccountNickname")),
+    title: t("modals:_trn_change_nickname")
+  },
   modDetails: {
     component: lazy(() => import("./modals/ModDetails")),
     title: t("modals:_trn_mod_details")
@@ -134,6 +138,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
   duplicatedModsResolution: {
     component: lazy(() => import("./modals/DuplicatedModsResolution")),
     title: t("content:_trn_duplicated_mods_detected")
+  },
+  betaPrompt: {
+    component: lazy(() => import("./modals/BetaPrompt")),
+    title: t("modals:_trn_beta_prompt_title")
   }
 })
 

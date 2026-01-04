@@ -15,7 +15,6 @@ model AppConfiguration {
   language                        String   @default("english")
   discordIntegration              Boolean  @default(true)
   releaseChannel                  String
-  lastAppVersion                  String?
   activeAccountUuid               String?
   activeAccountUuidData           Account? @relation("activeAccount", fields: [activeAccountUuid], references: [uuid])
   // Instances settings
@@ -39,7 +38,6 @@ model AppConfiguration {
   preLaunchHook                   String?
   wrapperCommand                  String?
   postExitHook                    String?
-  isFirstLaunch                   Boolean  @default(true)
   autoManageJavaSystemProfiles    Boolean  @default(true)
   modPlatformBlacklist            String   @default("")
   modChannels                     String   @default("stable:true,beta:true,alpha:true")
@@ -48,6 +46,15 @@ model AppConfiguration {
   termsAndPrivacyAcceptedChecksum String? // Should ask again if this changes
   gdlAccountUuid                  String?
   gdlAccountStatus                Bytes?
+  // Stable installation ID for cohort-based features
+  installationId                  String?
+}
+
+// Generic KV store for frontend preferences (onboarding, "don't show again" dialogs, etc.)
+model FrontendPreference {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model Java {

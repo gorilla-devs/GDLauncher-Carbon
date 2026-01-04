@@ -6,9 +6,14 @@ use tracing_subscriber::{
 };
 
 fn generate_logs_filters() -> String {
+    #[cfg(debug_assertions)]
+    let app_level = "carbon_app=trace";
+    #[cfg(not(debug_assertions))]
+    let app_level = "carbon_app=debug";
+
     let filters = &[
         "debug",
-        "carbon_app=trace",
+        app_level,
         "hyper::client::pool=warn",
         "reqwest::connect=warn",
         "hyper::proto::h1::conn=warn",

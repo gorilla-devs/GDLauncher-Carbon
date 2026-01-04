@@ -13,6 +13,8 @@ export const AdsBanner = () => {
       }}
     >
       <owadview
+        // @ts-ignore
+        cid={`gdlauncher_rectangle_${adSize.width}_${adSize.height}${isHighImpact() ? "_high_impact" : ""}`}
         class="relative"
         {...(isHighImpact() ? { adstyle: "high-impact-ad" } : {})}
       />

@@ -563,19 +563,32 @@ if ((app as any).overwolf) {
 // Set application name for Windows 10+ notifications
 if (process.platform === "win32") app.setAppUserModelId(app.getName())
 
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient("gdlauncher", process.execPath, [
-      resolve(process.argv[1])
-    ])
+// Register protocol handlers for gdlauncher, curseforge, and modrinth
+const protocols = ["gdlauncher", "curseforge", "modrinth"]
+for (const protocol of protocols) {
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(protocol, process.execPath, [
+        resolve(process.argv[1])
+      ])
+    }
+  } else {
+    app.setAsDefaultProtocolClient(protocol)
   }
-} else {
-  app.setAsDefaultProtocolClient("gdlauncher")
 }
 
 let lastDisplay: Display | null = null
 
 let isSpawningWindow = false
+
+// Queue for protocol URLs received before window is ready
+let pendingProtocolUrl: string | null = null
+
+// Helper to check if a URL is a supported protocol
+const isSupportedProtocol = (url: string) =>
+  url.startsWith("gdlauncher://") ||
+  url.startsWith("curseforge://") ||
+  url.startsWith("modrinth://")
 
 async function createWindow(): Promise<BrowserWindow> {
   console.log("Creating window...")
@@ -681,6 +694,16 @@ async function createWindow(): Promise<BrowserWindow> {
   win.on("ready-to-show", () => {
     isSpawningWindow = false
     console.log("Window is ready to show")
+
+    // Send any pending protocol URL that was received before window was ready
+    if (pendingProtocolUrl) {
+      console.log("Sending pending protocol URL:", pendingProtocolUrl)
+      // Small delay to ensure renderer is fully initialized
+      setTimeout(() => {
+        win?.webContents.send("protocol-url", pendingProtocolUrl)
+        pendingProtocolUrl = null
+      }, 500)
+    }
 
     function upsertKeyValue(obj: any, keyToChange: string, value: any) {
       const keyToChangeLower = keyToChange.toLowerCase()
@@ -1000,7 +1023,7 @@ app.whenReady().then(async () => {
 
   app.on("second-instance", (_e, argv) => {
     // Handle protocol URLs on Windows (passed as command line arguments)
-    const protocolUrl = argv.find((arg) => arg.startsWith("gdlauncher://"))
+    const protocolUrl = argv.find((arg) => isSupportedProtocol(arg))
 
     if (win && !win.isDestroyed()) {
       // Focus on the main window if the user tried to open another
@@ -1013,14 +1036,11 @@ app.whenReady().then(async () => {
         win.webContents.send("protocol-url", protocolUrl)
       }
     } else {
-      createWindow()
-
-      // If window was just created, wait a bit for it to be ready
-      if (protocolUrl && win) {
-        setTimeout(() => {
-          win?.webContents.send("protocol-url", protocolUrl)
-        }, 1000)
+      // Store URL and create window
+      if (protocolUrl) {
+        pendingProtocolUrl = protocolUrl
       }
+      createWindow()
     }
   })
 
@@ -1107,8 +1127,8 @@ app.on("render-process-gone", (event, webContents, detailed) => {
 app.on("open-url", (event, url) => {
   console.log("Protocol URL received:", url)
 
-  // Handle gdlauncher:// protocol URLs
-  if (url.startsWith("gdlauncher://")) {
+  // Handle gdlauncher://, curseforge://, and modrinth:// protocol URLs
+  if (isSupportedProtocol(url)) {
     event.preventDefault()
 
     // Focus the window if minimized
@@ -1120,9 +1140,8 @@ app.on("open-url", (event, url) => {
       win.webContents.send("protocol-url", url)
     } else {
       // Window not ready yet, store the URL for later
-      // This can happen if the app is launched via protocol before window is created
       console.log("Window not ready, storing protocol URL for later")
-      // You could implement a queue here if needed
+      pendingProtocolUrl = url
     }
   }
 })

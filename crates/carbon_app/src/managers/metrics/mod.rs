@@ -5,7 +5,7 @@ use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
 use serde_json::json;
 use std::sync::Arc;
-use tracing::info;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::ManagerRef;
@@ -103,7 +103,7 @@ impl ManagerRef<'_, MetricsManager> {
             event,
         });
 
-        info!("Sending event: {:?}", serialized_event);
+        debug!("Sending event: {:?}", serialized_event);
 
         self.client
             .post(endpoint)

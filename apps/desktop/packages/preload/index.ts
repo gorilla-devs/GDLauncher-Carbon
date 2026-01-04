@@ -31,3 +31,11 @@ contextBridge.exposeInMainWorld("onShowWindowCloseModal", async (cb: any) =>
 contextBridge.exposeInMainWorld("closeWindow", async () =>
   ipcRenderer.invoke("closeWindow")
 )
+
+// Protocol URL handler (curseforge://, modrinth://, gdlauncher://)
+contextBridge.exposeInMainWorld(
+  "onProtocolUrl",
+  (cb: (url: string) => void) => {
+    ipcRenderer.on("protocol-url", (_event, url) => cb(url))
+  }
+)

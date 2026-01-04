@@ -49,5 +49,6 @@
   "_trn_platform_filters": "{{platform}} Filters",
   "_trn_search": "Search",
   "_trn_sort_by": "Sort by",
-  "_trn_group_by": "Group by"
+  "_trn_group_by": "Group by",
+  "_trn_direct": "Direct"
 }

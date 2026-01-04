@@ -59,8 +59,11 @@ keys! {
         REQUEST_GDL_ACCOUNT_DELETION                = "requestGdlAccountDeletion";
         CHANGE_GDL_ACCOUNT_NICKNAME                 = "changeGdlAccountNickname";
         UPLOAD_PROFILE_ICON                         = "uploadProfileIcon";
+        DELETE_PROFILE_ICON                         = "deleteProfileIcon";
         CHECK_USERNAME_AVAILABLE                    = "checkUsernameAvailable";
         CREATE_PROFILE                              = "createProfile";
+        GET_NICKNAME_HISTORY                        = "getNicknameHistory";
+        CLEAR_NICKNAME_HISTORY                      = "clearNicknameHistory";
     }
 
     java {
@@ -144,6 +147,20 @@ keys! {
         SET_SETTINGS                                = "setSettings";
         GET_TERMS_OF_SERVICE_BODY                   = "getTermsOfServiceBody";
         GET_PRIVACY_STATEMENT_BODY                  = "getPrivacyStatementBody";
+        // First launch
+        IS_FIRST_LAUNCH                             = "isFirstLaunch";
+        COMPLETE_FIRST_LAUNCH                       = "completeFirstLaunch";
+        // Changelog
+        SHOULD_SHOW_CHANGELOG                       = "shouldShowChangelog";
+        MARK_CHANGELOG_SEEN                         = "markChangelogSeen";
+        // Beta prompt
+        SHOULD_SHOW_BETA_PROMPT                     = "shouldShowBetaPrompt";
+        DISMISS_BETA_PROMPT_PERMANENTLY             = "dismissBetaPromptPermanently";
+        REMIND_BETA_PROMPT_LATER                    = "remindBetaPromptLater";
+        // Onboarding tips
+        GET_SEEN_ONBOARDING_TIPS                    = "getSeenOnboardingTips";
+        MARK_ONBOARDING_TIP_SEEN                    = "markOnboardingTipSeen";
+        RESET_ONBOARDING_TIPS                       = "resetOnboardingTips";
     }
 
     metrics {
@@ -176,6 +193,7 @@ keys! {
 
         UNIFIED_SEARCH                              = "unifiedSearch";
         UNIFIED_GET_PROJECT                         = "unifiedGetProject";
+        UNIFIED_GET_PROJECTS_BY_IDS                 = "unifiedGetProjectsByIds";
         UNIFIED_GET_PROJECT_VERSIONS                = "unifiedGetProjectVersions";
         UNIFIED_SEARCH_PROJECT_TYPE                 = "unifiedSearchProjectType";
         GET_UNIFIED_CATEGORIES                      = "getUnifiedCategories";

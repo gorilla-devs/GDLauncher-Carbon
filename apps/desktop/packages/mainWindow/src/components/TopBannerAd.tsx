@@ -10,7 +10,8 @@ export const TopBannerAd = () => {
         position: "relative"
       }}
     >
-      <owadview class="relative" />
+      {/* @ts-ignore */}
+      <owadview cid="gdlauncher_horizontal_400_60" class="relative" />
     </div>
   )
 }

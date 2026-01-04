@@ -1,4 +1,5 @@
 import {
+  FEUnifiedBatchRequest,
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
   FEUnifiedSearchType
@@ -10,6 +11,7 @@ import { createAsyncEffect } from "./asyncEffect"
 import { createInfiniteQuery } from "@tanstack/solid-query"
 import { VirtualizerHandle } from "virtua/lib/solid"
 import { useSearchParams } from "@solidjs/router"
+import { parseSearchQuery, buildBatchRequest } from "./searchQueryParser"
 
 const defaultSearchQuery: FEUnifiedSearchParameters = {
   searchQuery: "",
@@ -102,16 +104,27 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     }
   })
 
+  // Check for protocol URL in query params (from deep link)
+  const initialSearchText = searchParams.q
+    ? decodeURIComponent(String(searchParams.q))
+    : ""
+
   const [searchQuery, _setSearchQuery] =
     createSignal<FEUnifiedSearchParameters>(
       {
         ...defaultSearchQuery,
-        ...opts.defaultSearchQuery
+        ...opts.defaultSearchQuery,
+        ...(initialSearchText ? { searchQuery: initialSearchText } : {})
       },
       {
         equals: false
       }
     )
+
+  // Clear the q param from URL after reading (one-time use)
+  if (searchParams.q) {
+    _setSearchParams({ ...searchParams, q: undefined })
+  }
 
   const setSearchQuery = (
     value:
@@ -152,9 +165,30 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     return pageSize
   }
 
+  // Direct search mode - for URLs, protocols, and # prefix IDs
+  // Must be defined before infinite queries so isDirectMode() is available
+  const parsedQuery = createMemo(() =>
+    parseSearchQuery(searchQuery().searchQuery || "")
+  )
+
+  const isDirectMode = () => parsedQuery().mode === "direct"
+
+  const directBatchRequest = createMemo<FEUnifiedBatchRequest>(() =>
+    buildBatchRequest(parsedQuery())
+  )
+
+  const directSearchQuery = rspc.createQuery(() => ({
+    queryKey: [
+      "modplatforms.unifiedGetProjectsByIds",
+      directBatchRequest()
+    ] as const,
+    enabled: isDirectMode() && parsedQuery().items.length > 0
+  }))
+
   const cfInfiniteResults = createInfiniteQuery(() => ({
     queryKey: ["modplatforms.unifiedSearch.cf"],
     enabled:
+      !isDirectMode() &&
       (searchQuery().searchQuery?.length || 0) > 0 &&
       (!searchQuery().searchApi || searchQuery().searchApi === "curseforge"),
     queryFn: (ctx) => {
@@ -188,6 +222,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const mrInfiniteResults = createInfiniteQuery(() => ({
     queryKey: ["modplatforms.unifiedSearch.mr"],
     enabled:
+      !isDirectMode() &&
       (searchQuery().searchQuery?.length || 0) > 0 &&
       (!searchQuery().searchApi || searchQuery().searchApi === "modrinth"),
     queryFn: (ctx) => {
@@ -242,6 +277,22 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   }, null)
 
   const allRows = createMemo<SearchResultItem[]>(() => {
+    // Direct mode - return results from batch query
+    if (isDirectMode()) {
+      const directResults = directSearchQuery.data?.results ?? []
+      const items: SearchResultItem[] = directResults.map((item) => ({
+        type: "value" as const,
+        value: item
+      }))
+
+      if (directSearchQuery.isFetching) {
+        items.push({ type: "loader" })
+      }
+
+      return items
+    }
+
+    // Regular search mode
     const cfData =
       searchQuery().searchApi === "modrinth"
         ? []
@@ -323,6 +374,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   }
 
   const isInitialLoading = createMemo(() => {
+    if (isDirectMode()) {
+      return directSearchQuery.isLoading
+    }
     if (searchQuery().searchApi === "curseforge") {
       return cfInfiniteResults.isLoading
     } else if (searchQuery().searchApi === "modrinth") {
@@ -332,6 +386,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   })
 
   const isLoading = createMemo(() => {
+    if (isDirectMode()) {
+      return directSearchQuery.isLoading || directSearchQuery.isFetching
+    }
     if (searchQuery().searchApi === "curseforge") {
       return cfInfiniteResults.isLoading || cfInfiniteResults.isFetching
     } else if (searchQuery().searchApi === "modrinth") {
@@ -364,7 +421,10 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     selectedInstance,
     selectedInstanceMods,
     setSelectedInstanceId,
-    selectedInstanceId
+    selectedInstanceId,
+    // Direct search mode
+    isDirectMode,
+    parsedQuery
   }
 }
 

@@ -4,18 +4,86 @@ use crate::{
         keys::{
             self,
             settings::{
-                GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+                COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY, GET_PRIVACY_STATEMENT_BODY,
+                GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, IS_FIRST_LAUNCH,
+                MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER,
+                RESET_ONBOARDING_TIPS, SET_SETTINGS, SHOULD_SHOW_BETA_PROMPT,
+                SHOULD_SHOW_CHANGELOG,
             },
         },
         router::router,
     },
-    managers::App,
+    app_version::APP_VERSION,
+    managers::{App, prisma_client::is_in_beta_prompt_cohort},
     mirror_into,
 };
+use carbon_repos::db::frontend_preference;
+use chrono::{DateTime, Duration, Utc};
 use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::str::FromStr;
+
+/// Internal preference keys - not exposed to frontend
+mod preference_keys {
+    pub const FIRST_LAUNCH_COMPLETED: &str = "first_launch_completed";
+    pub const LAST_SEEN_VERSION: &str = "last_seen_version";
+    pub const BETA_PROMPT_DISMISSED: &str = "beta_prompt_dismissed_permanently";
+    pub const BETA_PROMPT_LAST_SHOWN: &str = "beta_prompt_last_shown";
+    pub const ONBOARDING_TIPS_SEEN: &str = "onboarding_tips_seen";
+}
+
+/// Input state for beta prompt decision logic
+#[derive(Debug, Clone)]
+pub struct BetaPromptState {
+    pub release_channel: String,
+    pub first_launch_completed: bool,
+    pub permanently_dismissed: bool,
+    pub installation_id: Option<String>,
+    pub last_shown: Option<DateTime<Utc>>,
+}
+
+/// Constants for beta prompt logic
+pub const BETA_PROMPT_PERCENTAGE: f64 = 0.03; // 3% rollout
+pub const REMIND_AFTER_DAYS: i64 = 7;
+
+/// Pure function to determine if beta prompt should be shown.
+/// Extracted for testability.
+pub fn should_show_beta_prompt_logic(state: &BetaPromptState, now: DateTime<Utc>) -> bool {
+    // Only show to stable channel users
+    if state.release_channel != "stable" {
+        return false;
+    }
+
+    // Don't show on first launch (let them complete onboarding first)
+    if !state.first_launch_completed {
+        return false;
+    }
+
+    // Check if permanently dismissed
+    if state.permanently_dismissed {
+        return false;
+    }
+
+    // Check if installation ID exists and is in cohort
+    let Some(installation_id) = &state.installation_id else {
+        return false;
+    };
+
+    if !is_in_beta_prompt_cohort(installation_id, BETA_PROMPT_PERCENTAGE) {
+        return false;
+    }
+
+    // Check if recently shown (remind after X days)
+    if let Some(last_shown) = state.last_shown {
+        let remind_after = last_shown + Duration::days(REMIND_AFTER_DAYS);
+        if now < remind_after {
+            return false;
+        }
+    }
+
+    true
+}
 
 pub(super) fn mount() -> RouterBuilder<App> {
     router! {
@@ -45,6 +113,251 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .terms_and_privacy
                 .fetch_privacy_statement_body()
                 .await
+        }
+
+        // First Launch endpoints
+        query IS_FIRST_LAUNCH[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            let pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::FIRST_LAUNCH_COMPLETED.to_string()
+                ))
+                .exec()
+                .await?;
+
+            // First launch is true if the key is absent (not completed yet)
+            Ok(pref.is_none())
+        }
+
+        mutation COMPLETE_FIRST_LAUNCH[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::FIRST_LAUNCH_COMPLETED.to_string()),
+                    frontend_preference::create(
+                        preference_keys::FIRST_LAUNCH_COMPLETED.to_string(),
+                        "true".to_string(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set("true".to_string())],
+                )
+                .exec()
+                .await?;
+
+            // Invalidate related queries
+            app.invalidate(IS_FIRST_LAUNCH, None);
+            app.invalidate(SHOULD_SHOW_BETA_PROMPT, None);
+
+            Ok(())
+        }
+
+        // Changelog endpoints
+        query SHOULD_SHOW_CHANGELOG[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            let pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::LAST_SEEN_VERSION.to_string()
+                ))
+                .exec()
+                .await?;
+
+            // Show changelog if no version stored or version differs from current
+            match pref {
+                Some(p) => Ok(p.value != APP_VERSION),
+                None => Ok(true),
+            }
+        }
+
+        mutation MARK_CHANGELOG_SEEN[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::LAST_SEEN_VERSION.to_string()),
+                    frontend_preference::create(
+                        preference_keys::LAST_SEEN_VERSION.to_string(),
+                        APP_VERSION.to_string(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(APP_VERSION.to_string())],
+                )
+                .exec()
+                .await?;
+
+            // Invalidate so the query returns fresh data
+            app.invalidate(SHOULD_SHOW_CHANGELOG, None);
+
+            Ok(())
+        }
+
+        // Beta Prompt endpoints
+        query SHOULD_SHOW_BETA_PROMPT[app, _args: ()] {
+            let db = &app.prisma_client;
+            let config = app.settings_manager().get_settings().await?;
+
+            // Load preferences from database
+            let first_launch_pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::FIRST_LAUNCH_COMPLETED.to_string()
+                ))
+                .exec()
+                .await?;
+
+            let dismissed_pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::BETA_PROMPT_DISMISSED.to_string()
+                ))
+                .exec()
+                .await?;
+
+            let last_shown_pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::BETA_PROMPT_LAST_SHOWN.to_string()
+                ))
+                .exec()
+                .await?;
+
+            // Build state for decision logic
+            let state = BetaPromptState {
+                release_channel: config.release_channel.clone(),
+                first_launch_completed: first_launch_pref.is_some(),
+                permanently_dismissed: dismissed_pref.map(|p| p.value == "true").unwrap_or(false),
+                installation_id: config.installation_id.clone(),
+                last_shown: last_shown_pref.and_then(|p| {
+                    DateTime::parse_from_rfc3339(&p.value)
+                        .ok()
+                        .map(|dt| dt.with_timezone(&Utc))
+                }),
+            };
+
+            let result = should_show_beta_prompt_logic(&state, Utc::now());
+            tracing::debug!("Beta prompt check: {:?} -> {}", state, result);
+            Ok(result)
+        }
+
+        mutation DISMISS_BETA_PROMPT_PERMANENTLY[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::BETA_PROMPT_DISMISSED.to_string()),
+                    frontend_preference::create(
+                        preference_keys::BETA_PROMPT_DISMISSED.to_string(),
+                        "true".to_string(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set("true".to_string())],
+                )
+                .exec()
+                .await?;
+
+            Ok(())
+        }
+
+        mutation REMIND_BETA_PROMPT_LATER[app, _args: ()] {
+            let db = &app.prisma_client;
+            let now = Utc::now().to_rfc3339();
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::BETA_PROMPT_LAST_SHOWN.to_string()),
+                    frontend_preference::create(
+                        preference_keys::BETA_PROMPT_LAST_SHOWN.to_string(),
+                        now.clone(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(now)],
+                )
+                .exec()
+                .await?;
+
+            Ok(())
+        }
+
+        // Onboarding Tips endpoints
+        query GET_SEEN_ONBOARDING_TIPS[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            let pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::ONBOARDING_TIPS_SEEN.to_string()
+                ))
+                .exec()
+                .await?;
+
+            match pref {
+                Some(p) => Ok(serde_json::from_str::<Vec<String>>(&p.value).unwrap_or_default()),
+                None => Ok(Vec::new()),
+            }
+        }
+
+        mutation MARK_ONBOARDING_TIP_SEEN[app, tip_id: String] {
+            let db = &app.prisma_client;
+
+            // Get existing tips
+            let pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::ONBOARDING_TIPS_SEEN.to_string()
+                ))
+                .exec()
+                .await?;
+
+            let mut tips: Vec<String> = match pref {
+                Some(p) => serde_json::from_str(&p.value).unwrap_or_default(),
+                None => Vec::new(),
+            };
+
+            // Add tip if not already seen
+            if !tips.contains(&tip_id) {
+                tips.push(tip_id);
+            }
+
+            let value = serde_json::to_string(&tips)?;
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(preference_keys::ONBOARDING_TIPS_SEEN.to_string()),
+                    frontend_preference::create(
+                        preference_keys::ONBOARDING_TIPS_SEEN.to_string(),
+                        value.clone(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(value)],
+                )
+                .exec()
+                .await?;
+
+            // Invalidate so the query returns fresh data
+            app.invalidate(GET_SEEN_ONBOARDING_TIPS, None);
+
+            Ok(())
+        }
+
+        mutation RESET_ONBOARDING_TIPS[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            db.frontend_preference()
+                .delete(frontend_preference::key::equals(
+                    preference_keys::ONBOARDING_TIPS_SEEN.to_string()
+                ))
+                .exec()
+                .await
+                .ok(); // Ignore if not found
+
+            // Invalidate so the query returns fresh data
+            app.invalidate(GET_SEEN_ONBOARDING_TIPS, None);
+
+            Ok(())
         }
     }
 }
@@ -210,7 +523,6 @@ struct FESettings {
     reduced_motion: bool,
     discord_integration: bool,
     release_channel: FEReleaseChannel,
-    last_app_version: Option<String>,
     concurrent_downloads: i32,
     download_dependencies: bool,
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
@@ -227,7 +539,6 @@ struct FESettings {
     pre_launch_hook: Option<String>,
     wrapper_command: Option<String>,
     post_exit_hook: Option<String>,
-    is_first_launch: bool,
     game_resolution: Option<GameResolution>,
     java_custom_args: String,
     auto_manage_java_system_profiles: bool,
@@ -246,7 +557,6 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             reduced_motion: data.reduced_motion,
             discord_integration: data.discord_integration,
             release_channel: data.release_channel.try_into()?,
-            last_app_version: data.last_app_version,
             concurrent_downloads: data.concurrent_downloads,
             download_dependencies: data.download_dependencies,
             show_featured: data.show_featured,
@@ -261,7 +571,6 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             pre_launch_hook: data.pre_launch_hook,
             wrapper_command: data.wrapper_command,
             post_exit_hook: data.post_exit_hook,
-            is_first_launch: data.is_first_launch,
             launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
             show_app_close_warning: data.show_app_close_warning,
             game_resolution: data
@@ -348,8 +657,6 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub release_channel: Option<Set<FEReleaseChannel>>,
     #[specta(optional)]
-    pub last_app_version: Option<Set<Option<String>>>,
-    #[specta(optional)]
     pub concurrent_downloads: Option<Set<i32>>,
     #[specta(optional)]
     pub download_dependencies: Option<Set<bool>>,
@@ -377,8 +684,6 @@ pub struct FESettingsUpdate {
     pub wrapper_command: Option<Set<Option<String>>>,
     #[specta(optional)]
     pub post_exit_hook: Option<Set<Option<String>>>,
-    #[specta(optional)]
-    pub is_first_launch: Option<Set<bool>>,
     #[specta(optional)]
     pub launcher_action_on_game_launch: Option<Set<FELauncherActionOnGameLaunch>>,
     #[specta(optional)]
@@ -488,3 +793,150 @@ mirror_into!(ModSources, carbon_platforms::ModSources, |value| Self {
         .map(Into::into)
         .collect(),
 });
+
+#[cfg(test)]
+mod beta_prompt_tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    /// Helper to create a valid state that would show the prompt
+    fn valid_state() -> BetaPromptState {
+        BetaPromptState {
+            release_channel: "stable".to_string(),
+            first_launch_completed: true,
+            permanently_dismissed: false,
+            // Use an ID that's in the 3% cohort (starts with low hex value)
+            installation_id: Some("00000001-0000-0000-0000-000000000000".to_string()),
+            last_shown: None,
+        }
+    }
+
+    #[test]
+    fn shows_when_all_conditions_met() {
+        let state = valid_state();
+        let now = Utc::now();
+        assert!(should_show_beta_prompt_logic(&state, now));
+    }
+
+    #[test]
+    fn not_stable_channel_returns_false() {
+        let mut state = valid_state();
+        state.release_channel = "beta".to_string();
+        assert!(!should_show_beta_prompt_logic(&state, Utc::now()));
+
+        state.release_channel = "alpha".to_string();
+        assert!(!should_show_beta_prompt_logic(&state, Utc::now()));
+    }
+
+    #[test]
+    fn first_launch_not_completed_returns_false() {
+        let mut state = valid_state();
+        state.first_launch_completed = false;
+        assert!(!should_show_beta_prompt_logic(&state, Utc::now()));
+    }
+
+    #[test]
+    fn permanently_dismissed_returns_false() {
+        let mut state = valid_state();
+        state.permanently_dismissed = true;
+        assert!(!should_show_beta_prompt_logic(&state, Utc::now()));
+    }
+
+    #[test]
+    fn no_installation_id_returns_false() {
+        let mut state = valid_state();
+        state.installation_id = None;
+        assert!(!should_show_beta_prompt_logic(&state, Utc::now()));
+    }
+
+    #[test]
+    fn not_in_cohort_returns_false() {
+        let mut state = valid_state();
+        // Use an ID that's NOT in the 3% cohort (starts with high hex value)
+        state.installation_id = Some("ffffffff-0000-0000-0000-000000000000".to_string());
+        assert!(!should_show_beta_prompt_logic(&state, Utc::now()));
+    }
+
+    #[test]
+    fn recently_shown_returns_false() {
+        let mut state = valid_state();
+        let now = Utc::now();
+        // Shown 3 days ago - should still be within the 7-day reminder period
+        state.last_shown = Some(now - Duration::days(3));
+        assert!(!should_show_beta_prompt_logic(&state, now));
+    }
+
+    #[test]
+    fn shown_exactly_7_days_ago_returns_true() {
+        let mut state = valid_state();
+        let now = Utc::now();
+        // Shown exactly 7 days ago - reminder period has passed
+        state.last_shown = Some(now - Duration::days(7));
+        assert!(should_show_beta_prompt_logic(&state, now));
+    }
+
+    #[test]
+    fn shown_more_than_7_days_ago_returns_true() {
+        let mut state = valid_state();
+        let now = Utc::now();
+        // Shown 10 days ago - should show again
+        state.last_shown = Some(now - Duration::days(10));
+        assert!(should_show_beta_prompt_logic(&state, now));
+    }
+
+    #[test]
+    fn remind_later_within_period_does_not_show() {
+        let mut state = valid_state();
+        let now = Utc::now();
+
+        // Simulate "remind later" clicked 1 day ago
+        state.last_shown = Some(now - Duration::days(1));
+        assert!(!should_show_beta_prompt_logic(&state, now));
+
+        // Simulate "remind later" clicked 6 days ago
+        state.last_shown = Some(now - Duration::days(6));
+        assert!(!should_show_beta_prompt_logic(&state, now));
+    }
+
+    #[test]
+    fn dismiss_permanently_never_shows_again() {
+        let mut state = valid_state();
+        state.permanently_dismissed = true;
+
+        // Even if all other conditions are met, should not show
+        assert!(!should_show_beta_prompt_logic(&state, Utc::now()));
+
+        // Even after a long time
+        let future = Utc::now() + Duration::days(365);
+        assert!(!should_show_beta_prompt_logic(&state, future));
+    }
+
+    #[test]
+    fn remind_later_shows_after_period_expires() {
+        let mut state = valid_state();
+        let now = Utc::now();
+
+        // Clicked "remind later" 8 days ago - should show again
+        state.last_shown = Some(now - Duration::days(8));
+        assert!(should_show_beta_prompt_logic(&state, now));
+    }
+
+    #[test]
+    fn boundary_at_exactly_remind_period() {
+        let mut state = valid_state();
+        // Use a fixed timestamp for deterministic testing
+        let now = Utc.with_ymd_and_hms(2024, 6, 15, 12, 0, 0).unwrap();
+
+        // Last shown exactly 7 days ago at the same time
+        let seven_days_ago = now - Duration::days(7);
+        state.last_shown = Some(seven_days_ago);
+
+        // At exactly the boundary, should show (>= 7 days means show)
+        assert!(should_show_beta_prompt_logic(&state, now));
+
+        // 1 second before the boundary, should not show
+        let almost_now = now - Duration::seconds(1);
+        state.last_shown = Some(almost_now - Duration::days(7) + Duration::seconds(1));
+        assert!(!should_show_beta_prompt_logic(&state, almost_now));
+    }
+}

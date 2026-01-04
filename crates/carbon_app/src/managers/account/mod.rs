@@ -16,8 +16,9 @@ use carbon_repos::pcr::{
 };
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
-    GDLAccountStatus, GDLAccountTask, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
-    RequestNewEmailChangeError, RequestNewVerificationTokenError,
+    ChangeNicknameError, GDLAccountStatus, GDLAccountTask, GDLUser, NicknameHistoryEntry,
+    RegisterAccountBody, RequestGDLAccountDeletionError, RequestNewEmailChangeError,
+    RequestNewVerificationTokenError,
 };
 use jwt::{Header, Token};
 use reqwest::Client;
@@ -494,7 +495,46 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
-    pub async fn change_nickname(self, uuid: String, nickname: String) -> anyhow::Result<()> {
+    pub async fn change_nickname(
+        self,
+        uuid: String,
+        nickname: String,
+    ) -> Result<(), ChangeNicknameError> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await
+            .map_err(|e| ChangeNicknameError::RequestFailed(e))?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(ChangeNicknameError::RequestFailed(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            )))?
+            .id_token
+        else {
+            return Err(ChangeNicknameError::RequestFailed(anyhow::anyhow!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+            )));
+        };
+
+        self.gdl_account_task
+            .change_nickname(id_token, nickname)
+            .await?;
+
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        Ok(())
+    }
+
+    pub async fn get_nickname_history(
+        self,
+        user_id: i32,
+    ) -> anyhow::Result<Vec<NicknameHistoryEntry>> {
+        self.gdl_account_task.get_nickname_history(user_id).await
+    }
+
+    pub async fn clear_nickname_history(self, uuid: String) -> anyhow::Result<()> {
         let Some(id_token) = self
             .get_account_entries()
             .await?
@@ -510,16 +550,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ));
         };
 
-        let request = self
-            .gdl_account_task
-            .change_nickname(id_token, nickname)
-            .await;
-
-        self.app
-            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
-        self.app.invalidate(GET_GDL_ACCOUNT, None);
-
-        request?;
+        self.gdl_account_task
+            .clear_nickname_history(id_token)
+            .await?;
 
         Ok(())
     }
@@ -540,9 +573,47 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ));
         };
 
-        self.gdl_account_task
+        let request = self
+            .gdl_account_task
             .upload_profile_icon(id_token, icon_path)
-            .await
+            .await;
+
+        // Invalidate caches so UI refreshes with new avatar
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        request?;
+
+        Ok(())
+    }
+
+    pub async fn delete_profile_icon(self, uuid: String) -> anyhow::Result<()> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to delete profile icon for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            return Err(anyhow::anyhow!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+            ));
+        };
+
+        let request = self.gdl_account_task.delete_profile_icon(id_token).await;
+
+        // Invalidate caches so UI refreshes with generated avatar
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        request?;
+
+        Ok(())
     }
 
     pub async fn check_username_available(
@@ -1077,7 +1148,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     ) -> anyhow::Result<()> {
         use db::account::{SetParam, UniqueWhereParam};
 
-        info!("Checking account status");
+        debug!("Checking account status");
 
         let mut refresh_lock = match lock_refresh {
             true => Some(self.refreshloop_sleep.lock().await),
@@ -1095,7 +1166,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 ..
             } => access_token,
             _ => {
-                info!(?account.status, "Account is not ok, ignoring");
+                debug!(?account.status, "Account is not ok, ignoring");
                 return Ok(());
             }
         };

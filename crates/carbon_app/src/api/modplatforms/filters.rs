@@ -346,3 +346,25 @@ pub enum FEUnifiedProjectID {
 pub struct FEUnifiedProjectIDParameters {
     pub project_id: FEUnifiedProjectID,
 }
+
+/// Batch request for fetching multiple projects by ID or slug
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FEUnifiedBatchRequest {
+    /// CurseForge numeric IDs (CF only)
+    pub curseforge_ids: Vec<i32>,
+    /// Slugs to try on BOTH platforms
+    pub slugs: Vec<String>,
+    /// Modrinth-specific IDs (from modrinth:// protocol or URL)
+    pub modrinth_only_ids: Vec<String>,
+    /// CurseForge-specific slugs (from CF URLs)
+    pub curseforge_only_slugs: Vec<String>,
+}
+
+/// Response for batch project fetching
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FEUnifiedBatchResponse {
+    pub results: Vec<super::responses::FEUnifiedSearchResult>,
+    pub errors: Vec<String>,
+}
