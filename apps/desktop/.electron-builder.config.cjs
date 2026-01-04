@@ -81,6 +81,16 @@ module.exports = {
       name: "gdlauncher",
       role: "Viewer",
       schemes: ["gdlauncher"]
+    },
+    {
+      name: "CurseForge",
+      role: "Viewer",
+      schemes: ["curseforge"]
+    },
+    {
+      name: "Modrinth",
+      role: "Viewer",
+      schemes: ["modrinth"]
     }
   ],
   win: {

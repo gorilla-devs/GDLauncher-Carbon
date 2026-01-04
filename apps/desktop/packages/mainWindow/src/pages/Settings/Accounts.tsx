@@ -15,7 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "@gd/ui"
-import { port, rspc } from "@/utils/rspcClient"
+import { port, queryClient, rspc } from "@/utils/rspcClient"
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
 import Title from "./components/Title"
@@ -23,6 +23,7 @@ import RowsContainer from "./components/RowsContainer"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import {
   createEffect,
+  createMemo,
   createSignal,
   For,
   JSX,
@@ -42,6 +43,7 @@ const GDLAccountRowItem = (props: {
   value?: string | null | undefined
   children?: JSX.Element
   onEdit?: () => void
+  extraAction?: JSX.Element
 }) => {
   return (
     <div class="flex items-center justify-between">
@@ -69,6 +71,7 @@ const GDLAccountRowItem = (props: {
                 EDIT
               </div>
             </Show>
+            {props.extraAction}
             <div class="hidden group-hover:block">
               <div class="i-hugeicons:clipboard text-lightSlate-50 text-lg" />
             </div>
@@ -214,11 +217,21 @@ const Accounts = () => {
   const deleteAvatarMutation = rspc.createMutation(() => ({
     mutationKey: ["account.deleteProfileIcon"]
   }))
+  const clearNicknameHistoryMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.clearNicknameHistory"]
+  }))
 
   const validGDLUser = () =>
     globalStore.gdlAccount.data?.status === "valid"
       ? globalStore.gdlAccount.data?.value
       : undefined
+
+  const userId = createMemo(() => validGDLUser()?.id)
+
+  const nicknameHistoryQuery = rspc.createQuery(() => ({
+    queryKey: ["account.getNicknameHistory", userId() ?? 0],
+    enabled: !!userId()
+  }))
 
   const invalidGDLUser = () => globalStore.gdlAccount.data?.status === "invalid"
 
@@ -249,6 +262,7 @@ const Accounts = () => {
       setAvatarLoading(true)
       try {
         await uploadAvatarMutation.mutateAsync({ uuid, iconPath: filePath })
+        toast.success(t("accounts:_trn_avatar_upload_success"))
       } catch (err) {
         console.error("Avatar upload failed:", err)
         toast.error(t("accounts:_trn_avatar_upload_failed"))
@@ -266,6 +280,7 @@ const Accounts = () => {
     try {
       await deleteAvatarMutation.mutateAsync(uuid)
       setAvatarPreview(null)
+      toast.success(t("accounts:_trn_avatar_delete_success"))
     } catch (err) {
       console.error("Avatar deletion failed:", err)
       toast.error(t("accounts:_trn_avatar_delete_failed"))
@@ -412,7 +427,88 @@ const Accounts = () => {
                         class="rounded-md"
                         dialogTitle={t("accounts:_trn_select_avatar_image")}
                       />
-                      {validGDLUser()?.nickname}
+                      <GDLAccountRowItem
+                        title={t("accounts:_trn_nickname")}
+                        value={validGDLUser()?.nickname}
+                        onEdit={() => {
+                          modalsContext?.openModal({
+                            name: "changeGDLAccountNickname"
+                          })
+                        }}
+                        extraAction={
+                          <Show
+                            when={
+                              nicknameHistoryQuery.data &&
+                              nicknameHistoryQuery.data.length > 0
+                            }
+                          >
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Popover>
+                                <PopoverTrigger>
+                                  <div class="text-md text-lightSlate-700 hover:text-lightSlate-50 underline transition-all duration-100 ease-spring">
+                                    <Trans key="accounts:_trn_nickname_history" />
+                                  </div>
+                                </PopoverTrigger>
+                                <PopoverContent class="max-h-60 w-64 overflow-y-auto">
+                                  <div class="flex flex-col gap-2">
+                                    <div class="text-lightSlate-50 font-medium">
+                                      <Trans key="accounts:_trn_nickname_history" />
+                                    </div>
+                                    <For each={nicknameHistoryQuery.data}>
+                                      {(entry) => (
+                                        <div class="text-lightSlate-300 flex justify-between text-sm">
+                                          <span>{entry.nickname}</span>
+                                          <span class="text-lightSlate-500">
+                                            {new Date(
+                                              entry.changedAt
+                                            ).toLocaleDateString()}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </For>
+                                    <Button
+                                      type="secondary"
+                                      size="small"
+                                      class="mt-2"
+                                      onClick={async () => {
+                                        const uuid =
+                                          globalStore
+                                            ?.currentlySelectedAccountUuid?.data
+                                        if (!uuid) return
+
+                                        try {
+                                          await clearNicknameHistoryMutation.mutateAsync(
+                                            uuid
+                                          )
+                                          queryClient.invalidateQueries({
+                                            queryKey: [
+                                              "account.getNicknameHistory"
+                                            ]
+                                          })
+                                          toast.success(
+                                            t(
+                                              "accounts:_trn_nickname_history_cleared"
+                                            )
+                                          )
+                                        } catch (err) {
+                                          console.error(err)
+                                          toast.error(
+                                            t(
+                                              "accounts:_trn_nickname_history_clear_failed"
+                                            )
+                                          )
+                                        }
+                                      }}
+                                    >
+                                      <Trans key="accounts:_trn_clear_nickname_history" />
+                                    </Button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </Show>
+                        }
+                      />
                     </div>
                     <GDLAccountRowItem
                       title={t("accounts:_trn_friend_code")}

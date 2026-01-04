@@ -20,6 +20,21 @@ const changelogs: Changelog = {
         "https://cdn.gdl.gg/launcher/changelog/2.0.26/addons-browser-overhaul.mp4"
     },
     {
+      title: "Custom Profile Avatar",
+      description:
+        "Upload and customize your GDL account profile picture. Your avatar is displayed throughout the launcher and to other users."
+    },
+    {
+      title: "Nickname Change",
+      description:
+        "Change your GDL account nickname from the account settings. A 7-day cooldown applies between changes."
+    },
+    {
+      title: "Nickname History",
+      description:
+        "View your past nicknames Steam-style. Your nickname history is public, but you can clear it anytime from the account settings."
+    },
+    {
       title: "Japanese Language Support",
       description:
         "Added Japanese translations for the entire interface, making GDLauncher accessible to Japanese-speaking users."

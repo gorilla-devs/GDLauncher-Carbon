@@ -27,6 +27,7 @@ import RiveAppWapper from "./utils/RiveAppWrapper"
 import GDAnimation from "./gd_logo_animation.riv"
 import { GlobalStoreProvider } from "./components/GlobalStoreContext"
 import AuthLoadingOverlay from "./pages/Login/AuthLoadingOverlay"
+import { OnboardingProvider, SpotlightOverlay } from "./components/Onboarding"
 
 const BackendReadyContext = createContext<boolean>(false)
 
@@ -301,13 +302,18 @@ const TransWrapper = (props: TransWrapperProps) => {
         <BackendReadyContext.Provider value={props.isBackendReady}>
           <Router source={hashIntegration()}>
             <GlobalStoreProvider>
-              <NavigationManager>
-                <ContextMenuProvider>
-                  <ModalProvider>
-                    <App createInvalidateQuery={props.createInvalidateQuery} />
-                  </ModalProvider>
-                </ContextMenuProvider>
-              </NavigationManager>
+              <OnboardingProvider>
+                <NavigationManager>
+                  <ContextMenuProvider>
+                    <ModalProvider>
+                      <App
+                        createInvalidateQuery={props.createInvalidateQuery}
+                      />
+                      <SpotlightOverlay />
+                    </ModalProvider>
+                  </ContextMenuProvider>
+                </NavigationManager>
+              </OnboardingProvider>
             </GlobalStoreProvider>
           </Router>
         </BackendReadyContext.Provider>

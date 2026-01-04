@@ -365,4 +365,112 @@ mod test {
             initial_checksum
         );
     }
+
+    mod beta_prompt_cohort {
+        use super::super::is_in_beta_prompt_cohort;
+
+        #[test]
+        fn at_0_percent_never_includes() {
+            assert!(!is_in_beta_prompt_cohort(
+                "00000000-0000-0000-0000-000000000000",
+                0.0
+            ));
+            assert!(!is_in_beta_prompt_cohort(
+                "ffffffff-ffff-ffff-ffff-ffffffffffff",
+                0.0
+            ));
+        }
+
+        #[test]
+        fn at_100_percent_includes_almost_all() {
+            // At 100%, everyone except the theoretical max ID is included
+            assert!(is_in_beta_prompt_cohort(
+                "00000000-0000-0000-0000-000000000000",
+                1.0
+            ));
+            // fffffffe is just below max, should be included
+            assert!(is_in_beta_prompt_cohort(
+                "fffffffe-ffff-ffff-ffff-ffffffffffff",
+                1.0
+            ));
+            // ffffffff gives normalized = 1.0, and check is strictly <, so excluded
+            // This is an edge case (1 in 4.3 billion) and acceptable behavior
+            assert!(!is_in_beta_prompt_cohort(
+                "ffffffff-ffff-ffff-ffff-ffffffffffff",
+                1.0
+            ));
+        }
+
+        #[test]
+        fn is_deterministic() {
+            let id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+            let result1 = is_in_beta_prompt_cohort(id, 0.5);
+            let result2 = is_in_beta_prompt_cohort(id, 0.5);
+            assert_eq!(result1, result2);
+        }
+
+        #[test]
+        fn low_id_in_small_cohort() {
+            // ID starting with "00000000" → normalized ~0.0, should be in small cohorts
+            assert!(is_in_beta_prompt_cohort(
+                "00000000-1234-5678-9abc-def012345678",
+                0.01
+            ));
+        }
+
+        #[test]
+        fn high_id_not_in_small_cohort() {
+            // ID starting with "ffffffff" → normalized ~1.0, should NOT be in small cohorts
+            assert!(!is_in_beta_prompt_cohort(
+                "ffffffff-1234-5678-9abc-def012345678",
+                0.99
+            ));
+        }
+
+        #[test]
+        fn invalid_id_too_short() {
+            // IDs with < 8 hex chars should return false
+            assert!(!is_in_beta_prompt_cohort("abc", 1.0));
+            assert!(!is_in_beta_prompt_cohort("", 1.0));
+        }
+
+        #[test]
+        fn handles_non_hex_characters() {
+            // Should filter out non-hex chars and use remaining
+            // "ab-cd-ef-12" has only 8 hex chars: abcdef12
+            assert!(is_in_beta_prompt_cohort("ab-cd-ef-12", 1.0));
+            // But "ab-cd" only has 4 hex chars, not enough
+            assert!(!is_in_beta_prompt_cohort("ab-cd", 1.0));
+        }
+
+        #[test]
+        fn boundary_at_3_percent() {
+            // 3% of u32::MAX = 0.03 * 4294967295 ≈ 128849018 = 0x07AE147A
+            // IDs below this threshold should be included
+            assert!(is_in_beta_prompt_cohort(
+                "07ae147a-0000-0000-0000-000000000000",
+                0.03
+            ));
+            // IDs at or above should not be included (normalized >= 0.03)
+            assert!(!is_in_beta_prompt_cohort(
+                "07ae147b-0000-0000-0000-000000000000",
+                0.03
+            ));
+        }
+
+        #[test]
+        fn mid_range_values() {
+            // 50% threshold = 0x7FFFFFFF
+            // ID starting with "40000000" → normalized ~0.25, should be in 50% cohort
+            assert!(is_in_beta_prompt_cohort(
+                "40000000-0000-0000-0000-000000000000",
+                0.5
+            ));
+            // ID starting with "80000000" → normalized ~0.5, should NOT be in 50% cohort
+            assert!(!is_in_beta_prompt_cohort(
+                "80000000-0000-0000-0000-000000000000",
+                0.5
+            ));
+        }
+    }
 }

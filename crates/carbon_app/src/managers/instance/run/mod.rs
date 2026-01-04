@@ -551,21 +551,21 @@ impl ManagerRef<'_, InstanceManager> {
 
                     tokio::select! {
                         _ = child.wait() => {
-                            tracing::info!("Instance waited");
+                            tracing::debug!("Instance waited");
                         },
                         _ = kill_rx.recv() => {
-                            tracing::info!("Instance killed");
+                            tracing::debug!("Instance killed");
                             drop(child.kill().await);
                         },
                         _ = read_logs(log.as_ref().expect("log must exist when launching game"), stdout, stderr, file.as_mut()) => {
-                            tracing::info!("Instance read logs");
+                            tracing::debug!("Instance read logs");
                         },
                         _ = update_playtime => {
-                            tracing::info!("Instance updated playtime");
+                            tracing::debug!("Instance updated playtime");
                         }
                     }
 
-                    tracing::info!("Instance exited");
+                    tracing::debug!("Instance exited");
 
                     let r = app
                         .instance_manager()

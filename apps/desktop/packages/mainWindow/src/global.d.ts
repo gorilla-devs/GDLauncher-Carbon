@@ -89,6 +89,7 @@ declare global {
     listenToCoreModuleProgress: (
       cb: (event: Electron.IpcRendererEvent, progress: number) => void
     ) => void
+    onProtocolUrl: (cb: (url: string) => void) => void
   }
 }
 

@@ -1754,8 +1754,6 @@ mod log {
         State(app): State<App>,
     ) -> impl IntoResponse {
         req.on_upgrade(move |mut socket| async move {
-            tracing::info!("starting log stream");
-
             let log_rx = app
                 .instance_manager()
                 .get_log(domain::GameLogId(query.id))

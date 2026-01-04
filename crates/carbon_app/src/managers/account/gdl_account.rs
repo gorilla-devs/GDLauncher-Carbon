@@ -51,6 +51,21 @@ pub enum RequestGDLAccountDeletionError {
     RequestFailed(anyhow::Error),
 }
 
+#[derive(Error, Debug)]
+pub enum ChangeNicknameError {
+    #[error("Too many requests")]
+    TooManyRequests(u32),
+
+    #[error("request failed: {0}")]
+    RequestFailed(anyhow::Error),
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct NicknameHistoryEntry {
+    pub nickname: String,
+    pub changed_at: DateTime<Utc>,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum GDLAccountStatus {
     Valid(GDLUser),
@@ -61,6 +76,7 @@ pub enum GDLAccountStatus {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GDLUser {
+    pub id: i32,
     pub email: String,
     pub microsoft_oid: String,
     pub nickname: String,
@@ -75,6 +91,7 @@ pub struct GDLUser {
     pub has_pending_deletion_request: bool,
     pub deletion_timeout: Option<i64>,
     pub email_change_timeout: Option<i64>,
+    pub nickname_change_timeout: Option<i64>,
 }
 
 impl GDLAccountTask {
@@ -290,12 +307,21 @@ impl GDLAccountTask {
         Ok(())
     }
 
-    pub async fn change_nickname(&self, id_token: String, nickname: String) -> anyhow::Result<()> {
+    pub async fn change_nickname(
+        &self,
+        id_token: String,
+        nickname: String,
+    ) -> Result<(), ChangeNicknameError> {
         let url = format!("{}/v1/users/user/nickname", self.base_api);
 
         let authorization = format!("Bearer {}", id_token);
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, authorization.parse()?);
+        headers.insert(
+            AUTHORIZATION,
+            authorization
+                .parse()
+                .map_err(|e: InvalidHeaderValue| ChangeNicknameError::RequestFailed(e.into()))?,
+        );
         headers.insert(
             CONTENT_TYPE,
             "application/json"
@@ -303,7 +329,8 @@ impl GDLAccountTask {
                 .expect("failed to parse content type"),
         );
 
-        let body = serde_json::to_string(&serde_json::json!({ "new_nickname": nickname }))?;
+        let body = serde_json::to_string(&serde_json::json!({ "new_nickname": nickname }))
+            .map_err(|e| ChangeNicknameError::RequestFailed(e.into()))?;
 
         let resp = self
             .client
@@ -311,7 +338,52 @@ impl GDLAccountTask {
             .headers(headers)
             .body(reqwest::Body::from(body))
             .send()
-            .await?;
+            .await
+            .map_err(|e| ChangeNicknameError::RequestFailed(e.into()))?;
+
+        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+            let retry_after = resp
+                .headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u32>().ok());
+
+            return Err(ChangeNicknameError::TooManyRequests(
+                retry_after.unwrap_or(0),
+            ));
+        }
+
+        resp.error_for_status()
+            .map_err(|e| ChangeNicknameError::RequestFailed(e.into()))?;
+
+        Ok(())
+    }
+
+    pub async fn get_nickname_history(
+        &self,
+        user_id: i32,
+    ) -> anyhow::Result<Vec<NicknameHistoryEntry>> {
+        let url = format!("{}/v1/users/users/{}/nickname-history", self.base_api, user_id);
+
+        let resp = self.client.get(url).send().await?;
+
+        let resp = resp.error_for_status()?;
+
+        let history: Vec<NicknameHistoryEntry> = resp.json().await?;
+
+        Ok(history)
+    }
+
+    pub async fn clear_nickname_history(&self, id_token: String) -> anyhow::Result<()> {
+        let url = format!("{}/v1/users/user/nickname-history", self.base_api);
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+
+        let resp = self.client.delete(url).headers(headers).send().await?;
+
+        resp.error_for_status()?;
 
         Ok(())
     }

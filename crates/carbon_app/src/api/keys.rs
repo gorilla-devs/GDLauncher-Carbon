@@ -62,6 +62,8 @@ keys! {
         DELETE_PROFILE_ICON                         = "deleteProfileIcon";
         CHECK_USERNAME_AVAILABLE                    = "checkUsernameAvailable";
         CREATE_PROFILE                              = "createProfile";
+        GET_NICKNAME_HISTORY                        = "getNicknameHistory";
+        CLEAR_NICKNAME_HISTORY                      = "clearNicknameHistory";
     }
 
     java {
@@ -155,6 +157,10 @@ keys! {
         SHOULD_SHOW_BETA_PROMPT                     = "shouldShowBetaPrompt";
         DISMISS_BETA_PROMPT_PERMANENTLY             = "dismissBetaPromptPermanently";
         REMIND_BETA_PROMPT_LATER                    = "remindBetaPromptLater";
+        // Onboarding tips
+        GET_SEEN_ONBOARDING_TIPS                    = "getSeenOnboardingTips";
+        MARK_ONBOARDING_TIP_SEEN                    = "markOnboardingTipSeen";
+        RESET_ONBOARDING_TIPS                       = "resetOnboardingTips";
     }
 
     metrics {
@@ -187,6 +193,7 @@ keys! {
 
         UNIFIED_SEARCH                              = "unifiedSearch";
         UNIFIED_GET_PROJECT                         = "unifiedGetProject";
+        UNIFIED_GET_PROJECTS_BY_IDS                 = "unifiedGetProjectsByIds";
         UNIFIED_GET_PROJECT_VERSIONS                = "unifiedGetProjectVersions";
         UNIFIED_SEARCH_PROJECT_TYPE                 = "unifiedSearchProjectType";
         GET_UNIFIED_CATEGORIES                      = "getUnifiedCategories";

@@ -4,8 +4,8 @@ use crate::domain::account as domain;
 use crate::error::{AxumError, FeError};
 use crate::managers::account::api::{UsernameAvailability, XboxError};
 use crate::managers::account::gdl_account::{
-    GDLAccountStatus, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
-    RequestNewEmailChangeError, RequestNewVerificationTokenError,
+    ChangeNicknameError, GDLAccountStatus, GDLUser, NicknameHistoryEntry, RegisterAccountBody,
+    RequestGDLAccountDeletionError, RequestNewEmailChangeError, RequestNewVerificationTokenError,
 };
 use crate::managers::{App, AppInner, account};
 use axum::extract::{Query, State};
@@ -138,9 +138,11 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation CHANGE_GDL_ACCOUNT_NICKNAME[app, args: FEChangeGdlAccountNickname] {
-            app.account_manager()
+            let result = app.account_manager()
                 .change_nickname(args.uuid, args.nickname)
-                .await
+                .await;
+
+            Ok(FEChangeNicknameStatus::from(result))
         }
 
         mutation UPLOAD_PROFILE_ICON[app, args: FEUploadProfileIcon] {
@@ -160,6 +162,20 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation CREATE_PROFILE[app, args: FECreateProfile] {
             app.account_manager()
                 .create_minecraft_profile(args.access_token, args.username)
+                .await
+        }
+
+        query GET_NICKNAME_HISTORY[app, user_id: i32] {
+            let history = app.account_manager()
+                .get_nickname_history(user_id)
+                .await?;
+
+            Ok(history.into_iter().map(FENicknameHistoryEntry::from).collect::<Vec<_>>())
+        }
+
+        mutation CLEAR_NICKNAME_HISTORY[app, uuid: String] {
+            app.account_manager()
+                .clear_nickname_history(uuid)
                 .await
         }
     }
@@ -472,6 +488,7 @@ impl From<GDLAccountStatus> for FEGDLAccountStatus {
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FEGDLAccount {
+    id: i32,
     email: String,
     microsoft_oid: String,
     nickname: String,
@@ -485,11 +502,13 @@ struct FEGDLAccount {
     has_pending_deletion_request: bool,
     deletion_timeout: Option<u32>,
     email_change_timeout: Option<u32>,
+    nickname_change_timeout: Option<u32>,
 }
 
 impl From<GDLUser> for FEGDLAccount {
     fn from(value: GDLUser) -> Self {
         Self {
+            id: value.id,
             email: value.email,
             microsoft_oid: value.microsoft_oid,
             nickname: value.nickname,
@@ -503,6 +522,7 @@ impl From<GDLUser> for FEGDLAccount {
             has_pending_deletion_request: value.has_pending_deletion_request,
             deletion_timeout: value.deletion_timeout.map(|v| v as u32),
             email_change_timeout: value.email_change_timeout.map(|v| v as u32),
+            nickname_change_timeout: value.nickname_change_timeout.map(|v| v as u32),
         }
     }
 }
@@ -616,4 +636,38 @@ pub struct FECheckUsernameAvailability {
 pub struct FECreateProfile {
     pub access_token: String,
     pub username: String,
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
+pub enum FEChangeNicknameStatus {
+    Success,
+    Failed(Option<u32>),
+}
+
+impl From<Result<(), ChangeNicknameError>> for FEChangeNicknameStatus {
+    fn from(value: Result<(), ChangeNicknameError>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(ChangeNicknameError::TooManyRequests(cooldown)) => Self::Failed(Some(cooldown)),
+            Err(ChangeNicknameError::RequestFailed(_)) => Self::Failed(None),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FENicknameHistoryEntry {
+    pub nickname: String,
+    pub changed_at: DateTime<Utc>,
+}
+
+impl From<NicknameHistoryEntry> for FENicknameHistoryEntry {
+    fn from(value: NicknameHistoryEntry) -> Self {
+        Self {
+            nickname: value.nickname,
+            changed_at: value.changed_at,
+        }
+    }
 }

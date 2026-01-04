@@ -1,6 +1,6 @@
 import { createSignal, Show, mergeProps } from "solid-js"
 import { useTransContext } from "@gd/i18n"
-import { Spinner } from "@gd/ui"
+import { Popover, PopoverContent, PopoverTrigger, Spinner } from "@gd/ui"
 
 interface ImagePickerProps {
   imageUrl: () => string | null
@@ -18,7 +18,7 @@ interface ImagePickerProps {
 
 const ImagePicker = (props: ImagePickerProps) => {
   const [t] = useTransContext()
-  const [showConfirmDelete, setShowConfirmDelete] = createSignal(false)
+  const [isPopoverOpen, setIsPopoverOpen] = createSignal(false)
 
   const merged = mergeProps(
     {
@@ -49,22 +49,15 @@ const ImagePicker = (props: ImagePickerProps) => {
   const handleDeleteClick = async (e: MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (merged.confirmDelete) {
-      setShowConfirmDelete(true)
-    } else {
+    if (!merged.confirmDelete) {
       await props.onDelete?.()
     }
+    // If confirmDelete is true, the Popover handles showing the confirmation
   }
 
   const handleConfirmDelete = async () => {
-    setShowConfirmDelete(false)
+    setIsPopoverOpen(false)
     await props.onDelete?.()
-  }
-
-  const handleCancelDelete = (e?: MouseEvent) => {
-    e?.preventDefault()
-    e?.stopPropagation()
-    setShowConfirmDelete(false)
   }
 
   return (
@@ -93,20 +86,6 @@ const ImagePicker = (props: ImagePickerProps) => {
           </div>
         </Show>
 
-        {/* Delete button - top right corner, appears only when hovering near it */}
-        <Show
-          when={merged.deletable && props.imageUrl() && !showConfirmDelete()}
-        >
-          <div class="group/delete absolute -right-3.5 -top-3.5 z-10 p-1.5">
-            <div
-              class="cursor-pointer rounded-full bg-darkSlate-800 p-1 opacity-0 transition-opacity group-hover/delete:opacity-100"
-              onClick={handleDeleteClick}
-            >
-              <div class="i-hugeicons:delete-02 h-5 w-5 text-red-500 transition-all hover:text-red-400" />
-            </div>
-          </div>
-        </Show>
-
         {/* Loading overlay */}
         <Show when={props.isLoading?.()}>
           <div class="absolute inset-0 flex items-center justify-center rounded-xl bg-black/70">
@@ -115,27 +94,61 @@ const ImagePicker = (props: ImagePickerProps) => {
         </Show>
       </div>
 
-      {/* Confirmation dialog (inline popover style) */}
-      <Show when={showConfirmDelete()}>
-        <div
-          class="absolute left-full top-0 z-50 ml-2 flex items-center gap-2 whitespace-nowrap rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 px-3 py-2 shadow-md animate-in fade-in zoom-in-95"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span class="text-sm text-lightSlate-200">
-            {t("general:_trn_delete")}?
-          </span>
-          <button
-            class="rounded p-1 text-lightSlate-500 transition-colors hover:bg-darkSlate-700 hover:text-lightSlate-100"
-            onClick={handleCancelDelete}
+      {/* Delete button with confirmation popover */}
+      <Show when={merged.deletable && props.imageUrl()}>
+        <div class="absolute -right-3.5 -top-3.5 z-10">
+          <Show
+            when={merged.confirmDelete}
+            fallback={
+              <div class="group/delete p-1.5">
+                <div
+                  class="cursor-pointer rounded-full bg-darkSlate-800 p-1 opacity-0 transition-opacity group-hover/delete:opacity-100"
+                  onClick={handleDeleteClick}
+                >
+                  <div class="i-hugeicons:delete-02 h-5 w-5 text-red-500 transition-all hover:text-red-400" />
+                </div>
+              </div>
+            }
           >
-            <div class="i-hugeicons:cancel-01 h-5 w-5" />
-          </button>
-          <button
-            class="rounded p-1 text-red-500 transition-colors hover:bg-red-500/20 hover:text-red-400"
-            onClick={handleConfirmDelete}
-          >
-            <div class="i-hugeicons:tick-02 h-5 w-5" />
-          </button>
+            <Popover
+              open={isPopoverOpen()}
+              onOpenChange={setIsPopoverOpen}
+              placement="right"
+            >
+              <PopoverTrigger
+                as="div"
+                class="group/delete p-1.5"
+                onClick={(e: MouseEvent) => e.stopPropagation()}
+              >
+                <div class="cursor-pointer rounded-full bg-darkSlate-800 p-1 opacity-0 transition-opacity group-hover/delete:opacity-100">
+                  <div class="i-hugeicons:delete-02 h-5 w-5 text-red-500 transition-all hover:text-red-400" />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent
+                class="w-auto !p-2"
+                hideCloseButton
+                onClick={(e: MouseEvent) => e.stopPropagation()}
+              >
+                <div class="flex items-center gap-2 whitespace-nowrap">
+                  <span class="text-sm text-lightSlate-200">
+                    {t("general:_trn_delete")}?
+                  </span>
+                  <button
+                    class="rounded p-1 text-lightSlate-500 transition-colors hover:bg-darkSlate-700 hover:text-lightSlate-100"
+                    onClick={() => setIsPopoverOpen(false)}
+                  >
+                    <div class="i-hugeicons:cancel-01 h-5 w-5" />
+                  </button>
+                  <button
+                    class="rounded p-1 text-red-500 transition-colors hover:bg-red-500/20 hover:text-red-400"
+                    onClick={handleConfirmDelete}
+                  >
+                    <div class="i-hugeicons:tick-02 h-5 w-5" />
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </Show>
         </div>
       </Show>
     </div>

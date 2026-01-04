@@ -373,9 +373,12 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   const storeIconForBackend = async () => {
     const path = iconPath()
     if (path) {
-      await fetch(
+      const response = await fetch(
         `http://127.0.0.1:${port}/instance/loadIcon?path=${encodeURIComponent(path)}`
       )
+      if (!response.ok) {
+        throw new Error("Failed to upload icon")
+      }
     }
   }
 

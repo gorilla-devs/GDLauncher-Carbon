@@ -219,6 +219,138 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(response)
         }
 
+        query UNIFIED_GET_PROJECTS_BY_IDS[app, request: filters::FEUnifiedBatchRequest] {
+            use carbon_platforms::curseforge::filters::{ModSearchParameters, ModSearchParametersQuery, ModsParameters, ModsParametersBody};
+            use carbon_platforms::modrinth::search::ProjectIDs;
+            use std::collections::HashSet;
+
+            let modplatforms = app.modplatforms_manager();
+            let mut results: Vec<responses::FEUnifiedSearchResult> = Vec::new();
+            let mut errors: Vec<String> = Vec::new();
+            let mut seen_cf_ids: HashSet<i32> = HashSet::new();
+            let mut seen_mr_ids: HashSet<String> = HashSet::new();
+
+            // 1. Fetch CurseForge by numeric IDs
+            if !request.curseforge_ids.is_empty() {
+                match modplatforms.curseforge.get_mods(ModsParameters {
+                    body: ModsParametersBody { mod_ids: request.curseforge_ids.clone() }
+                }).await {
+                    Ok(response) => {
+                        for mod_data in response.data {
+                            seen_cf_ids.insert(mod_data.id);
+                            results.push(responses::FEUnifiedSearchResult::from(mod_data));
+                        }
+                    }
+                    Err(e) => {
+                        for id in &request.curseforge_ids {
+                            errors.push(format!("CurseForge ID {} not found: {}", id, e));
+                        }
+                    }
+                }
+            }
+
+            // 2. Fetch CurseForge-only slugs (from CF URLs)
+            for slug in &request.curseforge_only_slugs {
+                match modplatforms.curseforge.search(ModSearchParameters {
+                    query: ModSearchParametersQuery {
+                        game_id: 432,
+                        slug: Some(slug.clone()),
+                        page_size: Some(1),
+                        search_filter: None,
+                        game_version: None,
+                        category_ids: None,
+                        sort_order: None,
+                        sort_field: None,
+                        class_id: None,
+                        mod_loader_types: None,
+                        game_version_type_id: None,
+                        author_id: None,
+                        index: None,
+                    }
+                }).await {
+                    Ok(response) => {
+                        if let Some(found) = response.data.into_iter().find(|m| m.slug.eq_ignore_ascii_case(slug)) {
+                            if !seen_cf_ids.contains(&found.id) {
+                                seen_cf_ids.insert(found.id);
+                                results.push(responses::FEUnifiedSearchResult::from(found));
+                            }
+                        } else {
+                            errors.push(format!("CurseForge slug '{}' not found", slug));
+                        }
+                    }
+                    Err(e) => errors.push(format!("CurseForge slug '{}' search error: {}", slug, e))
+                }
+            }
+
+            // 3. Fetch Modrinth-only IDs (from MR protocol/URL)
+            if !request.modrinth_only_ids.is_empty() {
+                match modplatforms.modrinth.get_projects(ProjectIDs { ids: request.modrinth_only_ids.clone() }).await {
+                    Ok(projects) => {
+                        for project in projects {
+                            if !seen_mr_ids.contains(&project.id) {
+                                seen_mr_ids.insert(project.id.clone());
+                                results.push(responses::FEUnifiedSearchResult::from(project));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        for id in &request.modrinth_only_ids {
+                            errors.push(format!("Modrinth ID '{}' not found: {}", id, e));
+                        }
+                    }
+                }
+            }
+
+            // 4. Fetch slugs from BOTH platforms
+            for slug in &request.slugs {
+                let mut found_on_any = false;
+
+                // Try CurseForge slug search
+                if let Ok(response) = modplatforms.curseforge.search(ModSearchParameters {
+                    query: ModSearchParametersQuery {
+                        game_id: 432,
+                        slug: Some(slug.clone()),
+                        page_size: Some(1),
+                        search_filter: None,
+                        game_version: None,
+                        category_ids: None,
+                        sort_order: None,
+                        sort_field: None,
+                        class_id: None,
+                        mod_loader_types: None,
+                        game_version_type_id: None,
+                        author_id: None,
+                        index: None,
+                    }
+                }).await {
+                    if let Some(found) = response.data.into_iter().find(|m| m.slug.eq_ignore_ascii_case(slug)) {
+                        if !seen_cf_ids.contains(&found.id) {
+                            seen_cf_ids.insert(found.id);
+                            results.push(responses::FEUnifiedSearchResult::from(found));
+                            found_on_any = true;
+                        }
+                    }
+                }
+
+                // Try Modrinth (can accept slug as ID)
+                if let Ok(projects) = modplatforms.modrinth.get_projects(ProjectIDs { ids: vec![slug.clone()] }).await {
+                    for project in projects {
+                        if !seen_mr_ids.contains(&project.id) {
+                            seen_mr_ids.insert(project.id.clone());
+                            results.push(responses::FEUnifiedSearchResult::from(project));
+                            found_on_any = true;
+                        }
+                    }
+                }
+
+                if !found_on_any {
+                    errors.push(format!("Slug '{}' not found on either platform", slug));
+                }
+            }
+
+            Ok(filters::FEUnifiedBatchResponse { results, errors })
+        }
+
         query GET_UNIFIED_MODLOADERS[app, _args: ()] {
             Ok(FEUnifiedModLoaders(FEUnifiedModLoaderType::iter().collect::<Vec<_>>()))
         }

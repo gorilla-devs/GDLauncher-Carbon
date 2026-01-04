@@ -123,6 +123,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ChangeGDLAccountRecoveryEmail")),
     title: t("modals:_trn_change_recovery_email")
   },
+  changeGDLAccountNickname: {
+    component: lazy(() => import("./modals/ChangeGDLAccountNickname")),
+    title: t("modals:_trn_change_nickname")
+  },
   modDetails: {
     component: lazy(() => import("./modals/ModDetails")),
     title: t("modals:_trn_mod_details")
