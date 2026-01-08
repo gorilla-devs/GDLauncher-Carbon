@@ -3,7 +3,7 @@
   "productName": "GDLauncher",
   "private": true,
   "description": "GDLauncher Carbon.",
-  "author": "GorillaDevs Inc. <support@gdlauncher.com>",
+  "author": "GorillaDevs Inc.",
   "homepage": "https://gdlauncher.com",
   "license": "ARR",
   "type": "module",
