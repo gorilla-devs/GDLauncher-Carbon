@@ -363,7 +363,10 @@ impl GDLAccountTask {
         &self,
         user_id: i32,
     ) -> anyhow::Result<Vec<NicknameHistoryEntry>> {
-        let url = format!("{}/v1/users/users/{}/nickname-history", self.base_api, user_id);
+        let url = format!(
+            "{}/v1/users/users/{}/nickname-history",
+            self.base_api, user_id
+        );
 
         let resp = self.client.get(url).send().await?;
 
