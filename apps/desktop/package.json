@@ -4,6 +4,7 @@
   "private": true,
   "description": "GDLauncher Carbon.",
   "author": "GorillaDevs Inc.",
+  "email": "support@gdlauncher.com",
   "homepage": "https://gdlauncher.com",
   "license": "ARR",
   "type": "module",

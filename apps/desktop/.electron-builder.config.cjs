@@ -127,7 +127,8 @@ module.exports = {
     category: "Game",
     synopsis: "Custom Minecraft Launcher",
     description:
-      "GDLauncher is a custom Minecraft launcher with built-in mod management, modpack support, and a modern interface."
+      "GDLauncher is a custom Minecraft launcher with built-in mod management, modpack support, and a modern interface.",
+    maintainer: "GorillaDevs Inc. (support@gdlauncher.com)"
   },
   afterAllArtifactBuild: (_buildResult) => {
     const path = require("path")
