@@ -49,5 +49,6 @@
 "_trn_platform_filters": "{{platform}} フィルター",
 "_trn_search": "検索",
 "_trn_sort_by": "並び替え",
-"_trn_group_by": "グループ化"
+"_trn_group_by": "グループ化",
+"_trn_direct": "直接"
 }

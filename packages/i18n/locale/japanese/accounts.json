@@ -38,6 +38,22 @@
 "_trn_manage_accounts": "アカウント管理",
 "_trn_change_recovery_email_title": "復旧用メールアドレスの変更",
 "_trn_change_recovery_email_description": "GDLauncherアカウントの新しい復旧用メールアドレスを入力してください",
+"_trn_change_nickname_title": "ニックネームを変更",
+"_trn_change_nickname_description": "GDLauncherアカウントの新しいニックネームを入力してください。ニックネームは5文字以上20文字以内である必要があります。",
 "_trn_cancel": "キャンセル",
-"_trn_confirm": "確認"
+"_trn_confirm": "確認",
+"_trn_change_avatar": "アバターを変更",
+"_trn_select_avatar_image": "アバター画像を選択",
+"_trn_click_to_select_image": "クリックして画像を選択",
+"_trn_upload": "アップロード",
+"_trn_avatar_upload_failed": "アバターのアップロードに失敗しました",
+"_trn_avatar_delete_failed": "アバターの削除に失敗しました",
+"_trn_avatar_upload_success": "アバターのアップロードに成功しました",
+"_trn_avatar_delete_success": "アバターの削除に成功しました",
+"_trn_nickname_change_cooldown": "ニックネームを再変更するには {{time}} お待ちください",
+"_trn_nickname_change_failed": "ニックネームの変更に失敗しました",
+"_trn_nickname_history": "履歴",
+"_trn_clear_nickname_history": "履歴を消去",
+"_trn_nickname_history_cleared": "ニックネームの履歴を消去しました",
+"_trn_nickname_history_clear_failed": "ニックネーム履歴の消去に失敗しました"
 }
