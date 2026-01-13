@@ -49,5 +49,6 @@
   "_trn_platform_filters": "Filtros de {{platform}}",
   "_trn_search": "Buscar",
   "_trn_sort_by": "Ordenar por",
-  "_trn_group_by": "Agrupar por"
+  "_trn_group_by": "Agrupar por",
+  "_trn_direct": "Directo"
 }

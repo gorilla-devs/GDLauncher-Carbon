@@ -39,5 +39,21 @@
   "_trn_change_recovery_email_title": "Cambiar correo de recuperación",
   "_trn_change_recovery_email_description": "Introduce el nuevo correo electrónico de recuperación para tu cuenta de GDLauncher",
   "_trn_cancel": "Cancelar",
-  "_trn_confirm": "Confirmar"
+  "_trn_confirm": "Confirmar",
+  "_trn_change_nickname_title": "Cambiar apodo",
+  "_trn_change_nickname_description": "Introduce un nuevo apodo para tu cuenta de GDLauncher. El apodo debe tener entre 5 y 20 caracteres.",
+  "_trn_change_avatar": "Cambiar avatar",
+  "_trn_select_avatar_image": "Seleccionar imagen de avatar",
+  "_trn_click_to_select_image": "Haz clic para seleccionar una imagen",
+  "_trn_upload": "Subir",
+  "_trn_avatar_upload_failed": "Error al subir el avatar",
+  "_trn_avatar_delete_failed": "Error al eliminar el avatar",
+  "_trn_avatar_upload_success": "Avatar subido correctamente",
+  "_trn_avatar_delete_success": "Avatar eliminado correctamente",
+  "_trn_nickname_change_cooldown": "Espera {{time}} antes de cambiar el apodo de nuevo",
+  "_trn_nickname_change_failed": "Error al cambiar el apodo",
+  "_trn_nickname_history": "Historial",
+  "_trn_clear_nickname_history": "Borrar historial",
+  "_trn_nickname_history_cleared": "Historial de apodos borrado",
+  "_trn_nickname_history_clear_failed": "Error al borrar el historial de apodos"
 }
