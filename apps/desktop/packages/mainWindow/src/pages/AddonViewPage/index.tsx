@@ -28,7 +28,8 @@ import {
   createSignal,
   createMemo,
   onMount,
-  onCleanup
+  onCleanup,
+  useContext
 } from "solid-js"
 import { format } from "date-fns"
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar"
@@ -66,14 +67,33 @@ const ModsInfiniteScrollQueryWrapper = () => {
   const params = useParams()
   const platform = () => params.platform as FEUnifiedPlatform
 
+  // Hoisted project query to pass addonType to InfiniteScrollVersionsQueryWrapper
+  const project = rspc.createQuery(() => ({
+    queryKey: [
+      "modplatforms.unifiedGetProject",
+      platform() === "curseforge"
+        ? {
+            type: "curseforge",
+            value: parseInt(params.id, 10)
+          }
+        : {
+            type: "modrinth",
+            value: params.id
+          }
+    ]
+  }))
+
   return (
     <InfiniteScrollVersionsQueryWrapper
       modId={params.id}
       modplatform={platform()}
+      addonType={project.data?.type}
     >
-      <ContentWrapper zeroPadding>
-        <AddonExplore />
-      </ContentWrapper>
+      <AddonContext.Provider value={project}>
+        <ContentWrapper zeroPadding>
+          <AddonExplore />
+        </ContentWrapper>
+      </AddonContext.Provider>
     </InfiniteScrollVersionsQueryWrapper>
   )
 }
@@ -116,20 +136,8 @@ const AddonExplore = () => {
     enabled: selectedInstanceId() !== undefined
   }))
 
-  const project = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.unifiedGetProject",
-      platform() === "curseforge"
-        ? {
-            type: "curseforge",
-            value: parseInt(params.id, 10)
-          }
-        : {
-            type: "modrinth",
-            value: params.id
-          }
-    ]
-  }))
+  // Use the hoisted project query from context
+  const project = useContext(AddonContext)!
 
   const isFetching = () => project.isLoading
 
@@ -236,11 +244,26 @@ const AddonExplore = () => {
 
     // Measure sticky header height for versions table positioning
     if (refStickyTabs) {
+      let rafId: number | null = null
+
       const resizeObserver = new ResizeObserver(() => {
-        setStickyHeaderHeight(refStickyTabs.getBoundingClientRect().height)
+        // Debounce with requestAnimationFrame to avoid layout thrashing
+        // when Select dropdowns open (prevents page shift)
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId)
+        }
+        rafId = requestAnimationFrame(() => {
+          setStickyHeaderHeight(refStickyTabs.getBoundingClientRect().height)
+          rafId = null
+        })
       })
       resizeObserver.observe(refStickyTabs)
-      onCleanup(() => resizeObserver.disconnect())
+      onCleanup(() => {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId)
+        }
+        resizeObserver.disconnect()
+      })
     }
   })
 

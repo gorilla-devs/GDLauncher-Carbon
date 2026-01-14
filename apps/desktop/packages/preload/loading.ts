@@ -513,3 +513,7 @@ contextBridge.exposeInMainWorld(
   (cb: (event: Electron.IpcRendererEvent, progress: number) => void) =>
     ipcRenderer.on("coreModuleProgress", cb)
 )
+
+contextBridge.exposeInMainWorld("getCurrentProgress", () =>
+  ipcRenderer.invoke("getCurrentProgress")
+)
