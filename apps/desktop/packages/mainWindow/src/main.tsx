@@ -100,32 +100,14 @@ render(() => {
   })
 
   window.listenToCoreModuleProgress((_, progress) => {
-    const startProgress = coreModuleProgress() ?? 0
-    const endProgress = progress
-    const duration = 300
-    const startTime = Date.now()
+    setCoreModuleProgress(progress)
+  })
 
-    const easeOutCubic = (x: number): number => {
-      return 1 - Math.pow(1 - x, 3)
+  // Request any buffered progress that was sent before listener was ready
+  window.getCurrentProgress().then((progress) => {
+    if (progress !== null && progress > (coreModuleProgress() ?? 0)) {
+      setCoreModuleProgress(progress)
     }
-
-    const animate = () => {
-      const currentTime = Date.now()
-      const elapsed = currentTime - startTime
-      const progress = Math.min(elapsed / duration, 1)
-
-      if (progress < 1) {
-        const easedProgress = easeOutCubic(progress)
-        const currentValue =
-          startProgress + (endProgress - startProgress) * easedProgress
-        setCoreModuleProgress(currentValue)
-        requestAnimationFrame(animate)
-      } else {
-        setCoreModuleProgress(endProgress)
-      }
-    }
-
-    requestAnimationFrame(animate)
   })
 
   const startTime = Date.now()

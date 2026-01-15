@@ -80,11 +80,21 @@ export const SelectContent = <T extends ValidComponent = "div">(
   const handleListboxRef = (el: HTMLElement) => {
     listboxRef = el
 
-    // Wait for next tick to ensure items are rendered
+    // Scroll the selected item into view within the dropdown only
+    // Use manual scroll calculation to avoid affecting parent scroll containers
     setTimeout(() => {
-      const selectedItem = listboxRef?.querySelector('[aria-selected="true"]')
-      if (selectedItem) {
-        selectedItem.scrollIntoView({ block: "center", behavior: "instant" })
+      const selectedItem = listboxRef?.querySelector(
+        '[aria-selected="true"]'
+      ) as HTMLElement | null
+      const scrollContainer = listboxRef?.parentElement
+      if (selectedItem && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect()
+        const itemRect = selectedItem.getBoundingClientRect()
+        const relativeTop =
+          itemRect.top - containerRect.top + scrollContainer.scrollTop
+        const centerOffset =
+          relativeTop - scrollContainer.clientHeight / 2 + itemRect.height / 2
+        scrollContainer.scrollTop = Math.max(0, centerOffset)
       }
     }, 0)
   }
@@ -93,15 +103,17 @@ export const SelectContent = <T extends ValidComponent = "div">(
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         class={cn(
-          "relative z-[100000] max-h-80 min-w-[8rem] overflow-y-auto rounded-md border border-darkSlate-500 bg-darkSlate-800 text-lightSlate-100 shadow-md data-[expanded]:animate-selectEnter data-[closed]:animate-selectLeave",
+          "relative z-[100000] min-w-[8rem] rounded-md border border-darkSlate-500 bg-darkSlate-800 text-lightSlate-100 shadow-md data-[expanded]:animate-selectEnter data-[closed]:animate-selectLeave",
           local.class
         )}
         {...rest}
       >
-        <SelectPrimitive.Listbox
-          ref={handleListboxRef}
-          class="p-1 focus-visible:outline-none"
-        />
+        <div class="max-h-80 overflow-y-auto">
+          <SelectPrimitive.Listbox
+            ref={handleListboxRef}
+            class="p-1 focus-visible:outline-none"
+          />
+        </div>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   )

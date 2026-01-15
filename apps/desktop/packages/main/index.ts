@@ -88,6 +88,7 @@ const RUNTIME_PATH_DEFAULT_NAME = "data"
 export let CURRENT_RUNTIME_PATH: string | null = null
 
 let win: BrowserWindow | null = null
+let lastCoreModuleProgress: number | null = null
 
 const getWin = () => {
   return win
@@ -439,6 +440,7 @@ const loadCoreModule: CoreModule = () =>
                 break
             }
 
+            lastCoreModuleProgress = progress
             getWin()?.webContents.send("coreModuleProgress", progress)
           }
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
@@ -976,6 +978,10 @@ ipcMain.handle("getCoreModule", async () => {
     logs: cm.type === "error" ? cm.logs : undefined,
     port: cm.type === "success" ? cm.result.port : undefined
   }
+})
+
+ipcMain.handle("getCurrentProgress", () => {
+  return lastCoreModuleProgress
 })
 
 app.whenReady().then(async () => {

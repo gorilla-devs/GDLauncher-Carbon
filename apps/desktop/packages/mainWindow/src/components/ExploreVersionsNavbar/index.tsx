@@ -52,10 +52,13 @@ const ExploreVersionsNavbar = (props: Props) => {
 
   const infiniteQuery = useInfiniteVersionsQuery()
 
-  // Helper to determine if modloader filter should be shown
-  // Currently only hides for resourcePack, easily extensible to other types
+  // Addon types that don't need modloader filtering
+  const NO_MODLOADER_TYPES = ["resourcePack", "shader", "world", "datapack"]
+
   const shouldShowModloaderFilter = () => {
-    return props.addonType !== "resourcePack"
+    return props.addonType
+      ? !NO_MODLOADER_TYPES.includes(props.addonType)
+      : true
   }
 
   const [overrideEnabled, setOverrideEnabled] = createSignal(
@@ -72,9 +75,13 @@ const ExploreVersionsNavbar = (props: Props) => {
     queryKey: ["instance.getInstanceDetails", instanceId()]
   }))
 
+  // Supported modloaders in GDLauncher
+  const SUPPORTED_MODLOADERS = ["forge", "fabric", "quilt", "neoforge"]
+
   const modloaders = () => {
-    const results = globalStore.modloaders.data
-    return ["", ...(results?.map((v) => v.toString()) || [])]
+    // Always show all supported modloaders
+    // The default selection is set in InfiniteScrollVersionsQueryWrapper based on instance
+    return ["", ...SUPPORTED_MODLOADERS]
   }
 
   const getModloaderLabel = (value: string | null | undefined) => {
@@ -158,6 +165,11 @@ const ExploreVersionsNavbar = (props: Props) => {
           value={infiniteQuery.query.gameVersion || ""}
           options={filteredMappedGameVersions()}
           disabled={!overrideEnabled()}
+          gutter={4}
+          sameWidth={true}
+          placement="bottom"
+          modal={false}
+          preventScroll={false}
           placeholder={
             <div class="flex items-center gap-2">
               <div class="i-hugeicons:tag-01" />
@@ -194,6 +206,11 @@ const ExploreVersionsNavbar = (props: Props) => {
             value={infiniteQuery.query.modLoaderType || ""}
             options={modloaders()}
             disabled={!overrideEnabled()}
+            gutter={4}
+            sameWidth={true}
+            placement="bottom"
+            modal={false}
+            preventScroll={false}
             placeholder={
               <div class="flex items-center gap-2">
                 <div class="i-hugeicons:tag-01" />

@@ -48,7 +48,7 @@ export const Progress = (props: Props) => {
   }
 
   const barClasses = () => {
-    const baseClasses = `h-full transition-all duration-300 ease-out ${mergedProps.color}`
+    const baseClasses = `h-full transition-all duration-400 ease-spring ${mergedProps.color}`
     const animationClasses = isIndeterminate()
       ? "w-full origin-[0%_50%] animate-loadingbar"
       : ""

@@ -8,6 +8,13 @@ import { useSearchParams } from "@solidjs/router"
 import useVersionsQuery from "@/pages/Mods/useVersionsQuery"
 import useSearchContext from "../SearchInputContext"
 import { VirtualizerHandle } from "virtua/lib/solid"
+import { FEUnifiedSearchType } from "@gd/core_module/bindings"
+
+// Addon types that don't support modloader filtering
+const supportsModloader = (type?: FEUnifiedSearchType) => {
+  const noModloaderTypes = ["resourcePack", "shader", "world", "datapack"]
+  return type ? !noModloaderTypes.includes(type) : true
+}
 
 export interface VersionRowType {
   data: VersionRowTypeData[]
@@ -47,6 +54,7 @@ interface Props {
   modplatform: "curseforge" | "modrinth"
   modId: string
   initialQuery?: Partial<typeof versionsQuery>
+  addonType?: FEUnifiedSearchType
 }
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>()
@@ -185,6 +193,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   createEffect(() => {
     const _instanceId = parseInt(searchParams.instanceId, 10)
     const instanceId = isNaN(_instanceId) ? undefined : _instanceId
+    const addonType = props.addonType
 
     searchContext?.setSelectedInstanceId(instanceId)
 
@@ -193,7 +202,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
         .query(["instance.getInstanceDetails", instanceId])
         .then((details) => {
           setQueryWrapper({
-            modLoaderType: details?.modloaders[0].type_,
+            modLoaderType: supportsModloader(addonType)
+              ? details?.modloaders[0].type_
+              : undefined,
             gameVersion: details?.version
           })
         })

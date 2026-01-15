@@ -21,8 +21,7 @@ import {
 } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import fetchData from "./changelog.data"
-import { CFFEFile, CFFEFileIndex } from "@gd/core_module/bindings"
-import { sortArrayByGameVersion } from "@/utils/mods"
+import { CFFEFile } from "@gd/core_module/bindings"
 import { format, formatDistanceToNowStrict } from "date-fns"
 
 const ChangelogCard = (props: {
@@ -211,22 +210,22 @@ const Changelog = () => {
         setOptionLabels(labels)
       }
     } else {
-      const sortedVersions = sortArrayByGameVersion(
-        routeData.modpackDetails.data?.data.latestFilesIndexes
-      )
+      // Use latestFiles for actual distinct file versions (not latestFilesIndexes which is per-game-version)
+      const files = routeData.modpackDetails.data?.data.latestFiles || []
       setChangelog(undefined)
       setReleaseDate(undefined)
       setIsLoadingChangelog(false)
 
-      const opts = (sortedVersions as CFFEFileIndex[]).map((file) =>
-        file.fileId.toString()
-      )
+      const opts = files.map((file) => file.id.toString())
       const labels = Object.fromEntries(
-        (sortedVersions as CFFEFileIndex[]).map((file) => [
-          file.fileId.toString(),
-          file.filename
-        ])
+        files.map((file) => [file.id.toString(), file.displayName])
       )
+
+      // Set default value to first option for CurseForge
+      if (opts.length > 0) {
+        setFileId(opts[0])
+      }
+
       setOptions(opts)
       setOptionLabels(labels)
     }
