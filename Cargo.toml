@@ -112,7 +112,10 @@ strip-ansi-escapes = "0.2.1"
 trash = "5.2.2"
 uuid = "1.16.0"
 winreg = "0.55.0"
-zip = "2.4.2"
+# wayland-sys with dlopen for runtime loading on Linux (avoids compile-time linking)
+wayland-sys = { version = "0.31", features = ["dlopen", "client"] }
+
+zip = "7.1.0"
 tempfile = "3.19.1"
 sentry = { version = "0.34.0", features = [
   "panic",
