@@ -1,0 +1,62 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Install Minecraft Fabric"
+  description="Learn how to install Fabric mod loader for Minecraft using GDLauncher. Quick and easy setup guide."
+  keywords="install fabric, minecraft fabric, fabric mod loader, how to install fabric minecraft, fabric mods, gdlauncher fabric"
+  lastUpdated="December 2024"
+>
+  <h2>What's Fabric?</h2>
+  <p>
+    Fabric is a lightweight mod loader that's become the go-to for performance mods and newer content. It updates faster than Forge when new Minecraft versions drop (sometimes within hours), which is why it's popular with players who want the latest features.
+  </p>
+  <p>
+    The big performance mods (Sodium, Lithium, Starlight) all started on Fabric. If you want your game to run better, Fabric is usually the way to go.
+  </p>
+
+  <h2>Setting up Fabric</h2>
+  <p>
+    Click the <strong>+</strong> button in GDLauncher, pick your Minecraft version, and choose <strong>Fabric</strong>. Use the latest stable Fabric loader version and create the instance.
+  </p>
+  <p>
+    One important thing: most Fabric mods need the <strong>Fabric API</strong> library to work. Open your instance, go to the <strong>Addons</strong> tab, search for "Fabric API", and click <strong>Download</strong>. Do this before adding other mods.
+  </p>
+
+  <h2>Essential mods</h2>
+  <p>
+    Once you have Fabric API, consider adding these performance mods right away:
+  </p>
+  <p>
+    Sodium massively improves rendering. Lithium optimizes game logic and physics. Starlight fixes the lighting engine. FerriteCore reduces memory usage. Together they can double or triple your FPS with zero gameplay changes.
+  </p>
+  <p>
+    For quality of life: Mod Menu gives you an in-game menu to configure mods. Sodium Extra adds more graphics options. Iris lets you run shaders without sacrificing Sodium's performance.
+  </p>
+
+  <h2>Fabric vs Forge</h2>
+  <p>
+    Fabric updates faster and has better performance mods. Forge has a larger mod library and most of the classic big content mods. Many popular mods now exist for both, but not all.
+  </p>
+  <p>
+    Choose based on the mods you want to play. If you're after optimization and newer content, Fabric's your pick. If you want specific Forge-only mods, go with Forge.
+  </p>
+
+  <h2>OptiFine replacement</h2>
+  <p>
+    OptiFine doesn't work with Fabric. Instead, use:
+  </p>
+  <p>
+    Sodium for performance. Iris for shaders. Continuity for connected textures. LambDynamicLights for dynamic lighting. These usually outperform OptiFine anyway.
+  </p>
+
+  <h2>Troubleshooting</h2>
+  <p>
+    Getting "missing Fabric API" errors? Install Fabric API from the mods browser. It's separate from the Fabric loader and required by almost everything.
+  </p>
+  <p>
+    Crashes on startup usually mean a mod is for the wrong version, the wrong loader (not actually a Fabric mod), or missing dependencies. Check the mod's page for requirements.
+  </p>
+
+</GuideLayout>

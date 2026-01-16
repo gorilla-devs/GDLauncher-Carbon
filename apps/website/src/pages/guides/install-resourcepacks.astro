@@ -1,0 +1,56 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Install Minecraft Resource Packs"
+  description="Learn how to install resource packs and texture packs in Minecraft using GDLauncher. Complete guide to customizing your game's appearance."
+  keywords="install resource pack minecraft, texture pack, how to install texture packs, minecraft resource pack guide, gdlauncher resource pack"
+  lastUpdated="December 2024"
+>
+  <h2>What resource packs do</h2>
+  <p>
+    Resource packs change how Minecraft looks without adding new content. They replace textures, sounds, music, fonts, and more. You can make the game look realistic, cartoony, medieval, modern, or anything in between. No mods required.
+  </p>
+  <p>
+    Some packs go for HD textures at 128x, 256x, or higher resolution. Others add connected textures so glass panes look seamless. Some swap out all the sounds. You can even stack multiple packs, using one for blocks and another for GUI.
+  </p>
+
+  <h2>Installing with GDLauncher</h2>
+  <p>
+    Open your instance and go to the <strong>Addons</strong> tab. Click <strong>Add Addons</strong>, then select <strong>Resource Packs</strong> from the dropdown on the left of the search bar. Browse packs from CurseForge and Modrinth, find something you like, and click <strong>Download</strong>.
+  </p>
+  <p>
+    Then launch the game, go to Options → Resource Packs, find your pack in the "Available" list, and click the arrow to move it to "Selected". Hit Done and the textures load.
+  </p>
+
+  <h2>Manual installation</h2>
+  <p>
+    Have a .zip file from somewhere? Right-click your instance, select <strong>More options</strong> → <strong>Open folder</strong>. Navigate into the <code>instance</code> folder, then the <code>resourcepacks</code> folder, and drop your .zip file there. Don't extract it.
+  </p>
+  <p>
+    After adding files manually, go back to the home screen and click on your instance again. GDLauncher will rescan and detect the new resource pack.
+  </p>
+
+  <h2>Stacking packs</h2>
+  <p>
+    You can use multiple packs at once. Packs higher in the list override textures from packs below them. This lets you mix a main texture pack with separate GUI, sound, or sky packs.
+  </p>
+
+  <h2>Performance considerations</h2>
+  <p>
+    High-resolution packs (512x, 1024x) need more RAM and a decent GPU. If you're already struggling for frames, stick to 32x or 64x packs. Some features like connected textures require OptiFine or the Continuity mod to work.
+  </p>
+
+  <h2>Troubleshooting</h2>
+  <p>
+    Pack not showing up? Make sure you enabled it in Options → Resource Packs. Check that it's for your Minecraft version.
+  </p>
+  <p>
+    Pink and black textures mean missing files. The pack might be outdated or corrupted. Try redownloading or look for an updated version.
+  </p>
+  <p>
+    Connected textures not connecting? You probably need OptiFine or Continuity. These features aren't built into vanilla Minecraft.
+  </p>
+
+</GuideLayout>

@@ -1,0 +1,105 @@
+---
+import { Image } from "astro:assets"
+import HeroDownload from "./HeroDownload"
+---
+
+<section class="relative h-[calc(100vh-4rem)] flex flex-col items-center overflow-hidden">
+  <!-- Background -->
+  <div class="absolute inset-0 bg-darkSlate-900">
+    <!-- Subtle radial glow at top -->
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
+    <!-- Grid pattern -->
+    <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+    <!-- Bottom fade -->
+    <div class="absolute inset-x-0 bottom-0 h-48" style="background: linear-gradient(to top, rgb(21,24,30), transparent);"></div>
+  </div>
+
+  <!-- Spacer to center hero content -->
+  <div class="flex-1"></div>
+
+  <div class="relative z-10 w-full max-w-7xl mx-auto px-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+      <!-- Left side: Text content -->
+      <div class="flex flex-col items-center text-center lg:items-start lg:text-left">
+        <!-- Main headline -->
+        <h1
+          class="text-4xl sm:text-5xl lg:text-6xl font-bold text-lightSlate-50 leading-tight mb-6"
+          data-scroll="fade-up"
+        >
+          A Better Way to Play
+          <span class="bg-gradient-to-r from-primary-300 via-primary-400 to-primary-500 bg-clip-text text-transparent">
+            Modded Minecraft
+          </span>
+        </h1>
+
+        <!-- Subheadline -->
+        <p
+          class="text-lg text-darkSlate-50 max-w-lg mb-8"
+          data-scroll="fade-up"
+          data-scroll-delay="100"
+        >
+          Browse CurseForge and Modrinth in one place. Install modpacks with a click.
+          GDLauncher handles Java, dependencies, and updates so you don't have to.
+        </p>
+
+        <!-- Download Section -->
+        <div class="mb-8" data-scroll="fade-up" data-scroll-delay="200">
+          <HeroDownload client:only="solid-js" />
+        </div>
+
+        <!-- GitHub link -->
+        <a
+          href="https://github.com/gorilla-devs/GDLauncher-Carbon"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-2 text-darkSlate-100 hover:text-lightSlate-50 transition-colors transition-transform duration-100 ease-spring active:scale-95"
+          data-scroll="fade-up"
+          data-scroll-delay="300"
+        >
+          <div class="i-simple-icons:github w-5 h-5"></div>
+          <span>Available on GitHub</span>
+        </a>
+      </div>
+
+      <!-- Right side: App screenshot -->
+      <div class="relative lg:pl-8" data-scroll="scale" data-scroll-delay="150">
+        <div class="parallax relative rounded-xl overflow-hidden bg-darkSlate-700/50 border border-darkSlate-600 shadow-2xl shadow-primary-500/10">
+          <Image
+            src="https://cdn.gdl.gg/assets/website-home-app-screenshot.jpg"
+            alt="GDLauncher interface showing modpack management"
+            width={1280}
+            height={720}
+            class="w-full h-auto"
+            loading="eager"
+          />
+        </div>
+
+        <!-- Decorative elements -->
+        <div class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary-500/5 rounded-full blur-3xl"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom spacer -->
+  <div class="flex-1"></div>
+</section>
+
+<script>
+  import vanilla from "vanilla-tilt"
+
+  document.addEventListener(
+    "astro:page-load",
+    () => {
+      const parallaxEl = document.querySelector(".parallax") as HTMLElement
+      if (parallaxEl) {
+        vanilla.init(parallaxEl, {
+          max: 5,
+          speed: 400,
+          glare: true,
+          "max-glare": 0.08
+        })
+      }
+    },
+    { once: false }
+  )
+</script>

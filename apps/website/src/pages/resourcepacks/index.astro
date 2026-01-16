@@ -1,0 +1,159 @@
+---
+/**
+ * Resource Packs Hub Page
+ */
+import BaseHead from "../../components/BaseHead.astro"
+import Header from "../../components/Header.astro"
+import Footer from "../../components/Footer.astro"
+import LoadingBar from "../../components/LoadingBar.astro"
+import Breadcrumb from "../../components/Breadcrumb.astro"
+import "@fontsource/ubuntu"
+import "@fontsource/ubuntu/500.css"
+import "@fontsource/ubuntu/700.css"
+
+Astro.locals.cache(300)
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead
+      title="Minecraft Resource Packs | GDLauncher"
+      description="Browse and install Minecraft resource packs and texture packs from CurseForge and Modrinth."
+      keywords="minecraft resource packs, texture packs, curseforge resource packs, modrinth resource packs, gdlauncher"
+    />
+  </head>
+
+  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
+    <LoadingBar />
+    <!-- Background layers -->
+    <div class="fixed inset-0 -z-10">
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+    </div>
+    <Header />
+
+    <main class="py-8">
+      <Breadcrumb items={[{ label: "Resource Packs" }]} maxWidth="max-w-6xl" />
+
+      <div class="max-w-6xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-12">
+        <div class="text-center mb-12">
+          <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
+            Minecraft
+            <span class="text-primary-300">Resource Packs</span>
+          </h1>
+          <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+            Resource packs change how Minecraft looks with new textures, sounds, and fonts.
+            No mods required - works with vanilla Minecraft.
+          </p>
+        </div>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">What are Resource Packs?</h2>
+          <p class="text-darkSlate-100">
+            Resource packs (formerly texture packs) replace Minecraft's default visuals and audio.
+            They can completely change the game's style without adding any new content.
+          </p>
+          <p class="text-darkSlate-100">Resource packs can include:</p>
+          <ul class="text-darkSlate-100">
+            <li><strong class="text-lightSlate-50">HD Textures</strong> - Higher resolution block and item textures</li>
+            <li><strong class="text-lightSlate-50">Stylized Looks</strong> - Cartoon, realistic, or themed appearances</li>
+            <li><strong class="text-lightSlate-50">Connected Textures</strong> - Seamless glass, bookshelves, and more</li>
+            <li><strong class="text-lightSlate-50">Custom Sounds</strong> - New music, ambient sounds, and effects</li>
+            <li><strong class="text-lightSlate-50">3D Models</strong> - Items and blocks with custom 3D shapes</li>
+          </ul>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">Resolution Tiers</h2>
+          <p class="text-darkSlate-100">
+            Resource packs come in different resolutions, measured in pixels per block face:
+          </p>
+          <ul class="text-darkSlate-100">
+            <li><strong class="text-lightSlate-50">16x</strong> (Vanilla default) - Runs on any hardware, classic pixel art style</li>
+            <li><strong class="text-lightSlate-50">32x</strong> - Subtle improvement, minimal performance impact</li>
+            <li><strong class="text-lightSlate-50">64x</strong> - Noticeable detail increase, needs decent hardware</li>
+            <li><strong class="text-lightSlate-50">128x</strong> - High detail, needs a good GPU</li>
+            <li><strong class="text-lightSlate-50">256x-512x</strong> - Extreme detail, needs powerful hardware and OptiFine or Continuity mod</li>
+          </ul>
+          <p class="text-darkSlate-100">
+            Higher resolutions use more VRAM. A 256x pack might use 2-4GB of VRAM compared to 500MB for vanilla textures.
+          </p>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto">
+          <h2 class="text-lightSlate-50">Advanced Features</h2>
+          <p class="text-darkSlate-100">
+            Modern resource packs can include advanced features that may require additional mods:
+          </p>
+          <ul class="text-darkSlate-100">
+            <li><strong class="text-lightSlate-50">Connected Textures</strong> - Glass and bookshelves blend seamlessly (requires OptiFine or Continuity mod)</li>
+            <li><strong class="text-lightSlate-50">Custom Item Textures (CIT)</strong> - Renamed items get unique textures (requires OptiFine or CIT Resewn mod)</li>
+            <li><strong class="text-lightSlate-50">Animated Textures</strong> - Flowing lava, waving plants, glowing effects</li>
+            <li><strong class="text-lightSlate-50">Custom Entity Models (CEM)</strong> - Reshaped mobs and items (requires OptiFine or Entity Model Features mod)</li>
+            <li><strong class="text-lightSlate-50">PBR/POM Textures</strong> - Realistic lighting and depth effects (requires shader support)</li>
+          </ul>
+          <p class="text-darkSlate-100">
+            Check the resource pack description to see if it requires any mods for full functionality.
+          </p>
+        </section>
+      </div>
+
+      <section class="mb-12">
+        <div class="bg-darkSlate-800 rounded-xl overflow-hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div class="p-8 lg:p-12">
+              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">Browse Resource Packs in GDLauncher</h2>
+              <p class="text-darkSlate-100 mb-6">
+                Find and install resource packs from CurseForge and Modrinth directly in GDLauncher.
+                Transform your game's look with just a few clicks.
+              </p>
+              <ul class="flex flex-col gap-3 mb-8">
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>Browse thousands of texture packs</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>Preview packs before installing</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>Easy management and updates</span>
+                </li>
+              </ul>
+              <a href="/download/windows" data-astro-prefetch="false" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/></svg>
+                Download GDLauncher
+              </a>
+            </div>
+            <div class="relative">
+              <img
+                src="https://cdn.gdl.gg/assets/website-browse-resourcepacks.jpg"
+                alt="GDLauncher resource pack browser interface"
+                class="w-full h-auto"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-8 bg-darkSlate-800 rounded-xl p-8 md:p-12">
+        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">Learn More</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <a href="/guides/install-resourcepacks" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">How to Install Resource Packs</span>
+          </a>
+          <a href="/guides/install-shaders" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">How to Install Shaders</span>
+          </a>
+        </div>
+      </section>
+      </div>
+    </main>
+
+    <Footer />
+  </body>
+</html>

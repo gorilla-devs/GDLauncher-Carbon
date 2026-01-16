@@ -1,0 +1,77 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="Minecraft Performance Mods Guide"
+  description="Boost your FPS with these essential Minecraft performance mods. Comprehensive guide to optimization mods."
+  keywords="minecraft performance mods, fps mods, minecraft optimization, sodium, optifine alternative, boost minecraft fps, lag fix minecraft"
+  lastUpdated="December 2024"
+>
+  <h2>Why performance mods matter</h2>
+  <p>
+    Vanilla Minecraft's rendering is not well optimized. Performance mods can realistically double or triple your FPS. That means smoother gameplay, higher render distance without lag, and the ability to run more mods without your computer choking.
+  </p>
+
+  <h2>The Fabric stack</h2>
+  <p>
+    Fabric has the best performance mods, and they all work together. Install all of these:
+  </p>
+
+  <h3>Sodium</h3>
+  <p>
+    The single most important mod. It rewrites Minecraft's entire rendering engine. Expect 2-5x FPS improvement depending on your system. Also adds better graphics settings menus.
+  </p>
+
+  <h3>Lithium</h3>
+  <p>
+    Optimizes game physics, mob AI, and world generation. Works silently in the background without changing any gameplay. Reduces server-side lag too.
+  </p>
+
+  <h3>Phosphor or Starlight</h3>
+  <p>
+    Fixes Minecraft's slow lighting engine. Phosphor is more conservative, Starlight is more aggressive. Pick one. Starlight is usually faster but occasionally conflicts with other mods.
+  </p>
+
+  <h3>FerriteCore</h3>
+  <p>
+    Reduces memory usage significantly. If you play modpacks, this is essential. Less RAM used means fewer garbage collection pauses (those annoying stutters).
+  </p>
+
+  <h3>LazyDFU</h3>
+  <p>
+    Makes the game start up faster by deferring work that doesn't need to happen immediately. No downsides.
+  </p>
+
+  <h2>Extra optimizations</h2>
+  <p>
+    ModernFix patches various memory leaks and loading issues. Entity Culling stops rendering mobs you can't see. ImmediatelyFast speeds up GUI and text rendering. Krypton optimizes networking for multiplayer. More Culling extends culling to particles and block entities.
+  </p>
+  <p>
+    You don't need all of these, but they help. Add them if you want every bit of performance.
+  </p>
+
+  <h2>Forge options</h2>
+  <p>
+    Most Fabric performance mods have Forge ports. Embeddium is Sodium for Forge. Canary is Lithium for Forge. FerriteCore works on both. OptiFine is the classic all-in-one, but it conflicts with many mods and usually performs worse than Sodium-based alternatives now.
+  </p>
+
+  <h2>Don't want to pick mods yourself?</h2>
+  <p>
+    Install a performance modpack instead. Fabulously Optimized bundles everything with OptiFine-like features. Simply Optimized is minimal and focused. These give you the full performance stack without manual setup.
+  </p>
+
+  <h2>Settings that help</h2>
+  <p>
+    Beyond mods, tweak your video settings. Render distance of 8-12 chunks is enough for most gameplay. Use Fast graphics instead of Fancy. Turn particles to Minimal. Disable clouds or set them to Fast. Turn off VSync unless you're getting screen tearing.
+  </p>
+  <p>
+    System-wise: update your graphics drivers, close other apps while playing, use fullscreen mode, and disable overlays from Discord, Steam, etc.
+  </p>
+
+  <h2>Compatibility notes</h2>
+  <p>
+    Sodium and OptiFine don't work together. Choose one. Don't use both Phosphor and Starlight. Most other performance mods play nice with each other.
+  </p>
+
+</GuideLayout>

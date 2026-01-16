@@ -1,0 +1,62 @@
+---
+---
+
+<div id="page-loading-bar" transition:persist></div>
+
+<style is:global>
+  #page-loading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, rgb(var(--primary-400)), rgb(var(--primary-500)));
+    z-index: 9999;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s ease;
+    pointer-events: none;
+  }
+
+  #page-loading-bar.loading {
+    transform: scaleX(0.7);
+    transition: transform 8s cubic-bezier(0.1, 0.5, 0.1, 1);
+  }
+
+  #page-loading-bar.complete {
+    transform: scaleX(1);
+    transition: transform 0.1s ease;
+  }
+
+  #page-loading-bar.fade-out {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+</style>
+
+<script is:inline>
+  (function() {
+    if (window.__loadingBarInitialized) return;
+    window.__loadingBarInitialized = true;
+
+    document.addEventListener('astro:before-preparation', () => {
+      const bar = document.getElementById('page-loading-bar');
+      if (!bar) return;
+      bar.classList.remove('complete', 'fade-out', 'loading');
+      bar.style.cssText = 'transition: none; transform: scaleX(0); opacity: 1;';
+      void bar.offsetWidth;
+      bar.style.cssText = '';
+      bar.classList.add('loading');
+    });
+
+    document.addEventListener('astro:after-swap', () => {
+      const bar = document.getElementById('page-loading-bar');
+      if (!bar) return;
+      bar.classList.remove('loading');
+      bar.classList.add('complete');
+      setTimeout(() => {
+        bar.classList.add('fade-out');
+      }, 100);
+    });
+  })();
+</script>

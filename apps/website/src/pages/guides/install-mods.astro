@@ -1,0 +1,54 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Install Minecraft Mods"
+  description="Learn how to install Minecraft mods using GDLauncher. Complete guide to finding and installing mods from CurseForge and Modrinth."
+  keywords="install mods minecraft, how to install mods, minecraft mod guide, curseforge mods, modrinth mods, gdlauncher mods, forge mods, fabric mods"
+  lastUpdated="December 2024"
+>
+  <h2>What are mods?</h2>
+  <p>
+    Mods add new features to Minecraft that the base game doesn't have. Unlike modpacks (which bundle many mods together), individual mods focus on one thing: maybe new mobs, better automation, magic spells, or just smoother performance.
+  </p>
+  <p>
+    You'll find mods for pretty much anything: new items and blocks, tech and machinery, magic systems, quality-of-life tweaks, and performance improvements. The Minecraft modding community has been building these for over a decade.
+  </p>
+
+  <h2>Mod loaders</h2>
+  <p>
+    Mods need a mod loader to work. The two main ones are Forge and Fabric, and they're not compatible with each other. A Forge mod won't work on Fabric and vice versa. Always check what loader a mod needs before downloading.
+  </p>
+  <p>
+    Forge has been around longer and has the biggest mod library. Fabric is newer, lighter, and updates faster when new Minecraft versions come out. NeoForge is a modern fork of Forge, and Quilt is compatible with most Fabric mods. Pick whichever has the mods you want.
+  </p>
+
+  <h2>Installing mods with GDLauncher</h2>
+  <p>
+    First, you need an instance with a mod loader installed. Click the <strong>+</strong> button in GDLauncher, pick your Minecraft version, and choose Forge or Fabric as the mod loader. If you already have an instance set up, skip this step.
+  </p>
+  <p>
+    Open your instance and go to the <strong>Addons</strong> tab. Click <strong>Add Addons</strong> and you'll get a browser that searches both CurseForge and Modrinth at once. Find what you want and click <strong>Download</strong>. GDLauncher grabs any dependencies automatically.
+  </p>
+  <p>
+    That's it. Launch the game and your mods are ready.
+  </p>
+
+  <h2>Manual installation</h2>
+  <p>
+    Got a mod file (.jar) from somewhere else? Right-click your instance, select <strong>More options</strong> → <strong>Open folder</strong>. Navigate into the <code>instance</code> folder, then the <code>mods</code> folder, and drop your .jar file there.
+  </p>
+  <p>
+    After adding files manually, go back to the home screen and click on your instance again. GDLauncher will rescan and detect the new mods.
+  </p>
+
+  <h2>When things go wrong</h2>
+  <p>
+    If a mod isn't working, the usual suspects are version mismatches. Make sure the mod is for your exact Minecraft version and the right mod loader. Check the mod's page for any dependencies you might be missing.
+  </p>
+  <p>
+    Crashes on launch usually mean a conflict somewhere. Remove the most recently added mods one at a time until you find the culprit. Sometimes two mods just don't play nice together. If you have a ton of mods, you might also need more RAM (see our <a href="/guides/allocate-more-ram">RAM guide</a>).
+  </p>
+
+</GuideLayout>

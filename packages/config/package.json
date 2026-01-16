@@ -7,7 +7,16 @@
     ".": {
       "import": "./dist/index.js"
     },
-    "./tsconfig.json": "./tsconfig.json"
+    "./tsconfig.json": "./tsconfig.json",
+    "./unocss.theme": {
+      "import": "./dist/unocss.theme.js"
+    },
+    "./unocss.config": {
+      "import": "./dist/unocss.config.js"
+    },
+    "./unocss.icons": {
+      "import": "./dist/unocss.icons.js"
+    }
   },
   "scripts": {
     "dev": "tsc -p . -m esnext",

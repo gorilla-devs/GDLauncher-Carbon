@@ -29,8 +29,10 @@ const button = cva("button", {
         "gap-2",
         "justify-center",
         "relative",
+        "active:scale-95",
+        "ease-spring",
       ],
-      secondary: ["bg-bluegd-600", "text-white", "rounded-xsgd"],
+      secondary: ["bg-bluegd-600", "text-white", "rounded-xsgd", "active:scale-95", "ease-spring", "transition-transform", "duration-100"],
       transparent: [
         "bg-transparent",
         "text-bluegd-500",
@@ -38,6 +40,10 @@ const button = cva("button", {
         "border-[1px]",
         "border-bluegd-500",
         "rounded-smgd",
+        "active:scale-95",
+        "ease-spring",
+        "transition-transform",
+        "duration-100",
       ],
     },
     size: {

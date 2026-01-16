@@ -1,0 +1,63 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Allocate More RAM to Minecraft"
+  description="Improve Minecraft performance by allocating more memory. Step-by-step guide for GDLauncher users."
+  keywords="allocate more ram minecraft, minecraft ram, increase minecraft memory, minecraft lag fix, gdlauncher ram settings, minecraft performance"
+  lastUpdated="December 2024"
+>
+  <h2>When you need more RAM</h2>
+  <p>
+    Vanilla Minecraft runs fine on 2-4GB. But add mods and everything changes. A light modpack with 50 mods wants 4-6GB. Medium packs with 100+ mods need 6-8GB. Big packs like All The Mods or GregTech: New Horizons can need 10-16GB.
+  </p>
+  <p>
+    Signs you need more RAM: the game stutters or freezes periodically, you get out-of-memory crashes, or the loading screen takes forever.
+  </p>
+
+  <h2>How much to allocate</h2>
+  <p>
+    Check what the modpack recommends. If there's no recommendation, start with 6GB for medium packs and 8GB for large ones. Don't allocate more than you need. Too much RAM can actually cause worse performance because Java spends longer on garbage collection.
+  </p>
+  <p>
+    Never allocate all your system RAM. Leave at least 4GB for your operating system and other programs. If your computer has 16GB total, 8-10GB for Minecraft is the practical max.
+  </p>
+
+  <h2>Changing RAM in GDLauncher</h2>
+  <p>
+    For all instances: open Settings (gear icon), go to Java, and adjust the Maximum Memory slider. This becomes the default for new instances.
+  </p>
+  <p>
+    For one specific instance: right-click the instance, open Settings, go to the Java tab, enable "Override Global Settings", and set the memory there. This is useful when one modpack needs more than your default.
+  </p>
+
+  <h2>Checking your system</h2>
+  <p>
+    On Windows: Ctrl + Shift + Esc opens Task Manager. Click Performance, then Memory. On Mac: Apple menu → About This Mac shows memory. On Linux: run <code>free -h</code> in terminal.
+  </p>
+  <p>
+    You need 64-bit Java to allocate more than about 1.5GB. 32-bit Java is limited. GDLauncher handles Java for you, so this usually isn't an issue unless you've manually configured something.
+  </p>
+
+  <h2>When more RAM doesn't help</h2>
+  <p>
+    If the game is still laggy after allocating plenty of RAM, check the F3 debug screen in-game. It shows how much memory Minecraft is actually using. If it's not near the limit, RAM isn't your bottleneck.
+  </p>
+  <p>
+    The problem might be your GPU (try performance mods like Sodium), your CPU (try Lithium), or just too many mods for your hardware. Not every computer can run every modpack.
+  </p>
+
+  <h2>Garbage collection stutters</h2>
+  <p>
+    If you get periodic freezes (usually half a second to several seconds), that's garbage collection. Ironically, allocating less RAM sometimes helps because Java has less to clean up. Also try FerriteCore mod, which reduces memory usage.
+  </p>
+  <p>
+    For more control, you can use optimized Java arguments. Here's a set that works well for Minecraft:
+  </p>
+  <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+  <p>
+    Paste these into the Java arguments field in GDLauncher's settings. They optimize how Java manages memory for Minecraft specifically.
+  </p>
+
+</GuideLayout>

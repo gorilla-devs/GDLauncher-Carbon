@@ -1,32 +1,44 @@
 ---
 import composeCDNAssetLink from "../utils/composeCDNAssetLink";
+import "../styles/theme.css";
 import "../styles/global.css";
 import { ViewTransitions } from "astro:transitions";
 export interface Props {
   title: string;
   description: string;
   image?: string;
+  keywords?: string;
+  canonicalUrl?: string;
 }
 
-const { title, description, image } = Astro.props as Props;
+const { title, description, image, keywords, canonicalUrl } = Astro.props as Props;
+const siteUrl = Astro.site?.toString() || "https://gdlauncher.com";
+const currentUrl = canonicalUrl || new URL(Astro.url.pathname, siteUrl).toString();
 ---
 
+<!-- Primary Meta Tags -->
 <title>{title}</title>
-<meta name="description" content={title} />
-<meta name="og:title" property="og:title" content={title} />
-<meta property="og:type" content="website" />
-<meta property="og:description" content={description} />
+<meta name="description" content={description} />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta
-  property="og:image"
-  content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"}
-/>
+{keywords && <meta name="keywords" content={keywords} />}
+<link rel="canonical" href={currentUrl} />
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content={currentUrl} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"} />
+<meta property="og:site_name" content="GDLauncher" />
+
+<!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:url" content={currentUrl} />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
-<meta
-  property="twitter:image"
-  content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"}
-/>
+<meta name="twitter:image" content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"} />
+
+<!-- Favicon -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
 
 <ViewTransitions />

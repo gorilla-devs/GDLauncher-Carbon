@@ -1,0 +1,200 @@
+---
+/**
+ * ComparisonTable - GDLauncher vs other launchers comparison
+ */
+
+const launchers = [
+  { name: "GDLauncher", highlight: true },
+  { name: "Modrinth App" },
+  { name: "CurseForge App" },
+  { name: "Prism Launcher" },
+  { name: "ATLauncher" },
+  { name: "MultiMC" },
+  { name: "Official" }
+]
+
+const features: Array<{ name: string; values: (boolean | string)[]; note?: string }> = [
+  {
+    name: "CurseForge Support",
+    values: [true, false, true, "partial", "partial", "partial", false]
+  },
+  {
+    name: "Modrinth Support",
+    values: [true, true, false, true, true, true, false]
+  },
+  {
+    name: "Auto Java Management",
+    values: [true, true, true, false, true, false, true]
+  },
+  {
+    name: "Mods Auto Updater",
+    values: [true, true, true, false, true, false, false]
+  },
+  {
+    name: "Modpacks Auto Updater",
+    values: [true, true, true, false, true, false, false]
+  },
+  {
+    name: "Multi-Instance",
+    values: [true, true, true, true, true, true, false]
+  },
+  {
+    name: "REDACTED",
+    values: ["?", "?", "?", "?", "?", "?", "?"]
+  },
+  {
+    name: "Modern UI",
+    values: [true, true, true, false, false, false, false]
+  },
+  {
+    name: "Pays Addon Authors",
+    values: [true, true, true, false, false, false, false]
+  },
+  {
+    name: "Extremely Lightweight",
+    values: [false, false, false, true, false, true, false]
+  },
+  {
+    name: "Cloud Saves Sync",
+    values: ["coming-soon", false, false, false, false, false, false]
+  }
+]
+
+function getValueDisplay(value: boolean | string) {
+  if (value === true) {
+    return { icon: "check", class: "text-green-400", label: null }
+  } else if (value === false) {
+    return { icon: "x", class: "text-darkSlate-400", label: null }
+  } else if (value === "partial") {
+    return { icon: "check", class: "text-yellow-400", label: "requires workaround" }
+  } else if (value === "coming-soon") {
+    return { icon: "clock", class: "text-yellow-400", label: "coming soon" }
+  } else if (value === "?") {
+    return { icon: "?", class: "text-darkSlate-300", label: null }
+  } else {
+    return { icon: "x", class: "text-darkSlate-400", label: null }
+  }
+}
+---
+
+<section class="py-24 bg-darkSlate-900">
+  <div class="max-w-6xl mx-auto px-4">
+    <!-- Section header -->
+    <div class="text-center mb-16" data-scroll="fade-up">
+      <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
+        How We
+        <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
+          Compare
+        </span>
+      </h2>
+      <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+        See how GDLauncher stacks up against other popular Minecraft launchers.
+      </p>
+    </div>
+
+    <!-- Comparison table -->
+    <div class="overflow-x-auto" data-scroll="scale" data-scroll-delay="150">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr>
+            <th class="text-left p-4 text-darkSlate-100 font-medium border-b border-darkSlate-700">
+              Feature
+            </th>
+            {launchers.map((launcher) => (
+              <th
+                class={`p-4 text-center font-semibold border-b border-darkSlate-700 ${
+                  launcher.highlight
+                    ? "text-primary-300 bg-primary-500/5"
+                    : "text-lightSlate-100"
+                }`}
+              >
+                {launcher.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {features.map((feature, rowIndex) => (
+            <tr class={rowIndex % 2 === 0 ? "bg-darkSlate-800/30" : ""}>
+              <td class="p-4 text-lightSlate-100 border-b border-darkSlate-700/50">
+                {feature.name}
+                {feature.note && (
+                  <span class="block text-xs text-darkSlate-200 mt-1">{feature.note}</span>
+                )}
+              </td>
+              {feature.values.map((value, colIndex) => {
+                const display = getValueDisplay(value)
+                return (
+                  <td
+                    class={`p-4 text-center border-b border-darkSlate-700/50 ${
+                      colIndex === 0 ? "bg-primary-500/5" : ""
+                    }`}
+                  >
+                    {display.icon === "check" && (
+                      <div class="flex flex-col items-center gap-1">
+                        <svg class={`w-5 h-5 ${display.class}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                          <path d="M5 12l5 5L20 7"/>
+                        </svg>
+                        {display.label && (
+                          <span class="text-xs text-darkSlate-200">{display.label}</span>
+                        )}
+                      </div>
+                    )}
+                    {display.icon === "x" && (
+                      <svg class={`w-5 h-5 mx-auto ${display.class}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                      </svg>
+                    )}
+                    {display.icon === "clock" && (
+                      <div class="flex flex-col items-center gap-1">
+                        <svg class={`w-5 h-5 ${display.class}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <path d="M12 6v6l4 2"/>
+                        </svg>
+                        {display.label && (
+                          <span class="text-xs text-darkSlate-200">{display.label}</span>
+                        )}
+                      </div>
+                    )}
+                    {display.icon === "?" && (
+                      <span class={`text-lg font-bold ${display.class}`}>?</span>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center mt-12" data-scroll="fade-up" data-scroll-delay="300">
+      <a
+        href="/download/windows"
+        data-astro-prefetch="false"
+        class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95"
+      >
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+        Try GDLauncher Today
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  table {
+    min-width: 700px;
+  }
+
+  @media (max-width: 768px) {
+    .overflow-x-auto {
+      margin-left: -1rem;
+      margin-right: -1rem;
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+</style>

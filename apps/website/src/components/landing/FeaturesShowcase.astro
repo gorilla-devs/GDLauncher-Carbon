@@ -1,0 +1,141 @@
+---
+/**
+ * FeaturesShowcase - Alternating feature sections with images
+ * Each feature has an image on one side and description on the other
+ */
+
+const brandColors: Record<string, string> = {
+  "CurseForge": "#F16436",
+  "Modrinth": "#1bd96a"
+}
+
+const features = [
+  {
+    id: "one-click-install",
+    title: "One-Click Modpack Install",
+    description: "Pick a modpack from CurseForge or Modrinth and click install. GDLauncher downloads everything, sets up the mod loader, and configures Java. You just hit play.",
+    bullets: [
+      "Search both platforms at once",
+      "Dependencies handled automatically",
+      "Downloads in parallel for speed"
+    ],
+    image: "https://cdn.gdl.gg/assets/features/one-click-install.jpg"
+  },
+  {
+    id: "instance-sharing",
+    title: "Instance Sharing",
+    description: "Got your instance set up perfectly? Share it with friends using a code. They paste the code, GDLauncher recreates your exact setup, and everyone's playing the same thing.",
+    bullets: [
+      "Works with custom configs and mod tweaks",
+      "One code, one click",
+      "No manual file sharing"
+    ],
+    image: "https://cdn.gdl.gg/assets/features/instance-sharing.jpg"
+  },
+  {
+    id: "auto-java",
+    title: "Java Just Works",
+    description: "Different Minecraft versions need different Java versions. GDLauncher figures out which one and downloads it. You never have to think about Java again.",
+    bullets: [
+      "Right version for each instance",
+      "Downloaded and configured automatically",
+      "No system Java conflicts"
+    ],
+    image: "https://cdn.gdl.gg/assets/features/auto-java.jpg"
+  },
+  {
+    id: "mod-management",
+    title: "Mod Updates Without the Hassle",
+    description: "GDLauncher tracks which mods have updates available. Update them one by one or all at once. Dependencies update too.",
+    bullets: [
+      "See what's outdated at a glance",
+      "Update with one click",
+      "Roll back if something breaks"
+    ],
+    image: "https://cdn.gdl.gg/assets/features/mod-management.jpg"
+  },
+  {
+    id: "multi-instance",
+    title: "As Many Instances as You Want",
+    description: "Play different modpacks, different Minecraft versions, different mods. Each instance is separate. Organize them in groups.",
+    bullets: [
+      "Group instances however you like",
+      "Duplicate to experiment",
+      "Import from other launchers"
+    ],
+    image: "https://cdn.gdl.gg/assets/features/multi-instance.jpg"
+  }
+]
+---
+
+<section class="py-24 bg-darkSlate-800">
+  <div class="max-w-6xl mx-auto px-4">
+    <!-- Section header -->
+    <div class="text-center mb-20" data-scroll="fade-up">
+      <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
+        What
+        <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
+          GDLauncher
+        </span>
+        Does
+      </h2>
+      <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+        The boring stuff is automated. You focus on playing.
+      </p>
+    </div>
+
+    <!-- Feature rows -->
+    <div class="space-y-24">
+      {features.map((feature, index) => (
+        <div
+          class={`grid grid-cols-1 lg:grid-cols-2 gap-12 items-center ${
+            index % 2 === 1 ? "lg:flex-row-reverse" : ""
+          }`}
+        >
+          <!-- Feature image -->
+          <div
+            class={index % 2 === 1 ? "lg:order-2" : ""}
+            data-scroll={index % 2 === 0 ? "slide-left" : "slide-right"}
+          >
+            <div class="relative aspect-video rounded-xl overflow-hidden bg-darkSlate-700/50 border border-darkSlate-600 shadow-xl shadow-black/20">
+              <img
+                src={feature.image}
+                alt={feature.title}
+                class="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+          </div>
+
+          {/* Text content */}
+          <div
+            class={index % 2 === 1 ? "lg:order-1" : ""}
+            data-scroll={index % 2 === 0 ? "slide-right" : "slide-left"}
+            data-scroll-delay="100"
+          >
+            <h3 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">
+              {feature.title}
+            </h3>
+            <p class="text-darkSlate-100 text-lg mb-6">
+              {feature.description.split(/(CurseForge|Modrinth)/).map((part) =>
+                brandColors[part]
+                  ? <span style={`color: ${brandColors[part]}`}>{part}</span>
+                  : part
+              )}
+            </p>
+            <ul class="flex flex-col gap-3">
+              {feature.bullets.map((bullet) => (
+                <li class="flex items-start gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12l5 5L20 7"/>
+                  </svg>
+                  <span>{bullet}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

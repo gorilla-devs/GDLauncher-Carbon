@@ -1,0 +1,43 @@
+---
+import type { GetStaticPaths } from "astro"
+import AddonInstallLayout from "../../../components/AddonInstallLayout.astro"
+import { fetchTopCurseForgeAddons } from "../../../lib/api/curseforge"
+import type { AddonInfo } from "../../../lib/api/types"
+import { marked } from "marked"
+
+import shadersInstructions from "../../../content/addon-instructions/shaders.md?raw"
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const apiKey = import.meta.env.CURSEFORGE_API_KEY
+  if (!apiKey) {
+    console.warn("CURSEFORGE_API_KEY not set, skipping CurseForge shaders pages")
+    return []
+  }
+
+  const limit = import.meta.env.DEV ? 5 : 1000
+  const addons = await fetchTopCurseForgeAddons("shaders", apiKey, limit)
+
+  return addons.map((addon) => ({
+    params: { slug: addon.slug },
+    props: { addon },
+  }))
+}
+
+interface Props {
+  addon: AddonInfo
+}
+
+const { addon } = Astro.props
+const instructionsHtml = await marked(shadersInstructions)
+---
+
+<AddonInstallLayout
+  addonName={addon.name}
+  addonSlug={addon.slug}
+  addonType="shaders"
+  platform="curseforge"
+  imageUrl={addon.imageUrl}
+  websiteUrl={addon.websiteUrl}
+>
+  <Fragment set:html={instructionsHtml} />
+</AddonInstallLayout>

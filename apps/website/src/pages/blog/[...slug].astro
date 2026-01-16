@@ -16,22 +16,6 @@ const post = Astro.props;
 const { Content } = await post.render();
 ---
 
-<style>
-  body {
-    font-family: "Ubuntu", sans-serif;
-    /* background-color: rgba(29, 32, 40, 1); */
-    background-image: linear-gradient(
-        rgba(23, 29, 39, 0.3),
-        /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
-      ),
-      url("../../assets/patern.svg");
-
-    background-color: rgba(29, 32, 40, 1);
-
-    color: white;
-  }
-</style>
-
 <BlogPost {...post.data}>
   <Content />
 </BlogPost>

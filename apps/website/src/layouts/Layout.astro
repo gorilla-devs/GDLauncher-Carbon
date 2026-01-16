@@ -4,7 +4,9 @@ import BaseHead from "../components/BaseHead.astro";
 import "@fontsource/ubuntu";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
+import LoadingBar from "../components/LoadingBar.astro";
 import FormattedDate from "../components/FormattedDate.astro";
+import ParticleBackground from "../components/ParticleBackground.astro";
 
 type Props = CollectionEntry<"blog">["data"];
 
@@ -15,21 +17,10 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
   <head>
     <BaseHead title={title} description={description} />
     <style>
-      body {
-        font-family: "Ubuntu", sans-serif;
-        /* background-color: rgba(29, 32, 40, 1); */
-        background-image: linear-gradient(
-            rgba(23, 29, 39, 0.3),
-            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
-          ),
-          url("../assets/patern.svg");
-
-        /* background-repeat: repeat-x; */
-        background-color: rgba(29, 32, 40, 1);
-      }
       main {
         width: 960px;
         margin: 0 auto;
+        padding-top: 4rem;
       }
       .hero-image img {
         display: block;
@@ -38,7 +29,14 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
       }
     </style>
   </head>
-  <body>
+  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
+    <LoadingBar />
+    <!-- Background layers -->
+    <div class="fixed inset-0 -z-10">
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+    </div>
+    <ParticleBackground />
     <Header />
     <main>
       <article>

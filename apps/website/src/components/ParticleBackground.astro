@@ -1,0 +1,267 @@
+---
+// ParticleBackground.astro
+// Grid laser animation - lasers travel along the 64px grid lines
+---
+
+<canvas id="laser-canvas" class="fixed inset-0 pointer-events-none" style="z-index: -5;"></canvas>
+
+<script>
+  type Direction = 'up' | 'down' | 'left' | 'right';
+
+  interface Laser {
+    x: number;
+    y: number;
+    direction: Direction;
+    speed: number;
+    length: number;
+    opacity: number;
+    gridLine: number;
+  }
+
+  function initLasers() {
+    const bgContainer = document.querySelector('.fixed.inset-0.-z-10');
+    if (!bgContainer) return;
+
+    const canvas = document.getElementById('laser-canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Configuration
+    const GRID_SIZE = 64;
+    const LASER_COUNT = 8;
+    const lasers: Laser[] = [];
+    let animationId: number | null = null;
+    let isVisible = true;
+
+    function resize() {
+      // Use the bgContainer's size directly
+      const rect = bgContainer.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+    }
+
+    function getRandomDirection(): Direction {
+      const directions: Direction[] = ['up', 'down', 'left', 'right'];
+      return directions[Math.floor(Math.random() * directions.length)];
+    }
+
+    function getCanvasWidth() { return canvas.width; }
+    function getCanvasHeight() { return canvas.height; }
+
+    function getGridLines(isHorizontal: boolean): number[] {
+      const max = isHorizontal ? getCanvasHeight() : getCanvasWidth();
+      const lines: number[] = [];
+      for (let i = GRID_SIZE; i < max; i += GRID_SIZE) {
+        lines.push(i);
+      }
+      return lines;
+    }
+
+    function createLaser(direction?: Direction): Laser {
+      const dir = direction || getRandomDirection();
+      const isHorizontal = dir === 'left' || dir === 'right';
+      const gridLines = getGridLines(!isHorizontal);
+      const gridLine = gridLines[Math.floor(Math.random() * gridLines.length)] || GRID_SIZE;
+
+      const length = Math.random() * 40 + 20; // 20-60px
+      const speed = Math.random() * 1.5 + 0.5; // 0.5-2 px/frame
+      const opacity = Math.random() * 0.15 + 0.1; // 0.1-0.25 (very subtle)
+
+      let x: number, y: number;
+
+      switch (dir) {
+        case 'right':
+          x = -length;
+          y = gridLine;
+          break;
+        case 'left':
+          x = getCanvasWidth() + length;
+          y = gridLine;
+          break;
+        case 'down':
+          x = gridLine;
+          y = -length;
+          break;
+        case 'up':
+          x = gridLine;
+          y = getCanvasHeight() + length;
+          break;
+      }
+
+      return { x, y, direction: dir, speed, length, opacity, gridLine };
+    }
+
+    function init() {
+      lasers.length = 0;
+      for (let i = 0; i < LASER_COUNT; i++) {
+        const laser = createLaser();
+        // Randomize initial position so they don't all start at edges
+        const progress = Math.random();
+        switch (laser.direction) {
+          case 'right':
+            laser.x = -laser.length + progress * (getCanvasWidth() + laser.length * 2);
+            break;
+          case 'left':
+            laser.x = getCanvasWidth() + laser.length - progress * (getCanvasWidth() + laser.length * 2);
+            break;
+          case 'down':
+            laser.y = -laser.length + progress * (getCanvasHeight() + laser.length * 2);
+            break;
+          case 'up':
+            laser.y = getCanvasHeight() + laser.length - progress * (getCanvasHeight() + laser.length * 2);
+            break;
+        }
+        lasers.push(laser);
+      }
+    }
+
+    function drawLaser(laser: Laser) {
+      const { x, y, direction, length, opacity } = laser;
+
+      let startX: number, startY: number, endX: number, endY: number;
+
+      // Calculate start (head) and end (tail) positions
+      switch (direction) {
+        case 'right':
+          startX = x;
+          startY = y;
+          endX = x - length;
+          endY = y;
+          break;
+        case 'left':
+          startX = x;
+          startY = y;
+          endX = x + length;
+          endY = y;
+          break;
+        case 'down':
+          startX = x;
+          startY = y;
+          endX = x;
+          endY = y - length;
+          break;
+        case 'up':
+          startX = x;
+          startY = y;
+          endX = x;
+          endY = y + length;
+          break;
+      }
+
+      // Create gradient from head (bright) to tail (transparent)
+      const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+      gradient.addColorStop(0, `rgba(62, 133, 208, ${opacity})`); // Head - accent blue
+      gradient.addColorStop(0.3, `rgba(43, 107, 177, ${opacity * 0.7})`); // Primary blue
+      gradient.addColorStop(1, `rgba(43, 107, 177, 0)`); // Tail - transparent
+
+      // Draw subtle glow
+      ctx.save();
+      ctx.shadowColor = 'rgba(62, 133, 208, 0.3)';
+      ctx.shadowBlur = 4;
+
+      // Draw the laser line
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, getCanvasWidth(), getCanvasHeight());
+      for (const laser of lasers) {
+        drawLaser(laser);
+      }
+    }
+
+    function update() {
+      for (let i = 0; i < lasers.length; i++) {
+        const laser = lasers[i];
+
+        switch (laser.direction) {
+          case 'right':
+            laser.x += laser.speed;
+            if (laser.x - laser.length > getCanvasWidth()) {
+              lasers[i] = createLaser();
+            }
+            break;
+          case 'left':
+            laser.x -= laser.speed;
+            if (laser.x + laser.length < 0) {
+              lasers[i] = createLaser();
+            }
+            break;
+          case 'down':
+            laser.y += laser.speed;
+            if (laser.y - laser.length > getCanvasHeight()) {
+              lasers[i] = createLaser();
+            }
+            break;
+          case 'up':
+            laser.y -= laser.speed;
+            if (laser.y + laser.length < 0) {
+              lasers[i] = createLaser();
+            }
+            break;
+        }
+      }
+    }
+
+    function animate() {
+      if (!isVisible) {
+        animationId = requestAnimationFrame(animate);
+        return;
+      }
+
+      update();
+      draw();
+      animationId = requestAnimationFrame(animate);
+    }
+
+    function renderStatic() {
+      draw();
+    }
+
+    function handleVisibilityChange() {
+      isVisible = !document.hidden;
+    }
+
+    function cleanup() {
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+      window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    // Setup
+    resize();
+    init();
+    window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    if (prefersReducedMotion) {
+      renderStatic();
+    } else {
+      animate();
+    }
+
+    document.addEventListener('astro:before-swap', cleanup, { once: true });
+  }
+
+  initLasers();
+  document.addEventListener('astro:after-swap', initLasers);
+</script>

@@ -1,0 +1,37 @@
+---
+import type { GetStaticPaths } from "astro"
+import AddonInstallLayout from "../../../components/AddonInstallLayout.astro"
+import { fetchTopModrinthAddons } from "../../../lib/api/modrinth"
+import type { AddonInfo } from "../../../lib/api/types"
+import { marked } from "marked"
+
+import resourcepacksInstructions from "../../../content/addon-instructions/resourcepacks.md?raw"
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const limit = import.meta.env.DEV ? 5 : 1000
+  const addons = await fetchTopModrinthAddons("resourcepacks", limit)
+
+  return addons.map((addon) => ({
+    params: { slug: addon.slug },
+    props: { addon },
+  }))
+}
+
+interface Props {
+  addon: AddonInfo
+}
+
+const { addon } = Astro.props
+const instructionsHtml = await marked(resourcepacksInstructions)
+---
+
+<AddonInstallLayout
+  addonName={addon.name}
+  addonSlug={addon.slug}
+  addonType="resourcepacks"
+  platform="modrinth"
+  imageUrl={addon.imageUrl}
+  websiteUrl={addon.websiteUrl}
+>
+  <Fragment set:html={instructionsHtml} />
+</AddonInstallLayout>

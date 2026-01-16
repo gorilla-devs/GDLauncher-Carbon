@@ -1,0 +1,166 @@
+---
+/**
+ * Modpacks Hub Page
+ * Links to CurseForge and Modrinth catalogs
+ */
+import BaseHead from "../../components/BaseHead.astro"
+import Header from "../../components/Header.astro"
+import Footer from "../../components/Footer.astro"
+import LoadingBar from "../../components/LoadingBar.astro"
+import Breadcrumb from "../../components/Breadcrumb.astro"
+import "@fontsource/ubuntu"
+import "@fontsource/ubuntu/500.css"
+import "@fontsource/ubuntu/700.css"
+
+// Cache for 5 minutes
+Astro.locals.cache(300)
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead
+      title="Minecraft Modpacks | GDLauncher"
+      description="Browse and install Minecraft modpacks from CurseForge and Modrinth with one-click installation using GDLauncher."
+      keywords="minecraft modpacks, curseforge modpacks, modrinth modpacks, install modpacks, modpack launcher, gdlauncher"
+    />
+  </head>
+
+  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
+    <LoadingBar />
+    <!-- Background layers -->
+    <div class="fixed inset-0 -z-10">
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+    </div>
+    <Header />
+
+    <main class="py-8">
+      <Breadcrumb items={[{ label: "Modpacks" }]} maxWidth="max-w-6xl" />
+
+      <div class="max-w-6xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-12">
+        <!-- Header -->
+        <div class="text-center mb-12">
+          <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
+            Minecraft
+            <span class="text-primary-300">Modpacks</span>
+          </h1>
+          <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+            Modpacks are curated collections of mods bundled together to create unique gameplay experiences.
+            Install them with one click using GDLauncher.
+          </p>
+        </div>
+
+        <!-- What are modpacks -->
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">What is a Modpack?</h2>
+          <p class="text-darkSlate-100">
+            A modpack is a pre-configured collection of Minecraft mods designed to work together.
+            Instead of manually installing dozens of individual mods, modpacks give you everything
+            you need for a specific gameplay experience in one download.
+          </p>
+          <p class="text-darkSlate-100">Popular types of modpacks include:</p>
+          <ul class="text-darkSlate-100">
+            <li><strong class="text-lightSlate-50">Kitchen Sink</strong> - Hundreds of mods with everything you could want</li>
+            <li><strong class="text-lightSlate-50">Tech</strong> - Focus on machines, automation, and engineering</li>
+            <li><strong class="text-lightSlate-50">Magic</strong> - Spells, rituals, and mystical adventures</li>
+            <li><strong class="text-lightSlate-50">Adventure</strong> - Quests, dungeons, and exploration</li>
+            <li><strong class="text-lightSlate-50">Lightweight</strong> - Enhanced vanilla with quality of life improvements</li>
+          </ul>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">Modpack Complexity Levels</h2>
+          <p class="text-darkSlate-100">
+            Modpacks vary in complexity and hardware requirements:
+          </p>
+          <ul class="text-darkSlate-100">
+            <li><strong class="text-lightSlate-50">Lightweight</strong> (50-100 mods) - 4GB RAM, any modern PC. Examples: Fabulously Optimized, Simply Optimized</li>
+            <li><strong class="text-lightSlate-50">Medium</strong> (100-200 mods) - 6-8GB RAM, mid-range hardware. Examples: All The Mods, Better Minecraft</li>
+            <li><strong class="text-lightSlate-50">Heavy</strong> (200-400+ mods) - 8-12GB RAM, powerful hardware. Examples: All The Mods 9, Vault Hunters, Create: Above and Beyond</li>
+          </ul>
+          <p class="text-darkSlate-100">
+            GDLauncher automatically allocates the recommended RAM for each modpack based on its requirements.
+          </p>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto">
+          <h2 class="text-lightSlate-50">Finding the Right Modpack</h2>
+          <p class="text-darkSlate-100">
+            Consider these factors when choosing a modpack:
+          </p>
+          <ul class="text-darkSlate-100">
+            <li><strong class="text-lightSlate-50">Progression style</strong> - Guided quests vs sandbox exploration</li>
+            <li><strong class="text-lightSlate-50">Theme</strong> - Tech, magic, adventure, or kitchen sink (everything)</li>
+            <li><strong class="text-lightSlate-50">Difficulty</strong> - Casual, expert, or hardcore modes</li>
+            <li><strong class="text-lightSlate-50">Multiplayer</strong> - Some modpacks are designed specifically for servers</li>
+            <li><strong class="text-lightSlate-50">Updates</strong> - Active modpacks receive bug fixes; abandoned ones don't</li>
+          </ul>
+          <p class="text-darkSlate-100">
+            CurseForge hosts the largest collection of modpacks, while Modrinth offers a curated selection with faster downloads.
+          </p>
+        </section>
+      </div>
+
+      <section class="mb-12">
+        <div class="bg-darkSlate-800 rounded-xl overflow-hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div class="p-8 lg:p-12">
+              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">Browse Modpacks in GDLauncher</h2>
+              <p class="text-darkSlate-100 mb-6">
+                Find and install modpacks from CurseForge and Modrinth with one click.
+                We handle Java, memory, and updates automatically.
+              </p>
+              <ul class="flex flex-col gap-3 mb-8">
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>Browse thousands of modpacks</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>One-click install with auto Java setup</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>Automatic updates and memory optimization</span>
+                </li>
+              </ul>
+              <a href="/download/windows" data-astro-prefetch="false" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/></svg>
+                Download GDLauncher
+              </a>
+            </div>
+            <div class="relative">
+              <img
+                src="https://cdn.gdl.gg/assets/website-browse-modpacks.jpg"
+                alt="GDLauncher modpack browser interface"
+                class="w-full h-auto"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Related guides -->
+      <section class="mt-8 bg-darkSlate-800 rounded-xl p-8 md:p-12">
+        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">Learn More</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+          <a href="/guides/install-modpack" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">How to Install Modpacks</span>
+          </a>
+          <a href="/guides/allocate-more-ram" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">Allocate More RAM</span>
+          </a>
+          <a href="/blog/best-modpacks-2025" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">Best Modpacks 2025</span>
+          </a>
+        </div>
+      </section>
+      </div>
+    </main>
+
+    <Footer />
+  </body>
+</html>

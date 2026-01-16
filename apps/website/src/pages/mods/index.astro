@@ -1,0 +1,158 @@
+---
+/**
+ * Mods Hub Page
+ */
+import BaseHead from "../../components/BaseHead.astro"
+import Header from "../../components/Header.astro"
+import Footer from "../../components/Footer.astro"
+import LoadingBar from "../../components/LoadingBar.astro"
+import Breadcrumb from "../../components/Breadcrumb.astro"
+import "@fontsource/ubuntu"
+import "@fontsource/ubuntu/500.css"
+import "@fontsource/ubuntu/700.css"
+
+Astro.locals.cache(300)
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead
+      title="Minecraft Mods | GDLauncher"
+      description="Browse and install Minecraft mods from CurseForge and Modrinth. Easily manage mods with GDLauncher."
+      keywords="minecraft mods, curseforge mods, modrinth mods, install mods, mod manager, gdlauncher"
+    />
+  </head>
+
+  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
+    <LoadingBar />
+    <!-- Background layers -->
+    <div class="fixed inset-0 -z-10">
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+    </div>
+    <Header />
+
+    <main class="py-8">
+      <Breadcrumb items={[{ label: "Mods" }]} maxWidth="max-w-6xl" />
+
+      <div class="max-w-6xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-12">
+        <div class="text-center mb-12">
+          <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
+            Minecraft
+            <span class="text-primary-300">Mods</span>
+          </h1>
+          <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+            Mods add new content, features, and improvements to Minecraft.
+            Install them easily with GDLauncher's built-in mod browser.
+          </p>
+        </div>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">What are Mods?</h2>
+          <p class="text-darkSlate-100">
+            Mods (short for modifications) are community-created additions that change or enhance Minecraft.
+            They can add new blocks, items, mobs, dimensions, game mechanics, and much more.
+          </p>
+          <p class="text-darkSlate-100">Popular types of mods include:</p>
+          <ul class="text-darkSlate-100">
+            <li><strong class="text-lightSlate-50">Content</strong> - New items, blocks, dimensions, and mobs</li>
+            <li><strong class="text-lightSlate-50">Tech</strong> - Machines, automation, and power systems</li>
+            <li><strong class="text-lightSlate-50">Magic</strong> - Spells, rituals, and magical systems</li>
+            <li><strong class="text-lightSlate-50">Quality of Life</strong> - UI improvements and convenience features</li>
+            <li><strong class="text-lightSlate-50">Performance</strong> - FPS optimization and faster loading</li>
+          </ul>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">Mod Loaders Explained</h2>
+          <p class="text-darkSlate-100">
+            Mods require a mod loader to run. The main options are:
+          </p>
+          <ul class="text-darkSlate-100">
+            <li><strong class="text-lightSlate-50">Forge</strong> - The original mod loader (2011). Largest mod library with complex mods like Tinkers' Construct, Create, and Twilight Forest. Slower to update for new Minecraft versions.</li>
+            <li><strong class="text-lightSlate-50">Fabric</strong> - Lightweight and fast-updating. Popular for performance mods and newer Minecraft versions. Large mod library on Modrinth.</li>
+            <li><strong class="text-lightSlate-50">NeoForge</strong> - A 2023 fork of Forge by the original development team. Modern improvements with better performance. Increasingly the standard for Forge-style mods on 1.20.4+.</li>
+            <li><strong class="text-lightSlate-50">Quilt</strong> - A Fabric fork focused on community governance. Compatible with most Fabric mods plus its own additions.</li>
+          </ul>
+          <p class="text-darkSlate-100">
+            Most mods are made for either Forge/NeoForge OR Fabric - not both. Always check which loader a mod requires before installing.
+          </p>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto">
+          <h2 class="text-lightSlate-50">Mod Compatibility</h2>
+          <p class="text-darkSlate-100">
+            Key things to know about mod compatibility:
+          </p>
+          <ul class="text-darkSlate-100">
+            <li>Mods must match your Minecraft version exactly (a 1.20.1 mod won't work on 1.20.4)</li>
+            <li>All players on a server usually need the same mods installed</li>
+            <li>Some mods are "client-side only" (like minimaps) and don't need server installation</li>
+            <li>Mods can conflict with each other - check mod pages for known incompatibilities</li>
+            <li>Major Minecraft updates (like 1.13, 1.17, 1.20) often break mods until authors update them</li>
+          </ul>
+        </section>
+      </div>
+
+      <section class="mb-12">
+        <div class="bg-darkSlate-800 rounded-xl overflow-hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div class="p-8 lg:p-12">
+              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">Browse Mods in GDLauncher</h2>
+              <p class="text-darkSlate-100 mb-6">
+                Search and install mods from CurseForge and Modrinth directly in GDLauncher.
+                One-click installs with automatic dependency resolution.
+              </p>
+              <ul class="flex flex-col gap-3 mb-8">
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>Browse 100,000+ mods from CurseForge & Modrinth</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>Automatic dependency management</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>One-click updates for all your mods</span>
+                </li>
+              </ul>
+              <a href="/download/windows" data-astro-prefetch="false" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/></svg>
+                Download GDLauncher
+              </a>
+            </div>
+            <div class="relative">
+              <img
+                src="https://cdn.gdl.gg/assets/website-browse-mods.jpg"
+                alt="GDLauncher mod browser interface"
+                class="w-full h-auto"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-8 bg-darkSlate-800 rounded-xl p-8 md:p-12">
+        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">Learn More</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+          <a href="/guides/install-mods" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">How to Install Mods</span>
+          </a>
+          <a href="/guides/performance-mods" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">Performance Mods Guide</span>
+          </a>
+          <a href="/guides/install-forge" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">Install Forge</span>
+          </a>
+        </div>
+      </section>
+      </div>
+    </main>
+
+    <Footer />
+  </body>
+</html>
