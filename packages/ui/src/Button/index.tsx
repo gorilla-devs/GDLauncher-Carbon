@@ -12,14 +12,7 @@ import { Dynamic } from "solid-js/web"
 import { getPressEffectClasses } from "../Clickable"
 
 type Size = "small" | "medium" | "large"
-type Type =
-  | "primary"
-  | "secondary"
-  | "glow"
-  | "outline"
-  | "transparent"
-  | "glass"
-  | "text"
+type Type = "primary" | "secondary" | "glow" | "transparent" | "glass" | "text"
 
 interface Props
   extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
@@ -106,8 +99,8 @@ const getVariant = (
       }`]: true,
       [`${!isDisabled && !backgroundColor ? `hover:bg-${variant}-700` : ""}`]:
         true,
-      // "filter brightness-75": isDisabled,
       "text-[#404759]": isDisabled,
+      "disabled-stripes": isDisabled,
       "border-0": true
     },
     secondary: {
@@ -118,19 +111,8 @@ const getVariant = (
       "border-darkSlate-700": isDisabled,
       "bg-darkSlate-700": true,
       "text-lightSlate-700": isDisabled,
+      "disabled-stripes": isDisabled,
       "cursor-not-allowed": isDisabled
-    },
-    outline: {
-      ...commonStyle,
-      "border-1": true,
-      "text-lightSlate-50": !isDisabled,
-      "text-lightSlate-700": isDisabled,
-      "border-white": !isDisabled,
-      "border-darkSlate-500": isDisabled,
-      "hover:border-primary-300": !isDisabled,
-      "hover:text-primary-300": !isDisabled,
-      "bg-transparent": !isDisabled,
-      "bg-darkSlate-700": isDisabled
     },
     glow: {
       ...commonStyle,
@@ -138,24 +120,37 @@ const getVariant = (
       [`drop-shadow-[0_0px_12px_rgb(var(--${variant}-500))]`]: !isDisabled,
       "bg-[#404759]": isDisabled,
       "text-[#8A8B8F]": isDisabled,
+      "disabled-stripes": isDisabled,
       "border-0": true
     },
     transparent: {
       ...commonStyle,
-      // "backdrop-blur-md": true,
       "bg-darkSlate-800": true,
       "text-lightSlate-700": isDisabled,
+      "disabled-stripes": isDisabled,
       "border-1": true,
       "border-transparent": true,
       "hover:border-1": !isDisabled,
       "hover:border-white": !isDisabled
     },
     text: {
-      ...commonStyle,
+      ...getPressEffectClasses(isDisabled),
+      "font-main": true,
+      flex: true,
+      "items-center": true,
+      "gap-2": true,
+      "py-1": true,
+      "px-2": true,
+      "rounded-md": true,
       "bg-transparent": true,
-      "text-lightSlate-50": true,
-      "hover:bg-darkSlate-900": true,
-      "border-0": true
+      "text-lightSlate-400": !isDisabled,
+      "hover:text-lightSlate-100": !isDisabled,
+      "text-lightSlate-700": isDisabled,
+      "disabled-stripes": isDisabled,
+      "border-0": true,
+      "transition-colors": true,
+      "cursor-pointer": !isDisabled,
+      "cursor-not-allowed": isDisabled
     },
     glass: {
       ...commonStyle,
@@ -170,6 +165,7 @@ const getVariant = (
       "text-lightSlate-700": isDisabled,
       "bg-darkSlate-700": isDisabled,
       "border-darkSlate-500": isDisabled,
+      "disabled-stripes": isDisabled,
       "transition-all": true,
       "duration-200": true,
       "ease-out": true

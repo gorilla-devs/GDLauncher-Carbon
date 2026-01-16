@@ -49,7 +49,7 @@ export function FilterBadgesBar() {
           <Show when={searchContext?.selectedInstanceId()}>
             <Button
               size="small"
-              type="outline"
+              type="secondary"
               onClick={() => {
                 navigator.navigate(
                   `/library/${searchContext?.selectedInstanceId()}/addons`

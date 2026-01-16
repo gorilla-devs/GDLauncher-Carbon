@@ -244,7 +244,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               <Button
                 type="primary"
                 onClick={() => modalsContext?.closeModal()}
-                class="px-8 py-3 font-semibold transition-all hover:scale-105 active:scale-95"
+                class="px-8 py-3 font-semibold"
               >
                 <Trans key="ads:_trn_got_it_thanks" />
               </Button>

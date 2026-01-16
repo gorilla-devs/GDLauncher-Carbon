@@ -64,9 +64,6 @@ pub struct Project {
     pub id: String,
     /// The ID of the team that has ownership of this project
     pub team: String,
-    /// A link to the long description of the project (only present for old projects)
-    #[deprecated = "Read from `body` instead"]
-    pub body_url: Option<String>,
     pub moderator_message: Option<ModeratorMessage>,
     pub published: UtcDateTime,
     pub updated: UtcDateTime,
@@ -176,6 +173,11 @@ pub enum ProjectStatus {
     /// The project has been submitted for approval and is being reviewed
     Processing,
     Withheld,
+    /// The project is scheduled to be released in the future
+    Scheduled,
+    /// The project is approved but not viewable to the public
+    Private,
+    #[serde(other)]
     Unknown,
 }
 

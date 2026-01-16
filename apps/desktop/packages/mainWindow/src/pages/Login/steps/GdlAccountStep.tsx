@@ -31,7 +31,7 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
               <p class="text-lightSlate-400 m-0 max-w-md text-sm leading-relaxed">
                 <Trans
                   key="auth:_trn_login.found_existing_account_description"
-                  options={{ name: data.nickname || "User" }}
+                  options={{ name: data.displayName || "User" }}
                 />
               </p>
 

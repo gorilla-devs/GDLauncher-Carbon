@@ -1,4 +1,4 @@
-use crate::api::keys::instance::INSTANCE_MODS;
+use crate::api::keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS};
 use crate::api::translation::Translation;
 use crate::domain::instance::InstanceId;
 use crate::managers::App;
@@ -87,6 +87,29 @@ impl MetaCacheManager {
             watched_instance: watch::channel(None).0,
             pause_caching: watch::channel(false).0,
         }
+    }
+
+    /// Get the instance IDs that are currently being cached
+    pub async fn get_currently_caching_instances(&self) -> Vec<InstanceId> {
+        let mut result = Vec::new();
+
+        let local = self.local_targets.borrow().await.target();
+        let cf = self.curseforge_targets.borrow().await.target();
+        let mr = self.modrinth_targets.borrow().await.target();
+
+        if let Some(target) = local {
+            result.push(target.instance_id);
+        }
+
+        if let Some(target) = cf {
+            result.push(target.instance_id);
+        }
+
+        if let Some(target) = mr {
+            result.push(target.instance_id);
+        }
+
+        result
     }
 }
 
@@ -764,6 +787,8 @@ impl ManagerRef<'_, MetaCacheManager> {
         curseforge: bool,
         modrinth: bool,
     ) -> anyhow::Result<()> {
+        tracing::info!("Overriding caching and waiting for instance {instance_id}");
+
         let app = self.app.clone();
 
         let split = |c| match c {
@@ -844,6 +869,8 @@ impl ManagerRef<'_, MetaCacheManager> {
             rx.await??;
         }
 
+        tracing::info!("Overriding caching and waiting for instance {instance_id} done");
+
         Ok(())
     }
 
@@ -911,6 +938,9 @@ impl ManagerRef<'_, MetaCacheManager> {
         let app_debounce = self.app.clone();
         let mut debounce_watch_rx = self.watched_instance.subscribe();
         tokio::spawn(async move {
+            // Track the previous instance ID to detect changes
+            // let mut previous_instance_id: Option<InstanceId> = None;
+
             // wait until watched is some, then wait until we get a list debounce that matches.
             // Then wait 2 seconds, interrupted if the watch changes.
             // note: the various `return`s will only be hit if the cache manager is dropped somehow. they prevent a spinloop.
@@ -925,6 +955,14 @@ impl ManagerRef<'_, MetaCacheManager> {
                     atomic::Ordering::SeqCst,
                 );
 
+                // Check if the instance ID has changed
+                // if watched != previous_instance_id {
+                //     if let Some(prev_id) = previous_instance_id {
+                //         app_debounce.invalidate(INSTANCE_DETAILS, Some(prev_id.0.into()));
+                //     }
+                //     previous_instance_id = watched;
+                // }
+
                 let Some(watched) = watched else {
                     if debounce_watch_rx.changed().await.is_err() {
                         return;
@@ -936,6 +974,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                 tokio::select! {
                     _ = list_debounce_rx.changed() => {
                         app_debounce.invalidate(INSTANCE_MODS, Some(watched.0.into()));
+                        // app_debounce.invalidate(INSTANCE_DETAILS, Some(watched.0.into()));
+
                         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                     },
                     r = debounce_watch_rx.changed() => {
@@ -1182,6 +1222,12 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         Ok(meta_id)
     }
+
+    /// Check if a specific instance is currently being cached
+    pub async fn is_instance_being_cached(&self, instance_id: InstanceId) -> bool {
+        let currently_caching = self.get_currently_caching_instances().await;
+        currently_caching.contains(&instance_id)
+    }
 }
 
 fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
@@ -1375,6 +1421,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 "File scanning complete for instance {}: found {} files total",
                 instance_id, total_files_scanned
             );
+
+            trace!({ modpaths = ?modpaths }, "modpaths found for instance {instance_id}");
 
             scanning_subtask.complete_items();
 

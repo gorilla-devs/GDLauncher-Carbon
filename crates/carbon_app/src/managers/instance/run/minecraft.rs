@@ -222,14 +222,6 @@ pub async fn process_minecraft(
     completion.await?;
 
     if download_required {
-        let instance_manager = app.instance_manager();
-        let _lock = instance_manager
-            .persistence_manager
-            .instance_download_lock
-            .acquire()
-            .await
-            .unwrap();
-
         let (progress_watch_tx, mut progress_watch_rx) =
             tokio::sync::watch::channel(carbon_net::Progress::new());
 

@@ -82,6 +82,10 @@ importers:
         version: 8.18.0(eslint@9.16.0(jiti@1.21.6))(typescript@5.6.3)
 
   apps/desktop:
+    dependencies:
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       '@electron/notarize':
         specifier: ^3.0.2
@@ -8274,11 +8278,11 @@ packages:
   youch@3.3.3:
     resolution: {integrity: sha512-qSFXUk3UZBLfggAW3dJKg0BMblG5biqSF8M34E06o5CSsZtH92u9Hqmj2RzGiHDi64fhe83+4tENFP2DB6t6ZA==}
 
-  zod@3.22.4:
-    resolution: {integrity: sha512-iC+8Io04lddc+mVqQ9AZ7OQ2MrUKGN+oIQyq1vemgt46jwCwLfhq7/pwnBnNXXXZb8VTVLKwp9EDkx+ryxIWmg==}
-
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zod@4.3.5:
+    resolution: {integrity: sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -8421,7 +8425,7 @@ snapshots:
   '@astrojs/sitemap@3.0.5':
     dependencies:
       sitemap: 7.1.1
-      zod: 3.22.4
+      zod: 3.25.76
 
   '@astrojs/solid-js@3.0.3(@testing-library/jest-dom@5.17.0)(solid-js@1.8.12)(vite@5.1.4(@types/node@22.18.6)(less@4.2.0)(terser@5.27.0))':
     dependencies:
@@ -12496,7 +12500,7 @@ snapshots:
       vitefu: 0.2.5(vite@5.1.4(@types/node@22.18.6)(less@4.2.0)(terser@5.27.0))
       which-pm: 2.1.1
       yargs-parser: 21.1.1
-      zod: 3.22.4
+      zod: 3.25.76
     optionalDependencies:
       sharp: 0.32.6
     transitivePeerDependencies:
@@ -15386,7 +15390,7 @@ snapshots:
       workerd: 1.20231030.0
       ws: 8.16.0
       youch: 3.3.3
-      zod: 3.22.4
+      zod: 3.25.76
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -17843,8 +17847,8 @@ snapshots:
       mustache: 4.2.0
       stacktracey: 2.1.8
 
-  zod@3.22.4: {}
-
   zod@3.25.76: {}
+
+  zod@4.3.5: {}
 
   zwitch@2.0.4: {}

@@ -2,7 +2,7 @@ import { useTransContext } from "@gd/i18n"
 import LoadingGif from "/assets/images/image.gif"
 import { Progress } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
-import { createEffect, createSignal } from "solid-js"
+import { createEffect, createSignal, Show } from "solid-js"
 import { setTaskId, taskId } from "@/utils/import"
 import { setExportStep } from ".."
 
@@ -20,7 +20,10 @@ export default function Exporting() {
   createEffect(() => {
     if (vtask.data?.progress) {
       if (vtask.data.progress.type == "Known") {
-        setProgress(Math.floor((vtask.data.progress.value || 1) * 100))
+        setProgress(Math.floor(vtask.data.progress.value * 100))
+      }
+      if (vtask.data.progress.type === "Indeterminate") {
+        setProgress(-1)
       }
       if (vtask.data.progress.type === "Failed") {
         setFailedMsg(vtask.data.progress.value.cause[1].display)
@@ -34,6 +37,7 @@ export default function Exporting() {
     }
     if (isDownloaded) {
       setExportStep(2)
+      setProgress(0)
     }
   })
 
@@ -42,7 +46,14 @@ export default function Exporting() {
       <img src={LoadingGif} class="h-40 w-40" alt="loading" />
       <span>{t("instances:_trn_exporting_instance")}</span>
       <Progress color="bg-primary-500" value={progress()} />
-      <span>{`${progress()}% ${t("instances:_trn_export_completed")}`}</span>
+      <span>
+        <Show when={progress() === -1}>
+          {t("instances:_trn_preparing_export")}
+        </Show>
+        <Show when={progress() !== -1}>
+          {`${progress()}% ${t("instances:_trn_export_completed")}`}
+        </Show>
+      </span>
     </div>
   )
 }

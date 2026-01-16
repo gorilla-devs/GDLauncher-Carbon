@@ -34,7 +34,7 @@ const ExportPath = () => {
             />
           }
         />
-        <div class="flex items-center justify-center rounded-lg bg-[#1D2028] p-2">
+        <div class="flex items-center justify-center rounded-lg bg-darkSlate-900 p-2">
           <div
             class="i-material-symbols:folder-open-outline cursor-pointer text-2xl"
             onClick={async () => {

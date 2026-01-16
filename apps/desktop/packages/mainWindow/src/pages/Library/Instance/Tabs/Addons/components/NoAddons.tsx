@@ -18,7 +18,7 @@ export const NoAddons = (props: NoAddonsProps) => {
           <Trans key="content:_trn_no_addons_text" />
         </p>
       </div>
-      <Button type="outline" size="medium" onClick={props.onAddAddons}>
+      <Button type="secondary" size="medium" onClick={props.onAddAddons}>
         <div class="i-hugeicons:add-01 h-4 w-4" />
         <Trans key="content:_trn_add_addons" />
       </Button>

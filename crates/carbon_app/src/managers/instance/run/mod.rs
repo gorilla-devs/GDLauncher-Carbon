@@ -103,7 +103,7 @@ impl ManagerRef<'_, InstanceManager> {
             LaunchState::Deleting => {
                 bail!("cannot prepare an instance that is being deleted");
             }
-            LaunchState::Preparing(task_id) => {
+            LaunchState::Queued(task_id) | LaunchState::Preparing(task_id) => {
                 // dismiss the existing task if its a failure, return if its still in progress.
                 let r = self.app.task_manager().dismiss_task(*task_id).await;
 
@@ -233,7 +233,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let id = self.app.task_manager().spawn_task(&task).await;
 
-        data.state = LaunchState::Preparing(id);
+        data.state = LaunchState::Queued(id);
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -247,16 +247,17 @@ impl ManagerRef<'_, InstanceManager> {
         drop(instance);
         drop(instances);
 
+        // Capture datetime once to ensure log entry and file name match exactly
+        let now = Local::now();
+
         let (log_id, log) = if launch_account.is_some() {
-            let (id, sender) = app.instance_manager().create_log(instance_id, None).await;
+            let (id, sender) = app.instance_manager().create_log(instance_id, Some(now)).await;
             (Some(id), Some(sender))
         } else {
             (None, None)
         };
 
-        let now = Utc::now();
-
-        let log_file_name = format!("{}_{}", now.format("%Y-%m-%d"), now.format("%H-%M-%S"));
+        let log_file_name = format!("{}", now.format("%Y-%m-%d_%H-%M-%S"));
 
         let logs_file_path = if launch_account.is_some() {
             Some(
@@ -327,6 +328,30 @@ impl ManagerRef<'_, InstanceManager> {
             let instance_root = instance_path.get_root();
             let setup_path = instance_root.join(".setup");
             let is_setup = setup_path.is_dir();
+
+            // Acquire semaphore FIRST - this is where queuing happens
+            // Instance stays in Queued state until we get the lock
+            let instance_manager = app.instance_manager();
+            let _download_guard = instance_manager
+                .persistence_manager
+                .instance_download_lock
+                .acquire()
+                .await
+                .expect("Semaphore should not be closed");
+
+            // Now that we have the lock, transition from Queued to Preparing
+            {
+                let instance_manager_ref = app.instance_manager();
+                let mut instances = instance_manager_ref.instances.write().await;
+                if let Some(instance) = instances.get_mut(&instance_id) {
+                    if let InstanceType::Valid(data) = &mut instance.type_ {
+                        data.state = LaunchState::Preparing(id);
+                    }
+                }
+            }
+            app.invalidate(GET_GROUPS, None);
+            app.invalidate(GET_ALL_INSTANCES, None);
+            app.invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
             let try_result: anyhow::Result<_> = async {
                 let mut downloads = Vec::new();
@@ -660,6 +685,12 @@ impl ManagerRef<'_, InstanceManager> {
             // This must happen BEFORE invalidation so the frontend sees active: false
             drop(log);
 
+            // Flush and close the log file before invalidation so file size is accurate
+            if let Some(mut f) = file.take() {
+                let _ = f.flush().await;
+                drop(f);
+            }
+
             app.invalidate(GET_LOGS, Some(instance_id.0.into()));
 
             let now = Utc::now();
@@ -769,7 +800,7 @@ impl ManagerRef<'_, InstanceManager> {
                 info!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
                 println!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
             }
-            LaunchState::Preparing(_) | LaunchState::Deleting => (),
+            LaunchState::Queued(_) | LaunchState::Preparing(_) | LaunchState::Deleting => (),
         };
 
         debug!("changing state of instance {instance_id} to {state:?}");
@@ -812,6 +843,7 @@ impl ManagerRef<'_, InstanceManager> {
 
 pub enum LaunchState {
     Inactive { failed_task: Option<VisualTaskId> },
+    Queued(VisualTaskId),
     Preparing(VisualTaskId),
     Running(RunningInstance),
     Deleting,
@@ -824,6 +856,7 @@ impl Debug for LaunchState {
             "{}",
             match self {
                 Self::Inactive { .. } => "Inactive",
+                Self::Queued(_) => "Queued",
                 Self::Preparing(_) => "Preparing",
                 Self::Running(_) => "Running",
                 Self::Deleting => "Deleting",
@@ -845,6 +878,7 @@ impl From<&LaunchState> for domain::LaunchState {
             LaunchState::Inactive { failed_task } => Self::Inactive {
                 failed_task: failed_task.clone(),
             },
+            LaunchState::Queued(t) => Self::Queued(*t),
             LaunchState::Preparing(t) => Self::Preparing(*t),
             LaunchState::Running(RunningInstance {
                 start_time, log, ..

@@ -1,5 +1,6 @@
 use crate::domain::instance::info;
 use chrono::{DateTime, Utc};
+use futures::StreamExt;
 use hyper::{
     HeaderMap, StatusCode,
     header::{AUTHORIZATION, CONTENT_TYPE, InvalidHeaderValue},
@@ -7,6 +8,7 @@ use hyper::{
 use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::{fs::File, sync::watch::Sender};
 
 pub struct GDLAccountTask {
     client: reqwest_middleware::ClientWithMiddleware,
@@ -14,12 +16,14 @@ pub struct GDLAccountTask {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct RegisterAccountBody {
     pub email: String,
-    pub nickname: String,
+    pub display_name: String,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct RequestEmailChangeBody {
     pub new_email: String,
 }
@@ -52,7 +56,7 @@ pub enum RequestGDLAccountDeletionError {
 }
 
 #[derive(Error, Debug)]
-pub enum ChangeNicknameError {
+pub enum ChangeDisplayNameError {
     #[error("Too many requests")]
     TooManyRequests(u32),
 
@@ -60,9 +64,126 @@ pub enum ChangeNicknameError {
     RequestFailed(anyhow::Error),
 }
 
+/// Error response structure from enderium API
+#[derive(Debug, Deserialize)]
+struct EnderiumErrorResponse {
+    error: EnderiumErrorBody,
+}
+
+#[derive(Debug, Deserialize)]
+struct EnderiumErrorBody {
+    code: String,
+    message: String,
+}
+
+/// Typed error for instance sharing operations
+#[derive(Error, Debug)]
+pub enum InstanceShareError {
+    #[error("Share not found or expired")]
+    ShareNotFound,
+    #[error("Storage quota exceeded")]
+    QuotaExceeded,
+    #[error("Maximum downloads exceeded")]
+    MaxDownloadsExceeded,
+    #[error("Upload timed out")]
+    UploadTimeout,
+    #[error("Account not verified")]
+    UserNotVerified,
+    #[error("Too many active shares (max 50)")]
+    TooManyActiveShares,
+    #[error("Account has pending reports")]
+    UserHasPendingReports,
+    #[error("Invalid header: {0}")]
+    InvalidHeader(#[from] InvalidHeaderValue),
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("Network error: {0}")]
+    Network(#[from] reqwest::Error),
+    #[error("Network error: {0}")]
+    NetworkMiddleware(#[from] reqwest_middleware::Error),
+    #[error("{0}")]
+    Unknown(String),
+}
+
+impl InstanceShareError {
+    fn from_response(status: StatusCode, body: &str) -> Self {
+        if let Ok(resp) = serde_json::from_str::<EnderiumErrorResponse>(body) {
+            match resp.error.code.as_str() {
+                "SHARE_NOT_FOUND" => Self::ShareNotFound,
+                "QUOTA_EXCEEDED" => Self::QuotaExceeded,
+                "MAX_DOWNLOADS_EXCEEDED" => Self::MaxDownloadsExceeded,
+                "UPLOAD_TIMEOUT" => Self::UploadTimeout,
+                "USER_NOT_VERIFIED" => Self::UserNotVerified,
+                "TOO_MANY_ACTIVE_SHARES" => Self::TooManyActiveShares,
+                "USER_HAS_PENDING_REPORTS" => Self::UserHasPendingReports,
+                _ => Self::Unknown(resp.error.message),
+            }
+        } else {
+            Self::Unknown(format!("HTTP {}: {}", status.as_u16(), body))
+        }
+    }
+
+    /// Get the error code string for frontend consumption
+    pub fn error_code(&self) -> &'static str {
+        match self {
+            Self::ShareNotFound => "SHARE_NOT_FOUND",
+            Self::QuotaExceeded => "QUOTA_EXCEEDED",
+            Self::MaxDownloadsExceeded => "MAX_DOWNLOADS_EXCEEDED",
+            Self::UploadTimeout => "UPLOAD_TIMEOUT",
+            Self::UserNotVerified => "USER_NOT_VERIFIED",
+            Self::TooManyActiveShares => "TOO_MANY_ACTIVE_SHARES",
+            Self::UserHasPendingReports => "USER_HAS_PENDING_REPORTS",
+            Self::InvalidHeader(_) => "INVALID_HEADER",
+            Self::Json(_) => "JSON_ERROR",
+            Self::Network(_) | Self::NetworkMiddleware(_) => "NETWORK_ERROR",
+            Self::Unknown(_) => "UNKNOWN_ERROR",
+        }
+    }
+}
+
+/// Helper to handle instance share API responses
+async fn handle_instance_share_response<T: serde::de::DeserializeOwned>(
+    resp: reqwest::Response,
+) -> Result<T, InstanceShareError> {
+    let status = resp.status();
+    if status.is_success() {
+        Ok(resp.json().await?)
+    } else {
+        let body = resp.text().await.unwrap_or_default();
+        Err(InstanceShareError::from_response(status, &body))
+    }
+}
+
+/// Helper to handle instance share API responses that return empty body on success
+async fn handle_instance_share_response_empty(
+    resp: reqwest::Response,
+) -> Result<(), InstanceShareError> {
+    let status = resp.status();
+    if status.is_success() {
+        Ok(())
+    } else {
+        let body = resp.text().await.unwrap_or_default();
+        Err(InstanceShareError::from_response(status, &body))
+    }
+}
+
+/// Helper to handle instance share API responses that return plain text
+async fn handle_instance_share_response_text(
+    resp: reqwest::Response,
+) -> Result<String, InstanceShareError> {
+    let status = resp.status();
+    if status.is_success() {
+        Ok(resp.text().await?)
+    } else {
+        let body = resp.text().await.unwrap_or_default();
+        Err(InstanceShareError::from_response(status, &body))
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct NicknameHistoryEntry {
-    pub nickname: String,
+#[serde(rename_all = "snake_case")]
+pub struct DisplayNameHistoryEntry {
+    pub display_name: String,
     pub changed_at: DateTime<Utc>,
 }
 
@@ -75,10 +196,11 @@ pub enum GDLAccountStatus {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct GDLUser {
     pub email: String,
     pub microsoft_oid: String,
-    pub nickname: String,
+    pub display_name: String,
     pub friend_code: String,
     pub profile_icon_url: String,
     #[serde(default)]
@@ -86,11 +208,107 @@ pub struct GDLUser {
     pub microsoft_email: Option<String>,
     pub is_verified: bool,
     pub has_pending_verification: bool,
-    pub verification_timeout: Option<i64>,
     pub has_pending_deletion_request: bool,
+
+    // Cooldown timeouts in seconds (backwards compatible)
+    pub verification_timeout: Option<i64>,
     pub deletion_timeout: Option<i64>,
     pub email_change_timeout: Option<i64>,
-    pub nickname_change_timeout: Option<i64>,
+    pub display_name_change_timeout: Option<i64>,
+
+    // Absolute UTC timestamps when cooldown expires (ISO 8601)
+    pub verification_timeout_at: Option<String>,
+    pub deletion_timeout_at: Option<String>,
+    pub email_change_timeout_at: Option<String>,
+    pub display_name_change_timeout_at: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct RequestShareInstanceBody {
+    pub file_key: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct GetPresignedUploadUrlResponse {
+    pub file_key: String,
+    pub url: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct GetPresignedUploadUrlBody {
+    pub content_length: u64,
+    pub sha256_checksum: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiration_days: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_downloads: Option<i32>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct GetPresignedDownloadUrlBody {
+    pub share_code: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct WaitForShareInstanceResponse {
+    pub share_code: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+/// Individual share info returned from the list endpoint
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct ShareInfo {
+    pub share_code: String,
+    pub title: Option<String>,
+    pub download_count: i32,
+    pub max_downloads: Option<i32>,
+    pub expires_at: DateTime<Utc>,
+    pub size_kilobytes: i32,
+    pub created_at: DateTime<Utc>,
+    pub is_expired: bool,
+}
+
+/// Paginated response for user shares
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct PaginatedShares {
+    pub items: Vec<ShareInfo>,
+    pub total_count: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+/// Quota info for instance sharing
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct QuotaInfo {
+    pub used_kilobytes: i64,
+    pub total_kilobytes: i64,
+}
+
+/// Request body for updating a share
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct UpdateShareBody {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_downloads: Option<Option<i32>>,
+}
+
+/// Response for regenerating a share code
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct RegenerateShareCodeResponse {
+    pub new_share_code: String,
 }
 
 impl GDLAccountTask {
@@ -306,11 +524,11 @@ impl GDLAccountTask {
         Ok(())
     }
 
-    pub async fn change_nickname(
+    pub async fn change_display_name(
         &self,
         id_token: String,
-        nickname: String,
-    ) -> Result<(), ChangeNicknameError> {
+        display_name: String,
+    ) -> Result<(), ChangeDisplayNameError> {
         let url = format!("{}/v1/users/user/nickname", self.base_api);
 
         let authorization = format!("Bearer {}", id_token);
@@ -319,7 +537,7 @@ impl GDLAccountTask {
             AUTHORIZATION,
             authorization
                 .parse()
-                .map_err(|e: InvalidHeaderValue| ChangeNicknameError::RequestFailed(e.into()))?,
+                .map_err(|e: InvalidHeaderValue| ChangeDisplayNameError::RequestFailed(e.into()))?,
         );
         headers.insert(
             CONTENT_TYPE,
@@ -328,8 +546,8 @@ impl GDLAccountTask {
                 .expect("failed to parse content type"),
         );
 
-        let body = serde_json::to_string(&serde_json::json!({ "new_nickname": nickname }))
-            .map_err(|e| ChangeNicknameError::RequestFailed(e.into()))?;
+        let body = serde_json::to_string(&serde_json::json!({ "new_display_name": display_name }))
+            .map_err(|e| ChangeDisplayNameError::RequestFailed(e.into()))?;
 
         let resp = self
             .client
@@ -338,7 +556,7 @@ impl GDLAccountTask {
             .body(reqwest::Body::from(body))
             .send()
             .await
-            .map_err(|e| ChangeNicknameError::RequestFailed(e.into()))?;
+            .map_err(|e| ChangeDisplayNameError::RequestFailed(e.into()))?;
 
         if resp.status() == StatusCode::TOO_MANY_REQUESTS {
             let retry_after = resp
@@ -347,21 +565,21 @@ impl GDLAccountTask {
                 .and_then(|v| v.to_str().ok())
                 .and_then(|v| v.parse::<u32>().ok());
 
-            return Err(ChangeNicknameError::TooManyRequests(
+            return Err(ChangeDisplayNameError::TooManyRequests(
                 retry_after.unwrap_or(0),
             ));
         }
 
         resp.error_for_status()
-            .map_err(|e| ChangeNicknameError::RequestFailed(e.into()))?;
+            .map_err(|e| ChangeDisplayNameError::RequestFailed(e.into()))?;
 
         Ok(())
     }
 
-    pub async fn get_nickname_history(
+    pub async fn get_display_name_history(
         &self,
-        friend_code: String,
-    ) -> anyhow::Result<Vec<NicknameHistoryEntry>> {
+        user_id: i32,
+    ) -> anyhow::Result<Vec<DisplayNameHistoryEntry>> {
         let url = format!(
             "{}/v1/users/users/{}/nickname-history",
             self.base_api, friend_code
@@ -371,12 +589,12 @@ impl GDLAccountTask {
 
         let resp = resp.error_for_status()?;
 
-        let history: Vec<NicknameHistoryEntry> = resp.json().await?;
+        let history: Vec<DisplayNameHistoryEntry> = resp.json().await?;
 
         Ok(history)
     }
 
-    pub async fn clear_nickname_history(&self, id_token: String) -> anyhow::Result<()> {
+    pub async fn clear_display_name_history(&self, id_token: String) -> anyhow::Result<()> {
         let url = format!("{}/v1/users/user/nickname-history", self.base_api);
 
         let authorization = format!("Bearer {}", id_token);
@@ -433,4 +651,284 @@ impl GDLAccountTask {
     }
 
     pub async fn get_subscription_status(&self) {}
+
+    pub async fn get_presigned_download_url(
+        &self,
+        id_token: String,
+        share_code: String,
+    ) -> Result<String, InstanceShareError> {
+        let url = format!("{}/v1/instance-share/presigned-download-url", self.base_api);
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+        headers.insert(
+            CONTENT_TYPE,
+            "application/json"
+                .parse()
+                .expect("failed to parse content type"),
+        );
+
+        let body = serde_json::to_string(&GetPresignedDownloadUrlBody { share_code })?;
+
+        let resp = self
+            .client
+            .post(url)
+            .headers(headers)
+            .body(reqwest::Body::from(body))
+            .send()
+            .await?;
+
+        handle_instance_share_response_text(resp).await
+    }
+
+    pub async fn get_presigned_upload_url(
+        &self,
+        id_token: String,
+        content_length: u64,
+        sha256_checksum: String,
+        title: Option<String>,
+        expiration_days: Option<i32>,
+        max_downloads: Option<i32>,
+    ) -> Result<GetPresignedUploadUrlResponse, InstanceShareError> {
+        let url = format!("{}/v1/instance-share/presigned-upload-url", self.base_api);
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+        headers.insert(
+            CONTENT_TYPE,
+            "application/json"
+                .parse()
+                .expect("failed to parse content type"),
+        );
+
+        let body = serde_json::to_string(&GetPresignedUploadUrlBody {
+            content_length,
+            sha256_checksum,
+            title,
+            expiration_days,
+            max_downloads,
+        })?;
+
+        let resp = self
+            .client
+            .post(url)
+            .headers(headers)
+            .body(reqwest::Body::from(body))
+            .send()
+            .await?;
+
+        handle_instance_share_response(resp).await
+    }
+
+    pub async fn upload_share_instance(
+        &self,
+        presigned_url: String,
+        file: tokio::fs::File,
+        file_size: u64,
+        sha256_checksum: String,
+        progress_tx: tokio::sync::mpsc::Sender<i32>,
+    ) -> anyhow::Result<()> {
+        let mut reader_stream = tokio_util::io::ReaderStream::new(file);
+        let mut uploaded = 0u64;
+        let tx_clone = progress_tx.clone();
+
+        let async_stream = async_stream::stream! {
+            while let Some(chunk) = reader_stream.next().await {
+                if let Ok(chunk) = &chunk {
+                    uploaded += chunk.len() as u64;
+                    let progress = ((uploaded as f64 / file_size as f64) * 100.0) as i32;
+                    let _ = tx_clone.send(progress).await;
+                }
+                yield chunk;
+            }
+        };
+
+        let resp = self
+            .client
+            .put(presigned_url)
+            .header("Content-Length", file_size)
+            .header("x-amz-checksum-sha256", sha256_checksum)
+            .header("x-amz-sdk-checksum-algorithm", "SHA256")
+            .body(reqwest::Body::wrap_stream(async_stream))
+            .send()
+            .await?;
+
+        resp.error_for_status()?;
+
+        // Send 100% completion
+        let _ = progress_tx.send(100).await;
+
+        Ok(())
+    }
+
+    pub async fn wait_for_share_instance(
+        &self,
+        file_key: String,
+        id_token: String,
+    ) -> Result<WaitForShareInstanceResponse, InstanceShareError> {
+        let url = format!(
+            "{}/v1/instance-share/wait-for-upload-complete",
+            self.base_api
+        );
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+        headers.insert(
+            CONTENT_TYPE,
+            "application/json"
+                .parse()
+                .expect("failed to parse content type"),
+        );
+
+        let body = serde_json::to_string(&RequestShareInstanceBody { file_key })?;
+
+        let resp = self
+            .client
+            .post(url)
+            .body(reqwest::Body::from(body))
+            .headers(headers)
+            .send()
+            .await?;
+
+        handle_instance_share_response(resp).await
+    }
+
+    /// Get paginated list of user's shares
+    pub async fn get_user_shares(
+        &self,
+        id_token: String,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> Result<PaginatedShares, InstanceShareError> {
+        let mut url = format!("{}/v1/instance-share/my-shares", self.base_api);
+
+        // Add query params
+        let mut params = Vec::new();
+        if let Some(l) = limit {
+            params.push(format!("limit={}", l));
+        }
+        if let Some(o) = offset {
+            params.push(format!("offset={}", o));
+        }
+        if !params.is_empty() {
+            url = format!("{}?{}", url, params.join("&"));
+        }
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+
+        let resp = self.client.get(url).headers(headers).send().await?;
+
+        handle_instance_share_response(resp).await
+    }
+
+    /// Delete a share by its code
+    pub async fn delete_share(
+        &self,
+        id_token: String,
+        share_code: String,
+    ) -> Result<(), InstanceShareError> {
+        let url = format!("{}/v1/instance-share/share/{}", self.base_api, share_code);
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+
+        let resp = self.client.delete(url).headers(headers).send().await?;
+
+        handle_instance_share_response_empty(resp).await
+    }
+
+    pub async fn get_quota(&self, id_token: String) -> Result<QuotaInfo, InstanceShareError> {
+        let url = format!("{}/v1/instance-share/quota", self.base_api);
+
+        let authorization = format!("Bearer {}", id_token);
+
+        let resp = self
+            .client
+            .get(url)
+            .header("Authorization", authorization)
+            .send()
+            .await?;
+
+        handle_instance_share_response(resp).await
+    }
+
+    /// Update a share's metadata (title and/or max_downloads)
+    pub async fn update_share(
+        &self,
+        id_token: String,
+        share_code: String,
+        body: UpdateShareBody,
+    ) -> Result<(), InstanceShareError> {
+        let url = format!("{}/v1/instance-share/share/{}", self.base_api, share_code);
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+        headers.insert(
+            CONTENT_TYPE,
+            "application/json"
+                .parse()
+                .expect("failed to parse content type"),
+        );
+
+        let body_str = serde_json::to_string(&body)?;
+
+        let resp = self
+            .client
+            .patch(url)
+            .headers(headers)
+            .body(reqwest::Body::from(body_str))
+            .send()
+            .await?;
+
+        handle_instance_share_response_empty(resp).await
+    }
+
+    /// Regenerate a share code (invalidates the old code)
+    pub async fn regenerate_share_code(
+        &self,
+        id_token: String,
+        share_code: String,
+    ) -> Result<RegenerateShareCodeResponse, InstanceShareError> {
+        let url = format!(
+            "{}/v1/instance-share/share/{}/regenerate",
+            self.base_api, share_code
+        );
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+
+        let resp = self.client.post(url).headers(headers).send().await?;
+
+        handle_instance_share_response(resp).await
+    }
+
+    /// Validate if a share code exists and is not expired (no auth required)
+    pub async fn validate_share_code(
+        &self,
+        share_code: String,
+    ) -> Result<bool, InstanceShareError> {
+        let url = format!(
+            "{}/v1/instance-share/share/{}/validate",
+            self.base_api, share_code
+        );
+
+        let resp = self.client.get(url).send().await?;
+
+        match resp.status() {
+            StatusCode::NO_CONTENT => Ok(true),
+            StatusCode::NOT_FOUND => Ok(false),
+            status => {
+                let body = resp.text().await.unwrap_or_default();
+                Err(InstanceShareError::from_response(status, &body))
+            }
+        }
+    }
 }

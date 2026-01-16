@@ -9,7 +9,8 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false, // default: true
-      networkMode: "always"
+      networkMode: "always",
+      retry: false
     },
     mutations: {
       networkMode: "always"
@@ -27,17 +28,23 @@ export default function initRspc(_port: number) {
   const client = createClient<Procedures>({
     transport,
     onError: (error) => {
-      console.trace("RSPC error:", error)
+      console.error("RSPC error:", error)
 
+      // Show toast for errors that don't have custom error codes.
+      // Errors with codes (like QUOTA_EXCEEDED, MAX_DOWNLOADS_EXCEEDED) are
+      // handled by components with specific translated messages.
       try {
         const parsed = JSON.parse(error.message) as {
-          cause: { display: string }[]
+          cause: { display: string; code?: string }[]
         }
-        toast.error("RSPC Error", {
-          description: parsed.cause.reduce((acc: string, e) => {
-            return acc + (!acc ? "" : " | ") + e.display
-          }, "")
-        })
+
+        // Check if any cause segment has a custom error code
+        const hasCustomCode = parsed.cause?.some((c) => c.code)
+
+        // Only show global toast for errors without custom codes
+        if (!hasCustomCode && parsed.cause?.[0]?.display) {
+          toast.error(parsed.cause[0].display)
+        }
       } catch {
         toast.error(error.message)
       }

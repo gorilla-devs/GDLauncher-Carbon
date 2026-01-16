@@ -19,10 +19,22 @@ export const isListInstanceInvalid = (status: ListInstanceStatus) => {
 export const getLaunchState = (launchState: LaunchState | undefined) => {
   if (!launchState) return undefined
 
-  if (launchState.state === "preparing" || launchState.state === "running") {
+  if (
+    launchState.state === "queued" ||
+    launchState.state === "preparing" ||
+    launchState.state === "running"
+  ) {
     return launchState.value
   }
   return undefined
+}
+
+export const getQueuedState = (status: LaunchState | undefined) => {
+  if (!status) return undefined
+
+  if (status.state === "queued") {
+    return status.value
+  }
 }
 
 export const getPreparingState = (status: LaunchState | undefined) => {
@@ -61,6 +73,10 @@ export const isInstanceDeleting = (status: LaunchState | undefined) => {
   if (!status) return false
 
   return status.state === "deleting"
+}
+
+export const isInstanceQueued = (launchState: LaunchState) => {
+  return launchState.state === "queued"
 }
 
 export const isInstancePreparing = (launchState: LaunchState) => {

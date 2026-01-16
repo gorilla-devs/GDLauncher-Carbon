@@ -187,7 +187,7 @@ export const AccountsDropdown = (props: Props) => {
                     class="h-6 w-6 rounded-md"
                   />
                   <div class="max-w-50 truncate">
-                    {validGDLUser()?.nickname}
+                    {validGDLUser()?.displayName}
                   </div>
                 </div>
               </Match>
@@ -257,7 +257,7 @@ export const AccountsDropdown = (props: Props) => {
             ref={settingsButtonRef}
           >
             <Button
-              type="outline"
+              type="secondary"
               class="flex items-center justify-center gap-4"
               fullWidth
               onClick={() => {

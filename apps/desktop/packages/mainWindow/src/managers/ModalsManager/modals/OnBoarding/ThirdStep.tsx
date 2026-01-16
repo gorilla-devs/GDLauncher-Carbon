@@ -1,15 +1,72 @@
 import { useModal } from "../.."
-import { Button, Spinner } from "@gd/ui"
+import { Button, Input, Spinner, toast } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
-import { For, Match, Show, Switch, createSignal } from "solid-js"
-import { ImportEntityStatus } from "@gd/core_module/bindings"
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js"
+import { ImportEntity, ImportEntityStatus } from "@gd/core_module/bindings"
 import EntityCard from "@/components/Card/EntityCard"
-import SingleEntity, { setInstances, setStep } from "./SingleEntity"
+import SingleEntity, { setInstances } from "./SingleEntity"
 
-import { Trans } from "@gd/i18n"
-import { isDownloaded } from "./SingleImport"
-import { taskIds } from "@/utils/import"
+import { Trans, useTransContext } from "@gd/i18n"
 import { ENTITIES } from "@/utils/constants"
+
+const SHARE_CODE_LENGTH = 10
+
+// Helper to extract error code from rspc error
+const getErrorCode = (error: unknown): string | null => {
+  try {
+    if (
+      error &&
+      typeof error === "object" &&
+      "message" in error &&
+      typeof error.message === "string"
+    ) {
+      const parsed = JSON.parse(error.message)
+      if (parsed?.cause && Array.isArray(parsed.cause)) {
+        for (const segment of parsed.cause) {
+          if (segment?.code) {
+            return segment.code
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return null
+}
+
+// Map error codes to translation keys for share import errors
+type ShareErrorKey =
+  | "instances:_trn_share_errors.share_not_found"
+  | "instances:_trn_share_errors.max_downloads_exceeded"
+  | "instances:_trn_share_errors.network_error"
+  | "instances:_trn_share_errors.unknown"
+
+const getShareImportErrorKey = (code: string | null): ShareErrorKey => {
+  switch (code) {
+    case "SHARE_NOT_FOUND":
+      return "instances:_trn_share_errors.share_not_found"
+    case "MAX_DOWNLOADS_EXCEEDED":
+      return "instances:_trn_share_errors.max_downloads_exceeded"
+    case "NETWORK_ERROR":
+      return "instances:_trn_share_errors.network_error"
+    default:
+      return "instances:_trn_share_errors.unknown"
+  }
+}
+
+const LAUNCHER_ENTITIES: ImportEntity[] = [
+  "LegacyGDLauncher",
+  "ATLauncher",
+  "CurseForge",
+  "FTB",
+  "MultiMC",
+  "Technic",
+  "PrismLauncher",
+  "Modrinth"
+]
+
+const FILE_ENTITIES: ImportEntity[] = ["CurseForgeZip", "MRPack"]
 
 interface Props {
   prevStep: () => void
@@ -22,6 +79,8 @@ const [currentEntity, setCurrentEntity] = createSignal<
 
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal()
+  const [t] = useTransContext()
+  const rspcContext = rspc.useContext()
 
   const [entity, setEntity] = createSignal<ImportEntityStatus | undefined>()
 
@@ -29,14 +88,53 @@ const ThirdStep = (props: Props) => {
     queryKey: ["instance.getImportableEntities"]
   }))
 
+  const [shareCode, setShareCode] = createSignal<string | undefined>()
+  const [isValidating, setIsValidating] = createSignal(false)
+  const [isCodeValid, setIsCodeValid] = createSignal(false)
+  const [validationError, setValidationError] = createSignal<string | null>(
+    null
+  )
+
+  const importInstanceShareCode = rspc.createMutation(() => ({
+    mutationKey: ["instance.importInstanceShareCode"]
+  }))
+
+  // Auto-validate when code reaches expected length
+  createEffect(() => {
+    const code = shareCode()
+    if (code && code.length === SHARE_CODE_LENGTH) {
+      validateCode(code)
+    } else {
+      setIsCodeValid(false)
+      setValidationError(null)
+    }
+  })
+
+  const validateCode = async (code: string) => {
+    setIsValidating(true)
+    setValidationError(null)
+    try {
+      const isValid = await rspcContext.client.query([
+        "instance.validateShareCode",
+        code
+      ])
+      setIsCodeValid(isValid)
+      if (!isValid) {
+        setValidationError(t("instances:_trn_share_errors.share_not_found"))
+      }
+    } catch (err) {
+      setIsCodeValid(false)
+      const errorCode = getErrorCode(err)
+      setValidationError(t(getShareImportErrorKey(errorCode)))
+    } finally {
+      setIsValidating(false)
+    }
+  }
+
   const handleClickEntity = (ent: ImportEntityStatus) => {
     if (ent.supported) {
-      if (currentEntity() && !(currentEntity()?.entity === ent.entity)) {
-        setStep("selectionStep")
-        setInstances([])
-      }
-      if (taskIds().every((x) => x === undefined)) {
-        setStep("selectionStep")
+      // Reset instances when switching to a different entity
+      if (currentEntity() && currentEntity()?.entity !== ent.entity) {
         setInstances([])
       }
       setEntity(ent)
@@ -63,27 +161,107 @@ const ThirdStep = (props: Props) => {
         </Match>
         <Match when={!entity()}>
           <div
-            class={`flex w-full flex-1 flex-col gap-4 ${
+            class={`flex w-full flex-1 flex-col overflow-y-auto ${
               props.isImportInstance ? "px-4 pt-4" : ""
             }`}
           >
-            <Show when={props.isImportInstance}>
-              <div class="flex w-full items-center">
-                <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
-                <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
-                  <div class="i-hugeicons:rocket-02 text-primary-500 text-sm" />
-                  <Trans key="instances:_trn_import_instance" />
-                </span>
-                <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            <div class="flex w-full items-center">
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+              <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
+                <div class="i-hugeicons:share-08 text-primary-500 text-sm" />
+                <Trans key="instances:_trn_import_share_code" />
+              </span>
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            </div>
+            <div class="mt-3 mb-8 flex flex-col">
+              <div class="relative flex items-center gap-2">
+                <Input
+                  placeholder="Share code"
+                  class={`w-64 shrink-0 rounded-md ${isCodeValid() ? "ring-2 ring-green-500" : validationError() ? "ring-2 ring-red-500" : ""}`}
+                  inputColor="bg-darkSlate-800"
+                  value={shareCode() || ""}
+                  maxLength={SHARE_CODE_LENGTH}
+                  onInput={(e) => {
+                    setShareCode(e.target.value)
+                  }}
+                />
+                <div class="flex-1">
+                  <Button
+                    fullWidth
+                    disabled={
+                      !shareCode() ||
+                      shareCode()!.length !== SHARE_CODE_LENGTH ||
+                      !isCodeValid() ||
+                      isValidating()
+                    }
+                    loading={
+                      importInstanceShareCode.isPending || isValidating()
+                    }
+                    onClick={async () => {
+                      try {
+                        await importInstanceShareCode.mutateAsync(shareCode()!)
+                        modalsContext?.closeModal()
+                      } catch (err) {
+                        const errorCode = getErrorCode(err)
+                        toast.error(t(getShareImportErrorKey(errorCode)))
+                      }
+                    }}
+                  >
+                    <Trans key="instances:_trn_import_instance" />
+                  </Button>
+                </div>
+                <Show when={validationError()}>
+                  <span class="text-red-400 text-xs absolute -bottom-5 left-0">
+                    {validationError()}
+                  </span>
+                </Show>
               </div>
-            </Show>
-            <ul class="grid grid-cols-3 gap-1.5 p-0">
+            </div>
+            <div class="flex w-full items-center">
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+              <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
+                <div class="i-hugeicons:rocket-02 text-primary-500 text-sm" />
+                <Trans key="instances:_trn_import_from_launcher" />
+              </span>
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            </div>
+            <ul class="mt-3 mb-8 grid grid-cols-4 gap-1.5 p-0">
               <For
-                each={entities.data?.sort(
-                  (a, b) =>
-                    (b.supported === true ? 1 : 0) -
-                    (a.supported === true ? 1 : 0)
+                each={entities.data
+                  ?.filter((e) => LAUNCHER_ENTITIES.includes(e.entity))
+                  .sort(
+                    (a, b) =>
+                      (b.supported === true ? 1 : 0) -
+                      (a.supported === true ? 1 : 0)
+                  )}
+              >
+                {(entity) => (
+                  <EntityCard
+                    entity={entity}
+                    icon={ENTITIES[entity.entity].icon}
+                    translation={ENTITIES[entity.entity].translation}
+                    onClick={[handleClickEntity, entity]}
+                  />
                 )}
+              </For>
+            </ul>
+            <div class="flex w-full items-center">
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+              <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
+                <div class="i-hugeicons:file-zip text-primary-500 text-sm" />
+                <Trans key="instances:_trn_import_from_file" />
+              </span>
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            </div>
+            <ul class="mt-3 grid grid-cols-4 gap-1.5 p-0">
+              <For
+                each={entities.data
+                  ?.filter((e) => FILE_ENTITIES.includes(e.entity))
+                  .sort(
+                    (a, b) =>
+                      (b.supported === true ? 1 : 0) -
+                      (a.supported === true ? 1 : 0)
+                  )}
               >
                 {(entity) => (
                   <EntityCard
@@ -114,11 +292,7 @@ const ThirdStep = (props: Props) => {
                 size="large"
                 type="primary"
               >
-                {isDownloaded() ? (
-                  <Trans key="onboarding:_trn_done" />
-                ) : (
-                  <Trans key="onboarding:_trn_skip" />
-                )}
+                <Trans key="onboarding:_trn_skip" />
               </Button>
             </div>
           </Show>

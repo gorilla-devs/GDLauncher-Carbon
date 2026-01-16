@@ -208,7 +208,7 @@ const Settings = () => {
           <div class="flex gap-4">
             <Show when={routeData.instanceDetails.data?.modpack?.locked}>
               <Button
-                type="outline"
+                type="secondary"
                 onClick={() => {
                   searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                   // modalsContext?.openModal(
@@ -239,7 +239,7 @@ const Settings = () => {
               </div>
             </Show>
             <Button
-              type="outline"
+              type="secondary"
               onClick={() => {
                 searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                 modalsContext?.openModal(
@@ -257,7 +257,7 @@ const Settings = () => {
               <Trans key="instances:_trn_instance_settings.unpair" />
             </Button>
             <Button
-              type="outline"
+              type="secondary"
               onClick={() => {
                 modalsContext?.openModal(
                   {

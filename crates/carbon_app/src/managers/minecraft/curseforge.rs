@@ -157,23 +157,29 @@ pub async fn prepare_modpack_from_zip(
                 .collect::<HashMap<_, _>>(),
         );
 
-        let all_addons = app
-            .modplatforms_manager()
-            .curseforge
-            .get_files(curseforge::filters::FilesParameters {
-                body: curseforge::filters::FilesParametersBody {
-                    file_ids: manifest
-                        .files
-                        .iter()
-                        .map(|file| file.file_id)
-                        .collect::<Vec<_>>(),
-                },
-            })
-            .await?
-            .data
-            .into_iter()
-            .map(|file| (file.id, file))
-            .collect::<HashMap<_, _>>();
+        let manifest_files = manifest
+            .files
+            .iter()
+            .map(|file| file.file_id)
+            .collect::<Vec<_>>();
+
+        let all_addons = if manifest_files.len() > 0 {
+            // curseforge returns 400 bad response if file_ids is empty
+            app.modplatforms_manager()
+                .curseforge
+                .get_files(curseforge::filters::FilesParameters {
+                    body: curseforge::filters::FilesParametersBody {
+                        file_ids: manifest_files,
+                    },
+                })
+                .await?
+                .data
+                .into_iter()
+                .map(|file| (file.id, file))
+                .collect::<HashMap<_, _>>()
+        } else {
+            HashMap::new()
+        };
 
         for file in &manifest.files {
             let mod_id = file.project_id;

@@ -4,8 +4,9 @@ use crate::domain::account as domain;
 use crate::error::{AxumError, FeError};
 use crate::managers::account::api::{UsernameAvailability, XboxError};
 use crate::managers::account::gdl_account::{
-    ChangeNicknameError, GDLAccountStatus, GDLUser, NicknameHistoryEntry, RegisterAccountBody,
-    RequestGDLAccountDeletionError, RequestNewEmailChangeError, RequestNewVerificationTokenError,
+    ChangeDisplayNameError, DisplayNameHistoryEntry, GDLAccountStatus, GDLUser,
+    RegisterAccountBody, RequestGDLAccountDeletionError, RequestNewEmailChangeError,
+    RequestNewVerificationTokenError,
 };
 use crate::managers::{App, AppInner, account};
 use axum::extract::{Query, State};
@@ -137,12 +138,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(FERequestDeletionStatus::from(result))
         }
 
-        mutation CHANGE_GDL_ACCOUNT_NICKNAME[app, args: FEChangeGdlAccountNickname] {
+        mutation CHANGE_GDL_ACCOUNT_DISPLAY_NAME[app, args: FEChangeGdlAccountDisplayName] {
             let result = app.account_manager()
-                .change_nickname(args.uuid, args.nickname)
+                .change_display_name(args.uuid, args.display_name)
                 .await;
 
-            Ok(FEChangeNicknameStatus::from(result))
+            Ok(FEChangeDisplayNameStatus::from(result))
         }
 
         mutation UPLOAD_PROFILE_ICON[app, args: FEUploadProfileIcon] {
@@ -165,17 +166,17 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
-        query GET_NICKNAME_HISTORY[app, friend_code: String] {
+        query GET_DISPLAY_NAME_HISTORY[app, user_id: i32] {
             let history = app.account_manager()
-                .get_nickname_history(friend_code)
+                .get_display_name_history(user_id)
                 .await?;
 
-            Ok(history.into_iter().map(FENicknameHistoryEntry::from).collect::<Vec<_>>())
+            Ok(history.into_iter().map(FEDisplayNameHistoryEntry::from).collect::<Vec<_>>())
         }
 
-        mutation CLEAR_NICKNAME_HISTORY[app, uuid: String] {
+        mutation CLEAR_DISPLAY_NAME_HISTORY[app, uuid: String] {
             app.account_manager()
-                .clear_nickname_history(uuid)
+                .clear_display_name_history(uuid)
                 .await
         }
     }
@@ -490,18 +491,26 @@ impl From<GDLAccountStatus> for FEGDLAccountStatus {
 struct FEGDLAccount {
     email: String,
     microsoft_oid: String,
-    nickname: String,
+    display_name: String,
     friend_code: String,
     profile_icon_url: String,
     has_custom_avatar: bool,
     microsoft_email: Option<String>,
     is_email_verified: bool,
     has_pending_verification: bool,
-    verification_timeout: Option<u32>,
     has_pending_deletion_request: bool,
+
+    // Cooldown timeouts in seconds (backwards compatible)
+    verification_timeout: Option<u32>,
     deletion_timeout: Option<u32>,
     email_change_timeout: Option<u32>,
-    nickname_change_timeout: Option<u32>,
+    display_name_change_timeout: Option<u32>,
+
+    // Absolute UTC timestamps when cooldown expires (ISO 8601)
+    verification_timeout_at: Option<String>,
+    deletion_timeout_at: Option<String>,
+    email_change_timeout_at: Option<String>,
+    display_name_change_timeout_at: Option<String>,
 }
 
 impl From<GDLUser> for FEGDLAccount {
@@ -509,18 +518,22 @@ impl From<GDLUser> for FEGDLAccount {
         Self {
             email: value.email,
             microsoft_oid: value.microsoft_oid,
-            nickname: value.nickname,
+            display_name: value.display_name,
             friend_code: value.friend_code,
             profile_icon_url: value.profile_icon_url,
             has_custom_avatar: value.has_custom_avatar,
             microsoft_email: value.microsoft_email,
             is_email_verified: value.is_verified,
             has_pending_verification: value.has_pending_verification,
-            verification_timeout: value.verification_timeout.map(|v| v as u32),
             has_pending_deletion_request: value.has_pending_deletion_request,
+            verification_timeout: value.verification_timeout.map(|v| v as u32),
             deletion_timeout: value.deletion_timeout.map(|v| v as u32),
             email_change_timeout: value.email_change_timeout.map(|v| v as u32),
-            nickname_change_timeout: value.nickname_change_timeout.map(|v| v as u32),
+            display_name_change_timeout: value.display_name_change_timeout.map(|v| v as u32),
+            verification_timeout_at: value.verification_timeout_at,
+            deletion_timeout_at: value.deletion_timeout_at,
+            email_change_timeout_at: value.email_change_timeout_at,
+            display_name_change_timeout_at: value.display_name_change_timeout_at,
         }
     }
 }
@@ -529,7 +542,7 @@ impl From<GDLUser> for FEGDLAccount {
 #[serde(rename_all = "camelCase")]
 pub struct FERegisterAccount {
     pub email: String,
-    pub nickname: String,
+    pub display_name: String,
     pub uuid: String,
 }
 
@@ -537,7 +550,7 @@ impl From<FERegisterAccount> for RegisterAccountBody {
     fn from(value: FERegisterAccount) -> Self {
         Self {
             email: value.email,
-            nickname: value.nickname,
+            display_name: value.display_name,
         }
     }
 }
@@ -610,9 +623,9 @@ impl From<Result<(), RequestGDLAccountDeletionError>> for FERequestDeletionStatu
 
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEChangeGdlAccountNickname {
+pub struct FEChangeGdlAccountDisplayName {
     pub uuid: String,
-    pub nickname: String,
+    pub display_name: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -639,32 +652,32 @@ pub struct FECreateProfile {
 #[derive(Type, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "status", content = "value")]
-pub enum FEChangeNicknameStatus {
+pub enum FEChangeDisplayNameStatus {
     Success,
     Failed(Option<u32>),
 }
 
-impl From<Result<(), ChangeNicknameError>> for FEChangeNicknameStatus {
-    fn from(value: Result<(), ChangeNicknameError>) -> Self {
+impl From<Result<(), ChangeDisplayNameError>> for FEChangeDisplayNameStatus {
+    fn from(value: Result<(), ChangeDisplayNameError>) -> Self {
         match value {
             Ok(_) => Self::Success,
-            Err(ChangeNicknameError::TooManyRequests(cooldown)) => Self::Failed(Some(cooldown)),
-            Err(ChangeNicknameError::RequestFailed(_)) => Self::Failed(None),
+            Err(ChangeDisplayNameError::TooManyRequests(cooldown)) => Self::Failed(Some(cooldown)),
+            Err(ChangeDisplayNameError::RequestFailed(_)) => Self::Failed(None),
         }
     }
 }
 
 #[derive(Type, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FENicknameHistoryEntry {
-    pub nickname: String,
+pub struct FEDisplayNameHistoryEntry {
+    pub display_name: String,
     pub changed_at: DateTime<Utc>,
 }
 
-impl From<NicknameHistoryEntry> for FENicknameHistoryEntry {
-    fn from(value: NicknameHistoryEntry) -> Self {
+impl From<DisplayNameHistoryEntry> for FEDisplayNameHistoryEntry {
+    fn from(value: DisplayNameHistoryEntry) -> Self {
         Self {
-            nickname: value.nickname,
+            display_name: value.display_name,
             changed_at: value.changed_at,
         }
     }

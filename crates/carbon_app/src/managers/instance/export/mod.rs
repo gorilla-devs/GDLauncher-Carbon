@@ -1,27 +1,42 @@
 use std::{
+    collections::HashMap,
     fs::{self, File},
-    io,
+    io::{self, Read, Write},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use itertools::Itertools;
-use tokio::sync::mpsc;
+use tokio::{io::AsyncReadExt, sync::mpsc};
+use uuid::Uuid;
 use zip::{
     ZipWriter,
     write::{FileOptionExtension, FileOptions},
 };
 
 use crate::{
+    api::translation::Translation,
     domain::{
         instance::{ExportEntry, ExportTarget, InstanceId},
-        vtask::VisualTaskId,
+        vtask::{Progress, VisualTaskId},
     },
-    managers::{ManagerRef, vtask::Subtask},
+    managers::{
+        account::gdl_account::WaitForShareInstanceResponse,
+        vtask::{Subtask, VisualTask},
+        ManagerRef,
+    },
 };
+
+use super::InvalidInstanceIdError;
 
 mod curseforge_archive;
 mod gdlauncher_archive;
 mod modrinth_archive;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ShareInstanceProgress {
+    Progress(i32),
+}
 
 #[derive(Debug)]
 pub struct InstanceExportManager {}
@@ -50,9 +65,10 @@ impl ManagerRef<'_, InstanceExportManager> {
                     save_path,
                     self_contained_addons_bundling,
                     filter,
-                    version,
+                    Some(version),
                 )
                 .await
+                .map(|v| v.0)
             }
             ExportTarget::Modrinth => {
                 modrinth_archive::export_modrinth(
@@ -61,9 +77,10 @@ impl ManagerRef<'_, InstanceExportManager> {
                     save_path,
                     self_contained_addons_bundling,
                     filter,
-                    version,
+                    Some(version),
                 )
                 .await
+                .map(|v| v.0)
             }
             ExportTarget::Gdlauncher => {
                 gdlauncher_archive::export_gdlauncher(
@@ -77,11 +94,253 @@ impl ManagerRef<'_, InstanceExportManager> {
             }
         }
     }
-}
 
+    pub async fn share_instance(
+        self,
+        instance_id: InstanceId,
+        title: Option<String>,
+        expiration_days: Option<i32>,
+        max_downloads: Option<i32>,
+    ) -> anyhow::Result<(
+        mpsc::Receiver<ShareInstanceProgress>,
+        tokio::task::JoinHandle<Result<String, anyhow::Error>>,
+    )> {
+        let app = self.app.clone();
+        let title = title.clone();
+        let expiration_days = expiration_days;
+        let max_downloads = max_downloads;
+
+        let tmpdir = app
+            .settings_manager()
+            .runtime_path
+            .get_temp()
+            .maketmpdir()
+            .await?;
+
+        let instance_manager = app.instance_manager();
+        let instances = instance_manager.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let basepath = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&instance.shortpath)
+            .get_data_path();
+
+        let mut hashmap = HashMap::new();
+
+        for entry in fs::read_dir(basepath)? {
+            let entry = entry?;
+            let name = entry.file_name();
+            let name = name.to_string_lossy().to_string();
+
+            if name == "saves" {
+                // saves is super heavy and not worth adding
+                continue;
+            }
+
+            hashmap.insert(name, None);
+        }
+
+        drop(instances);
+
+        let filter = ExportEntry(hashmap);
+
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+
+        let handle = tokio::spawn(async move {
+            let phases_count = 4;
+            let mut current_phase = 0;
+
+            // Calculate phase weights as floats
+            let first_phase_weight = 25.0; // 25% for export
+            let second_phase_weight = 25.0; // 25% for checksum
+            let third_phase_weight = 10.0; // 10% for getting URL
+            let fourth_phase_weight = 40.0; // 40% for upload
+            let mut total_progress = 0.0;
+
+            // First phase: Export the instance
+            tx.send(ShareInstanceProgress::Progress(0)).await?;
+
+            let rand_uuid = Uuid::new_v4();
+            let initial_tmpfile = tmpdir.join(rand_uuid.to_string());
+            let (vtask_id, handle) = curseforge_archive::export_curseforge(
+                app.clone(),
+                instance_id,
+                initial_tmpfile.clone(),
+                false,
+                filter,
+                None,
+            )
+            .await?;
+
+            let app_clone = app.clone();
+            let tx_clone = tx.clone();
+
+            tokio::spawn(async move {
+                loop {
+                    let vtask_id = app_clone.task_manager().get_task(vtask_id).await;
+                    if let Some(vtask) = vtask_id {
+                        match vtask.progress {
+                            Progress::Known(progress) => {
+                                // Scale progress to phase weight (0-25%)
+                                let normalized_progress = (progress * first_phase_weight) as i32;
+                                let _ = tx_clone
+                                    .send(ShareInstanceProgress::Progress(normalized_progress))
+                                    .await;
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        break;
+                    }
+
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                }
+            });
+
+            handle.await?;
+
+            // Update total progress after first phase
+            total_progress += first_phase_weight;
+            tx.send(ShareInstanceProgress::Progress(total_progress as i32))
+                .await?;
+
+            // Second phase: Calculate the checksum
+            current_phase += 1;
+
+            let content_length = tokio::fs::metadata(&initial_tmpfile).await?.len();
+            let sha256_checksum = {
+                use base64::{engine::general_purpose, Engine as _};
+                use sha2::{Digest, Sha256};
+                let mut file = tokio::fs::File::open(&initial_tmpfile).await?;
+                let mut hasher = Sha256::new();
+                let mut buffer = vec![0; 1024 * 1024]; // 1MB buffer
+
+                // Get the total file size for progress calculation
+                let total_size = content_length;
+                let mut bytes_processed = 0;
+
+                carbon_scheduler::buffered_digest(&mut file, |chunk| {
+                    bytes_processed += chunk.len() as u64;
+                    hasher.update(chunk);
+
+                    // Update progress
+                    let phase_progress =
+                        (bytes_processed as f64 / total_size as f64) * second_phase_weight;
+                    let current_progress = total_progress + phase_progress as f32;
+
+                    let _ =
+                        tx.blocking_send(ShareInstanceProgress::Progress(current_progress as i32));
+                })
+                .await?;
+
+                general_purpose::STANDARD.encode(hasher.finalize())
+            };
+
+            // Update total progress after second phase
+            total_progress += second_phase_weight as f32;
+            tx.send(ShareInstanceProgress::Progress(total_progress as i32))
+                .await?;
+
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                return Err(anyhow::anyhow!(
+                    "no gdl account found for instance {instance_id}"
+                ));
+            };
+
+            // Third phase: Get the presigned upload URL
+            current_phase += 1;
+
+            let presigned_response = app
+                .account_manager()
+                .get_presigned_upload_url(
+                    gdl_account_uuid.clone(),
+                    content_length,
+                    sha256_checksum.clone(),
+                    title,
+                    expiration_days,
+                    max_downloads,
+                )
+                .await?;
+
+            // Update total progress after third phase
+            total_progress += third_phase_weight;
+            tx.send(ShareInstanceProgress::Progress(total_progress as i32))
+                .await?;
+
+            // Fourth phase: Upload the file
+            current_phase += 1;
+
+            let file = tokio::fs::File::open(&initial_tmpfile).await?;
+
+            let (upload_tx, mut upload_rx) = tokio::sync::mpsc::channel::<i32>(1);
+
+            let tx_clone = tx.clone();
+            let final_progress = total_progress;
+            tokio::spawn(async move {
+                while let Some(progress) = upload_rx.recv().await {
+                    let scaled_progress =
+                        final_progress + (progress as f32 * fourth_phase_weight / 100.0);
+                    let _ = tx_clone
+                        .send(ShareInstanceProgress::Progress(scaled_progress as i32))
+                        .await;
+                }
+            });
+
+            let presigned_url = app
+                .account_manager()
+                .upload_share_instance(
+                    gdl_account_uuid,
+                    presigned_response.url,
+                    file,
+                    content_length,
+                    sha256_checksum,
+                    upload_tx,
+                )
+                .await?;
+
+            Ok(presigned_response.file_key.clone())
+        });
+
+        Ok((rx, handle))
+    }
+
+    pub async fn wait_for_share_instance(
+        self,
+        file_key: String,
+    ) -> anyhow::Result<WaitForShareInstanceResponse> {
+        let Some(gdl_account_uuid) = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .gdl_account_uuid
+        else {
+            return Err(anyhow::anyhow!("no gdl account found"));
+        };
+
+        self.app
+            .account_manager()
+            .wait_for_share_instance(gdl_account_uuid, file_key)
+            .await
+    }
+}
 enum ZipMode<'a, W: io::Write + io::Seek, T: FileOptionExtension + Clone> {
-    Count(&'a mut u32),
-    Create(&'a mut ZipWriter<W>, FileOptions<'a, T>, mpsc::Sender<()>),
+    Count(&'a mut u32, &'a mut u64),
+    Create(
+        &'a mut ZipWriter<W>,
+        FileOptions<'a, T>,
+        tokio::sync::watch::Sender<(u64, u64)>,
+    ),
 }
 
 fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
@@ -90,12 +349,22 @@ fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
     prefix: &str,
     filter: &ExportEntry,
 ) -> anyhow::Result<()> {
+    // Create shared counters for the entire operation
+    let mut bytes_accumulated = 0;
+    let mut files_completed = 0;
+    let mut last_notify = std::time::Instant::now();
+    let notify_interval = std::time::Duration::from_millis(50);
+
     fn walk_recursive<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
         mode: &mut ZipMode<W, T>,
         path: &Path,
         prefix: &str,
         relpath: &[&str],
         filter: Option<&ExportEntry>,
+        bytes_accumulated: &mut u64,
+        files_completed: &mut u64,
+        last_notify: &mut std::time::Instant,
+        notify_interval: std::time::Duration,
     ) -> anyhow::Result<()> {
         for entry in fs::read_dir(path)? {
             let entry = entry?;
@@ -115,16 +384,66 @@ fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
 
             if entry.metadata()?.is_dir() {
                 let relpath = &[relpath, &[&*name][..]].concat()[..];
-                walk_recursive(mode, &entry.path(), prefix, relpath, subfilter.as_ref())?;
+                walk_recursive(
+                    mode,
+                    &entry.path(),
+                    prefix,
+                    relpath,
+                    subfilter.as_ref(),
+                    bytes_accumulated,
+                    files_completed,
+                    last_notify,
+                    notify_interval,
+                )?;
+            } else if entry.metadata()?.is_symlink() {
+                continue;
             } else {
                 match mode {
-                    ZipMode::Count(counter) => {
+                    ZipMode::Count(counter, size) => {
                         **counter += 1;
+                        **size += entry.metadata()?.len();
                     }
                     ZipMode::Create(zip, options, notify) => {
                         zip.start_file(pathstr, options.clone())?;
-                        io::copy(&mut File::open(entry.path())?, zip)?;
-                        let _ = notify.blocking_send(());
+                        let mut file = File::open(entry.path())?;
+                        let total_size = entry.metadata()?.len();
+
+                        // Adaptive buffer: use file size or cap at 1MB
+                        let buffer_size = std::cmp::min(total_size as usize, 1024 * 1024); // 1MB max
+                        let mut buffer = vec![0; buffer_size];
+                        let mut bytes_copied = 0;
+
+                        loop {
+                            let bytes_read = file.read(&mut buffer)?;
+                            if bytes_read == 0 {
+                                break;
+                            }
+
+                            zip.write_all(&buffer[..bytes_read])?;
+                            bytes_copied += bytes_read as u64;
+                            *bytes_accumulated += bytes_read as u64;
+
+                            // Report progress every 200ms
+                            let now = std::time::Instant::now();
+                            if now.duration_since(*last_notify) >= notify_interval {
+                                let _ = notify.send((*bytes_accumulated, *files_completed));
+                                *bytes_accumulated = 0;
+                                *files_completed = 0;
+                                *last_notify = now;
+                            }
+                        }
+
+                        // Increment file counter after each completed file
+                        *files_completed += 1;
+
+                        // Only send notification if we've exceeded the interval
+                        let now = std::time::Instant::now();
+                        if now.duration_since(*last_notify) >= notify_interval {
+                            let _ = notify.send((*bytes_accumulated, *files_completed));
+                            *bytes_accumulated = 0;
+                            *files_completed = 0;
+                            *last_notify = now;
+                        }
                     }
                 }
             }
@@ -133,5 +452,25 @@ fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
         Ok(())
     }
 
-    walk_recursive(&mut mode, base_path, prefix, &[], Some(filter))
+    // Pass the shared counters to the recursive function
+    let result = walk_recursive(
+        &mut mode,
+        base_path,
+        prefix,
+        &[],
+        Some(filter),
+        &mut bytes_accumulated,
+        &mut files_completed,
+        &mut last_notify,
+        notify_interval,
+    );
+
+    // Send any final accumulated data
+    if let ZipMode::Create(_, _, notify) = &mode {
+        if bytes_accumulated > 0 || files_completed > 0 {
+            let _ = notify.send((bytes_accumulated, files_completed));
+        }
+    }
+
+    result
 }

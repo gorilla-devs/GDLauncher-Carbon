@@ -55,6 +55,7 @@ interface Props {
   downloaded?: number
   totalDownload?: number
   isRunning?: boolean
+  isQueued?: boolean
   isPreparing?: boolean
   isDeleting?: boolean
   subTasks?: FESubtask[] | undefined
@@ -113,7 +114,7 @@ const Tile = (props: Props) => {
   const isLoading = () => props.isLoading
 
   const handlePlay = () => {
-    if (props.isPreparing) {
+    if (props.isQueued || props.isPreparing) {
       return
     }
 
@@ -197,7 +198,8 @@ const Tile = (props: Props) => {
     return {}
   }
 
-  const isInQueue = () => props.isPreparing && !isLoading()
+  // Instance is in queue when it has queued state from backend
+  const isInQueue = () => props.isQueued
 
   return (
     <Switch>
@@ -256,6 +258,24 @@ const Tile = (props: Props) => {
                 {props.instance.favorite
                   ? t("instances:_trn_remove_favorite")
                   : t("instances:_trn_add_favorite")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={() => {
+                  const instanceId = props.instance.id
+                  modalsContext?.openModal(
+                    {
+                      name: "shareInstance"
+                    },
+                    {
+                      instanceId: instanceId
+                    }
+                  )
+                }}
+                disabled={isLoading() || isInQueue() || props.isDeleting}
+              >
+                <div class="i-ri:share-line h-4 w-4" />
+                {t("instances:_trn_instance_share.title")}
               </ContextMenuItem>
               <ContextMenuItem
                 class="flex items-center gap-2"

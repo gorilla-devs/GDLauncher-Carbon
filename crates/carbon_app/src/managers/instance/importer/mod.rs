@@ -3,14 +3,17 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
-use tokio::sync::{RwLock, watch};
-use tracing::{debug, trace};
+use tokio::{
+    fs::File,
+    io::AsyncWriteExt,
+    sync::{watch, RwLock},
+};
+use tracing::{debug, info, trace};
 
 use crate::{
-    api::keys::instance::*,
-    api::translation::Translation,
+    api::{keys::instance::*, translation::Translation},
     domain::vtask::VisualTaskId,
-    managers::{AppInner, ManagerRef, modplatforms::curseforge::CurseForge},
+    managers::{modplatforms::curseforge::CurseForge, vtask::VisualTask, AppInner, ManagerRef},
 };
 
 use self::{
@@ -41,6 +44,73 @@ impl InstanceImportManager {
 }
 
 impl ManagerRef<'_, InstanceImportManager> {
+    pub async fn import_instance_share_code(
+        self,
+        share_code: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        let Some(gdl_account_uuid) = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .gdl_account_uuid
+        else {
+            return Err(anyhow::anyhow!(
+                "no gdl account found for import of instance share code {share_code}"
+            ));
+        };
+
+        let presigned_url = self
+            .app
+            .account_manager()
+            .get_presigned_download_url(gdl_account_uuid, share_code.clone())
+            .await?;
+
+        let tmpdir = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_temp()
+            .maketmpdir()
+            .await?;
+
+        let file_path = tmpdir.join(format!("{share_code}.zip"));
+
+        info!(
+            "downloading instance share code {share_code} to {file_path:?} ({:?})",
+            tmpdir.into_path()
+        );
+
+        let mut file = File::create(&file_path).await?;
+
+        // Download the file from the presigned URL
+        let client = reqwest::Client::new();
+        let mut response = client
+            .get(&presigned_url)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        // Stream the response body to the file
+        while let Some(chunk) = response.chunk().await? {
+            file.write_all(&chunk).await?;
+        }
+
+        // Ensure all data is written to disk
+        file.flush().await?;
+
+        let scanner = Entity::CurseForgeZip.create_importer();
+
+        scanner.scan(&self.app, file_path).await?;
+
+        scanner.begin_import(&self.app, 0, None).await?;
+
+        let vtask = VisualTask::new(Translation::InstanceImportShareCode);
+        let vtask_id = self.app.task_manager().spawn_task(&vtask).await;
+
+        Ok(vtask_id)
+    }
+
     pub fn set_scan_target(self, path: Option<(Entity, PathBuf)>) -> anyhow::Result<()> {
         self.scan_path
             .send(path)
@@ -268,7 +338,7 @@ pub trait InstanceImporter: std::fmt::Debug + Send + Sync {
         app: &Arc<AppInner>,
         index: u32,
         name: Option<String>,
-    ) -> anyhow::Result<VisualTaskId>;
+    ) -> anyhow::Result<(VisualTaskId)>;
 }
 
 #[derive(Debug, Clone)]

@@ -13,80 +13,31 @@ import {
   PopoverTrigger,
   Tooltip,
   TooltipContent,
-  TooltipTrigger
+  TooltipTrigger,
+  Collapsable
 } from "@gd/ui"
 import { port, queryClient, rspc } from "@/utils/rspcClient"
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
 import Title from "./components/Title"
+import RightHandSide from "./components/RightHandSide"
 import RowsContainer from "./components/RowsContainer"
+import CopyableField from "./components/CopyableField"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import {
   createEffect,
   createMemo,
   createSignal,
   For,
-  JSX,
   Match,
   Show,
   Switch
 } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { blobToBase64, convertSecondsToHumanTime } from "@/utils/helpers"
-import ImagePicker from "@/components/ImagePicker"
+import { convertSecondsToHumanTime } from "@/utils/helpers"
 import { useModal } from "@/managers/ModalsManager"
 import { AccountEntry } from "@gd/core_module/bindings"
 import { getAccountImageUuid } from "@/utils/showcaseHelpers"
-
-const GDLAccountRowItem = (props: {
-  title?: string
-  value?: string | null | undefined
-  children?: JSX.Element
-  onEdit?: () => void
-  extraAction?: JSX.Element
-}) => {
-  return (
-    <div class="flex items-center justify-between">
-      <div
-        class="group flex flex-col justify-center gap-2"
-        onClick={() => {
-          if (!props.value) return
-
-          navigator.clipboard.writeText(props.value)
-
-          toast.success("Copied to clipboard")
-        }}
-      >
-        <Show when={props.title}>
-          <div class="text-lightSlate-700 group-hover:text-lightSlate-50 flex items-center gap-4 text-base font-light uppercase transition-all duration-100 ease-spring">
-            {props.title}
-            <Show when={props.onEdit}>
-              <div
-                class="text-md text-lightSlate-700 hover:text-lightSlate-50 underline transition-all duration-100 ease-spring"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  props.onEdit?.()
-                }}
-              >
-                EDIT
-              </div>
-            </Show>
-            {props.extraAction}
-            <div class="hidden group-hover:block">
-              <div class="i-hugeicons:clipboard text-lightSlate-50 text-lg" />
-            </div>
-          </div>
-        </Show>
-        <Show when={props.value}>
-          <div class="text-lightSlate-50 overflow-hidden text-ellipsis whitespace-nowrap">
-            {props.value}
-          </div>
-        </Show>
-        {props.children}
-      </div>
-    </div>
-  )
-}
 
 const defaultColumns: ColumnDef<AccountEntry>[] = [
   {
@@ -195,10 +146,6 @@ const Accounts = () => {
     mutationKey: ["account.removeGdlAccount"]
   }))
 
-  const requestNewVerificationTokenMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.requestNewVerificationToken"]
-  }))
-
   const removeAccountMutation = rspc.createMutation(() => ({
     mutationKey: ["account.deleteAccount"]
   }))
@@ -207,18 +154,11 @@ const Accounts = () => {
     mutationKey: ["account.setActiveUuid"]
   }))
 
-  // Avatar state and mutations
-  const [avatarLoading, setAvatarLoading] = createSignal(false)
+  // Avatar preview state
   const [avatarPreview, setAvatarPreview] = createSignal<string | null>(null)
 
-  const uploadAvatarMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.uploadProfileIcon"]
-  }))
-  const deleteAvatarMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.deleteProfileIcon"]
-  }))
-  const clearNicknameHistoryMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.clearNicknameHistory"]
+  const clearDisplayNameHistoryMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.clearDisplayNameHistory"]
   }))
 
   const validGDLUser = () =>
@@ -228,9 +168,9 @@ const Accounts = () => {
 
   const friendCode = createMemo(() => validGDLUser()?.friendCode)
 
-  const nicknameHistoryQuery = rspc.createQuery(() => ({
-    queryKey: ["account.getNicknameHistory", friendCode() ?? ""],
-    enabled: !!friendCode()
+  const displayNameHistoryQuery = rspc.createQuery(() => ({
+    queryKey: ["account.getDisplayNameHistory", userId() ?? 0],
+    enabled: !!userId()
   }))
 
   const invalidGDLUser = () => globalStore.gdlAccount.data?.status === "invalid"
@@ -245,74 +185,32 @@ const Accounts = () => {
     }
   })
 
-  const handleAvatarSelect = async (filePath: string) => {
-    // Load preview
-    const response = await fetch(
-      `http://127.0.0.1:${port}/loadImage?path=${encodeURIComponent(filePath)}`
-    )
-    const blob = await response.blob()
-    const b64 = (await blobToBase64(blob)) as string
-    setAvatarPreview(
-      `data:image/png;base64,${b64.substring(b64.indexOf(",") + 1)}`
-    )
-
-    // Upload immediately
-    const uuid = globalStore?.currentlySelectedAccountUuid?.data
-    if (uuid) {
-      setAvatarLoading(true)
-      try {
-        await uploadAvatarMutation.mutateAsync({ uuid, iconPath: filePath })
-        toast.success(t("accounts:_trn_avatar_upload_success"))
-      } catch (err) {
-        console.error("Avatar upload failed:", err)
-        toast.error(t("accounts:_trn_avatar_upload_failed"))
-      } finally {
-        setAvatarLoading(false)
-      }
+  // Helper to calculate remaining seconds from an absolute UTC timestamp
+  const getRemainingSeconds = (
+    timeoutAt: string | null | undefined,
+    fallbackSeconds: number | null | undefined
+  ): number => {
+    if (timeoutAt) {
+      const expiresAt = new Date(timeoutAt).getTime()
+      const remaining = Math.floor((expiresAt - Date.now()) / 1000)
+      return Math.max(0, remaining)
     }
+    return fallbackSeconds && fallbackSeconds > 0 ? fallbackSeconds : 0
   }
 
-  const handleAvatarDelete = async () => {
-    const uuid = globalStore?.currentlySelectedAccountUuid?.data
-    if (!uuid) return
-
-    setAvatarLoading(true)
-    try {
-      await deleteAvatarMutation.mutateAsync(uuid)
-      setAvatarPreview(null)
-      toast.success(t("accounts:_trn_avatar_delete_success"))
-    } catch (err) {
-      console.error("Avatar deletion failed:", err)
-      toast.error(t("accounts:_trn_avatar_delete_failed"))
-    } finally {
-      setAvatarLoading(false)
-    }
+  const deletionCooldownRemaining = () => {
+    const user = validGDLUser()
+    return getRemainingSeconds(user?.deletionTimeoutAt, user?.deletionTimeout)
   }
 
   const deleteAccountContent = () => {
-    if (validGDLUser()?.deletionTimeout) {
+    const remaining = deletionCooldownRemaining()
+    if (remaining > 0) {
       return (
         <Trans
           key="accounts:_trn_cannot_request_deletion_for_time"
           options={{
-            time: convertSecondsToHumanTime(validGDLUser()?.deletionTimeout!)
-          }}
-        />
-      )
-    } else {
-      return undefined
-    }
-  }
-
-  const verificationContent = () => {
-    if (validGDLUser()?.verificationTimeout) {
-      return (
-        <Trans
-          key="accounts:_trn_cannot_request_deletion_for_time"
-          options={{
-            time: convertSecondsToHumanTime(
-              validGDLUser()?.verificationTimeout!
-            )
+            time: convertSecondsToHumanTime(remaining)
           }}
         />
       )
@@ -334,285 +232,329 @@ const Accounts = () => {
       <PageTitle>
         <Trans key="accounts:_trn_accounts" />
       </PageTitle>
-      <RowsContainer>
-        <Row forceContentBelow>
-          <Title>
-            <Trans key="accounts:_trn_gdl_account_title" />
-          </Title>
-          <div class="bg-darkSlate-700 mb-6 p-4">
-            <Switch>
-              <Match when={validGDLUser()}>
-                <div class="flex flex-col gap-4">
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="text-xl text-green-400">
-                      <Trans key="accounts:_trn_gdl_account_synced" />
-                    </div>
-
-                    <Popover>
-                      <PopoverTrigger>
-                        <Button type="outline">
-                          <div class="i-hugeicons:logout-01 block h-6 w-6" />
-                          <Trans key="accounts:_trn_log_out_gdl_account" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent>
+      {/* GDL Account Section */}
+      <Switch>
+        {/* Logged in state - Discord-like profile card */}
+        <Match when={validGDLUser()}>
+          <div class="bg-darkSlate-700 rounded-xl p-6">
+            {/* Profile Header */}
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="text-lightSlate-50 text-lg font-semibold">
+                <Trans key="accounts:_trn_gdl_account_title" />
+              </h2>
+              <div class="flex items-center gap-2">
+                <Button
+                  type="secondary"
+                  size="small"
+                  onClick={() =>
+                    modalsContext?.openModal({ name: "editGDLProfile" })
+                  }
+                >
+                  <div class="i-hugeicons:edit-02" />
+                  <Trans key="accounts:_trn_edit_profile" />
+                </Button>
+                <Popover>
+                  <PopoverTrigger>
+                    <Button type="secondary" size="small">
+                      <div class="i-hugeicons:logout-01" />
+                      <Trans key="accounts:_trn_log_out" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent class="w-80" hideCloseButton>
+                    <div class="flex flex-col gap-3">
+                      <p class="text-lightSlate-200 m-0 text-sm">
+                        <Trans key="accounts:_trn_log_out_description" />
+                      </p>
+                      <div class="flex justify-end">
                         <Button
                           type="secondary"
+                          size="small"
                           onClick={() => {
                             removeGDLAccountMutation.mutate(undefined)
                           }}
                         >
-                          <div class="i-hugeicons:logout-01 block h-6 w-6" />
-                          <Trans key="accounts:_trn_confirm" />
+                          <div class="i-hugeicons:logout-01" />
+                          <Trans key="accounts:_trn_log_out" />
                         </Button>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <Show
-                    when={validGDLUser() && !validGDLUser()?.isEmailVerified}
-                  >
-                    <div class="mb-4 flex items-center justify-between gap-8 rounded-md p-4 text-yellow-500 outline outline-yellow-500">
-                      <div class="flex items-center gap-4">
-                        <div class="i-hugeicons:alert-01 block h-6 w-6" />
-                        <Trans key="accounts:_trn_gdl_account_not_verified" />
                       </div>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Button
-                            disabled={!!validGDLUser()?.verificationTimeout}
-                            onClick={async () => {
-                              const uuid = globalStore.accounts.data?.find(
-                                (account) =>
-                                  account.uuid ===
-                                  globalStore.settings.data?.gdlAccountId
-                              )?.uuid
-
-                              if (!uuid) {
-                                throw new Error("No active gdl account")
-                              }
-
-                              const request =
-                                await requestNewVerificationTokenMutation.mutateAsync(
-                                  uuid
-                                )
-
-                              if (
-                                request.status === "failed" &&
-                                request.value
-                              ) {
-                                throw new Error(
-                                  `Too many requests, retry in ${request.value}s`
-                                )
-                              }
-                            }}
-                          >
-                            <div class="i-hugeicons:mail-send-01 text-lg" />
-                            <Trans key="accounts:_trn_send_new_verification_email" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{verificationContent()}</TooltipContent>
-                      </Tooltip>
                     </div>
-                  </Show>
-                  <div class="grid grid-cols-2 gap-4">
-                    <div class="flex items-center gap-4">
-                      <ImagePicker
-                        imageUrl={avatarPreview}
-                        onSelect={handleAvatarSelect}
-                        onDelete={handleAvatarDelete}
-                        isLoading={avatarLoading}
-                        deletable={!!validGDLUser()?.hasCustomAvatar}
-                        confirmDelete={true}
-                        sizeClass="h-12 w-12"
-                        class="rounded-md"
-                        dialogTitle={t("accounts:_trn_select_avatar_image")}
-                      />
-                      <GDLAccountRowItem
-                        title={t("accounts:_trn_nickname")}
-                        value={validGDLUser()?.nickname}
-                        onEdit={() => {
-                          modalsContext?.openModal({
-                            name: "changeGDLAccountNickname"
-                          })
-                        }}
-                        extraAction={
-                          <Show
-                            when={
-                              nicknameHistoryQuery.data &&
-                              nicknameHistoryQuery.data.length > 0
-                            }
-                          >
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <Popover>
-                                <PopoverTrigger>
-                                  <div class="text-md text-lightSlate-700 hover:text-lightSlate-50 underline transition-all duration-100 ease-spring">
-                                    <Trans key="accounts:_trn_nickname_history" />
-                                  </div>
-                                </PopoverTrigger>
-                                <PopoverContent class="max-h-60 w-64 overflow-y-auto">
-                                  <div class="flex flex-col gap-2">
-                                    <div class="text-lightSlate-50 font-medium">
-                                      <Trans key="accounts:_trn_nickname_history" />
-                                    </div>
-                                    <For each={nicknameHistoryQuery.data}>
-                                      {(entry) => (
-                                        <div class="text-lightSlate-300 flex justify-between text-sm">
-                                          <span>{entry.nickname}</span>
-                                          <span class="text-lightSlate-500">
-                                            {new Date(
-                                              entry.changedAt
-                                            ).toLocaleDateString()}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </For>
-                                    <Button
-                                      type="secondary"
-                                      size="small"
-                                      class="mt-2"
-                                      onClick={async () => {
-                                        const uuid =
-                                          globalStore
-                                            ?.currentlySelectedAccountUuid?.data
-                                        if (!uuid) return
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
 
-                                        try {
-                                          await clearNicknameHistoryMutation.mutateAsync(
-                                            uuid
-                                          )
-                                          queryClient.invalidateQueries({
-                                            queryKey: [
-                                              "account.getNicknameHistory"
-                                            ]
-                                          })
-                                          toast.success(
-                                            t(
-                                              "accounts:_trn_nickname_history_cleared"
-                                            )
-                                          )
-                                        } catch (err) {
-                                          console.error(err)
-                                          toast.error(
-                                            t(
-                                              "accounts:_trn_nickname_history_clear_failed"
-                                            )
-                                          )
-                                        }
-                                      }}
-                                    >
-                                      <Trans key="accounts:_trn_clear_nickname_history" />
-                                    </Button>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
+            {/* Profile Card */}
+            <div class="flex items-start gap-6">
+              {/* Avatar - Display only */}
+              <img
+                src={
+                  avatarPreview() ||
+                  `http://127.0.0.1:${port}/account/headImage?uuid=${globalStore.settings.data?.gdlAccountId}`
+                }
+                class="h-20 w-20 rounded-xl"
+              />
+
+              {/* Profile Info */}
+              <div class="flex-1">
+                {/* Display Name with History */}
+                <div class="mb-3">
+                  <span class="text-lightSlate-500 text-sm">
+                    <Trans key="accounts:_trn_display_name" />
+                  </span>
+                  <div class="flex items-center gap-1">
+                    <span class="text-lightSlate-50 text-xl font-semibold">
+                      {validGDLUser()?.displayName}
+                    </span>
+                    <Show
+                      when={
+                        displayNameHistoryQuery.data &&
+                        displayNameHistoryQuery.data.length > 0
+                      }
+                    >
+                      <Popover>
+                        <PopoverTrigger>
+                          <button class="text-lightSlate-500 hover:text-lightSlate-300 flex items-center justify-center rounded p-1 transition-colors hover:bg-darkSlate-600">
+                            <div class="i-hugeicons:arrow-down-01 text-lg" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent class="max-h-60 w-64 overflow-y-auto">
+                          <div class="flex flex-col gap-2">
+                            <div class="text-lightSlate-50 font-medium">
+                              <Trans key="accounts:_trn_previous_names" />
                             </div>
-                          </Show>
-                        }
-                      />
-                    </div>
-                    <GDLAccountRowItem
-                      title={t("accounts:_trn_friend_code")}
-                      value={validGDLUser()?.friendCode}
+                            <For each={displayNameHistoryQuery.data}>
+                              {(entry) => (
+                                <div class="text-lightSlate-300 flex justify-between text-sm">
+                                  <span>{entry.displayName}</span>
+                                  <span class="text-lightSlate-500">
+                                    {new Date(
+                                      entry.changedAt
+                                    ).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              )}
+                            </For>
+                            <Button
+                              type="secondary"
+                              size="small"
+                              class="mt-2"
+                              onClick={async () => {
+                                const uuid =
+                                  globalStore?.currentlySelectedAccountUuid
+                                    ?.data
+                                if (!uuid) return
+
+                                try {
+                                  await clearDisplayNameHistoryMutation.mutateAsync(
+                                    uuid
+                                  )
+                                  queryClient.invalidateQueries({
+                                    queryKey: ["account.getDisplayNameHistory"]
+                                  })
+                                  toast.success(
+                                    t(
+                                      "accounts:_trn_display_name_history_cleared"
+                                    )
+                                  )
+                                } catch (err) {
+                                  console.error(err)
+                                  toast.error(
+                                    t(
+                                      "accounts:_trn_display_name_history_clear_failed"
+                                    )
+                                  )
+                                }
+                              }}
+                            >
+                              <Trans key="accounts:_trn_clear_display_name_history" />
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </Show>
+                  </div>
+                </div>
+
+                {/* Info Fields */}
+                <div class="space-y-1">
+                  <CopyableField
+                    label={t("accounts:_trn_friend_code")}
+                    value={validGDLUser()?.friendCode}
+                  />
+                  <div class="text-lightSlate-300 flex items-center gap-2 text-sm">
+                    <span class="text-lightSlate-500">
+                      <Trans key="accounts:_trn_microsoft_account" />:
+                    </span>
+                    <img
+                      src={`http://127.0.0.1:${port}/account/headImage?uuid=${globalStore.settings.data?.gdlAccountId}`}
+                      class="h-4 w-4 rounded"
                     />
-                    <GDLAccountRowItem
-                      title={t("accounts:_trn_microsoft_username")}
-                      value={
+                    <span>
+                      {
                         globalStore.accounts.data?.find(
                           (account) =>
                             account.uuid ===
                             globalStore.settings.data?.gdlAccountId
                         )?.username
                       }
-                    />
-                    <GDLAccountRowItem
-                      title={t("accounts:_trn_microsoft_oid")}
-                      value={validGDLUser()?.microsoftOid}
-                    />
-                    <GDLAccountRowItem
-                      title={t("accounts:_trn_recovery_email")}
-                      value={validGDLUser()?.email}
-                      onEdit={() => {
-                        modalsContext?.openModal({
-                          name: "changeGDLAccountRecoveryEmail"
-                        })
-                      }}
-                    />
-                    <GDLAccountRowItem
-                      title={t("accounts:_trn_microsoft_email")}
-                      value={validGDLUser()?.microsoftEmail}
-                    />
+                    </span>
+                  </div>
+                  <div class="text-lightSlate-300 flex items-center gap-2 text-sm">
+                    <span class="text-lightSlate-500">
+                      <Trans key="accounts:_trn_recovery_email" />:
+                    </span>
+                    <span>{validGDLUser()?.email || "-"}</span>
+                  </div>
+                  <div class="text-lightSlate-300 flex items-center gap-2 text-sm">
+                    <span class="text-lightSlate-500">
+                      <Trans key="accounts:_trn_status" />:
+                    </span>
+                    <Show
+                      when={validGDLUser()?.isEmailVerified}
+                      fallback={
+                        <span class="text-yellow-400">
+                          <Trans key="accounts:_trn_not_verified" />
+                        </span>
+                      }
+                    >
+                      <span class="flex items-center gap-1 text-green-400">
+                        <div class="i-hugeicons:tick-02" />
+                        <Trans key="accounts:_trn_verified" />
+                      </span>
+                    </Show>
                   </div>
                 </div>
+              </div>
+            </div>
 
-                <div class="my-10 flex items-center gap-2 text-xl text-red-500">
-                  <div class="i-hugeicons:alert-01 h-4 w-4" />
-                  <Trans key="accounts:_trn_danger_zone" />
-                </div>
-                <div class="text-lightSlate-700 flex items-center justify-between gap-12">
-                  <div>
-                    <Trans key="accounts:_trn_request_account_deletion_description" />
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger>
+            {/* Actions */}
+            <div class="border-darkSlate-500 mt-6 flex gap-3 border-t pt-4">
+              <Button
+                type="secondary"
+                size="small"
+                onClick={() => {
+                  modalsContext?.openModal({ name: "myShares" })
+                }}
+              >
+                <div class="i-ri:share-line" />
+                <Trans key="accounts:_trn_view_shares" />
+              </Button>
+            </div>
+
+            {/* Danger Zone - Collapsible */}
+            <div class="border-darkSlate-500 mt-4 border-t pt-2">
+              <Collapsable
+                title={
+                  <span class="text-red-400 normal-case">
+                    <Trans key="accounts:_trn_danger_zone" />
+                  </span>
+                }
+                defaultOpened={false}
+                noPadding
+                size="small"
+              >
+                <div class="flex items-center justify-between py-2">
+                  <p class="text-lightSlate-500 text-sm">
+                    <Trans key="accounts:_trn_delete_account_description" />
+                  </p>
+                  <Show
+                    when={deletionCooldownRemaining() > 0}
+                    fallback={
                       <Button
-                        variant="red"
-                        size="large"
-                        disabled={!!validGDLUser()?.deletionTimeout}
+                        type="secondary"
+                        size="small"
+                        class="text-red-400 hover:text-red-300"
                         onClick={() => {
                           modalsContext?.openModal({
                             name: "confirmGDLAccountDeletion"
                           })
                         }}
                       >
-                        <div class="i-hugeicons:delete-02 block h-6 w-6" />
                         <Trans key="accounts:_trn_request_account_deletion" />
                       </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{deleteAccountContent()}</TooltipContent>
-                  </Tooltip>
-                </div>
-              </Match>
-              <Match when={!validGDLUser() && !invalidGDLUser()}>
-                <div class="flex items-center justify-between gap-2">
-                  <div class="text-xl text-red-400">
-                    <Trans key="accounts:_trn_gdl_account_not_synced" />
-                  </div>
-
-                  <Button
-                    type="outline"
-                    onClick={async () => {
-                      await removeGDLAccountMutation.mutateAsync(undefined)
-                      gdNavigator.navigate(
-                        "/?addGdlAccount=true&returnTo=/settings/accounts"
-                      )
-                    }}
+                    }
                   >
-                    <div class="i-hugeicons:link-01 text-lg" />
-                    <Trans key="accounts:_trn_link_gdl_account" />
-                  </Button>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Button
+                          type="secondary"
+                          size="small"
+                          class="text-red-400 hover:text-red-300"
+                          disabled
+                        >
+                          <Trans key="accounts:_trn_request_account_deletion" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{deleteAccountContent()}</TooltipContent>
+                    </Tooltip>
+                  </Show>
                 </div>
-              </Match>
-              <Match when={invalidGDLUser()}>
-                <div class="flex items-center justify-between gap-2">
-                  <div class="text-xl text-yellow-400">
-                    <Trans key="accounts:_trn_gdl_account_error" />
-                  </div>
-
-                  <Button
-                    type="outline"
-                    onClick={() => {
-                      removeGDLAccountMutation.mutate(undefined)
-                    }}
-                  >
-                    <div class="i-hugeicons:logout-01 block h-6 w-6" />
-                    <Trans key="accounts:_trn_log_out_gdl_account" />
-                  </Button>
-                </div>
-              </Match>
-            </Switch>
+              </Collapsable>
+            </div>
           </div>
-        </Row>
-      </RowsContainer>
+        </Match>
+
+        {/* Not logged in state */}
+        <Match when={!validGDLUser() && !invalidGDLUser()}>
+          <RowsContainer>
+            <Row>
+              <Title>
+                <Trans key="accounts:_trn_gdl_account_title" />
+              </Title>
+            </Row>
+            <Row>
+              <Title>
+                <span class="text-red-400">
+                  <Trans key="accounts:_trn_gdl_account_not_synced" />
+                </span>
+              </Title>
+              <RightHandSide>
+                <Button
+                  type="secondary"
+                  onClick={async () => {
+                    await removeGDLAccountMutation.mutateAsync(undefined)
+                    gdNavigator.navigate(
+                      "/?addGdlAccount=true&returnTo=/settings/accounts"
+                    )
+                  }}
+                >
+                  <div class="i-hugeicons:link-01" />
+                  <Trans key="accounts:_trn_link_gdl_account" />
+                </Button>
+              </RightHandSide>
+            </Row>
+          </RowsContainer>
+        </Match>
+
+        {/* Error state */}
+        <Match when={invalidGDLUser()}>
+          <RowsContainer>
+            <Row>
+              <Title>
+                <Trans key="accounts:_trn_gdl_account_title" />
+              </Title>
+            </Row>
+            <Row>
+              <Title>
+                <span class="text-yellow-400">
+                  <Trans key="accounts:_trn_gdl_account_error" />
+                </span>
+              </Title>
+              <RightHandSide>
+                <Button
+                  type="secondary"
+                  onClick={() => {
+                    removeGDLAccountMutation.mutate(undefined)
+                  }}
+                >
+                  <div class="i-hugeicons:logout-01" />
+                  <Trans key="accounts:_trn_log_out_gdl_account" />
+                </Button>
+              </RightHandSide>
+            </Row>
+          </RowsContainer>
+        </Match>
+      </Switch>
       <RowsContainer>
         <Row forceContentBelow>
           <Title>

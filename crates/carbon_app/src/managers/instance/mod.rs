@@ -1743,6 +1743,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             favorite: instance.favorite,
             name: instance.config.name.clone(),
             version: mc_version,
+            // is_being_cached: self
+            //     .app
+            //     .meta_cache_manager()
+            //     .is_instance_being_cached(instance_id)
+            //     .await,
             modpack: instance.config.modpack.clone(),
             global_java_args: instance.config.game_configuration.global_java_args,
             extra_java_args: instance.config.game_configuration.extra_java_args.clone(),

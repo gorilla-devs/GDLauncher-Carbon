@@ -121,7 +121,7 @@ const Mods = () => {
             <Trans key="content:_trn_no_mods_text" />
           </p>
           <Button
-            type="outline"
+            type="secondary"
             size="medium"
             onClick={() => {
               gotoSearchPage()
@@ -358,7 +358,7 @@ const Mods = () => {
             <Show when={isInstanceLocked()}>
               <Tooltip placement="top">
                 <TooltipTrigger>
-                  <Button disabled type="outline" size="medium">
+                  <Button disabled type="secondary" size="medium">
                     <Trans key="content:_trn_add_mod" />
                   </Button>
                 </TooltipTrigger>
@@ -370,7 +370,7 @@ const Mods = () => {
             <Show when={!isInstanceLocked()}>
               <Button
                 disabled={isInstanceLocked()}
-                type="outline"
+                type="secondary"
                 size="medium"
                 onClick={() => {
                   gotoSearchPage()

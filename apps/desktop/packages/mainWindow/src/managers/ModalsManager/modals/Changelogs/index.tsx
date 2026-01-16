@@ -490,7 +490,7 @@ const Changelogs = (props: ModalProps) => {
               </p>
             </div>
             <Button
-              type="outline"
+              type="secondary"
               onClick={() => {
                 window.open(
                   "https://github.com/gorilla-devs/GDLauncher-Carbon/issues/new",

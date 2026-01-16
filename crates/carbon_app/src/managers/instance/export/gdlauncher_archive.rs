@@ -17,7 +17,7 @@ use carbon_platforms::curseforge::manifest::{
 };
 use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
-use tokio::sync::mpsc;
+use tokio::sync::watch;
 use tracing::trace;
 
 pub async fn export_gdlauncher(
@@ -131,8 +131,9 @@ pub async fn export_gdlauncher(
             t_calc_size.start_opaque();
 
             let mut file_count = 0;
+            let mut total_bytes = 0u64;
             super::zip_excluding(
-                ZipMode::<File, ()>::Count(&mut file_count),
+                ZipMode::<File, ()>::Count(&mut file_count, &mut total_bytes),
                 &basepath,
                 "overrides",
                 &filter,
@@ -167,7 +168,7 @@ pub async fn export_gdlauncher(
                 .await?;
 
             let send_path = tmpfile.to_path_buf();
-            let (notify_tx, mut notify_rx) = mpsc::channel::<()>(1);
+            let (notify_tx, mut notify_rx) = watch::channel::<(u64, u64)>((0, 0));
 
             let ziptask = tokio::task::spawn_blocking(move || {
                 let mut zip = zip::ZipWriter::new(File::create(&send_path)?);
@@ -190,11 +191,12 @@ pub async fn export_gdlauncher(
             tokio::select! {
                 r = ziptask => r??,
                 _ = async {
-                    let mut counter = 0;
+                    let mut counter = 0u32;
 
                     loop {
-                        if notify_rx.recv().await.is_some() {
-                            counter += 1;
+                        if notify_rx.changed().await.is_ok() {
+                            let (_, count) = *notify_rx.borrow();
+                            counter += count as u32;
                             t_create_bundle.update_items(counter, file_count);
                         } else {
                             futures::future::pending().await

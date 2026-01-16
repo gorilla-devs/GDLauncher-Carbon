@@ -91,9 +91,6 @@ pub struct Version {
     pub author_id: String,
     pub date_published: UtcDateTime,
     pub downloads: u32,
-    /// A link to the version's changelog (only present for old versions)
-    #[deprecated = "Read from `changelog` instead"]
-    pub changelog_url: Option<String>,
     /// A list of files available for download
     pub files: Vec<VersionFile>,
 }
@@ -167,6 +164,8 @@ pub enum DependencyType {
     Optional,
     Incompatible,
     Embedded,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -177,6 +176,7 @@ pub enum Status {
     Draft,
     Unlisted,
     Scheduled,
+    #[serde(other)]
     Unknown,
 }
 
@@ -187,6 +187,8 @@ pub enum RequestedVersionStatus {
     Archived,
     Draft,
     Unlisted,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -194,6 +196,12 @@ pub enum RequestedVersionStatus {
 pub enum AdditionalFileType {
     RequiredResourcePack,
     OptionalResourcePack,
+    SourcesJar,
+    DevJar,
+    JavadocJar,
+    Signature,
+    #[serde(other)]
+    Unknown,
 }
 
 impl From<VersionType> for ModChannel {

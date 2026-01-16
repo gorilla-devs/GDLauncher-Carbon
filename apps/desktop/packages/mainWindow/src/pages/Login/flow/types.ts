@@ -79,7 +79,7 @@ export type AuthStep =
     }
   | { type: "profile-creation"; accessToken: string }
   | { type: "gdl-account"; gdlAccount: GDLAccountState }
-  | { type: "gdl-account-form"; email?: string; nickname?: string }
+  | { type: "gdl-account-form"; email?: string; displayName?: string }
   | { type: "gdl-account-verification"; email: string; uuid: string }
   | { type: "error"; message: string; canRetry: boolean }
 

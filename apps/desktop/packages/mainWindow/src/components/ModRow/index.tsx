@@ -212,7 +212,7 @@ const ModRow = (props: ModRowProps) => {
                     <div class="flex items-center gap-3">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
-                        type="outline"
+                        type="secondary"
                         onClick={() => handleExplore()}
                       >
                         <Trans key="instances:_trn_explore_modpack" />
@@ -278,7 +278,7 @@ const ModRow = (props: ModRowProps) => {
                     <div class="flex gap-3">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
-                        type="outline"
+                        type="secondary"
                         onClick={() => handleExplore()}
                       >
                         <Trans key="instances:_trn_explore_modpack" />

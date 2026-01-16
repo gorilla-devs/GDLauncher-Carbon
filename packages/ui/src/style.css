@@ -19,6 +19,11 @@
   background-color: rgb(var(--lightGray-900));
 }
 
+:root {
+  /* Enables smoother size/transform transitions - key fix for scale animation blur */
+  interpolate-size: allow-keywords;
+}
+
 html,
 body {
   background: rgb(var(--darkSlate-800));
@@ -207,3 +212,52 @@ a {
 
 /* Respect potato PC mode (performance mode) - disabled by .potato-pc class on body */
 /* Note: .potato-pc already sets transition: none !important on all elements */
+
+/* Scale transitions with rendering optimizations:
+   - interpolate-size: allow-keywords on :root enables smoother transforms
+   - 125ms ease-out for scale (fast but smooth)
+   - backface-visibility: hidden forces 3D compositing layer
+   - transform-origin: center ensures consistent scaling point
+   - will-change on hover pre-promotes to GPU before animation */
+.press-effect {
+  transition:
+    opacity 0.2s ease-in-out,
+    filter 0.2s ease-in-out,
+    scale 0.125s ease-out,
+    transform 0.125s ease-out;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-origin: center center;
+}
+
+.press-effect:hover,
+.press-effect:focus {
+  will-change: transform;
+}
+
+[class*="active:scale-"],
+[class*="hover:scale-"],
+[class*="group-hover:scale-"] {
+  transition-property: scale, transform, opacity, filter;
+  transition-duration: 0.125s, 0.125s, 0.2s, 0.2s;
+  transition-timing-function: ease-out, ease-out, ease-in-out, ease-in-out;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-origin: center center;
+}
+
+[class*="hover:scale-"]:hover,
+[class*="group-hover:scale-"]:hover {
+  will-change: transform;
+}
+
+/* Disabled input stripes pattern */
+.disabled-stripes {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.15) 3px,
+    rgba(0, 0, 0, 0.15) 6px
+  );
+}

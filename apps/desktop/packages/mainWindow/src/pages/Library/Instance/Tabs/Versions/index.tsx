@@ -22,7 +22,7 @@ const NoVersions = () => {
             }}
           />
         </p>
-        <Button type="outline" size="medium">
+        <Button type="secondary" size="medium">
           <Trans
             key="content:_trn_modpack.no_versions"
             options={{

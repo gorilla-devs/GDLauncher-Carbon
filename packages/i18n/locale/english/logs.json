@@ -18,5 +18,6 @@
   "_trn_columns.source_kind": "Source Kind",
   "_trn_columns.thread_name": "Thread Name",
   "_trn_columns.level": "Log Level",
-  "_trn_font_size": "Font Size"
+  "_trn_font_size": "Font Size",
+  "_trn_open_in_folder": "Open in Folder"
 }

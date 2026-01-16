@@ -7,10 +7,10 @@ import { queryClient, rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { convertSecondsToHumanTime } from "@/utils/helpers"
 
-const ChangeGDLAccountNickname = () => {
+const ChangeGDLAccountDisplayName = () => {
   const [t] = useTransContext()
   const modalsContext = useModal()
-  const [newNickname, setNewNickname] = createSignal("")
+  const [newDisplayName, setNewDisplayName] = createSignal("")
   const [isLoading, setIsLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [cooldown, setCooldown] = createSignal(0)
@@ -24,11 +24,28 @@ const ChangeGDLAccountNickname = () => {
       ? globalStore.gdlAccount.data?.value
       : undefined
 
+  // Helper to calculate remaining seconds from an absolute UTC timestamp
+  const getRemainingSeconds = (
+    timeoutAt: string | null | undefined,
+    fallbackSeconds: number | null | undefined
+  ): number => {
+    if (timeoutAt) {
+      const expiresAt = new Date(timeoutAt).getTime()
+      const remaining = Math.floor((expiresAt - Date.now()) / 1000)
+      return Math.max(0, remaining)
+    }
+    return fallbackSeconds && fallbackSeconds > 0 ? fallbackSeconds : 0
+  }
+
   // Initialize cooldown from GDL user data
   createEffect(() => {
-    const timeout = validGDLUser()?.nicknameChangeTimeout
-    if (timeout && timeout > 0) {
-      setCooldown(timeout)
+    const user = validGDLUser()
+    const remaining = getRemainingSeconds(
+      user?.displayNameChangeTimeoutAt,
+      user?.displayNameChangeTimeout
+    )
+    if (remaining > 0) {
+      setCooldown(remaining)
       startCooldownTimer()
     }
   })
@@ -56,31 +73,31 @@ const ChangeGDLAccountNickname = () => {
     }
   })
 
-  const changeNicknameMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.changeGdlAccountNickname"]
+  const changeDisplayNameMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.changeGdlAccountDisplayName"]
   }))
 
   const isValid = () => {
-    const nickname = newNickname().trim()
-    return nickname.length >= 5 && nickname.length <= 20
+    const displayName = newDisplayName().trim()
+    return displayName.length >= 5 && displayName.length <= 20
   }
 
   return (
     <ModalLayout
-      title={t("accounts:_trn_change_nickname_title")}
+      title={t("accounts:_trn_change_display_name_title")}
       height="h-70"
       width="w-140"
     >
       <div class="flex h-full flex-col justify-between">
         <div class="flex flex-col gap-4">
           <div>
-            <Trans key="accounts:_trn_change_nickname_description" />
+            <Trans key="accounts:_trn_change_display_name_description" />
           </div>
           <Input
-            placeholder={t("auth:_trn_login.nickname")}
-            value={newNickname()}
+            placeholder={t("auth:_trn_login.display_name")}
+            value={newDisplayName()}
             onInput={(e) => {
-              setNewNickname(e.currentTarget.value)
+              setNewDisplayName(e.currentTarget.value)
               setError(null)
             }}
             disabled={!!cooldown()}
@@ -91,7 +108,7 @@ const ChangeGDLAccountNickname = () => {
           <Show when={cooldown()}>
             <div class="text-lightSlate-500 text-sm">
               <Trans
-                key="accounts:_trn_nickname_change_cooldown"
+                key="accounts:_trn_display_name_change_cooldown"
                 options={{
                   time: convertSecondsToHumanTime(cooldown())
                 }}
@@ -119,35 +136,35 @@ const ChangeGDLAccountNickname = () => {
                 throw new Error("No active uuid")
               }
 
-              const nickname = newNickname().trim()
+              const displayName = newDisplayName().trim()
 
-              if (!nickname) {
-                setError(t("auth:_trn_login.nickname_required"))
+              if (!displayName) {
+                setError(t("auth:_trn_login.display_name_required"))
                 return
               }
 
-              if (nickname.length < 5) {
-                setError(t("auth:_trn_login.nickname_too_short"))
+              if (displayName.length < 5) {
+                setError(t("auth:_trn_login.display_name_too_short"))
                 return
               }
 
               setIsLoading(true)
               try {
-                const result = await changeNicknameMutation.mutateAsync({
+                const result = await changeDisplayNameMutation.mutateAsync({
                   uuid,
-                  nickname
+                  displayName: displayName
                 })
 
                 if (!result) {
                   // Mutation returned null - likely a backend error
-                  setError(t("accounts:_trn_nickname_change_failed"))
+                  setError(t("accounts:_trn_display_name_change_failed"))
                   setIsLoading(false)
                   return
                 }
 
                 if (result.status === "success") {
                   queryClient.invalidateQueries({
-                    queryKey: ["account.getNicknameHistory"]
+                    queryKey: ["account.getDisplayNameHistory"]
                   })
                   modalsContext?.closeModal()
                 } else if (result.status === "failed" && result.value) {
@@ -155,7 +172,7 @@ const ChangeGDLAccountNickname = () => {
                   setCooldown(result.value)
                   startCooldownTimer()
                 } else if (result.status === "failed") {
-                  setError(t("accounts:_trn_nickname_change_failed"))
+                  setError(t("accounts:_trn_display_name_change_failed"))
                   setIsLoading(false)
                 }
               } catch (err) {
@@ -173,4 +190,4 @@ const ChangeGDLAccountNickname = () => {
   )
 }
 
-export default ChangeGDLAccountNickname
+export default ChangeGDLAccountDisplayName

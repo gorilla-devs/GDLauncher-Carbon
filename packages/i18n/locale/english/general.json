@@ -38,5 +38,6 @@
   "_trn_instance_unpair_confirmation": "Unpairing removes the link between your instance and the modpack. This means you won't be able to change modpack version anymore. This action cannot be undone.",
   "_trn_select_image": "Select Image",
   "_trn_cancel": "Cancel",
-  "_trn_delete": "Delete"
+  "_trn_delete": "Delete",
+  "_trn_edit": "Edit"
 }

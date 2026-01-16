@@ -17,18 +17,31 @@ pub struct FeError {
 pub struct CauseSegment {
     pub display: String,
     pub debug: String,
+    /// Optional error code for structured error handling (e.g., "QUOTA_EXCEEDED")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
 }
 
 pub type AxumError = (axum::http::StatusCode, String);
 
 impl FeError {
     pub fn from_anyhow(error: &anyhow::Error) -> Self {
+        use crate::managers::account::gdl_account::InstanceShareError;
+
         Self {
             cause: error
                 .chain()
-                .map(|entry| CauseSegment {
-                    display: format!("{entry}"),
-                    debug: format!("{entry:#?}"),
+                .map(|entry| {
+                    // Try to downcast to InstanceShareError to extract the error code
+                    let code = entry
+                        .downcast_ref::<InstanceShareError>()
+                        .map(|e| e.error_code().to_string());
+
+                    CauseSegment {
+                        display: format!("{entry}"),
+                        debug: format!("{entry:#?}"),
+                        code,
+                    }
                 })
                 .collect(),
             backtrace: format!("{}", error.backtrace()),
@@ -59,6 +72,7 @@ impl CauseSegment {
         Self {
             display: format!("{v}"),
             debug: String::new(),
+            code: None,
         }
     }
 
@@ -66,6 +80,7 @@ impl CauseSegment {
         Self {
             display: format!("{v}"),
             debug: format!("{v:#?}"),
+            code: None,
         }
     }
 }

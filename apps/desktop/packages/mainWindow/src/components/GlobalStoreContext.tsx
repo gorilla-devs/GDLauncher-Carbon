@@ -123,7 +123,7 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
                 ...data,
                 value: {
                   ...data.value,
-                  nickname: "DemoUser",
+                  displayName: "DemoUser",
                   email: "demo@example.com",
                   friendCode: "DEMO#0000",
                   microsoftOid: "00000000-0000-0000-0000-000000000000",

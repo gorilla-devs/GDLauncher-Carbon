@@ -223,12 +223,7 @@ async fn invalidation_ws_handler(
                 error!("Failed to serialize invalidation event: {:?}", event);
                 continue;
             };
-            match socket.send(Message::Text(message)).await {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("Failed to send invalidation event: {:?}", e);
-                }
-            }
+            let _ = socket.send(Message::Text(message)).await;
         }
 
         info!("Invalidation channel disconnected");

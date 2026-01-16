@@ -319,6 +319,47 @@ impl ManagerRef<'_, InstanceManager> {
         }
     }
 
+    pub async fn get_log_file_path(
+        self,
+        instance_id: InstanceId,
+        log_id: GameLogId,
+    ) -> anyhow::Result<String> {
+        // Get the log entry to find the datetime
+        let logs = self.game_logs.read().await;
+        let (_, datetime, _) = logs
+            .get(&log_id)
+            .ok_or_else(|| anyhow::anyhow!(InvalidGameLogIdError))?;
+        let datetime = datetime.clone();
+        drop(logs);
+
+        // Get the instance shortpath
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or_else(|| anyhow::anyhow!("Instance not found"))?;
+        let shortpath = instance.shortpath.clone();
+        drop(instances);
+
+        // Construct the log file path
+        let logs_path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath)
+            .get_gdl_logs_path();
+
+        let filename = format!("{}.log", datetime.format("%Y-%m-%d_%H-%M-%S"));
+        let log_file_path = logs_path.join(&filename);
+
+        // Return the file path if it exists, otherwise return the logs folder
+        if log_file_path.exists() {
+            Ok(log_file_path.to_string_lossy().to_string())
+        } else {
+            Ok(logs_path.to_string_lossy().to_string())
+        }
+    }
+
     pub async fn get_log(
         self,
         id: GameLogId,
@@ -333,6 +374,7 @@ impl ManagerRef<'_, InstanceManager> {
         async fn read_logs_from_memory(
             itself: ManagerRef<'_, InstanceManager>,
             instance_id: InstanceId,
+            logs_path: Option<std::path::PathBuf>,
         ) -> Vec<GameLogEntry> {
             itself
                 .game_logs
@@ -340,17 +382,44 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
                 .iter()
                 .filter(|(_, (id, _, _))| *id == instance_id)
-                .map(|(id, (instance_id, datetime, rx))| GameLogEntry {
-                    id: *id,
-                    instance_id: *instance_id,
-                    active: rx.has_changed().is_ok(),
-                    datetime: datetime.clone(),
+                .map(|(id, (instance_id, datetime, rx))| {
+                    let active = rx.has_changed().is_ok();
+                    // For inactive logs, compute file size from the log file
+                    let file_size = if active {
+                        None
+                    } else if let Some(ref logs_path) = logs_path {
+                        let filename = format!("{}.log", datetime.format("%Y-%m-%d_%H-%M-%S"));
+                        let file_path = logs_path.join(&filename);
+                        std::fs::metadata(&file_path).ok().map(|m| m.len())
+                    } else {
+                        None
+                    };
+                    GameLogEntry {
+                        id: *id,
+                        instance_id: *instance_id,
+                        active,
+                        datetime: datetime.clone(),
+                        file_size,
+                    }
                 })
                 .sorted_by_key(|entry| entry.id.0)
                 .collect()
         }
 
-        let in_memory_logs = read_logs_from_memory(self.clone(), instance_id).await;
+        // Get instance logs path for file size computation
+        let logs_path = {
+            let instance_lock = self.instances.read().await;
+            instance_lock.get(&instance_id).map(|v| {
+                self.app
+                    .settings_manager()
+                    .runtime_path
+                    .get_instances()
+                    .get_instance_path(&v.shortpath)
+                    .get_gdl_logs_path()
+            })
+        };
+
+        let in_memory_logs = read_logs_from_memory(self.clone(), instance_id, logs_path.clone()).await;
 
         if in_memory_logs.len() == 0 {
             let instance_lock = self.instances.read().await;
@@ -394,7 +463,10 @@ impl ManagerRef<'_, InstanceManager> {
                             continue;
                         };
 
-                        let file_as_datetime = Local.from_utc_datetime(&naive);
+                        // Use from_local_datetime since the filename is in local time
+                        let Some(file_as_datetime) = Local.from_local_datetime(&naive).single() else {
+                            continue;
+                        };
 
                         let (log_id, tx) =
                             self.create_log(instance_id, Some(file_as_datetime)).await;
@@ -419,7 +491,7 @@ impl ManagerRef<'_, InstanceManager> {
             }
         }
 
-        read_logs_from_memory(self.clone(), instance_id).await
+        read_logs_from_memory(self.clone(), instance_id, logs_path.clone()).await
     }
 
     pub async fn search_in_log(

@@ -149,7 +149,7 @@ const Overview = () => {
                 <div class="flex gap-4">
                   <Button
                     rounded={false}
-                    type="outline"
+                    type="secondary"
                     onClick={() => {
                       if (modpackPlatform() === "curseforge") {
                         window.openExternalLink(

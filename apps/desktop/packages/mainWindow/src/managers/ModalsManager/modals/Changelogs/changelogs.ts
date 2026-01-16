@@ -25,14 +25,14 @@ const changelogs: Changelog = {
         "Upload and customize your GDL account profile picture. Your avatar is displayed throughout the launcher and to other users."
     },
     {
-      title: "Nickname Change",
+      title: "Display Name Change",
       description:
-        "Change your GDL account nickname from the account settings. A 7-day cooldown applies between changes."
+        "Change your GDL account display name from the account settings. A cooldown applies between changes."
     },
     {
-      title: "Nickname History",
+      title: "Display Name History",
       description:
-        "View your past nicknames Steam-style. Your nickname history is public, but you can clear it anytime from the account settings."
+        "View your past display names Steam-style. Your display name history is public, but you can clear it anytime from the account settings."
     },
     {
       title: "Japanese Language Support",

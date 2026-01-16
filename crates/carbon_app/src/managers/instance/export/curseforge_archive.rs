@@ -27,8 +27,8 @@ pub async fn export_curseforge(
     save_path: PathBuf,
     self_contained_addons_bundling: bool,
     mut filter: ExportEntry,
-    version: String,
-) -> anyhow::Result<VisualTaskId> {
+    version: Option<String>,
+) -> anyhow::Result<(VisualTaskId, tokio::task::JoinHandle<()>)> {
     let instance_manager = app.instance_manager();
     let instances = instance_manager.instances.read().await;
     let instance = instances
@@ -65,32 +65,30 @@ pub async fn export_curseforge(
     let vtask = VisualTask::new(Translation::InstanceExport);
     let vtask_id = app.task_manager().spawn_task(&vtask).await;
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         let try_result: anyhow::Result<_> = async {
             let mut mods = Vec::new();
 
-            let t_calc_size = vtask.subtask(Translation::InstanceExportCalculateSize);
-            t_calc_size.set_weight(0.0);
             let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
 
+            t_create_bundle.start_opaque();
             vtask
-                .edit(|data| data.state = TaskState::KnownProgress)
+                .edit(|data| data.state = TaskState::Indeterminate)
                 .await;
 
             if !self_contained_addons_bundling {
                 let mods_filter = filter.0.get_mut("mods");
-                if let Some(mods_filter) = mods_filter {
-                    let t_scan = vtask.subtask(Translation::InstanceExportScanningMods);
-                    t_scan.start_opaque();
 
+                if let Some(mods_filter) = mods_filter {
                     if mods_filter.is_none() {
                         let mut modsdir_entries = HashMap::new();
 
-                        let mut dir = tokio::fs::read_dir(basepath.join("mods")).await?;
-                        while let Some(next) = dir.next_entry().await? {
-                            let name = next.file_name();
-                            let Some(name) = name.to_str() else { continue };
-                            modsdir_entries.insert(name.to_string(), None);
+                        if let Ok(mut dir) = tokio::fs::read_dir(basepath.join("mods")).await {
+                            while let Some(next) = dir.next_entry().await? {
+                                let name = next.file_name();
+                                let Some(name) = name.to_str() else { continue };
+                                modsdir_entries.insert(name.to_string(), None);
+                            }
                         }
 
                         *mods_filter = Some(ExportEntry(modsdir_entries));
@@ -126,29 +124,26 @@ pub async fn export_curseforge(
                         });
 
                     mods.extend(mods2);
-                    t_scan.complete_opaque();
                 }
             }
 
-            t_calc_size.start_opaque();
-
             let mut file_count = 0;
+            let mut size_count = 0;
             super::zip_excluding(
-                ZipMode::<File, ()>::Count(&mut file_count),
+                ZipMode::<File, ()>::Count(&mut file_count, &mut size_count),
                 &basepath,
                 "overrides",
                 &filter,
             )?;
 
-            t_calc_size.complete_opaque();
-            t_create_bundle.update_items(0, file_count);
+            t_create_bundle.update_items(0, 100);
 
             let manifest = Manifest {
                 minecraft: convert_standard_version_to_cf_version(game_version.clone())?,
                 manifest_type: String::from("minecraftModpack"),
                 manifest_version: 1,
                 name: config.name,
-                version: Some(version),
+                version,
                 author: String::new(),
                 overrides: String::from("overrides"),
                 files: mods
@@ -169,7 +164,9 @@ pub async fn export_curseforge(
                 .await?;
 
             let send_path = tmpfile.to_path_buf();
-            let (notify_tx, mut notify_rx) = mpsc::channel::<()>(1);
+            let (notify_tx, mut notify_rx) = tokio::sync::watch::channel::<(u64, u64)>(
+                (0, 0)
+            );
 
             let ziptask = tokio::task::spawn_blocking(move || {
                 let mut zip = zip::ZipWriter::new(File::create(&send_path)?);
@@ -189,15 +186,41 @@ pub async fn export_curseforge(
                 Ok::<_, anyhow::Error>(())
             });
 
+            t_create_bundle.complete_opaque();
+
+            vtask
+                .edit(|data| data.state = TaskState::KnownProgress)
+                .await;
+
+            t_create_bundle.update_items(0, 100);
+
             tokio::select! {
                 r = ziptask => r??,
                 _ = async {
                     let mut counter = 0;
+                    let mut size = 0;
 
                     loop {
-                        if notify_rx.recv().await.is_some() {
-                            counter += 1;
-                            t_create_bundle.update_items(counter, file_count);
+                        if notify_rx.changed().await.is_ok() {
+                            let (bytes_read, count) = notify_rx.borrow().clone();
+
+                            counter += count;
+                            size += bytes_read;
+
+                            const SIZE_WEIGHT: f64 = 0.6;
+                            const COUNT_WEIGHT: f64 = 0.4;
+                            
+                            let estimated_total_files = file_count;
+                            let estimated_total_size = size_count;
+                            
+                            let count_progress = (counter as f64 / estimated_total_files as f64).min(1.0);
+                            let size_progress = (size as f64 / estimated_total_size as f64).min(1.0);
+                            
+                            let weighted_progress = (count_progress * COUNT_WEIGHT + size_progress * SIZE_WEIGHT) * 100.0;
+                            
+                            let computed_curr = weighted_progress as u32;
+
+                            t_create_bundle.update_items(computed_curr, 100);
                         } else {
                             futures::future::pending().await
                         }
@@ -218,7 +241,7 @@ pub async fn export_curseforge(
         }
     });
 
-    Ok(vtask_id)
+    Ok((vtask_id, handle))
 }
 
 #[cfg(test)]

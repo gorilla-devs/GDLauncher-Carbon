@@ -123,9 +123,13 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ChangeGDLAccountRecoveryEmail")),
     title: t("modals:_trn_change_recovery_email")
   },
-  changeGDLAccountNickname: {
-    component: lazy(() => import("./modals/ChangeGDLAccountNickname")),
-    title: t("modals:_trn_change_nickname")
+  editGDLProfile: {
+    component: lazy(() => import("./modals/EditGDLProfile")),
+    title: t("modals:_trn_edit_profile")
+  },
+  changeGDLAccountDisplayName: {
+    component: lazy(() => import("./modals/ChangeGDLAccountDisplayName")),
+    title: t("modals:_trn_change_display_name")
   },
   modDetails: {
     component: lazy(() => import("./modals/ModDetails")),
@@ -142,6 +146,14 @@ const getDefaultModals = (t: TypedTFunction) => ({
   betaPrompt: {
     component: lazy(() => import("./modals/BetaPrompt")),
     title: t("modals:_trn_beta_prompt_title")
+  },
+  shareInstance: {
+    component: lazy(() => import("./modals/ShareInstance")),
+    title: t("instances:_trn_instance_share.title")
+  },
+  myShares: {
+    component: lazy(() => import("./modals/MyShares")),
+    title: t("instances:_trn_my_shares.title")
   }
 })
 

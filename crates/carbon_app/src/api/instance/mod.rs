@@ -7,14 +7,21 @@ use super::vtask::FETaskId;
 use crate::api::keys;
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::error::{AxumError, FeError};
+use crate::managers::account::gdl_account::{
+    PaginatedShares, QuotaInfo, RegenerateShareCodeResponse, ShareInfo, UpdateShareBody,
+    WaitForShareInstanceResponse,
+};
 use crate::managers::instance as manager;
+use crate::managers::instance::export::ShareInstanceProgress;
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
 use crate::managers::{App, AppInner, instance::importer};
 use anyhow::anyhow;
+use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
+use axum::Json;
 use carbon_platforms as mpdomain;
 use chrono::{DateTime, Utc};
 use rspc::RouterBuilder;
@@ -270,6 +277,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        mutation OPEN_LOG_IN_FOLDER[app, req: OpenLogInFolder] {
+            Ok(app.instance_manager()
+                .get_log_file_path(req.instance_id.into(), req.log_id.into())
+                .await?)
+        }
+
         mutation ENABLE_MOD[app, imod: InstanceMod] {
             app.instance_manager()
                 .enable_mod(
@@ -383,6 +396,20 @@ pub(super) fn mount() -> RouterBuilder<App> {
             .await
         }
 
+        mutation IMPORT_INSTANCE_SHARE_CODE[app, share_code: String] {
+            app.instance_manager()
+                .import_manager()
+                .import_instance_share_code(share_code)
+                .await
+                .map(FETaskId::from)
+        }
+
+        query VALIDATE_SHARE_CODE[app, share_code: String] {
+            app.account_manager()
+                .validate_share_code(share_code)
+                .await
+        }
+
         query GET_IMPORTABLE_ENTITIES[_, _args: ()] {
             anyhow::Result::Ok(importer::Entity::list()
                 .into_iter()
@@ -449,6 +476,112 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             Ok(FETaskId::from(task))
         }
+
+        query WAIT_FOR_SHARE_INSTANCE[app, file_key: String] {
+            let resp = app.instance_manager()
+                .export_manager()
+                .wait_for_share_instance(file_key)
+                .await?;
+
+            Ok(FEWaitForInstanceShareResponse::from(resp))
+        }
+
+        query GET_USER_SHARES[app, args: FEGetUserSharesArgs] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            let shares = app
+                .account_manager()
+                .get_user_shares(
+                    gdl_account_uuid,
+                    args.limit.map(|l| l as i64),
+                    args.offset.map(|o| o as i64),
+                )
+                .await?;
+
+            Ok(FEPaginatedShares::from(shares))
+        }
+
+        query GET_USER_QUOTA[app, args: ()] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            let quota = app
+                .account_manager()
+                .get_quota(gdl_account_uuid)
+                .await?;
+
+            Ok(FEQuotaInfo::from(quota))
+        }
+
+        mutation DELETE_SHARE[app, share_code: String] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            app.account_manager()
+                .delete_share(gdl_account_uuid, share_code)
+                .await?;
+
+            Ok(())
+        }
+
+        mutation UPDATE_SHARE[app, args: FEUpdateShareArgs] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            app.account_manager()
+                .update_share(
+                    gdl_account_uuid,
+                    args.share_code,
+                    args.title,
+                    args.max_downloads,
+                )
+                .await?;
+
+            Ok(())
+        }
+
+        mutation REGENERATE_SHARE_CODE[app, share_code: String] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            let response = app
+                .account_manager()
+                .regenerate_share_code(gdl_account_uuid, share_code)
+                .await?;
+
+            Ok(FERegenerateShareCodeResponse::from(response))
+        }
     }
 }
 
@@ -501,6 +634,66 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         };
 
         Ok::<_, AxumError>(res)
+    }
+
+    async fn share_instance(
+        State(app): State<Arc<AppInner>>,
+        Query(query): Query<ShareInstanceQuery>,
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
+        let (mut rx, handle) = app
+            .instance_manager()
+            .export_manager()
+            .share_instance(query.instance_id.into(), query.title, query.expiration_days, query.max_downloads)
+            .await
+            .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+        let response = axum::response::sse::Sse::new(async_stream::stream! {
+            yield Ok::<_, Infallible>(axum::response::sse::Event::default()
+                .json_data(FEShareInstanceProgress::Progress(0))
+                .unwrap());
+
+            let mut last_progress = ShareInstanceProgress::Progress(0);
+
+            while let Some(progress) = rx.recv().await {
+                if last_progress != progress {
+                    last_progress = progress.clone();
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(FEShareInstanceProgress::from(progress.clone()))
+                        .unwrap());
+                }
+            }
+
+            let result = match handle.await {
+                Ok(result) => result,
+                Err(err) => Err(anyhow::anyhow!(err)),
+            };
+
+            match result {
+                Ok(result) => {
+                    tracing::info!("Share instance finished with result: {}", result);
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(FEShareInstanceProgress::Finished(result))
+                        .unwrap());
+                }
+                Err(err) => {
+                    use crate::managers::account::gdl_account::InstanceShareError;
+                    tracing::error!("Share instance failed with error: {}", err);
+
+                    // Try to extract error code from InstanceShareError
+                    let (code, message) = err
+                        .downcast_ref::<InstanceShareError>()
+                        .map(|e| (e.error_code().to_string(), e.to_string()))
+                        .unwrap_or_else(|| ("UNKNOWN_ERROR".to_string(), err.to_string()));
+
+                    yield Ok(axum::response::sse::Event::default()
+                        .event("error")
+                        .json_data(FEShareInstanceProgress::Error { code, message })
+                        .unwrap());
+                }
+            };
+        });
+
+        Ok::<_, AxumError>(response)
     }
 
     axum::Router::new()
@@ -571,6 +764,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             )
         )
         .route("/log", axum::routing::get(log::log_handler))
+        .route("/shareInstance", axum::routing::get(share_instance))
 }
 
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -817,6 +1011,7 @@ struct GameLogEntry {
     instance_id: FEInstanceId,
     active: bool,
     timestamp: String,
+    file_size: Option<f64>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -914,6 +1109,7 @@ struct InstanceDetails {
     name: String,
     favorite: bool,
     version: Option<String>,
+    // is_being_cached: bool,
     modpack: Option<ModpackInfo>,
     global_java_args: bool,
     extra_java_args: Option<String>,
@@ -965,6 +1161,12 @@ struct OpenInstanceFolder {
 }
 
 #[derive(Type, Debug, Deserialize)]
+struct OpenLogInFolder {
+    instance_id: FEInstanceId,
+    log_id: GameLogId,
+}
+
+#[derive(Type, Debug, Deserialize)]
 enum InstanceFolder {
     Root,
     Data,
@@ -1001,6 +1203,7 @@ enum LaunchState {
     Inactive {
         failed_task: Option<FETaskId>,
     },
+    Queued(FETaskId),
     Preparing(FETaskId),
     Running {
         start_time: DateTime<Utc>,
@@ -1184,6 +1387,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             favorite: value.favorite,
             name: value.name,
             version: value.version,
+            // is_being_cached: value.is_being_cached,
             modpack: value.modpack.map(Into::into),
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
@@ -1455,6 +1659,7 @@ impl From<domain::LaunchState> for LaunchState {
             domain::Inactive { failed_task } => Self::Inactive {
                 failed_task: failed_task.map(Into::into),
             },
+            domain::Queued(task) => Self::Queued(task.into()),
             domain::Preparing(task) => Self::Preparing(task.into()),
             domain::Running { start_time, log_id } => Self::Running {
                 start_time,
@@ -1549,6 +1754,7 @@ impl From<domain::GameLogEntry> for GameLogEntry {
             instance_id: value.instance_id.into(),
             active: value.active,
             timestamp: value.datetime.timestamp_millis().to_string(),
+            file_size: value.file_size.map(|s| s as f64),
         }
     }
 }
@@ -1841,6 +2047,147 @@ impl From<FESearchResult> for SearchResult {
             entry_index: value.entry_index as usize,
             pos: value.pos as usize,
             len: value.len as usize,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct ShareInstanceQuery {
+    instance_id: FEInstanceId,
+    title: Option<String>,
+    expiration_days: Option<i32>,
+    max_downloads: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+enum FEShareInstanceProgress {
+    Progress(i32),
+    Finished(String),
+    Error { code: String, message: String },
+}
+
+impl From<ShareInstanceProgress> for FEShareInstanceProgress {
+    fn from(value: ShareInstanceProgress) -> Self {
+        match value {
+            ShareInstanceProgress::Progress(p) => Self::Progress(p),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Type)]
+struct FEWaitForInstanceShareResponse {
+    share_code: String,
+    expires_at: DateTime<Utc>,
+}
+
+impl From<WaitForShareInstanceResponse> for FEWaitForInstanceShareResponse {
+    fn from(value: WaitForShareInstanceResponse) -> Self {
+        Self {
+            share_code: value.share_code,
+            expires_at: value.expires_at,
+        }
+    }
+}
+
+// Args for GET_USER_SHARES query
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEGetUserSharesArgs {
+    limit: Option<i32>,
+    offset: Option<i32>,
+}
+
+// Individual share info
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEShareInfo {
+    share_code: String,
+    title: Option<String>,
+    download_count: i32,
+    max_downloads: Option<i32>,
+    expires_at: DateTime<Utc>,
+    size_kilobytes: i32,
+    created_at: DateTime<Utc>,
+    is_expired: bool,
+}
+
+impl From<ShareInfo> for FEShareInfo {
+    fn from(value: ShareInfo) -> Self {
+        Self {
+            share_code: value.share_code,
+            title: value.title,
+            download_count: value.download_count,
+            max_downloads: value.max_downloads,
+            expires_at: value.expires_at,
+            size_kilobytes: value.size_kilobytes,
+            created_at: value.created_at,
+            is_expired: value.is_expired,
+        }
+    }
+}
+
+// Paginated shares response
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEPaginatedShares {
+    items: Vec<FEShareInfo>,
+    total_count: i32,
+    limit: i32,
+    offset: i32,
+}
+
+impl From<PaginatedShares> for FEPaginatedShares {
+    fn from(value: PaginatedShares) -> Self {
+        Self {
+            items: value.items.into_iter().map(FEShareInfo::from).collect(),
+            total_count: value.total_count as i32,
+            limit: value.limit as i32,
+            offset: value.offset as i32,
+        }
+    }
+}
+
+// Quota info
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEQuotaInfo {
+    used_kilobytes: i32,
+    total_kilobytes: i32,
+}
+
+impl From<QuotaInfo> for FEQuotaInfo {
+    fn from(value: QuotaInfo) -> Self {
+        Self {
+            used_kilobytes: value.used_kilobytes as i32,
+            total_kilobytes: value.total_kilobytes as i32,
+        }
+    }
+}
+
+// Args for UPDATE_SHARE mutation
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEUpdateShareArgs {
+    share_code: String,
+    #[specta(optional)]
+    title: Option<String>,
+    #[specta(optional)]
+    max_downloads: Option<Option<i32>>,
+}
+
+// Response for REGENERATE_SHARE_CODE mutation
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FERegenerateShareCodeResponse {
+    new_share_code: String,
+}
+
+impl From<RegenerateShareCodeResponse> for FERegenerateShareCodeResponse {
+    fn from(value: RegenerateShareCodeResponse) -> Self {
+        Self {
+            new_share_code: value.new_share_code,
         }
     }
 }

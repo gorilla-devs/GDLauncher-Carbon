@@ -6,11 +6,11 @@ import type { AuthStep } from "../flow/types"
 interface GdlAccountFormStepProps {
   step: Extract<AuthStep, { type: "gdl-account-form" }>
   email: string
-  nickname: string
+  displayName: string
   onEmailChange: (email: string) => void
-  onNicknameChange: (nickname: string) => void
+  onDisplayNameChange: (displayName: string) => void
   emailError?: string
-  nicknameError?: string
+  displayNameError?: string
 }
 
 export function GdlAccountFormStep(props: GdlAccountFormStepProps) {
@@ -23,9 +23,9 @@ export function GdlAccountFormStep(props: GdlAccountFormStepProps) {
     return emailRegex.test(email)
   })
 
-  const isNicknameValid = createMemo(() => {
-    const nickname = props.nickname.trim()
-    return nickname.length >= 3
+  const isDisplayNameValid = createMemo(() => {
+    const displayName = props.displayName.trim()
+    return displayName.length >= 3
   })
 
   return (
@@ -36,7 +36,7 @@ export function GdlAccountFormStep(props: GdlAccountFormStepProps) {
         </div>
 
         <p class="text-lightSlate-400 m-0 max-w-md text-sm leading-relaxed">
-          <Trans key="auth:_trn_login.enter_recovery_email_nickname" />
+          <Trans key="auth:_trn_login.enter_recovery_email_display_name" />
         </p>
       </div>
 
@@ -78,35 +78,39 @@ export function GdlAccountFormStep(props: GdlAccountFormStepProps) {
         <div class="flex flex-col gap-2 text-left">
           <div class="flex items-center gap-2">
             <label class="text-lightSlate-400 text-sm font-medium">
-              <Trans key="auth:_trn_login.nickname" />
+              <Trans key="auth:_trn_login.display_name" />
             </label>
             <Tooltip>
               <TooltipTrigger>
                 <div class="i-ri:information-fill w-4 h-4 text-lightSlate-600" />
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="auth:_trn_login.nickname_description" />
+                <Trans key="auth:_trn_login.display_name_description" />
               </TooltipContent>
             </Tooltip>
           </div>
           <input
             type="text"
-            value={props.nickname}
-            onInput={(e) => props.onNicknameChange(e.currentTarget.value)}
-            placeholder={t("auth:_trn_login.nickname")}
+            value={props.displayName}
+            onInput={(e) => props.onDisplayNameChange(e.currentTarget.value)}
+            placeholder={t("auth:_trn_login.display_name")}
             class="border-darkSlate-600 bg-darkSlate-700 text-lightSlate-50 placeholder:text-lightSlate-700 w-full rounded-lg border px-4 py-3 focus:border-primary-500 focus:outline-none"
             classList={{
-              "border-red-500": !!props.nicknameError
+              "border-red-500": !!props.displayNameError
             }}
           />
-          <Show when={props.nicknameError}>
-            <p class="text-red-400 text-sm m-0">{props.nicknameError}</p>
+          <Show when={props.displayNameError}>
+            <p class="text-red-400 text-sm m-0">{props.displayNameError}</p>
           </Show>
           <Show
-            when={!props.nicknameError && props.nickname && !isNicknameValid()}
+            when={
+              !props.displayNameError &&
+              props.displayName &&
+              !isDisplayNameValid()
+            }
           >
             <p class="text-red-400 text-sm m-0">
-              <Trans key="auth:_trn_login.nickname_too_short" />
+              <Trans key="auth:_trn_login.display_name_too_short" />
             </p>
           </Show>
         </div>

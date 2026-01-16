@@ -180,6 +180,7 @@ const Logs = () => {
     <div class="border-darkSlate-600 border-t-solid flex h-full w-full overflow-hidden border">
       <LogsSidebar
         availableLogEntries={availableLogEntries.data || []}
+        instanceId={parseInt(params.id, 10)}
         setSelectedLog={setSelectedLog}
         selectedLog={selectedLog()}
         isLoading={availableLogEntries.isLoading}

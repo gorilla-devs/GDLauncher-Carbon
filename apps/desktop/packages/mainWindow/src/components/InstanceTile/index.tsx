@@ -1,6 +1,7 @@
 import { createEffect, createSignal, createMemo } from "solid-js"
 import Tile from "../Instance/Tile"
 import {
+  getQueuedState,
   getPreparingState,
   getRunningState,
   getInactiveState,
@@ -55,12 +56,14 @@ const InstanceTile = (props: {
       : undefined
 
   const inactiveState = () => getInactiveState(validInstance()?.state)
+  const isQueuedState = () => getQueuedState(validInstance()?.state)
   const isPreparingState = () => getPreparingState(validInstance()?.state)
   const isDeleting = () => isInstanceDeleting(validInstance()?.state)
 
   const modloader = () => validInstance()?.modloader
 
-  const taskId = () => isPreparingState()
+  // Task ID can be from either queued or preparing state
+  const taskId = () => isQueuedState() || isPreparingState()
 
   const isRunning = () => getRunningState(validInstance()?.state)
   const dismissTaskMutation = rspc.createMutation(() => ({
@@ -167,6 +170,7 @@ const InstanceTile = (props: {
       isInvalid={props.instance.status.status === "invalid"}
       failError={failError()}
       isRunning={!!isRunning()}
+      isQueued={isQueuedState() !== undefined}
       isPreparing={isPreparingState() !== undefined}
       isDeleting={isDeleting()}
       variant={type()}

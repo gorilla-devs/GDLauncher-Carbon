@@ -27,7 +27,7 @@ const input = cva(
           "border-0 border-transparent hover:border-darkSlate-500 active:border-darkSlate-500"
       },
       disabled: {
-        true: "text-darkSlate-300",
+        true: "text-darkSlate-500 cursor-not-allowed disabled-stripes",
         false: "text-lightSlate-50"
       },
       hasIcon: {
@@ -61,7 +61,7 @@ const input = cva(
 )
 
 const container = cva(
-  "outline-none has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-[outline,background-color] duration-200 rounded-md ease-spring",
+  "outline-none has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-[outline,background-color] duration-200 rounded-md ease-spring",
   {
     variants: {
       hasIcon: {
@@ -72,11 +72,17 @@ const container = cva(
         default: "",
         transparent:
           "!outline-none hover:!outline-none has-[:focus-visible]:!outline-none !bg-transparent"
+      },
+      disabled: {
+        true: "cursor-not-allowed",
+        false:
+          "hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500"
       }
     },
     defaultVariants: {
       hasIcon: false,
-      variant: "default"
+      variant: "default",
+      disabled: false
     }
   }
 )
@@ -175,6 +181,7 @@ function Input(props: Props) {
         class={container({
           hasIcon: !!local.icon,
           variant: local.variant,
+          disabled: !!local.disabled,
           class: `${!local.disabled ? "animate-icons-on-hover" : ""} ${local.class || ""} ${local.inputColor || ""}`
         })}
         ref={setInputContainerRef}

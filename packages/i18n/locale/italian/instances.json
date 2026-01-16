@@ -134,5 +134,18 @@
   "_trn_self_contained_addons_bundling_tooltip": "Includi tutti gli addons nell'istanza esportata",
   "_trn_view_mods": "Visualizza Mod",
   "_trn_view_versions_on_curseforge": "Visualizza versioni su CurseForge",
-  "_trn_view_versions_on_modrinth": "Visualizza versioni su Modrinth"
+  "_trn_view_versions_on_modrinth": "Visualizza versioni su Modrinth",
+  "_trn_instance_share.title": "Condividi Istanza",
+  "_trn_instance_share.description": "Crea un codice di condivisione per permettere ad altri di scaricare la configurazione della tua istanza.",
+  "_trn_instance_share.share_code_label": "Codice di Condivisione",
+  "_trn_instance_share.share_code_details": "Condividi questo codice con altri per permettere loro di importare la tua istanza.",
+  "_trn_instance_share.copy": "Copia",
+  "_trn_instance_share.copied": "Copiato!",
+  "_trn_instance_share.expires_at": "Scade il:",
+  "_trn_instance_share.cancel": "Annulla",
+  "_trn_instance_share.share_button": "Condividi Istanza",
+  "_trn_import_share_code": "Importa da Codice di Condivisione",
+  "_trn_import_from_launcher": "Importa da Launcher",
+  "_trn_import_from_file": "Importa da File",
+  "_trn_preparing_export": "Preparazione esportazione..."
 }

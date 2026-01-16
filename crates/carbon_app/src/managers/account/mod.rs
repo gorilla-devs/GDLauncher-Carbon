@@ -16,9 +16,10 @@ use carbon_repos::pcr::{
 };
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
-    ChangeNicknameError, GDLAccountStatus, GDLAccountTask, GDLUser, NicknameHistoryEntry,
-    RegisterAccountBody, RequestGDLAccountDeletionError, RequestNewEmailChangeError,
-    RequestNewVerificationTokenError,
+    ChangeDisplayNameError, DisplayNameHistoryEntry, GDLAccountStatus, GDLAccountTask, GDLUser,
+    GetPresignedUploadUrlResponse, PaginatedShares, QuotaInfo, RegisterAccountBody,
+    RequestGDLAccountDeletionError, RequestNewEmailChangeError, RequestNewVerificationTokenError,
+    ShareInfo, WaitForShareInstanceResponse,
 };
 use jwt::{Header, Token};
 use reqwest::Client;
@@ -33,7 +34,9 @@ use std::{
     time::{Duration, Instant},
 };
 use thiserror::Error;
+use tokio::fs::File;
 use tokio::select;
+use tokio::sync::watch::Sender;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, info, trace, warn};
 
@@ -401,6 +404,244 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(GDLAccountStatus::Valid(user))
     }
 
+    pub async fn get_presigned_download_url(
+        self,
+        uuid: String,
+        file_key: String,
+    ) -> anyhow::Result<String> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get a presigned url for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .get_presigned_download_url(id_token, file_key)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn get_presigned_upload_url(
+        self,
+        uuid: String,
+        content_length: u64,
+        sha256_checksum: String,
+        title: Option<String>,
+        expiration_days: Option<i32>,
+        max_downloads: Option<i32>,
+    ) -> anyhow::Result<GetPresignedUploadUrlResponse> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get a presigned url for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .get_presigned_upload_url(id_token, content_length, sha256_checksum, title, expiration_days, max_downloads)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn upload_share_instance(
+        self,
+        uuid: String,
+        presigned_url: String,
+        file: File,
+        file_size: u64,
+        sha256_checksum: String,
+        progress_tx: tokio::sync::mpsc::Sender<i32>,
+    ) -> anyhow::Result<()> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to upload a share instance for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .upload_share_instance(presigned_url, file, file_size, sha256_checksum, progress_tx)
+            .await
+    }
+
+    pub async fn wait_for_share_instance(
+        self,
+        uuid: String,
+        file_key: String,
+    ) -> anyhow::Result<WaitForShareInstanceResponse> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to upload a share instance for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .wait_for_share_instance(file_key, id_token)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Get paginated list of user's shares
+    pub async fn get_user_shares(
+        self,
+        uuid: String,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> anyhow::Result<PaginatedShares> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get shares for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .get_user_shares(id_token, limit, offset)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Delete a share by its code
+    pub async fn delete_share(self, uuid: String, share_code: String) -> anyhow::Result<()> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to delete a share for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .delete_share(id_token, share_code)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Update a share's metadata (title and/or max_downloads)
+    pub async fn update_share(
+        self,
+        uuid: String,
+        share_code: String,
+        title: Option<String>,
+        max_downloads: Option<Option<i32>>,
+    ) -> anyhow::Result<()> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to update a share for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .update_share(
+                id_token,
+                share_code,
+                gdl_account::UpdateShareBody {
+                    title,
+                    max_downloads,
+                },
+            )
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Regenerate a share code (invalidates the old code)
+    pub async fn regenerate_share_code(
+        self,
+        uuid: String,
+        share_code: String,
+    ) -> anyhow::Result<gdl_account::RegenerateShareCodeResponse> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to regenerate a share code for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .regenerate_share_code(id_token, share_code)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Get user's quota information for instance sharing
+    pub async fn get_quota(self, uuid: String) -> anyhow::Result<QuotaInfo> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get quota for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .get_quota(id_token)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Validate if a share code exists and is not expired (no auth required)
+    pub async fn validate_share_code(self, share_code: String) -> anyhow::Result<bool> {
+        self.gdl_account_task
+            .validate_share_code(share_code)
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn request_new_verification_token(
         self,
         uuid: String,
@@ -495,29 +736,29 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
-    pub async fn change_nickname(
+    pub async fn change_display_name(
         self,
         uuid: String,
-        nickname: String,
-    ) -> Result<(), ChangeNicknameError> {
+        display_name: String,
+    ) -> Result<(), ChangeDisplayNameError> {
         let Some(id_token) = self
             .get_account_entries()
             .await
-            .map_err(|e| ChangeNicknameError::RequestFailed(e))?
+            .map_err(|e| ChangeDisplayNameError::RequestFailed(e))?
             .into_iter()
             .find(|account| account.uuid == uuid)
-            .ok_or(ChangeNicknameError::RequestFailed(anyhow::anyhow!(
+            .ok_or(ChangeDisplayNameError::RequestFailed(anyhow::anyhow!(
                 "attempted to get an account that does not exist"
             )))?
             .id_token
         else {
-            return Err(ChangeNicknameError::RequestFailed(anyhow::anyhow!(
+            return Err(ChangeDisplayNameError::RequestFailed(anyhow::anyhow!(
                 "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
             )));
         };
 
         self.gdl_account_task
-            .change_nickname(id_token, nickname)
+            .change_display_name(id_token, display_name)
             .await?;
 
         self.app
@@ -527,16 +768,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
-    pub async fn get_nickname_history(
+    pub async fn get_display_name_history(
         self,
-        friend_code: String,
-    ) -> anyhow::Result<Vec<NicknameHistoryEntry>> {
-        self.gdl_account_task
-            .get_nickname_history(friend_code)
-            .await
+        user_id: i32,
+    ) -> anyhow::Result<Vec<DisplayNameHistoryEntry>> {
+        self.gdl_account_task.get_display_name_history(user_id).await
     }
 
-    pub async fn clear_nickname_history(self, uuid: String) -> anyhow::Result<()> {
+    pub async fn clear_display_name_history(self, uuid: String) -> anyhow::Result<()> {
         let Some(id_token) = self
             .get_account_entries()
             .await?
@@ -553,7 +792,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         };
 
         self.gdl_account_task
-            .clear_nickname_history(id_token)
+            .clear_display_name_history(id_token)
             .await?;
 
         Ok(())

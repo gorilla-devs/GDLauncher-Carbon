@@ -123,7 +123,10 @@ render(() => {
     const minLoadingTime = 3000
     const timeElapsed = Date.now() - startTime
 
-    if (coreModuleLoaded.state === "ready" && timeElapsed >= minLoadingTime) {
+    if (
+      coreModuleLoaded.state === "ready" &&
+      (timeElapsed >= minLoadingTime || import.meta.env.DEV)
+    ) {
       setIsReady(true)
     } else if (coreModuleLoaded.state === "ready") {
       setTimeout(() => {

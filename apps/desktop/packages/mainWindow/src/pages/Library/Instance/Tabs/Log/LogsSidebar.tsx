@@ -10,6 +10,7 @@ type LogsByTimespan = Record<string, GameLogEntry[]>
 
 export interface LogsSidebarProps {
   availableLogEntries: GameLogEntry[]
+  instanceId: number
   setSelectedLog: (_: number | undefined) => void
   selectedLog: number | undefined
   isLoading: boolean
@@ -132,6 +133,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
               {(log) => (
                 <LiveSessionCard
                   log={log()}
+                  instanceId={props.instanceId}
                   isSelected={props.selectedLog === log().id}
                   onClick={() => props.setSelectedLog(log().id)}
                 />
@@ -152,6 +154,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
                       {(log) => (
                         <SessionEntry
                           log={log}
+                          instanceId={props.instanceId}
                           isSelected={props.selectedLog === log.id}
                           onClick={() => props.setSelectedLog(log.id)}
                         />

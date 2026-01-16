@@ -47,10 +47,10 @@ pub enum Translation {
     InstanceImportMrpackMissingManifest,
     InstanceImportMrpackMalformedManifest,
     InstanceExport,
-    InstanceExportScanningMods,
-    InstanceExportCacheMods,
-    InstanceExportCalculateSize,
     InstanceExportCreatingBundle,
+    InstanceExportCalculateSize,
+    InstanceExportScanningMods,
+    InstanceImportShareCode,
     CacheTaskLocal {
         instance_name: String,
     },

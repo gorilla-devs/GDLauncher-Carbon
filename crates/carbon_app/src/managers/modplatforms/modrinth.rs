@@ -41,8 +41,6 @@ impl Modrinth {
     pub async fn get_categories(&self) -> anyhow::Result<CategoriesResponse> {
         let url = self.base_url.join("tag/category")?;
 
-        trace!("GET {}", url);
-
         let categories = self
             .client
             .get(url.as_str())
@@ -57,8 +55,6 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_loaders(&self) -> anyhow::Result<LoadersResponse> {
         let url = self.base_url.join("tag/loader")?;
-
-        trace!("GET {}", url);
 
         let categories = self
             .client
@@ -79,8 +75,6 @@ impl Modrinth {
         let query = search_params.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
         let search_results = self
             .client
             .get(url.as_str())
@@ -94,8 +88,6 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_project(&self, project: ProjectID) -> anyhow::Result<Project> {
         let url = self.base_url.join(&format!("project/{}", &*project))?;
-
-        trace!("GET {}", url);
 
         let proj = self
             .client
@@ -119,8 +111,6 @@ impl Modrinth {
         let query = filters.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
         let proj = self
             .client
             .get(url.as_str())
@@ -137,8 +127,6 @@ impl Modrinth {
         let query = projects.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
         let projects = self
             .client
             .get(url.as_str())
@@ -152,8 +140,6 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_version(&self, version: VersionID) -> anyhow::Result<Version> {
         let url = self.base_url.join(&format!("version/{}", &*version))?;
-
-        trace!("GET {}", url);
 
         let ver = self
             .client
@@ -170,8 +156,6 @@ impl Modrinth {
         let mut url = self.base_url.join("versions")?;
         let query = version_ids.into_query_parameters()?;
         url.set_query(Some(&query));
-
-        trace!("GET {}", url);
 
         let versions = self
             .client
@@ -192,8 +176,6 @@ impl Modrinth {
 
         let body = serde_json::to_string(hashes_query)?;
 
-        trace!("POST {url}");
-
         let versions = self
             .client
             .post(url.as_str())
@@ -208,8 +190,6 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_team(&self, team: TeamID) -> anyhow::Result<TeamResponse> {
         let url = self.base_url.join(&format!("team/{}/members", &*team))?;
-
-        trace!("GET {}", url);
 
         let team = self
             .client
@@ -230,8 +210,6 @@ impl Modrinth {
         let query = team_ids.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
         let teams = self
             .client
             .get(url.as_str())
@@ -250,8 +228,6 @@ impl Modrinth {
         let url = self
             .base_url
             .join(&format!("project/{}/members", &*project))?;
-
-        trace!("GET {}", url);
 
         let team = self
             .client
