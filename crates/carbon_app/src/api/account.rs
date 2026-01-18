@@ -166,9 +166,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
-        query GET_DISPLAY_NAME_HISTORY[app, user_id: i32] {
+        query GET_DISPLAY_NAME_HISTORY[app, friend_code: String] {
             let history = app.account_manager()
-                .get_display_name_history(user_id)
+                .get_display_name_history(friend_code)
                 .await?;
 
             Ok(history.into_iter().map(FEDisplayNameHistoryEntry::from).collect::<Vec<_>>())

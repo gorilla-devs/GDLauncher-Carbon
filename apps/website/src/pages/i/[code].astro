@@ -1,0 +1,14 @@
+---
+// Redirect from /i/CODE to /instance-share/CODE
+// This provides a short URL format for share links (e.g., gdl.gg/i/ABC123)
+
+export const prerender = false;
+
+const { code } = Astro.params;
+
+if (!code) {
+  return Astro.redirect("/");
+}
+
+return Astro.redirect(`/instance-share/${code}`, 301);
+---

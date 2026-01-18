@@ -1,0 +1,471 @@
+---
+import BaseHead from "../../components/BaseHead.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+import LoadingBar from "../../components/LoadingBar.astro";
+import ParticleBackground from "../../components/ParticleBackground.astro";
+import {
+  fetchSharePreview,
+  formatFileSize,
+  formatModloader,
+} from "../../lib/api/share";
+
+// Enable SSR for this page
+export const prerender = false;
+
+const { code } = Astro.params;
+
+if (!code) {
+  return Astro.redirect("/");
+}
+
+const preview = await fetchSharePreview(code);
+
+// Build meta information
+const title = preview?.title || "Shared Instance";
+const modCount = preview?.mods?.length || 0;
+const description = preview
+  ? `${title} - ${preview.minecraft_version || "Minecraft"} modpack with ${modCount} mods. Import directly into GDLauncher.`
+  : "View and import this shared Minecraft instance in GDLauncher.";
+const ogImage = preview?.background_url || undefined;
+
+// Format metadata for display
+const modloader = preview
+  ? formatModloader(preview.modloader_type, preview.modloader_version)
+  : null;
+const fileSize = preview ? formatFileSize(preview.size_kilobytes) : null;
+const expiresAt = preview ? new Date(preview.expires_at) : null;
+const isExpired = expiresAt ? expiresAt < new Date() : false;
+
+// Deep link URL for opening in GDLauncher
+const deepLinkUrl = `gdlauncher://share/${code}`;
+---
+
+<html lang="en">
+  <head>
+    <BaseHead
+      title={`${title} | GDLauncher`}
+      description={description}
+      image={ogImage}
+    />
+    <style>
+      .preview-card {
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .background-image {
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        width: 100%;
+      }
+
+      .metadata-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+      }
+
+      @media (min-width: 640px) {
+        .metadata-grid {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+
+      .metadata-item {
+        text-align: center;
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+      }
+
+      .metadata-label {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .metadata-value {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-top: 0.25rem;
+      }
+
+      .cta-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-top: 2rem;
+      }
+
+      @media (min-width: 640px) {
+        .cta-buttons {
+          flex-direction: row;
+          justify-content: center;
+        }
+      }
+
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.875rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        text-decoration: none;
+        transition: all 0.2s ease;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+      }
+
+      .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.875rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        text-decoration: none;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.2s ease;
+      }
+
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .expired-banner {
+        background: rgba(239, 68, 68, 0.2);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 1.5rem;
+      }
+
+      .not-found {
+        text-align: center;
+        padding: 4rem 2rem;
+      }
+
+      .mods-section {
+        margin-top: 1.5rem;
+      }
+
+      .mods-header {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+      }
+
+      .mods-list {
+        max-height: 200px;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+      }
+
+      .mod-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .mod-item:last-child {
+        border-bottom: none;
+      }
+
+      .mod-name {
+        font-size: 0.875rem;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mod-links {
+        display: flex;
+        gap: 0.5rem;
+        margin-left: 0.5rem;
+      }
+
+      .mod-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+      }
+
+      .mod-link-curseforge {
+        color: #f16436;
+      }
+
+      .mod-link-curseforge:hover {
+        background: rgba(241, 100, 54, 0.2);
+      }
+
+      .mod-link-modrinth {
+        color: #1bd96a;
+      }
+
+      .mod-link-modrinth:hover {
+        background: rgba(27, 217, 106, 0.2);
+      }
+
+      .disclaimer {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-top: 1.5rem;
+        padding: 0.75rem;
+        background: rgba(234, 179, 8, 0.1);
+        border: 1px solid rgba(234, 179, 8, 0.3);
+        border-radius: 8px;
+        font-size: 0.75rem;
+        color: #fde047;
+      }
+
+      .disclaimer-icon {
+        flex-shrink: 0;
+        width: 16px;
+        height: 16px;
+        margin-top: 1px;
+      }
+    </style>
+  </head>
+
+  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
+    <LoadingBar />
+    <div class="fixed inset-0 -z-10">
+      <div
+        class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"
+      >
+      </div>
+      <div
+        class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"
+      >
+      </div>
+    </div>
+    <ParticleBackground />
+    <Header />
+
+    <main class="px-4 py-8 md:py-16">
+      {
+        !preview ? (
+          <div class="not-found">
+            <h1 class="text-3xl font-bold mb-4">Share Not Found</h1>
+            <p class="text-lightSlate-400 mb-8">
+              This share link may have expired or doesn't exist.
+            </p>
+            <a href="/" class="btn-secondary">
+              Go to Homepage
+            </a>
+          </div>
+        ) : (
+          <div class="preview-card">
+            {isExpired && (
+              <div class="expired-banner">
+                <strong>This share has expired</strong>
+                <p class="text-sm mt-1">
+                  The instance is no longer available for download.
+                </p>
+              </div>
+            )}
+
+            {preview.background_url && (
+              <img
+                src={preview.background_url}
+                alt={title}
+                class="background-image rounded-t-xl"
+              />
+            )}
+
+            <div
+              class={`p-6 bg-darkSlate-800 ${preview.background_url ? "rounded-b-xl" : "rounded-xl"}`}
+            >
+              <h1 class="text-2xl font-bold mb-2">{title}</h1>
+
+              <div class="metadata-grid mt-6">
+                {preview.minecraft_version && (
+                  <div class="metadata-item">
+                    <div class="metadata-label">Minecraft</div>
+                    <div class="metadata-value">{preview.minecraft_version}</div>
+                  </div>
+                )}
+
+                {modloader && (
+                  <div class="metadata-item">
+                    <div class="metadata-label">Modloader</div>
+                    <div class="metadata-value">{modloader}</div>
+                  </div>
+                )}
+
+                <div class="metadata-item">
+                  <div class="metadata-label">Mods</div>
+                  <div class="metadata-value">{modCount}</div>
+                </div>
+
+                {fileSize && (
+                  <div class="metadata-item">
+                    <div class="metadata-label">Size</div>
+                    <div class="metadata-value">{fileSize}</div>
+                  </div>
+                )}
+              </div>
+
+              {preview.mods && preview.mods.length > 0 && (
+                <div class="mods-section">
+                  <div class="mods-header">
+                    Included Mods ({preview.mods.length})
+                  </div>
+                  <div class="mods-list">
+                    {preview.mods.map((mod) => (
+                      <div class="mod-item">
+                        <span class="mod-name">{mod.name}</span>
+                        <div class="mod-links">
+                          {mod.curseforge_slug && (
+                            <a
+                              href={`https://www.curseforge.com/minecraft/mc-mods/${mod.curseforge_slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="mod-link mod-link-curseforge"
+                              title="View on CurseForge"
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                width="16"
+                                height="16"
+                              >
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                              </svg>
+                            </a>
+                          )}
+                          {mod.modrinth_slug && (
+                            <a
+                              href={`https://modrinth.com/mod/${mod.modrinth_slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="mod-link mod-link-modrinth"
+                              title="View on Modrinth"
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                width="16"
+                                height="16"
+                              >
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                              </svg>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!isExpired && (
+                <div class="disclaimer">
+                  <svg
+                    class="disclaimer-icon"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                  </svg>
+                  <span>
+                    This content is shared by a user and is not reviewed by
+                    GDLauncher. The actual contents may differ from the preview.
+                    Import at your own risk.
+                  </span>
+                </div>
+              )}
+
+              {!isExpired && (
+                <div class="cta-buttons">
+                  <a href={deepLinkUrl} class="btn-primary">
+                    <svg
+                      class="w-5 h-5 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                    Open in GDLauncher
+                  </a>
+                  <a href="/" class="btn-secondary">
+                    Download GDLauncher
+                  </a>
+                </div>
+              )}
+
+              {expiresAt && !isExpired && (
+                <p class="text-sm text-lightSlate-500 text-center mt-6">
+                  Expires{" "}
+                  {expiresAt.toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      }
+    </main>
+
+    <Footer />
+
+    <script define:vars={{ deepLinkUrl }}>
+      // Try to open the app automatically when the page loads
+      // This uses a hidden iframe technique to avoid navigation issues
+      function tryOpenApp() {
+        const iframe = document.createElement("iframe");
+        iframe.style.display = "none";
+        iframe.src = deepLinkUrl;
+        document.body.appendChild(iframe);
+
+        // Clean up after a short delay
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 2000);
+      }
+
+      // Only try to open app on user interaction or after a delay
+      // to avoid aggressive auto-opening behavior
+      document.addEventListener("DOMContentLoaded", () => {
+        // If there's a hash #open, try to open the app
+        if (window.location.hash === "#open") {
+          tryOpenApp();
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -80,5 +80,7 @@
   "_trn_display_name_change_failed": "Failed to change display name",
   "_trn_recovery_email_change_failed": "Failed to change recovery email",
   "_trn_recovery_email_change_success": "Recovery email updated successfully",
-  "_trn_email_change_cooldown": "Wait {{time}} before changing email again"
+  "_trn_email_change_cooldown": "Wait {{time}} before changing email again",
+  "_trn_banned_dialog_title": "Account Banned",
+  "_trn_banned_dialog_message": "Your GDLauncher account has been banned. You have been logged out."
 }

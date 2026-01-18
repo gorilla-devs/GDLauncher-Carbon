@@ -8,8 +8,8 @@ use crate::api::keys;
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::error::{AxumError, FeError};
 use crate::managers::account::gdl_account::{
-    PaginatedShares, QuotaInfo, RegenerateShareCodeResponse, ShareInfo, UpdateShareBody,
-    WaitForShareInstanceResponse,
+    PaginatedShares, QuotaInfo, RegenerateShareCodeResponse, SharedMod, ShareInfo, SharePreview,
+    UpdateShareBody, WaitForShareInstanceResponse,
 };
 use crate::managers::instance as manager;
 use crate::managers::instance::export::ShareInstanceProgress;
@@ -410,6 +410,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        query GET_SHARE_PREVIEW[app, share_code: String] {
+            let preview = app.account_manager()
+                .get_share_preview(share_code)
+                .await?;
+
+            Ok(FESharePreview::from(preview))
+        }
+
         query GET_IMPORTABLE_ENTITIES[_, _args: ()] {
             anyhow::Result::Ok(importer::Entity::list()
                 .into_iter()
@@ -477,10 +485,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(FETaskId::from(task))
         }
 
-        query WAIT_FOR_SHARE_INSTANCE[app, file_key: String] {
+        query WAIT_FOR_SHARE_INSTANCE[app, args: FEWaitForShareInstanceArgs] {
+            let instance_id = args.instance_id.map(|id| domain::InstanceId(id));
+
             let resp = app.instance_manager()
                 .export_manager()
-                .wait_for_share_instance(file_key)
+                .wait_for_share_instance(args.file_key, instance_id)
                 .await?;
 
             Ok(FEWaitForInstanceShareResponse::from(resp))
@@ -2089,6 +2099,78 @@ impl From<WaitForShareInstanceResponse> for FEWaitForInstanceShareResponse {
             expires_at: value.expires_at,
         }
     }
+}
+
+// Individual mod data for share preview
+#[derive(Debug, Serialize, Clone, Type)]
+#[serde(rename_all = "camelCase")]
+struct FESharedMod {
+    name: String,
+    curseforge_project_id: Option<i32>,
+    curseforge_file_id: Option<i32>,
+    curseforge_slug: Option<String>,
+    modrinth_project_id: Option<String>,
+    modrinth_version_id: Option<String>,
+    modrinth_slug: Option<String>,
+}
+
+impl From<SharedMod> for FESharedMod {
+    fn from(value: SharedMod) -> Self {
+        Self {
+            name: value.name,
+            curseforge_project_id: value.curseforge_project_id,
+            curseforge_file_id: value.curseforge_file_id,
+            curseforge_slug: value.curseforge_slug,
+            modrinth_project_id: value.modrinth_project_id,
+            modrinth_version_id: value.modrinth_version_id,
+            modrinth_slug: value.modrinth_slug,
+        }
+    }
+}
+
+// Share preview for public preview endpoint (no auth required)
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FESharePreview {
+    share_code: String,
+    title: Option<String>,
+    minecraft_version: Option<String>,
+    modloader_type: Option<String>,
+    modloader_version: Option<String>,
+    mods: Vec<FESharedMod>,
+    size_kilobytes: i32,
+    background_url: Option<String>,
+    expires_at: DateTime<Utc>,
+    download_count: i32,
+    max_downloads: Option<i32>,
+}
+
+impl From<SharePreview> for FESharePreview {
+    fn from(value: SharePreview) -> Self {
+        Self {
+            share_code: value.share_code,
+            title: value.title,
+            minecraft_version: value.minecraft_version,
+            modloader_type: value.modloader_type,
+            modloader_version: value.modloader_version,
+            mods: value.mods.into_iter().map(FESharedMod::from).collect(),
+            size_kilobytes: value.size_kilobytes,
+            background_url: value.background_url,
+            expires_at: value.expires_at,
+            download_count: value.download_count,
+            max_downloads: value.max_downloads,
+        }
+    }
+}
+
+// Args for WAIT_FOR_SHARE_INSTANCE query
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEWaitForShareInstanceArgs {
+    file_key: String,
+    /// Optional instance_id to upload instance background after share completes
+    #[specta(optional)]
+    instance_id: Option<i32>,
 }
 
 // Args for GET_USER_SHARES query

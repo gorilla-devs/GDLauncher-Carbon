@@ -1,4 +1,4 @@
-import { createEffect, createSignal, untrack } from "solid-js"
+import { createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js"
 import { useLocation, useRoutes } from "@solidjs/router"
 import { routes } from "./route"
 import initThemes from "./utils/theme"
@@ -7,6 +7,7 @@ import { useModal } from "./managers/ModalsManager"
 import { useKeyDownEvent } from "@solid-primitives/keyboard"
 import { checkForUpdates } from "./utils/updater"
 import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning"
+import { ACCOUNT_BANNED_EVENT } from "./utils/bannedEventBridge"
 
 interface Props {
   createInvalidateQuery: () => void
@@ -31,6 +32,17 @@ const App = (props: Props) => {
   initThemes()
 
   checkForUpdates()
+
+  // Listen for account banned events from rspcClient
+  onMount(() => {
+    const handleBanned = () => {
+      modalsContext?.openModal({ name: "accountBanned" })
+    }
+    window.addEventListener(ACCOUNT_BANNED_EVENT, handleBanned)
+    onCleanup(() =>
+      window.removeEventListener(ACCOUNT_BANNED_EVENT, handleBanned)
+    )
+  })
 
   // First launch detection using semantic query
   const isFirstLaunch = rspc.createQuery(() => ({

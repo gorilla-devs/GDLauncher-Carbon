@@ -14,6 +14,11 @@ use zip::{
     write::{FileOptionExtension, FileOptions},
 };
 
+use carbon_platforms::curseforge::manifest::Manifest as CurseforgeManifest;
+use carbon_repos::db::{
+    curse_forge_mod_cache as cfdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
+};
+
 use crate::{
     api::translation::Translation,
     domain::{
@@ -21,7 +26,7 @@ use crate::{
         vtask::{Progress, VisualTaskId},
     },
     managers::{
-        account::gdl_account::WaitForShareInstanceResponse,
+        account::gdl_account::{SharedMod, ShareMetadata, WaitForShareInstanceResponse},
         vtask::{Subtask, VisualTask},
         ManagerRef,
     },
@@ -30,8 +35,126 @@ use crate::{
 use super::InvalidInstanceIdError;
 
 mod curseforge_archive;
-mod gdlauncher_archive;
+pub mod gdlauncher_archive;
 mod modrinth_archive;
+
+/// Extract basic metadata from a CurseForge modpack zip file
+/// Returns ShareMetadata with mods containing only CurseForge IDs (names/slugs need enrichment)
+fn extract_curseforge_metadata(zip_path: &Path) -> anyhow::Result<ShareMetadata> {
+    use std::io::Read as StdRead;
+
+    let file = File::open(zip_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    let mut manifest_file = archive.by_name("manifest.json")?;
+    let mut manifest_content = String::new();
+    manifest_file.read_to_string(&mut manifest_content)?;
+    drop(manifest_file);
+
+    let manifest: CurseforgeManifest = serde_json::from_str(&manifest_content)?;
+
+    // Extract minecraft version
+    let minecraft_version = Some(manifest.minecraft.version);
+
+    // Extract modloader info from the primary modloader
+    let (modloader_type, modloader_version) = manifest
+        .minecraft
+        .mod_loaders
+        .iter()
+        .find(|ml| ml.primary)
+        .or_else(|| manifest.minecraft.mod_loaders.first())
+        .map(|ml| {
+            // Parse modloader ID like "forge-36.2.34" or "fabric-0.14.21"
+            if let Some(dash_pos) = ml.id.find('-') {
+                let loader_type = &ml.id[..dash_pos];
+                let loader_version = &ml.id[dash_pos + 1..];
+                (Some(loader_type.to_string()), Some(loader_version.to_string()))
+            } else {
+                (Some(ml.id.clone()), None)
+            }
+        })
+        .unwrap_or((None, None));
+
+    // Build mods list from manifest files (with CurseForge IDs only)
+    let mods: Vec<SharedMod> = manifest
+        .files
+        .iter()
+        .map(|file_ref| SharedMod {
+            name: format!("Mod {}", file_ref.project_id), // Placeholder until enriched
+            curseforge_project_id: Some(file_ref.project_id),
+            curseforge_file_id: Some(file_ref.file_id),
+            curseforge_slug: None,
+            modrinth_project_id: None,
+            modrinth_version_id: None,
+            modrinth_slug: None,
+        })
+        .collect();
+
+    Ok(ShareMetadata {
+        minecraft_version,
+        modloader_type,
+        modloader_version,
+        mods,
+    })
+}
+
+/// Enrich ShareMetadata mods with names and slugs from the database caches
+async fn enrich_share_metadata(
+    app: &crate::managers::App,
+    mut metadata: ShareMetadata,
+) -> ShareMetadata {
+    // Collect CurseForge project IDs to query
+    let cf_project_ids: Vec<i32> = metadata
+        .mods
+        .iter()
+        .filter_map(|m| m.curseforge_project_id)
+        .collect();
+
+    if cf_project_ids.is_empty() {
+        return metadata;
+    }
+
+    // Query CurseForge cache for all project IDs in one batch
+    let cf_cache_results = app
+        .prisma_client
+        .curse_forge_mod_cache()
+        .find_many(vec![cfdb::project_id::in_vec(cf_project_ids)])
+        .with(cfdb::metadata::fetch().with(metadb::modrinth::fetch()))
+        .exec()
+        .await;
+
+    if let Ok(cf_entries) = cf_cache_results {
+        // Build a map of project_id -> cache data for fast lookup
+        let cf_map: HashMap<i32, _> = cf_entries
+            .into_iter()
+            .map(|entry| (entry.project_id, entry))
+            .collect();
+
+        // Enrich each mod with data from the cache
+        for shared_mod in &mut metadata.mods {
+            if let Some(cf_project_id) = shared_mod.curseforge_project_id {
+                if let Some(cf_entry) = cf_map.get(&cf_project_id) {
+                    // Update name and CurseForge slug
+                    shared_mod.name = cf_entry.name.clone();
+                    shared_mod.curseforge_slug = Some(cf_entry.urlslug.clone());
+
+                    // Check for Modrinth cross-reference via metadata
+                    if let Some(Some(mr_data)) = cf_entry
+                        .metadata
+                        .as_ref()
+                        .and_then(|m| m.modrinth.as_ref())
+                    {
+                        shared_mod.modrinth_project_id = Some(mr_data.project_id.clone());
+                        shared_mod.modrinth_version_id = Some(mr_data.version_id.clone());
+                        shared_mod.modrinth_slug = Some(mr_data.urlslug.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    metadata
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShareInstanceProgress {
@@ -209,6 +332,18 @@ impl ManagerRef<'_, InstanceExportManager> {
             tx.send(ShareInstanceProgress::Progress(total_progress as i32))
                 .await?;
 
+            // Extract metadata from the CurseForge zip
+            let metadata = {
+                let zip_path = initial_tmpfile.clone();
+                let basic_metadata =
+                    tokio::task::spawn_blocking(move || extract_curseforge_metadata(&zip_path))
+                        .await?
+                        .unwrap_or_default();
+
+                // Enrich with names/slugs from database
+                enrich_share_metadata(&app, basic_metadata).await
+            };
+
             // Second phase: Calculate the checksum
             current_phase += 1;
 
@@ -269,6 +404,7 @@ impl ManagerRef<'_, InstanceExportManager> {
                     title,
                     expiration_days,
                     max_downloads,
+                    metadata,
                 )
                 .await?;
 
@@ -317,6 +453,7 @@ impl ManagerRef<'_, InstanceExportManager> {
     pub async fn wait_for_share_instance(
         self,
         file_key: String,
+        instance_id: Option<InstanceId>,
     ) -> anyhow::Result<WaitForShareInstanceResponse> {
         let Some(gdl_account_uuid) = self
             .app
@@ -328,10 +465,88 @@ impl ManagerRef<'_, InstanceExportManager> {
             return Err(anyhow::anyhow!("no gdl account found"));
         };
 
+        let response = self
+            .app
+            .account_manager()
+            .wait_for_share_instance(gdl_account_uuid.clone(), file_key)
+            .await?;
+
+        // Upload instance background if available (best-effort, don't fail the share)
+        if let Some(instance_id) = instance_id {
+            if let Err(e) = self
+                .upload_instance_background(&gdl_account_uuid, &response.share_code, instance_id)
+                .await
+            {
+                tracing::warn!(
+                    "Failed to upload instance background for share {}: {}",
+                    response.share_code,
+                    e
+                );
+            }
+        }
+
+        Ok(response)
+    }
+
+    /// Upload the instance background to the share (best-effort)
+    async fn upload_instance_background(
+        &self,
+        gdl_account_uuid: &str,
+        share_code: &str,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<()> {
+        use crate::domain::instance::info::InstanceIcon;
+
+        let instance_manager = self.app.instance_manager();
+        let instances = instance_manager.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or_else(|| anyhow::anyhow!("Instance not found"))?;
+
+        let super::InstanceType::Valid(data) = &instance.type_ else {
+            return Ok(()); // Instance not valid, skip background upload
+        };
+
+        // Check if instance has a custom icon
+        let InstanceIcon::RelativePath(icon_path) = &data.config.icon else {
+            return Ok(()); // No custom icon, nothing to upload
+        };
+
+        // Get the full path to the icon
+        let basepath = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&instance.shortpath)
+            .get_data_path();
+
+        let icon_full_path = basepath.join(icon_path);
+
+        if !icon_full_path.exists() {
+            return Ok(()); // Icon file doesn't exist, skip
+        }
+
+        // Read the icon file
+        let image_data = tokio::fs::read(&icon_full_path).await?;
+
+        // Upload to enderium
         self.app
             .account_manager()
-            .wait_for_share_instance(gdl_account_uuid, file_key)
-            .await
+            .upload_share_background(
+                gdl_account_uuid.to_string(),
+                share_code.to_string(),
+                image_data,
+            )
+            .await?;
+
+        tracing::info!(
+            "Uploaded background for share {} from instance {}",
+            share_code,
+            instance_id
+        );
+
+        Ok(())
     }
 }
 enum ZipMode<'a, W: io::Write + io::Seek, T: FileOptionExtension + Clone> {

@@ -1,7 +1,7 @@
 use crate::{
     api::translation::Translation,
     domain::{
-        instance::{ExportEntry, InstanceId, info::GameVersion},
+        instance::{ExportEntry, InstanceId, info::{GameVersion, InstanceIcon}},
         vtask::VisualTaskId,
     },
     managers::{
@@ -16,9 +16,22 @@ use carbon_platforms::curseforge::manifest::{
     Manifest, ManifestFileReference, Minecraft, ModLoaders,
 };
 use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
-use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fs::File, io::Write, path::{Path, PathBuf}, sync::Arc};
 use tokio::sync::watch;
 use tracing::trace;
+
+/// GDLauncher-specific manifest for enhanced archive format
+#[derive(Serialize, Deserialize)]
+pub struct GdlManifest {
+    /// Format version (currently 1)
+    pub format_version: u32,
+    /// Instance name
+    pub name: String,
+    /// Relative path to icon within archive (e.g., "gdl/icon.png")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+}
 
 pub async fn export_gdlauncher(
     app: Arc<AppInner>,
@@ -45,8 +58,33 @@ pub async fn export_gdlauncher(
     };
 
     let config = data.config.clone();
+    let instance_icon = config.icon.clone();
 
     drop(instances);
+
+    // Read icon data if present (before spawn_blocking)
+    let icon_data: Option<(Vec<u8>, String)> = match &instance_icon {
+        InstanceIcon::RelativePath(icon_path) => {
+            let icon_full_path = basepath.join(icon_path);
+            if icon_full_path.exists() {
+                let ext = Path::new(icon_path)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("png")
+                    .to_string();
+                match std::fs::read(&icon_full_path) {
+                    Ok(data) => Some((data, ext)),
+                    Err(e) => {
+                        tracing::warn!("Failed to read instance icon: {}", e);
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        }
+        InstanceIcon::Default => None,
+    };
 
     let Some(version) = config.game_configuration.version else {
         return Err(anyhow!(
@@ -142,6 +180,8 @@ pub async fn export_gdlauncher(
             t_calc_size.complete_opaque();
             t_create_bundle.update_items(0, file_count);
 
+            let instance_name = config.name.clone();
+
             let manifest = Manifest {
                 minecraft: convert_standard_version_to_cf_version(version.clone())?,
                 manifest_type: String::from("minecraftModpack"),
@@ -160,6 +200,14 @@ pub async fn export_gdlauncher(
                     .collect(),
             };
 
+            // Prepare GDL manifest with icon reference
+            let gdl_icon_path = icon_data.as_ref().map(|(_, ext)| format!("gdl/icon.{}", ext));
+            let gdl_manifest = GdlManifest {
+                format_version: 1,
+                name: instance_name,
+                icon: gdl_icon_path.clone(),
+            };
+
             let tmpfile = app
                 .settings_manager()
                 .runtime_path
@@ -173,8 +221,20 @@ pub async fn export_gdlauncher(
             let ziptask = tokio::task::spawn_blocking(move || {
                 let mut zip = zip::ZipWriter::new(File::create(&send_path)?);
                 let options = zip::write::FileOptions::<()>::default();
+
+                // Write CurseForge manifest (for compatibility)
                 zip.start_file("manifest.json", options)?;
                 zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
+
+                // Write GDL manifest
+                zip.start_file("gdl/manifest.json", options)?;
+                zip.write_all(&serde_json::to_vec_pretty(&gdl_manifest)?)?;
+
+                // Write icon if present
+                if let (Some((icon_bytes, _)), Some(icon_archive_path)) = (&icon_data, &gdl_icon_path) {
+                    zip.start_file(icon_archive_path, options)?;
+                    zip.write_all(icon_bytes)?;
+                }
 
                 super::zip_excluding(
                     ZipMode::Create(&mut zip, options, notify_tx),

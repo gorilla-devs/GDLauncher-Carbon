@@ -19,7 +19,7 @@ use gdl_account::{
     ChangeDisplayNameError, DisplayNameHistoryEntry, GDLAccountStatus, GDLAccountTask, GDLUser,
     GetPresignedUploadUrlResponse, PaginatedShares, QuotaInfo, RegisterAccountBody,
     RequestGDLAccountDeletionError, RequestNewEmailChangeError, RequestNewVerificationTokenError,
-    ShareInfo, WaitForShareInstanceResponse,
+    ShareInfo, ShareMetadata, SharePreview, WaitForShareInstanceResponse,
 };
 use jwt::{Header, Token};
 use reqwest::Client;
@@ -436,6 +436,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         title: Option<String>,
         expiration_days: Option<i32>,
         max_downloads: Option<i32>,
+        metadata: ShareMetadata,
     ) -> anyhow::Result<GetPresignedUploadUrlResponse> {
         let Some(id_token) = self
             .get_account_entries()
@@ -451,7 +452,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         };
 
         self.gdl_account_task
-            .get_presigned_upload_url(id_token, content_length, sha256_checksum, title, expiration_days, max_downloads)
+            .get_presigned_upload_url(id_token, content_length, sha256_checksum, title, expiration_days, max_downloads, metadata)
             .await
             .map_err(Into::into)
     }
@@ -642,6 +643,40 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .map_err(Into::into)
     }
 
+    /// Get share preview info (no auth required)
+    pub async fn get_share_preview(self, share_code: String) -> anyhow::Result<SharePreview> {
+        self.gdl_account_task
+            .get_share_preview(share_code)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Upload a background image for a share
+    pub async fn upload_share_background(
+        self,
+        uuid: String,
+        share_code: String,
+        image_data: Vec<u8>,
+    ) -> anyhow::Result<String> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to upload background for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+        };
+
+        self.gdl_account_task
+            .upload_share_background(id_token, share_code, image_data)
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn request_new_verification_token(
         self,
         uuid: String,
@@ -770,9 +805,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
     pub async fn get_display_name_history(
         self,
-        user_id: i32,
+        friend_code: String,
     ) -> anyhow::Result<Vec<DisplayNameHistoryEntry>> {
-        self.gdl_account_task.get_display_name_history(user_id).await
+        self.gdl_account_task.get_display_name_history(friend_code).await
     }
 
     pub async fn clear_display_name_history(self, uuid: String) -> anyhow::Result<()> {

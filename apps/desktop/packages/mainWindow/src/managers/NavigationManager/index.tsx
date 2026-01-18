@@ -8,6 +8,7 @@ import {
 import { parseSearchQuery } from "@/utils/searchQueryParser"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { JSX, createContext, createSignal, onMount, useContext } from "solid-js"
+import { useModal } from "@/managers/ModalsManager"
 
 const getTransitionClassToApply = (from: string, to: string) => {
   if (isSearchPath(from) && isAddonPath(to)) {
@@ -45,20 +46,30 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const globalstore = useGlobalStore()
+  const modalsContext = useModal()
   const [lastPathVisited, setLastPathVisited] = createSignal({
     path: location.pathname,
     searchParams: location.search
   })
 
-  // Handle protocol URLs (curseforge://, modrinth://)
+  // Handle protocol URLs (curseforge://, modrinth://, gdlauncher://)
   onMount(() => {
     window.onProtocolUrl?.((url) => {
       console.log("Protocol URL received in renderer:", url)
       const parsed = parseSearchQuery(url)
       if (parsed.mode === "direct" && parsed.items.length > 0) {
-        // Navigate to search page with the URL pre-filled
-        // The search page will parse this and show the direct results
-        navigate(`/search?q=${encodeURIComponent(url)}`)
+        const firstItem = parsed.items[0]
+        // Handle GDLauncher share protocol
+        if (firstItem.type === "gdlauncher_share") {
+          modalsContext?.openModal(
+            { name: "sharePreview" },
+            { shareCode: firstItem.shareCode }
+          )
+        } else {
+          // Navigate to search page with the URL pre-filled
+          // The search page will parse this and show the direct results
+          navigate(`/search?q=${encodeURIComponent(url)}`)
+        }
       }
     })
   })

@@ -73,7 +73,8 @@ module.exports = {
     {
       from: "binaries/${arch}",
       to: `binaries`
-    }
+    },
+    "legal"
   ],
   npmRebuild: false,
   protocols: [

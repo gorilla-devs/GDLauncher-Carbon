@@ -91,8 +91,8 @@ pub enum InstanceShareError {
     UserNotVerified,
     #[error("Too many active shares (max 50)")]
     TooManyActiveShares,
-    #[error("Account has pending reports")]
-    UserHasPendingReports,
+    #[error("Account is banned")]
+    AccountBanned,
     #[error("Invalid header: {0}")]
     InvalidHeader(#[from] InvalidHeaderValue),
     #[error("JSON error: {0}")]
@@ -115,7 +115,7 @@ impl InstanceShareError {
                 "UPLOAD_TIMEOUT" => Self::UploadTimeout,
                 "USER_NOT_VERIFIED" => Self::UserNotVerified,
                 "TOO_MANY_ACTIVE_SHARES" => Self::TooManyActiveShares,
-                "USER_HAS_PENDING_REPORTS" => Self::UserHasPendingReports,
+                "ACCOUNT_BANNED" => Self::AccountBanned,
                 _ => Self::Unknown(resp.error.message),
             }
         } else {
@@ -132,7 +132,7 @@ impl InstanceShareError {
             Self::UploadTimeout => "UPLOAD_TIMEOUT",
             Self::UserNotVerified => "USER_NOT_VERIFIED",
             Self::TooManyActiveShares => "TOO_MANY_ACTIVE_SHARES",
-            Self::UserHasPendingReports => "USER_HAS_PENDING_REPORTS",
+            Self::AccountBanned => "ACCOUNT_BANNED",
             Self::InvalidHeader(_) => "INVALID_HEADER",
             Self::Json(_) => "JSON_ERROR",
             Self::Network(_) | Self::NetworkMiddleware(_) => "NETWORK_ERROR",
@@ -247,6 +247,46 @@ pub struct GetPresignedUploadUrlBody {
     pub expiration_days: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_downloads: Option<i32>,
+    // Instance metadata for preview
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minecraft_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modloader_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modloader_version: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub mods: Vec<SharedMod>,
+}
+
+/// Individual mod data for sharing - supports both CurseForge and Modrinth
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SharedMod {
+    pub name: String,
+    // CurseForge data (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub curseforge_project_id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub curseforge_file_id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub curseforge_slug: Option<String>,
+    // Modrinth data (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modrinth_project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modrinth_version_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modrinth_slug: Option<String>,
+}
+
+/// Metadata for instance sharing
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ShareMetadata {
+    pub minecraft_version: Option<String>,
+    pub modloader_type: Option<String>,
+    pub modloader_version: Option<String>,
+    pub mods: Vec<SharedMod>,
 }
 
 #[derive(Serialize)]
@@ -274,6 +314,30 @@ pub struct ShareInfo {
     pub size_kilobytes: i32,
     pub created_at: DateTime<Utc>,
     pub is_expired: bool,
+    pub minecraft_version: Option<String>,
+    pub modloader_type: Option<String>,
+    pub modloader_version: Option<String>,
+    #[serde(default)]
+    pub mods: Vec<SharedMod>,
+    pub background_url: Option<String>,
+}
+
+/// Share preview for public endpoint (no auth required)
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct SharePreview {
+    pub share_code: String,
+    pub title: Option<String>,
+    pub minecraft_version: Option<String>,
+    pub modloader_type: Option<String>,
+    pub modloader_version: Option<String>,
+    #[serde(default)]
+    pub mods: Vec<SharedMod>,
+    pub size_kilobytes: i32,
+    pub background_url: Option<String>,
+    pub expires_at: DateTime<Utc>,
+    pub download_count: i32,
+    pub max_downloads: Option<i32>,
 }
 
 /// Paginated response for user shares
@@ -578,7 +642,7 @@ impl GDLAccountTask {
 
     pub async fn get_display_name_history(
         &self,
-        user_id: i32,
+        friend_code: String,
     ) -> anyhow::Result<Vec<DisplayNameHistoryEntry>> {
         let url = format!(
             "{}/v1/users/users/{}/nickname-history",
@@ -690,6 +754,7 @@ impl GDLAccountTask {
         title: Option<String>,
         expiration_days: Option<i32>,
         max_downloads: Option<i32>,
+        metadata: ShareMetadata,
     ) -> Result<GetPresignedUploadUrlResponse, InstanceShareError> {
         let url = format!("{}/v1/instance-share/presigned-upload-url", self.base_api);
 
@@ -709,6 +774,10 @@ impl GDLAccountTask {
             title,
             expiration_days,
             max_downloads,
+            minecraft_version: metadata.minecraft_version,
+            modloader_type: metadata.modloader_type,
+            modloader_version: metadata.modloader_version,
+            mods: metadata.mods,
         })?;
 
         let resp = self
@@ -930,5 +999,63 @@ impl GDLAccountTask {
                 Err(InstanceShareError::from_response(status, &body))
             }
         }
+    }
+
+    /// Get share preview (no auth required)
+    pub async fn get_share_preview(
+        &self,
+        share_code: String,
+    ) -> Result<SharePreview, InstanceShareError> {
+        let url = format!(
+            "{}/v1/instance-share/share/{}/preview",
+            self.base_api, share_code
+        );
+
+        let resp = self.client.get(url).send().await?;
+
+        handle_instance_share_response(resp).await
+    }
+
+    /// Upload a background image for a share
+    /// Returns the background URL on success
+    pub async fn upload_share_background(
+        &self,
+        id_token: String,
+        share_code: String,
+        image_data: Vec<u8>,
+    ) -> Result<String, InstanceShareError> {
+        // reqwest-middleware does not support multipart form data
+        // so we need to use reqwest directly
+        let client = reqwest::Client::new();
+
+        let url = format!(
+            "{}/v1/instance-share/share/{}/background",
+            self.base_api, share_code
+        );
+
+        let part = reqwest::multipart::Part::bytes(image_data)
+            .file_name("background")
+            .mime_str("application/octet-stream")
+            .map_err(|e| InstanceShareError::Unknown(e.to_string()))?;
+
+        let form = Form::new().part("file", part);
+
+        let authorization = format!("Bearer {}", id_token);
+
+        let resp = client
+            .post(url)
+            .header(AUTHORIZATION, authorization)
+            .multipart(form)
+            .send()
+            .await?;
+
+        // Response contains { background_url: "https://..." }
+        #[derive(Deserialize)]
+        struct BackgroundResponse {
+            background_url: String,
+        }
+
+        let result: BackgroundResponse = handle_instance_share_response(resp).await?;
+        Ok(result.background_url)
     }
 }

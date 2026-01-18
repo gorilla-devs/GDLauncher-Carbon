@@ -3,6 +3,7 @@ import { WebsocketTransport, createClient } from "@rspc/client"
 import { createSolidQueryHooks } from "@rspc/solid"
 import type { Procedures } from "@gd/core_module"
 import { toast } from "@gd/ui"
+import { dispatchBannedEvent } from "./bannedEventBridge"
 
 export const rspc = createSolidQueryHooks<Procedures>()
 export const queryClient = new QueryClient({
@@ -39,7 +40,14 @@ export default function initRspc(_port: number) {
         }
 
         // Check if any cause segment has a custom error code
-        const hasCustomCode = parsed.cause?.some((c) => c.code)
+        const errorCode = parsed.cause?.find((c) => c.code)?.code
+        const hasCustomCode = !!errorCode
+
+        // Handle ACCOUNT_BANNED globally - show dialog and log out
+        if (errorCode === "ACCOUNT_BANNED") {
+          dispatchBannedEvent()
+          return // Don't show generic toast
+        }
 
         // Only show global toast for errors without custom codes
         if (!hasCustomCode && parsed.cause?.[0]?.display) {

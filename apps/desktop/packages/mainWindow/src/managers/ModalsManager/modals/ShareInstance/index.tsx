@@ -25,7 +25,6 @@ type ShareErrorKey =
   | "instances:_trn_share_errors.quota_exceeded"
   | "instances:_trn_share_errors.too_many_shares"
   | "instances:_trn_share_errors.not_verified"
-  | "instances:_trn_share_errors.pending_reports"
   | "instances:_trn_share_errors.network_error"
   | "instances:_trn_share_errors.upload_timeout"
   | "instances:_trn_share_errors.upload_failed"
@@ -38,8 +37,6 @@ const getShareErrorKey = (code: string | null): ShareErrorKey => {
       return "instances:_trn_share_errors.too_many_shares"
     case "USER_NOT_VERIFIED":
       return "instances:_trn_share_errors.not_verified"
-    case "USER_HAS_PENDING_REPORTS":
-      return "instances:_trn_share_errors.pending_reports"
     case "NETWORK_ERROR":
       return "instances:_trn_share_errors.network_error"
     case "UPLOAD_TIMEOUT":
