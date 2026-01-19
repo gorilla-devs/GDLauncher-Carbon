@@ -72,12 +72,12 @@ impl CurseforgeImporter {
     }
 
     pub async fn get_default_scan_path() -> anyhow::Result<PathBuf> {
-        let userdirs = directories::UserDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
+        let userdirs = directories::UserDirs::new().ok_or(anyhow!("Cannot determine user directories. Please manually select your CurseForge instances folder."))?;
 
         #[cfg(not(target_os = "windows"))]
         let p = userdirs
             .document_dir()
-            .ok_or(anyhow!("Cannot build document_dir"))?;
+            .ok_or(anyhow!("Cannot find Documents folder. This is common on WSL or minimal Linux installations. Please manually select your CurseForge instances folder (usually ~/Documents/curseforge/minecraft/Instances)."))?;
         #[cfg(target_os = "windows")]
         let p = userdirs.home_dir();
 

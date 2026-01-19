@@ -48,22 +48,10 @@ impl ManagerRef<'_, InstanceImportManager> {
         self,
         share_code: String,
     ) -> anyhow::Result<VisualTaskId> {
-        let Some(gdl_account_uuid) = self
-            .app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .gdl_account_uuid
-        else {
-            return Err(anyhow::anyhow!(
-                "no gdl account found for import of instance share code {share_code}"
-            ));
-        };
-
         let presigned_url = self
             .app
             .account_manager()
-            .get_presigned_download_url(gdl_account_uuid, share_code.clone())
+            .get_presigned_download_url(share_code.clone())
             .await?;
 
         let tmpdir = self

@@ -34,6 +34,7 @@
   "_trn_import_no_instances": "There is no importable instance",
   "_trn_instance_creation_custom_tab": "Custom",
   "_trn_instance_import_tab": "Import",
+  "_trn_instance_share_code_tab": "Share Code",
   "_trn_instance_presets_tab": "Presets",
   "_trn_quick_start_presets": "Quick Start Presets",
   "_trn_preset_description": "Select a preset to quickly create an instance with the latest versions",
@@ -210,5 +211,6 @@
   "_trn_share_preview.import": "Import Instance",
   "_trn_share_preview.input_placeholder": "Share code or gdl.gg link",
   "_trn_share_preview.preview_button": "Preview",
+  "_trn_share_preview.shared_by": "Shared by",
   "_trn_share_preview.disclaimer": "This content is shared by a user and is not reviewed by GDLauncher. The actual contents may differ from the preview. Import at your own risk."
 }

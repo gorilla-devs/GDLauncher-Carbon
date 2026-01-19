@@ -163,6 +163,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/AccountBanned")),
     preventClose: true,
     noHeader: true
+  },
+  requiresGdlAccount: {
+    component: lazy(() => import("./modals/RequiresGdlAccountModal")),
+    title: t("accounts:_trn_requires_gdl_account")
   }
 })
 

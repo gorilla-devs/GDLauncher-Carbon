@@ -2143,6 +2143,8 @@ struct FESharePreview {
     expires_at: DateTime<Utc>,
     download_count: i32,
     max_downloads: Option<i32>,
+    sharer_display_name: String,
+    sharer_friend_code: String,
 }
 
 impl From<SharePreview> for FESharePreview {
@@ -2159,6 +2161,8 @@ impl From<SharePreview> for FESharePreview {
             expires_at: value.expires_at,
             download_count: value.download_count,
             max_downloads: value.max_downloads,
+            sharer_display_name: value.sharer_display_name,
+            sharer_friend_code: value.sharer_friend_code,
         }
     }
 }

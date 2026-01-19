@@ -404,26 +404,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(GDLAccountStatus::Valid(user))
     }
 
+    /// Get presigned download URL for a share (no auth required)
     pub async fn get_presigned_download_url(
         self,
-        uuid: String,
-        file_key: String,
+        share_code: String,
     ) -> anyhow::Result<String> {
-        let Some(id_token) = self
-            .get_account_entries()
-            .await?
-            .into_iter()
-            .find(|account| account.uuid == uuid)
-            .ok_or(anyhow::anyhow!(
-                "attempted to get a presigned url for an account that does not exist"
-            ))?
-            .id_token
-        else {
-            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
-        };
-
         self.gdl_account_task
-            .get_presigned_download_url(id_token, file_key)
+            .get_presigned_download_url(share_code)
             .await
             .map_err(Into::into)
     }

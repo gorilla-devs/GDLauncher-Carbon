@@ -455,6 +455,12 @@ impl ManagerRef<'_, InstanceExportManager> {
         file_key: String,
         instance_id: Option<InstanceId>,
     ) -> anyhow::Result<WaitForShareInstanceResponse> {
+        tracing::info!(
+            "wait_for_share_instance called with file_key={}, instance_id={:?}",
+            file_key,
+            instance_id
+        );
+
         let Some(gdl_account_uuid) = self
             .app
             .settings_manager()
@@ -489,46 +495,32 @@ impl ManagerRef<'_, InstanceExportManager> {
     }
 
     /// Upload the instance background to the share (best-effort)
+    /// Upload the instance background to the share (best-effort)
     async fn upload_instance_background(
         &self,
         gdl_account_uuid: &str,
         share_code: &str,
         instance_id: InstanceId,
     ) -> anyhow::Result<()> {
-        use crate::domain::instance::info::InstanceIcon;
+        tracing::info!(
+            "Attempting to upload background for share {} from instance {:?}",
+            share_code,
+            instance_id
+        );
 
-        let instance_manager = self.app.instance_manager();
-        let instances = instance_manager.instances.read().await;
-        let instance = instances
-            .get(&instance_id)
-            .ok_or_else(|| anyhow::anyhow!("Instance not found"))?;
-
-        let super::InstanceType::Valid(data) = &instance.type_ else {
-            return Ok(()); // Instance not valid, skip background upload
-        };
-
-        // Check if instance has a custom icon
-        let InstanceIcon::RelativePath(icon_path) = &data.config.icon else {
-            return Ok(()); // No custom icon, nothing to upload
-        };
-
-        // Get the full path to the icon
-        let basepath = self
+        // Use the existing instance_icon method which handles path resolution correctly
+        let Some((_icon_name, image_data)) = self
             .app
-            .settings_manager()
-            .runtime_path
-            .get_instances()
-            .get_instance_path(&instance.shortpath)
-            .get_data_path();
-
-        let icon_full_path = basepath.join(icon_path);
-
-        if !icon_full_path.exists() {
-            return Ok(()); // Icon file doesn't exist, skip
-        }
-
-        // Read the icon file
-        let image_data = tokio::fs::read(&icon_full_path).await?;
+            .instance_manager()
+            .instance_icon(instance_id)
+            .await?
+        else {
+            tracing::info!(
+                "Instance {:?} has no custom icon, skipping background upload",
+                instance_id
+            );
+            return Ok(());
+        };
 
         // Upload to enderium
         self.app

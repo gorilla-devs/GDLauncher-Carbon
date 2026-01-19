@@ -75,7 +75,10 @@ function ShareInstance(props: ModalProps) {
   const [maxDownloads, setMaxDownloads] = createSignal<string>("")
 
   const waitForShareInstanceMutation = rspc.createQuery(() => ({
-    queryKey: ["instance.waitForShareInstance", fileKey()!],
+    queryKey: [
+      "instance.waitForShareInstance",
+      { fileKey: fileKey()!, instanceId: data()?.instanceId }
+    ],
     retry: true,
     enabled: !!fileKey()
   }))

@@ -374,7 +374,7 @@ function MyShares(props: ModalProps) {
           <Match when={sharesQuery.isLoading}>
             <div class="flex flex-1 flex-col overflow-hidden">
               <TableHeader />
-              <div class="flex-1 overflow-y-auto scrollbar-gutter-stable">
+              <div class="flex-1 overflow-y-auto" style={{ "scrollbar-gutter": "stable" }}>
                 <SkeletonRow />
                 <SkeletonRow />
                 <SkeletonRow />
@@ -405,7 +405,8 @@ function MyShares(props: ModalProps) {
               {/* Table body */}
               <div
                 ref={scrollContainerRef}
-                class="flex-1 overflow-y-auto scrollbar-gutter-stable"
+                class="flex-1 overflow-y-auto"
+                style={{ "scrollbar-gutter": "stable" }}
               >
                 <For each={allShares()}>
                   {(share) => (
@@ -522,28 +523,45 @@ function MyShares(props: ModalProps) {
         <div class="border-darkSlate-700 mt-4 flex items-center gap-4 border-t pt-4">
           <div class="flex flex-1 flex-col gap-2">
             {/* Quota display */}
-            <Show when={quotaQuery.data}>
-              {(quota) => (
-                <div class="flex w-1/2 items-center gap-3">
-                  <Progress
-                    class="flex-1"
-                    value={quota().usedKilobytes}
-                    max={quota().totalKilobytes}
-                  />
-                  <span class="text-lightSlate-400 whitespace-nowrap text-sm">
-                    {formatSize(quota().usedKilobytes)} /{" "}
-                    {formatSize(quota().totalKilobytes)}
-                  </span>
-                </div>
-              )}
-            </Show>
+            <div class="flex w-1/2 items-center gap-3">
+              <Show
+                when={quotaQuery.data}
+                fallback={
+                  <>
+                    <div class="bg-darkSlate-600 h-2 flex-1 animate-pulse rounded-full" />
+                    <div class="bg-darkSlate-600 h-4 w-24 animate-pulse rounded" />
+                  </>
+                }
+              >
+                {(quota) => (
+                  <>
+                    <Progress
+                      class="flex-1"
+                      value={quota().usedKilobytes}
+                      max={quota().totalKilobytes}
+                    />
+                    <span class="text-lightSlate-400 whitespace-nowrap text-sm">
+                      {formatSize(quota().usedKilobytes)} /{" "}
+                      {formatSize(quota().totalKilobytes)}
+                    </span>
+                  </>
+                )}
+              </Show>
+            </div>
             <span class="text-lightSlate-500 text-xs">
               <Trans key="instances:_trn_my_shares.quota_note" />
             </span>
           </div>
-          <span class="text-lightSlate-500 whitespace-nowrap text-sm">
-            {totalCount()} {totalCount() === 1 ? "share" : "shares"}
-          </span>
+          <Show
+            when={!sharesQuery.isLoading}
+            fallback={
+              <div class="bg-darkSlate-600 h-4 w-16 animate-pulse rounded" />
+            }
+          >
+            <span class="text-lightSlate-500 whitespace-nowrap text-sm">
+              {totalCount()} {totalCount() === 1 ? "share" : "shares"}
+            </span>
+          </Show>
         </div>
       </div>
     </ModalLayout>

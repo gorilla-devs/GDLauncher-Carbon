@@ -338,6 +338,8 @@ pub struct SharePreview {
     pub expires_at: DateTime<Utc>,
     pub download_count: i32,
     pub max_downloads: Option<i32>,
+    pub sharer_display_name: String,
+    pub sharer_friend_code: String,
 }
 
 /// Paginated response for user shares
@@ -716,16 +718,14 @@ impl GDLAccountTask {
 
     pub async fn get_subscription_status(&self) {}
 
+    /// Get presigned download URL for a share (no auth required)
     pub async fn get_presigned_download_url(
         &self,
-        id_token: String,
         share_code: String,
     ) -> Result<String, InstanceShareError> {
         let url = format!("{}/v1/instance-share/presigned-download-url", self.base_api);
 
-        let authorization = format!("Bearer {}", id_token);
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, authorization.parse()?);
         headers.insert(
             CONTENT_TYPE,
             "application/json"

@@ -39,6 +39,7 @@ import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/
 import { setClickedInstanceId } from "../InstanceTile"
 import { useGlobalStore } from "../GlobalStoreContext"
 import useSearchContext from "../SearchInputContext"
+import GdlFeatureContextMenuItem from "../GdlFeatureContextMenuItem"
 
 type Variant = "default" | "sidebar" | "sidebar-small"
 
@@ -259,8 +260,8 @@ const Tile = (props: Props) => {
                   ? t("instances:_trn_remove_favorite")
                   : t("instances:_trn_add_favorite")}
               </ContextMenuItem>
-              <ContextMenuItem
-                class="flex items-center gap-2"
+              <GdlFeatureContextMenuItem
+                icon={<div class="i-ri:share-line h-4 w-4" />}
                 onClick={() => {
                   const instanceId = props.instance.id
                   modalsContext?.openModal(
@@ -274,9 +275,8 @@ const Tile = (props: Props) => {
                 }}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
-                <div class="i-ri:share-line h-4 w-4" />
                 {t("instances:_trn_instance_share.title")}
-              </ContextMenuItem>
+              </GdlFeatureContextMenuItem>
               <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={() => {
