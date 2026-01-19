@@ -226,11 +226,11 @@ const Accounts = () => {
       ? globalStore.gdlAccount.data?.value
       : undefined
 
-  const userId = createMemo(() => validGDLUser()?.id)
+  const friendCode = createMemo(() => validGDLUser()?.friendCode)
 
   const nicknameHistoryQuery = rspc.createQuery(() => ({
-    queryKey: ["account.getNicknameHistory", userId() ?? 0],
-    enabled: !!userId()
+    queryKey: ["account.getNicknameHistory", friendCode() ?? ""],
+    enabled: !!friendCode()
   }))
 
   const invalidGDLUser = () => globalStore.gdlAccount.data?.status === "invalid"

@@ -76,7 +76,6 @@ pub enum GDLAccountStatus {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GDLUser {
-    pub id: i32,
     pub email: String,
     pub microsoft_oid: String,
     pub nickname: String,
@@ -361,11 +360,11 @@ impl GDLAccountTask {
 
     pub async fn get_nickname_history(
         &self,
-        user_id: i32,
+        friend_code: String,
     ) -> anyhow::Result<Vec<NicknameHistoryEntry>> {
         let url = format!(
             "{}/v1/users/users/{}/nickname-history",
-            self.base_api, user_id
+            self.base_api, friend_code
         );
 
         let resp = self.client.get(url).send().await?;

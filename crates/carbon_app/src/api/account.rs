@@ -165,9 +165,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
-        query GET_NICKNAME_HISTORY[app, user_id: i32] {
+        query GET_NICKNAME_HISTORY[app, friend_code: String] {
             let history = app.account_manager()
-                .get_nickname_history(user_id)
+                .get_nickname_history(friend_code)
                 .await?;
 
             Ok(history.into_iter().map(FENicknameHistoryEntry::from).collect::<Vec<_>>())
@@ -488,7 +488,6 @@ impl From<GDLAccountStatus> for FEGDLAccountStatus {
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FEGDLAccount {
-    id: i32,
     email: String,
     microsoft_oid: String,
     nickname: String,
@@ -508,7 +507,6 @@ struct FEGDLAccount {
 impl From<GDLUser> for FEGDLAccount {
     fn from(value: GDLUser) -> Self {
         Self {
-            id: value.id,
             email: value.email,
             microsoft_oid: value.microsoft_oid,
             nickname: value.nickname,
