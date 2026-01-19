@@ -92,6 +92,7 @@ winreg = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { workspace = true }
+wayland-sys = { workspace = true } # dlopen feature for runtime loading
 
 [build-dependencies]
 serde_json = { workspace = true }

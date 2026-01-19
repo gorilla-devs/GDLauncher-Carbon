@@ -80,11 +80,17 @@ export class AnimationControllerImpl implements AnimationController {
      * Also fades out loading spinner and background blur
      */
     slideIn: async (): Promise<void> => {
-      if (this.reducedMotion) return
-
       await this.waitForRefs()
 
       const { sidebar, video, loadingSpinner, backgroundBlur } = this.refs
+
+      if (this.reducedMotion) {
+        sidebar!.style.transform = "translateX(0%)"
+        video!.style.transform = "translateX(15%)"
+        loadingSpinner!.style.opacity = "0"
+        backgroundBlur!.style.opacity = "0"
+        return
+      }
 
       // Run all animations in parallel
       await Promise.all([
@@ -108,11 +114,15 @@ export class AnimationControllerImpl implements AnimationController {
      * Slide sidebar out to left, video to center
      */
     slideOut: async (): Promise<void> => {
-      if (this.reducedMotion) return
-
       await this.waitForRefs()
 
       const { sidebar, video } = this.refs
+
+      if (this.reducedMotion) {
+        sidebar!.style.transform = "translateX(-100%)"
+        video!.style.transform = "translateX(0%)"
+        return
+      }
 
       await Promise.all([
         AnimationPresets.slideX(sidebar!, "0%", "-100%", { duration: 500 }),
@@ -131,11 +141,15 @@ export class AnimationControllerImpl implements AnimationController {
      * Show loading overlay (spinner + blur)
      */
     show: async (): Promise<void> => {
-      if (this.reducedMotion) return
-
       await this.waitForRefs()
 
       const { loadingSpinner, backgroundBlur } = this.refs
+
+      if (this.reducedMotion) {
+        loadingSpinner!.style.opacity = "1"
+        backgroundBlur!.style.opacity = "1"
+        return
+      }
 
       await Promise.all([
         AnimationPresets.fadeIn(loadingSpinner!, { duration: 300 }),
@@ -147,11 +161,15 @@ export class AnimationControllerImpl implements AnimationController {
      * Hide loading overlay
      */
     hide: async (): Promise<void> => {
-      if (this.reducedMotion) return
-
       await this.waitForRefs()
 
       const { loadingSpinner, backgroundBlur } = this.refs
+
+      if (this.reducedMotion) {
+        loadingSpinner!.style.opacity = "0"
+        backgroundBlur!.style.opacity = "0"
+        return
+      }
 
       await Promise.all([
         AnimationPresets.fadeOut(loadingSpinner!, { duration: 300 }),
@@ -172,13 +190,16 @@ export class AnimationControllerImpl implements AnimationController {
       ref: AnimationRefName,
       options: AnimationOptions = {}
     ): Promise<void> => {
-      if (this.reducedMotion) return
-
       await this.waitForRefs()
 
       const element = this.refs[ref]
       if (!element) {
         console.warn(`[AnimationController] Text ref '${ref}' not available`)
+        return
+      }
+
+      if (this.reducedMotion) {
+        element.style.opacity = "1"
         return
       }
 
@@ -195,11 +216,19 @@ export class AnimationControllerImpl implements AnimationController {
       ref: AnimationRefName | AnimationRefName[],
       options: AnimationOptions = {}
     ): Promise<void> => {
-      if (this.reducedMotion) return
-
       await this.waitForRefs()
 
       const refs = Array.isArray(ref) ? ref : [ref]
+
+      if (this.reducedMotion) {
+        refs.forEach((r) => {
+          const element = this.refs[r]
+          if (element) {
+            element.style.opacity = "0"
+          }
+        })
+        return
+      }
 
       await Promise.all(
         refs.map((r) => {
@@ -227,12 +256,15 @@ export class AnimationControllerImpl implements AnimationController {
      * Fade in background blur
      */
     fadeIn: async (options: AnimationOptions = {}): Promise<void> => {
-      if (this.reducedMotion) return
-
       await this.waitForRefs()
 
       const element = this.refs.backgroundBlur
       if (!element) return
+
+      if (this.reducedMotion) {
+        element.style.opacity = "1"
+        return
+      }
 
       await AnimationPresets.fadeIn(element, {
         duration: options.duration ?? 500,
@@ -244,12 +276,15 @@ export class AnimationControllerImpl implements AnimationController {
      * Fade out background blur
      */
     fadeOut: async (options: AnimationOptions = {}): Promise<void> => {
-      if (this.reducedMotion) return
-
       await this.waitForRefs()
 
       const element = this.refs.backgroundBlur
       if (!element) return
+
+      if (this.reducedMotion) {
+        element.style.opacity = "0"
+        return
+      }
 
       await AnimationPresets.fadeOut(element, {
         duration: options.duration ?? 500,
