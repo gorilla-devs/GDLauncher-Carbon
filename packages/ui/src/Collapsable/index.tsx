@@ -1,4 +1,4 @@
-import { JSX, createSignal } from "solid-js"
+import { JSX, Show, createSignal } from "solid-js"
 
 interface Props {
   children: JSX.Element
@@ -7,42 +7,51 @@ interface Props {
   noPadding?: boolean
   defaultOpened?: boolean
   class?: string
+  /** Custom header render function - receives toggle function and opened state */
+  customHeader?: (toggle: () => void, isOpened: () => boolean) => JSX.Element
 }
 
 const Collapsable = (props: Props) => {
   const [opened, setOpened] = createSignal(props.defaultOpened ?? true)
 
+  const toggle = () => setOpened((prev) => !prev)
+
   return (
     <div class="w-full box-border flex flex-col py-2 select-none max-w-full">
-      <div
-        class="w-fit h-8 flex gap-2 items-center cursor-pointer press-effect active:scale-97"
-        classList={{
-          "px-6": props.size !== "small" && !props.noPadding,
-          "px-2": props.size === "small" && !props.noPadding,
-          ...(props.class && {
-            [props.class]: true
-          })
-        }}
-        onClick={() => {
-          setOpened((prev) => !prev)
-        }}
+      <Show
+        when={props.customHeader}
+        fallback={
+          <div
+            class="w-fit h-8 flex gap-2 items-center cursor-pointer press-effect active:scale-97"
+            classList={{
+              "px-6": props.size !== "small" && !props.noPadding,
+              "px-2": props.size === "small" && !props.noPadding,
+              ...(props.class && {
+                [props.class]: true
+              })
+            }}
+            onClick={toggle}
+          >
+            <div
+              class="i-hugeicons:arrow-right-01 min-w-4 min-h-4 transition ease-spring text-lightSlate-700"
+              classList={{
+                "rotate-90": opened()
+              }}
+            />
+            <p
+              class="m-0 text-lightSlate-700 flex items-center uppercase text-ellipsis max-w-full text-left"
+              classList={{
+                "text-md": props.size !== "small",
+                "text-xs": props.size === "small"
+              }}
+            >
+              {props.title}
+            </p>
+          </div>
+        }
       >
-        <div
-          class="i-hugeicons:arrow-right-01 min-w-4 min-h-4 transition ease-spring text-lightSlate-700"
-          classList={{
-            "rotate-90": opened()
-          }}
-        />
-        <p
-          class="m-0 text-lightSlate-700 flex items-center uppercase text-ellipsis max-w-full text-left"
-          classList={{
-            "text-md": props.size !== "small",
-            "text-xs": props.size === "small"
-          }}
-        >
-          {props.title}
-        </p>
-      </div>
+        {props.customHeader?.(toggle, opened)}
+      </Show>
       <div
         classList={{
           "h-auto": opened(),

@@ -295,9 +295,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         info!("Waiting for account validation");
@@ -318,9 +316,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         Ok(self.gdl_account_task.get_account(auth_token).await?)
@@ -381,9 +377,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         let user = self
@@ -508,9 +502,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -546,9 +538,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(_auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -571,9 +561,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -599,9 +587,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -622,9 +608,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -651,9 +635,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -685,9 +667,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -708,9 +688,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -752,9 +730,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            );
+            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
         };
 
         self.gdl_account_task
@@ -1947,6 +1923,10 @@ fn extract_email(token: Option<&String>) -> Option<String> {
 /// Get the GDL auth token for API calls.
 /// Returns None if no GDL token is available (user needs to re-authenticate).
 fn get_gdl_auth_token(account: &db::account::Data) -> Option<&String> {
+    println!(
+        "Getting GDL auth token for account {}",
+        account.gdl_token.as_ref().unwrap_or(&"".to_string())
+    );
     account.gdl_token.as_ref()
 }
 

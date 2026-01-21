@@ -14,6 +14,7 @@
   "_trn_unpair_instance": "Unpair Instance",
   "_trn_notification": "Notification",
   "_trn_confirm_instance_deletion": "Confirm Instance Deletion",
+  "_trn_confirm_batch_instance_deletion": "Delete Instances",
   "_trn_confirm_change_runtime_path": "Confirm Change RuntimePath",
   "_trn_why_are_ads_needed": "Why are ads needed?",
   "_trn_mods_updater": "Mods Updater",

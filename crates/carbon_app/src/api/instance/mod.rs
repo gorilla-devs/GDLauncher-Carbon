@@ -114,6 +114,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        mutation RENAME_GROUP[app, rename: RenameGroup] {
+            app.instance_manager()
+                .rename_group(rename.group.into(), rename.name)
+                .await
+        }
+
         mutation DELETE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .delete_instance(id.into())
@@ -142,6 +148,21 @@ pub(super) fn mount() -> RouterBuilder<App> {
                             => InstanceMoveTarget::EndOfGroup(group.into()),
                     }
                 )
+                .await
+        }
+
+        mutation CREATE_FOLDER_FROM_INSTANCES[app, data: CreateFolderFromInstances] {
+            app.instance_manager()
+                .create_folder_from_instances(
+                    data.instances.into_iter().map(|id| id.into()).collect()
+                )
+                .await
+                .map(FEGroupId::from)
+        }
+
+        mutation SORT_LIBRARY[app, sort_by: LibrarySortCriteria] {
+            app.instance_manager()
+                .sort_library(sort_by.into())
                 .await
         }
 
@@ -817,6 +838,7 @@ struct ListGroup {
 struct ListInstance {
     id: FEInstanceId,
     group_id: FEGroupId,
+    index: i32,
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
@@ -1072,6 +1094,37 @@ struct StandardVersion {
 struct MoveGroup {
     group: FEGroupId,
     before: Option<FEGroupId>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct CreateFolderFromInstances {
+    instances: Vec<FEInstanceId>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum LibrarySortCriteria {
+    Name,
+    LastPlayed,
+    MostPlayed,
+    DateCreated,
+}
+
+impl From<LibrarySortCriteria> for manager::LibrarySortCriteria {
+    fn from(value: LibrarySortCriteria) -> Self {
+        match value {
+            LibrarySortCriteria::Name => Self::Name,
+            LibrarySortCriteria::LastPlayed => Self::LastPlayed,
+            LibrarySortCriteria::MostPlayed => Self::MostPlayed,
+            LibrarySortCriteria::DateCreated => Self::DateCreated,
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct RenameGroup {
+    group: FEGroupId,
+    name: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -1593,6 +1646,7 @@ impl From<manager::ListInstance> for ListInstance {
         Self {
             id: value.id.into(),
             group_id: value.group_id.into(),
+            index: value.index,
             name: value.name,
             favorite: value.favorite,
             status: value.status.into(),

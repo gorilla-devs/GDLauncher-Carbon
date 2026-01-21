@@ -10,6 +10,7 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
 import { rspc } from "@/utils/rspcClient"
 import {
+  Checkbox,
   ContextMenu,
   ContextMenuContent,
   ContextMenuGroup,
@@ -25,7 +26,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  PRESS_CLASSES
+  PRESS_CLASSES_LIGHT
 } from "@gd/ui"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -40,6 +41,7 @@ import { setClickedInstanceId } from "../InstanceTile"
 import { useGlobalStore } from "../GlobalStoreContext"
 import useSearchContext from "../SearchInputContext"
 import GdlFeatureContextMenuItem from "../GdlFeatureContextMenuItem"
+import SelectionBorder from "./SelectionBorder"
 
 type Variant = "default" | "sidebar" | "sidebar-small"
 
@@ -67,6 +69,10 @@ interface Props {
   shouldSetViewTransition: boolean
   isNew?: boolean
   onHover?: () => void
+  isMultiSelected?: boolean
+  onToggleSelection?: () => void
+  onDragStart?: (_e: PointerEvent) => void
+  isDragging?: boolean
 }
 
 const Tile = (props: Props) => {
@@ -80,6 +86,7 @@ const Tile = (props: Props) => {
   const globalStore = useGlobalStore()
 
   const [copiedError, setCopiedError] = createSignal(false)
+  const [isHovering, setIsHovering] = createSignal(false)
 
   const [t] = useTransContext()
   const navigate = useGDNavigate()
@@ -363,7 +370,11 @@ const Tile = (props: Props) => {
           </ContextMenuContent>
           <ContextMenuTrigger>
             <div
-              class={`group relative flex select-none flex-col items-start justify-center ${PRESS_CLASSES}`}
+              class={`group relative flex select-none flex-col items-center justify-center ${PRESS_CLASSES_LIGHT}`}
+              classList={{
+                "opacity-50 scale-95": props.isDragging,
+                "cursor-grab": !isLoading() && !isInQueue() && !props.isDeleting && !props.instance.locked
+              }}
               onClick={(e) => {
                 e.stopPropagation()
                 if (
@@ -375,8 +386,29 @@ const Tile = (props: Props) => {
                   props?.onClick?.(e)
                 }
               }}
-              onMouseEnter={() => props.onHover?.()}
+              onPointerDown={(e) => {
+                // Only handle left click and if not loading/queued/deleting
+                // Note: locked instances can still be reordered (locked only prevents content modification)
+                if (
+                  e.button === 0 &&
+                  !isLoading() &&
+                  !isInQueue() &&
+                  !props.isDeleting &&
+                  props.onDragStart
+                ) {
+                  props.onDragStart(e)
+                }
+              }}
+              onMouseEnter={() => {
+                setIsHovering(true)
+                props.onHover?.()
+              }}
+              onMouseLeave={() => setIsHovering(false)}
             >
+              <SelectionBorder
+                isSelected={props.isMultiSelected ?? false}
+                size={props.size}
+              />
               <Tooltip
                 open={props.failError ? undefined : false}
                 placement="top"
@@ -401,11 +433,11 @@ const Tile = (props: Props) => {
                     <div
                       class="relative overflow-hidden rounded-2xl "
                       classList={{
-                        "h-100 w-100": props.size === 5,
-                        "h-70 w-70": props.size === 4,
-                        "h-50 w-50": props.size === 3,
-                        "h-38 w-38": props.size === 2,
-                        "h-20 w-20": props.size === 1
+                        "h-120 w-120": props.size === 5,
+                        "h-84 w-84": props.size === 4,
+                        "h-60 w-60": props.size === 3,
+                        "h-46 w-46": props.size === 2,
+                        "h-24 w-24": props.size === 1
                       }}
                       style={
                         props.shouldSetViewTransition
@@ -420,20 +452,26 @@ const Tile = (props: Props) => {
                         class="bg-darkSlate-800 relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-cover bg-center transition-all duration-300 ease-spring"
                         classList={{
                           grayscale: isLoading() || isInQueue(),
-                          "group-hover:scale-120": !isLoading() && !isInQueue()
+                          "group-hover:scale-110 group-hover:blur-[2px]":
+                            !isLoading() && !isInQueue()
                         }}
                         style={{
                           "background-image": props.img
                             ? `url("${props.img}")`
                             : `url("${DefaultImg}")`,
-                          "will-change": "transform, opacity",
+                          "will-change": "transform, filter",
                           contain: "layout style",
-                          transform: "translateZ(0)",
                           ...(props.shouldSetViewTransition
                             ? {
                                 "view-transition-name": `instance-tile-image`
                               }
                             : {})
+                        }}
+                      />
+                      <div
+                        class="z-1 absolute inset-0 rounded-2xl bg-black/0 transition-all duration-300 ease-spring group-hover:bg-black/30"
+                        classList={{
+                          "!bg-black/0": isLoading() || isInQueue()
                         }}
                       />
                       <Show when={props.isInvalid}>
@@ -570,9 +608,30 @@ const Tile = (props: Props) => {
                           />
                         </div>
                       </Show>
-                      <Show when={props.isNew}>
+                      <Show when={props.isNew && !props.onToggleSelection}>
                         <div class="border-1 border-primary-400 bg-primary-500 z-3 absolute left-2 top-2 flex items-center justify-center rounded-lg border-solid px-2 py-0.5 text-xs font-bold text-white uppercase shadow-md">
                           NEW
+                        </div>
+                      </Show>
+                      <Show when={props.onToggleSelection}>
+                        <div
+                          class="z-10 absolute left-2 top-2 transition-all duration-200 ease-spring"
+                          classList={{
+                            "translate-x-0 opacity-100":
+                              props.isMultiSelected || isHovering(),
+                            "-translate-x-3 opacity-0":
+                              !props.isMultiSelected && !isHovering()
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            props.onToggleSelection?.()
+                          }}
+                        >
+                          <Checkbox
+                            checked={props.isMultiSelected}
+                            hover={false}
+                          />
                         </div>
                       </Show>
                       <Show
@@ -613,19 +672,19 @@ const Tile = (props: Props) => {
                         />
                       </Show>
                       <div
-                        class="z-2 absolute left-1/2 top-1/2 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl transition-all duration-200 ease-spring"
+                        class="z-5 absolute right-2 top-2 h-10 items-center justify-center gap-2 rounded-xl px-4 transition-all duration-200 ease-spring translate-x-3 opacity-0"
                         classList={{
-                          "scale-100 bg-red-500": isLoading(),
-                          "flex bg-primary-500 hover:bg-primary-400 text-2xl":
+                          "translate-x-0 opacity-100 bg-red-500": isLoading(),
+                          "flex bg-primary-500 hover:bg-primary-400":
                             !props.isRunning &&
                             !isLoading() &&
                             !isInQueue() &&
                             !props.isDeleting,
-                          "scale-0": !props.isRunning,
-                          "flex bg-red-500 scale-100 opacity-0 animate-enterWithOpacityChange":
+                          "hidden": !props.isRunning && !isLoading(),
+                          "flex bg-red-500 translate-x-0 opacity-100":
                             props.isRunning,
 
-                          "group-hover:scale-100":
+                          "group-hover:flex group-hover:translate-x-0 group-hover:opacity-100":
                             !isLoading() &&
                             !isInQueue() &&
                             !props.isInvalid &&
@@ -647,11 +706,32 @@ const Tile = (props: Props) => {
                         }}
                       >
                         <div
-                          class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} text-lightSlate-50 shrink-0`}
-                          classList={{
-                            "text-xl": props.isRunning
-                          }}
+                          class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} text-lightSlate-50 h-5 w-5 shrink-0`}
                         />
+                        <span class="text-lightSlate-50 text-base font-semibold">
+                          {props.isRunning ? "STOP" : "PLAY"}
+                        </span>
+                      </div>
+                      {/* Info overlay - always visible */}
+                      <div
+                        class="z-4 absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl transition-opacity duration-300"
+                        classList={{
+                          "opacity-0":
+                            isLoading() || isInQueue() || props.isDeleting
+                        }}
+                      >
+                        <h4 class="m-0 text-sm font-semibold text-white truncate">
+                          {props.instance.name}
+                        </h4>
+                        <div class="flex items-center gap-2 text-xs text-white/70">
+                          <Show when={props.modloader}>
+                            <img
+                              class="h-3 w-3"
+                              src={getModloaderIcon(props.modloader!)}
+                            />
+                          </Show>
+                          <span>{props.version}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -696,81 +776,23 @@ const Tile = (props: Props) => {
                   </div>
                 </TooltipContent>
               </Tooltip>
-
-              <h4
-                class="mb-1 mt-2 text-ellipsis whitespace-nowrap"
-                classList={{
-                  "text-lightSlate-50":
-                    !isLoading() && !isInQueue() && !props.isDeleting,
-                  "text-lightGray-900":
-                    isLoading() || isInQueue() || props.isDeleting,
-                  "max-w-100": props.size === 5,
-                  "max-w-70": props.size === 4,
-                  "max-w-50": props.size === 3,
-                  "max-w-38": props.size === 2,
-                  "max-w-20": props.size === 1
-                }}
-                style={
-                  props.shouldSetViewTransition
-                    ? {
-                        "view-transition-name": `instance-tile-title`,
-                        contain: "layout"
-                      }
-                    : {}
+              <Show
+                when={
+                  isLoading() &&
+                  props.downloaded !== 0 &&
+                  props.totalDownload !== 0
                 }
               >
-                <Tooltip
-                  open={props.instance.name.length > 20 ? undefined : false}
-                  placement="top"
-                >
-                  <TooltipTrigger class="w-full overflow-hidden text-ellipsis">
-                    {props.instance.name}
-                  </TooltipTrigger>
-                  <TooltipContent>{props.instance.name}</TooltipContent>
-                </Tooltip>
-              </h4>
-              <Switch>
-                <Match when={!isLoading() && !props.isPreparing}>
-                  <div class="text-lightGray-900 flex justify-between gap-2">
-                    <span
-                      class="flex gap-1"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-modloader`,
-                              contain: "layout"
-                            }
-                          : {}
-                      }
-                    >
-                      <Show when={props.modloader}>
-                        <img
-                          class="h-4 w-4"
-                          src={getModloaderIcon(props.modloader!)}
-                        />
-                      </Show>
-                    </span>
-                    <p class="m-0">{props.version}</p>
-                  </div>
-                </Match>
-                <Match
-                  when={
-                    isLoading() &&
-                    props.downloaded !== 0 &&
-                    props.totalDownload !== 0
-                  }
-                >
-                  <p class="text-lightSlate-50 m-0 text-center text-sm">
-                    <Trans
-                      key="content:_trn_common.download_progress_mb"
-                      options={{
-                        downloaded: Math.round(props.downloaded || 0),
-                        total: Math.round(props.totalDownload || 0)
-                      }}
-                    />
-                  </p>
-                </Match>
-              </Switch>
+                <p class="text-lightSlate-50 m-0 mt-2 text-center text-sm">
+                  <Trans
+                    key="content:_trn_common.download_progress_mb"
+                    options={{
+                      downloaded: Math.round(props.downloaded || 0),
+                      total: Math.round(props.totalDownload || 0)
+                    }}
+                  />
+                </p>
+              </Show>
             </div>
           </ContextMenuTrigger>
         </ContextMenu>

@@ -7,8 +7,8 @@ const checkboxStyles = cva(
   {
     variants: {
       checked: {
-        true: "bg-primary-500 outline-transparent",
-        false: "outline-darkSlate-500 bg-transparent outline"
+        true: "bg-primary-500",
+        false: "bg-darkSlate-800 ring-1 ring-inset ring-darkSlate-500"
       },
       disabled: {
         true: "bg-darkSlate-900",
@@ -19,18 +19,10 @@ const checkboxStyles = cva(
         false: ""
       },
       hover: {
-        true: "hover:outline-darkSlate-300 outline",
+        true: "hover:ring-darkSlate-300 hover:ring-1 hover:ring-inset",
         false: ""
       }
     },
-    compoundVariants: [
-      {
-        checked: false,
-        disabled: false,
-        indeterminate: false,
-        className: "bg-transparent"
-      }
-    ],
     defaultVariants: {
       checked: false,
       disabled: false,

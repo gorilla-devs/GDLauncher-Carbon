@@ -442,6 +442,7 @@ impl FromStr for GameResolution {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InstancesSortBy {
+    Manual,
     Name,
     LastPlayed,
     LastUpdated,
@@ -453,6 +454,7 @@ pub enum InstancesSortBy {
 impl From<InstancesSortBy> for String {
     fn from(value: InstancesSortBy) -> Self {
         match value {
+            InstancesSortBy::Manual => "manual",
             InstancesSortBy::Name => "name",
             InstancesSortBy::LastPlayed => "last_played",
             InstancesSortBy::LastUpdated => "last_updated",
@@ -469,6 +471,7 @@ impl TryFrom<String> for InstancesSortBy {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match &*value.to_lowercase() {
+            "manual" => Ok(Self::Manual),
             "name" => Ok(Self::Name),
             "last_played" => Ok(Self::LastPlayed),
             "last_updated" => Ok(Self::LastUpdated),

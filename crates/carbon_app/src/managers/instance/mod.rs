@@ -388,6 +388,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .map(|(instance, status)| ListInstance {
                         id: InstanceId(instance.id),
                         group_id: GroupId(instance.group_id),
+                        index: instance.index,
                         name: instance.name,
                         favorite: instance.favorite,
                         icon_revision: match &status {
@@ -621,7 +622,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     vec![
                         WhereParam::GroupId(IntFilter::Equals(*target_group)),
                         WhereParam::Index(IntFilter::Gt(start)),
-                        WhereParam::Index(IntFilter::Lte(target)),
+                        WhereParam::Index(IntFilter::Lt(target)),
                     ],
                     vec![SetParam::DecrementIndex(1)],
                 ),
@@ -654,6 +655,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             ]
         };
 
+        // When moving forward in the same group, the source ends up at target - 1
+        // because we're shifting items in (start, target) down, not including target
+        let final_idx = if start_group == target_group && start_idx < target_idx {
+            target_idx - 1
+        } else {
+            target_idx
+        };
+
         self.app
             .prisma_client
             ._batch((
@@ -662,7 +671,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     UniqueWhereParam::IdEquals(*instance),
                     vec![
                         SetParam::SetGroupId(*target_group),
-                        SetParam::SetIndex(target_idx),
+                        SetParam::SetIndex(final_idx),
                     ],
                 ),
             ))
@@ -777,6 +786,173 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_ALL_INSTANCES, None);
 
         Ok(GroupId(group.id))
+    }
+
+    pub async fn rename_group(self, group: GroupId, name: String) -> anyhow::Result<()> {
+        use db::instance_group::{SetParam, UniqueWhereParam};
+
+        self.app
+            .prisma_client
+            .instance_group()
+            .update(
+                UniqueWhereParam::IdEquals(*group),
+                vec![SetParam::SetName(name)],
+            )
+            .exec()
+            .await?;
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
+
+        Ok(())
+    }
+
+    /// Create a new folder (group) from a list of instances.
+    /// The folder is named "New Folder" by default.
+    pub async fn create_folder_from_instances(
+        self,
+        instance_ids: Vec<InstanceId>,
+    ) -> anyhow::Result<GroupId> {
+        if instance_ids.is_empty() {
+            bail!("Cannot create folder from empty list of instances");
+        }
+
+        // Create a new group named "New Folder"
+        let group_id = self.create_group(String::from("New Folder")).await?;
+
+        // Move all instances to the new group
+        for instance_id in instance_ids {
+            self.move_instance(instance_id, InstanceMoveTarget::EndOfGroup(group_id))
+                .await?;
+        }
+
+        Ok(group_id)
+    }
+
+    /// Sort all ungrouped instances (in default group) and folders by the given criteria.
+    /// This is a one-off sort that reassigns indices.
+    pub async fn sort_library(self, sort_by: LibrarySortCriteria) -> anyhow::Result<()> {
+        use db::instance::{SetParam, UniqueWhereParam, WhereParam};
+        use db::instance_group::{SetParam as GroupSetParam, UniqueWhereParam as GroupUniqueWhereParam};
+
+        let default_group_id = self.get_default_group().await?;
+
+        // Lock indexes while we're changing them
+        let _index_lock = self.index_lock.lock().await;
+
+        // Get all instances in the default group (ungrouped instances)
+        let instances = self
+            .app
+            .prisma_client
+            .instance()
+            .find_many(vec![WhereParam::GroupId(IntFilter::Equals(*default_group_id))])
+            .exec()
+            .await?;
+
+        // Get instance data for sorting
+        let active_instances = self.instances.read().await;
+
+        // Build a sortable list of (instance_id, sort_key)
+        let mut sortable_instances: Vec<(i32, String, Option<DateTime<Utc>>, u32)> = instances
+            .iter()
+            .map(|inst| {
+                let instance_data = active_instances.get(&InstanceId(inst.id));
+                let (last_played, seconds_played) = match instance_data {
+                    Some(data) => match &data.type_ {
+                        InstanceType::Valid(valid) => (valid.config.last_played, valid.config.seconds_played),
+                        InstanceType::Invalid(_) => (None, 0),
+                    },
+                    None => (None, 0),
+                };
+                (inst.id, inst.name.clone(), last_played, seconds_played)
+            })
+            .collect();
+
+        drop(active_instances);
+
+        // Sort based on criteria
+        match sort_by {
+            LibrarySortCriteria::Name => {
+                sortable_instances.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+            }
+            LibrarySortCriteria::LastPlayed => {
+                sortable_instances.sort_by(|a, b| {
+                    match (&b.2, &a.2) {
+                        (Some(b_date), Some(a_date)) => b_date.cmp(a_date),
+                        (Some(_), None) => std::cmp::Ordering::Less,
+                        (None, Some(_)) => std::cmp::Ordering::Greater,
+                        (None, None) => a.1.to_lowercase().cmp(&b.1.to_lowercase()),
+                    }
+                });
+            }
+            LibrarySortCriteria::MostPlayed => {
+                sortable_instances.sort_by(|a, b| {
+                    b.3.cmp(&a.3).then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase()))
+                });
+            }
+            LibrarySortCriteria::DateCreated => {
+                // Use instance id as proxy for creation order (lower id = older)
+                sortable_instances.sort_by(|a, b| a.0.cmp(&b.0));
+            }
+        }
+
+        // Update indices for all instances
+        let mut updates = Vec::new();
+        for (new_index, (instance_id, _, _, _)) in sortable_instances.iter().enumerate() {
+            updates.push(self.app.prisma_client.instance().update(
+                UniqueWhereParam::IdEquals(*instance_id),
+                vec![SetParam::SetIndex(new_index as i32)],
+            ));
+        }
+
+        if !updates.is_empty() {
+            self.app.prisma_client._batch(updates).await?;
+        }
+
+        // Now sort the groups (folders) by the same criteria
+        let groups = self
+            .app
+            .prisma_client
+            .instance_group()
+            .find_many(vec![])
+            .exec()
+            .await?;
+
+        // Filter out the default group and sort the rest
+        let mut sortable_groups: Vec<(i32, String)> = groups
+            .iter()
+            .filter(|g| g.id != *default_group_id)
+            .map(|g| (g.id, g.name.clone()))
+            .collect();
+
+        // Sort groups by name (primary sort for folders)
+        sortable_groups.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+
+        // Update group indices (default group stays at index 0)
+        let mut group_updates = Vec::new();
+
+        // Update default group to index 0
+        group_updates.push(self.app.prisma_client.instance_group().update(
+            GroupUniqueWhereParam::IdEquals(*default_group_id),
+            vec![GroupSetParam::SetGroupIndex(0)],
+        ));
+
+        // Update other groups starting at index 1
+        for (new_index, (group_id, _)) in sortable_groups.iter().enumerate() {
+            group_updates.push(self.app.prisma_client.instance_group().update(
+                GroupUniqueWhereParam::IdEquals(*group_id),
+                vec![GroupSetParam::SetGroupIndex((new_index + 1) as i32)],
+            ));
+        }
+
+        if !group_updates.is_empty() {
+            self.app.prisma_client._batch(group_updates).await?;
+        }
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
+
+        Ok(())
     }
 
     /// Add an instance to the database without checking if it exists.
@@ -1929,6 +2105,7 @@ pub struct ListGroup {
 pub struct ListInstance {
     pub id: InstanceId,
     pub group_id: GroupId,
+    pub index: i32,
     pub name: String,
     pub favorite: bool,
     pub status: ListInstanceStatus,
@@ -2000,6 +2177,14 @@ pub enum InstanceMoveTarget {
     Before(InstanceId),
     BeginningOfGroup(GroupId),
     EndOfGroup(GroupId),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LibrarySortCriteria {
+    Name,
+    LastPlayed,
+    MostPlayed,
+    DateCreated,
 }
 
 #[derive(Debug)]
@@ -2528,6 +2713,7 @@ mod test {
             instances: vec![ListInstance {
                 id: instance_id,
                 group_id: default_group.id,
+                index: 0,
                 name: String::from("test"),
                 favorite: false,
                 icon_revision: None,

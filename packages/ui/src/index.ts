@@ -28,6 +28,7 @@ export { ContextMenuProvider, useContextMenu } from "./Menu/ContextMenuContext"
 export { CopyText } from "./CopyText"
 export {
   PRESS_CLASSES,
+  PRESS_CLASSES_LIGHT,
   PRESS_CLASSES_DISABLED,
   getPressEffectClasses
 } from "./Clickable"

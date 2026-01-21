@@ -79,6 +79,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
     title: t("modals:_trn_confirm_instance_deletion")
   },
+  confirmBatchInstanceDeletion: {
+    component: lazy(() => import("./modals/ConfirmBatchInstanceDeletion")),
+    title: t("modals:_trn_confirm_batch_instance_deletion")
+  },
   ConfirmChangeRuntimePath: {
     component: lazy(() => import("./modals/ConfirmChangeRuntimePath")),
     title: t("modals:_trn_confirm_change_runtime_path")
@@ -167,6 +171,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
   requiresGdlAccount: {
     component: lazy(() => import("./modals/RequiresGdlAccountModal")),
     title: t("accounts:_trn_requires_gdl_account")
+  },
+  createGroup: {
+    component: lazy(() => import("./modals/CreateGroupModal")),
+    title: t("instances:_trn_create_group_title")
   }
 })
 

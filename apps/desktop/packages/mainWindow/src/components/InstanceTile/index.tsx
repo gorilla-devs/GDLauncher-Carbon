@@ -32,6 +32,12 @@ const InstanceTile = (props: {
   identifier: string
   selected?: boolean
   size: 1 | 2 | 3 | 4 | 5
+  isMultiSelected?: boolean
+  onToggleSelection?: () => void
+  onDragStart?: (e: PointerEvent) => void
+  isDragging?: boolean
+  groupId?: number
+  preventClick?: () => boolean
 }) => {
   const [isLoading, setIsLoading] = createSignal(false)
   const [failError, setFailError] = createSignal("")
@@ -153,6 +159,9 @@ const InstanceTile = (props: {
   return (
     <Tile
       onClick={() => {
+        // Prevent click if we just finished a drag operation
+        if (props.preventClick?.()) return
+
         globalStore.markInstanceAsSeen(props.instance.id)
         setClickedInstanceId(props.identifier)
 
@@ -182,6 +191,10 @@ const InstanceTile = (props: {
       totalDownload={bytesToMB(progress.totalDownload)}
       downloaded={bytesToMB(progress.downloaded)}
       subTasks={progress.subTasks}
+      isMultiSelected={props.isMultiSelected}
+      onToggleSelection={props.onToggleSelection}
+      onDragStart={props.onDragStart}
+      isDragging={props.isDragging}
     />
   )
 }

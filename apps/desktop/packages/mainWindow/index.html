@@ -221,6 +221,43 @@
         animation-name: slide-in-from-left;
       }
 
+      /* Folder expansion view transitions */
+      /* Disable default crossfade - only the group morph should animate */
+      ::view-transition-old(folder-tile) {
+        animation: none;
+        opacity: 0;
+      }
+
+      ::view-transition-new(folder-tile) {
+        animation: none;
+      }
+
+      /* Control size/position morphing for folder tile */
+      ::view-transition-group(folder-tile) {
+        animation-duration: 200ms;
+        animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation-fill-mode: both;
+      }
+
+      /* Folder preview image transitions */
+      ::view-transition-old(folder-preview-0),
+      ::view-transition-new(folder-preview-0),
+      ::view-transition-old(folder-preview-1),
+      ::view-transition-new(folder-preview-1),
+      ::view-transition-old(folder-preview-2),
+      ::view-transition-new(folder-preview-2),
+      ::view-transition-old(folder-preview-3),
+      ::view-transition-new(folder-preview-3) {
+        animation-duration: 200ms;
+        animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation-fill-mode: both;
+      }
+
+      /* Disable root transition to avoid full page morph during folder transitions */
+      ::view-transition-group(root) {
+        animation: none;
+      }
+
       html,
       body {
         background: rgb(var(--darkSlate-800));
@@ -300,6 +337,37 @@
         outline-offset: 0px;
         border-radius: 1rem;
         animation: pulse-new-instance 1.5s ease-in-out infinite;
+      }
+
+      /* Selection border drawing animation */
+      @keyframes draw-selection-border {
+        from {
+          stroke-dashoffset: var(--border-perimeter);
+        }
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+
+      @keyframes undraw-selection-border {
+        from {
+          stroke-dashoffset: 0;
+        }
+        to {
+          stroke-dashoffset: var(--border-perimeter);
+        }
+      }
+
+      .selection-border-draw {
+        stroke-dasharray: var(--border-perimeter);
+        stroke-dashoffset: var(--border-perimeter);
+        animation: draw-selection-border 0.35s ease-out forwards;
+      }
+
+      .selection-border-undraw {
+        stroke-dasharray: var(--border-perimeter);
+        stroke-dashoffset: 0;
+        animation: undraw-selection-border 0.25s ease-in forwards;
       }
 
       .appFatalCrash {

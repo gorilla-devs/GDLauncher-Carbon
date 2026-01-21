@@ -36,5 +36,10 @@
   "_trn_last_played": "Last Played",
   "_trn_last_updated": "Last Updated",
   "_trn_game_version": "Game Version",
-  "_trn_modloader": "Modloader"
+  "_trn_modloader": "Modloader",
+  "_trn_manual": "Manual",
+  "_trn_by_name": "By Name",
+  "_trn_by_last_played": "By Last Played",
+  "_trn_by_most_played": "By Most Played",
+  "_trn_by_date_created": "By Date Created"
 }
