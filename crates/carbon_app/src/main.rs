@@ -169,6 +169,15 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     let app = AppInner::new(invalidation_sender, runtime_path, base_api_override).await;
 
+    // Migrate existing accounts to GDL tokens (for accounts logged in before GDL token system)
+    if let Err(e) = app
+        .account_manager()
+        .migrate_existing_accounts_to_gdl_tokens()
+        .await
+    {
+        tracing::warn!("Failed to migrate existing accounts to GDL tokens: {}", e);
+    }
+
     let auto_manage_java_system_profiles = app
         .settings_manager()
         .get_settings()

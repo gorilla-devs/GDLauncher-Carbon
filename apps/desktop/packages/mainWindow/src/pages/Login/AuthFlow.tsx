@@ -502,7 +502,7 @@ function AuthFlowContent() {
   const handleRetryGdlCheck = async () => {
     setButtonLoading(true)
     try {
-      const gdlState = await flow.checkGDLAccount(true)
+      const gdlState = await flow.checkGDLAccount(false)
       await flow.goToStep({ type: "gdl-account", gdlAccount: gdlState })
     } catch (error) {
       console.error("[AuthFlow] Failed to retry GDL check:", error)

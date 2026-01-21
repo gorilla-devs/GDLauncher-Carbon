@@ -14,9 +14,9 @@ use zip::{
     write::{FileOptionExtension, FileOptions},
 };
 
-use carbon_platforms::curseforge::manifest::Manifest as CurseforgeManifest;
 use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
+    modrinth_mod_cache as mrdb,
 };
 
 use crate::{
@@ -38,57 +38,50 @@ mod curseforge_archive;
 pub mod gdlauncher_archive;
 mod modrinth_archive;
 
-/// Extract basic metadata from a CurseForge modpack zip file
-/// Returns ShareMetadata with mods containing only CurseForge IDs (names/slugs need enrichment)
-fn extract_curseforge_metadata(zip_path: &Path) -> anyhow::Result<ShareMetadata> {
+/// Extract basic metadata from a GDLPack zip file
+/// Returns ShareMetadata with basic pack info (no mods list since they're hash-based)
+fn extract_gdlpack_metadata(zip_path: &Path) -> anyhow::Result<ShareMetadata> {
+    use carbon_platforms::gdlauncher::manifest::schema::v1::Manifest as GdlpackManifest;
     use std::io::Read as StdRead;
 
     let file = File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
-    let mut manifest_file = archive.by_name("manifest.json")?;
+    let mut manifest_file = archive.by_name("gdlpack.json")?;
     let mut manifest_content = String::new();
     manifest_file.read_to_string(&mut manifest_content)?;
     drop(manifest_file);
 
-    let manifest: CurseforgeManifest = serde_json::from_str(&manifest_content)?;
+    let manifest: GdlpackManifest = serde_json::from_str(&manifest_content)?;
 
     // Extract minecraft version
-    let minecraft_version = Some(manifest.minecraft.version);
+    let minecraft_version = Some(manifest.dependencies.minecraft);
 
     // Extract modloader info from the primary modloader
     let (modloader_type, modloader_version) = manifest
-        .minecraft
-        .mod_loaders
+        .dependencies
+        .modloaders
         .iter()
         .find(|ml| ml.primary)
-        .or_else(|| manifest.minecraft.mod_loaders.first())
+        .or_else(|| manifest.dependencies.modloaders.first())
         .map(|ml| {
-            // Parse modloader ID like "forge-36.2.34" or "fabric-0.14.21"
-            if let Some(dash_pos) = ml.id.find('-') {
-                let loader_type = &ml.id[..dash_pos];
-                let loader_version = &ml.id[dash_pos + 1..];
-                (Some(loader_type.to_string()), Some(loader_version.to_string()))
-            } else {
-                (Some(ml.id.clone()), None)
-            }
+            let loader_type = match ml.type_ {
+                carbon_platforms::gdlauncher::manifest::schema::v1::ModloaderType::Forge => "forge",
+                carbon_platforms::gdlauncher::manifest::schema::v1::ModloaderType::Neoforge => {
+                    "neoforge"
+                }
+                carbon_platforms::gdlauncher::manifest::schema::v1::ModloaderType::Fabric => {
+                    "fabric"
+                }
+                carbon_platforms::gdlauncher::manifest::schema::v1::ModloaderType::Quilt => "quilt",
+            };
+            (Some(loader_type.to_string()), Some(ml.version.clone()))
         })
         .unwrap_or((None, None));
 
-    // Build mods list from manifest files (with CurseForge IDs only)
-    let mods: Vec<SharedMod> = manifest
-        .files
-        .iter()
-        .map(|file_ref| SharedMod {
-            name: format!("Mod {}", file_ref.project_id), // Placeholder until enriched
-            curseforge_project_id: Some(file_ref.project_id),
-            curseforge_file_id: Some(file_ref.file_id),
-            curseforge_slug: None,
-            modrinth_project_id: None,
-            modrinth_version_id: None,
-            modrinth_slug: None,
-        })
-        .collect();
+    // GDLPack files are hash-based, we don't have mod metadata here
+    // The mods list will be empty - enrichment happens on the backend
+    let mods: Vec<SharedMod> = Vec::new();
 
     Ok(ShareMetadata {
         minecraft_version,
@@ -96,6 +89,75 @@ fn extract_curseforge_metadata(zip_path: &Path) -> anyhow::Result<ShareMetadata>
         modloader_version,
         mods,
     })
+}
+
+/// Build SharedMod list from the instance's ModFileCache
+/// This is used for sharing to get accurate mod metadata with platform IDs
+async fn build_shared_mods_from_cache(
+    app: &crate::managers::App,
+    instance_id: InstanceId,
+) -> Vec<SharedMod> {
+    // Query ModFileCache for all mods in this instance with their platform metadata
+    let cached_files = app
+        .prisma_client
+        .mod_file_cache()
+        .find_many(vec![
+            fcdb::instance_id::equals(*instance_id),
+            fcdb::addon_type::equals("mods".to_string()),
+        ])
+        .with(
+            fcdb::metadata::fetch()
+                .with(metadb::curseforge::fetch())
+                .with(metadb::modrinth::fetch()),
+        )
+        .exec()
+        .await;
+
+    let Ok(cached_files) = cached_files else {
+        tracing::warn!(
+            "Failed to query ModFileCache for instance {}",
+            *instance_id
+        );
+        return Vec::new();
+    };
+
+    let mut mods = Vec::new();
+
+    for cached_file in cached_files {
+        let Some(metadata) = cached_file.metadata else {
+            continue;
+        };
+
+        let metadata = *metadata;
+
+        // Try to build SharedMod from CurseForge or Modrinth data
+        let curseforge = metadata.curseforge.flatten();
+        let modrinth = metadata.modrinth.flatten();
+
+        // Skip files that have no platform data
+        if curseforge.is_none() && modrinth.is_none() {
+            continue;
+        }
+
+        let name = curseforge
+            .as_ref()
+            .map(|cf| cf.name.clone())
+            .or_else(|| modrinth.as_ref().map(|mr| mr.title.clone()))
+            .or_else(|| metadata.name.clone())
+            .unwrap_or_else(|| cached_file.filename.clone());
+
+        mods.push(SharedMod {
+            name,
+            curseforge_project_id: curseforge.as_ref().map(|cf| cf.project_id),
+            curseforge_file_id: curseforge.as_ref().map(|cf| cf.file_id),
+            curseforge_slug: curseforge.as_ref().map(|cf| cf.urlslug.clone()),
+            modrinth_project_id: modrinth.as_ref().map(|mr| mr.project_id.clone()),
+            modrinth_version_id: modrinth.as_ref().map(|mr| mr.version_id.clone()),
+            modrinth_slug: modrinth.as_ref().map(|mr| mr.urlslug.clone()),
+        });
+    }
+
+    mods
 }
 
 /// Enrich ShareMetadata mods with names and slugs from the database caches
@@ -289,58 +351,61 @@ impl ManagerRef<'_, InstanceExportManager> {
             tx.send(ShareInstanceProgress::Progress(0)).await?;
 
             let rand_uuid = Uuid::new_v4();
-            let initial_tmpfile = tmpdir.join(rand_uuid.to_string());
-            let (vtask_id, handle) = curseforge_archive::export_curseforge(
+            let initial_tmpfile = tmpdir.join(format!("{}.gdlpack", rand_uuid));
+            let vtask_id = gdlauncher_archive::export_gdlauncher(
                 app.clone(),
                 instance_id,
                 initial_tmpfile.clone(),
                 false,
                 filter,
-                None,
             )
             .await?;
 
-            let app_clone = app.clone();
-            let tx_clone = tx.clone();
-
-            tokio::spawn(async move {
-                loop {
-                    let vtask_id = app_clone.task_manager().get_task(vtask_id).await;
-                    if let Some(vtask) = vtask_id {
-                        match vtask.progress {
-                            Progress::Known(progress) => {
-                                // Scale progress to phase weight (0-25%)
-                                let normalized_progress = (progress * first_phase_weight) as i32;
-                                let _ = tx_clone
-                                    .send(ShareInstanceProgress::Progress(normalized_progress))
-                                    .await;
-                            }
-                            _ => {}
+            // Wait for export task to complete while reporting progress
+            loop {
+                let vtask = app.task_manager().get_task(vtask_id).await;
+                if let Some(vtask) = vtask {
+                    match vtask.progress {
+                        Progress::Known(progress) => {
+                            // Scale progress to phase weight (0-25%)
+                            let normalized_progress = (progress * first_phase_weight) as i32;
+                            let _ = tx
+                                .send(ShareInstanceProgress::Progress(normalized_progress))
+                                .await;
                         }
-                    } else {
-                        break;
+                        _ => {}
                     }
 
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    // Check if task is complete
+                    if vtask.progress == Progress::Known(1.0) {
+                        break;
+                    }
+                } else {
+                    // Task no longer exists, assume it's done
+                    break;
                 }
-            });
 
-            handle.await?;
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
 
             // Update total progress after first phase
             total_progress += first_phase_weight;
             tx.send(ShareInstanceProgress::Progress(total_progress as i32))
                 .await?;
 
-            // Extract metadata from the CurseForge zip
+            // Extract metadata from the GDLPack zip and the instance's mod cache
             let metadata = {
                 let zip_path = initial_tmpfile.clone();
-                let basic_metadata =
-                    tokio::task::spawn_blocking(move || extract_curseforge_metadata(&zip_path))
+                let mut basic_metadata =
+                    tokio::task::spawn_blocking(move || extract_gdlpack_metadata(&zip_path))
                         .await?
                         .unwrap_or_default();
 
-                // Enrich with names/slugs from database
+                // Build mods list from the instance's ModFileCache (not from the manifest)
+                // This gives us accurate platform IDs for the share preview
+                basic_metadata.mods = build_shared_mods_from_cache(&app, instance_id).await;
+
+                // Enrich with names/slugs from database (fills in any missing data)
                 enrich_share_metadata(&app, basic_metadata).await
             };
 

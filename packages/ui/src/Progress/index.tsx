@@ -1,4 +1,4 @@
-import { mergeProps } from "solid-js"
+import { mergeProps, createSignal, onMount } from "solid-js"
 
 interface Props {
   class?: string
@@ -6,11 +6,19 @@ interface Props {
   max?: number
   indeterminate?: boolean
   color?: string
+  barStyle?: { [key: string]: string }
   size?: "small" | "medium" | "large"
   variant?: "rounded" | "square"
 }
 
 export const Progress = (props: Props) => {
+  const [mounted, setMounted] = createSignal(false)
+
+  onMount(() => {
+    // Delay to ensure CSS transition animates from 0
+    requestAnimationFrame(() => setMounted(true))
+  })
+
   const mergedProps = mergeProps(
     {
       max: 100,
@@ -24,6 +32,7 @@ export const Progress = (props: Props) => {
   const isIndeterminate = () => props.indeterminate || props.value === undefined
   const percentage = () => {
     if (isIndeterminate()) return 0
+    if (!mounted()) return 0
     const max = mergedProps.max
     const value = Math.min(Math.max(props.value || 0, 0), max)
     return (value / max) * 100
@@ -48,18 +57,22 @@ export const Progress = (props: Props) => {
   }
 
   const barClasses = () => {
-    const baseClasses = `h-full transition-all duration-400 ease-spring ${mergedProps.color}`
+    const baseClasses = `h-full transition-all duration-400 ease-spring`
+    const colorClass = props.barStyle?.background ? "" : mergedProps.color
     const animationClasses = isIndeterminate()
       ? "w-full origin-[0%_50%] animate-loadingbar"
       : ""
-    return `${baseClasses} ${animationClasses}`
+    return `${baseClasses} ${colorClass} ${animationClasses}`
   }
 
   return (
     <div class={containerClasses()}>
       <div
         class={barClasses()}
-        style={isIndeterminate() ? {} : { width: `${percentage()}%` }}
+        style={{
+          ...(isIndeterminate() ? {} : { width: `${percentage()}%` }),
+          ...props.barStyle
+        }}
       />
     </div>
   )

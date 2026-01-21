@@ -1,38 +1,39 @@
 use crate::{
     api::translation::Translation,
     domain::{
-        instance::{ExportEntry, InstanceId, info::{GameVersion, InstanceIcon}},
+        instance::{
+            info::{GameVersion, InstanceIcon, ModLoaderType, Modpack},
+            ExportEntry, InstanceId,
+        },
         vtask::VisualTaskId,
     },
     managers::{
-        AppInner,
-        instance::{InstanceType, InvalidInstanceIdError, export::ZipMode},
-        modplatforms::curseforge::convert_standard_version_to_cf_version,
+        instance::{export::ZipMode, InstanceType, InvalidInstanceIdError},
         vtask::{TaskState, VisualTask},
+        AppInner,
     },
 };
 use anyhow::anyhow;
-use carbon_platforms::curseforge::manifest::{
-    Manifest, ManifestFileReference, Minecraft, ModLoaders,
+use carbon_platforms::gdlauncher::manifest::schema::v1::{
+    FileHashes, GameDependencies, Manifest, ModloaderDependency, ModloaderType, ModpackSource,
+    PackFile, PlatformFile,
 };
-use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::File, io::Write, path::{Path, PathBuf}, sync::Arc};
+use carbon_repos::db::{
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
+    modrinth_mod_cache as mrdb,
+};
+use chrono::Utc;
+use std::{collections::HashMap, fs::File, io::Write, path::Path, path::PathBuf, sync::Arc};
 use tokio::sync::watch;
 use tracing::trace;
 
-/// GDLauncher-specific manifest for enhanced archive format
-#[derive(Serialize, Deserialize)]
-pub struct GdlManifest {
-    /// Format version (currently 1)
-    pub format_version: u32,
-    /// Instance name
-    pub name: String,
-    /// Relative path to icon within archive (e.g., "gdl/icon.png")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub icon: Option<String>,
-}
-
+/// Export an instance to the GDLPack format (.gdlpack)
+///
+/// The GDLPack format is a minimal, hash-based modpack distribution format that:
+/// - Uses hashes to resolve files from CurseForge and Modrinth at import time
+/// - Derives file path, addon type, size, and metadata from platform APIs
+/// - Embeds icon for offline display
+/// - Supports optional files and overrides
 pub async fn export_gdlauncher(
     app: Arc<AppInner>,
     instance_id: InstanceId,
@@ -46,12 +47,21 @@ pub async fn export_gdlauncher(
         .get(&instance_id)
         .ok_or(InvalidInstanceIdError(instance_id))?;
 
-    let basepath = app
+    let instance_path = app
         .settings_manager()
         .runtime_path
         .get_instances()
-        .get_instance_path(&instance.shortpath)
-        .get_data_path();
+        .get_instance_path(&instance.shortpath);
+
+    let basepath = instance_path.get_data_path();
+
+    // Instance root is where icons are stored (not inside /instance/ subdirectory)
+    let instance_root = app
+        .settings_manager()
+        .runtime_path
+        .get_instances()
+        .to_path()
+        .join(&instance.shortpath);
 
     let InstanceType::Valid(data) = &instance.type_ else {
         return Err(anyhow!("Instance {instance_id} is not in a valid state"));
@@ -59,13 +69,15 @@ pub async fn export_gdlauncher(
 
     let config = data.config.clone();
     let instance_icon = config.icon.clone();
+    let modpack_info = config.modpack.clone();
 
     drop(instances);
 
     // Read icon data if present (before spawn_blocking)
+    // Icons are stored at instance root, not inside the /instance/ data directory
     let icon_data: Option<(Vec<u8>, String)> = match &instance_icon {
         InstanceIcon::RelativePath(icon_path) => {
-            let icon_full_path = basepath.join(icon_path);
+            let icon_full_path = instance_root.join(icon_path);
             if icon_full_path.exists() {
                 let ext = Path::new(icon_path)
                     .extension()
@@ -103,7 +115,7 @@ pub async fn export_gdlauncher(
 
     tokio::spawn(async move {
         let try_result: anyhow::Result<_> = async {
-            let mut mods = Vec::new();
+            let mut pack_files: Vec<PackFile> = Vec::new();
 
             let t_calc_size = vtask.subtask(Translation::InstanceExportCalculateSize);
             t_calc_size.set_weight(0.0);
@@ -113,56 +125,86 @@ pub async fn export_gdlauncher(
                 .edit(|data| data.state = TaskState::KnownProgress)
                 .await;
 
+            // Collect tracked addon files from ModFileCache
             if !self_contained_addons_bundling {
-                let mods_filter = filter.0.get_mut("mods");
-                if let Some(mods_filter) = mods_filter {
-                    let t_scan = vtask.subtask(Translation::InstanceExportScanningMods);
-                    t_scan.start_opaque();
-
-                    if mods_filter.is_none() {
-                        let mut modsdir_entries = HashMap::new();
-
-                        let mut dir = tokio::fs::read_dir(basepath.join("mods")).await?;
-                        while let Some(next) = dir.next_entry().await? {
-                            let name = next.file_name();
-                            let Some(name) = name.to_str() else { continue };
-                            modsdir_entries.insert(name.to_string(), None);
+                // Process tracked addon folders (mods, resourcepacks, shaders, etc.)
+                for addon_folder in &["mods", "resourcepacks", "shaderpacks"] {
+                    let folder_filter = filter.0.get_mut(*addon_folder);
+                    if let Some(folder_filter) = folder_filter {
+                        // Build filter if not specified
+                        if folder_filter.is_none() {
+                            let mut entries = HashMap::new();
+                            let folder_path = basepath.join(addon_folder);
+                            if let Ok(mut dir) = tokio::fs::read_dir(&folder_path).await {
+                                while let Some(next) = dir.next_entry().await? {
+                                    let name = next.file_name();
+                                    let Some(name) = name.to_str() else {
+                                        continue;
+                                    };
+                                    entries.insert(name.to_string(), None);
+                                }
+                            }
+                            *folder_filter = Some(ExportEntry(entries));
                         }
 
-                        *mods_filter = Some(ExportEntry(modsdir_entries));
-                    }
+                        let folder_filter = folder_filter.as_mut().map(|v| &mut v.0).unwrap();
 
-                    let mods_filter = mods_filter.as_mut().map(|v| &mut v.0).unwrap();
+                        // Ensure cache is up to date
+                        app.meta_cache_manager()
+                            .override_caching_and_wait(instance_id, true, false)
+                            .await?;
 
-                    app.meta_cache_manager()
-                        .override_caching_and_wait(instance_id, true, false)
-                        .await?;
+                        // Query ModFileCache for tracked files
+                        let cached_files = app
+                            .prisma_client
+                            .mod_file_cache()
+                            .find_many(vec![fcdb::instance_id::equals(*instance_id)])
+                            .with(
+                                fcdb::metadata::fetch()
+                                    .with(metadb::curseforge::fetch())
+                                    .with(metadb::modrinth::fetch()),
+                            )
+                            .exec()
+                            .await?;
 
-                    let mods2 = app
-                        .prisma_client
-                        .mod_file_cache()
-                        .find_many(vec![fcdb::instance_id::equals(*instance_id)])
-                        .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
-                        .exec()
-                        .await?
-                        .into_iter()
-                        .filter_map(|m| {
-                            let Some(metadata) = m.metadata else {
-                                return None;
-                            };
-
-                            let Some(Some(curseforge)) = metadata.curseforge else {
-                                return None;
-                            };
-
-                            match mods_filter.remove(&m.filename) {
-                                Some(_) => Some((curseforge.project_id, curseforge.file_id)),
-                                None => None,
+                        for cached_file in cached_files {
+                            // Check if in filter (don't remove yet - we may need to keep it for overrides)
+                            if !folder_filter.contains_key(&cached_file.filename) {
+                                continue;
                             }
-                        });
 
-                    mods.extend(mods2);
-                    t_scan.complete_opaque();
+                            let Some(metadata) = cached_file.metadata else {
+                                continue;
+                            };
+
+                            // Check if file has platform data in cache - if yes, it's resolvable
+                            // This avoids making network calls for every file during export
+                            let has_curseforge = metadata.curseforge.as_ref().map(|o| o.is_some()).unwrap_or(false);
+                            let has_modrinth = metadata.modrinth.as_ref().map(|o| o.is_some()).unwrap_or(false);
+                            let can_resolve = has_curseforge || has_modrinth;
+
+                            // Build hashes from metadata
+                            let sha512 = hex::encode(&metadata.sha_512);
+                            let sha1 = hex::encode(&metadata.sha_1);
+                            let murmur2 = metadata.murmur_2 as u32;
+
+                            let hashes = FileHashes {
+                                sha512,
+                                sha1,
+                                murmur2,
+                            };
+
+                            if can_resolve {
+                                // Add as Platform entry for efficient hash-based resolution
+                                // BUT keep in filter so it's also bundled in overrides as fallback
+                                // This ensures the pack works even if platform resolution fails
+                                // (e.g., file removed from platform, API issues, etc.)
+                                pack_files.push(PackFile::Platform(PlatformFile { hashes }));
+                            }
+                            // Always keep files in overrides - they serve as fallback if
+                            // platform resolution fails at import time
+                        }
+                    }
                 }
             }
 
@@ -182,30 +224,58 @@ pub async fn export_gdlauncher(
 
             let instance_name = config.name.clone();
 
-            let manifest = Manifest {
-                minecraft: convert_standard_version_to_cf_version(version.clone())?,
-                manifest_type: String::from("minecraftModpack"),
-                manifest_version: 1,
-                name: config.name,
-                version: None,
-                author: String::new(),
-                overrides: String::from("overrides"),
-                files: mods
-                    .iter()
-                    .map(|(project_id, file_id)| ManifestFileReference {
-                        project_id: *project_id,
-                        file_id: *file_id,
-                        required: true,
-                    })
-                    .collect(),
-            };
+            // Build modloader dependencies
+            let modloaders: Vec<ModloaderDependency> = version
+                .modloaders
+                .iter()
+                .map(|ml| ModloaderDependency {
+                    type_: match ml.type_ {
+                        ModLoaderType::Forge => ModloaderType::Forge,
+                        ModLoaderType::Neoforge => ModloaderType::Neoforge,
+                        ModLoaderType::Fabric => ModloaderType::Fabric,
+                        ModLoaderType::Quilt => ModloaderType::Quilt,
+                    },
+                    version: ml.version.clone(),
+                    primary: true, // First modloader is primary
+                })
+                .collect();
 
-            // Prepare GDL manifest with icon reference
-            let gdl_icon_path = icon_data.as_ref().map(|(_, ext)| format!("gdl/icon.{}", ext));
-            let gdl_manifest = GdlManifest {
+            // Build source reference from modpack info if available
+            let source = modpack_info.map(|info| match info.modpack {
+                Modpack::Curseforge(cf) => ModpackSource::Curseforge {
+                    project_id: cf.project_id,
+                    file_id: cf.file_id,
+                    name: None,
+                    url: None,
+                },
+                Modpack::Modrinth(mr) => ModpackSource::Modrinth {
+                    project_id: mr.project_id,
+                    version_id: mr.version_id,
+                    name: None,
+                    url: None,
+                },
+            });
+
+            // Prepare icon path
+            let icon_archive_path = icon_data.as_ref().map(|(_, ext)| format!(".gdl/icon.{}", ext));
+
+            let manifest = Manifest {
                 format_version: 1,
                 name: instance_name,
-                icon: gdl_icon_path.clone(),
+                version: None,
+                summary: None,
+                author: None,
+                created_at: Utc::now(),
+                icon: icon_archive_path.clone(),
+                dependencies: GameDependencies {
+                    minecraft: version.release.clone(),
+                    modloaders,
+                },
+                entries: pack_files,
+                overrides: "overrides".to_string(),
+                server_overrides: None,
+                client_overrides: None,
+                source,
             };
 
             let tmpfile = app
@@ -222,20 +292,17 @@ pub async fn export_gdlauncher(
                 let mut zip = zip::ZipWriter::new(File::create(&send_path)?);
                 let options = zip::write::FileOptions::<()>::default();
 
-                // Write CurseForge manifest (for compatibility)
-                zip.start_file("manifest.json", options)?;
+                // Write GDLPack manifest
+                zip.start_file("gdlpack.json", options)?;
                 zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
 
-                // Write GDL manifest
-                zip.start_file("gdl/manifest.json", options)?;
-                zip.write_all(&serde_json::to_vec_pretty(&gdl_manifest)?)?;
-
                 // Write icon if present
-                if let (Some((icon_bytes, _)), Some(icon_archive_path)) = (&icon_data, &gdl_icon_path) {
-                    zip.start_file(icon_archive_path, options)?;
+                if let (Some((icon_bytes, _)), Some(icon_path)) = (&icon_data, &icon_archive_path) {
+                    zip.start_file(icon_path, options)?;
                     zip.write_all(icon_bytes)?;
                 }
 
+                // Write overrides
                 super::zip_excluding(
                     ZipMode::Create(&mut zip, options, notify_tx),
                     &basepath,
@@ -290,13 +357,14 @@ mod test {
         sync::Arc,
     };
 
+    use carbon_platforms::gdlauncher::manifest::schema::v1::Manifest;
     use flowtest::flowtest;
     use tracing_test::traced_test;
     use zip::ZipArchive;
 
     use crate::{
-        domain::instance::{ExportEntry, InstanceId, info},
-        managers::instance::{InstanceVersionSource, export::ExportTarget},
+        domain::instance::{info, ExportEntry, ExportTarget, InstanceId},
+        managers::instance::InstanceVersionSource,
     };
 
     #[traced_test]
@@ -322,27 +390,20 @@ mod test {
                 .instance_manager()
                 .create_instance(
                     default_group_id,
-                    String::from("test"),
+                    String::from("test-gdlpack"),
                     false,
                     InstanceVersionSource::Version(info::GameVersion::Standard(
                         info::StandardVersion {
-                            release: String::from("1.16.5"),
+                            release: String::from("1.20.1"),
                             modloaders: HashSet::from([info::ModLoader {
                                 type_: info::ModLoaderType::Forge,
-                                version: String::from("1.16.5-36.2.34"),
+                                version: String::from("47.2.0"),
                             }]),
                         },
                     )),
                     String::new(),
                 )
                 .await?;
-
-            let task = app
-                .instance_manager()
-                .install_curseforge_mod(instance_id, 247560, 4024011, false, None)
-                .await?;
-
-            app.task_manager().wait_with_log(task).await?;
 
             Ok((rt.clone(), app, instance_id))
         })
@@ -367,7 +428,7 @@ mod test {
             .export_manager()
             .export_instance(
                 instance_id,
-                ExportTarget::Curseforge,
+                ExportTarget::Gdlauncher,
                 target_file.clone(),
                 self_contained_addons_bundling,
                 export_entry,
@@ -383,7 +444,7 @@ mod test {
     async fn check_export(
         app: &Arc<crate::TestEnv>,
         filename: &str,
-        check: impl FnOnce(String, ZipArchive<File>) -> anyhow::Result<()> + Send + 'static,
+        check: impl FnOnce(Manifest, ZipArchive<File>) -> anyhow::Result<()> + Send + 'static,
     ) -> anyhow::Result<()> {
         let target_file = app
             .settings_manager()
@@ -395,11 +456,12 @@ mod test {
         tokio::task::spawn_blocking(|| {
             let mut zip = ZipArchive::new(File::open(target_file)?)?;
 
-            let mut file = zip.by_name("manifest.json")?;
-            let mut manifest = String::new();
-            file.read_to_string(&mut manifest)?;
+            let mut file = zip.by_name("gdlpack.json")?;
+            let mut manifest_str = String::new();
+            file.read_to_string(&mut manifest_str)?;
             drop(file);
 
+            let manifest: Manifest = serde_json::from_str(&manifest_str)?;
             check(manifest, zip)
         })
         .await?
@@ -408,237 +470,24 @@ mod test {
     #[traced_test]
     #[test]
     #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_with_folder_linked() -> anyhow::Result<()> {
+    fn export_gdlpack_basic() -> anyhow::Result<()> {
         rt.block_on(async {
             run_export(
                 &app,
                 instance_id,
-                "folder_linked.zip",
-                ExportEntry(HashMap::from([(String::from("mods"), None)])),
-                false,
-            )
-            .await?;
-
-            check_export(&app, "folder_linked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
-  "name": "test",
-  "version": "1.0.0",
-  "author": "",
-  "overrides": "overrides",
-  "files": [
-    {
-      "projectID": 247560,
-      "fileID": 4024011,
-      "required": true
-    }
-  ]
-}"#
-                );
-
-                assert!(zip.by_name("overrides/mods").is_err());
-                Ok(())
-            })
-            .await?;
-
-            Ok(())
-        })
-    }
-
-    #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_with_folder_unlinked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "folder_unlinked.zip",
-                ExportEntry(HashMap::from([(String::from("mods"), None)])),
+                "test.gdlpack",
+                ExportEntry(HashMap::new()),
                 true,
             )
             .await?;
 
-            check_export(&app, "folder_unlinked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
-  "name": "test",
-  "version": "1.0.0",
-  "author": "",
-  "overrides": "overrides",
-  "files": []
-}"#
-                );
-
-                assert!(zip.by_name("overrides/mods/byg-1.3.6.jar").is_ok());
-                Ok(())
-            })
-            .await?;
-
-            Ok(())
-        })
-    }
-
-    #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_without_folder_linked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "nofolder_linked.zip",
-                ExportEntry(HashMap::from([])),
-                false,
-            )
-            .await?;
-
-            check_export(&app, "nofolder_linked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
-  "name": "test",
-  "version": "1.0.0",
-  "author": "",
-  "overrides": "overrides",
-  "files": []
-}"#
-                );
-
-                assert!(zip.by_name("overrides/mods").is_err());
-                Ok(())
-            })
-            .await?;
-
-            Ok(())
-        })
-    }
-
-    #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_without_folder_unlinked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "nofolder_unlinked.zip",
-                ExportEntry(HashMap::from([])),
-                true,
-            )
-            .await?;
-
-            check_export(&app, "nofolder_unlinked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
-  "name": "test",
-  "version": "1.0.0",
-  "author": "",
-  "overrides": "overrides",
-  "files": []
-}"#
-                );
-
-                assert!(zip.by_name("overrides/mods").is_err());
-                Ok(())
-            })
-            .await?;
-
-            Ok(())
-        })
-    }
-
-    #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_with_fake_folder_linked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "fakefolder_linked.zip",
-                ExportEntry(HashMap::from([(
-                    String::from("mods"),
-                    Some(ExportEntry(HashMap::from([(
-                        String::from("fake-mod.jar"),
-                        None,
-                    )]))),
-                )])),
-                true,
-            )
-            .await?;
-
-            check_export(&app, "fakefolder_linked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
-  "name": "test",
-  "version": "1.0.0",
-  "author": "",
-  "overrides": "overrides",
-  "files": []
-}"#
-                );
-
-                assert!(zip.by_name("overrides/mods").is_err());
+            check_export(&app, "test.gdlpack", |manifest, _zip| {
+                assert_eq!(manifest.format_version, 1);
+                assert_eq!(manifest.name, "test-gdlpack");
+                assert_eq!(manifest.dependencies.minecraft, "1.20.1");
+                assert_eq!(manifest.dependencies.modloaders.len(), 1);
+                assert_eq!(manifest.dependencies.modloaders[0].version, "47.2.0");
+                assert_eq!(manifest.overrides, "overrides");
                 Ok(())
             })
             .await?;

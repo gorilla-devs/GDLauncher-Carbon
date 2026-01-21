@@ -56,6 +56,7 @@ pub enum CoreModuleStatus {
     XboxAuth,
     MCEntitlements,
     McProfile,
+    ExchangingGdlToken,
     AccountRefreshComplete,
 }
 

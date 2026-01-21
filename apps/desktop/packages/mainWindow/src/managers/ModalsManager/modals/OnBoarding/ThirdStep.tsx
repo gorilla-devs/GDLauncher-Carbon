@@ -20,7 +20,7 @@ const LAUNCHER_ENTITIES: ImportEntity[] = [
   "Modrinth"
 ]
 
-const FILE_ENTITIES: ImportEntity[] = ["CurseForgeZip", "MRPack"]
+const FILE_ENTITIES: ImportEntity[] = ["CurseForgeZip", "MRPack", "GDLPack"]
 
 interface Props {
   prevStep: () => void

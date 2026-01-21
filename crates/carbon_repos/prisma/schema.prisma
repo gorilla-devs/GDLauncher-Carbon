@@ -85,6 +85,7 @@ model Account {
   tokenExpires                  DateTime?
   msRefreshToken                String?
   idToken                       String?
+  gdlToken                      String?            // GDL custom JWT for API calls
   lastUsed                      DateTime
   skinId                        String?
   AppConfigurationActiveAccount AppConfiguration[] @relation("activeAccount")

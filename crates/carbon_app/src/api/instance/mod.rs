@@ -1304,6 +1304,7 @@ struct ExportEntry {
 enum ExportTarget {
     Curseforge,
     Modrinth,
+    Gdlauncher,
 }
 
 #[derive(Type, Deserialize, Debug)]
@@ -1328,6 +1329,7 @@ pub enum ImportEntity {
     FTB,
     MultiMC,
     PrismLauncher,
+    GDLPack,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1851,6 +1853,7 @@ impl From<ImportEntity> for importer::Entity {
             ImportEntity::FTB => Self::FTB,
             ImportEntity::MultiMC => Self::MultiMC,
             ImportEntity::PrismLauncher => Self::PrismLauncher,
+            ImportEntity::GDLPack => Self::GDLPack,
         }
     }
 }
@@ -1870,6 +1873,7 @@ impl From<importer::Entity> for ImportEntity {
             backend::FTB => Self::FTB,
             backend::MultiMC => Self::MultiMC,
             backend::PrismLauncher => Self::PrismLauncher,
+            backend::GDLPack => Self::GDLPack,
         }
     }
 }
@@ -1915,6 +1919,7 @@ impl From<ExportTarget> for domain::ExportTarget {
         match value {
             ExportTarget::Curseforge => Self::Curseforge,
             ExportTarget::Modrinth => Self::Modrinth,
+            ExportTarget::Gdlauncher => Self::Gdlauncher,
         }
     }
 }

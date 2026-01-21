@@ -978,6 +978,8 @@ pub struct McAccount {
 pub struct FullAccount {
     pub ms: MsAuth,
     pub mc: McAccount,
+    /// GDL JWT token (exchanged in parallel during refresh)
+    pub gdl_token: Option<String>,
 }
 
 #[derive(Debug, Clone)]

@@ -46,9 +46,15 @@ const ExportPath = () => {
                     name:
                       payload.target === "Curseforge"
                         ? "ZIP Files"
-                        : "MRPACK Files",
+                        : payload.target === "Gdlauncher"
+                          ? "GDLPack Files"
+                          : "MRPACK Files",
                     extensions: [
-                      payload.target === "Curseforge" ? "zip" : "mrpack"
+                      payload.target === "Curseforge"
+                        ? "zip"
+                        : payload.target === "Gdlauncher"
+                          ? "gdlpack"
+                          : "mrpack"
                     ]
                   }
                 ]

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{fs::File, sync::watch::Sender};
 
+#[derive(Clone)]
 pub struct GDLAccountTask {
     client: reqwest_middleware::ClientWithMiddleware,
     base_api: String,
@@ -377,9 +378,70 @@ pub struct RegenerateShareCodeResponse {
     pub new_share_code: String,
 }
 
+/// Response from the GDL token exchange endpoint
+#[derive(Deserialize, Debug)]
+pub struct TokenExchangeResponse {
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_at: u64,
+}
+
+/// Error for token exchange operations
+#[derive(Error, Debug)]
+pub enum TokenExchangeError {
+    #[error("Invalid or expired Microsoft token")]
+    InvalidToken,
+    #[error("Token exchange service unavailable")]
+    ServiceUnavailable,
+    #[error("Network error: {0}")]
+    Network(#[from] reqwest_middleware::Error),
+    #[error("Request failed: {0}")]
+    RequestFailed(String),
+}
+
 impl GDLAccountTask {
     pub fn new(client: reqwest_middleware::ClientWithMiddleware, base_api: String) -> Self {
         Self { client, base_api }
+    }
+
+    /// Exchange a Microsoft JWT for a GDL custom JWT.
+    ///
+    /// This calls POST /v1/auth/token with the Microsoft id_token
+    /// and returns a GDL JWT that should be used for all GDL API calls.
+    pub async fn exchange_token(
+        &self,
+        ms_id_token: &str,
+    ) -> Result<TokenExchangeResponse, TokenExchangeError> {
+        let url = format!("{}/v1/auth/token", self.base_api);
+
+        let resp = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", ms_id_token))
+            .send()
+            .await?;
+
+        match resp.status() {
+            StatusCode::OK => {
+                let response: TokenExchangeResponse = resp
+                    .json()
+                    .await
+                    .map_err(|e| TokenExchangeError::RequestFailed(e.to_string()))?;
+                Ok(response)
+            }
+            StatusCode::UNAUTHORIZED => Err(TokenExchangeError::InvalidToken),
+            StatusCode::SERVICE_UNAVAILABLE | StatusCode::INTERNAL_SERVER_ERROR => {
+                Err(TokenExchangeError::ServiceUnavailable)
+            }
+            status => {
+                let body = resp.text().await.unwrap_or_default();
+                Err(TokenExchangeError::RequestFailed(format!(
+                    "HTTP {}: {}",
+                    status.as_u16(),
+                    body
+                )))
+            }
+        }
     }
 
     pub async fn register_account(
@@ -817,6 +879,7 @@ impl GDLAccountTask {
         let resp = self
             .client
             .put(presigned_url)
+            .header("Content-Type", "application/vnd.gdlauncher.gdlpack")
             .header("Content-Length", file_size)
             .header("x-amz-checksum-sha256", sha256_checksum)
             .header("x-amz-sdk-checksum-algorithm", "SHA256")

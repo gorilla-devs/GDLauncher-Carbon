@@ -566,16 +566,16 @@ if ((app as any).overwolf) {
 if (process.platform === "win32") app.setAppUserModelId(app.getName())
 
 // Register protocol handlers for gdlauncher, curseforge, and modrinth
-const protocols = ["gdlauncher", "curseforge", "modrinth"]
-for (const protocol of protocols) {
+const deepLinkProtocols = ["gdlauncher", "curseforge", "modrinth"]
+for (const deepLinkProtocol of deepLinkProtocols) {
   if (process.defaultApp) {
     if (process.argv.length >= 2) {
-      app.setAsDefaultProtocolClient(protocol, process.execPath, [
+      app.setAsDefaultProtocolClient(deepLinkProtocol, process.execPath, [
         resolve(process.argv[1])
       ])
     }
   } else {
-    app.setAsDefaultProtocolClient(protocol)
+    app.setAsDefaultProtocolClient(deepLinkProtocol)
   }
 }
 
@@ -1020,6 +1020,40 @@ app.whenReady().then(async () => {
 
       delete details.responseHeaders!["access-control-allow-origin"]
       details.responseHeaders!["Access-Control-Allow-Origin"] = ["*"]
+
+      // Remove X-Frame-Options and CSP frame-ancestors for iframe-embeddable content
+      // This allows YouTube and other embeds to work when loaded from file:// origin
+      const url = details.url.toLowerCase()
+      const isEmbeddableContent =
+        url.includes("youtube.com") ||
+        url.includes("youtube-nocookie.com") ||
+        url.includes("googlevideo.com") || // YouTube video CDN
+        url.includes("i.imgur.com") ||
+        url.includes("cdn.ko-fi.com")
+
+      if (isEmbeddableContent) {
+        // Remove X-Frame-Options header (case-insensitive)
+        delete details.responseHeaders!["X-Frame-Options"]
+        delete details.responseHeaders!["x-frame-options"]
+
+        // Remove or modify Content-Security-Policy frame-ancestors
+        // Note: CSP can have multiple header names
+        const cspKeys = Object.keys(details.responseHeaders!).filter(
+          (key) =>
+            key.toLowerCase() === "content-security-policy" ||
+            key.toLowerCase() === "content-security-policy-report-only"
+        )
+        for (const key of cspKeys) {
+          const values = details.responseHeaders![key]
+          if (values) {
+            // Remove frame-ancestors directive from CSP
+            details.responseHeaders![key] = values.map((value) =>
+              value.replace(/frame-ancestors\s+[^;]+;?/gi, "")
+            )
+          }
+        }
+      }
+
       callback({
         cancel: false,
         responseHeaders: details.responseHeaders

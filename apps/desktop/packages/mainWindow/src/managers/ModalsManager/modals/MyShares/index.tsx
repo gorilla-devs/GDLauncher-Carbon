@@ -86,10 +86,24 @@ const getShareErrorKey = <T extends ShareErrorKey>(
   }
 }
 
+const getQuotaBarColor = (percentage: number): string => {
+  if (percentage <= 60) {
+    return "rgb(var(--primary-500))"
+  } else if (percentage <= 85) {
+    return "rgb(var(--yellow-500))"
+  } else {
+    return "rgb(var(--red-500))"
+  }
+}
+
 function MyShares(props: ModalProps) {
   const [t] = useTransContext()
   const rspcContext = rspc.useContext()
-  const [copySuccess, setCopySuccess] = createSignal<string | null>(null)
+  const [regeneratingShareCode, setRegeneratingShareCode] = createSignal<string | null>(null)
+  const [updatingShare, setUpdatingShare] = createSignal<{
+    shareCode: string
+    fields: { title?: boolean; maxDownloads?: boolean }
+  } | null>(null)
 
   // Edit state
   const [editingShare, setEditingShare] = createSignal<string | null>(null)
@@ -148,11 +162,12 @@ function MyShares(props: ModalProps) {
   }
 
   const handleRegenerateCode = async (shareCode: string) => {
+    setRegeneratingShareCode(shareCode)
     try {
       const result = await regenerateMutation.mutateAsync(shareCode)
       toast.success(t("instances:_trn_my_shares.regenerated"))
-      await copyToClipboard(result.newShareCode)
-      sharesQuery.refetch()
+      await navigator.clipboard.writeText(result.newShareCode)
+      await sharesQuery.refetch()
     } catch (err) {
       const errorCode = getErrorCode(err)
       toast.error(
@@ -163,6 +178,8 @@ function MyShares(props: ModalProps) {
           )
         )
       )
+    } finally {
+      setRegeneratingShareCode(null)
     }
   }
 
@@ -182,34 +199,50 @@ function MyShares(props: ModalProps) {
     const shareCode = editingShare()
     if (!shareCode) return
 
-    try {
-      const maxDownloadsValue = editMaxDownloads().trim()
-      const maxDownloads = maxDownloadsValue
-        ? parseInt(maxDownloadsValue) >= 1
-          ? parseInt(maxDownloadsValue)
-          : null
-        : null
+    // Find current share to compare values
+    const currentShare = allShares().find((s) => s.shareCode === shareCode)
+    if (!currentShare) return
 
+    const newTitle = editTitle().trim() || null
+    const maxDownloadsValue = editMaxDownloads().trim()
+    const newMaxDownloads = maxDownloadsValue
+      ? parseInt(maxDownloadsValue) >= 1
+        ? parseInt(maxDownloadsValue)
+        : null
+      : null
+
+    // Determine which fields changed
+    const titleChanged = newTitle !== (currentShare.title || null)
+    const maxDownloadsChanged = newMaxDownloads !== currentShare.maxDownloads
+
+    // Close dialog first, then set loading state
+    closeEditDialog()
+    setUpdatingShare({
+      shareCode,
+      fields: { title: titleChanged, maxDownloads: maxDownloadsChanged }
+    })
+
+    try {
       await updateMutation.mutateAsync({
         shareCode,
-        title: editTitle().trim() || null,
-        maxDownloads: maxDownloads
+        title: newTitle,
+        maxDownloads: newMaxDownloads
       })
       toast.success(t("instances:_trn_my_shares.updated"))
-      closeEditDialog()
-      sharesQuery.refetch()
+      await sharesQuery.refetch()
     } catch (err) {
       const errorCode = getErrorCode(err)
       toast.error(
         t(getShareErrorKey(errorCode, "instances:_trn_my_shares.update_failed"))
       )
+    } finally {
+      setUpdatingShare(null)
     }
   }
 
   const copyToClipboard = async (shareCode: string) => {
     await navigator.clipboard.writeText(shareCode)
-    setCopySuccess(shareCode)
-    setTimeout(() => setCopySuccess(null), 2000)
+    toast.success(t("instances:_trn_my_shares.copied"))
   }
 
   // Flatten pages into single array
@@ -418,16 +451,30 @@ function MyShares(props: ModalProps) {
                     >
                       {/* Name */}
                       <div class="text-lightSlate-100 min-w-0 truncate pr-2">
-                        {share.title || "-"}
+                        <Show
+                          when={
+                            !(
+                              updatingShare()?.shareCode === share.shareCode &&
+                              updatingShare()?.fields.title
+                            )
+                          }
+                          fallback={
+                            <div class="bg-darkSlate-600 h-4 w-24 animate-pulse rounded" />
+                          }
+                        >
+                          {share.title || "-"}
+                        </Show>
                       </div>
 
                       {/* Code */}
                       <div class="flex min-w-0 items-center gap-1">
-                        <span class="text-lightSlate-400 truncate font-mono text-xs">
-                          {share.shareCode}
-                        </span>
-                        <Show when={copySuccess() === share.shareCode}>
-                          <div class="i-ri:check-line text-green-400 text-xs" />
+                        <Show
+                          when={regeneratingShareCode() !== share.shareCode}
+                          fallback={<div class="bg-darkSlate-600 h-4 w-16 animate-pulse rounded" />}
+                        >
+                          <span class="text-lightSlate-400 truncate font-mono text-xs">
+                            {share.shareCode}
+                          </span>
                         </Show>
                       </div>
 
@@ -449,12 +496,24 @@ function MyShares(props: ModalProps) {
 
                       {/* Downloads */}
                       <div class="text-lightSlate-400 text-right">
-                        {formatDownloadCount(share.downloadCount)}
-                        <Show when={share.maxDownloads}>
-                          <span class="text-lightSlate-500">
-                            {" / "}
-                            {formatDownloadCount(share.maxDownloads!)}
-                          </span>
+                        <Show
+                          when={
+                            !(
+                              updatingShare()?.shareCode === share.shareCode &&
+                              updatingShare()?.fields.maxDownloads
+                            )
+                          }
+                          fallback={
+                            <div class="bg-darkSlate-600 ml-auto h-4 w-12 animate-pulse rounded" />
+                          }
+                        >
+                          {formatDownloadCount(share.downloadCount)}
+                          <Show when={share.maxDownloads}>
+                            <span class="text-lightSlate-500">
+                              {" / "}
+                              {formatDownloadCount(share.maxDownloads!)}
+                            </span>
+                          </Show>
                         </Show>
                       </div>
 
@@ -533,19 +592,24 @@ function MyShares(props: ModalProps) {
                   </>
                 }
               >
-                {(quota) => (
-                  <>
-                    <Progress
-                      class="flex-1"
-                      value={quota().usedKilobytes}
-                      max={quota().totalKilobytes}
-                    />
-                    <span class="text-lightSlate-400 whitespace-nowrap text-sm">
-                      {formatSize(quota().usedKilobytes)} /{" "}
-                      {formatSize(quota().totalKilobytes)}
-                    </span>
-                  </>
-                )}
+                {(quota) => {
+                  const percentage = () =>
+                    (quota().usedKilobytes / quota().totalKilobytes) * 100
+                  return (
+                    <>
+                      <Progress
+                        class="flex-1"
+                        value={quota().usedKilobytes}
+                        max={quota().totalKilobytes}
+                        barStyle={{ background: getQuotaBarColor(percentage()) }}
+                      />
+                      <span class="text-lightSlate-400 whitespace-nowrap text-sm">
+                        {formatSize(quota().usedKilobytes)} /{" "}
+                        {formatSize(quota().totalKilobytes)}
+                      </span>
+                    </>
+                  )
+                }}
               </Show>
             </div>
             <span class="text-lightSlate-500 text-xs">

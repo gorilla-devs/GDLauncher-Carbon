@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-mod v1;
+pub mod v1;
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "_version")]

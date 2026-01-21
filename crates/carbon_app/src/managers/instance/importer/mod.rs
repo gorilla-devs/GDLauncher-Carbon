@@ -18,13 +18,15 @@ use crate::{
 
 use self::{
     curseforge::CurseforgeImporter, curseforge_archive::CurseforgeArchiveImporter,
-    legacy_gdlauncher::LegacyGDLauncherImporter, modrinth_archive::ModrinthArchiveImporter,
+    gdlpack::GdlpackImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
+    modrinth_archive::ModrinthArchiveImporter,
 };
 
 use super::{InstanceManager, export::InstanceExportManager};
 
 mod curseforge;
 mod curseforge_archive;
+mod gdlpack;
 mod legacy_gdlauncher;
 mod modrinth_archive;
 
@@ -62,7 +64,7 @@ impl ManagerRef<'_, InstanceImportManager> {
             .maketmpdir()
             .await?;
 
-        let file_path = tmpdir.join(format!("{share_code}.zip"));
+        let file_path = tmpdir.join(format!("{share_code}.gdlpack"));
 
         info!(
             "downloading instance share code {share_code} to {file_path:?} ({:?})",
@@ -87,7 +89,7 @@ impl ManagerRef<'_, InstanceImportManager> {
         // Ensure all data is written to disk
         file.flush().await?;
 
-        let scanner = Entity::CurseForgeZip.create_importer();
+        let scanner = Entity::GDLPack.create_importer();
 
         scanner.scan(&self.app, file_path).await?;
 
@@ -234,6 +236,7 @@ pub enum Entity {
     FTB,
     MultiMC,
     PrismLauncher,
+    GDLPack,
 }
 
 impl Entity {
@@ -249,17 +252,19 @@ impl Entity {
             Self::FTB => SelectionType::Directory,
             Self::MultiMC => SelectionType::Directory,
             Self::PrismLauncher => SelectionType::Directory,
+            Self::GDLPack => SelectionType::File,
         }
     }
 
     pub fn list() -> Vec<(Self, bool, SelectionType)> {
         use strum::IntoEnumIterator;
 
-        const SUPPORT: [Entity; 4] = [
+        const SUPPORT: [Entity; 5] = [
             Entity::LegacyGDLauncher,
             Entity::CurseForgeZip,
             Entity::MRPack,
             Entity::CurseForge,
+            Entity::GDLPack,
         ];
 
         Self::iter()
@@ -273,6 +278,7 @@ impl Entity {
             Self::CurseForgeZip => Arc::new(CurseforgeArchiveImporter::new()),
             Self::MRPack => Arc::new(ModrinthArchiveImporter::new()),
             Self::CurseForge => Arc::new(CurseforgeImporter::new()),
+            Self::GDLPack => Arc::new(GdlpackImporter::new()),
             _ => todo!(),
         }
     }

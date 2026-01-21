@@ -11,10 +11,17 @@ use crate::{
     },
     managers::{
         AppInner,
-        instance::{InstanceVersionSource, export::gdlauncher_archive::GdlManifest},
+        instance::InstanceVersionSource,
         modplatforms::curseforge::convert_cf_version_to_standard_version,
     },
 };
+use serde::Deserialize;
+
+/// Legacy GDLauncher manifest format (for reading old exports)
+#[derive(Deserialize)]
+struct LegacyGdlManifest {
+    icon: Option<String>,
+}
 use anyhow::anyhow;
 use carbon_platforms::curseforge::manifest::Manifest;
 use std::{
@@ -111,7 +118,7 @@ impl CurseforgeArchiveImporter {
             // Try to read GDL manifest and icon (optional, for GDLauncher archives)
             let gdl_icon: Option<(String, Vec<u8>)> = (|| {
                 // Read GDL manifest
-                let gdl_manifest: GdlManifest = {
+                let gdl_manifest: LegacyGdlManifest = {
                     let mut gdl_manifest_file = zip.by_name("gdl/manifest.json").ok()?;
                     let mut gdl_manifest_data = Vec::new();
                     gdl_manifest_file.read_to_end(&mut gdl_manifest_data).ok()?;

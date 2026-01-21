@@ -11,6 +11,7 @@ import {
 } from "solid-js"
 import { queryClient, rspc, port } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import ImagePicker from "@/components/ImagePicker"
 import { convertSecondsToHumanTime, blobToBase64 } from "@/utils/helpers"
 
 const EditGDLProfile = () => {
@@ -205,29 +206,19 @@ const EditGDLProfile = () => {
   })
 
   // Avatar handling
-  const handleAvatarSelect = async () => {
-    const extensions = ["jpg", "jpeg", "png", "gif", "webp"]
-    const result = await window.openFileDialog({
-      title: t("accounts:_trn_select_avatar_image"),
-      filters: [{ name: "Images", extensions }],
-      properties: ["openFile"]
-    })
+  const handleAvatarSelect = async (filePath: string) => {
+    setAvatarFilePath(filePath)
+    setAvatarDeleted(false)
 
-    if (result && result.filePaths.length > 0) {
-      const filePath = result.filePaths[0]
-      setAvatarFilePath(filePath)
-      setAvatarDeleted(false)
-
-      // Load preview
-      const response = await fetch(
-        `http://127.0.0.1:${port}/loadImage?path=${encodeURIComponent(filePath)}`
-      )
-      const blob = await response.blob()
-      const b64 = (await blobToBase64(blob)) as string
-      setAvatarPreview(
-        `data:image/png;base64,${b64.substring(b64.indexOf(",") + 1)}`
-      )
-    }
+    // Load preview
+    const response = await fetch(
+      `http://127.0.0.1:${port}/loadImage?path=${encodeURIComponent(filePath)}`
+    )
+    const blob = await response.blob()
+    const b64 = (await blobToBase64(blob)) as string
+    setAvatarPreview(
+      `data:image/png;base64,${b64.substring(b64.indexOf(",") + 1)}`
+    )
   }
 
   const handleAvatarRemove = () => {
@@ -340,44 +331,17 @@ const EditGDLProfile = () => {
       <div class="flex flex-col gap-6">
         {/* Avatar + Display Name Section */}
         <div class="flex items-start gap-4">
-          {/* Avatar with hover effect */}
-          <div
-            class="bg-darkSlate-600 group relative h-20 w-20 flex-shrink-0 cursor-pointer overflow-hidden rounded-xl transition-all hover:brightness-90"
-            onClick={handleAvatarSelect}
-          >
-            <Show
-              when={avatarPreview()}
-              fallback={
-                <div class="flex h-full w-full items-center justify-center">
-                  <div class="i-hugeicons:user text-lightSlate-500 text-3xl" />
-                </div>
-              }
-            >
-              <img src={avatarPreview()!} class="h-full w-full object-cover" />
-            </Show>
-            {/* Hover overlay */}
-            <div class="absolute inset-0 flex items-center justify-center bg-darkSlate-900/60 opacity-0 transition-opacity group-hover:opacity-100">
-              <div class="i-hugeicons:camera-01 text-2xl text-white" />
-            </div>
-            {/* Loading overlay */}
-            <Show when={avatarLoading()}>
-              <div class="bg-darkSlate-900/70 absolute inset-0 flex items-center justify-center">
-                <div class="i-hugeicons:loading-02 animate-spin text-xl" />
-              </div>
-            </Show>
-            {/* Remove button (shown on hover if has custom avatar) */}
-            <Show when={avatarPreview() && validGDLUser()?.hasCustomAvatar}>
-              <div
-                class="absolute -right-1 -top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-red-500 opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleAvatarRemove()
-                }}
-              >
-                <div class="i-hugeicons:cancel-01 text-xs text-white" />
-              </div>
-            </Show>
-          </div>
+          <ImagePicker
+            imageUrl={avatarPreview}
+            onSelect={handleAvatarSelect}
+            onDelete={handleAvatarRemove}
+            isLoading={avatarLoading}
+            deletable={Boolean(avatarPreview() && validGDLUser()?.hasCustomAvatar)}
+            confirmDelete={false}
+            sizeClass="h-20 w-20"
+            dialogTitle={t("accounts:_trn_select_avatar_image")}
+            placeholderIcon="i-hugeicons:user"
+          />
 
           {/* Display Name */}
           <div class="flex-1">
