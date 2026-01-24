@@ -61,23 +61,12 @@ Skeleton.instance = Instance
 Skeleton.instances = () => {
   return (
     <div class="flex flex-col gap-4">
-      <div class="bg-darkSlate-500 skeleton-shimmer h-10 w-full rounded-lg skeleton-shimmer" />
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
+      {/* Header: search input + filter button */}
+      <div class="flex items-center gap-4 py-4">
+        <div class="bg-darkSlate-500 skeleton-shimmer h-10 w-full rounded-full" />
+        <div class="bg-darkSlate-500 skeleton-shimmer h-8 w-8 min-w-8 rounded-md" />
       </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
+      <div class="flex flex-wrap gap-4">
         <For each={new Array(10)}>{() => <Instance />}</For>
       </div>
     </div>

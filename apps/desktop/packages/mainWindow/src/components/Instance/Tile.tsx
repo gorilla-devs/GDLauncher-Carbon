@@ -73,6 +73,7 @@ interface Props {
   onToggleSelection?: () => void
   onDragStart?: (_e: PointerEvent) => void
   isDragging?: boolean
+  isDragActive?: boolean // True when any drag operation is in progress (disables hover effects)
 }
 
 const Tile = (props: Props) => {
@@ -453,7 +454,7 @@ const Tile = (props: Props) => {
                         classList={{
                           grayscale: isLoading() || isInQueue(),
                           "group-hover:scale-110 group-hover:blur-[2px]":
-                            !isLoading() && !isInQueue()
+                            !isLoading() && !isInQueue() && !props.isDragActive
                         }}
                         style={{
                           "background-image": props.img
@@ -469,9 +470,10 @@ const Tile = (props: Props) => {
                         }}
                       />
                       <div
-                        class="z-1 absolute inset-0 rounded-2xl bg-black/0 transition-all duration-300 ease-spring group-hover:bg-black/30"
+                        class="z-1 absolute inset-0 rounded-2xl bg-black/0 transition-all duration-300 ease-spring"
                         classList={{
-                          "!bg-black/0": isLoading() || isInQueue()
+                          "!bg-black/0": isLoading() || isInQueue(),
+                          "group-hover:bg-black/30": !props.isDragActive
                         }}
                       />
                       <Show when={props.isInvalid}>
@@ -618,9 +620,9 @@ const Tile = (props: Props) => {
                           class="z-10 absolute left-2 top-2 transition-all duration-200 ease-spring"
                           classList={{
                             "translate-x-0 opacity-100":
-                              props.isMultiSelected || isHovering(),
+                              props.isMultiSelected || (isHovering() && !props.isDragActive),
                             "-translate-x-3 opacity-0":
-                              !props.isMultiSelected && !isHovering()
+                              !props.isMultiSelected && (!isHovering() || props.isDragActive)
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -690,7 +692,8 @@ const Tile = (props: Props) => {
                             !props.isInvalid &&
                             !props.failError &&
                             !props.isRunning &&
-                            !props.isDeleting
+                            !props.isDeleting &&
+                            !props.isDragActive
                         }}
                         style={
                           props.shouldSetViewTransition

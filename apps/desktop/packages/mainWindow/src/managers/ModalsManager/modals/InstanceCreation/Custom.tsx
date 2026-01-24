@@ -413,7 +413,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         await storeIconForBackend()
 
         const instanceId = await createInstanceMutation.mutateAsync({
-          group: defaultGroup.data || 1,
+          group: (props.data as { groupId?: number } | undefined)?.groupId ?? defaultGroup.data ?? 1,
           use_loaded_icon: true,
           notes: "",
           name: title()!,

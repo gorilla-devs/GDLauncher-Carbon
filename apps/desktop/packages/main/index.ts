@@ -42,7 +42,6 @@ import {
 
 console.log("Modules imported successfully")
 
-// Overwolf ready state and pending email
 let overwolfReady = false
 let pendingEmail: string | null | undefined = null
 

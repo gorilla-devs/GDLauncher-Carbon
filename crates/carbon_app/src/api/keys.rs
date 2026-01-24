@@ -101,12 +101,14 @@ keys! {
         CHANGE_MODPACK                              = "changeModpack";
         LOAD_ICON_URL                               = "loadIconUrl";
         DELETE_GROUP                                = "deleteGroup";
+        DELETE_GROUP_WITH_INSTANCES                 = "deleteGroupWithInstances";
         RENAME_GROUP                                = "renameGroup";
         DELETE_INSTANCE                             = "deleteInstance";
         MOVE_GROUP                                  = "moveGroup";
         MOVE_INSTANCE                               = "moveInstance";
         CREATE_FOLDER_FROM_INSTANCES                = "createFolderFromInstances";
         SORT_LIBRARY                                = "sortLibrary";
+        SORT_GROUP                                  = "sortGroup";
         DUPLICATE_INSTANCE                          = "duplicateInstance";
         UPDATE_INSTANCE                             = "updateInstance";
         SET_FAVORITE                                = "setFavorite";

@@ -114,6 +114,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        mutation DELETE_GROUP_WITH_INSTANCES[app, id: FEGroupId] {
+            app.instance_manager()
+                .delete_group_with_instances(id.into())
+                .await
+        }
+
         mutation RENAME_GROUP[app, rename: RenameGroup] {
             app.instance_manager()
                 .rename_group(rename.group.into(), rename.name)
@@ -127,11 +133,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation MOVE_GROUP[app, move_data: MoveGroup] {
+            let target = match move_data.target {
+                MoveGroupTarget::BeforeGroup(id) => manager::GroupMoveTarget::BeforeGroup(id.into()),
+                MoveGroupTarget::BeforeInstance(id) => manager::GroupMoveTarget::BeforeInstance(id.into()),
+                MoveGroupTarget::EndOfLibrary => manager::GroupMoveTarget::EndOfLibrary,
+            };
             app.instance_manager()
-                .move_group(
-                    move_data.group.into(),
-                    move_data.before.map(Into::into)
-                )
+                .move_group(move_data.group.into(), target)
                 .await
         }
 
@@ -146,6 +154,8 @@ pub(super) fn mount() -> RouterBuilder<App> {
                             => InstanceMoveTarget::BeginningOfGroup(group.into()),
                         MoveInstanceTarget::EndOfGroup(group)
                             => InstanceMoveTarget::EndOfGroup(group.into()),
+                        MoveInstanceTarget::BeforeGroup(group)
+                            => InstanceMoveTarget::BeforeGroup(group.into()),
                     }
                 )
                 .await
@@ -163,6 +173,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation SORT_LIBRARY[app, sort_by: LibrarySortCriteria] {
             app.instance_manager()
                 .sort_library(sort_by.into())
+                .await
+        }
+
+        mutation SORT_GROUP[app, data: SortGroup] {
+            app.instance_manager()
+                .sort_group(data.group.into(), data.sort_by.into())
                 .await
         }
 
@@ -832,6 +848,7 @@ impl From<FEInstanceId> for domain::InstanceId {
 struct ListGroup {
     id: FEGroupId,
     name: String,
+    library_position: Option<i32>,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -839,6 +856,7 @@ struct ListInstance {
     id: FEInstanceId,
     group_id: FEGroupId,
     index: i32,
+    library_position: Option<i32>,
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
@@ -1091,9 +1109,16 @@ struct StandardVersion {
 }
 
 #[derive(Type, Debug, Deserialize)]
+enum MoveGroupTarget {
+    BeforeGroup(FEGroupId),
+    BeforeInstance(FEInstanceId),  // Instance must be in default group (ungrouped)
+    EndOfLibrary,
+}
+
+#[derive(Type, Debug, Deserialize)]
 struct MoveGroup {
     group: FEGroupId,
-    before: Option<FEGroupId>,
+    target: MoveGroupTarget,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -1122,6 +1147,13 @@ impl From<LibrarySortCriteria> for manager::LibrarySortCriteria {
 }
 
 #[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SortGroup {
+    group: FEGroupId,
+    sort_by: LibrarySortCriteria,
+}
+
+#[derive(Type, Debug, Deserialize)]
 struct RenameGroup {
     group: FEGroupId,
     name: String,
@@ -1138,6 +1170,7 @@ enum MoveInstanceTarget {
     BeforeInstance(FEInstanceId),
     BeginningOfGroup(FEGroupId),
     EndOfGroup(FEGroupId),
+    BeforeGroup(FEGroupId),  // Position instance before a folder (at library root level)
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -1637,6 +1670,7 @@ impl From<manager::ListGroup> for ListGroup {
         Self {
             id: value.id.into(),
             name: value.name,
+            library_position: value.library_position,
         }
     }
 }
@@ -1647,6 +1681,7 @@ impl From<manager::ListInstance> for ListInstance {
             id: value.id.into(),
             group_id: value.group_id.into(),
             index: value.index,
+            library_position: value.library_position,
             name: value.name,
             favorite: value.favorite,
             status: value.status.into(),

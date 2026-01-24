@@ -52,6 +52,9 @@ pub enum RequestGDLAccountDeletionError {
     #[error("Too many requests")]
     TooManyRequests(u32),
 
+    #[error("Server error: {0}")]
+    ServerError(String),
+
     #[error("request failed: {0}")]
     RequestFailed(anyhow::Error),
 }
@@ -629,7 +632,9 @@ impl GDLAccountTask {
             .await
             .map_err(|err| RequestGDLAccountDeletionError::RequestFailed(err.into()))?;
 
-        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+        let status = resp.status();
+
+        if status == StatusCode::TOO_MANY_REQUESTS {
             let retry_after = resp
                 .headers()
                 .get("Retry-After")
@@ -641,13 +646,20 @@ impl GDLAccountTask {
             ));
         }
 
-        let resp = resp
-            .error_for_status()
-            .map_err(|err| RequestGDLAccountDeletionError::RequestFailed(err.into()))?;
-
-        resp.bytes()
-            .await
-            .map_err(|err| RequestGDLAccountDeletionError::RequestFailed(err.into()))?;
+        if !status.is_success() {
+            // Try to parse error message from response body
+            let body = resp.bytes().await.ok();
+            if let Some(bytes) = body {
+                if let Ok(error_resp) = serde_json::from_slice::<EnderiumErrorResponse>(&bytes) {
+                    return Err(RequestGDLAccountDeletionError::ServerError(
+                        error_resp.error.message,
+                    ));
+                }
+            }
+            return Err(RequestGDLAccountDeletionError::RequestFailed(
+                anyhow::anyhow!("Request failed with status: {}", status),
+            ));
+        }
 
         Ok(())
     }

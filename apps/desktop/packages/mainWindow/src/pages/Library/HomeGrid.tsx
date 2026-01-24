@@ -32,6 +32,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  on,
   onCleanup,
   onMount
 } from "solid-js"
@@ -52,16 +53,48 @@ import { useModal } from "@/managers/ModalsManager"
 import { DragProvider, useDragContext, DropTarget } from "./DragContext"
 import DragGhost from "@/components/DragGhost"
 import FavoritesDropZone from "@/components/Library/FavoritesDropZone"
+import FavoriteTile from "@/components/Library/FavoriteTile"
 import GroupHeader from "@/components/Library/GroupHeader"
 import FolderTile, {
   clickedFolderId,
-  setClickedFolderId
+  setClickedFolderId,
+  setVisibleFolderIndices,
+  injectFolderTransitionCSS,
+  removeFolderTransitionCSS
 } from "@/components/Library/FolderTile"
 import ExpandedFolderContent from "@/components/Library/ExpandedFolderContent"
+import LibraryItemTile from "@/components/Library/LibraryItemTile"
 import "@/components/Library/folderTransitions.css"
+import { createAutoAnimate } from "@formkit/auto-animate/solid"
 
 const animatedInstanceIds = new Set<number>()
 let initialAnimationComplete = false
+
+// Animation tracking for iOS folder view (libraryItems: folders + ungrouped instances)
+const animatedLibraryItemIds = new Set<string>() // "folder-{id}" or "instance-{id}"
+const libraryInitialAnimationCompleteRef = { value: false }
+
+// Stable object cache for <For> - preserves object identity across re-renders
+type CachedLibraryItem =
+  | { id: string; type: "instance"; data: ListInstance }
+  | {
+      id: string
+      type: "folder"
+      data: {
+        id: number
+        name: string
+        libraryPosition: number | null
+        instances: ListInstance[]
+      }
+    }
+const libraryItemCache = new Map<string, CachedLibraryItem>()
+
+// FLIP animation state - stores positions before reorder
+const libraryItemPositions = new Map<string, DOMRect>()
+// Store snapshot of item order to detect when data actually changes (async after mutation)
+let libraryItemOrderSnapshot: string[] | null = null
+// Safety timeout to re-enable auto-animate if mutation fails
+let flipAnimationTimeoutId: ReturnType<typeof setTimeout> | null = null
 
 // End of group drop zone component
 const EndOfGroupDropZone = (props: {
@@ -195,6 +228,37 @@ const HomeGridInner = () => {
 
   const globalStore = useGlobalStore()
 
+  // Auto-animate refs for grid containers (respects reduced motion)
+  const [favoritesGridRef, setFavoritesGridEnabled] = createAutoAnimate({
+    duration: 200,
+    easing: "ease-out"
+  })
+  const [mainGridRef, setMainGridEnabled] = createAutoAnimate({
+    duration: 200,
+    easing: "ease-out"
+  })
+
+  // Disable auto-animate when reduced motion is enabled
+  createEffect(() => {
+    const reducedMotion = globalStore.settings.data?.reducedMotion ?? false
+    setFavoritesGridEnabled(!reducedMotion)
+    setMainGridEnabled(!reducedMotion)
+  })
+
+  // Helper to cleanup FLIP animation state (called on success or timeout)
+  const cleanupFlipAnimationState = () => {
+    if (flipAnimationTimeoutId) {
+      clearTimeout(flipAnimationTimeoutId)
+      flipAnimationTimeoutId = null
+    }
+    libraryItemOrderSnapshot = null
+    libraryItemPositions.clear()
+    // Re-enable auto-animate (respects reduced motion)
+    const reducedMotion = globalStore.settings.data?.reducedMotion ?? false
+    setFavoritesGridEnabled(!reducedMotion)
+    setMainGridEnabled(!reducedMotion)
+  }
+
   const modals = useModal()
 
   const [instancesTileSize, setInstancesTileSize] = createSignal(2)
@@ -220,8 +284,66 @@ const HomeGridInner = () => {
 
   const isSelected = (id: number) => selectedIds().has(id)
 
-  // Store refs for all instance tiles
+  // Store refs for all instance tiles (for drag selection)
   const tileRefs = new Map<number, HTMLDivElement>()
+
+  // Store refs for ALL library items (for FLIP animation)
+  const libraryItemRefs = new Map<string, HTMLDivElement>()
+
+  // Capture positions of all library items (called before reorder)
+  const captureLibraryItemPositions = () => {
+    // Don't clear - update positions in place
+    // Preserves positions for refs that may not be in libraryItemRefs yet
+    libraryItemRefs.forEach((el, key) => {
+      if (el.isConnected) {
+        libraryItemPositions.set(key, el.getBoundingClientRect())
+      }
+    })
+  }
+
+  // Run FLIP animation after reorder
+  const runFlipAnimation = () => {
+    // Clear the safety timeout since animation is running
+    if (flipAnimationTimeoutId) {
+      clearTimeout(flipAnimationTimeoutId)
+      flipAnimationTimeoutId = null
+    }
+
+    if (globalStore.settings.data?.reducedMotion) {
+      libraryItemPositions.clear()
+      return
+    }
+
+    // Iterate over captured positions, not refs
+    // This ensures items that were recreated during DOM reconciliation still animate
+    libraryItemPositions.forEach((oldRect, key) => {
+      const el = libraryItemRefs.get(key)
+      if (!el || !el.isConnected) return
+
+      const newRect = el.getBoundingClientRect()
+      const dx = oldRect.left - newRect.left
+      const dy = oldRect.top - newRect.top
+
+      if (dx === 0 && dy === 0) return // No movement
+
+      // Apply FLIP animation
+      el.animate([
+        { transform: `translate(${dx}px, ${dy}px)` },
+        { transform: 'translate(0, 0)' }
+      ], {
+        duration: 300,
+        easing: 'ease-out'
+      })
+    })
+
+    // Clear after animation to ensure fresh capture next time
+    libraryItemPositions.clear()
+
+    // Re-enable auto-animate after FLIP completes (respects reduced motion)
+    const reducedMotion = globalStore.settings.data?.reducedMotion ?? false
+    setFavoritesGridEnabled(!reducedMotion)
+    setMainGridEnabled(!reducedMotion)
+  }
 
   // Function to get bounding rects for all tiles
   const getItemRects = (): Map<number, DOMRect> => {
@@ -246,9 +368,10 @@ const HomeGridInner = () => {
   const shouldIgnoreClick = (e: MouseEvent): boolean => {
     const target = e.target as HTMLElement
     // Ignore clicks on tiles, inputs, buttons, and interactive elements
-    // Also ignore if drag and drop is active
+    // Also ignore if drag and drop is active or folder is open
     return (
       !dragContext.dragSelectEnabled() ||
+      openFolderId() !== null ||
       target.closest("[data-instance-tile]") !== null ||
       target.closest("[data-folder-tile]") !== null ||
       target.closest("input") !== null ||
@@ -326,16 +449,38 @@ const HomeGridInner = () => {
   // State for open folder in iOS-style view
   const [openFolderId, setOpenFolderId] = createSignal<number | null>(null)
 
-  const toggleFolder = (folderId: number) => {
+  const toggleFolder = async (folderId: number) => {
     const shouldTransition =
       !globalStore.settings.data?.reducedMotion && document.startViewTransition
 
     if (shouldTransition) {
+      // Get folder instance count for dynamic CSS injection
+      const folder = libraryItems().find(
+        (i) => i.type === "folder" && i.data.id === folderId
+      )
+      const instanceCount =
+        folder?.type === "folder" ? folder.data.instances.length : 0
+
+      // Only animate the 4 preview instances visible in the folder tile
+      // Other instances will appear instantly (no view-transition-name = no animation)
+      const maxVisibleOnOpen = Math.min(instanceCount, 4)
+      const visibleIndices = Array.from({ length: maxVisibleOnOpen }, (_, i) => i)
+
+      setVisibleFolderIndices(visibleIndices)
+      injectFolderTransitionCSS(visibleIndices, "open")
       setClickedFolderId(folderId)
+
+      // Wait for SolidJS to flush DOM updates before capturing old snapshot
+      await new Promise((resolve) => queueMicrotask(resolve))
+
       const transition = document.startViewTransition(() => {
         setOpenFolderId((prev) => (prev === folderId ? null : folderId))
       })
-      transition.finished.then(() => setClickedFolderId(null))
+      transition.finished.then(() => {
+        setClickedFolderId(null)
+        setVisibleFolderIndices([])
+        removeFolderTransitionCSS()
+      })
     } else {
       setOpenFolderId((prev) => (prev === folderId ? null : folderId))
     }
@@ -361,6 +506,17 @@ const HomeGridInner = () => {
     dragType: string
   ) => {
     if (!target || draggedIds.length === 0) return
+
+    // Capture positions and order BEFORE mutation for FLIP animation
+    captureLibraryItemPositions()
+    // Store current order - animation runs when order actually changes (async)
+    libraryItemOrderSnapshot = libraryItems().map(item => item.id)
+    // Disable auto-animate to prevent conflict with manual FLIP
+    setFavoritesGridEnabled(false)
+    setMainGridEnabled(false)
+    // Safety timeout: re-enable auto-animate if mutation fails or order doesn't change
+    if (flipAnimationTimeoutId) clearTimeout(flipAnimationTimeoutId)
+    flipAnimationTimeoutId = setTimeout(cleanupFlipAnimationState, 2000)
 
     if (dragType === "instance") {
       switch (target.type) {
@@ -436,6 +592,16 @@ const HomeGridInner = () => {
           }
           break
         }
+        case "beforeInstanceAtFolder": {
+          // Move instances to default group, positioned before the folder
+          for (const id of draggedIds) {
+            moveInstanceMutation.mutate({
+              instance: id,
+              target: { BeforeGroup: target.folderId }
+            })
+          }
+          break
+        }
         default:
           break
       }
@@ -452,16 +618,25 @@ const HomeGridInner = () => {
           if (groupId !== target.groupId) {
             moveGroupMutation.mutate({
               group: groupId,
-              before: target.groupId
+              target: { BeforeGroup: target.groupId }
             })
           }
           break
         }
-        case "endOfGroups": {
-          // Move group to end
+        case "beforeGroupAtInstance": {
+          // Move group before an ungrouped instance
           moveGroupMutation.mutate({
             group: groupId,
-            before: null
+            target: { BeforeInstance: target.beforeInstanceId }
+          })
+          break
+        }
+        case "endOfGroups":
+        case "endOfLibrary": {
+          // Move group to end of library
+          moveGroupMutation.mutate({
+            group: groupId,
+            target: "EndOfLibrary"
           })
           break
         }
@@ -675,10 +850,11 @@ const HomeGridInner = () => {
 
   // iOS-style folder view data structures
   type LibraryItem =
-    | { type: "instance"; data: ListInstance }
+    | { id: string; type: "instance"; data: ListInstance }
     | {
+        id: string
         type: "folder"
-        data: { id: number; name: string; instances: ListInstance[] }
+        data: { id: number; name: string; libraryPosition: number | null; instances: ListInstance[] }
       }
 
   // Get the default group ID from query
@@ -688,17 +864,22 @@ const HomeGridInner = () => {
 
   const defaultGroupId = createMemo(() => defaultGroupQuery.data ?? null)
 
-  // Favorite instances (static row at top)
-  const favoriteInstances = createMemo(() => {
+  // Favorite instance IDs (static row at top)
+  // Returns primitive IDs - SolidJS <For> uses value equality for primitives
+  // FavoriteTile looks up instance from globalStore, creating signal dependency for reactivity
+  const favoriteInstanceIds = createMemo((): number[] => {
     const nameFilter = filter().replaceAll(" ", "").toLowerCase()
-    return (globalStore.instances.data || []).filter(
-      (i) =>
-        i.favorite &&
-        i.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
-    )
+    return (globalStore.instances.data || [])
+      .filter(
+        (i) =>
+          i.favorite &&
+          i.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
+      )
+      .map((i) => i.id as unknown as number)
   })
 
   // Library items: ungrouped instances + folder tiles (when in folder view mode)
+  // Uses stable object cache to preserve identity for <For> - enables auto-animate reorder detection
   const libraryItems = createMemo((): LibraryItem[] => {
     const items: LibraryItem[] = []
     const nameFilter = filter().replaceAll(" ", "").toLowerCase()
@@ -710,6 +891,9 @@ const HomeGridInner = () => {
     const groups = globalStore.instanceGroups.data || []
     const allInstances = globalStore.instances.data || []
 
+    // DEBUG: Trace group data flow
+    console.log("[DEBUG] Total groups from store:", groups.length, groups.map(g => ({ id: g.id, name: g.name })))
+
     // Group instances by group_id
     const instancesByGroup = new Map<number, ListInstance[]>()
     for (const instance of allInstances) {
@@ -717,6 +901,9 @@ const HomeGridInner = () => {
       list.push(instance)
       instancesByGroup.set(instance.group_id, list)
     }
+
+    // Track which keys we see this render (for cache cleanup)
+    const seenKeys = new Set<string>()
 
     for (const group of groups) {
       const groupInstances = instancesByGroup.get(group.id) || []
@@ -729,7 +916,19 @@ const HomeGridInner = () => {
         // Default group instances become ungrouped items (excluding favorites)
         for (const instance of filteredInstances) {
           if (!instance.favorite) {
-            items.push({ type: "instance", data: instance })
+            const key = `instance-${instance.id}`
+            seenKeys.add(key)
+
+            // Get or create cached wrapper - PRESERVES OBJECT IDENTITY
+            let cached = libraryItemCache.get(key)
+            if (!cached || cached.type !== "instance") {
+              cached = { id: key, type: "instance", data: instance }
+              libraryItemCache.set(key, cached)
+            } else {
+              // Update data in existing object (keeps same reference)
+              cached.data = instance
+            }
+            items.push(cached)
           }
         }
       } else {
@@ -745,35 +944,54 @@ const HomeGridInner = () => {
 
         // Show folder if it has no instances (empty folder) or has filtered instances
         if (!hasAnyInstances || hasFilteredInstances) {
-          items.push({
-            type: "folder",
-            data: {
-              id: group.id,
-              name:
-                group.name === "localize➽default"
-                  ? t("general:_trn_default")
-                  : group.name,
-              instances: filteredNonFavorites
-            }
-          })
+          const key = `folder-${group.id}`
+          seenKeys.add(key)
+
+          const folderData = {
+            id: group.id,
+            name:
+              group.name === "localize➽default"
+                ? t("general:_trn_default")
+                : group.name,
+            libraryPosition: group.library_position,
+            instances: filteredNonFavorites
+          }
+
+          // Get or create cached wrapper - PRESERVES OBJECT IDENTITY
+          let cached = libraryItemCache.get(key)
+          if (!cached || cached.type !== "folder") {
+            cached = { id: key, type: "folder", data: folderData }
+            libraryItemCache.set(key, cached)
+          } else {
+            // Update data in existing object (keeps same reference)
+            ;(cached as { id: string; type: "folder"; data: typeof folderData }).data = folderData
+          }
+          items.push(cached)
         }
       }
     }
 
-    // Sort items: instances by their index, folders by their group index
-    // Get group indices for folders (use position in array as proxy)
-    const groupIndexMap = new Map<number, number>()
-    groups.forEach((g, index) => {
-      groupIndexMap.set(g.id, index)
-    })
+    // DEBUG: Log how many folders were added
+    console.log("[DEBUG] Folders added to items:", items.filter(i => i.type === "folder").length)
 
+    // Clean up cache entries for items no longer present
+    for (const key of libraryItemCache.keys()) {
+      if (!seenKeys.has(key)) {
+        libraryItemCache.delete(key)
+      }
+    }
+
+    // Sort items by libraryPosition for interleaving
+    // Items with libraryPosition are sorted by that value
+    // Items without (shouldn't happen at root level) fall back to index
     items.sort((a, b) => {
-      // Get sort keys
       const getKey = (item: LibraryItem) => {
         if (item.type === "instance") {
-          return item.data.index
+          // Use libraryPosition if available (for ungrouped instances), fallback to index
+          return item.data.library_position ?? item.data.index
         } else {
-          return (groupIndexMap.get(item.data.id) ?? 0) * 10000 // Folders interleave with instances
+          // For folders, use libraryPosition if available, fallback to a large number
+          return item.data.libraryPosition ?? 10000
         }
       }
       return getKey(a) - getKey(b)
@@ -782,9 +1000,49 @@ const HomeGridInner = () => {
     return items
   })
 
+  // FLIP animation effect - runs after libraryItems changes
+  createEffect(() => {
+    // Track libraryItems to trigger on change
+    const items = libraryItems()
+
+    // Only animate if we have a snapshot and the order has actually changed
+    if (libraryItemOrderSnapshot && items.length > 0) {
+      const currentOrder = items.map(item => item.id)
+      const orderChanged = libraryItemOrderSnapshot.length !== currentOrder.length ||
+        libraryItemOrderSnapshot.some((id, i) => id !== currentOrder[i])
+
+      if (orderChanged) {
+        // Clear snapshot before animation
+        libraryItemOrderSnapshot = null
+        // Double RAF ensures DOM reconciliation completes before measuring positions
+        // Auto-animate is disabled during FLIP, so no conflict occurs
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            runFlipAnimation()
+          })
+        })
+      }
+    }
+  })
+
   // Check if we're in iOS-style folder view mode
   const isIosFolderView = createMemo(
     () => globalStore.settings.data?.instancesGroupBy === "group"
+  )
+
+  // Reset animation state when switching view modes (but NOT on initial mount)
+  // Using on() with defer: true skips the first run, so animation state
+  // persists across navigation and only resets when view mode actually changes
+  createEffect(
+    on(isIosFolderView, () => {
+      // Reset the library animation tracking when switching views
+      animatedLibraryItemIds.clear()
+      libraryInitialAnimationCompleteRef.value = false
+
+      // Also reset collapsible view animation tracking
+      animatedInstanceIds.clear()
+      initialAnimationComplete = false
+    }, { defer: true })
   )
 
   const sortByOptions: {
@@ -854,7 +1112,7 @@ const HomeGridInner = () => {
     >
       <UnstableCard />
       <Switch>
-        <Match when={globalStore.instances.isLoading}>
+        <Match when={globalStore.instances.isLoading || (isIosFolderView() && !defaultGroupId())}>
           <div>
             <Skeleton.instances />
           </div>
@@ -1220,47 +1478,49 @@ const HomeGridInner = () => {
             </div>
             <ContextMenu>
               <ContextMenuTrigger>
-                <div class="mt-4" onClick={() => setOpenFolderId(null)}>
+                <div class="mt-4" onClick={() => {
+                  // Don't close folder if we're currently dragging or just finished a drag
+                  if (!dragContext.isDragging() && !dragContext.justDropped()) {
+                    setOpenFolderId(null)
+                  }
+                }}>
                   {/* iOS-style folder view when grouped by "group" */}
                   <Show when={isIosFolderView()}>
-                    {/* Favorites Row (static, non-draggable) */}
-                    <Show when={favoriteInstances().length > 0}>
+                    {/* Favorites Row - Large Prominent Cards (Max 3) */}
+                    <Show when={favoriteInstanceIds().length > 0}>
                       <div class="mb-6">
-                        <div class="flex items-center gap-2 mb-3">
-                          <div class="i-ri:star-fill text-yellow-500" />
-                          <span class="text-sm font-medium text-lightSlate-500 uppercase">
-                            <Trans key="instances:_trn_favorites" />
+                        {/* Header with star icon */}
+                        <div class="flex items-center gap-2 mb-4">
+                          <div class="i-ri:star-fill text-yellow-500 text-lg" />
+                          <span class="text-base font-semibold text-lightSlate-300">
+                            <Trans key="instances:_trn_favorites" /> ({Math.min(favoriteInstanceIds().length, 3)}/3)
                           </span>
                         </div>
+
+                        {/* 3-column grid */}
                         <div
-                          class="flex flex-wrap gap-x-4"
-                          classList={{
-                            "gap-y-4": instancesTileSize() === 1,
-                            "gap-y-6": instancesTileSize() === 2,
-                            "gap-y-8": instancesTileSize() === 3,
-                            "gap-y-10": instancesTileSize() === 4,
-                            "gap-y-12": instancesTileSize() === 5
-                          }}
+                          ref={favoritesGridRef}
+                          class="grid grid-cols-3 gap-4"
                         >
-                          <For each={favoriteInstances()}>
-                            {(instance) => (
-                              <div data-instance-tile class="relative">
-                                <InstanceTile
-                                  instance={instance}
-                                  identifier={`favorites-${instance.id}`}
-                                  size={instancesTileSize() as any}
-                                  preventClick={() => dragContext.justDropped()}
-                                />
-                              </div>
+                          <For each={favoriteInstanceIds().slice(0, 3)}>
+                            {(instanceId) => (
+                              <FavoriteTile
+                                instanceId={instanceId}
+                                isDragActive={dragContext.isDragging()}
+                                preventClick={() => dragContext.justDropped()}
+                              />
                             )}
                           </For>
                         </div>
+
+                        {/* Subtle separator */}
+                        <div class="border-t border-darkSlate-700 mt-6" />
                       </div>
-                      <div class="border-b border-darkSlate-600 mb-6" />
                     </Show>
 
                     {/* Main Grid: Ungrouped instances + Folder tiles */}
                     <div
+                      ref={mainGridRef}
                       class="relative flex flex-wrap gap-x-4 content-start"
                       classList={{
                         "gap-y-4": instancesTileSize() === 1,
@@ -1271,302 +1531,30 @@ const HomeGridInner = () => {
                       }}
                     >
                       <For each={libraryItems()}>
-                        {(item, itemIndex) => {
-                          return (
-                            <>
-                              <Switch>
-                                <Match
-                                  when={item.type === "folder" && item.data}
-                                >
-                                  {(_) => {
-                                    const folder = () =>
-                                      (
-                                        item as {
-                                          type: "folder"
-                                          data: {
-                                            id: number
-                                            name: string
-                                            instances: ListInstance[]
-                                          }
-                                        }
-                                      ).data
-                                    let folderRef: HTMLDivElement | undefined
-
-                                    // Show drop indicator before this folder when dragging groups
-                                    const showFolderDropIndicator = () => {
-                                      const target = dragContext.dropTarget()
-                                      return (
-                                        dragContext.isDragging() &&
-                                        dragContext.dragType() === "group" &&
-                                        target?.type === "beforeGroup" &&
-                                        target.groupId === folder().id
-                                      )
-                                    }
-
-                                    // Register drop zone for folder reordering
-                                    createEffect(() => {
-                                      if (
-                                        dragContext.isDragging() &&
-                                        dragContext.dragType() === "group" &&
-                                        folderRef
-                                      ) {
-                                        // Don't register drop zone for the folder being dragged
-                                        if (
-                                          dragContext
-                                            .draggedIds()
-                                            .includes(folder().id)
-                                        ) {
-                                          dragContext.unregisterDropZone(
-                                            `before-group-${folder().id}`
-                                          )
-                                          return
-                                        }
-
-                                        const rect =
-                                          folderRef.getBoundingClientRect()
-                                        // Register drop zone on left edge
-                                        const dropRect = new DOMRect(
-                                          rect.left - 8,
-                                          rect.top,
-                                          rect.width / 3 + 8,
-                                          rect.height
-                                        )
-                                        dragContext.registerDropZone({
-                                          id: `before-group-${folder().id}`,
-                                          rect: dropRect,
-                                          target: {
-                                            type: "beforeGroup",
-                                            groupId: folder().id
-                                          }
-                                        })
-                                      } else {
-                                        dragContext.unregisterDropZone(
-                                          `before-group-${folder().id}`
-                                        )
-                                      }
-                                    })
-
-                                    onCleanup(() => {
-                                      dragContext.unregisterDropZone(
-                                        `before-group-${folder().id}`
-                                      )
-                                    })
-
-                                    return (
-                                      <div
-                                        ref={folderRef}
-                                        class="relative"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        {/* Drop indicator before this folder */}
-                                        <Show when={showFolderDropIndicator()}>
-                                          <div class="absolute -left-2 top-0 bottom-0 w-1 bg-primary-500 rounded-full z-50">
-                                            <div class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary-500" />
-                                            <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary-500" />
-                                          </div>
-                                        </Show>
-                                        <FolderTile
-                                          group={folder()}
-                                          isOpen={
-                                            openFolderId() === folder().id
-                                          }
-                                          onToggle={() =>
-                                            toggleFolder(folder().id)
-                                          }
-                                          size={
-                                            instancesTileSize() as
-                                              | 1
-                                              | 2
-                                              | 3
-                                              | 4
-                                              | 5
-                                          }
-                                        />
-                                      </div>
-                                    )
-                                  }}
-                                </Match>
-                                <Match
-                                  when={item.type === "instance" && item.data}
-                                >
-                                  {(_) => {
-                                    const instance = () =>
-                                      (
-                                        item as {
-                                          type: "instance"
-                                          data: ListInstance
-                                        }
-                                      ).data
-                                    let ref: HTMLDivElement | undefined
-
-                                    const isBeingDragged = () =>
-                                      dragContext.isDragging() &&
-                                      dragContext.dragType() === "instance" &&
-                                      dragContext
-                                        .draggedIds()
-                                        .includes(instance().id)
-
-                                    const showDropIndicator = () => {
-                                      const target = dragContext.dropTarget()
-                                      return (
-                                        dragContext.isDragging() &&
-                                        dragContext.dragType() === "instance" &&
-                                        target?.type === "beforeInstance" &&
-                                        target.instanceId === instance().id
-                                      )
-                                    }
-
-                                    const showCreateFolderIndicator = () => {
-                                      const target = dragContext.dropTarget()
-                                      return (
-                                        dragContext.isDragging() &&
-                                        dragContext.dragType() === "instance" &&
-                                        target?.type === "createFolder" &&
-                                        target.instanceId === instance().id
-                                      )
-                                    }
-
-                                    // Register drop zones for ungrouped instances
-                                    createEffect(() => {
-                                      if (
-                                        dragContext.isDragging() &&
-                                        dragContext.dragType() === "instance" &&
-                                        ref
-                                      ) {
-                                        // Don't register drop zone for dragged instances
-                                        if (
-                                          dragContext
-                                            .draggedIds()
-                                            .includes(instance().id)
-                                        ) {
-                                          dragContext.unregisterDropZone(
-                                            `before-instance-${instance().id}`
-                                          )
-                                          dragContext.unregisterDropZone(
-                                            `create-folder-${instance().id}`
-                                          )
-                                          return
-                                        }
-
-                                        const rect = ref.getBoundingClientRect()
-
-                                        // Register "before instance" drop zone (left edge)
-                                        const dropRect = new DOMRect(
-                                          rect.left - 8,
-                                          rect.top,
-                                          rect.width / 4 + 8,
-                                          rect.height
-                                        )
-                                        dragContext.registerDropZone({
-                                          id: `before-instance-${instance().id}`,
-                                          rect: dropRect,
-                                          target: {
-                                            type: "beforeInstance",
-                                            instanceId: instance().id,
-                                            groupId: defaultGroupId()!
-                                          }
-                                        })
-
-                                        // Register "create folder" drop zone (center of tile)
-                                        const centerRect = new DOMRect(
-                                          rect.left + rect.width * 0.25,
-                                          rect.top,
-                                          rect.width * 0.5,
-                                          rect.height
-                                        )
-                                        dragContext.registerDropZone({
-                                          id: `create-folder-${instance().id}`,
-                                          rect: centerRect,
-                                          target: {
-                                            type: "createFolder",
-                                            instanceId: instance().id
-                                          }
-                                        })
-                                      } else {
-                                        dragContext.unregisterDropZone(
-                                          `before-instance-${instance().id}`
-                                        )
-                                        dragContext.unregisterDropZone(
-                                          `create-folder-${instance().id}`
-                                        )
-                                      }
-                                    })
-
-                                    onCleanup(() => {
-                                      dragContext.unregisterDropZone(
-                                        `before-instance-${instance().id}`
-                                      )
-                                      dragContext.unregisterDropZone(
-                                        `create-folder-${instance().id}`
-                                      )
-                                      tileRefs.delete(instance().id)
-                                    })
-
-                                    onMount(() => {
-                                      if (ref) {
-                                        tileRefs.set(instance().id, ref)
-                                      }
-                                    })
-
-                                    return (
-                                      <div
-                                        ref={ref}
-                                        data-instance-tile
-                                        class="relative"
-                                      >
-                                        {/* Drop indicator before this instance */}
-                                        <Show when={showDropIndicator()}>
-                                          <div class="absolute -left-2 top-0 bottom-0 w-1 bg-primary-500 rounded-full z-50">
-                                            <div class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary-500" />
-                                            <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary-500" />
-                                          </div>
-                                        </Show>
-                                        {/* Create folder indicator */}
-                                        <Show
-                                          when={showCreateFolderIndicator()}
-                                        >
-                                          <div class="absolute inset-0 border-2 border-primary-500 rounded-lg bg-primary-500/20 pointer-events-none z-40 flex items-center justify-center">
-                                            <div class="i-hugeicons:folder-add text-primary-400 text-2xl" />
-                                          </div>
-                                        </Show>
-                                        <InstanceTile
-                                          instance={instance()}
-                                          identifier={`ungrouped-${instance().id}`}
-                                          size={instancesTileSize() as any}
-                                          isMultiSelected={isSelected(
-                                            instance().id
-                                          )}
-                                          onToggleSelection={() =>
-                                            toggleSelection(instance().id)
-                                          }
-                                          isDragging={isBeingDragged()}
-                                          groupId={
-                                            defaultGroupId() ?? undefined
-                                          }
-                                          onDragStart={(e) => {
-                                            const ids = isSelected(
-                                              instance().id
-                                            )
-                                              ? Array.from(selectedIds())
-                                              : [instance().id]
-                                            dragContext.startDrag(
-                                              "instance",
-                                              ids,
-                                              e
-                                            )
-                                          }}
-                                          preventClick={() =>
-                                            dragContext.justDropped()
-                                          }
-                                        />
-                                      </div>
-                                    )
-                                  }}
-                                </Match>
-                              </Switch>
-                            </>
-                          )
-                        }}
+                        {(item, itemIndex) => (
+                          <LibraryItemTile
+                            item={item}
+                            itemIndex={itemIndex}
+                            instancesTileSize={instancesTileSize}
+                            defaultGroupId={defaultGroupId}
+                            openFolderId={openFolderId}
+                            toggleFolder={toggleFolder}
+                            isSelected={isSelected}
+                            toggleSelection={toggleSelection}
+                            selectedIds={selectedIds}
+                            onDragStart={(type, ids, e) =>
+                              dragContext.startDrag(type, ids, e)
+                            }
+                            justDropped={dragContext.justDropped}
+                            tileRefs={tileRefs}
+                            libraryItemRefs={libraryItemRefs}
+                            animatedLibraryItemIds={animatedLibraryItemIds}
+                            libraryInitialAnimationComplete={
+                              libraryInitialAnimationCompleteRef
+                            }
+                            libraryItemsLength={() => libraryItems().length}
+                          />
+                        )}
                       </For>
 
                       {/* End of main grid drop zone for instances */}
@@ -1606,6 +1594,7 @@ const HomeGridInner = () => {
                             isDefaultGroup={false}
                             selectedIds={selectedIds()}
                             onToggleSelection={toggleSelection}
+                            onSetSelection={(ids) => setSelectedIds(new Set(ids))}
                             onDragStart={(
                               instanceId,
                               isInstanceSelected,
@@ -1696,7 +1685,7 @@ const HomeGridInner = () => {
                                           0
                                         )
 
-                                    const baseDelay = 300
+                                    const baseDelay = 100
 
                                     const groupDelay =
                                       i() * 60 +
@@ -1833,9 +1822,10 @@ const HomeGridInner = () => {
                                       >
                                         {/* Drop indicator before this instance */}
                                         <Show when={showDropIndicator()}>
-                                          <div class="absolute -left-2 top-0 bottom-0 w-1 bg-primary-500 rounded-full z-50">
-                                            <div class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary-500" />
-                                            <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary-500" />
+                                          <div class="absolute -left-2.5 top-0 bottom-0 w-1.5 z-50 flex flex-col items-center">
+                                            <div class="w-3 h-3 rounded-full bg-primary-500 -mt-1.5 shadow-lg shadow-primary-500/50" />
+                                            <div class="flex-1 w-1 bg-gradient-to-b from-primary-500 via-primary-400 to-primary-500 rounded-full shadow-lg shadow-primary-500/40" />
+                                            <div class="w-3 h-3 rounded-full bg-primary-500 -mb-1.5 shadow-lg shadow-primary-500/50" />
                                           </div>
                                         </Show>
                                         <InstanceTile
@@ -1849,6 +1839,7 @@ const HomeGridInner = () => {
                                             toggleSelection(instance.id)
                                           }
                                           isDragging={isBeingDragged()}
+                                          isDragActive={dragContext.isDragging()}
                                           groupId={
                                             typeof group.id === "number"
                                               ? group.id
@@ -1956,12 +1947,26 @@ const HomeGridInner = () => {
       </Show>
       <DragGhost
         instances={globalStore.instances.data || []}
-        groups={
-          globalStore.instanceGroups.data?.map((g) => ({
-            id: g.id,
-            name: g.name
-          })) || []
-        }
+        groups={libraryItems()
+          .filter(
+            (
+              item
+            ): item is {
+              id: string
+              type: "folder"
+              data: {
+                id: number
+                name: string
+                libraryPosition: number | null
+                instances: ListInstance[]
+              }
+            } => item.type === "folder"
+          )
+          .map((item) => ({
+            id: item.data.id,
+            name: item.data.name,
+            instances: item.data.instances
+          }))}
       />
     </div>
   )

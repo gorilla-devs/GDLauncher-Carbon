@@ -230,5 +230,11 @@
   "_trn_group_name": "Group Name",
   "_trn_group_name_placeholder": "Enter group name",
   "_trn_rearrange": "Rearrange",
-  "_trn_drag_instances_to_folder": "Drag instances here to add them to this folder"
+  "_trn_drag_instances_to_folder": "Drag instances here to add them to this folder",
+  "_trn_unlink_folder": "Move instances to root and delete folder",
+  "_trn_unlink_folder_title": "Unlink Folder",
+  "_trn_unlink_folder_message": "This will move {{count}} instance(s) to the root level and delete the folder. The instances will not be deleted.",
+  "_trn_delete_folder_all": "Delete folder and all instances",
+  "_trn_delete_folder_all_title": "Delete Folder and Instances",
+  "_trn_delete_folder_all_message": "This will permanently delete the folder and all {{count}} instance(s) inside it. This action cannot be undone."
 }

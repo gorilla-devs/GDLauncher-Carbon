@@ -349,9 +349,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let deletion = self
             .gdl_account_task
             .request_deletion(auth_token)
-            .await
-            .with_context(|| format!("failed to request account deletion: {}", uuid))
-            .map_err(|e| RequestGDLAccountDeletionError::RequestFailed(e));
+            .await;
 
         self.app
             .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));

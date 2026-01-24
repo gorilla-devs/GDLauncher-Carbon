@@ -7,7 +7,7 @@ import { getInstanceImageUrl } from "@/utils/instances"
 
 interface DragGhostProps {
   instances: ListInstance[]
-  groups: { id: number; name: string }[]
+  groups: { id: number; name: string; instances: ListInstance[] }[]
 }
 
 const DragGhost = (props: DragGhostProps) => {
@@ -56,7 +56,13 @@ const DragGhost = (props: DragGhostProps) => {
           </Show>
           <Show when={dragContext.dragType() === "group"}>
             <GroupGhost
-              groups={draggedItems() as { id: number; name: string }[]}
+              groups={
+                draggedItems() as {
+                  id: number
+                  name: string
+                  instances: ListInstance[]
+                }[]
+              }
             />
           </Show>
         </div>
@@ -117,22 +123,63 @@ const InstanceGhost = (props: InstanceGhostProps) => {
 }
 
 interface GroupGhostProps {
-  groups: { id: number; name: string }[]
+  groups: { id: number; name: string; instances: ListInstance[] }[]
 }
 
 const GroupGhost = (props: GroupGhostProps) => {
   const firstGroup = () => props.groups[0]
+  const previewInstances = () => firstGroup()?.instances.slice(0, 4) || []
+  const count = () => props.groups.length
 
   return (
-    <div class="bg-darkSlate-700 rounded-lg px-4 py-2 shadow-lg opacity-90 flex items-center gap-2">
-      <div class="i-hugeicons:folder-01 h-5 w-5 text-lightSlate-400" />
-      <span class="text-lightSlate-100 font-medium text-sm truncate max-w-32">
-        {firstGroup()?.name}
-      </span>
-      <Show when={props.groups.length > 1}>
-        <span class="text-lightSlate-500 text-xs">
-          +{props.groups.length - 1}
-        </span>
+    <div class="relative">
+      {/* Stacked effect for multiple groups */}
+      <Show when={count() > 1}>
+        <div class="absolute -right-1 -bottom-1 w-16 h-16 rounded-lg bg-darkSlate-700 opacity-60" />
+        <div class="absolute -right-0.5 -bottom-0.5 w-16 h-16 rounded-lg bg-darkSlate-600 opacity-80" />
+      </Show>
+
+      {/* Main ghost - 64x64 folder tile preview */}
+      <div class="relative w-16 h-16 rounded-lg bg-darkSlate-700 shadow-lg opacity-90 overflow-hidden p-1">
+        {/* 2x2 grid of instance previews */}
+        <div class="grid grid-cols-2 grid-rows-2 gap-0.5 h-full">
+          <For each={[0, 1, 2, 3]}>
+            {(index) => {
+              const instance = () => previewInstances()[index]
+              return (
+                <div class="rounded-sm bg-darkSlate-600 overflow-hidden">
+                  <Show when={instance()}>
+                    {(inst) => (
+                      <img
+                        src={
+                          inst().icon_revision
+                            ? getInstanceImageUrl(
+                                inst().id,
+                                inst().icon_revision!
+                              )
+                            : DefaultImg
+                        }
+                        alt=""
+                        class="w-full h-full object-cover"
+                      />
+                    )}
+                  </Show>
+                </div>
+              )
+            }}
+          </For>
+        </div>
+        {/* Folder icon overlay in corner */}
+        <div class="absolute bottom-0.5 right-0.5">
+          <div class="i-hugeicons:folder-01 text-xs text-primary-400" />
+        </div>
+      </div>
+
+      {/* Count badge (top-right) */}
+      <Show when={count() > 1}>
+        <div class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md">
+          {count()}
+        </div>
       </Show>
     </div>
   )

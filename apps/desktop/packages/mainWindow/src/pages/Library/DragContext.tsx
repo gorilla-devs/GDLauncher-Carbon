@@ -18,6 +18,9 @@ export type DropTarget =
   | { type: "dropOnFolder"; groupId: number }        // Drop on collapsed folder
   | { type: "createFolder"; instanceId: number }     // Drop on ungrouped instance to create folder
   | { type: "ungrouped" }                            // Return to default group (main grid)
+  | { type: "beforeGroupAtInstance"; beforeInstanceId: number }  // Position group before an ungrouped instance
+  | { type: "endOfLibrary" }                         // Position group at end of library
+  | { type: "beforeInstanceAtFolder"; folderId: number }  // Position instance before a folder
 
 export interface DraggedItem {
   type: DragType
@@ -115,10 +118,13 @@ export function DragProvider(props: { children: JSX.Element }) {
         favorites: 0,
         createFolder: 1,      // Higher priority than beforeInstance (center of tile)
         beforeInstance: 2,
+        beforeGroupAtInstance: 2.5,  // Same band as beforeInstance for groups
+        beforeInstanceAtFolder: 2.5, // Same band for instances before folders
         dropOnFolder: 3,
         endOfGroup: 4,
         beforeGroup: 5,
-        endOfGroups: 6,
+        endOfGroups: 5.5,
+        endOfLibrary: 5.5,
         ungrouped: 7
       }
       return priority[a.target.type] - priority[b.target.type]

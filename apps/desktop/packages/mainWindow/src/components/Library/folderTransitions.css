@@ -1,41 +1,23 @@
 /**
  * View Transition API styles for folder open/close animations
  *
- * Syncs the folder container and instance preview animations
- * to use the same duration and easing for a cohesive effect.
+ * Folder tile container animation. Instance preview animations
+ * are dynamically injected via injectFolderTransitionCSS() to
+ * support any number of instances.
  */
 
-/* Shared animation timing for all folder-related transitions */
-::view-transition-group(folder-tile),
-::view-transition-group(folder-preview-0),
-::view-transition-group(folder-preview-1),
-::view-transition-group(folder-preview-2),
-::view-transition-group(folder-preview-3) {
+/* Folder tile container animation */
+::view-transition-group(folder-tile) {
   animation-duration: 300ms;
   animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* Sync old/new image animations */
 ::view-transition-old(folder-tile),
-::view-transition-new(folder-tile),
-::view-transition-old(folder-preview-0),
-::view-transition-new(folder-preview-0),
-::view-transition-old(folder-preview-1),
-::view-transition-new(folder-preview-1),
-::view-transition-old(folder-preview-2),
-::view-transition-new(folder-preview-2),
-::view-transition-old(folder-preview-3),
-::view-transition-new(folder-preview-3) {
+::view-transition-new(folder-tile) {
   animation-duration: 300ms;
   animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   mix-blend-mode: normal;
-}
-
-/* Force snapshots to fill the animating group container.
- * Default height: auto preserves aspect ratio, which causes
- * the rectangle snapshot to not morph during close animation. */
-::view-transition-old(folder-tile),
-::view-transition-new(folder-tile) {
   height: 100%;
+  z-index: 1;
 }
 

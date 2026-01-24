@@ -46,10 +46,22 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
                 throw new Error("No active gdl account")
               }
 
-              await requestAccountDeletionMutation.mutateAsync(uuid)
-              toast.success("Deletion Request Sent", {
-                description: "Check your email"
-              })
+              const result = await requestAccountDeletionMutation.mutateAsync(uuid)
+              if (result === "success") {
+                toast.success("Deletion Request Sent", {
+                  description: "Check your email"
+                })
+              } else if (result.failed.cooldown !== null) {
+                toast.error("Too Many Requests", {
+                  description: `Please try again in ${result.failed.cooldown} seconds`
+                })
+              } else {
+                toast.error("Request Failed", {
+                  description:
+                    result.failed.message ??
+                    "Unable to process deletion request. Please try again later."
+                })
+              }
 
               modalsContext?.closeModal()
             }}

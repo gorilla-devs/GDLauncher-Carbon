@@ -603,10 +603,16 @@ impl From<Result<(), RequestNewEmailChangeError>> for FERequestNewEmailChangeSta
 
 #[derive(Type, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FERequestDeletionFailed {
+    pub cooldown: Option<u32>,
+    pub message: Option<String>,
+}
 
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FERequestDeletionStatus {
     Success,
-    Failed(Option<u32>),
+    Failed(FERequestDeletionFailed),
 }
 
 impl From<Result<(), RequestGDLAccountDeletionError>> for FERequestDeletionStatus {
@@ -614,9 +620,23 @@ impl From<Result<(), RequestGDLAccountDeletionError>> for FERequestDeletionStatu
         match value {
             Ok(_) => Self::Success,
             Err(RequestGDLAccountDeletionError::TooManyRequests(cooldown)) => {
-                Self::Failed(Some(cooldown))
+                Self::Failed(FERequestDeletionFailed {
+                    cooldown: Some(cooldown),
+                    message: None,
+                })
             }
-            Err(RequestGDLAccountDeletionError::RequestFailed(_)) => Self::Failed(None),
+            Err(RequestGDLAccountDeletionError::ServerError(msg)) => {
+                Self::Failed(FERequestDeletionFailed {
+                    cooldown: None,
+                    message: Some(msg),
+                })
+            }
+            Err(RequestGDLAccountDeletionError::RequestFailed(_)) => {
+                Self::Failed(FERequestDeletionFailed {
+                    cooldown: None,
+                    message: None,
+                })
+            }
         }
     }
 }

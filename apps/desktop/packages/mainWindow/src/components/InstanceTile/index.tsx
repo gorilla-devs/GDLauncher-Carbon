@@ -36,6 +36,7 @@ const InstanceTile = (props: {
   onToggleSelection?: () => void
   onDragStart?: (e: PointerEvent) => void
   isDragging?: boolean
+  isDragActive?: boolean
   groupId?: number
   preventClick?: () => boolean
 }) => {
@@ -195,6 +196,7 @@ const InstanceTile = (props: {
       onToggleSelection={props.onToggleSelection}
       onDragStart={props.onDragStart}
       isDragging={props.isDragging}
+      isDragActive={props.isDragActive}
     />
   )
 }

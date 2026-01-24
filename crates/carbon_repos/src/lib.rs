@@ -84,6 +84,10 @@ pub fn get_migrations() -> (Migrations<'static>, i32) {
             env!("CARGO_MANIFEST_DIR"),
             "/prisma/migrations/20260120212303_add_gdl_token/migration.sql"
         ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20260122000000_add_library_position/migration.sql"
+        ))),
     ];
     let count = migration_list.len() as i32;
     (Migrations::new(migration_list), count)
