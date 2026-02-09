@@ -373,7 +373,7 @@ const Tile = (props: Props) => {
             <div
               class={`group relative flex select-none flex-col items-center justify-center ${PRESS_CLASSES_LIGHT}`}
               classList={{
-                "opacity-50 scale-95": props.isDragging,
+                "opacity-0": props.isDragging,
                 "cursor-grab": !isLoading() && !isInQueue() && !props.isDeleting && !props.instance.locked
               }}
               onClick={(e) => {
@@ -723,7 +723,7 @@ const Tile = (props: Props) => {
                             isLoading() || isInQueue() || props.isDeleting
                         }}
                       >
-                        <h4 class="m-0 text-sm font-semibold text-white truncate">
+                        <h4 class="m-0 text-left text-sm font-semibold text-white truncate">
                           {props.instance.name}
                         </h4>
                         <div class="flex items-center gap-2 text-xs text-white/70">

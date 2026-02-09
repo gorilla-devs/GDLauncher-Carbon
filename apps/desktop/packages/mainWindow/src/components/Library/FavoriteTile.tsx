@@ -1,5 +1,6 @@
 import { createMemo, Show } from "solid-js"
-import { Trans, useTransContext } from "@gd/i18n"
+import type { ValidListInstance } from "@gd/core_module/bindings"
+import { Trans, useTransContext, TypedTFunction } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
@@ -30,9 +31,12 @@ import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/
 import useSearchContext from "@/components/SearchInputContext"
 import GdlFeatureContextMenuItem from "@/components/GdlFeatureContextMenuItem"
 
-// Helper function to format relative time
-function formatRelativeTime(dateString: string | null | undefined): string {
-  if (!dateString) return "Never played"
+// Helper function to format relative time using translations
+function formatRelativeTime(
+  t: TypedTFunction,
+  dateString: string | null | undefined
+): string {
+  if (!dateString) return t("instances:_trn_never_played")
 
   const date = new Date(dateString)
   const now = new Date()
@@ -44,25 +48,33 @@ function formatRelativeTime(dateString: string | null | undefined): string {
   const diffWeeks = Math.floor(diffDays / 7)
   const diffMonths = Math.floor(diffDays / 30)
 
-  if (diffMinutes < 1) return "Just now"
-  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`
-  if (diffDays === 1) return "Yesterday"
-  if (diffDays < 7) return `${diffDays} days ago`
-  if (diffWeeks < 4) return `${diffWeeks} week${diffWeeks > 1 ? "s" : ""} ago`
-  if (diffMonths < 12) return `${diffMonths} month${diffMonths > 1 ? "s" : ""} ago`
+  if (diffMinutes < 1) return t("instances:_trn_just_now")
+  if (diffMinutes < 60)
+    return t("instances:_trn_minutes_ago", { count: diffMinutes })
+  if (diffHours < 24) return t("instances:_trn_hours_ago", { count: diffHours })
+  if (diffDays === 1) return t("instances:_trn_yesterday")
+  if (diffDays < 7) return t("instances:_trn_days_ago", { count: diffDays })
+  if (diffWeeks < 4) return t("instances:_trn_weeks_ago", { count: diffWeeks })
+  if (diffMonths < 12)
+    return t("instances:_trn_months_ago", { count: diffMonths })
 
   return date.toLocaleDateString()
 }
 
-// Helper function to format playtime
-function formatPlaytime(seconds: number | null | undefined): string {
-  if (!seconds || seconds === 0) return "No playtime"
+// Helper function to format playtime using translations
+function formatPlaytime(
+  t: TypedTFunction,
+  seconds: number | null | undefined
+): string {
+  if (!seconds || seconds === 0) return t("instances:_trn_no_playtime")
 
   const hours = seconds / 3600
-  if (hours < 1) return "< 1 hour played"
-  if (hours < 10) return `${hours.toFixed(1)} hours played`
-  return `${Math.round(hours)} hours played`
+  if (hours < 1) return t("instances:_trn_less_than_hour")
+  if (hours < 10)
+    return t("instances:_trn_hours_played", {
+      count: Math.round(hours * 10) / 10
+    })
+  return t("instances:_trn_hours_played", { count: Math.round(hours) })
 }
 
 interface FavoriteTileProps {
@@ -85,19 +97,26 @@ const FavoriteTile = (props: FavoriteTileProps) => {
     )
   )
 
-  const validInstance = () =>
-    instance()?.status.status === "valid" ? instance()?.status.value : undefined
+  const validInstance = (): ValidListInstance | undefined =>
+    instance()?.status.status === "valid"
+      ? (instance()?.status.value as ValidListInstance)
+      : undefined
 
   const modloader = createMemo(() => validInstance()?.modloader)
   const mcVersion = createMemo(() => validInstance()?.mc_version)
-  const lastPlayed = createMemo(() => formatRelativeTime(instance()?.last_played))
-  const playtime = createMemo(() => formatPlaytime(instance()?.seconds_played))
-
-  const instanceImageUrl = createMemo(() =>
-    instance()?.icon_revision
-      ? getInstanceImageUrl(props.instanceId, instance()!.icon_revision)
-      : undefined
+  const lastPlayed = createMemo(() =>
+    formatRelativeTime(t, instance()?.last_played)
   )
+  const playtime = createMemo(() =>
+    formatPlaytime(t, instance()?.seconds_played)
+  )
+
+  const instanceImageUrl = createMemo(() => {
+    const inst = instance()
+    return inst?.icon_revision
+      ? getInstanceImageUrl(props.instanceId, inst.icon_revision)
+      : undefined
+  })
 
   // Mutations
   const launchInstanceMutation = rspc.createMutation(() => ({
@@ -120,28 +139,13 @@ const FavoriteTile = (props: FavoriteTileProps) => {
     mutationKey: ["instance.setFavorite"]
   }))
 
-  // Check states
-  const isRunning = createMemo(() => {
-    const state = validInstance()?.state
-    return state?.state === "running"
-  })
-
-  const isQueued = createMemo(() => {
-    const state = validInstance()?.state
-    return state?.state === "inactive" && state.value?.task !== undefined
-  })
-
-  const isPreparing = createMemo(() => {
-    const state = validInstance()?.state
-    return state?.state === "preparing"
-  })
-
-  const isLoading = createMemo(() => isQueued() || isPreparing())
-
-  const isDeleting = createMemo(() => {
-    const state = validInstance()?.state
-    return state?.state === "deleting"
-  })
+  // Check states - single memo to cache state access, simple functions for checks
+  const instanceState = createMemo(() => validInstance()?.state?.state)
+  const isRunning = () => instanceState() === "running"
+  const isQueued = () => instanceState() === "queued"
+  const isPreparing = () => instanceState() === "preparing"
+  const isDeleting = () => instanceState() === "deleting"
+  const isLoading = () => isQueued() || isPreparing()
 
   // Handlers
   const handleClick = () => {
@@ -374,7 +378,9 @@ const FavoriteTile = (props: FavoriteTileProps) => {
               "ring-2 ring-green-500": isRunning()
             }}
             onClick={handleClick}
-            onMouseEnter={() => globalStore.markInstanceAsSeen(props.instanceId)}
+            onMouseEnter={() =>
+              globalStore.markInstanceAsSeen(props.instanceId)
+            }
           >
             {/* Full background image */}
             <div

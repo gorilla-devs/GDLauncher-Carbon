@@ -8,14 +8,14 @@ function AccountBanned(props: ModalProps) {
   const modalsContext = useModal()
 
   const unlinkMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.unlinkGdlAccount"]
+    mutationKey: ["account.removeGdlAccount"]
   }))
 
   const handleClose = async () => {
     try {
       await unlinkMutation.mutateAsync(undefined)
-    } catch {
-      // Ignore errors - user is already banned
+    } catch (e) {
+      console.debug("Expected error during account unlink (user banned):", e)
     }
     modalsContext?.closeModal()
   }
@@ -33,7 +33,7 @@ function AccountBanned(props: ModalProps) {
           </p>
         </div>
         <Button type="primary" size="large" onClick={handleClose}>
-          <Trans key="common:ok" />
+          <Trans key="general:_trn_ok" />
         </Button>
       </div>
     </ModalLayout>

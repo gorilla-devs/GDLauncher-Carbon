@@ -58,13 +58,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .collect::<Vec<_>>())
         }
 
-        mutation CREATE_GROUP[app, name: String] {
-            app.instance_manager()
-                .create_group(name)
-                .await
-                .map(FEGroupId::from)
-        }
-
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
             if details.name.is_empty() {
                 return Err(anyhow::anyhow!("instance name cannot be empty"));
@@ -164,21 +157,22 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation CREATE_FOLDER_FROM_INSTANCES[app, data: CreateFolderFromInstances] {
             app.instance_manager()
                 .create_folder_from_instances(
-                    data.instances.into_iter().map(|id| id.into()).collect()
+                    data.instances.into_iter().map(|id| id.into()).collect(),
+                    data.target_instance_id.map(|id| id.into()),
                 )
                 .await
                 .map(FEGroupId::from)
         }
 
-        mutation SORT_LIBRARY[app, sort_by: LibrarySortCriteria] {
+        mutation ARRANGE_LIBRARY[app, sort_by: LibrarySortCriteria] {
             app.instance_manager()
-                .sort_library(sort_by.into())
+                .arrange_library(sort_by.into())
                 .await
         }
 
-        mutation SORT_GROUP[app, data: SortGroup] {
+        mutation ARRANGE_GROUP[app, data: ArrangeGroup] {
             app.instance_manager()
-                .sort_group(data.group.into(), data.sort_by.into())
+                .arrange_group(data.group.into(), data.sort_by.into())
                 .await
         }
 
@@ -1122,8 +1116,11 @@ struct MoveGroup {
 }
 
 #[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct CreateFolderFromInstances {
     instances: Vec<FEInstanceId>,
+    #[specta(optional)]
+    target_instance_id: Option<FEInstanceId>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -1148,7 +1145,7 @@ impl From<LibrarySortCriteria> for manager::LibrarySortCriteria {
 
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct SortGroup {
+struct ArrangeGroup {
     group: FEGroupId,
     sort_by: LibrarySortCriteria,
 }

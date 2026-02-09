@@ -96,7 +96,6 @@ keys! {
         DEFAULT_GROUP                               = "getDefaultGroup";
         GET_GROUPS                                  = "getGroups";
         GET_ALL_INSTANCES                           = "getAllInstances";
-        CREATE_GROUP                                = "createGroup";
         CREATE_INSTANCE                             = "createInstance";
         CHANGE_MODPACK                              = "changeModpack";
         LOAD_ICON_URL                               = "loadIconUrl";
@@ -107,8 +106,8 @@ keys! {
         MOVE_GROUP                                  = "moveGroup";
         MOVE_INSTANCE                               = "moveInstance";
         CREATE_FOLDER_FROM_INSTANCES                = "createFolderFromInstances";
-        SORT_LIBRARY                                = "sortLibrary";
-        SORT_GROUP                                  = "sortGroup";
+        ARRANGE_LIBRARY                             = "arrangeLibrary";
+        ARRANGE_GROUP                               = "arrangeGroup";
         DUPLICATE_INSTANCE                          = "duplicateInstance";
         UPDATE_INSTANCE                             = "updateInstance";
         SET_FAVORITE                                = "setFavorite";

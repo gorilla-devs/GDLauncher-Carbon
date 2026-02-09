@@ -1,0 +1,236 @@
+/**
+ * useLibraryDragDrop Hook
+ *
+ * Manages drag-drop mutations for library items.
+ * Integrates with FLIP animations and selection state.
+ */
+
+import { Accessor, createSignal, batch } from "solid-js"
+import { rspc } from "@/utils/rspcClient"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { DropTarget, DragType } from "../DragContext"
+import { SelectionState, FLIPAnimation, LibraryItem } from "../types"
+
+interface UseLibraryDragDropOptions {
+  /** Default group ID for ungrouped instances */
+  defaultGroupId: Accessor<number | null>
+  /** Selection state for multi-select drag */
+  selection: SelectionState
+  /** FLIP animation hook for capturing positions */
+  flipAnimation: FLIPAnimation
+  /** Current library items for order snapshot */
+  libraryItems: LibraryItem[]
+  /** Callback to disable auto-animate during FLIP */
+  onBeforeDrop?: () => void
+  /** Callback when drop completes */
+  onAfterDrop?: () => void
+}
+
+/**
+ * Hook for handling library drag-drop operations.
+ */
+export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
+  const globalStore = useGlobalStore()
+
+  // Track newly created folder for spring animation
+  const [newlyCreatedFolderId, setNewlyCreatedFolderId] = createSignal<number | null>(null)
+
+  // Create all mutations
+  const moveInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.moveInstance"]
+  }))
+
+  const setFavoriteMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.setFavorite"]
+  }))
+
+  const moveGroupMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.moveGroup"]
+  }))
+
+  const createFolderFromInstancesMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.createFolderFromInstances"],
+    onSuccess: (groupId: number) => setNewlyCreatedFolderId(groupId)
+  }))
+
+  const arrangeLibraryMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.arrangeLibrary"]
+  }))
+
+  /**
+   * Handle instance drop events.
+   * Mutations are batched to trigger a single reconciliation pass.
+   */
+  const handleInstanceDrop = (target: DropTarget, draggedIds: number[]): void => {
+    const _defaultGroupId = options.defaultGroupId()
+
+    batch(() => {
+      switch (target.type) {
+        case "favorites": {
+          // Toggle favorite status for all dragged instances
+          const draggedInstances = (globalStore.instances.data || []).filter(
+            (i) => draggedIds.includes(i.id)
+          )
+          const allAreFavorite = draggedInstances.every((i) => i.favorite)
+          const newFavoriteStatus = !allAreFavorite
+
+          for (const id of draggedIds) {
+            setFavoriteMutation.mutate({
+              instance: id,
+              favorite: newFavoriteStatus
+            })
+          }
+          break
+        }
+
+        case "beforeInstance": {
+          // Move instances before target instance
+          for (const id of draggedIds) {
+            if (id !== target.instanceId) {
+              moveInstanceMutation.mutate({
+                instance: id,
+                target: { BeforeInstance: target.instanceId }
+              })
+            }
+          }
+          break
+        }
+
+        case "endOfGroup": {
+          // Move instances to end of group
+          for (const id of draggedIds) {
+            moveInstanceMutation.mutate({
+              instance: id,
+              target: { EndOfGroup: target.groupId }
+            })
+          }
+          break
+        }
+
+        case "dropOnFolder": {
+          // Move instances into folder (group)
+          for (const id of draggedIds) {
+            moveInstanceMutation.mutate({
+              instance: id,
+              target: { EndOfGroup: target.groupId }
+            })
+          }
+          break
+        }
+
+        case "createFolder": {
+          // Create new folder with the target instance and all dragged instances
+          const allInstanceIds = [
+            target.instanceId,
+            ...draggedIds.filter((id) => id !== target.instanceId)
+          ]
+          createFolderFromInstancesMutation.mutate({
+            instances: allInstanceIds,
+            targetInstanceId: target.instanceId
+          })
+          break
+        }
+
+        case "ungrouped": {
+          // Move instances back to default group
+          if (_defaultGroupId) {
+            for (const id of draggedIds) {
+              moveInstanceMutation.mutate({
+                instance: id,
+                target: { EndOfGroup: _defaultGroupId }
+              })
+            }
+          }
+          break
+        }
+
+        case "beforeInstanceAtFolder": {
+          // Move instances to default group, positioned before the folder
+          for (const id of draggedIds) {
+            moveInstanceMutation.mutate({
+              instance: id,
+              target: { BeforeGroup: target.folderId }
+            })
+          }
+          break
+        }
+      }
+
+      // Clear selection after drop
+      options.selection.clearSelection()
+    })
+  }
+
+  /**
+   * Handle group drop events.
+   */
+  const handleGroupDrop = (target: DropTarget, groupId: number): void => {
+    switch (target.type) {
+      case "beforeGroup": {
+        // Move group before target group
+        if (groupId !== target.groupId) {
+          moveGroupMutation.mutate({
+            group: groupId,
+            target: { BeforeGroup: target.groupId }
+          })
+        }
+        break
+      }
+
+      case "beforeGroupAtInstance": {
+        // Move group before an ungrouped instance
+        moveGroupMutation.mutate({
+          group: groupId,
+          target: { BeforeInstance: target.beforeInstanceId }
+        })
+        break
+      }
+
+      case "endOfGroups":
+      case "endOfLibrary": {
+        // Move group to end of library
+        moveGroupMutation.mutate({
+          group: groupId,
+          target: "EndOfLibrary"
+        })
+        break
+      }
+    }
+  }
+
+  /**
+   * Main drop handler.
+   */
+  const handleDrop = (target: DropTarget, draggedIds: number[], dragType: DragType): void => {
+    if (!target || draggedIds.length === 0) return
+
+    // Capture positions and order BEFORE mutation for FLIP animation
+    options.flipAnimation.capturePositions(
+      options.libraryItems.map((item) => item.id)
+    )
+
+    // Notify parent to disable auto-animate
+    options.onBeforeDrop?.()
+
+    if (dragType === "instance") {
+      handleInstanceDrop(target, draggedIds)
+    } else if (dragType === "group") {
+      handleGroupDrop(target, draggedIds[0])
+    }
+
+    options.onAfterDrop?.()
+  }
+
+  return {
+    handleDrop,
+    newlyCreatedFolderId,
+    clearNewlyCreatedFolderId: () => setNewlyCreatedFolderId(null),
+    mutations: {
+      moveInstance: moveInstanceMutation,
+      setFavorite: setFavoriteMutation,
+      moveGroup: moveGroupMutation,
+      createFolder: createFolderFromInstancesMutation,
+      arrangeLibrary: arrangeLibraryMutation
+    }
+  }
+}

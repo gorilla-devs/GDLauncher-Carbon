@@ -1196,6 +1196,66 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(GroupId(group.id))
     }
 
+    /// Create a group at a specific library position, shifting existing items to make room.
+    pub async fn create_group_at_position(
+        self,
+        name: String,
+        target_position: i32,
+    ) -> anyhow::Result<GroupId> {
+        use db::instance_group::WhereParam;
+        let index = self.next_group_index().await?;
+
+        let default_group_id = self.get_default_group().await?;
+
+        // Shift all items (groups and ungrouped instances) with library_position >= target_position up by 1
+        self.app
+            .prisma_client
+            .instance()
+            .update_many(
+                vec![
+                    db::instance::WhereParam::GroupId(IntFilter::Equals(*default_group_id)),
+                    db::instance::WhereParam::LibraryPosition(
+                        db::read_filters::IntNullableFilter::Gte(target_position),
+                    ),
+                ],
+                vec![db::instance::SetParam::IncrementLibraryPosition(1)],
+            )
+            .exec()
+            .await?;
+
+        self.app
+            .prisma_client
+            .instance_group()
+            .update_many(
+                vec![WhereParam::LibraryPosition(
+                    db::read_filters::IntNullableFilter::Gte(target_position),
+                )],
+                vec![db::instance_group::SetParam::IncrementLibraryPosition(1)],
+            )
+            .exec()
+            .await?;
+
+        // Create the group at the target position
+        let group = self
+            .app
+            .prisma_client
+            .instance_group()
+            .create(
+                name,
+                index.value,
+                vec![db::instance_group::SetParam::SetLibraryPosition(Some(
+                    target_position,
+                ))],
+            )
+            .exec()
+            .await?;
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
+
+        Ok(GroupId(group.id))
+    }
+
     pub async fn rename_group(self, group: GroupId, name: String) -> anyhow::Result<()> {
         use db::instance_group::{SetParam, UniqueWhereParam};
 
@@ -1257,9 +1317,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     /// Create a new folder (group) from a list of instances.
     /// The folder is named "New Folder" by default, with (1), (2), etc. appended if needed.
+    /// If target_instance_id is provided and is at the library root, the folder is created
+    /// at that instance's position instead of at the end.
     pub async fn create_folder_from_instances(
         self,
         instance_ids: Vec<InstanceId>,
+        target_instance_id: Option<InstanceId>,
     ) -> anyhow::Result<GroupId> {
         if instance_ids.is_empty() {
             bail!("Cannot create folder from empty list of instances");
@@ -1268,8 +1331,30 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // Generate a unique folder name
         let folder_name = self.generate_unique_folder_name("New Folder").await?;
 
-        // Create a new group with the unique name
-        let group_id = self.create_group(folder_name).await?;
+        // Determine the target library position if target instance is at library root
+        let target_library_pos = if let Some(target_id) = target_instance_id {
+            let default_group_id = self.get_default_group().await?;
+            let target_instance = self
+                .app
+                .prisma_client
+                .instance()
+                .find_unique(db::instance::UniqueWhereParam::IdEquals(*target_id))
+                .exec()
+                .await?;
+
+            // Only use position if instance exists, is in default group, and has a library_position
+            target_instance
+                .filter(|i| i.group_id == *default_group_id)
+                .and_then(|i| i.library_position)
+        } else {
+            None
+        };
+
+        // Create group at target position or at end
+        let group_id = match target_library_pos {
+            Some(pos) => self.create_group_at_position(folder_name, pos).await?,
+            None => self.create_group(folder_name).await?,
+        };
 
         // Move all instances to the new group
         for instance_id in instance_ids {
@@ -1280,9 +1365,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(group_id)
     }
 
-    /// Sort all ungrouped instances (in default group) and folders by the given criteria.
-    /// This is a one-off sort that reassigns indices.
-    pub async fn sort_library(self, sort_by: LibrarySortCriteria) -> anyhow::Result<()> {
+    /// Arrange all ungrouped instances (in default group) and folders by the given criteria.
+    /// This is a one-off arrange operation that reassigns library positions.
+    /// Used in folders mode only (instancesGroupBy = null).
+    pub async fn arrange_library(self, sort_by: LibrarySortCriteria) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam, WhereParam};
         use db::instance_group::{SetParam as GroupSetParam, UniqueWhereParam as GroupUniqueWhereParam};
 
@@ -1406,9 +1492,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    /// Sort all instances within a specific group by the given criteria.
-    /// This is a one-off sort that reassigns indices within the group.
-    pub async fn sort_group(self, group_id: GroupId, sort_by: LibrarySortCriteria) -> anyhow::Result<()> {
+    /// Arrange all instances within a specific folder by the given criteria.
+    /// This is a one-off arrange operation that reassigns indices within the folder.
+    /// Used in folders mode only (instancesGroupBy = null).
+    pub async fn arrange_group(self, group_id: GroupId, sort_by: LibrarySortCriteria) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam, WhereParam};
 
         // Lock indexes while we're changing them
@@ -1552,7 +1639,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 self.app
                     .prisma_client
                     .instance()
-                    .delete_many(vec![WhereParam::Shortpath(StringFilter::Contains(
+                    .delete_many(vec![WhereParam::Shortpath(StringFilter::Equals(
                         shortpath.clone(),
                     ))]),
                 self.app.prisma_client.instance().create(
@@ -3004,8 +3091,8 @@ mod test {
     use crate::{
         domain::instance::{InstanceSettingsUpdate, info},
         managers::instance::{
-            GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance, ListInstanceStatus,
-            ValidListInstance,
+            GroupId, GroupMoveTarget, InstanceId, InstanceMoveTarget, ListGroup, ListInstance,
+            ListInstanceStatus, ValidListInstance,
         },
     };
 
@@ -3049,7 +3136,7 @@ mod test {
 
         // move 1 to 1 (do nothing)
         app.instance_manager()
-            .move_group(groups[1], Some(groups[1]))
+            .move_group(groups[1], GroupMoveTarget::BeforeGroup(groups[1]))
             .await?;
         assert_eq!(
             groups[..],
@@ -3058,7 +3145,7 @@ mod test {
 
         // move 1 to 3 as if dragged
         app.instance_manager()
-            .move_group(groups[1], Some(groups[3]))
+            .move_group(groups[1], GroupMoveTarget::BeforeGroup(groups[3]))
             .await?;
         groups = [groups[0], groups[2], groups[1], groups[3], groups[4]];
         assert_eq!(
@@ -3068,7 +3155,7 @@ mod test {
 
         // move 3 back to 1
         app.instance_manager()
-            .move_group(groups[3], Some(groups[1]))
+            .move_group(groups[3], GroupMoveTarget::BeforeGroup(groups[1]))
             .await?;
         groups = [groups[0], groups[3], groups[1], groups[2], groups[4]];
         assert_eq!(
@@ -3077,7 +3164,9 @@ mod test {
         );
 
         // move 1 to end of list
-        app.instance_manager().move_group(groups[1], None).await?;
+        app.instance_manager()
+            .move_group(groups[1], GroupMoveTarget::EndOfLibrary)
+            .await?;
         groups = [groups[0], groups[2], groups[3], groups[4], groups[1]];
         assert_eq!(
             groups[..],
@@ -3086,7 +3175,7 @@ mod test {
 
         // move 4 to beginning of list
         app.instance_manager()
-            .move_group(groups[4], Some(groups[0]))
+            .move_group(groups[4], GroupMoveTarget::BeforeGroup(groups[0]))
             .await?;
         groups = [groups[4], groups[0], groups[1], groups[2], groups[3]];
         assert_eq!(

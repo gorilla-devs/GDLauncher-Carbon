@@ -21,10 +21,11 @@ model AppConfiguration {
   concurrentDownloads             Int      @default(10)
   downloadDependencies            Boolean  @default(true)
   instancesTileSize               Int      @default(2) // 1-5
-  instancesGroupBy                String   @default("group")
+  instancesGroupBy                String?  // null = folders mode (manual drag-drop)
   instancesGroupByAsc             Boolean  @default(true)
-  instancesSortBy                 String   @default("created")
+  instancesSortBy                 String?  // null = manual order (uses libraryPosition)
   instancesSortByAsc              Boolean  @default(false)
+  instancesDuplicateFavorites     Boolean  @default(true) // Show favorites in both favorites section AND their folder/group
   showFeatured                    Boolean  @default(true)
   // Other settings
   deletionThroughRecycleBin       Boolean  @default(true)

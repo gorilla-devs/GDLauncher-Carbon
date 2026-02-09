@@ -22,7 +22,7 @@ const SelectionBorder = (props: SelectionBorderProps) => {
       const timer = setTimeout(() => {
         setIsVisible(false)
         setIsExiting(false)
-      }, 250) // Match undraw animation duration
+      }, 100) // Match undraw animation duration
       onCleanup(() => clearTimeout(timer))
     }
   })

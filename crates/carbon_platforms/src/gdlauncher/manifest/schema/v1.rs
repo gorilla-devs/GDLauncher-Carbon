@@ -199,7 +199,10 @@ mod tests {
                         sha1: "uvw012".to_string(),
                         murmur2: 987654321,
                     }],
-                    override_paths: vec!["config/iris".to_string(), "shaderpacks/default".to_string()],
+                    override_paths: vec![
+                        "config/iris".to_string(),
+                        "shaderpacks/default".to_string(),
+                    ],
                 }),
                 // Optional feature with just overrides
                 PackFile::Optional(OptionalFeature {

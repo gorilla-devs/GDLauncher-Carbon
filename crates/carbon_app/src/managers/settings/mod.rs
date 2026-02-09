@@ -135,11 +135,13 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
+        // instances_sort_by: Option<Option<InstancesSortBy>>
+        // Outer Option = whether to update, Inner Option = null (manual order) or Some(sort criteria)
         if let Some(sort_by) = incoming_settings.instances_sort_by {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::instances_sort_by::set(
-                    sort_by.inner().into(),
+                    sort_by.inner().map(Into::into),
                 )],
             ));
         }
@@ -153,11 +155,13 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
+        // instances_group_by: Option<Option<InstancesGroupBy>>
+        // Outer Option = whether to update, Inner Option = null (folders mode) or Some(group criteria)
         if let Some(instances_group_by) = incoming_settings.instances_group_by {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::instances_group_by::set(
-                    instances_group_by.inner().into(),
+                    instances_group_by.inner().map(Into::into),
                 )],
             ));
         }
@@ -167,6 +171,16 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::instances_group_by_asc::set(
                     instances_group_by_asc.inner(),
+                )],
+            ));
+        }
+
+        if let Some(instances_duplicate_favorites) = incoming_settings.instances_duplicate_favorites
+        {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::instances_duplicate_favorites::set(
+                    instances_duplicate_favorites.inner(),
                 )],
             ));
         }

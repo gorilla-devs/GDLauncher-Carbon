@@ -17,8 +17,8 @@ export interface SelectionRect {
 
 interface UseDragSelectOptions {
   containerRef: () => HTMLElement | undefined
-  onSelectionChange: (selectedIds: number[]) => void
-  getItemRects: () => Map<number, DOMRect>
+  onSelectionChange: (selectedIds: string[]) => void
+  getItemRects: () => Map<string, DOMRect>
   minDragDistance?: number
 }
 
@@ -48,9 +48,9 @@ export function useDragSelect(options: UseDragSelectOptions) {
     )
   }
 
-  const getSelectedIds = (rect: SelectionRect): number[] => {
+  const getSelectedIds = (rect: SelectionRect): string[] => {
     const itemRects = options.getItemRects()
-    const selected: number[] = []
+    const selected: string[] = []
 
     itemRects.forEach((itemRect, id) => {
       if (rectsIntersect(rect, itemRect)) {

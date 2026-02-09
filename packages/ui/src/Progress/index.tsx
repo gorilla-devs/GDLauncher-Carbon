@@ -6,7 +6,7 @@ interface Props {
   max?: number
   indeterminate?: boolean
   color?: string
-  barStyle?: { [key: string]: string }
+  barStyle?: Record<string, string>
   size?: "small" | "medium" | "large"
   variant?: "rounded" | "square"
 }

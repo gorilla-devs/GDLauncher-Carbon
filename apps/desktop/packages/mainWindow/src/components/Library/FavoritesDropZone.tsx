@@ -37,6 +37,7 @@ const FavoritesDropZone = (props: FavoritesDropZoneProps) => {
       dragContext.registerDropZone({
         id: "favorites-drop-zone",
         rect,
+        element: container,
         target: { type: "favorites" }
       })
     } else {

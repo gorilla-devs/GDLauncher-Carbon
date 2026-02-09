@@ -2,26 +2,20 @@ import {
   For,
   Show,
   createEffect,
+  createMemo,
   createSignal,
   onCleanup,
   onMount
 } from "solid-js"
+import { createAutoAnimate } from "@formkit/auto-animate/solid"
 import { Portal } from "solid-js/web"
 import {
-  Button,
-  Input,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  ContextMenuTrigger
 } from "@gd/ui"
-import { Trans, useTransContext } from "@gd/i18n"
+import { Trans } from "@gd/i18n"
 import { ListInstance } from "@gd/core_module/bindings"
 import InstanceTile from "@/components/InstanceTile"
 import { useDragContext } from "@/pages/Library/DragContext"
@@ -35,19 +29,23 @@ import {
   setVisibleFolderIndices,
   injectFolderTransitionCSS,
   removeFolderTransitionCSS
-} from "../FolderTile"
+} from "@/pages/Library/utils/folderViewTransition"
+import { TILE_SIZES } from "@/pages/Library/constants"
 import { getInstanceImageUrl } from "@/utils/instances"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
+import { EndOfGroupDropZone } from "@/pages/Library/components/EndOfGroupDropZone"
+import DropPreviewTile from "@/pages/Library/components/DropPreviewTile"
+import { FolderHeader } from "./FolderHeader"
 
 interface ExpandedFolderContentProps {
   group: { id: number; name: string; instances: ListInstance[] }
   onClose: () => void
   tileSize: 1 | 2 | 3 | 4 | 5
   isDefaultGroup: boolean
-  selectedIds: Set<number>
-  onToggleSelection: (id: number) => void
-  onSetSelection: (ids: number[]) => void
+  selectedIds: Set<string>
+  onToggleSelection: (id: string) => void
+  onSetSelection: (ids: string[]) => void
   onDragStart: (
     instanceId: number,
     isSelected: boolean,
@@ -56,7 +54,7 @@ interface ExpandedFolderContentProps {
 }
 
 // Backdrop drop zone - dropping on it moves instances to root library
-const BackdropDropZone = (props: { onClose: () => void }) => {
+const BackdropDropZone = (props: { onClose: () => void; folderId: number }) => {
   const dragContext = useDragContext()
   let ref: HTMLDivElement | undefined
 
@@ -76,7 +74,9 @@ const BackdropDropZone = (props: { onClose: () => void }) => {
       dragContext.registerDropZone({
         id: "backdrop-ungrouped",
         rect,
-        target: { type: "ungrouped" }
+        element: ref,
+        target: { type: "ungrouped" },
+        scope: `folder-${props.folderId}`
       })
     } else {
       dragContext.unregisterDropZone("backdrop-ungrouped")
@@ -90,7 +90,7 @@ const BackdropDropZone = (props: { onClose: () => void }) => {
   return (
     <div
       ref={ref}
-      class="absolute inset-0 transition-colors duration-200"
+      class="pointer-events-auto absolute inset-0 transition-colors duration-200"
       classList={{
         "bg-black/50": !isOver(),
         "bg-primary-500/20 border-2 border-dashed border-primary-500": isOver()
@@ -106,67 +106,7 @@ const BackdropDropZone = (props: { onClose: () => void }) => {
   )
 }
 
-// End of folder drop zone component
-const EndOfFolderDropZone = (props: { groupId: number }) => {
-  const dragContext = useDragContext()
-  let ref: HTMLDivElement | undefined
-
-  const isOver = () => {
-    const target = dragContext.dropTarget()
-    return target?.type === "endOfGroup" && target.groupId === props.groupId
-  }
-
-  // Register drop zone
-  createEffect(() => {
-    if (
-      dragContext.isDragging() &&
-      dragContext.dragType() === "instance" &&
-      ref
-    ) {
-      const rect = ref.getBoundingClientRect()
-      dragContext.registerDropZone({
-        id: `end-of-folder-${props.groupId}`,
-        rect,
-        target: { type: "endOfGroup", groupId: props.groupId }
-      })
-    } else {
-      dragContext.unregisterDropZone(`end-of-folder-${props.groupId}`)
-    }
-  })
-
-  onCleanup(() => {
-    dragContext.unregisterDropZone(`end-of-folder-${props.groupId}`)
-  })
-
-  return (
-    <div
-      ref={ref}
-      class="relative flex items-center justify-center min-w-16 h-24 rounded-lg transition-all duration-200"
-      classList={{
-        "border-2 border-dashed border-darkSlate-500": !isOver(),
-        "border-2 border-solid border-primary-500 bg-primary-500/10": isOver()
-      }}
-    >
-      <Show when={isOver()}>
-        <div class="absolute -left-2.5 top-0 bottom-0 w-1.5 z-50 flex flex-col items-center">
-          <div class="w-3 h-3 rounded-full bg-primary-500 -mt-1.5 shadow-lg shadow-primary-500/50" />
-          <div class="flex-1 w-1 bg-gradient-to-b from-primary-500 via-primary-400 to-primary-500 rounded-full shadow-lg shadow-primary-500/40" />
-          <div class="w-3 h-3 rounded-full bg-primary-500 -mb-1.5 shadow-lg shadow-primary-500/50" />
-        </div>
-      </Show>
-      <div
-        class="i-hugeicons:plus text-lg transition-colors"
-        classList={{
-          "text-darkSlate-500": !isOver(),
-          "text-primary-500": isOver()
-        }}
-      />
-    </div>
-  )
-}
-
 const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
-  const [t] = useTransContext()
   const dragContext = useDragContext()
   const globalStore = useGlobalStore()
   const modalsContext = useModal()
@@ -175,12 +115,48 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   let inputRef: HTMLInputElement | undefined
   let scrollContainerRef: HTMLDivElement | undefined
 
-  // Tile refs for folder instances (for drag selection)
-  const folderTileRefs = new Map<number, HTMLDivElement>()
+  const [folderGridRef, setFolderGridEnabled] = createAutoAnimate({
+    duration: 200,
+    easing: "ease-out"
+  })
 
-  // Get item rects for drag select
-  const getItemRects = (): Map<number, DOMRect> => {
-    const rects = new Map<number, DOMRect>()
+  // Enable auto-animate unless reduced motion is on — smooth animations during drag
+  createEffect(() => {
+    const reducedMotion = globalStore.settings.data?.reducedMotion ?? false
+    setFolderGridEnabled(!reducedMotion && !dragContext.justDropped())
+  })
+
+  // Capture group values at mount time to avoid stale access during unmount
+  // (props.group comes from a <Show> callback and becomes stale when parent unmounts)
+  const groupId = props.group.id
+  const groupName = props.group.name
+
+  // Set active scope for folder overlay - only scoped zones will be considered during drag
+  createEffect(() => {
+    dragContext.setActiveScope(`folder-${groupId}`)
+    onCleanup(() => {
+      dragContext.setActiveScope(null)
+    })
+  })
+
+  // Create a safe accessor for instances that returns empty array if props become stale
+  // This prevents the For loop from throwing when the parent Show unmounts
+  const safeInstances = createMemo(() => {
+    try {
+      return props.group.instances
+    } catch {
+      // Return empty array if props.group is stale (parent Show unmounting)
+      return []
+    }
+  })
+
+  // Non-reactive Map for storing DOM refs - refs don't need reactivity
+  // Keyed by type-prefixed string ID (e.g., "instance-5")
+  const folderTileRefs = new Map<string, HTMLDivElement>()
+
+  // Get item rects for drag select - returns rects keyed by string IDs
+  const getItemRects = (): Map<string, DOMRect> => {
+    const rects = new Map<string, DOMRect>()
     folderTileRefs.forEach((el, id) => {
       if (el) rects.set(id, el.getBoundingClientRect())
     })
@@ -194,12 +170,107 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
     onSelectionChange: (ids) => props.onSetSelection(ids)
   })
 
+  // Track registered drop zone IDs to clean up properly without accessing stale props
+  const registeredDropZoneIds = new Set<string>()
+
+  // Register drop zones for instance reordering within folder
+  createEffect(() => {
+    if (dragContext.isDragging() && dragContext.dragType() === "instance") {
+      const draggedIds = dragContext.draggedIds()
+      // Use safeInstances which handles stale props gracefully
+      const instances = safeInstances()
+
+      instances.forEach((instance, index) => {
+        const zoneId = `before-folder-instance-${instance.id}`
+        const instanceStringId = `instance-${instance.id}`
+        const el = folderTileRefs.get(instanceStringId)
+        if (!el) return
+
+        // Don't register drop zone for dragged instances
+        if (draggedIds.includes(instance.id)) {
+          dragContext.unregisterDropZone(zoneId)
+          registeredDropZoneIds.delete(zoneId)
+          return
+        }
+
+        // Don't register if previous instance is being dragged (no-op drop)
+        const prevInstance = instances[index - 1]
+        if (prevInstance && draggedIds.includes(prevInstance.id)) {
+          dragContext.unregisterDropZone(zoneId)
+          registeredDropZoneIds.delete(zoneId)
+          return
+        }
+
+        const rect = el.getBoundingClientRect()
+        // Full tile width - no createFolder zones inside folders
+        const dropRect = new DOMRect(
+          rect.left - 8,
+          rect.top,
+          rect.width + 16,
+          rect.height
+        )
+
+        dragContext.registerDropZone({
+          id: zoneId,
+          rect: dropRect,
+          element: el,
+          rectTransform: (r) =>
+            new DOMRect(r.left - 8, r.top, r.width + 16, r.height),
+          target: {
+            type: "beforeInstance",
+            instanceId: instance.id,
+            groupId: groupId
+          },
+          scope: `folder-${groupId}`
+        })
+        registeredDropZoneIds.add(zoneId)
+      })
+    } else {
+      // Unregister all when not dragging - use tracked IDs instead of stale props
+      registeredDropZoneIds.forEach((zoneId) => {
+        dragContext.unregisterDropZone(zoneId)
+      })
+      registeredDropZoneIds.clear()
+    }
+  })
+
+  // Register content area as endOfGroup zone to prevent cursor from falling through
+  // to the backdrop's "ungrouped" zone when not on a specific instance's beforeInstance zone
+  createEffect(() => {
+    if (
+      dragContext.isDragging() &&
+      dragContext.dragType() === "instance" &&
+      scrollContainerRef
+    ) {
+      const rect = scrollContainerRef.getBoundingClientRect()
+      dragContext.registerDropZone({
+        id: `folder-content-area-${groupId}`,
+        rect,
+        element: scrollContainerRef,
+        target: { type: "endOfGroup", groupId: groupId },
+        scope: `folder-${groupId}`
+      })
+      registeredDropZoneIds.add(`folder-content-area-${groupId}`)
+    } else {
+      dragContext.unregisterDropZone(`folder-content-area-${groupId}`)
+      registeredDropZoneIds.delete(`folder-content-area-${groupId}`)
+    }
+  })
+
+  // Cleanup drop zones on unmount - use tracked IDs instead of stale props
+  onCleanup(() => {
+    registeredDropZoneIds.forEach((zoneId) => {
+      dragContext.unregisterDropZone(zoneId)
+    })
+    registeredDropZoneIds.clear()
+  })
+
   const renameGroupMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.renameGroup"]
   }))
 
-  const sortGroupMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.sortGroup"]
+  const arrangeGroupMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.arrangeGroup"]
   }))
 
   // Detect which instance tiles are currently visible in the scroll container
@@ -236,10 +307,10 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
       const visibleIndices = getVisibleInstanceIndices()
       setVisibleFolderIndices(visibleIndices)
       injectFolderTransitionCSS(visibleIndices, "close")
-      setClickedFolderId(props.group.id)
+      setClickedFolderId(groupId)
 
       // Preload preview images (first 4) into browser cache before transition
-      const previewInstances = props.group.instances.slice(0, 4)
+      const previewInstances = safeInstances().slice(0, 4)
       await Promise.all(
         previewInstances.map((inst) => {
           if (!inst.icon_revision) return Promise.resolve()
@@ -247,19 +318,19 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
             const img = new Image()
             img.onload = () => resolve()
             img.onerror = () => resolve()
-            img.src = getInstanceImageUrl(inst.id, inst.icon_revision)
-            setTimeout(resolve, 150) // Don't wait forever
+            img.src = getInstanceImageUrl(inst.id, inst.icon_revision!)
+            setTimeout(resolve, 300) // Don't wait forever
           })
         })
       )
 
       // Wait for SolidJS to flush DOM updates before capturing OLD snapshot
-      await new Promise((resolve) => queueMicrotask(resolve))
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
 
       const transition = document.startViewTransition(async () => {
         props.onClose()
         // Wait for SolidJS to render FolderTile's images before capturing NEW snapshot
-        await new Promise((resolve) => queueMicrotask(resolve))
+        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
       })
       transition.finished.then(() => {
         setClickedFolderId(null)
@@ -281,9 +352,9 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
 
   const handleSave = () => {
     const newName = editValue().trim()
-    if (newName && newName !== props.group.name) {
+    if (newName && newName !== groupName) {
       renameGroupMutation.mutate({
-        group: props.group.id,
+        group: groupId,
         name: newName
       })
     }
@@ -305,17 +376,12 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
 
   const handleStartEdit = () => {
     if (props.isDefaultGroup) return
-    setEditValue(props.group.name)
+    setEditValue(groupName)
     setIsEditing(true)
   }
 
-  // Escape key handler and overlay visibility management
+  // Escape key handler - overlay display is managed by toggleFolder in HomeGrid
   onMount(() => {
-    const overlay = document.getElementById("overlay")
-    if (overlay) {
-      overlay.style.display = "flex"
-    }
-
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isEditing()) {
         handleClose()
@@ -325,6 +391,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
 
     onCleanup(() => {
       window.removeEventListener("keydown", handleEscape)
+      const overlay = document.getElementById("overlay")
       if (overlay) {
         overlay.style.display = "none"
       }
@@ -334,7 +401,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   return (
     <Portal mount={document.getElementById("overlay")!}>
       {/* Full viewport container */}
-      <div class="absolute inset-0 z-50 flex h-screen w-screen">
+      <div class="pointer-events-auto absolute inset-0 z-50 flex h-screen w-screen">
         {/* Centering container - grows to fill available space */}
         <div
           class="relative flex h-full grow items-center justify-center"
@@ -345,129 +412,49 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
           }}
         >
           {/* Backdrop - also serves as drop zone to move instances to root */}
-          <BackdropDropZone onClose={handleClose} />
+          <BackdropDropZone onClose={handleClose} folderId={groupId} />
 
           {/* Overlay content - centered via parent flex */}
           <div
             ref={scrollContainerRef}
-            class="relative z-10 w-[60%] h-[60%] max-w-3xl max-h-[500px] bg-darkSlate-800 backdrop-blur-sm rounded-lg p-6 border border-darkSlate-600 overflow-auto"
+            class="bg-darkSlate-800 border-darkSlate-600 relative z-10 h-3/5 max-h-[500px] w-3/5 max-w-3xl overflow-auto rounded-lg border p-6 backdrop-blur-sm"
             onClick={(e) => e.stopPropagation()}
             style={
-              clickedFolderId() === props.group.id
+              clickedFolderId() === groupId
                 ? { "view-transition-name": "folder-tile" }
                 : {}
             }
           >
             {/* Header */}
-            <div class="flex justify-between items-center mb-4">
-              <div class="flex items-center gap-2">
-                <div class="i-hugeicons:folder-01 text-primary-400" />
-                <Show
-                  when={!isEditing()}
-                  fallback={
-                    <Input
-                      ref={inputRef}
-                      value={editValue()}
-                      onInput={(e) => setEditValue(e.currentTarget.value)}
-                      onKeyDown={handleKeyDown}
-                      onBlur={handleSave}
-                      class="h-7 text-base py-0 w-48"
-                    />
-                  }
-                >
-                  <h3
-                    class="text-lg font-medium text-lightSlate-100 cursor-pointer hover:text-lightSlate-50"
-                    classList={{
-                      "cursor-default": props.isDefaultGroup
-                    }}
-                    onDblClick={handleStartEdit}
-                  >
-                    {props.group.name}
-                  </h3>
-                </Show>
-                <span class="text-sm text-darkSlate-400">
-                  ({props.group.instances.length})
-                </span>
-              </div>
-              <div class="flex items-center gap-2">
-                {/* Sort dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger>
-                    <Button
-                      variant="ghost"
-                      size="small"
-                      title={t("instances:_trn_rearrange")}
-                    >
-                      <div class="i-hugeicons:arrow-up-down w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuLabel>
-                      <Trans key="instances:_trn_rearrange" />
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => sortGroupMutation.mutate({ group: props.group.id, sortBy: "name" })}
-                    >
-                      <div class="flex items-center gap-2">
-                        <div class="i-hugeicons:text h-4 w-4" />
-                        <Trans key="ui:_trn_by_name" />
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => sortGroupMutation.mutate({ group: props.group.id, sortBy: "lastPlayed" })}
-                    >
-                      <div class="flex items-center gap-2">
-                        <div class="i-hugeicons:clock-01 h-4 w-4" />
-                        <Trans key="ui:_trn_by_last_played" />
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => sortGroupMutation.mutate({ group: props.group.id, sortBy: "mostPlayed" })}
-                    >
-                      <div class="flex items-center gap-2">
-                        <div class="i-hugeicons:time-02 h-4 w-4" />
-                        <Trans key="ui:_trn_by_most_played" />
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => sortGroupMutation.mutate({ group: props.group.id, sortBy: "dateCreated" })}
-                    >
-                      <div class="flex items-center gap-2">
-                        <div class="i-hugeicons:calendar-add-01 h-4 w-4" />
-                        <Trans key="ui:_trn_by_date_created" />
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Show when={!props.isDefaultGroup}>
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    onClick={handleStartEdit}
-                    title={t("instances:_trn_rename_group")}
-                  >
-                    <div class="i-hugeicons:pencil-edit-01 w-4 h-4" />
-                  </Button>
-                </Show>
-                <Button variant="ghost" size="small" onClick={handleClose}>
-                  <div class="i-hugeicons:cancel-01 w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+            <FolderHeader
+              groupId={groupId}
+              groupName={groupName}
+              instanceCount={() => safeInstances().length}
+              isDefaultGroup={props.isDefaultGroup}
+              isEditing={isEditing}
+              editValue={editValue}
+              onStartEdit={handleStartEdit}
+              onSave={handleSave}
+              onEditValueChange={setEditValue}
+              onKeyDown={handleKeyDown}
+              onSort={(sortBy) =>
+                arrangeGroupMutation.mutate({ group: groupId, sortBy })
+              }
+              onClose={handleClose}
+              viewTransitionName={
+                clickedFolderId() === groupId ? "folder-name" : undefined
+              }
+              inputRef={(el) => {
+                inputRef = el
+              }}
+            />
 
             {/* Instance grid with context menu for creating new instances */}
             <ContextMenu>
               <ContextMenuTrigger class="flex-1">
                 <div
-                  class="flex flex-wrap gap-4 min-h-[100px]"
-                  classList={{
-                    "gap-y-4": props.tileSize === 1,
-                    "gap-y-6": props.tileSize === 2,
-                    "gap-y-8": props.tileSize === 3,
-                    "gap-y-10": props.tileSize === 4,
-                    "gap-y-12": props.tileSize === 5
-                  }}
+                  ref={folderGridRef}
+                  class={`flex min-h-[100px] flex-wrap gap-4 overflow-visible ${TILE_SIZES[props.tileSize]?.gapY ?? "gap-y-6"}`}
                   onMouseDown={(e) => {
                     // Only start drag select on left click in empty space
                     if (e.button !== 0) return
@@ -478,18 +465,41 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                     dragSelect.handlers.handleMouseDown(e)
                   }}
                 >
-                  <For each={props.group.instances}>
+                  <For each={safeInstances()}>
                     {(instance, index) => {
+                      const instanceStringId = `instance-${instance.id}`
                       const isBeingDragged = () =>
-                        dragContext.isDragging() &&
+                        (dragContext.isDragging() ||
+                          dragContext.justDropped()) &&
                         dragContext.dragType() === "instance" &&
                         dragContext.draggedIds().includes(instance.id)
 
-                      const isSelected = () => props.selectedIds.has(instance.id)
+                      const isSelected = () =>
+                        props.selectedIds.has(instanceStringId)
+
+                      // Compute active drop target for this instance
+                      // Use captured groupId to avoid stale props access during unmount
+                      const activeDropTarget = createMemo(() => {
+                        const target = dragContext.dropTarget()
+                        if (!target) return null
+                        if (
+                          target.type === "beforeInstance" &&
+                          (target as { instanceId: number }).instanceId ===
+                            instance.id &&
+                          (target as { groupId: number }).groupId === groupId
+                        ) {
+                          return target
+                        }
+                        return null
+                      })
 
                       // Only visible instances get folder-preview transition names for animation
+                      // Use captured groupId to avoid stale props access during unmount
                       const getFolderPreviewStyle = () => {
-                        if (clickedFolderId() === props.group.id && visibleFolderIndices().includes(index())) {
+                        if (
+                          clickedFolderId() === groupId &&
+                          visibleFolderIndices().includes(index())
+                        ) {
                           return {
                             "view-transition-name": `folder-preview-${index()}`
                           }
@@ -498,39 +508,60 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                       }
 
                       return (
-                        <div
-                          data-instance-tile
-                          class="relative"
-                          style={getFolderPreviewStyle()}
-                          ref={(el) => {
-                            if (el) folderTileRefs.set(instance.id, el)
-                            onCleanup(() => folderTileRefs.delete(instance.id))
-                          }}
-                        >
-                          <InstanceTile
-                            instance={instance}
-                            identifier={`folder-${props.group.id}-${instance.id}`}
-                            size={props.tileSize as any}
-                            isMultiSelected={isSelected()}
-                            onToggleSelection={() =>
-                              props.onToggleSelection(instance.id)
-                            }
-                            isDragging={isBeingDragged()}
-                            isDragActive={dragContext.isDragging()}
-                            groupId={props.group.id}
-                            onDragStart={(e) =>
-                              props.onDragStart(instance.id, isSelected(), e)
-                            }
-                            preventClick={() => dragContext.justDropped()}
-                          />
-                        </div>
+                        <>
+                          {/* Drop preview tile */}
+                          <Show when={activeDropTarget()}>
+                            {(target) => (
+                              <DropPreviewTile
+                                tileSize={() => props.tileSize}
+                                dropTarget={target()}
+                                scope={`folder-${groupId}`}
+                              />
+                            )}
+                          </Show>
+                          {/* Remove dragged tile from DOM so auto-animate collapses the gap */}
+                          <Show when={!isBeingDragged()}>
+                            <div
+                              data-instance-tile
+                              class="relative"
+                              style={getFolderPreviewStyle()}
+                              ref={(el) => {
+                                if (el) folderTileRefs.set(instanceStringId, el)
+                                onCleanup(() =>
+                                  folderTileRefs.delete(instanceStringId)
+                                )
+                              }}
+                            >
+                              <InstanceTile
+                                instance={instance}
+                                identifier={`folder-${groupId}-${instance.id}`}
+                                size={props.tileSize}
+                                isMultiSelected={isSelected()}
+                                onToggleSelection={() =>
+                                  props.onToggleSelection(instanceStringId)
+                                }
+                                isDragging={isBeingDragged()}
+                                isDragActive={dragContext.isDragging()}
+                                groupId={groupId}
+                                onDragStart={(e) =>
+                                  props.onDragStart(
+                                    instance.id,
+                                    isSelected(),
+                                    e
+                                  )
+                                }
+                                preventClick={() => dragContext.justDropped()}
+                              />
+                            </div>
+                          </Show>
+                        </>
                       )
                     }}
                   </For>
 
                   {/* Empty state */}
-                  <Show when={props.group.instances.length === 0}>
-                    <div class="text-darkSlate-400 text-center w-full py-8">
+                  <Show when={safeInstances().length === 0}>
+                    <div class="text-darkSlate-400 w-full py-8 text-center">
                       <Trans key="instances:_trn_drag_instances_to_folder" />
                     </div>
                   </Show>
@@ -538,11 +569,16 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                   {/* End of folder drop zone */}
                   <Show
                     when={
-                      dragContext.isDragging() &&
+                      (dragContext.isDragging() || dragContext.justDropped()) &&
                       dragContext.dragType() === "instance"
                     }
                   >
-                    <EndOfFolderDropZone groupId={props.group.id} />
+                    <EndOfGroupDropZone
+                      groupId={groupId}
+                      zoneIdPrefix="end-of-folder"
+                      tileSize={() => props.tileSize}
+                      scope={`folder-${groupId}`}
+                    />
                   </Show>
                 </div>
               </ContextMenuTrigger>
@@ -552,7 +588,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                   onClick={() => {
                     modalsContext?.openModal(
                       { name: "instanceCreation" },
-                      { groupId: props.group.id }
+                      { groupId: groupId }
                     )
                   }}
                 >
@@ -564,7 +600,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                   onClick={() => {
                     modalsContext?.openModal(
                       { name: "instanceCreation" },
-                      { import: true, groupId: props.group.id }
+                      { import: true, groupId: groupId }
                     )
                   }}
                 >
@@ -578,7 +614,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
 
         {/* Ad sidebar placeholder - matches the ad area width for proper centering */}
         <div
-          class="h-screen bg-black/50 animate-fadeIn"
+          class="animate-fadeIn pointer-events-auto h-screen bg-black/50"
           style={{ width: `${adSize.width}px` }}
           onClick={() => {
             if (!dragContext.isDragging() && !dragContext.justDropped()) {
@@ -591,7 +627,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
         <Show when={dragSelect.selectionRect()}>
           {(rect) => (
             <div
-              class="fixed pointer-events-none border-2 border-primary-500 bg-primary-500/20 z-[60]"
+              class="border-primary-500 bg-primary-500/20 pointer-events-none fixed z-[60] border-2"
               style={{
                 left: `${rect().left}px`,
                 top: `${rect().top}px`,

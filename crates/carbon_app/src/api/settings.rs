@@ -439,10 +439,11 @@ impl FromStr for GameResolution {
     }
 }
 
+/// Sort criteria for instances in accordion mode (virtual grouping).
+/// When instancesSortBy is null, manual ordering is used (libraryPosition).
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InstancesSortBy {
-    Manual,
     Name,
     LastPlayed,
     LastUpdated,
@@ -454,7 +455,6 @@ pub enum InstancesSortBy {
 impl From<InstancesSortBy> for String {
     fn from(value: InstancesSortBy) -> Self {
         match value {
-            InstancesSortBy::Manual => "manual",
             InstancesSortBy::Name => "name",
             InstancesSortBy::LastPlayed => "last_played",
             InstancesSortBy::LastUpdated => "last_updated",
@@ -471,7 +471,6 @@ impl TryFrom<String> for InstancesSortBy {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match &*value.to_lowercase() {
-            "manual" => Ok(Self::Manual),
             "name" => Ok(Self::Name),
             "last_played" => Ok(Self::LastPlayed),
             "last_updated" => Ok(Self::LastUpdated),
@@ -483,10 +482,11 @@ impl TryFrom<String> for InstancesSortBy {
     }
 }
 
+/// Grouping criteria for accordion mode (virtual grouping).
+/// When instancesGroupBy is null, folders mode is used (real folders with drag-drop).
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InstancesGroupBy {
-    Group,
     Modloader,
     GameVersion,
     Modplatform,
@@ -495,7 +495,6 @@ pub enum InstancesGroupBy {
 impl From<InstancesGroupBy> for String {
     fn from(value: InstancesGroupBy) -> Self {
         match value {
-            InstancesGroupBy::Group => "group",
             InstancesGroupBy::Modloader => "modloader",
             InstancesGroupBy::GameVersion => "game_version",
             InstancesGroupBy::Modplatform => "modplatform",
@@ -509,7 +508,6 @@ impl TryFrom<String> for InstancesGroupBy {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match &*value.to_lowercase() {
-            "group" => Ok(Self::Group),
             "modloader" => Ok(Self::Modloader),
             "game_version" => Ok(Self::GameVersion),
             "modplatform" => Ok(Self::Modplatform),
@@ -531,10 +529,15 @@ struct FESettings {
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_app_close_warning: bool,
     show_featured: bool,
-    instances_sort_by: InstancesSortBy,
+    /// Sort criteria for accordion mode. None = manual ordering (libraryPosition).
+    instances_sort_by: Option<InstancesSortBy>,
     instances_sort_by_asc: bool,
-    instances_group_by: InstancesGroupBy,
+    /// Group criteria for accordion mode. None = folders mode (real folders with drag-drop).
+    instances_group_by: Option<InstancesGroupBy>,
     instances_group_by_asc: bool,
+    /// When true, favorites appear in both favorites section AND their folder/group.
+    /// When false, favorites appear ONLY in the favorites section.
+    instances_duplicate_favorites: bool,
     instances_tile_size: i32,
     deletion_through_recycle_bin: bool,
     xmx: i32,
@@ -563,10 +566,19 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             concurrent_downloads: data.concurrent_downloads,
             download_dependencies: data.download_dependencies,
             show_featured: data.show_featured,
-            instances_sort_by: data.instances_sort_by.try_into()?,
+            // instances_sort_by: None = manual ordering, Some(x) = accordion mode sorting
+            instances_sort_by: data
+                .instances_sort_by
+                .map(|s| s.try_into())
+                .transpose()?,
             instances_sort_by_asc: data.instances_sort_by_asc,
-            instances_group_by: data.instances_group_by.try_into()?,
+            // instances_group_by: None = folders mode, Some(x) = accordion mode
+            instances_group_by: data
+                .instances_group_by
+                .map(|s| s.try_into())
+                .transpose()?,
             instances_group_by_asc: data.instances_group_by_asc,
+            instances_duplicate_favorites: data.instances_duplicate_favorites,
             instances_tile_size: data.instances_tile_size,
             deletion_through_recycle_bin: data.deletion_through_recycle_bin,
             xmx: data.xmx,
@@ -663,14 +675,19 @@ pub struct FESettingsUpdate {
     pub concurrent_downloads: Option<Set<i32>>,
     #[specta(optional)]
     pub download_dependencies: Option<Set<bool>>,
+    /// Sort criteria for accordion mode. None = manual ordering (libraryPosition).
     #[specta(optional)]
-    pub instances_sort_by: Option<Set<InstancesSortBy>>,
+    pub instances_sort_by: Option<Set<Option<InstancesSortBy>>>,
     #[specta(optional)]
     pub instances_sort_by_asc: Option<Set<bool>>,
+    /// Group criteria for accordion mode. None = folders mode (real folders with drag-drop).
     #[specta(optional)]
-    pub instances_group_by: Option<Set<InstancesGroupBy>>,
+    pub instances_group_by: Option<Set<Option<InstancesGroupBy>>>,
     #[specta(optional)]
     pub instances_group_by_asc: Option<Set<bool>>,
+    /// When true, favorites appear in both favorites section AND their folder/group.
+    #[specta(optional)]
+    pub instances_duplicate_favorites: Option<Set<bool>>,
     #[specta(optional)]
     pub instances_tile_size: Option<Set<i32>>,
     #[specta(optional)]
