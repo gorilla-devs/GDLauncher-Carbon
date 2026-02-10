@@ -264,7 +264,9 @@ const ModRow = (props: ModRowProps) => {
                             <Spinner />
                           </Show>
                           <Show when={!loading()}>
-                            <Trans key="instances:_trn_download" />
+                            <span class="whitespace-nowrap">
+                              <Trans key="instances:_trn_download" />
+                            </span>
                           </Show>
                         </Button>
                       </Show>
