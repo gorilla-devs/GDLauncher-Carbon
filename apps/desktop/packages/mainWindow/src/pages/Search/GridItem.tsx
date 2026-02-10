@@ -143,7 +143,7 @@ export function GridItem(props: GridItemProps) {
         >
           <Switch>
             <Match when={props.isInstalled}>
-              <div class="flex items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-600/90 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-green-500/20 backdrop-blur-sm">
+              <div class="flex items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-600/90 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-green-500/20 backdrop-blur-sm whitespace-nowrap">
                 <div class="i-hugeicons:tick-02 h-4 w-4" />
                 <Trans key="instances:_trn_status_installed" />
               </div>
