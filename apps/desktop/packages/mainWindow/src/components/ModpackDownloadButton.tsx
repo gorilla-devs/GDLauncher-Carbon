@@ -118,6 +118,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
         disabled={loading()}
         size={props.size || "medium"}
         onClick={handleDownload}
+        class="!h-auto !py-2"
       >
         <Show when={loading()}>
           <Spinner />
@@ -126,7 +127,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
           <Show
             when={props.iconOnly}
             fallback={
-              <div class="flex items-center gap-1.5">
+              <div class="flex items-center gap-1.5 whitespace-nowrap">
                 <div class="i-hugeicons:download-02" />
                 <Trans key="instances:_trn_download" />
               </div>
