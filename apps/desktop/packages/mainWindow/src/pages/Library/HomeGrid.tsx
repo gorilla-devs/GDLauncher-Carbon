@@ -79,16 +79,12 @@ const HomeGridInner = () => {
   const tileRefs = new Map<string, HTMLDivElement>()
 
   // Hooks
-  const {
-    libraryItems,
-    virtualGroups,
-    favoriteIds,
-    viewMode,
-    isFoldersView,
-    defaultGroupId,
-    isLoading,
-    isEmpty
-  } = useLibraryData(filter)
+  // Don't destructure libraryItems/virtualGroups/favoriteIds — they are store
+  // properties returned via getters. Destructuring reads the proxy once; if
+  // reconcile replaces it the captured reference goes stale. Access them
+  // through `data.*` so every read hits the getter in a reactive context.
+  const data = useLibraryData(filter)
+  const { viewMode, isFoldersView, defaultGroupId, isLoading, isEmpty } = data
 
   const showFoldersView = createMemo(() => isFoldersView() && !filter().trim())
 
@@ -111,7 +107,7 @@ const HomeGridInner = () => {
     defaultGroupId,
     selection,
     flipAnimation,
-    libraryItems: libraryItems,
+    get libraryItems() { return data.libraryItems },
     onBeforeDrop: () => setAutoAnimateEnabled(false)
   })
 
@@ -124,7 +120,7 @@ const HomeGridInner = () => {
 
   // Enable auto-animate only after items are rendered and settled
   createEffect(() => {
-    const items = libraryItems
+    const items = data.libraryItems
     const reducedMotion = globalStore.settings.data?.reducedMotion ?? false
     if (items.length > 0 && !reducedMotion && !dragContext.justDropped()) {
       // Wait for DOM to settle before enabling auto-animate
@@ -156,7 +152,7 @@ const HomeGridInner = () => {
 
   // FLIP animation effect - runs after libraryItems changes
   createEffect(() => {
-    const items = libraryItems
+    const items = data.libraryItems
     if (items.length > 0 && flipAnimation.isAnimating()) {
       flipAnimation.animateIfOrderChanged(items.map((item) => item.id))
     }
@@ -221,7 +217,7 @@ const HomeGridInner = () => {
       !globalStore.settings.data?.reducedMotion && document.startViewTransition
 
     if (shouldTransition) {
-      const folder = libraryItems.find(
+      const folder = data.libraryItems.find(
         (i) => i.type === "folder" && i.data.id === folderId
       )
       const instanceCount =
@@ -237,7 +233,12 @@ const HomeGridInner = () => {
       setClickedFolderId(folderId)
 
       // Show overlay BEFORE view transition captures states
-      if (overlay) overlay.style.display = "flex"
+      // Reset opacity in case it was left at "0" by ModalsManager.closeModal()
+      if (overlay) {
+        overlay.style.display = "flex"
+        overlay.style.opacity = "1"
+        overlay.style.transition = ""
+      }
 
       await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
 
@@ -256,6 +257,8 @@ const HomeGridInner = () => {
     } else {
       if (overlay) {
         overlay.style.display = folderId ? "flex" : "none"
+        overlay.style.opacity = folderId ? "1" : ""
+        overlay.style.transition = ""
       }
       setOpenFolderId((prev) => (prev === folderId ? null : folderId))
     }
@@ -364,8 +367,8 @@ const HomeGridInner = () => {
                   <Switch>
                     <Match when={showFoldersView()}>
                       <FoldersView
-                        libraryItems={libraryItems}
-                        favoriteIds={favoriteIds}
+                        libraryItems={data.libraryItems}
+                        favoriteIds={data.favoriteIds}
                         defaultGroupId={defaultGroupId()}
                         tileSize={tileSize}
                         selection={selection}
@@ -388,7 +391,7 @@ const HomeGridInner = () => {
                     </Match>
                     <Match when={!showFoldersView()}>
                       <AccordionView
-                        virtualGroups={virtualGroups}
+                        virtualGroups={data.virtualGroups}
                         tileSize={tileSize}
                         selection={selection}
                         onDragStart={(type, ids, e) =>
@@ -459,7 +462,7 @@ const HomeGridInner = () => {
 
       <DragGhost
         instances={globalStore.instances.data || []}
-        groups={libraryItems
+        groups={data.libraryItems
           .filter(
             (item): item is LibraryItem & { type: "folder" } =>
               item.type === "folder"

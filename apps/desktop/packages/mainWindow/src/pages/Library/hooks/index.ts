@@ -19,5 +19,5 @@ export type { UseDropIndicatorsOptions, DropIndicatorState } from "./useDropIndi
 export { useDropZoneRegistration } from "./useDropZoneRegistration"
 export type { UseDropZoneRegistrationOptions } from "./useDropZoneRegistration"
 
-export { useLibraryItemAnimation, needsEntranceAnimation, needsSpringAnimation } from "./useLibraryItemAnimation"
+export { useLibraryItemAnimation } from "./useLibraryItemAnimation"
 export type { UseLibraryItemAnimationOptions } from "./useLibraryItemAnimation"

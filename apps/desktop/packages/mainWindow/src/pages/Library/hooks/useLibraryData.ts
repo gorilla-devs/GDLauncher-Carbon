@@ -93,10 +93,14 @@ export function useLibraryData(filter: Accessor<string>): UseLibraryDataReturn {
       ] as const,
       ([instances, groups, filterValue, defGroupId, foldersView]) => {
         const filterActive = !!filterValue?.trim()
-        if (!foldersView || !defGroupId || filterActive) {
+        if (!foldersView || filterActive) {
           setStore("libraryItems", reconcile([], { key: "id" }))
           return
         }
+
+        // Don't clear libraryItems while defaultGroupId is still loading —
+        // keep previous data visible. isLoading covers the loading state.
+        if (!defGroupId) return
 
         const items = computeLibraryItems(
           instances || [],
@@ -151,10 +155,14 @@ export function useLibraryData(filter: Accessor<string>): UseLibraryDataReturn {
       !globalStore.instances.isLoading
   )
 
+  // Return getters so store properties are read lazily in reactive contexts.
+  // Reading store.libraryItems eagerly (e.g. `libraryItems: store.libraryItems`)
+  // captures the proxy reference once — if reconcile replaces it, consumers
+  // hold a stale proxy and never see updates.
   return {
-    libraryItems: store.libraryItems,
-    virtualGroups: store.virtualGroups,
-    favoriteIds: store.favoriteIds,
+    get libraryItems() { return store.libraryItems },
+    get virtualGroups() { return store.virtualGroups },
+    get favoriteIds() { return store.favoriteIds },
     viewMode,
     isFoldersView,
     defaultGroupId,

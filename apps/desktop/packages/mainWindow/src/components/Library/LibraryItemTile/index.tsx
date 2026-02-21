@@ -9,9 +9,7 @@ import DropPreviewTile from "@/pages/Library/components/DropPreviewTile"
 import {
   useDropIndicators,
   useDropZoneRegistration,
-  useLibraryItemAnimation,
-  needsEntranceAnimation,
-  needsSpringAnimation
+  useLibraryItemAnimation
 } from "@/pages/Library/hooks"
 import { parseInstanceIds } from "@/pages/Library/utils/selectionIds"
 import { DropOverlayIndicator } from "@/pages/Library/components/DropOverlayIndicator"
@@ -107,23 +105,6 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
       <div
         ref={(el) => {
           ref = el
-          const reducedMotion =
-            globalStore.settings.data?.reducedMotion ?? false
-          const needsEntrance = needsEntranceAnimation(
-            reducedMotion,
-            props.animatedLibraryItemIds,
-            itemKey,
-            props.libraryInitialAnimationComplete.value
-          )
-          const needsSpring = needsSpringAnimation(
-            isFolder,
-            reducedMotion,
-            props.newlyCreatedFolderId?.() ?? null,
-            itemId
-          )
-          if (!needsEntrance && !needsSpring) {
-            el.style.opacity = "1"
-          }
         }}
         data-library-item
         data-instance-tile={isInstance || undefined}

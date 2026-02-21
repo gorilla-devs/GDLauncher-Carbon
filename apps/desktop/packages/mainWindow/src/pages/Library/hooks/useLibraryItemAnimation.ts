@@ -75,6 +75,8 @@ export function useLibraryItemAnimation(options: UseLibraryItemAnimationOptions)
       !animatedIds.has(itemKey) &&
       !initialComplete.value
 
+    const isNewlyCreatedFolder = isFolder && newlyCreatedFolderId?.() === itemId
+
     if (shouldAnimate) {
       animatedIds.add(itemKey)
       const delay = ANIMATION.STAGGER_BASE + itemIndex() * ANIMATION.STAGGER_PER_ITEM
@@ -87,30 +89,30 @@ export function useLibraryItemAnimation(options: UseLibraryItemAnimationOptions)
       anim.onfinish = () => {
         el.style.opacity = "1"
       }
-    }
-
-    // Spring animation for newly created folders
-    if (isFolder && newlyCreatedFolderId?.() === itemId) {
-      if (reducedMotion()) {
-        clearNewlyCreatedFolderId?.()
-      } else {
-        const anim = el.animate(
-          [
-            { transform: "scale(0.5)", opacity: 0 },
-            { transform: "scale(1.05)", opacity: 1, offset: 0.7 },
-            { transform: "scale(0.98)", opacity: 1, offset: 0.85 },
-            { transform: "scale(1)", opacity: 1 }
-          ],
-          {
-            duration: ANIMATION.SPRING_DURATION,
-            easing: ANIMATION.SPRING_EASING,
-            fill: "forwards"
-          }
-        )
-        anim.onfinish = () => {
-          el.style.opacity = "1"
-          clearNewlyCreatedFolderId?.()
+    } else if (isNewlyCreatedFolder && !reducedMotion()) {
+      // Spring animation for newly created folders
+      const anim = el.animate(
+        [
+          { transform: "scale(0.5)", opacity: 0 },
+          { transform: "scale(1.05)", opacity: 1, offset: 0.7 },
+          { transform: "scale(0.98)", opacity: 1, offset: 0.85 },
+          { transform: "scale(1)", opacity: 1 }
+        ],
+        {
+          duration: ANIMATION.SPRING_DURATION,
+          easing: ANIMATION.SPRING_EASING,
+          fill: "forwards"
         }
+      )
+      anim.onfinish = () => {
+        el.style.opacity = "1"
+        clearNewlyCreatedFolderId?.()
+      }
+    } else {
+      // No animation — make visible immediately
+      el.style.opacity = "1"
+      if (isNewlyCreatedFolder) {
+        clearNewlyCreatedFolderId?.()
       }
     }
 
@@ -129,26 +131,3 @@ export function useLibraryItemAnimation(options: UseLibraryItemAnimationOptions)
   })
 }
 
-/**
- * Check if an item needs entrance animation (for ref callback).
- */
-export function needsEntranceAnimation(
-  reducedMotion: boolean,
-  animatedIds: Set<string>,
-  itemKey: string,
-  initialComplete: boolean
-): boolean {
-  return !reducedMotion && !animatedIds.has(itemKey) && !initialComplete
-}
-
-/**
- * Check if a folder needs spring animation (for ref callback).
- */
-export function needsSpringAnimation(
-  isFolder: boolean,
-  reducedMotion: boolean,
-  newlyCreatedFolderId: number | null,
-  itemId: number
-): boolean {
-  return isFolder && !reducedMotion && newlyCreatedFolderId === itemId
-}
