@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use tracing::info;
+
 
 mod common;
 mod curseforge;

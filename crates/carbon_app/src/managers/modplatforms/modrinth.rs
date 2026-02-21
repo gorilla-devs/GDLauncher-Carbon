@@ -82,6 +82,7 @@ impl Modrinth {
             .await?
             .json_with_context_reporting("modrinth::search")
             .await?;
+
         Ok(search_results)
     }
 

@@ -49,6 +49,7 @@ impl Middleware for CacheMiddleware {
         }
 
         let method = req.method().clone();
+        let _req_url = req.url().to_string();
 
         let mut cached = if method != Method::GET {
             None
@@ -56,7 +57,7 @@ impl Middleware for CacheMiddleware {
             app.prisma_client
                 .http_cache()
                 .find_first(vec![WhereParam::Url(StringFilter::Equals(
-                    req.url().to_string(),
+                    _req_url.clone(),
                 ))])
                 .exec()
                 .await

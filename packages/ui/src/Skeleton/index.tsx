@@ -275,8 +275,8 @@ Skeleton.featuredHomeTile = () => {
 
 const SearchListItem = () => {
   return (
-    <div class="my-2 overflow-hidden rounded-md">
-      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent px-8 py-2">
+    <div class="my-1 overflow-hidden rounded-md">
+      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent px-8 py-4">
         <div class="relative z-10 flex w-full items-center gap-4">
           <div class="bg-darkSlate-500 skeleton-shimmer h-16 w-16 rounded-md" />
           <div class="w-7/10 flex flex-col gap-2">
@@ -286,9 +286,9 @@ const SearchListItem = () => {
             <div class="text-lightSlate-700 truncate text-left text-sm">
               <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-full rounded-md" />
             </div>
-            <div class="flex gap-2">
-              <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-16 rounded-md" />
-              <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-20 rounded-md" />
+            <div class="flex items-center gap-2 py-1">
+              <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-16 rounded-md" />
+              <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-20 rounded-md" />
             </div>
           </div>
           <div class="ml-auto flex items-center">
