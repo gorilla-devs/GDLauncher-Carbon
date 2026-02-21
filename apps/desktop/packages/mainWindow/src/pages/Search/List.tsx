@@ -10,6 +10,9 @@ import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { Grid } from "./Grid"
+import SharePreviewContent from "@/components/SharePreviewContent"
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
+import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 
 export function List() {
   const searchContext = useSearchContext()
@@ -79,13 +82,21 @@ export function List() {
   return (
     <div class="flex h-full flex-col overflow-hidden">
       <div class="flex-1 overflow-hidden">
+        <Show when={searchContext?.isShareMode() && searchContext?.shareCode()}>
+          <div class="flex h-full items-start justify-center overflow-auto px-6 pt-6">
+            <div class="w-full max-w-md">
+              <SharePreviewContent shareCode={searchContext!.shareCode()!} />
+            </div>
+          </div>
+        </Show>
+        <Show when={!searchContext?.isShareMode()}>
         <Switch>
           <Match when={searchContext?.viewMode() === "grid"}>
             <Grid />
           </Match>
           <Match when={searchContext?.viewMode() === "list"}>
             <Show
-              when={!searchContext?.isInitialLoading()}
+              when={!searchContext?.isInitialLoading() || (searchContext?.allRows() || []).some(r => r.type === 'value')}
               fallback={<Skeleton.searchList />}
             >
               <Show
@@ -127,6 +138,48 @@ export function List() {
                       return <Skeleton.searchListItem />
                     }
 
+                    if (result.type === "skeleton") {
+                      return (
+                        <div class="my-1 overflow-hidden rounded-md">
+                          <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent px-8 py-4">
+                            <div class="relative z-10 flex w-full items-center gap-4">
+                              <div class="bg-darkSlate-500 skeleton-shimmer relative flex h-16 w-16 items-center justify-center rounded-md">
+                                <Show when={result.platform}>
+                                  <img
+                                    src={result.platform === "curseforge" ? CurseforgeLogo : ModrinthLogo}
+                                    class="h-6 w-6 opacity-40"
+                                    alt={`${result.platform} logo`}
+                                  />
+                                </Show>
+                              </div>
+                              <div class="w-7/10 flex flex-col gap-2">
+                                <div class="truncate text-left text-xl font-medium">
+                                  <div class="bg-darkSlate-500 skeleton-shimmer h-7 w-3/4 rounded-md" />
+                                </div>
+                                <div class="text-lightSlate-700 truncate text-left text-sm">
+                                  <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-full rounded-md" />
+                                </div>
+                                <div class="flex items-center gap-2 py-1">
+                                  <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-16 rounded-md" />
+                                  <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-20 rounded-md" />
+                                </div>
+                              </div>
+                              <div class="ml-auto flex items-center">
+                                <div class="relative flex items-center">
+                                  <div class="flex items-center gap-2">
+                                    <div class="text-lightSlate-700 text-sm">
+                                      <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-14 rounded-md" />
+                                    </div>
+                                    <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-12 rounded" />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+
                     return (
                       <ListItem
                         instanceMods={instanceMods()?.data ?? undefined}
@@ -148,6 +201,7 @@ export function List() {
             </Show>
           </Match>
         </Switch>
+        </Show>
       </div>
     </div>
   )

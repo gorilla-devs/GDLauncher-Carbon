@@ -146,7 +146,13 @@ export function EnhancedSearchBar() {
           />
         </Show>
 
-        <Show when={isExpanded() && searchResults?.isDirectMode()}>
+        <Show when={isExpanded() && searchResults?.isShareMode()}>
+          <div class="bg-green-600/20 text-green-400 flex shrink-0 items-center gap-1 rounded px-2 py-0.5 text-xs">
+            <div class="i-hugeicons:share-08 text-sm" />
+            <span>{t("search:_trn_share")}</span>
+          </div>
+        </Show>
+        <Show when={isExpanded() && searchResults?.isDirectMode() && !searchResults?.isShareMode()}>
           <div class="bg-primary-600/20 text-primary-400 flex shrink-0 items-center gap-1 rounded px-2 py-0.5 text-xs">
             <div class="i-hugeicons:link-01 text-sm" />
             <span>{t("search:_trn_direct")}</span>

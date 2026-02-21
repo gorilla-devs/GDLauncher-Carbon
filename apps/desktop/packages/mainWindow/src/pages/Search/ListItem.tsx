@@ -5,7 +5,7 @@ import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DynamicBadgeContainer from "./DynamicBadgeContainer"
-import { createSignal, Match, Switch } from "solid-js"
+import { createMemo, createSignal, Match, Switch } from "solid-js"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 
@@ -21,14 +21,16 @@ export function ListItem(props: SearchResultItemProps) {
   const [isHoverActive, setIsHoverActive] = createSignal(false)
   const globalStore = useGlobalStore()
 
-  const cats =
-    props.result.platform === "curseforge"
-      ? globalStore.categories.data?.curseforge
-      : globalStore.categories.data?.modrinth
+  const filteredCategories = createMemo(() => {
+    const cats =
+      props.result.platform === "curseforge"
+        ? globalStore.categories.data?.curseforge
+        : globalStore.categories.data?.modrinth
 
-  const filteredCategories = props.result.categories
-    .map((cat) => cats?.[cat as number])
-    .filter((cat) => cat !== undefined)
+    return props.result.categories
+      .map((cat) => cats?.[cat as number])
+      .filter((cat) => cat !== undefined)
+  })
 
   return (
     <div class="my-1 overflow-hidden rounded-md">
@@ -71,7 +73,8 @@ export function ListItem(props: SearchResultItemProps) {
             </div>
             <DynamicBadgeContainer
               typeBadgeContent={props.result.type}
-              categories={filteredCategories}
+              categories={filteredCategories()}
+              categoriesLoading={globalStore.categories.isLoading}
             />
           </div>
 

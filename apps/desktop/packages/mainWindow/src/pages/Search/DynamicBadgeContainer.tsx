@@ -1,5 +1,5 @@
 import { Badge } from "@gd/ui"
-import { For, Show } from "solid-js"
+import { For, Index, Show } from "solid-js"
 import { Trans } from "@gd/i18n"
 import { CategoryIcon } from "@/utils/instances"
 import { FEUnifiedCategory } from "@gd/core_module/bindings"
@@ -16,6 +16,7 @@ const MAX_VISIBLE_CATEGORIES = 3
 export default function DynamicBadgeContainer(props: {
   typeBadgeContent: string
   categories: FEUnifiedCategory[]
+  categoriesLoading?: boolean
 }) {
   const searchContext = useSearchContext()
 
@@ -29,52 +30,63 @@ export default function DynamicBadgeContainer(props: {
 
   return (
     <div class="flex items-center gap-2 overflow-x-hidden overflow-y-visible py-1">
-      <For each={visibleCategories()}>
-        {(category) => {
-          const isInSearchQuery = searchContext
-            ?.searchQuery()
-            .categories?.includes(category.id)
+      <Show
+        when={!props.categoriesLoading || props.categories.length > 0}
+        fallback={
+          <Index each={[1, 2, 3]}>
+            {() => (
+              <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-20 rounded-md" />
+            )}
+          </Index>
+        }
+      >
+        <For each={visibleCategories()}>
+          {(category) => {
+            const isInSearchQuery = searchContext
+              ?.searchQuery()
+              .categories?.includes(category.id)
 
-          return (
-            <Badge
-              variant={isInSearchQuery ? "default" : "secondary"}
-              class="flex shrink-0 items-center gap-2"
-              classList={{
-                "text-lightSlate-500": !isInSearchQuery,
-                "text-white": isInSearchQuery
-              }}
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
+            return (
+              <Badge
+                variant={isInSearchQuery ? "default" : "secondary"}
+                class="flex shrink-0 items-center gap-2"
+                classList={{
+                  "text-lightSlate-500": !isInSearchQuery,
+                  "text-white": isInSearchQuery
+                }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
 
-                searchContext?.setSearchQuery((prev) => {
-                  const newCategories = { ...prev }
+                  searchContext?.setSearchQuery((prev) => {
+                    const newCategories = { ...prev }
 
-                  if (isInSearchQuery) {
-                    newCategories.categories =
-                      newCategories.categories?.filter(
-                        (c) => c !== category.id
-                      ) ?? null
-                  } else {
-                    newCategories.categories = [
-                      ...(newCategories.categories || []),
-                      category.id
-                    ]
-                  }
+                    if (isInSearchQuery) {
+                      newCategories.categories =
+                        newCategories.categories?.filter(
+                          (c) => c !== category.id
+                        ) ?? null
+                    } else {
+                      newCategories.categories = [
+                        ...(newCategories.categories || []),
+                        category.id
+                      ]
+                    }
 
-                  return newCategories
-                })
-              }}
-            >
-              <CategoryIcon
-                type={category.icon?.type}
-                value={category.icon?.value}
-              />
-              {category.name}
-            </Badge>
-          )
-        }}
-      </For>
+                    return newCategories
+                  })
+                }}
+              >
+                <CategoryIcon
+                  type={category.icon?.type}
+                  value={category.icon?.value}
+                />
+                {category.name}
+              </Badge>
+            )
+          }}
+        </For>
+      </Show>
 
       <Show when={hiddenCount() > 0}>
         <Tooltip placement="top">

@@ -5,7 +5,7 @@ import {
   FEUnifiedSearchType
 } from "@gd/core_module/bindings"
 
-import { createEffect, createMemo, createSignal, mergeProps } from "solid-js"
+import { createEffect, createMemo, createSignal, mergeProps, onCleanup } from "solid-js"
 import { rspc } from "./rspcClient"
 import { createAsyncEffect } from "./asyncEffect"
 import { createInfiniteQuery } from "@tanstack/solid-query"
@@ -37,8 +37,9 @@ export interface SearchResultsOpts {
 }
 
 export interface SearchResultItem {
-  type: "value" | "loader"
+  type: "value" | "loader" | "skeleton"
   value?: FEUnifiedSearchResult
+  platform?: "curseforge" | "modrinth"
 }
 
 export const getSearchResults = (_opts?: SearchResultsOpts) => {
@@ -139,6 +140,19 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     _setSearchQuery(value)
   }
 
+  // Debounced version of searchQuery for network requests (trailing-only, 300ms).
+  // The initial value is set from searchQuery() so deep-link searches fire immediately on mount.
+  const [debouncedSearchQuery, setDebouncedSearchQuery] =
+    createSignal<FEUnifiedSearchParameters>(searchQuery())
+
+  createEffect(() => {
+    const current = searchQuery()
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(() => current)
+    }, 300)
+    onCleanup(() => clearTimeout(timer))
+  })
+
   // When the instanceId changes, reset the search query to default with instance filters
   createAsyncEffect((isStale, prevInstanceId: number | undefined) => {
     if (
@@ -156,9 +170,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   }, undefined)
 
   const actualPageSize = () => {
-    let pageSize = searchQuery().pageSize || 40
+    let pageSize = debouncedSearchQuery().pageSize || 40
 
-    if (searchQuery().searchApi) {
+    if (debouncedSearchQuery().searchApi) {
       // Use Math.ceil to handle odd numbers properly
       pageSize = Math.ceil(pageSize / 2)
     }
@@ -173,6 +187,27 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
   const isDirectMode = () => parsedQuery().mode === "direct"
 
+  const isShareMode = createMemo(() =>
+    parsedQuery().items.some(
+      (item) =>
+        item.type === "gdlauncher_share" ||
+        item.type === "gdlauncher_share_link"
+    )
+  )
+
+  const shareCode = createMemo(() => {
+    const item = parsedQuery().items.find(
+      (i) =>
+        i.type === "gdlauncher_share" ||
+        i.type === "gdlauncher_share_link"
+    )
+    if (!item) return null
+    return item.type === "gdlauncher_share" ||
+      item.type === "gdlauncher_share_link"
+      ? item.shareCode
+      : null
+  })
+
   const directBatchRequest = createMemo<FEUnifiedBatchRequest>(() =>
     buildBatchRequest(parsedQuery())
   )
@@ -182,33 +217,49 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       "modplatforms.unifiedGetProjectsByIds",
       directBatchRequest()
     ] as const,
-    enabled: isDirectMode() && parsedQuery().items.length > 0
+    enabled: isDirectMode() && !isShareMode() && parsedQuery().items.length > 0
   }))
 
+  // Extract cache-relevant fields from search params (excludes pagination and searchApi)
+  const searchCacheKey = (params: FEUnifiedSearchParameters) => ({
+    q: params.searchQuery ?? "",
+    cat: params.categories,
+    gv: params.gameVersions,
+    ml: params.modloaders,
+    pt: params.projectType,
+    pf: params.platformFilters,
+    env: params.environment
+  })
+
   const cfInfiniteResults = createInfiniteQuery(() => ({
-    queryKey: ["modplatforms.unifiedSearch.cf"],
+    queryKey: [
+      "modplatforms.unifiedSearch.cf",
+      searchCacheKey(debouncedSearchQuery())
+    ],
     enabled:
       !isDirectMode() &&
-      (searchQuery().searchQuery?.length || 0) > 0 &&
-      (!searchQuery().searchApi || searchQuery().searchApi === "curseforge"),
+      (!debouncedSearchQuery().searchApi || debouncedSearchQuery().searchApi === "curseforge"),
     queryFn: (ctx) => {
-      return rspcContext.client.query([
-        "modplatforms.unifiedSearch",
-        {
-          searchQuery: searchQuery().searchQuery,
-          categories: searchQuery().categories,
-          gameVersions: searchQuery().gameVersions,
-          modloaders: !shouldBypassModloaderFilter(searchQuery().projectType)
-            ? searchQuery().modloaders
-            : null,
-          pageSize: actualPageSize(),
-          projectType: searchQuery().projectType,
-          index: ctx.pageParam,
-          searchApi: "curseforge",
-          environment: searchQuery().environment,
-          platformFilters: searchQuery().platformFilters
-        }
-      ])
+      return rspcContext.client.query(
+        [
+          "modplatforms.unifiedSearch",
+          {
+            searchQuery: debouncedSearchQuery().searchQuery,
+            categories: debouncedSearchQuery().categories,
+            gameVersions: debouncedSearchQuery().gameVersions,
+            modloaders: !shouldBypassModloaderFilter(debouncedSearchQuery().projectType)
+              ? debouncedSearchQuery().modloaders
+              : null,
+            pageSize: actualPageSize(),
+            projectType: debouncedSearchQuery().projectType,
+            index: ctx.pageParam,
+            searchApi: "curseforge",
+            environment: debouncedSearchQuery().environment,
+            platformFilters: debouncedSearchQuery().platformFilters
+          }
+        ],
+        { signal: ctx.signal }
+      )
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
@@ -220,29 +271,34 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   }))
 
   const mrInfiniteResults = createInfiniteQuery(() => ({
-    queryKey: ["modplatforms.unifiedSearch.mr"],
+    queryKey: [
+      "modplatforms.unifiedSearch.mr",
+      searchCacheKey(debouncedSearchQuery())
+    ],
     enabled:
       !isDirectMode() &&
-      (searchQuery().searchQuery?.length || 0) > 0 &&
-      (!searchQuery().searchApi || searchQuery().searchApi === "modrinth"),
+      (!debouncedSearchQuery().searchApi || debouncedSearchQuery().searchApi === "modrinth"),
     queryFn: (ctx) => {
-      return rspcContext.client.query([
-        "modplatforms.unifiedSearch",
-        {
-          searchQuery: searchQuery().searchQuery,
-          categories: searchQuery().categories,
-          gameVersions: searchQuery().gameVersions,
-          modloaders: !shouldBypassModloaderFilter(searchQuery().projectType)
-            ? searchQuery().modloaders
-            : null,
-          pageSize: actualPageSize(),
-          projectType: searchQuery().projectType,
-          index: ctx.pageParam,
-          searchApi: "modrinth",
-          environment: searchQuery().environment,
-          platformFilters: searchQuery().platformFilters
-        }
-      ])
+      return rspcContext.client.query(
+        [
+          "modplatforms.unifiedSearch",
+          {
+            searchQuery: debouncedSearchQuery().searchQuery,
+            categories: debouncedSearchQuery().categories,
+            gameVersions: debouncedSearchQuery().gameVersions,
+            modloaders: !shouldBypassModloaderFilter(debouncedSearchQuery().projectType)
+              ? debouncedSearchQuery().modloaders
+              : null,
+            pageSize: actualPageSize(),
+            projectType: debouncedSearchQuery().projectType,
+            index: ctx.pageParam,
+            searchApi: "modrinth",
+            environment: debouncedSearchQuery().environment,
+            platformFilters: debouncedSearchQuery().platformFilters
+          }
+        ],
+        { signal: ctx.signal }
+      )
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
@@ -252,29 +308,6 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
         : null
     }
   }))
-
-  // Debounce search query changes to avoid excessive refetching
-  createEffect((prevQuery) => {
-    const currentQuery = searchQuery()
-
-    // Only refetch if query actually changed (deep comparison)
-    const queryChanged =
-      JSON.stringify(prevQuery) !== JSON.stringify(currentQuery)
-
-    if (queryChanged) {
-      rspcContext.queryClient.removeQueries({
-        queryKey: ["modplatforms.unifiedSearch.cf"]
-      })
-      rspcContext.queryClient.removeQueries({
-        queryKey: ["modplatforms.unifiedSearch.mr"]
-      })
-
-      mrInfiniteResults.refetch()
-      cfInfiniteResults.refetch()
-    }
-
-    return currentQuery
-  }, null)
 
   const allRows = createMemo<SearchResultItem[]>(() => {
     // Direct mode - return results from batch query
@@ -294,40 +327,53 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
     // Regular search mode
     const cfData =
-      searchQuery().searchApi === "modrinth"
+      debouncedSearchQuery().searchApi === "modrinth"
         ? []
         : (cfInfiniteResults.data?.pages.flatMap((p) => p.data) ?? [])
     const mrData =
-      searchQuery().searchApi === "curseforge"
+      debouncedSearchQuery().searchApi === "curseforge"
         ? []
         : (mrInfiniteResults.data?.pages.flatMap((p) => p.data) ?? [])
 
     let results: SearchResultItem[] = []
 
-    if (searchQuery().searchApi === "curseforge") {
+    if (debouncedSearchQuery().searchApi === "curseforge") {
       results = cfData.map((item) => ({ type: "value", value: item }))
-    } else if (searchQuery().searchApi === "modrinth") {
+    } else if (debouncedSearchQuery().searchApi === "modrinth") {
       results = mrData.map((item) => ({ type: "value", value: item }))
     } else {
-      // Interleave results
+      // Both platforms — interleave with skeleton placeholders for the slower platform
+      const cfFetching = cfInfiniteResults.isFetching
+      const mrFetching = mrInfiniteResults.isFetching
+
+      // When a platform has no data but is still fetching, expect actualPageSize() items
+      const cfExpected = cfData.length > 0 ? cfData.length : (cfFetching ? actualPageSize() : 0)
+      const mrExpected = mrData.length > 0 ? mrData.length : (mrFetching ? actualPageSize() : 0)
+      const maxLength = Math.max(cfExpected, mrExpected)
+
       const interleaved: SearchResultItem[] = []
-      const maxLength = Math.max(cfData.length, mrData.length)
       for (let i = 0; i < maxLength; i++) {
-        if (i < cfData.length)
+        // CF slot
+        if (i < cfData.length) {
           interleaved.push({ type: "value", value: cfData[i] })
-        if (i < mrData.length)
+        } else if (cfFetching) {
+          interleaved.push({ type: "skeleton", platform: "curseforge" })
+        }
+        // MR slot
+        if (i < mrData.length) {
           interleaved.push({ type: "value", value: mrData[i] })
+        } else if (mrFetching) {
+          interleaved.push({ type: "skeleton", platform: "modrinth" })
+        }
       }
       results = interleaved
     }
 
-    // Add a loader item if either query is loading or fetching more data
-    const cfLoading =
-      cfInfiniteResults.isFetching && searchQuery().searchApi !== "modrinth"
-    const mrLoading =
-      mrInfiniteResults.isFetching && searchQuery().searchApi !== "curseforge"
-
-    if (cfLoading || mrLoading) {
+    // Single-platform filter: keep the trailing loader sentinel
+    const searchApi = debouncedSearchQuery().searchApi
+    if (searchApi === "curseforge" && cfInfiniteResults.isFetching) {
+      results.push({ type: "loader" })
+    } else if (searchApi === "modrinth" && mrInfiniteResults.isFetching) {
       results.push({ type: "loader" })
     }
 
@@ -335,9 +381,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   })
 
   const hasNextPage = createMemo(() => {
-    if (searchQuery().searchApi === "curseforge") {
+    if (debouncedSearchQuery().searchApi === "curseforge") {
       return cfInfiniteResults.hasNextPage
-    } else if (searchQuery().searchApi === "modrinth") {
+    } else if (debouncedSearchQuery().searchApi === "modrinth") {
       return mrInfiniteResults.hasNextPage
     }
     return cfInfiniteResults.hasNextPage || mrInfiniteResults.hasNextPage
@@ -347,7 +393,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     const virtualizer = ref()
     setLastScrollOffset(virtualizer?.scrollOffset || 0)
 
-    if (!virtualizer || isLoading()) return
+    if (!virtualizer || allRows().length === 0) return
 
     // Check if we're near the bottom with an increased threshold
     const endIndex = virtualizer.findEndIndex()
@@ -357,9 +403,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     const loadThreshold = Math.ceil(totalItems - totalItems * 0.25)
 
     if (endIndex >= loadThreshold && hasNextPage()) {
-      if (searchQuery().searchApi === "curseforge") {
+      if (debouncedSearchQuery().searchApi === "curseforge") {
         cfInfiniteResults.fetchNextPage()
-      } else if (searchQuery().searchApi === "modrinth") {
+      } else if (debouncedSearchQuery().searchApi === "modrinth") {
         mrInfiniteResults.fetchNextPage()
       } else {
         // If both platforms are enabled, fetch both
@@ -377,11 +423,18 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     if (isDirectMode()) {
       return directSearchQuery.isLoading
     }
-    if (searchQuery().searchApi === "curseforge") {
+    if (debouncedSearchQuery().searchApi === "curseforge") {
       return cfInfiniteResults.isLoading
-    } else if (searchQuery().searchApi === "modrinth") {
+    } else if (debouncedSearchQuery().searchApi === "modrinth") {
       return mrInfiniteResults.isLoading
     }
+    // Both platforms — show results as soon as ANY platform has data.
+    // The interleaved view handles the missing platform with skeleton placeholders.
+    const cfHasData = (cfInfiniteResults.data?.pages?.length ?? 0) > 0
+    const mrHasData = (mrInfiniteResults.data?.pages?.length ?? 0) > 0
+    if (cfHasData || mrHasData) return false
+
+    // Neither has data — still loading if either query is active
     return cfInfiniteResults.isLoading || mrInfiniteResults.isLoading
   })
 
@@ -389,9 +442,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     if (isDirectMode()) {
       return directSearchQuery.isLoading || directSearchQuery.isFetching
     }
-    if (searchQuery().searchApi === "curseforge") {
+    if (debouncedSearchQuery().searchApi === "curseforge") {
       return cfInfiniteResults.isLoading || cfInfiniteResults.isFetching
-    } else if (searchQuery().searchApi === "modrinth") {
+    } else if (debouncedSearchQuery().searchApi === "modrinth") {
       return mrInfiniteResults.isLoading || mrInfiniteResults.isFetching
     }
     return (
@@ -424,7 +477,10 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     selectedInstanceId,
     // Direct search mode
     isDirectMode,
-    parsedQuery
+    parsedQuery,
+    // Share mode
+    isShareMode,
+    shareCode
   }
 }
 

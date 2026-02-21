@@ -17,6 +17,8 @@ import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { SearchResultItem } from "@/utils/platformSearch"
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
+import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 
 const ITEM_WIDTH = 320 // Approximate width of each grid item in pixels (larger for better visuals)
 const GAP = 24 // Gap between items in pixels
@@ -127,7 +129,7 @@ export function Grid() {
   const gridScrollHandler = (_index: number) => {
     const virtualizer = searchContext?.ref()
 
-    if (!virtualizer || searchContext?.isLoading()) return
+    if (!virtualizer || (searchContext?.allRows().length ?? 0) === 0) return
 
     // Get the row-based end index and convert to item index
     const endRowIndex = virtualizer.findEndIndex()
@@ -149,10 +151,18 @@ export function Grid() {
   }
 
   // Grid item skeleton matching actual card design
-  const GridItemSkeleton = () => (
+  const GridItemSkeleton = (props: { platform?: "curseforge" | "modrinth" }) => (
     <div class="bg-darkSlate-800 relative aspect-square overflow-hidden rounded-2xl border border-white/5">
-      {/* Image area skeleton */}
-      <Skeleton class="h-full w-full rounded-none" />
+      {/* Image area skeleton with platform icon */}
+      <div class="skeleton-shimmer bg-darkSlate-500 flex h-full w-full items-center justify-center">
+        <Show when={props.platform}>
+          <img
+            src={props.platform === "curseforge" ? CurseforgeLogo : ModrinthLogo}
+            class="h-8 w-8 opacity-40"
+            alt={`${props.platform} logo`}
+          />
+        </Show>
+      </div>
 
       {/* Bottom overlay matching card design */}
       <div class="absolute inset-x-0 bottom-0 h-1/5 border-t border-white/10 bg-black/60 p-3">
@@ -181,7 +191,7 @@ export function Grid() {
     <div ref={containerRef} class="flex h-full flex-col overflow-hidden">
       <div class="flex-1 overflow-hidden">
         <Show
-          when={!searchContext?.isInitialLoading()}
+          when={!searchContext?.isInitialLoading() || (searchContext?.allRows() || []).some(r => r.type === 'value')}
           fallback={<GridSkeleton />}
         >
           <Show
@@ -227,8 +237,8 @@ export function Grid() {
                 >
                   <For each={row}>
                     {(item) => {
-                      if (item.type === "loader") {
-                        return <GridItemSkeleton />
+                      if (item.type === "loader" || item.type === "skeleton") {
+                        return <GridItemSkeleton platform={item.platform} />
                       }
 
                       return (
