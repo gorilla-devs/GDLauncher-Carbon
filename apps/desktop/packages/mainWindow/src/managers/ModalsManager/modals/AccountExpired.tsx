@@ -42,7 +42,7 @@ function AccountExpired(props: ModalProps) {
             type="secondary"
             size="large"
             onClick={() => {
-              launchInstanceMutation.mutate(props.data?.id)
+              launchInstanceMutation.mutate({ id: props.data?.id, skipMemoryCheck: false })
               modalsContext?.closeModal()
             }}
           >

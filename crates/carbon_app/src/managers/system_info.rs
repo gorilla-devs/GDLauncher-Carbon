@@ -25,6 +25,12 @@ impl SystemInfoManager {
         lock.used_memory()
     }
 
+    pub async fn get_available_ram(&self) -> u64 {
+        let mut lock = self.system.lock().await;
+        lock.refresh_memory();
+        lock.available_memory()
+    }
+
     pub async fn get_cpus(&self) -> u32 {
         let lock = self.system.lock().await;
         lock.cpus().len() as u32

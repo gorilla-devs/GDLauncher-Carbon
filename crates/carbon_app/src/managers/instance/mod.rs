@@ -56,7 +56,7 @@ pub mod installer;
 pub mod log;
 pub mod modpack;
 mod mods;
-mod run;
+pub mod run;
 mod schema;
 
 #[derive(Debug)]

@@ -109,6 +109,24 @@ pub enum InstanceShareError {
     Unknown(String),
 }
 
+impl crate::error::FeErrorCode for InstanceShareError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::ShareNotFound => "SHARE_NOT_FOUND",
+            Self::QuotaExceeded => "QUOTA_EXCEEDED",
+            Self::MaxDownloadsExceeded => "MAX_DOWNLOADS_EXCEEDED",
+            Self::UploadTimeout => "UPLOAD_TIMEOUT",
+            Self::UserNotVerified => "USER_NOT_VERIFIED",
+            Self::TooManyActiveShares => "TOO_MANY_ACTIVE_SHARES",
+            Self::AccountBanned => "ACCOUNT_BANNED",
+            Self::InvalidHeader(_) => "INVALID_HEADER",
+            Self::Json(_) => "JSON_ERROR",
+            Self::Network(_) | Self::NetworkMiddleware(_) => "NETWORK_ERROR",
+            Self::Unknown(_) => "UNKNOWN_ERROR",
+        }
+    }
+}
+
 impl InstanceShareError {
     fn from_response(status: StatusCode, body: &str) -> Self {
         if let Ok(resp) = serde_json::from_str::<EnderiumErrorResponse>(body) {
@@ -124,23 +142,6 @@ impl InstanceShareError {
             }
         } else {
             Self::Unknown(format!("HTTP {}: {}", status.as_u16(), body))
-        }
-    }
-
-    /// Get the error code string for frontend consumption
-    pub fn error_code(&self) -> &'static str {
-        match self {
-            Self::ShareNotFound => "SHARE_NOT_FOUND",
-            Self::QuotaExceeded => "QUOTA_EXCEEDED",
-            Self::MaxDownloadsExceeded => "MAX_DOWNLOADS_EXCEEDED",
-            Self::UploadTimeout => "UPLOAD_TIMEOUT",
-            Self::UserNotVerified => "USER_NOT_VERIFIED",
-            Self::TooManyActiveShares => "TOO_MANY_ACTIVE_SHARES",
-            Self::AccountBanned => "ACCOUNT_BANNED",
-            Self::InvalidHeader(_) => "INVALID_HEADER",
-            Self::Json(_) => "JSON_ERROR",
-            Self::Network(_) | Self::NetworkMiddleware(_) => "NETWORK_ERROR",
-            Self::Unknown(_) => "UNKNOWN_ERROR",
         }
     }
 }

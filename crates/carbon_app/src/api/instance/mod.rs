@@ -6,7 +6,7 @@ use super::translation::Translation;
 use super::vtask::FETaskId;
 use crate::api::keys;
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
-use crate::error::{AxumError, FeError};
+use crate::error::{AxumError, FeError, FeErrorCode};
 use crate::managers::account::gdl_account::{
     PaginatedShares, QuotaInfo, RegenerateShareCodeResponse, SharedMod, ShareInfo, SharePreview,
     UpdateShareBody, WaitForShareInstanceResponse,
@@ -254,7 +254,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(FETaskId::from(vtask_id))
         }
 
-        mutation LAUNCH_INSTANCE[app, id: FEInstanceId] {
+        mutation LAUNCH_INSTANCE[app, args: FELaunchInstanceArgs] {
             let account = app.account_manager()
                 .get_active_account()
                 .await?;
@@ -263,8 +263,37 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 return Err(anyhow::anyhow!("attempted to launch instance without an account"));
             };
 
+            if !args.skip_memory_check {
+                let instance_id = crate::domain::instance::InstanceId(args.id.0);
+                let (_xms, xmx) = app.instance_manager()
+                    .get_effective_memory(instance_id)
+                    .await?;
+
+                let available_bytes = app.system_info_manager()
+                    .get_available_ram()
+                    .await;
+                let available_mb = (available_bytes / 1024 / 1024) as u16;
+
+                // If we couldn't determine available RAM, skip the check
+                // and let the user launch normally.
+                if available_mb > 0 {
+                    // JVM needs native memory beyond the heap for JIT compiler, thread
+                    // stacks, metaspace, GC structures, direct buffers, etc.
+                    // A 1500 MB buffer accounts for this overhead.
+                    let total_estimated_mb = xmx.saturating_add(1500);
+
+                    if total_estimated_mb > available_mb {
+                        return Err(crate::managers::instance::run::InsufficientMemoryError {
+                            instance_id: args.id.0,
+                            requested_mb: xmx,
+                            available_mb,
+                        }.into());
+                    }
+                }
+            }
+
             app.instance_manager()
-                .prepare_game(id.into(), Some(account), None, false)
+                .prepare_game(args.id.into(), Some(account), None, false)
                 .await?;
 
             Ok(())
@@ -976,6 +1005,14 @@ struct FEUpdateInstance {
     mod_sources: Option<Set<Option<ModSources>>>,
     #[specta(optional)]
     modpack_locked: Option<Set<Option<bool>>>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FELaunchInstanceArgs {
+    id: FEInstanceId,
+    #[serde(default)]
+    skip_memory_check: bool,
 }
 
 #[derive(Type, Debug, Deserialize)]

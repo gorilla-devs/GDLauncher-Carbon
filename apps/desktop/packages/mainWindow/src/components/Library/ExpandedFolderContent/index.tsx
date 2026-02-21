@@ -391,9 +391,12 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
 
     onCleanup(() => {
       window.removeEventListener("keydown", handleEscape)
-      const overlay = document.getElementById("overlay")
-      if (overlay) {
-        overlay.style.display = "none"
+      // Hide the overlay unless a modal is still open on top of it
+      if (!modalsContext?.hasOpenModals()) {
+        const overlay = document.getElementById("overlay")
+        if (overlay) {
+          overlay.style.display = "none"
+        }
       }
     })
   })
@@ -417,7 +420,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
           {/* Overlay content - centered via parent flex */}
           <div
             ref={scrollContainerRef}
-            class="bg-darkSlate-800 border-darkSlate-600 relative z-10 h-3/5 max-h-[500px] w-3/5 max-w-3xl overflow-auto rounded-lg border p-6 backdrop-blur-sm"
+            class="bg-darkSlate-800 border-darkSlate-600 relative z-10 h-3/5 max-h-[600px] w-3/5 max-w-3xl overflow-auto rounded-lg border p-6 backdrop-blur-sm"
             onClick={(e) => e.stopPropagation()}
             style={
               clickedFolderId() === groupId

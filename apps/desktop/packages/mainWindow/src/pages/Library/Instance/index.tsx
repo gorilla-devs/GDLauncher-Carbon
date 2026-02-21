@@ -270,7 +270,7 @@ const Instance = () => {
       )
       return
     }
-    launchInstanceMutation.mutate(parsedInstanceId)
+    launchInstanceMutation.mutate({ id: parsedInstanceId, skipMemoryCheck: false })
   }
 
   const isRunning = () =>

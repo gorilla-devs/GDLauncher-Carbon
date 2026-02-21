@@ -179,7 +179,7 @@ const FavoriteTile = (props: FavoriteTileProps) => {
       return
     }
 
-    launchInstanceMutation.mutate(props.instanceId)
+    launchInstanceMutation.mutate({ id: props.instanceId, skipMemoryCheck: false })
   }
 
   const handleDelete = () => {

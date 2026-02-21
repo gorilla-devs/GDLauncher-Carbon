@@ -474,6 +474,17 @@ const Settings = () => {
             }}
           />
         </div>
+        <Show
+          when={
+            routeData?.instanceDetails.data?.memory?.max_mb &&
+            routeData.instanceDetails.data.memory.max_mb > mbTotalRAM() * 0.8
+          }
+        >
+          <div class="mt-2 flex items-center gap-2 px-2 text-sm text-yellow-500">
+            <div class="i-hugeicons:alert-02 h-4 w-4 shrink-0" />
+            <Trans key="java:_trn_ram_warning_high_allocation" />
+          </div>
+        </Show>
       </Show>
 
       <Row>

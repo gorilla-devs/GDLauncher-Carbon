@@ -185,6 +185,7 @@ keys! {
     systeminfo {
         GET_TOTAL_RAM                               = "getTotalRAM";
         GET_USED_RAM                                = "getUsedRAM";
+        GET_AVAILABLE_RAM                           = "getAvailableRAM";
     }
 
     modplatforms {

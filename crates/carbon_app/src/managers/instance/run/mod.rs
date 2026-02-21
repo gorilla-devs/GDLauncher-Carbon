@@ -58,6 +58,28 @@ mod java;
 mod minecraft;
 mod modpack;
 
+#[derive(thiserror::Error, Debug)]
+#[error("Minecraft needs {requested_mb} MB but only {available_mb} MB is available")]
+pub struct InsufficientMemoryError {
+    pub instance_id: i32,
+    pub requested_mb: u16,
+    pub available_mb: u16,
+}
+
+impl crate::error::FeErrorCode for InsufficientMemoryError {
+    fn error_code(&self) -> &'static str {
+        "INSUFFICIENT_MEMORY"
+    }
+
+    fn error_data(&self) -> Option<serde_json::Value> {
+        Some(serde_json::json!({
+            "instance_id": self.instance_id,
+            "requested_mb": self.requested_mb,
+            "available_mb": self.available_mb
+        }))
+    }
+}
+
 #[derive(Debug)]
 pub struct PersistenceManager {
     instance_download_lock: Semaphore,
@@ -79,6 +101,32 @@ type InstanceCallback = Box<
 >;
 
 impl ManagerRef<'_, InstanceManager> {
+    /// Resolve the effective memory (xms, xmx) for an instance.
+    /// Uses instance-level override if set, otherwise falls back to global settings.
+    pub async fn get_effective_memory(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<(u16, u16)> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let InstanceType::Valid(data) = &instance.type_ else {
+            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
+        };
+
+        match data.config.game_configuration.memory {
+            Some(memory) => Ok(memory),
+            None => self
+                .app
+                .settings_manager()
+                .get_settings()
+                .await
+                .map(|c| (c.xms as u16, c.xmx as u16)),
+        }
+    }
+
     #[tracing::instrument(skip(self, callback_task))]
     pub async fn prepare_game(
         self,

@@ -5,12 +5,15 @@ import {
   For,
   JSX,
   lazy,
+  onCleanup,
+  onMount,
   useContext
 } from "solid-js"
 import { Dynamic, Portal } from "solid-js/web"
 import { useTransContext, TypedTFunction } from "@gd/i18n"
 import { useGDNavigate } from "../NavigationManager"
 import adSize from "@/utils/adhelper"
+import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
 
 export interface ModalProps {
   title: string
@@ -179,6 +182,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
   requiresGdlAccount: {
     component: lazy(() => import("./modals/RequiresGdlAccountModal")),
     title: t("accounts:_trn_requires_gdl_account")
+  },
+  insufficientMemory: {
+    component: lazy(() => import("./modals/InsufficientMemory")),
+    title: t("java:_trn_insufficient_memory_title")
   }
 })
 
@@ -192,6 +199,7 @@ interface Modal {
 interface Context {
   openModal: (_modal: Modal, _data?: any) => void
   closeModal: () => void
+  hasOpenModals: () => boolean
 }
 
 type Stack = { name: ModalName; data: any }[]
@@ -206,6 +214,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const queryParams = () => location.search as ModalName
   const urlSearchParams = () => new URLSearchParams(queryParams())
   const [modalStack, setModalStack] = createSignal<Stack>([])
+  let modalPortalRef: HTMLDivElement | undefined
 
   const [_searchParams, setSearchParams] = useSearchParams()
 
@@ -240,12 +249,29 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
     if (modalStack().length === 0) {
       const overlay = document.getElementById("overlay")!
-      overlay.style.opacity = "0"
-      setTimeout(() => {
-        overlay.style.display = "none"
-      }, 100) // Wait for transition to complete
+      // Only hide the overlay if nothing else (e.g. an expanded folder) is
+      // using it. The folder portal also renders into #overlay, so hiding it
+      // here would close the folder too.
+      const hasOtherContent = Array.from(overlay.children).some(
+        (child) =>
+          !(modalPortalRef && child.contains(modalPortalRef)) &&
+          child.childNodes.length > 0
+      )
+      if (!hasOtherContent) {
+        overlay.style.opacity = "0"
+        setTimeout(() => {
+          overlay.style.display = "none"
+        }, 100) // Wait for transition to complete
+      }
     }
   }
+
+  onMount(() => {
+    const cleanup = listenMemoryWarning((data) => {
+      manager.openModal({ name: "insufficientMemory" }, data)
+    })
+    onCleanup(cleanup)
+  })
 
   const manager = {
     openModal: (modal: Modal, data: any) => {
@@ -273,14 +299,15 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         })
       }
     },
-    closeModal
+    closeModal,
+    hasOpenModals: () => modalStack().length > 0
   }
 
   return (
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay")!}>
-        <div class="h-screen w-screen">
+        <div ref={modalPortalRef} class="h-screen w-screen">
           <For each={modalStack()}>
             {(modal, index) => {
               const ModalComponent = defaultModals[modal.name].component

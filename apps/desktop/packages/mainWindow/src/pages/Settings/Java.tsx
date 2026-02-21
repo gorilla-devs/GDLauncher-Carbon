@@ -183,6 +183,16 @@ const Java = () => {
               }}
             />
           </Center>
+          <Show
+            when={
+              settings.data?.xmx && settings.data.xmx > mbTotalRAM() * 0.8
+            }
+          >
+            <div class="mt-2 flex items-center gap-2 text-sm text-yellow-500">
+              <div class="i-hugeicons:alert-02 h-4 w-4 shrink-0" />
+              <Trans key="java:_trn_ram_warning_high_allocation" />
+            </div>
+          </Show>
         </Row>
         <Row class="flex-col items-stretch">
           <Title>

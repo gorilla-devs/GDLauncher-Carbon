@@ -148,7 +148,7 @@ const Tile = (props: Props) => {
       return
     }
 
-    launchInstanceMutation.mutate(props.instance.id)
+    launchInstanceMutation.mutate({ id: props.instance.id, skipMemoryCheck: false })
   }
 
   const handleDelete = () => {
