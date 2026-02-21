@@ -1,5 +1,5 @@
 import { FETask } from "@gd/core_module/bindings"
-import { RSPCError } from "@rspc/client"
+import { RSPCError } from "@/utils/rspcClient"
 import { CreateQueryResult } from "@tanstack/solid-query"
 import { createSignal } from "solid-js"
 import { createStore } from "solid-js/store"

@@ -3,7 +3,7 @@ import type {
   CreateMutationResult,
   CreateQueryResult
 } from "@tanstack/solid-query"
-import type { RSPCError } from "@rspc/client"
+import type { RSPCError } from "@/utils/rspcClient"
 import type {
   FEGDLAccount,
   FESettingsUpdate,

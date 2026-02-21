@@ -15,6 +15,7 @@ import {
 import { createAsyncEffect } from "@/utils/asyncEffect"
 import { Router, hashIntegration } from "@solidjs/router"
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient"
+import { QueryClientProvider } from "@tanstack/solid-query"
 import { i18n, TransProvider, loadLanguageFiles } from "@gd/i18n"
 import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
@@ -177,15 +178,15 @@ interface InnerAppProps {
 }
 
 const InnerApp = (props: InnerAppProps) => {
-  const { client, createInvalidateQuery } = initRspc(props.port)
+  const { createInvalidateQuery } = initRspc(props.port)
 
   return (
-    <rspc.Provider client={client} queryClient={queryClient}>
+    <QueryClientProvider client={queryClient}>
       <TransWrapper
         createInvalidateQuery={createInvalidateQuery}
         isBackendReady={props.isBackendReady}
       />
-    </rspc.Provider>
+    </QueryClientProvider>
   )
 }
 

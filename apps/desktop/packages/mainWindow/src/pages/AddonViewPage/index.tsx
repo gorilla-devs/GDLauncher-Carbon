@@ -43,7 +43,7 @@ import {
   FEUnifiedSearchResultWithDescription
 } from "@gd/core_module/bindings"
 import { CreateQueryResult } from "@tanstack/solid-query"
-import { RSPCError } from "@rspc/client"
+import { RSPCError } from "@/utils/rspcClient"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import AuthorAvatars, { Author } from "@/components/AuthorAvatars"
 

@@ -6,7 +6,7 @@ import { Trans } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { createSignal, onCleanup } from "solid-js"
 import { Mod } from "@gd/core_module/bindings"
-import { RSPCError } from "@rspc/client"
+import { RSPCError } from "@/utils/rspcClient"
 
 interface Props {
   instanceId: number

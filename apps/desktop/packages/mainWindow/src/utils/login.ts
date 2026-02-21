@@ -4,7 +4,7 @@ import {
   EnrollmentError,
   EnrollmentStatus
 } from "@gd/core_module/bindings"
-import { RSPCError } from "@rspc/client"
+import { RSPCError } from "@/utils/rspcClient"
 import { CreateQueryResult } from "@tanstack/solid-query"
 
 type RouteData = CreateQueryResult<EnrollmentStatus | null, RSPCError>

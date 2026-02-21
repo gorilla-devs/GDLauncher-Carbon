@@ -41,8 +41,6 @@
     "@overwolf/ow-electron-builder": "^26.0.12",
     "@playwright/test": "^1.49.1",
     "@rive-app/canvas": "^2.21.5",
-    "@rspc/client": "0.2.0",
-    "@rspc/solid": "0.2.0",
     "@sentry/electron": "^4.23.0",
     "@sentry/vite-plugin": "^2.14.2",
     "@solid-primitives/deep": "^0.2.3",

@@ -10,7 +10,7 @@ import {
   ListInstance,
   ManifestVersion
 } from "@gd/core_module/bindings"
-import { RSPCError } from "@rspc/client"
+import { RSPCError } from "@/utils/rspcClient"
 import { CreateQueryResult } from "@tanstack/solid-query"
 import {
   JSX,
