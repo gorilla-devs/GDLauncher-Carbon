@@ -73,8 +73,24 @@ function handleGlobalError(error: Error) {
   console.error("RSPC error:", error)
 
   try {
-    const parsed = JSON.parse(error.message) as {
-      cause: { display: string; code?: string; data?: unknown }[]
+    let parsed = JSON.parse(error.message) as {
+      code?: number
+      message?: string
+      cause?: { display: string; code?: string; data?: unknown }[]
+    }
+
+    // rspc wraps errors as {code, message} where message is a JSON string containing {cause, backtrace}
+    if (parsed.message && !parsed.cause) {
+      try {
+        const inner = JSON.parse(parsed.message) as {
+          cause?: { display: string; code?: string; data?: unknown }[]
+        }
+        if (inner.cause) {
+          parsed = inner
+        }
+      } catch {
+        // message wasn't JSON, keep parsed as-is
+      }
     }
 
     const errorCause = parsed.cause?.find((c) => c.code)

@@ -1675,78 +1675,39 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn set_favorite(self, instance_id: InstanceId, favorite: bool) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam};
 
-        const MAX_FAVORITES: usize = 3;
+        const MAX_FAVORITES: usize = 10;
 
         let mut instances = self.instances.write().await;
-        let instance = instances
-            .get_mut(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let data = instance.data_mut()?;
+        // Verify instance exists
+        if !instances.contains_key(&instance_id) {
+            return Err(InvalidInstanceIdError(instance_id).into());
+        }
 
-        // If setting as favorite, check if we need to remove old favorites
-        let mut removed_favorite_ids: Vec<InstanceId> = Vec::new();
+        // If setting as favorite, check the limit before taking mutable borrow
         if favorite {
-            // Collect all current favorites (excluding target instance)
-            let mut current_favorites: Vec<(InstanceId, Option<chrono::DateTime<chrono::Utc>>)> =
-                instances
-                    .iter()
-                    .filter_map(|(&id, inst)| {
-                        if id == instance_id {
-                            return None;
-                        }
-                        match &inst.type_ {
-                            InstanceType::Valid(data) if data.favorite => {
-                                Some((id, data.config.last_played))
-                            }
-                            _ => None,
-                        }
-                    })
-                    .collect();
+            let current_favorite_count = instances
+                .iter()
+                .filter(|(id, inst)| {
+                    **id != instance_id
+                        && matches!(&inst.type_, InstanceType::Valid(data) if data.favorite)
+                })
+                .count();
 
-            // If at or over limit, remove oldest favorites until we have room for the new one
-            if current_favorites.len() >= MAX_FAVORITES {
-                // Sort by last_played (oldest first, None treated as oldest)
-                current_favorites.sort_by(|a, b| match (a.1, b.1) {
-                    (None, None) => std::cmp::Ordering::Equal,
-                    (None, Some(_)) => std::cmp::Ordering::Less,
-                    (Some(_), None) => std::cmp::Ordering::Greater,
-                    (Some(a_time), Some(b_time)) => a_time.cmp(&b_time),
-                });
-
-                // Remove oldest favorites until we have room
-                let to_remove = current_favorites.len() - MAX_FAVORITES + 1;
-                for (id, _) in current_favorites.iter().take(to_remove) {
-                    if let Some(inst) = instances.get_mut(id) {
-                        if let Ok(inst_data) = inst.data_mut() {
-                            inst_data.favorite = false;
-                            removed_favorite_ids.push(*id);
-                        }
-                    }
-                }
+            if current_favorite_count >= MAX_FAVORITES {
+                bail!(
+                    "Maximum number of favorites ({}) reached. Remove a favorite before adding a new one.",
+                    MAX_FAVORITES
+                );
             }
         }
 
-        // Re-get the target instance since we may have modified others
         let instance = instances
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
         let data = instance.data_mut()?;
         data.favorite = favorite;
         drop(instances);
-
-        // Update database for removed favorites
-        for removed_id in &removed_favorite_ids {
-            self.app
-                .prisma_client
-                .instance()
-                .update(
-                    UniqueWhereParam::IdEquals(**removed_id),
-                    vec![SetParam::SetFavorite(false)],
-                )
-                .exec()
-                .await?;
-        }
 
         // Update database for target instance
         self.app
@@ -1763,12 +1724,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
-
-        // Also invalidate details for any removed favorites
-        for removed_id in removed_favorite_ids {
-            self.app
-                .invalidate(INSTANCE_DETAILS, Some(removed_id.0.into()));
-        }
 
         Ok(())
     }

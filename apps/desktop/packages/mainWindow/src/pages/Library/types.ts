@@ -138,7 +138,6 @@ export interface HomeGridProps {
  */
 export interface FoldersViewProps {
   libraryItems: LibraryItem[]
-  favoriteIds: number[]
   defaultGroupId: number | null
   tileSize: Accessor<number>
   selection: SelectionState
@@ -171,5 +170,4 @@ export interface LibraryHeaderProps {
   tileSize: Accessor<number>
   setTileSize: (size: number) => void
   viewMode: Accessor<LibraryViewMode>
-  isFavoritesDropVisible: boolean
 }

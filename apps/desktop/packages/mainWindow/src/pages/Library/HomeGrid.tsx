@@ -45,8 +45,10 @@ import {
 import { parseInstanceIds, parseFolderIds } from "./utils/selectionIds"
 import "@/components/Library/folderTransitions.css"
 
+import { setClickedInstanceId } from "@/components/InstanceTile"
 import { DragProvider, useDragContext } from "./DragContext"
 import { SelectionActionBar } from "./components/SelectionActionBar"
+import { FloatingFavoritesBar } from "./components/FloatingFavoritesBar"
 import { LibraryHeader } from "./components/LibraryHeader"
 import {
   useLibraryData,
@@ -158,9 +160,10 @@ const HomeGridInner = () => {
     }
   })
 
-  // Register drop handler
+  // Register drop handler and clear stale view-transition state
   onMount(() => {
     dragContext.setOnDrop(dragDrop.handleDrop)
+    setClickedInstanceId(undefined)
   })
 
   onCleanup(() => {
@@ -177,9 +180,11 @@ const HomeGridInner = () => {
   }
 
   const dragSelect = useDragSelect({
-    containerRef: () => undefined,
+    containerRef: () =>
+      document.getElementById("gdl-content-wrapper") ?? undefined,
     getItemRects,
-    onSelectionChange: (ids) => selection.selectAll(ids)
+    onSelectionChange: (ids) => selection.selectAll(ids),
+    getExistingSelection: () => selection.selectedIds()
   })
 
   const shouldIgnoreClick = (e: MouseEvent): boolean => {
@@ -346,10 +351,6 @@ const HomeGridInner = () => {
               tileSize={tileSize}
               setTileSize={setTileSize}
               viewMode={viewMode}
-              isFavoritesDropVisible={
-                dragContext.isDragging() &&
-                dragContext.dragType() === "instance"
-              }
             />
             <ContextMenu>
               <ContextMenuTrigger>
@@ -368,7 +369,6 @@ const HomeGridInner = () => {
                     <Match when={showFoldersView()}>
                       <FoldersView
                         libraryItems={data.libraryItems}
-                        favoriteIds={data.favoriteIds}
                         defaultGroupId={defaultGroupId()}
                         tileSize={tileSize}
                         selection={selection}
@@ -444,6 +444,11 @@ const HomeGridInner = () => {
         selectedCount={() => selection.selectedIds().size}
         onClearSelection={selection.clearSelection}
         onDelete={handleBatchDelete}
+      />
+
+      <FloatingFavoritesBar
+        favoriteIds={data.favoriteIds}
+        isSelectionActive={selection.selectedIds().size > 0}
       />
 
       <Show when={dragSelect.selectionRect()}>

@@ -26,7 +26,6 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
-import FavoritesDropZone from "@/components/Library/FavoritesDropZone"
 import { LibraryHeaderProps } from "../types"
 import { InstancesGroupBy, InstancesSortBy } from "@gd/core_module/bindings"
 
@@ -35,7 +34,6 @@ export function LibraryHeader(props: LibraryHeaderProps) {
   const globalStore = useGlobalStore()
   const modals = useModal()
   let inputRef: HTMLInputElement | undefined
-  let favoritesDropZoneRef: HTMLDivElement | undefined
 
   const settingsMutation = rspc.createMutation(() => ({
     mutationKey: ["settings.setSettings"]
@@ -67,38 +65,26 @@ export function LibraryHeader(props: LibraryHeaderProps) {
 
   return (
     <div class="bg-darkSlate-800 z-5 sticky top-0 flex items-center gap-4 py-4">
-      <Show
-        when={props.isFavoritesDropVisible}
-        fallback={
-          <Input
-            ref={inputRef}
-            placeholder={t("search:_trn_search_instances")}
-            value={props.filter()}
-            class="w-full rounded-full"
-            onInput={(e) => props.setFilter(e.target.value)}
-            icon={
-              <Switch>
-                <Match when={props.filter()}>
-                  <div
-                    class="hover:bg-white i-hugeicons:cancel-01"
-                    onClick={() => props.setFilter("")}
-                  />
-                </Match>
-                <Match when={!props.filter()}>
-                  <div class="i-hugeicons:search-01" />
-                </Match>
-              </Switch>
-            }
-          />
+      <Input
+        ref={inputRef}
+        placeholder={t("search:_trn_search_instances")}
+        value={props.filter()}
+        class="w-full rounded-full"
+        onInput={(e) => props.setFilter(e.target.value)}
+        icon={
+          <Switch>
+            <Match when={props.filter()}>
+              <div
+                class="hover:bg-white i-hugeicons:cancel-01"
+                onClick={() => props.setFilter("")}
+              />
+            </Match>
+            <Match when={!props.filter()}>
+              <div class="i-hugeicons:search-01" />
+            </Match>
+          </Switch>
         }
-      >
-        <div ref={favoritesDropZoneRef} class="w-full h-10">
-          <FavoritesDropZone
-            instances={globalStore.instances.data || []}
-            containerRef={favoritesDropZoneRef}
-          />
-        </div>
-      </Show>
+      />
 
       {/* Filter dropdown */}
       <DropdownMenu>

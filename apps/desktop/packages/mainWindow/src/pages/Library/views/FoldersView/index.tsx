@@ -2,7 +2,7 @@
  * FoldersView Component
  *
  * iOS-style folder view for the library.
- * Displays favorites row, main grid with folders + ungrouped instances,
+ * Displays main grid with folders + ungrouped instances,
  * and expanded folder overlay.
  */
 
@@ -10,7 +10,6 @@ import { createEffect, createMemo, Show, Accessor } from "solid-js"
 import { createAutoAnimate } from "@formkit/auto-animate/solid"
 import { useDragContext, DragType } from "../../DragContext"
 import ExpandedFolderContent from "@/components/Library/ExpandedFolderContent"
-import { FavoritesRow } from "./FavoritesRow"
 import { LibraryGrid } from "./LibraryGrid"
 import { LibraryItem, SelectionState, FLIPAnimation } from "../../types"
 import { EntranceAnimationReturn } from "../../hooks/useFLIPAnimation"
@@ -18,7 +17,6 @@ import { parseInstanceIds } from "../../utils/selectionIds"
 
 interface FoldersViewProps {
   libraryItems: LibraryItem[]
-  favoriteIds: number[]
   defaultGroupId: number | null
   tileSize: Accessor<number>
   selection: SelectionState
@@ -39,10 +37,6 @@ export default function FoldersView(props: FoldersViewProps) {
   const dragContext = useDragContext()
 
   // Auto-animate refs for grid containers
-  const [favoritesGridRef, setFavoritesGridEnabled] = createAutoAnimate({
-    duration: 200,
-    easing: "ease-out"
-  })
   const [mainGridRef, setMainGridEnabled] = createAutoAnimate({
     duration: 200,
     easing: "ease-out"
@@ -50,7 +44,6 @@ export default function FoldersView(props: FoldersViewProps) {
 
   // Sync auto-animate with prop
   const updateAutoAnimate = (enabled: boolean) => {
-    setFavoritesGridEnabled(enabled)
     setMainGridEnabled(enabled)
   }
 
@@ -71,14 +64,6 @@ export default function FoldersView(props: FoldersViewProps) {
 
   return (
     <>
-      {/* Favorites Row */}
-      <FavoritesRow
-        favoriteIds={props.favoriteIds}
-        isDragActive={dragContext.isDragging()}
-        justDropped={props.justDropped}
-        gridRef={favoritesGridRef}
-      />
-
       {/* Main Grid: Ungrouped instances + Folder tiles */}
       <LibraryGrid
         libraryItems={props.libraryItems}

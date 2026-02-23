@@ -3,15 +3,15 @@ import { Checkbox } from "@gd/ui"
 import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
 import {
-  buildNestedObject,
   checkedFiles,
   setCheckedFiles
 } from "./ExportCheckboxParent"
 import _ from "lodash"
+import type { ExploreEntry } from "@gd/core_module/bindings"
 
 interface FileFolder {
   name?: string
-  type?: "file" | "folder" | "Directory"
+  type?: ExploreEntry["type"]
   path?: string[]
 }
 export function isSubsetOf(needle: string[], haystack: string[]) {
@@ -64,19 +64,19 @@ const FileCheckbox = (props: { file: FileFolder; name: string }) => {
 
 const ExportCheckbox = (props: {
   folder: FileFolder
-  initialData: any
+  initialData: ExploreEntry[] | undefined
   instanceId: number
 }) => {
   const [isOpen, setIsOpen] = createSignal(false)
-  const [contents, setContents] = createSignal<any[]>([])
+  const [contents, setContents] = createSignal<ExploreEntry[] | null>(null)
   const rspcContext = rspc.useContext()
 
   createAsyncEffect((isStale) => {
     const currentIsOpen = isOpen()
-    const currentContentsLength = contents().length
+    const currentContents = contents()
     const currentPath = props.folder.path
 
-    if (!currentIsOpen && currentContentsLength === 0 && currentPath) {
+    if (!currentIsOpen && currentContents === null && currentPath) {
       rspcContext.client
         .query([
           "instance.explore",
@@ -95,11 +95,6 @@ const ExportCheckbox = (props: {
           console.error("Failed to explore instance folder:", error)
         })
     }
-  })
-
-  createEffect(() => {
-    const obj = buildNestedObject(checkedFiles())
-    console.log(obj)
   })
 
   const handleChange = (checked: boolean, path: string[]) => {
@@ -125,12 +120,13 @@ const ExportCheckbox = (props: {
       isSubsetOf(item, path)
     )
 
+    const currentContents = contents() ?? []
     const isAllChildrenChecked =
       !isAreadyChecked &&
       checkedFiles().filter(
         (item) => item.length - path.length === 1 && isSubsetOf(path, item)
-      ).length === contents().length &&
-      contents().length !== 0
+      ).length === currentContents.length &&
+      currentContents.length !== 0
 
     if (isAreadyChecked || isAllChildrenChecked) {
       setCheckedFiles((prev) => [...prev, path])
@@ -167,16 +163,7 @@ const ExportCheckbox = (props: {
       </Show>
       <div style={{ "margin-left": !props.initialData ? "20px" : "" }}>
         <Show when={isOpen() || props.initialData}>
-          {/* <For each={contents()}>
-            {(item) =>
-              item.type === "folder" ? (
-                <ExportCheckbox folder={item} />
-              ) : (
-                <div>{item.name}</div>
-              )
-            }
-          </For> */}
-          <For each={props.initialData || contents()}>
+          <For each={props.initialData || contents() || []}>
             {(item) => (
               <div class="flex flex-row items-center justify-between">
                 <Switch>
@@ -195,21 +182,6 @@ const ExportCheckbox = (props: {
                     <div class="flex items-center gap-2 p-1">
                       <div class="h-[16px] w-[16px]" />
                       <FileCheckbox name={item.name} file={props.folder} />
-                      {/* <Checkbox
-                        checked={checkedFiles().some((checkedItem) =>
-                          _.isEqual(checkedItem, [
-                            ...(props.folder.path as Array<string>),
-                            item.name
-                          ])
-                        )}
-                        onChange={(checked: boolean) => {
-                          handleChange(checked, [
-                            ...(props.folder.path as Array<string>),
-                            item.name
-                          ] as Array<string>);
-                        }}
-                        children={<span>{item.name}</span>}
-                      /> */}
                     </div>
                   </Match>
                 </Switch>

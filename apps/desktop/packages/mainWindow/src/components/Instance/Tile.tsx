@@ -210,10 +210,12 @@ const Tile = (props: Props) => {
   // Instance is in queue when it has queued state from backend
   const isInQueue = () => props.isQueued
 
+  const [isMenuOpen, setIsMenuOpen] = createSignal(false)
+
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
-        <ContextMenu>
+        <ContextMenu onOpenChange={setIsMenuOpen}>
           <ContextMenuContent>
             <ContextMenuGroup>
               <ContextMenuGroupLabel>
@@ -371,7 +373,7 @@ const Tile = (props: Props) => {
           </ContextMenuContent>
           <ContextMenuTrigger>
             <div
-              class={`group relative flex select-none flex-col items-center justify-center ${PRESS_CLASSES_LIGHT}`}
+              class={`group isolate relative flex select-none flex-col items-center justify-center ${PRESS_CLASSES_LIGHT}`}
               classList={{
                 "opacity-0": props.isDragging,
                 "cursor-grab": !isLoading() && !isInQueue() && !props.isDeleting && !props.instance.locked
@@ -388,6 +390,10 @@ const Tile = (props: Props) => {
                 }
               }}
               onPointerDown={(e) => {
+                // Close context menu on left click inside trigger
+                if (e.button === 0 && isMenuOpen()) {
+                  document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+                }
                 // Only handle left click and if not loading/queued/deleting
                 // Note: locked instances can still be reordered (locked only prevents content modification)
                 if (
@@ -454,7 +460,9 @@ const Tile = (props: Props) => {
                         classList={{
                           grayscale: isLoading() || isInQueue(),
                           "group-hover:scale-110 group-hover:blur-[2px]":
-                            !isLoading() && !isInQueue() && !props.isDragActive
+                            !isLoading() && !isInQueue() && !props.isDragActive,
+                          "scale-110 blur-[2px]":
+                            isMenuOpen() && !isLoading() && !isInQueue() && !props.isDragActive
                         }}
                         style={{
                           "background-image": props.img
@@ -473,7 +481,8 @@ const Tile = (props: Props) => {
                         class="z-1 absolute inset-0 rounded-2xl bg-black/0 transition-all duration-300 ease-spring"
                         classList={{
                           "!bg-black/0": isLoading() || isInQueue(),
-                          "group-hover:bg-black/30": !props.isDragActive
+                          "group-hover:bg-black/30": !props.isDragActive,
+                          "bg-black/30": isMenuOpen() && !props.isDragActive
                         }}
                       />
                       <Show when={props.isInvalid}>
@@ -624,6 +633,12 @@ const Tile = (props: Props) => {
                             "-translate-x-3 opacity-0":
                               !props.isMultiSelected && (!isHovering() || props.isDragActive)
                           }}
+                          onPointerDown={(e) => {
+                            e.stopPropagation()
+                            if (isMenuOpen()) {
+                              document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+                            }
+                          }}
                           onClick={(e) => {
                             e.stopPropagation()
                             e.preventDefault()
@@ -693,7 +708,15 @@ const Tile = (props: Props) => {
                             !props.failError &&
                             !props.isRunning &&
                             !props.isDeleting &&
-                            !props.isDragActive
+                            !props.isDragActive,
+                          "!flex !translate-x-0 !opacity-100":
+                            isMenuOpen() &&
+                            !isLoading() &&
+                            !isInQueue() &&
+                            !props.isInvalid &&
+                            !props.failError &&
+                            !props.isRunning &&
+                            !props.isDeleting
                         }}
                         style={
                           props.shouldSetViewTransition

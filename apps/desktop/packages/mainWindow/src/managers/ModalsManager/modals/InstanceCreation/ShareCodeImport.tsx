@@ -69,10 +69,10 @@ const ShareCodeImport = () => {
               </div>
             </Match>
 
-            {/* Share preview (debounced) */}
-            <Match when={debouncedCode()}>
+            {/* Share preview (shown immediately, query debounced) */}
+            <Match when={parsedShareCode()}>
               <SharePreviewContent
-                shareCode={debouncedCode()!}
+                shareCode={debouncedCode() || null}
                 onImportSuccess={() => modalsContext?.closeModal()}
               />
             </Match>

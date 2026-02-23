@@ -14,7 +14,14 @@ import {
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { port, rspc } from "@/utils/rspcClient"
-import { createEffect, createSignal, Match, Show, Switch } from "solid-js"
+import {
+  createEffect,
+  createSignal,
+  Match,
+  onCleanup,
+  Show,
+  Switch
+} from "solid-js"
 import { FEWaitForInstanceShareResponse } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useNavigate } from "@solidjs/router"
@@ -53,8 +60,8 @@ interface Props {
 const EXPIRATION_OPTIONS = [
   { value: "1", label: "_trn_instance_share.expiration_1d" },
   { value: "7", label: "_trn_instance_share.expiration_7d" },
-  { value: "30", label: "_trn_instance_share.expiration_30d" },
-  { value: "90", label: "_trn_instance_share.expiration_90d" }
+  // { value: "30", label: "_trn_instance_share.expiration_30d" },
+  // { value: "90", label: "_trn_instance_share.expiration_90d" }
 ] as const
 
 function ShareInstance(props: ModalProps) {
@@ -68,6 +75,15 @@ function ShareInstance(props: ModalProps) {
   const [fileKey, setFileKey] = createSignal<string>()
   const [isLoading, setIsLoading] = createSignal(false)
   const [progress, setProgress] = createSignal(0)
+
+  let sseStream: EventSource | null = null
+
+  onCleanup(() => {
+    if (sseStream) {
+      sseStream.close()
+      sseStream = null
+    }
+  })
 
   // New state for title, expiration, and max downloads
   const [title, setTitle] = createSignal("")
@@ -110,7 +126,7 @@ function ShareInstance(props: ModalProps) {
       params.set("maxDownloads", maxDownloadsValue)
     }
 
-    const sseStream = new EventSource(
+    sseStream = new EventSource(
       `http://127.0.0.1:${port}/instance/shareInstance?${params.toString()}`
     )
 
@@ -290,7 +306,13 @@ function ShareInstance(props: ModalProps) {
           <Show when={!shareObject()}>
             <Button
               type="secondary"
-              onClick={() => modalsContext?.closeModal()}
+              onClick={() => {
+                if (sseStream) {
+                  sseStream.close()
+                  sseStream = null
+                }
+                modalsContext?.closeModal()
+              }}
             >
               <Trans key="instances:_trn_instance_share.cancel" />
             </Button>

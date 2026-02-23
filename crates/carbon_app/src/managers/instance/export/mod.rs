@@ -8,6 +8,7 @@ use std::{
 
 use itertools::Itertools;
 use tokio::{io::AsyncReadExt, sync::mpsc};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 use zip::{
     ZipWriter,
@@ -274,6 +275,7 @@ impl ManagerRef<'_, InstanceExportManager> {
                     save_path,
                     self_contained_addons_bundling,
                     filter,
+                    None,
                 )
                 .await
             }
@@ -286,6 +288,7 @@ impl ManagerRef<'_, InstanceExportManager> {
         title: Option<String>,
         expiration_days: Option<i32>,
         max_downloads: Option<i32>,
+        cancel_token: CancellationToken,
     ) -> anyhow::Result<(
         mpsc::Receiver<ShareInstanceProgress>,
         tokio::task::JoinHandle<Result<String, anyhow::Error>>,
@@ -358,20 +361,28 @@ impl ManagerRef<'_, InstanceExportManager> {
                 initial_tmpfile.clone(),
                 false,
                 filter,
+                Some(cancel_token.clone()),
             )
             .await?;
 
             // Wait for export task to complete while reporting progress
             loop {
+                if cancel_token.is_cancelled() {
+                    tracing::info!("ShareInstance: cancelled during phase 1 (export)");
+                    anyhow::bail!("Share cancelled");
+                }
                 let vtask = app.task_manager().get_task(vtask_id).await;
                 if let Some(vtask) = vtask {
-                    match vtask.progress {
+                    match &vtask.progress {
                         Progress::Known(progress) => {
                             // Scale progress to phase weight (0-25%)
                             let normalized_progress = (progress * first_phase_weight) as i32;
                             let _ = tx
                                 .send(ShareInstanceProgress::Progress(normalized_progress))
                                 .await;
+                        }
+                        Progress::Failed(err) => {
+                            anyhow::bail!("Export task failed: {err}");
                         }
                         _ => {}
                     }
@@ -388,10 +399,16 @@ impl ManagerRef<'_, InstanceExportManager> {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
 
+
             // Update total progress after first phase
             total_progress += first_phase_weight;
             tx.send(ShareInstanceProgress::Progress(total_progress as i32))
                 .await?;
+
+            if cancel_token.is_cancelled() {
+                tracing::info!("ShareInstance: cancelled between phase 1 (export) and phase 2 (checksum)");
+                anyhow::bail!("Share cancelled");
+            }
 
             // Extract metadata from the GDLPack zip and the instance's mod cache
             let metadata = {
@@ -446,6 +463,11 @@ impl ManagerRef<'_, InstanceExportManager> {
             tx.send(ShareInstanceProgress::Progress(total_progress as i32))
                 .await?;
 
+            if cancel_token.is_cancelled() {
+                tracing::info!("ShareInstance: cancelled between phase 2 (checksum) and phase 3 (presigned URL)");
+                anyhow::bail!("Share cancelled");
+            }
+
             let Some(gdl_account_uuid) = app
                 .settings_manager()
                 .get_settings()
@@ -478,6 +500,11 @@ impl ManagerRef<'_, InstanceExportManager> {
             tx.send(ShareInstanceProgress::Progress(total_progress as i32))
                 .await?;
 
+            if cancel_token.is_cancelled() {
+                tracing::info!("ShareInstance: cancelled between phase 3 (presigned URL) and phase 4 (upload)");
+                anyhow::bail!("Share cancelled");
+            }
+
             // Fourth phase: Upload the file
             current_phase += 1;
 
@@ -497,8 +524,7 @@ impl ManagerRef<'_, InstanceExportManager> {
                 }
             });
 
-            let presigned_url = app
-                .account_manager()
+            app.account_manager()
                 .upload_share_instance(
                     gdl_account_uuid,
                     presigned_response.url,
@@ -506,6 +532,7 @@ impl ManagerRef<'_, InstanceExportManager> {
                     content_length,
                     sha256_checksum,
                     upload_tx,
+                    cancel_token,
                 )
                 .await?;
 

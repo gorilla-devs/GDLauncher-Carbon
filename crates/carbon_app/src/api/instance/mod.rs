@@ -13,6 +13,7 @@ use crate::managers::account::gdl_account::{
 };
 use crate::managers::instance as manager;
 use crate::managers::instance::export::ShareInstanceProgress;
+use crate::managers::instance::importer::ImportShareCodeProgress;
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
 use crate::managers::{App, AppInner, instance::importer};
@@ -456,14 +457,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
             .await
         }
 
-        mutation IMPORT_INSTANCE_SHARE_CODE[app, share_code: String] {
-            app.instance_manager()
-                .import_manager()
-                .import_instance_share_code(share_code)
-                .await
-                .map(FETaskId::from)
-        }
-
         query VALIDATE_SHARE_CODE[app, share_code: String] {
             app.account_manager()
                 .validate_share_code(share_code)
@@ -710,14 +703,43 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         State(app): State<Arc<AppInner>>,
         Query(query): Query<ShareInstanceQuery>,
     ) -> Result<impl IntoResponse, impl IntoResponse> {
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+
         let (mut rx, handle) = app
             .instance_manager()
             .export_manager()
-            .share_instance(query.instance_id.into(), query.title, query.expiration_days, query.max_downloads)
+            .share_instance(query.instance_id.into(), query.title, query.expiration_days, query.max_downloads, cancel_token.clone())
             .await
             .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
+        let abort_handle = handle.abort_handle();
+
+        struct CancelGuard {
+            token: tokio_util::sync::CancellationToken,
+            abort_handle: tokio::task::AbortHandle,
+            completed: bool,
+        }
+
+        impl Drop for CancelGuard {
+            fn drop(&mut self) {
+                if !self.completed {
+                    tracing::info!("ShareInstance: client disconnected, cancelling task");
+                    self.token.cancel();
+                    self.abort_handle.abort();
+                }
+            }
+        }
+
+        let guard = CancelGuard {
+            token: cancel_token,
+            abort_handle,
+            completed: false,
+        };
+
         let response = axum::response::sse::Sse::new(async_stream::stream! {
+            // Explicitly move guard into the stream so it lives until the stream is dropped
+            let mut guard = guard;
+
             yield Ok::<_, Infallible>(axum::response::sse::Event::default()
                 .json_data(FEShareInstanceProgress::Progress(0))
                 .unwrap());
@@ -741,6 +763,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             match result {
                 Ok(result) => {
                     tracing::info!("Share instance finished with result: {}", result);
+                    guard.completed = true;
                     yield Ok(axum::response::sse::Event::default()
                         .json_data(FEShareInstanceProgress::Finished(result))
                         .unwrap());
@@ -748,6 +771,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 Err(err) => {
                     use crate::managers::account::gdl_account::InstanceShareError;
                     tracing::error!("Share instance failed with error: {}", err);
+                    guard.completed = true;
 
                     // Try to extract error code from InstanceShareError
                     let (code, message) = err
@@ -758,6 +782,95 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                     yield Ok(axum::response::sse::Event::default()
                         .event("error")
                         .json_data(FEShareInstanceProgress::Error { code, message })
+                        .unwrap());
+                }
+            };
+        });
+
+        Ok::<_, AxumError>(response)
+    }
+
+    async fn import_share_instance(
+        State(app): State<Arc<AppInner>>,
+        Query(query): Query<ImportShareCodeQuery>,
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+
+        let (mut rx, handle) = app
+            .instance_manager()
+            .import_manager()
+            .import_instance_share_code_with_progress(query.share_code, cancel_token.clone())
+            .await
+            .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+        let abort_handle = handle.abort_handle();
+
+        struct CancelGuard {
+            token: tokio_util::sync::CancellationToken,
+            abort_handle: tokio::task::AbortHandle,
+            completed: bool,
+        }
+
+        impl Drop for CancelGuard {
+            fn drop(&mut self) {
+                if !self.completed {
+                    tracing::info!("ImportShareInstance: client disconnected, cancelling task");
+                    self.token.cancel();
+                    self.abort_handle.abort();
+                }
+            }
+        }
+
+        let guard = CancelGuard {
+            token: cancel_token,
+            abort_handle,
+            completed: false,
+        };
+
+        let response = axum::response::sse::Sse::new(async_stream::stream! {
+            let mut guard = guard;
+
+            yield Ok::<_, Infallible>(axum::response::sse::Event::default()
+                .json_data(FEImportShareCodeProgress::Progress(0))
+                .unwrap());
+
+            let mut last_progress = ImportShareCodeProgress::Progress(0);
+
+            while let Some(progress) = rx.recv().await {
+                if last_progress != progress {
+                    last_progress = progress.clone();
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(FEImportShareCodeProgress::from(progress.clone()))
+                        .unwrap());
+                }
+            }
+
+            let result = match handle.await {
+                Ok(result) => result,
+                Err(err) => Err(anyhow::anyhow!(err)),
+            };
+
+            match result {
+                Ok(()) => {
+                    tracing::info!("Import share instance finished successfully");
+                    guard.completed = true;
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(FEImportShareCodeProgress::Finished("ok".into()))
+                        .unwrap());
+                }
+                Err(err) => {
+                    use crate::managers::account::gdl_account::InstanceShareError;
+                    tracing::error!("Import share instance failed with error: {}", err);
+                    guard.completed = true;
+
+                    let (code, message) = err
+                        .downcast_ref::<InstanceShareError>()
+                        .map(|e| (e.error_code().to_string(), e.to_string()))
+                        .unwrap_or_else(|| ("UNKNOWN_ERROR".to_string(), err.to_string()));
+
+                    yield Ok(axum::response::sse::Event::default()
+                        .event("error")
+                        .json_data(FEImportShareCodeProgress::Error { code, message })
                         .unwrap());
                 }
             };
@@ -835,6 +948,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         )
         .route("/log", axum::routing::get(log::log_handler))
         .route("/shareInstance", axum::routing::get(share_instance))
+        .route("/importShareInstance", axum::routing::get(import_share_instance))
 }
 
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -2210,6 +2324,28 @@ impl From<ShareInstanceProgress> for FEShareInstanceProgress {
     fn from(value: ShareInstanceProgress) -> Self {
         match value {
             ShareInstanceProgress::Progress(p) => Self::Progress(p),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct ImportShareCodeQuery {
+    share_code: String,
+}
+
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+enum FEImportShareCodeProgress {
+    Progress(i32),
+    Finished(String),
+    Error { code: String, message: String },
+}
+
+impl From<ImportShareCodeProgress> for FEImportShareCodeProgress {
+    fn from(value: ImportShareCodeProgress) -> Self {
+        match value {
+            ImportShareCodeProgress::Progress(p) => Self::Progress(p),
         }
     }
 }

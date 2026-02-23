@@ -9,6 +9,7 @@ use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{fs::File, sync::watch::Sender};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct GDLAccountTask {
@@ -873,6 +874,7 @@ impl GDLAccountTask {
         file_size: u64,
         sha256_checksum: String,
         progress_tx: tokio::sync::mpsc::Sender<i32>,
+        cancel_token: CancellationToken,
     ) -> anyhow::Result<()> {
         let mut reader_stream = tokio_util::io::ReaderStream::new(file);
         let mut uploaded = 0u64;
@@ -880,6 +882,11 @@ impl GDLAccountTask {
 
         let async_stream = async_stream::stream! {
             while let Some(chunk) = reader_stream.next().await {
+                if cancel_token.is_cancelled() {
+                    tracing::info!("ShareInstance: cancelled during phase 4 (upload), {}% uploaded", ((uploaded as f64 / file_size as f64) * 100.0) as i32);
+                    yield Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "Upload cancelled"));
+                    return;
+                }
                 if let Ok(chunk) = &chunk {
                     uploaded += chunk.len() as u64;
                     let progress = ((uploaded as f64 / file_size as f64) * 100.0) as i32;

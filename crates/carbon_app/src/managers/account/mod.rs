@@ -525,6 +525,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         file_size: u64,
         sha256_checksum: String,
         progress_tx: tokio::sync::mpsc::Sender<i32>,
+        cancel_token: tokio_util::sync::CancellationToken,
     ) -> anyhow::Result<()> {
         let account = self
             .get_account_entries()
@@ -540,7 +541,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         };
 
         self.gdl_account_task
-            .upload_share_instance(presigned_url, file, file_size, sha256_checksum, progress_tx)
+            .upload_share_instance(presigned_url, file, file_size, sha256_checksum, progress_tx, cancel_token)
             .await
     }
 

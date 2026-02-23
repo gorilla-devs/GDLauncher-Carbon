@@ -1,6 +1,6 @@
-import { Button } from "@gd/ui"
-import { rspc } from "@/utils/rspcClient"
-import { createMemo, Match, Show, Switch } from "solid-js"
+import { Button, toast, Progress } from "@gd/ui"
+import { port, rspc } from "@/utils/rspcClient"
+import { createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js"
 import { VList } from "@/components/VirtuaWrapper"
 import { Trans, useTransContext } from "@gd/i18n"
 import { FESharePreview } from "@gd/core_module/bindings"
@@ -87,7 +87,7 @@ export function formatModloader(
 }
 
 interface SharePreviewContentProps {
-  shareCode: string
+  shareCode: string | null
   onImportSuccess?: () => void
 }
 
@@ -95,13 +95,20 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
   const [t] = useTransContext()
 
   const previewQuery = rspc.createQuery(() => ({
-    queryKey: ["instance.getSharePreview", props.shareCode],
+    queryKey: ["instance.getSharePreview", props.shareCode ?? ""],
     enabled: !!props.shareCode
   }))
 
-  const importMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.importInstanceShareCode"]
-  }))
+  const [isImporting, setIsImporting] = createSignal(false)
+  const [importProgress, setImportProgress] = createSignal(0)
+  let sseStream: EventSource | null = null
+
+  onCleanup(() => {
+    if (sseStream) {
+      sseStream.close()
+      sseStream = null
+    }
+  })
 
   const preview = createMemo(
     () => previewQuery.data as FESharePreview | undefined
@@ -126,7 +133,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
   })
 
   const canImport = createMemo(
-    () => preview() && !isExpired() && !importMutation.isPending
+    () => preview() && !isExpired() && !isImporting()
   )
 
   const errorMessage = createMemo(() => {
@@ -135,22 +142,48 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
     return t(getShareImportErrorKey(errorCode))
   })
 
-  const handleImport = async () => {
+  const handleImport = () => {
     if (!props.shareCode) return
+    setIsImporting(true)
+    setImportProgress(0)
 
-    try {
-      await importMutation.mutateAsync(props.shareCode)
-      props.onImportSuccess?.()
-    } catch (error) {
-      console.error("Failed to import share:", error)
+    const params = new URLSearchParams({ shareCode: props.shareCode })
+    sseStream = new EventSource(
+      `http://127.0.0.1:${port}/instance/importShareInstance?${params.toString()}`
+    )
+
+    sseStream.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      if (data.progress) {
+        setImportProgress(data.progress)
+      }
+      if (data.finished) {
+        sseStream?.close()
+        sseStream = null
+        setIsImporting(false)
+        props.onImportSuccess?.()
+      }
     }
+
+    sseStream.addEventListener("error", (event) => {
+      try {
+        const data = JSON.parse((event as MessageEvent).data)
+        const errorCode = data?.error?.code || null
+        toast.error(t(getShareImportErrorKey(errorCode)))
+      } catch {
+        toast.error(t(getShareImportErrorKey(null)))
+      }
+      sseStream?.close()
+      sseStream = null
+      setIsImporting(false)
+    })
   }
 
   return (
     <div class="text-lightSlate-50 flex flex-col">
       <Switch>
-        {/* Loading state - skeleton preview */}
-        <Match when={previewQuery.isLoading}>
+        {/* Loading state - skeleton preview (also shown while debounce pending) */}
+        <Match when={!props.shareCode || previewQuery.isLoading}>
           <div class="text-lightSlate-50 flex flex-col">
             {/* Hero header skeleton */}
             <div class="relative shrink-0 overflow-hidden rounded-lg">
@@ -370,11 +403,19 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
               <Button
                 type="primary"
                 disabled={!canImport()}
-                loading={importMutation.isPending}
                 onClick={handleImport}
               >
-                <div class="i-ri:download-line" />
-                <Trans key="instances:_trn_share_preview.import" />
+                <Switch>
+                  <Match when={isImporting()}>
+                    <div class="w-20">
+                      <Progress color="bg-primary-400" value={importProgress()} />
+                    </div>
+                  </Match>
+                  <Match when={!isImporting()}>
+                    <div class="i-ri:download-line" />
+                    <Trans key="instances:_trn_share_preview.import" />
+                  </Match>
+                </Switch>
               </Button>
             </div>
           </div>

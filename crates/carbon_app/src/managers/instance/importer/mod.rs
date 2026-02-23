@@ -6,8 +6,9 @@ use strum_macros::EnumIter;
 use tokio::{
     fs::File,
     io::AsyncWriteExt,
-    sync::{watch, RwLock},
+    sync::{mpsc, watch, RwLock},
 };
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, trace};
 
 use crate::{
@@ -21,6 +22,11 @@ use self::{
     gdlpack::GdlpackImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
     modrinth_archive::ModrinthArchiveImporter,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImportShareCodeProgress {
+    Progress(i32), // 0-100
+}
 
 use super::{InstanceManager, export::InstanceExportManager};
 
@@ -46,59 +52,92 @@ impl InstanceImportManager {
 }
 
 impl ManagerRef<'_, InstanceImportManager> {
-    pub async fn import_instance_share_code(
+    pub async fn import_instance_share_code_with_progress(
         self,
         share_code: String,
-    ) -> anyhow::Result<VisualTaskId> {
-        let presigned_url = self
-            .app
-            .account_manager()
-            .get_presigned_download_url(share_code.clone())
-            .await?;
+        cancel_token: CancellationToken,
+    ) -> anyhow::Result<(
+        mpsc::Receiver<ImportShareCodeProgress>,
+        tokio::task::JoinHandle<Result<(), anyhow::Error>>,
+    )> {
+        let (tx, rx) = mpsc::channel(10);
+        let app = self.app.clone();
 
-        let tmpdir = self
-            .app
-            .settings_manager()
-            .runtime_path
-            .get_temp()
-            .maketmpdir()
-            .await?;
+        let handle = tokio::spawn(async move {
+            // 0-5%: Get presigned URL
+            let _ = tx.send(ImportShareCodeProgress::Progress(0)).await;
 
-        let file_path = tmpdir.join(format!("{share_code}.gdlpack"));
+            let presigned_url = app
+                .account_manager()
+                .get_presigned_download_url(share_code.clone())
+                .await?;
 
-        info!(
-            "downloading instance share code {share_code} to {file_path:?} ({:?})",
-            tmpdir.into_path()
-        );
+            let _ = tx.send(ImportShareCodeProgress::Progress(5)).await;
 
-        let mut file = File::create(&file_path).await?;
+            let tmpdir = app
+                .settings_manager()
+                .runtime_path
+                .get_temp()
+                .maketmpdir()
+                .await?;
 
-        // Download the file from the presigned URL
-        let client = reqwest::Client::new();
-        let mut response = client
-            .get(&presigned_url)
-            .send()
-            .await?
-            .error_for_status()?;
+            let file_path = tmpdir.join(format!("{share_code}.gdlpack"));
 
-        // Stream the response body to the file
-        while let Some(chunk) = response.chunk().await? {
-            file.write_all(&chunk).await?;
-        }
+            info!(
+                "downloading instance share code {share_code} to {file_path:?} ({:?})",
+                tmpdir.into_path()
+            );
 
-        // Ensure all data is written to disk
-        file.flush().await?;
+            let mut file = File::create(&file_path).await?;
 
-        let scanner = Entity::GDLPack.create_importer();
+            // 5-90%: Download file with progress
+            let client = reqwest::Client::new();
+            let response = client
+                .get(&presigned_url)
+                .send()
+                .await?
+                .error_for_status()?;
 
-        scanner.scan(&self.app, file_path).await?;
+            let total_size = response.content_length();
+            let mut downloaded: u64 = 0;
+            let mut stream = response.bytes_stream();
 
-        scanner.begin_import(&self.app, 0, None).await?;
+            use futures::StreamExt;
+            while let Some(chunk_result) = stream.next().await {
+                if cancel_token.is_cancelled() {
+                    return Err(anyhow!("Import cancelled"));
+                }
 
-        let vtask = VisualTask::new(Translation::InstanceImportShareCode);
-        let vtask_id = self.app.task_manager().spawn_task(&vtask).await;
+                let chunk = chunk_result?;
+                file.write_all(&chunk).await?;
+                downloaded += chunk.len() as u64;
 
-        Ok(vtask_id)
+                if let Some(total) = total_size {
+                    let progress = (downloaded as f64 / total as f64 * 85.0 + 5.0) as i32;
+                    let progress = progress.min(90);
+                    let _ = tx.send(ImportShareCodeProgress::Progress(progress)).await;
+                }
+            }
+
+            file.flush().await?;
+
+            // 90-95%: Scan archive
+            let _ = tx.send(ImportShareCodeProgress::Progress(90)).await;
+
+            let scanner = Entity::GDLPack.create_importer();
+            scanner.scan(&app, file_path).await?;
+
+            let _ = tx.send(ImportShareCodeProgress::Progress(95)).await;
+
+            // 95-100%: Begin import
+            let _ = scanner.begin_import(&app, 0, None).await?;
+
+            let _ = tx.send(ImportShareCodeProgress::Progress(100)).await;
+
+            Ok(())
+        });
+
+        Ok((rx, handle))
     }
 
     pub fn set_scan_target(self, path: Option<(Entity, PathBuf)>) -> anyhow::Result<()> {

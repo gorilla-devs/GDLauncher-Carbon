@@ -25,6 +25,7 @@ use carbon_repos::db::{
 use chrono::Utc;
 use std::{collections::HashMap, fs::File, io::Write, path::Path, path::PathBuf, sync::Arc};
 use tokio::sync::watch;
+use tokio_util::sync::CancellationToken;
 use tracing::trace;
 
 /// Export an instance to the GDLPack format (.gdlpack)
@@ -40,6 +41,7 @@ pub async fn export_gdlauncher(
     save_path: PathBuf,
     self_contained_addons_bundling: bool,
     mut filter: ExportEntry,
+    cancel_token: Option<CancellationToken>,
 ) -> anyhow::Result<VisualTaskId> {
     let instance_manager = app.instance_manager();
     let instances = instance_manager.instances.read().await;
@@ -121,12 +123,13 @@ pub async fn export_gdlauncher(
             t_calc_size.set_weight(0.0);
             let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
 
-            vtask
-                .edit(|data| data.state = TaskState::KnownProgress)
-                .await;
-
             // Collect tracked addon files from ModFileCache
             if !self_contained_addons_bundling {
+                // Show indeterminate spinner while caching metadata
+                t_create_bundle.start_opaque();
+                vtask
+                    .edit(|data| data.state = TaskState::Indeterminate)
+                    .await;
                 // Process tracked addon folders (mods, resourcepacks, shaders, etc.)
                 for addon_folder in &["mods", "resourcepacks", "shaderpacks"] {
                     let folder_filter = filter.0.get_mut(*addon_folder);
@@ -168,7 +171,7 @@ pub async fn export_gdlauncher(
                             .await?;
 
                         for cached_file in cached_files {
-                            // Check if in filter (don't remove yet - we may need to keep it for overrides)
+                            // Check if in filter
                             if !folder_filter.contains_key(&cached_file.filename) {
                                 continue;
                             }
@@ -195,14 +198,11 @@ pub async fn export_gdlauncher(
                             };
 
                             if can_resolve {
-                                // Add as Platform entry for efficient hash-based resolution
-                                // BUT keep in filter so it's also bundled in overrides as fallback
-                                // This ensures the pack works even if platform resolution fails
-                                // (e.g., file removed from platform, API issues, etc.)
+                                // Remove from filter so it's NOT bundled in overrides
+                                folder_filter.remove(&cached_file.filename);
                                 pack_files.push(PackFile::Platform(PlatformFile { hashes }));
                             }
-                            // Always keep files in overrides - they serve as fallback if
-                            // platform resolution fails at import time
+                            // Non-resolvable files remain in filter and get bundled in overrides
                         }
                     }
                 }
@@ -220,7 +220,15 @@ pub async fn export_gdlauncher(
             )?;
 
             t_calc_size.complete_opaque();
-            t_create_bundle.update_items(0, file_count);
+
+            // Switch to known progress for the zip phase
+            t_create_bundle.complete_opaque();
+            vtask
+                .edit(|data| data.state = TaskState::KnownProgress)
+                .await;
+            // Guard against 0/0 NaN when all files were removed from filter
+            // (e.g., all mods are platform-resolvable)
+            t_create_bundle.update_items(0, file_count.max(1));
 
             let instance_name = config.name.clone();
 
@@ -324,15 +332,30 @@ pub async fn export_gdlauncher(
                         if notify_rx.changed().await.is_ok() {
                             let (_, count) = *notify_rx.borrow();
                             counter += count as u32;
-                            t_create_bundle.update_items(counter, file_count);
+                            t_create_bundle.update_items(counter, file_count.max(1));
                         } else {
                             futures::future::pending().await
                         }
                     }
                 } => {},
+                _ = async {
+                    match &cancel_token {
+                        Some(token) => token.cancelled().await,
+                        None => futures::future::pending().await,
+                    }
+                } => {
+                    tracing::info!("ShareInstance: export cancelled, aborting zip task");
+                    anyhow::bail!("Export cancelled");
+                },
             }
 
-            tmpfile.try_rename_or_move(save_path).await?;
+            // If the destination directory was removed (e.g. share was cancelled),
+            // skip the move — the caller no longer needs the file.
+            if save_path.parent().map_or(true, |p| p.exists()) {
+                tmpfile.try_rename_or_move(save_path).await?;
+            } else {
+                tracing::debug!("Export destination no longer exists, skipping move (share likely cancelled)");
+            }
 
             t_create_bundle.complete_items();
 
@@ -357,7 +380,7 @@ mod test {
         sync::Arc,
     };
 
-    use carbon_platforms::gdlauncher::manifest::schema::v1::Manifest;
+    use carbon_platforms::gdlauncher::manifest::schema::v1::{Manifest, PackFile};
     use flowtest::flowtest;
     use tracing_test::traced_test;
     use zip::ZipArchive;
@@ -394,16 +417,23 @@ mod test {
                     false,
                     InstanceVersionSource::Version(info::GameVersion::Standard(
                         info::StandardVersion {
-                            release: String::from("1.20.1"),
+                            release: String::from("1.16.5"),
                             modloaders: HashSet::from([info::ModLoader {
                                 type_: info::ModLoaderType::Forge,
-                                version: String::from("47.2.0"),
+                                version: String::from("1.16.5-36.2.34"),
                             }]),
                         },
                     )),
                     String::new(),
                 )
                 .await?;
+
+            let task = app
+                .instance_manager()
+                .install_curseforge_mod(instance_id, 247560, 4024011, false, None)
+                .await?;
+
+            app.task_manager().wait_with_log(task).await?;
 
             Ok((rt.clone(), app, instance_id))
         })
@@ -484,12 +514,141 @@ mod test {
             check_export(&app, "test.gdlpack", |manifest, _zip| {
                 assert_eq!(manifest.format_version, 1);
                 assert_eq!(manifest.name, "test-gdlpack");
-                assert_eq!(manifest.dependencies.minecraft, "1.20.1");
+                assert_eq!(manifest.dependencies.minecraft, "1.16.5");
                 assert_eq!(manifest.dependencies.modloaders.len(), 1);
-                assert_eq!(manifest.dependencies.modloaders[0].version, "47.2.0");
+                assert_eq!(manifest.dependencies.modloaders[0].version, "1.16.5-36.2.34");
                 assert_eq!(manifest.overrides, "overrides");
                 Ok(())
             })
+            .await?;
+
+            Ok(())
+        })
+    }
+
+    #[traced_test]
+    #[test]
+    #[flowtest(_setup: (rt, app, instance_id))]
+    fn export_gdlpack_with_mods_linked() -> anyhow::Result<()> {
+        rt.block_on(async {
+            run_export(
+                &app,
+                instance_id,
+                "gdl_with_mods_linked.gdlpack",
+                ExportEntry(HashMap::from([(String::from("mods"), None)])),
+                false,
+            )
+            .await?;
+
+            check_export(&app, "gdl_with_mods_linked.gdlpack", |manifest, mut zip| {
+                // Should have 1 Platform entry for the resolvable mod
+                let platform_count = manifest
+                    .entries
+                    .iter()
+                    .filter(|e| matches!(e, PackFile::Platform(_)))
+                    .count();
+                assert_eq!(platform_count, 1);
+
+                // Mod should NOT be in overrides (removed from filter)
+                assert!(zip.by_name("overrides/mods/byg-1.3.6.jar").is_err());
+                Ok(())
+            })
+            .await?;
+
+            Ok(())
+        })
+    }
+
+    #[traced_test]
+    #[test]
+    #[flowtest(_setup: (rt, app, instance_id))]
+    fn export_gdlpack_with_mods_unlinked() -> anyhow::Result<()> {
+        rt.block_on(async {
+            run_export(
+                &app,
+                instance_id,
+                "gdl_with_mods_unlinked.gdlpack",
+                ExportEntry(HashMap::from([(String::from("mods"), None)])),
+                true,
+            )
+            .await?;
+
+            check_export(
+                &app,
+                "gdl_with_mods_unlinked.gdlpack",
+                |manifest, mut zip| {
+                    // No entries when bundling is ON (self-contained)
+                    assert_eq!(manifest.entries.len(), 0);
+
+                    // Mod SHOULD be in overrides (bundled directly)
+                    assert!(zip.by_name("overrides/mods/byg-1.3.6.jar").is_ok());
+                    Ok(())
+                },
+            )
+            .await?;
+
+            Ok(())
+        })
+    }
+
+    #[traced_test]
+    #[test]
+    #[flowtest(_setup: (rt, app, instance_id))]
+    fn export_gdlpack_without_mods_linked() -> anyhow::Result<()> {
+        rt.block_on(async {
+            run_export(
+                &app,
+                instance_id,
+                "gdl_without_mods_linked.gdlpack",
+                ExportEntry(HashMap::from([])),
+                false,
+            )
+            .await?;
+
+            check_export(
+                &app,
+                "gdl_without_mods_linked.gdlpack",
+                |manifest, mut zip| {
+                    // No entries when mods folder not in filter
+                    assert_eq!(manifest.entries.len(), 0);
+
+                    // No mods in overrides
+                    assert!(zip.by_name("overrides/mods").is_err());
+                    Ok(())
+                },
+            )
+            .await?;
+
+            Ok(())
+        })
+    }
+
+    #[traced_test]
+    #[test]
+    #[flowtest(_setup: (rt, app, instance_id))]
+    fn export_gdlpack_without_mods_unlinked() -> anyhow::Result<()> {
+        rt.block_on(async {
+            run_export(
+                &app,
+                instance_id,
+                "gdl_without_mods_unlinked.gdlpack",
+                ExportEntry(HashMap::from([])),
+                true,
+            )
+            .await?;
+
+            check_export(
+                &app,
+                "gdl_without_mods_unlinked.gdlpack",
+                |manifest, mut zip| {
+                    // No entries when mods folder not in filter
+                    assert_eq!(manifest.entries.len(), 0);
+
+                    // No mods in overrides
+                    assert!(zip.by_name("overrides/mods").is_err());
+                    Ok(())
+                },
+            )
             .await?;
 
             Ok(())

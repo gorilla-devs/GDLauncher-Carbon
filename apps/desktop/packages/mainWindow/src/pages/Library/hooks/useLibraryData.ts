@@ -201,22 +201,18 @@ function computeLibraryItems(
     )
 
     if (group.id === defaultGroupId) {
-      // Default group instances become ungrouped items (excluding favorites)
+      // Default group instances become ungrouped items
       for (const instance of filteredInstances) {
-        if (!instance.favorite) {
-          items.push({
-            id: `instance-${instance.id}`,
-            type: "instance",
-            data: instance
-          })
-        }
+        items.push({
+          id: `instance-${instance.id}`,
+          type: "instance",
+          data: instance
+        })
       }
     } else {
       // Other groups become folder items
-      const nonFavoriteInstances = groupInstances.filter((inst) => !inst.favorite)
-      const hasAnyInstances = nonFavoriteInstances.length > 0
-      const filteredNonFavorites = filteredInstances.filter((inst) => !inst.favorite)
-      const hasFilteredInstances = filteredNonFavorites.length > 0
+      const hasAnyInstances = groupInstances.length > 0
+      const hasFilteredInstances = filteredInstances.length > 0
 
       // Show folder if it has no instances (empty folder) or has filtered instances
       if (!hasAnyInstances || hasFilteredInstances) {
@@ -232,7 +228,7 @@ function computeLibraryItems(
             id: group.id,
             name: folderName,
             libraryPosition: group.library_position,
-            instances: filteredNonFavorites
+            instances: filteredInstances
           }
         })
       }

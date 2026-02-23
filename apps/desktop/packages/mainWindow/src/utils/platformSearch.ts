@@ -140,17 +140,29 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     _setSearchQuery(value)
   }
 
-  // Debounced version of searchQuery for network requests (trailing-only, 300ms).
+  // Debounced version of searchQuery for network requests (leading + trailing, 500ms).
   // The initial value is set from searchQuery() so deep-link searches fire immediately on mount.
+  // Leading edge fires immediately on first change; trailing edge fires after 500ms of inactivity.
   const [debouncedSearchQuery, setDebouncedSearchQuery] =
     createSignal<FEUnifiedSearchParameters>(searchQuery())
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined
 
   createEffect(() => {
     const current = searchQuery()
-    const timer = setTimeout(() => {
+    // Leading edge: fire immediately if no pending debounce
+    if (debounceTimer === undefined) {
       setDebouncedSearchQuery(() => current)
-    }, 300)
-    onCleanup(() => clearTimeout(timer))
+    }
+    // Trailing edge: always schedule to capture the latest value
+    clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = undefined
+      setDebouncedSearchQuery(() => current)
+    }, 500)
+    onCleanup(() => {
+      clearTimeout(debounceTimer)
+      debounceTimer = undefined
+    })
   })
 
   // When the instanceId changes, reset the search query to default with instance filters
@@ -419,6 +431,40 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     }
   }
 
+  // Grace period: when one platform resolves, wait up to 500ms for the other
+  // before showing partial results with skeletons.
+  const [graceExpired, setGraceExpired] = createSignal(false)
+  let graceTimer: ReturnType<typeof setTimeout> | undefined
+
+  createEffect(() => {
+    const cfHasData = (cfInfiniteResults.data?.pages?.length ?? 0) > 0
+    const mrHasData = (mrInfiniteResults.data?.pages?.length ?? 0) > 0
+
+    if (cfHasData && mrHasData) {
+      // Both resolved — no grace period needed
+      clearTimeout(graceTimer)
+      graceTimer = undefined
+      setGraceExpired(false)
+    } else if ((cfHasData || mrHasData) && !graceTimer) {
+      // One resolved — start grace period for the other
+      setGraceExpired(false)
+      graceTimer = setTimeout(() => {
+        graceTimer = undefined
+        setGraceExpired(true)
+      }, 500)
+    } else if (!cfHasData && !mrHasData) {
+      // Neither has data (new search) — reset grace state
+      clearTimeout(graceTimer)
+      graceTimer = undefined
+      setGraceExpired(false)
+    }
+
+    onCleanup(() => {
+      clearTimeout(graceTimer)
+      graceTimer = undefined
+    })
+  })
+
   const isInitialLoading = createMemo(() => {
     if (isDirectMode()) {
       return directSearchQuery.isLoading
@@ -428,11 +474,18 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     } else if (debouncedSearchQuery().searchApi === "modrinth") {
       return mrInfiniteResults.isLoading
     }
-    // Both platforms — show results as soon as ANY platform has data.
-    // The interleaved view handles the missing platform with skeleton placeholders.
+    // Both platforms — wait for both to resolve together unless they're >500ms apart.
     const cfHasData = (cfInfiniteResults.data?.pages?.length ?? 0) > 0
     const mrHasData = (mrInfiniteResults.data?.pages?.length ?? 0) > 0
-    if (cfHasData || mrHasData) return false
+
+    // Both resolved — not loading
+    if (cfHasData && mrHasData) return false
+
+    // One resolved but grace period hasn't expired — keep showing loading
+    if ((cfHasData || mrHasData) && !graceExpired()) return true
+
+    // One resolved and grace expired — show partial results with skeletons
+    if ((cfHasData || mrHasData) && graceExpired()) return false
 
     // Neither has data — still loading if either query is active
     return cfInfiniteResults.isLoading || mrInfiniteResults.isLoading

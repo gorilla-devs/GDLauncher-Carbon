@@ -167,7 +167,8 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   const dragSelect = useDragSelect({
     containerRef: () => scrollContainerRef,
     getItemRects,
-    onSelectionChange: (ids) => props.onSetSelection(ids)
+    onSelectionChange: (ids) => props.onSetSelection(ids),
+    getExistingSelection: () => props.selectedIds
   })
 
   // Track registered drop zone IDs to clean up properly without accessing stale props

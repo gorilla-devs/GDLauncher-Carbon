@@ -47,6 +47,7 @@ const FolderTile = (props: FolderTileProps) => {
   const modalsContext = useModal()
   let ref: HTMLDivElement | undefined
   const [isHovering, setIsHovering] = createSignal(false)
+  const [isMenuOpen, setIsMenuOpen] = createSignal(false)
 
   const deleteGroupMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteGroup"]
@@ -70,7 +71,7 @@ const FolderTile = (props: FolderTileProps) => {
   // Get instances for this group - REACTIVE DEPENDENCY on globalStore.instances
   const groupInstances = createMemo(() =>
     (globalStore.instances.data || []).filter(
-      (i) => i.group_id === props.groupId && !i.favorite
+      (i) => i.group_id === props.groupId
     )
   )
 
@@ -172,7 +173,7 @@ const FolderTile = (props: FolderTileProps) => {
   }
 
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={setIsMenuOpen}>
       <ContextMenuContent>
         <ContextMenuGroup>
           <ContextMenuGroupLabel>{groupName()}</ContextMenuGroupLabel>
@@ -215,11 +216,17 @@ const FolderTile = (props: FolderTileProps) => {
                 if (dragContext.justDropped()) return
                 props.onToggle()
               }}
-              onPointerDown={handleDragStart}
+              onPointerDown={(e) => {
+                if (e.button === 0 && isMenuOpen()) {
+                  document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+                }
+                handleDragStart(e)
+              }}
               data-folder-tile
               class={`bg-darkSlate-700 hover:bg-darkSlate-600 group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl transition-all duration-200 ${sizeClasses()}`}
               classList={{
-                "opacity-0": isBeingDragged() || props.isOpen
+                "opacity-0": isBeingDragged() || props.isOpen,
+                "!bg-darkSlate-600": isMenuOpen()
               }}
               style={
                 shouldSetViewTransition()
@@ -289,7 +296,7 @@ const FolderTile = (props: FolderTileProps) => {
 
               {/* Drag handle */}
               <div
-                class="i-ri:drag-move-2-line text-darkSlate-400 hover:text-lightSlate-400 absolute left-1 top-1 cursor-grab text-sm opacity-0 transition-colors group-hover:opacity-100"
+                class={`i-ri:drag-move-2-line text-darkSlate-400 hover:text-lightSlate-400 absolute left-1 top-1 cursor-grab text-sm transition-colors group-hover:opacity-100 ${isMenuOpen() ? "opacity-100" : "opacity-0"}`}
                 onPointerDown={handleDragStart}
                 onClick={(e) => e.stopPropagation()}
               />
@@ -305,6 +312,12 @@ const FolderTile = (props: FolderTileProps) => {
                     "-translate-x-3 opacity-0":
                       !props.isSelected &&
                       (!isHovering() || dragContext.isDragging())
+                  }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation()
+                    if (isMenuOpen()) {
+                      document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+                    }
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
