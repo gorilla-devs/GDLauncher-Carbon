@@ -188,6 +188,22 @@ keys! {
         GET_AVAILABLE_RAM                           = "getAvailableRAM";
     }
 
+    server {
+        GET_DEFAULT_GROUP                           = "getDefaultGroup";
+        GET_GROUPS                                  = "getGroups";
+        GET_ALL_SERVERS                             = "getAllServers";
+        CREATE_SERVER                               = "createServer";
+        DELETE_SERVER                               = "deleteServer";
+        START_SERVER                                = "startServer";
+        STOP_SERVER                                 = "stopServer";
+        KILL_SERVER                                 = "killServer";
+        SEND_CONSOLE_COMMAND                        = "sendConsoleCommand";
+        GET_SERVER_DETAILS                          = "getServerDetails";
+        GET_SERVER_METRICS                          = "getServerMetrics";
+        SET_FAVORITE                                = "setFavorite";
+        UPDATE_SERVER                               = "updateServer";
+    }
+
     modplatforms {
         CURSEFORGE_SEARCH                           = "curseforge.search";
         CURSEFORGE_GET_MOD                          = "curseforge.getMod";

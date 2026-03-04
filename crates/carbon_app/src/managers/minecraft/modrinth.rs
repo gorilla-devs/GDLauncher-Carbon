@@ -144,7 +144,10 @@ pub async fn download_mrpack(
 
     carbon_net::download_multiple(
         &[file_downloadable],
-        DownloadOptions::builder().concurrency(1).build(),
+        DownloadOptions::builder()
+            .concurrency(1)
+            .progress_sender(download_progress_sender)
+            .build(),
     )
     .await
     .with_context(|| {

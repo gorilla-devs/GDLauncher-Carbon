@@ -18,8 +18,6 @@ import { ANIMATION } from "../constants"
 interface UseFLIPAnimationOptions {
   /** Whether reduced motion is enabled */
   reducedMotion: Accessor<boolean>
-  /** Callback when animation cleanup occurs */
-  onCleanup?: () => void
 }
 
 /**
@@ -190,7 +188,6 @@ export function useFLIPAnimation(options: UseFLIPAnimationOptions): FLIPAnimatio
     setPositionSnapshot(new Map())
     setOrderSnapshot(null)
     setIsAnimating(false)
-    options.onCleanup?.()
   }
 
   // Clean up on component unmount

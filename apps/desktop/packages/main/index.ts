@@ -97,6 +97,7 @@ let isGameRunning = false
 let showAppCloseWarning = true
 
 app.enableSandbox()
+app.commandLine.appendSwitch("proxy-bypass-list", "127.0.0.1,localhost")
 
 export function initRTPath(override: string | null | undefined) {
   console.log("Initializing runtime path...")

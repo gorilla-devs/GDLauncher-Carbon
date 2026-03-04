@@ -8,6 +8,8 @@ import {
   FEUnifiedModLoaders,
   ListGroup,
   ListInstance,
+  ListServer,
+  ListServerGroup,
   ManifestVersion
 } from "@gd/core_module/bindings"
 import { RSPCError } from "@/utils/rspcClient"
@@ -23,6 +25,8 @@ import {
 interface Context {
   instances: CreateQueryResult<ListInstance[], RSPCError>
   instanceGroups: CreateQueryResult<ListGroup[], RSPCError>
+  servers: CreateQueryResult<ListServer[], RSPCError>
+  serverGroups: CreateQueryResult<ListServerGroup[], RSPCError>
   settings: CreateQueryResult<FESettings, RSPCError>
   accounts: CreateQueryResult<AccountEntry[], RSPCError>
   currentlySelectedAccount: () => AccountEntry | null
@@ -161,6 +165,14 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
     queryKey: ["mc.getMinecraftVersions"]
   }))
 
+  const servers = rspc.createQuery(() => ({
+    queryKey: ["server.getAllServers"]
+  }))
+
+  const serverGroups = rspc.createQuery(() => ({
+    queryKey: ["server.getGroups"]
+  }))
+
   // Track which instances existed at app load (for NEW badge feature)
   const [baselineInstanceIds, setBaselineInstanceIds] = createSignal<
     Set<number>
@@ -192,6 +204,8 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
   const store: Context = {
     instances,
     instanceGroups: groups,
+    servers,
+    serverGroups,
     settings,
     accounts,
     currentlySelectedAccountUuid,

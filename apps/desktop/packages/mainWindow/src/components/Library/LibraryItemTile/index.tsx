@@ -1,7 +1,8 @@
 import { Accessor, Show } from "solid-js"
 import { useDragContext } from "@/pages/Library/DragContext"
-import { ListInstance } from "@gd/core_module/bindings"
+import { ListInstance, ListServer } from "@gd/core_module/bindings"
 import InstanceTile from "@/components/InstanceTile"
+import ServerTile from "@/components/Server/Tile"
 import FolderTile from "@/components/Library/FolderTile"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { LibraryItem } from "@/pages/Library/types"
@@ -37,7 +38,9 @@ interface LibraryItemTileProps {
   libraryItemsLength: () => number
   newlyCreatedFolderId?: Accessor<number | null>
   clearNewlyCreatedFolderId?: () => void
-  previousItemId?: () => number | null
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: (id: string) => void
 }
 
 const LibraryItemTile = (props: LibraryItemTileProps) => {
@@ -48,6 +51,7 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
   // Item identity - these never change for a given item
   const isFolder = props.item.type === "folder"
   const isInstance = props.item.type === "instance"
+  const isServer = props.item.type === "server"
   const itemKey = props.item.id
   const itemId = props.item.data.id
 
@@ -55,6 +59,11 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
   const instanceData = () =>
     isInstance
       ? (props.item as { type: "instance"; data: ListInstance }).data
+      : null
+
+  const serverData = () =>
+    isServer
+      ? (props.item as { type: "server"; data: ListServer }).data
       : null
 
   // Extracted hooks for drop indicators
@@ -70,8 +79,7 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
     itemType: isFolder ? "folder" : "instance",
     ref: () => ref,
     dragContext,
-    defaultGroupId: props.defaultGroupId,
-    previousItemId: props.previousItemId
+    defaultGroupId: props.defaultGroupId
   })
 
   // Extracted hook for animations
@@ -131,6 +139,9 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
             size={props.tileSize() as 1 | 2 | 3 | 4 | 5}
             isSelected={props.isSelected(props.item.id)}
             onToggleSelection={() => props.toggleSelection(props.item.id)}
+            selectedCount={props.selectedCount}
+            onBatchDelete={props.onBatchDelete}
+            onSelectExclusive={() => props.onSelectExclusive?.(props.item.id)}
           />
         </Show>
 
@@ -153,6 +164,24 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
                 props.onDragStart("instance", ids, e)
               }}
               preventClick={() => props.justDropped()}
+              selectedCount={props.selectedCount}
+              onBatchDelete={props.onBatchDelete}
+              onSelectExclusive={() => props.onSelectExclusive?.(props.item.id)}
+            />
+          )}
+        </Show>
+
+        {/* Server rendering - condition never changes for a given item */}
+        <Show when={isServer && serverData()}>
+          {(server) => (
+            <ServerTile
+              server={server()}
+              identifier={`server-${itemId}`}
+              size={props.tileSize() as 1 | 2 | 3 | 4 | 5}
+              isMultiSelected={props.isSelected(props.item.id)}
+              isDragging={dropIndicators.isBeingDragged()}
+              isDragActive={dragContext.isDragging()}
+              groupId={props.defaultGroupId() ?? undefined}
             />
           )}
         </Show>

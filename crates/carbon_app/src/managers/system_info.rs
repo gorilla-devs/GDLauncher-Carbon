@@ -45,4 +45,19 @@ impl SystemInfoManager {
     }
 }
 
+impl SystemInfoManager {
+    pub async fn get_process_metrics(&self, pid: u32) -> Option<crate::domain::server::ProcessMetrics> {
+        use sysinfo::{Pid, ProcessesToUpdate};
+
+        let mut lock = self.system.lock().await;
+        let pid = Pid::from_u32(pid);
+        lock.refresh_processes(ProcessesToUpdate::Some(&[pid]));
+        let process = lock.process(pid)?;
+        Some(crate::domain::server::ProcessMetrics {
+            cpu_percent: process.cpu_usage(),
+            memory_bytes: process.memory(),
+        })
+    }
+}
+
 impl ManagerRef<'_, SystemInfoManager> {}

@@ -7,7 +7,6 @@ import {
   onCleanup,
   onMount
 } from "solid-js"
-import { createAutoAnimate } from "@formkit/auto-animate/solid"
 import { Portal } from "solid-js/web"
 import {
   ContextMenu,
@@ -31,6 +30,7 @@ import {
   removeFolderTransitionCSS
 } from "@/pages/Library/utils/folderViewTransition"
 import { TILE_SIZES } from "@/pages/Library/constants"
+import { useDragLayoutAnimation } from "@/pages/Library/hooks/useDragLayoutAnimation"
 import { getInstanceImageUrl } from "@/utils/instances"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
@@ -51,6 +51,9 @@ interface ExpandedFolderContentProps {
     isSelected: boolean,
     e: PointerEvent
   ) => void
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: (id: string) => void
 }
 
 // Backdrop drop zone - dropping on it moves instances to root library
@@ -115,16 +118,8 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   let inputRef: HTMLInputElement | undefined
   let scrollContainerRef: HTMLDivElement | undefined
 
-  const [folderGridRef, setFolderGridEnabled] = createAutoAnimate({
-    duration: 200,
-    easing: "ease-out"
-  })
-
-  // Enable auto-animate unless reduced motion is on — smooth animations during drag
-  createEffect(() => {
-    const reducedMotion = globalStore.settings.data?.reducedMotion ?? false
-    setFolderGridEnabled(!reducedMotion && !dragContext.justDropped())
-  })
+  let folderGridEl: HTMLDivElement | undefined
+  useDragLayoutAnimation(() => folderGridEl)
 
   // Capture group values at mount time to avoid stale access during unmount
   // (props.group comes from a <Show> callback and becomes stale when parent unmounts)
@@ -155,10 +150,20 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   const folderTileRefs = new Map<string, HTMLDivElement>()
 
   // Get item rects for drag select - returns rects keyed by string IDs
+  // Excludes instances that are queued or downloading (preparing).
   const getItemRects = (): Map<string, DOMRect> => {
+    const nonSelectable = new Set<string>()
+    for (const inst of safeInstances()) {
+      if (inst.status.status === "valid") {
+        const s = inst.status.value.state.state
+        if (s === "queued" || s === "preparing") {
+          nonSelectable.add(`instance-${inst.id}`)
+        }
+      }
+    }
     const rects = new Map<string, DOMRect>()
     folderTileRefs.forEach((el, id) => {
-      if (el) rects.set(id, el.getBoundingClientRect())
+      if (el && !nonSelectable.has(id)) rects.set(id, el.getBoundingClientRect())
     })
     return rects
   }
@@ -423,6 +428,21 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
             ref={scrollContainerRef}
             class="bg-darkSlate-800 border-darkSlate-600 relative z-10 h-3/5 max-h-[600px] w-3/5 max-w-3xl overflow-auto rounded-lg border p-6 backdrop-blur-sm"
             onClick={(e) => e.stopPropagation()}
+            on:mousedown={(e) => {
+              // Drag-select handler on scroll container (outside ContextMenuTrigger)
+              // to avoid event interference from Kobalte's trigger wrappers
+              if (e.button !== 0) return
+              const target = e.target as HTMLElement
+              if (
+                target.closest("[data-instance-tile]") ||
+                target.closest("button") ||
+                target.closest("input") ||
+                target.closest("[data-kb-menu]") ||
+                target.closest("[role='menu']")
+              ) return
+              e.stopPropagation()
+              dragSelect.handlers.handleMouseDown(e)
+            }}
             style={
               clickedFolderId() === groupId
                 ? { "view-transition-name": "folder-tile" }
@@ -457,16 +477,13 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
             <ContextMenu>
               <ContextMenuTrigger class="flex-1">
                 <div
-                  ref={folderGridRef}
-                  class={`flex min-h-[100px] flex-wrap gap-4 overflow-visible ${TILE_SIZES[props.tileSize]?.gapY ?? "gap-y-6"}`}
-                  onMouseDown={(e) => {
-                    // Only start drag select on left click in empty space
-                    if (e.button !== 0) return
-                    const target = e.target as HTMLElement
-                    if (target.closest("[data-instance-tile]")) return
-                    // Stop propagation to prevent root-level HomeGrid drag-select from triggering
-                    e.stopPropagation()
-                    dragSelect.handlers.handleMouseDown(e)
+                  ref={folderGridEl}
+                  class={`min-h-[100px] overflow-visible ${TILE_SIZES[props.tileSize]?.gapY ?? "gap-y-6"}`}
+                  style={{
+                    display: "grid",
+                    "grid-template-columns": `repeat(auto-fill, ${TILE_SIZES[props.tileSize]?.widthPx ?? 184}px)`,
+                    "justify-content": "space-between",
+                    "column-gap": "16px"
                   }}
                 >
                   <For each={safeInstances()}>
@@ -475,6 +492,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                       const isBeingDragged = () =>
                         (dragContext.isDragging() ||
                           dragContext.justDropped()) &&
+                        dragContext.dragDetached() &&
                         dragContext.dragType() === "instance" &&
                         dragContext.draggedIds().includes(instance.id)
 
@@ -523,7 +541,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                               />
                             )}
                           </Show>
-                          {/* Remove dragged tile from DOM so auto-animate collapses the gap */}
+                          {/* Remove dragged tile from DOM so the grid collapses the gap */}
                           <Show when={!isBeingDragged()}>
                             <div
                               data-instance-tile
@@ -555,6 +573,9 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                                   )
                                 }
                                 preventClick={() => dragContext.justDropped()}
+                                selectedCount={props.selectedCount}
+                                onBatchDelete={props.onBatchDelete}
+                                onSelectExclusive={() => props.onSelectExclusive?.(`instance-${instance.id}`)}
                               />
                             </div>
                           </Show>

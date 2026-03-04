@@ -4,6 +4,7 @@ import SettingsJavaData from "@/pages/Settings/settings.java.data"
 import SettingsGeneralData from "@/pages/Settings/settings.general.data"
 import AddonVersionsData from "@/pages/AddonViewPage/changelog.data"
 import InstanceData from "@/pages/Library/Instance/instance.data"
+import ServerData from "@/pages/Library/Server/server.data"
 import Login from "@/pages/Login"
 import withAdsLayout from "@/pages/withAds"
 import Library from "@/pages/Library"
@@ -29,6 +30,13 @@ export const routes: RouteDefinition[] = [
           {
             path: "/",
             component: Home
+          },
+          {
+            path: "/server/:id",
+            component: lazy(
+              () => import("@/pages/Library/Server")
+            ),
+            data: ServerData
           },
           {
             path: "/:id",

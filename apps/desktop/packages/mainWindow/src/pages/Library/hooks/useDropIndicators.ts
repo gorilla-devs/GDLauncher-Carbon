@@ -119,14 +119,16 @@ export function useDropIndicators(
     if (!isInstance) return false
     return (
       isDragActive() &&
+      dragContext.dragDetached() &&
       dragContext.dragType() === "instance" &&
       dragContext.draggedIds().includes(itemId)
     )
   })
 
   // Check if THIS item (instance OR folder) is being dragged
+  // Only true once cursor has moved far enough from start (dragDetached latch)
   const isItemBeingDragged = createMemo(() => {
-    if (!isDragActive()) return false
+    if (!isDragActive() || !dragContext.dragDetached()) return false
 
     if (isInstance) {
       return (

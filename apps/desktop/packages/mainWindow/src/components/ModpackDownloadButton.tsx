@@ -35,10 +35,6 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     }
   }))
 
-  const loadIconMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.loadIconUrl"]
-  }))
-
   const createInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.createInstance"],
     onSuccess(instanceId) {
@@ -87,9 +83,6 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     runWithOwner(owner, async () => {
       setLoading(true)
 
-      const imgUrl = props.addon?.imageUrl
-      if (imgUrl) loadIconMutation.mutate(imgUrl)
-
       let fileVersion = props.fileId
       if (!fileVersion && props.addon?.platform === "modrinth") {
         const mrVersions = await rspcContext.client.query([
@@ -102,7 +95,8 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
       }
 
       createInstanceMutation.mutate({
-        use_loaded_icon: true,
+        use_loaded_icon: false,
+        icon_url: props.addon?.imageUrl ?? null,
         notes: "",
         name: props.name || props.addon?.title!,
         version: {

@@ -4,6 +4,7 @@ import { useDragContext } from "@/pages/Library/DragContext"
 import { ListInstance } from "@gd/core_module/bindings"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { getInstanceImageUrl } from "@/utils/instances"
+import { getModloaderIcon } from "@/utils/sidebar"
 
 interface DragGhostProps {
   instances: ListInstance[]
@@ -21,6 +22,13 @@ const getTileDimensions = (size: 1 | 2 | 3 | 4 | 5) => {
   }
   return sizeMap[size]
 }
+
+const clamp = (v: number, min: number, max: number) =>
+  Math.min(Math.max(v, min), max)
+
+const smoothstep = (t: number) => t * t * (3 - 2 * t)
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
 const DragGhost = (props: DragGhostProps) => {
   const dragContext = useDragContext()
@@ -40,13 +48,42 @@ const DragGhost = (props: DragGhostProps) => {
     return []
   })
 
+  const blendFactor = createMemo(() => {
+    const rect = dragContext.dropPreviewRect()
+    if (!rect) return 0
+
+    const cursor = dragContext.ghostPosition()
+    const halfW = rect.width / 2
+    const halfH = rect.height / 2
+    if (halfW === 0 || halfH === 0) return 0
+
+    const dx = (cursor.x - (rect.left + halfW)) / halfW
+    const dy = (cursor.y - (rect.top + halfH)) / halfH
+    const normalizedDist = Math.sqrt(dx * dx + dy * dy)
+    const raw = clamp(1 - normalizedDist, 0, 1)
+
+    return smoothstep(Math.pow(raw, 0.4))
+  })
+
   const ghostPosition = createMemo(() => {
     const pos = dragContext.ghostPosition()
     const dim = getTileDimensions(props.tileSize)
-    // Offset so cursor appears at top-left area of tile
+    const blend = blendFactor()
+
+    const cursorX = pos.x - dim.width * 0.15
+    const cursorY = pos.y - dim.height * 0.15
+
+    if (blend === 0) {
+      return { left: `${cursorX}px`, top: `${cursorY}px` }
+    }
+
+    const rect = dragContext.dropPreviewRect()!
+    const snapX = rect.left + rect.width / 2
+    const snapY = rect.top + rect.height / 2
+
     return {
-      left: `${pos.x - dim.width * 0.15}px`,
-      top: `${pos.y - dim.height * 0.15}px`
+      left: `${lerp(cursorX, snapX, blend)}px`,
+      top: `${lerp(cursorY, snapY, blend)}px`
     }
   })
 
@@ -56,20 +93,45 @@ const DragGhost = (props: DragGhostProps) => {
     return target.type === "dropOnFolder" || target.type === "createFolder"
   })
 
+  const isOverFavorites = createMemo(() => {
+    const target = dragContext.dropTarget()
+    return target?.type === "favorites"
+  })
+
+  const dropAnim = createMemo(() => dragContext.dropAnimating())
+
   const count = () => draggedItems().length
 
   return (
     <Portal>
-      <Show when={dragContext.isDragging() && count() > 0}>
+      <Show when={dragContext.isDragging() && count() > 0 && (dragContext.dragDetached() || dragContext.dropAnimating() !== null)}>
         <div
-          class="fixed z-[10001] pointer-events-none transition-transform duration-150 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none"
+          class="fixed z-[10002] pointer-events-none motion-reduce:transition-none"
           style={{
-            left: ghostPosition().left,
-            top: ghostPosition().top,
-            transform: `translate(-50%, -50%) scale(${isOverGroup() ? 0.8 : 1})`
+            left: dropAnim()
+              ? `${dropAnim()!.targetX}px`
+              : ghostPosition().left,
+            top: dropAnim()
+              ? `${dropAnim()!.targetY}px`
+              : ghostPosition().top,
+            transform: dropAnim()
+              ? dropAnim()!.type === "settle"
+                ? "translate(-50%, -50%) scale(1)"
+                : "translate(-50%, -50%) scale(0.05) scaleX(0.3)"
+              : `translate(-50%, -50%) scale(${isOverFavorites() ? 0.25 : isOverGroup() ? 0.45 : 1})`,
+            opacity: dropAnim()
+              ? dropAnim()!.type === "settle"
+                ? 1
+                : 0
+              : 1,
+            transition: dropAnim()
+              ? dropAnim()!.type === "settle"
+                ? "left 200ms cubic-bezier(0.25, 1, 0.5, 1), top 200ms cubic-bezier(0.25, 1, 0.5, 1), transform 200ms cubic-bezier(0.25, 1, 0.5, 1)"
+                : "left 250ms cubic-bezier(0.4, 0, 1, 0.4), top 250ms cubic-bezier(0.4, 0, 1, 0.4), transform 250ms cubic-bezier(0.4, 0, 1, 0.4), opacity 200ms ease-in 50ms"
+              : "left 0s, top 0s, transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1)"
           }}
         >
-          <div class="relative">
+          <div class="relative" style={{ opacity: dropAnim() ? 1 : 1 - 0.5 * blendFactor() }}>
             <Show when={dragContext.dragType() === "instance"}>
               <InstanceGhost
                 instances={draggedItems() as ListInstance[]}
@@ -88,12 +150,17 @@ const DragGhost = (props: DragGhostProps) => {
                 tileSize={props.tileSize}
               />
             </Show>
+            {/* Dashed border overlay when snapping to preview position */}
+            <div
+              class="absolute inset-0 rounded-2xl border-2 border-dashed border-primary-400 pointer-events-none"
+              style={{ opacity: dropAnim() ? 0 : blendFactor() }}
+            />
             {/* Primary tint when over a group */}
             <div
               class="absolute inset-0 rounded-xl bg-primary-500 pointer-events-none transition-opacity duration-150 ease-out motion-reduce:transition-none"
               classList={{
-                "opacity-30": isOverGroup(),
-                "opacity-0": !isOverGroup()
+                "opacity-30": !dropAnim() && isOverGroup(),
+                "opacity-0": !!dropAnim() || !isOverGroup()
               }}
             />
           </div>
@@ -112,6 +179,12 @@ const InstanceGhost = (props: InstanceGhostProps) => {
   const firstInstance = () => props.instances[0]
   const count = () => props.instances.length
   const dim = () => getTileDimensions(props.tileSize)
+
+  const validFirstInstance = () => {
+    const inst = firstInstance()
+    if (!inst) return undefined
+    return inst.status.status === "valid" ? inst.status.value : undefined
+  }
 
   const imageUrl = createMemo(() => {
     const instance = firstInstance()
@@ -156,11 +229,22 @@ const InstanceGhost = (props: InstanceGhostProps) => {
           "background-position": "center"
         }}
       >
-        {/* Bottom gradient with name */}
-        <div class="absolute bottom-0 left-0 right-0 px-3 pt-6 pb-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-          <h4 class="m-0 text-sm font-semibold text-white truncate">
+        {/* Bottom gradient with name and subtitle */}
+        <div class="absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl">
+          <h4 class="m-0 text-left text-sm font-semibold text-white truncate">
             {firstInstance()?.name || ""}
           </h4>
+          <Show when={validFirstInstance()}>
+            <div class="flex items-center gap-2 text-xs text-white/70">
+              <Show when={validFirstInstance()?.modloader}>
+                <img
+                  class="h-3 w-3"
+                  src={getModloaderIcon(validFirstInstance()!.modloader!)}
+                />
+              </Show>
+              <span>{validFirstInstance()?.mc_version}</span>
+            </div>
+          </Show>
         </div>
       </div>
 

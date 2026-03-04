@@ -6,7 +6,7 @@
  * - Accordion Mode (instancesGroupBy != null): Read-only virtual grouping, optional sortBy within groups
  */
 
-import { ListInstance, ListGroup } from "@gd/core_module/bindings"
+import { ListInstance, ListGroup, ListServer, ListServerGroup } from "@gd/core_module/bindings"
 import { Accessor } from "solid-js"
 import { DragType } from "./DragContext"
 
@@ -22,6 +22,7 @@ export type LibraryViewMode = "folders" | "accordion"
  */
 export type LibraryItem =
   | { id: string; type: "instance"; data: ListInstance }
+  | { id: string; type: "server"; data: ListServer }
   | {
       id: string
       type: "folder"
@@ -162,6 +163,11 @@ export interface AccordionViewProps {
 }
 
 /**
+ * Library mode: instances or servers.
+ */
+export type LibraryMode = "instances" | "servers"
+
+/**
  * Props for LibraryHeader component.
  */
 export interface LibraryHeaderProps {
@@ -170,4 +176,6 @@ export interface LibraryHeaderProps {
   tileSize: Accessor<number>
   setTileSize: (size: number) => void
   viewMode: Accessor<LibraryViewMode>
+  libraryMode: Accessor<LibraryMode>
+  setLibraryMode: (mode: LibraryMode) => void
 }

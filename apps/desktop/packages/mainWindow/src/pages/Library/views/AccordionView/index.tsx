@@ -19,6 +19,9 @@ interface AccordionViewProps {
   animatedInstanceIds: Set<string | number>
   initialAnimationComplete: { value: boolean }
   tileRefs: Map<string, HTMLDivElement>
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: (id: string) => void
 }
 
 export default function AccordionView(props: AccordionViewProps) {
@@ -36,6 +39,9 @@ export default function AccordionView(props: AccordionViewProps) {
           animatedInstanceIds={props.animatedInstanceIds}
           initialAnimationComplete={props.initialAnimationComplete}
           tileRefs={props.tileRefs}
+          selectedCount={props.selectedCount}
+          onBatchDelete={props.onBatchDelete}
+          onSelectExclusive={props.onSelectExclusive}
         />
       )}
     </For>

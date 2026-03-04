@@ -21,8 +21,6 @@ export interface UseDropZoneRegistrationOptions {
   dragContext: DragContextValue
   /** Default group ID for ungrouped instances */
   defaultGroupId: Accessor<number | null>
-  /** ID of the previous item in the list (for detecting no-op drops) */
-  previousItemId?: Accessor<number | null>
 }
 
 /**
@@ -31,8 +29,7 @@ export interface UseDropZoneRegistrationOptions {
 export function useDropZoneRegistration(
   options: UseDropZoneRegistrationOptions
 ): void {
-  const { itemId, itemType, ref, dragContext, defaultGroupId, previousItemId } =
-    options
+  const { itemId, itemType, ref, dragContext, defaultGroupId } = options
   const isFolder = itemType === "folder"
   const isInstance = itemType === "instance"
 
@@ -109,42 +106,28 @@ export function useDropZoneRegistration(
         return
       }
 
-      // Don't register "beforeInstance" zone if the previous item is being dragged
-      // (dropping there would be a no-op - the item is already in that position)
-      const prevId = previousItemId?.()
-      const prevItemIsBeingDragged =
-        prevId !== null &&
-        prevId !== undefined &&
-        dragContext.draggedIds().includes(prevId)
-
-      if (prevItemIsBeingDragged) {
-        dragContext.unregisterDropZone(`before-instance-${itemId}`)
-      } else {
-        const rect = el.getBoundingClientRect()
-        // Register "before instance" drop zone (left edge)
-        const dropRect = new DOMRect(
-          rect.left - 8,
-          rect.top,
-          rect.width * 0.4 + 8,
-          rect.height
-        )
-        dragContext.registerDropZone({
-          id: `before-instance-${itemId}`,
-          rect: dropRect,
-          element: el,
-          rectTransform: (r) =>
-            new DOMRect(r.left - 8, r.top, r.width * 0.4 + 8, r.height),
-          target: {
-            type: "beforeInstance",
-            instanceId: itemId,
-            groupId: defaultGroupId()!
-          }
-        })
-      }
+      const rect = el.getBoundingClientRect()
+      // Register "before instance" drop zone (left edge)
+      const dropRect = new DOMRect(
+        rect.left - 8,
+        rect.top,
+        rect.width * 0.4 + 8,
+        rect.height
+      )
+      dragContext.registerDropZone({
+        id: `before-instance-${itemId}`,
+        rect: dropRect,
+        element: el,
+        rectTransform: (r) =>
+          new DOMRect(r.left - 8, r.top, r.width * 0.4 + 8, r.height),
+        target: {
+          type: "beforeInstance",
+          instanceId: itemId,
+          groupId: defaultGroupId()!
+        }
+      })
 
       // Register "create folder" drop zone (right 60% of tile, excluding beforeInstance zone)
-      // This is still valid even if previous item is being dragged
-      const rect = el.getBoundingClientRect()
       const createFolderRect = new DOMRect(
         rect.left + rect.width * 0.4, // Start where beforeInstance ends
         rect.top,

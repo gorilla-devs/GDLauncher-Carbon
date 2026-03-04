@@ -10,7 +10,6 @@ import { useTransContext } from "@gd/i18n"
 import { useDragContext } from "@/pages/Library/DragContext"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { getInstanceImageUrl } from "@/utils/instances"
-import { rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
 import {
   Checkbox,
@@ -38,6 +37,9 @@ interface FolderTileProps {
   size: 1 | 2 | 3 | 4 | 5
   isSelected?: boolean
   onToggleSelection?: () => void
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: () => void
 }
 
 const FolderTile = (props: FolderTileProps) => {
@@ -48,14 +50,6 @@ const FolderTile = (props: FolderTileProps) => {
   let ref: HTMLDivElement | undefined
   const [isHovering, setIsHovering] = createSignal(false)
   const [isMenuOpen, setIsMenuOpen] = createSignal(false)
-
-  const deleteGroupMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.deleteGroup"]
-  }))
-
-  const deleteGroupWithInstancesMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.deleteGroupWithInstances"]
-  }))
 
   // Look up group from globalStore - creates reactive dependency
   const group = createMemo(() =>
@@ -95,6 +89,7 @@ const FolderTile = (props: FolderTileProps) => {
   const isBeingDragged = createMemo(
     () =>
       dragContext.isDragging() &&
+      dragContext.dragDetached() &&
       dragContext.dragType() === "group" &&
       dragContext.draggedIds().includes(props.groupId)
   )
@@ -143,60 +138,62 @@ const FolderTile = (props: FolderTileProps) => {
   const sizeClasses = () => TILE_SIZES[props.size].container
   const iconSizeClasses = () => TILE_SIZES[props.size].icon
 
-  // Context menu handlers
-  const handleUnlinkAndDelete = () => {
+  // Context menu handler - opens batch folder deletion modal with unlink/delete options
+  const handleManageFolder = () => {
+    const g = group()
+    if (!g) return
     modalsContext?.openModal(
-      { name: "notification" },
-      {
-        title: t("instances:_trn_unlink_folder_title"),
-        message: t("instances:_trn_unlink_folder_message", {
-          count: instanceCount()
-        }),
-        type: "warning",
-        onConfirm: () => deleteGroupMutation.mutate(props.groupId)
-      }
-    )
-  }
-
-  const handleDeleteAll = () => {
-    modalsContext?.openModal(
-      { name: "notification" },
-      {
-        title: t("instances:_trn_delete_folder_all_title"),
-        message: t("instances:_trn_delete_folder_all_message", {
-          count: instanceCount()
-        }),
-        type: "warning",
-        onConfirm: () => deleteGroupWithInstancesMutation.mutate(props.groupId)
-      }
+      { name: "confirmBatchFolderDeletion" },
+      { folders: [g], onComplete: () => {} }
     )
   }
 
   return (
-    <ContextMenu onOpenChange={setIsMenuOpen}>
+    <ContextMenu onOpenChange={(open) => {
+        setIsMenuOpen(open)
+        if (open && !props.isSelected && props.onSelectExclusive) {
+          props.onSelectExclusive()
+        }
+      }}>
       <ContextMenuContent>
-        <ContextMenuGroup>
-          <ContextMenuGroupLabel>{groupName()}</ContextMenuGroupLabel>
-          <ContextMenuSeparator />
-
-          <ContextMenuItem
-            class="flex items-center gap-2"
-            onClick={handleUnlinkAndDelete}
-          >
-            <div class="i-hugeicons:folder-remove h-4 w-4" />
-            {t("instances:_trn_unlink_folder")}
-          </ContextMenuItem>
-
-          <ContextMenuSeparator />
-
-          <ContextMenuItem
-            class="flex items-center gap-2 text-red-400"
-            onClick={handleDeleteAll}
-          >
-            <div class="i-hugeicons:delete-02 h-4 w-4" />
-            {t("instances:_trn_delete_folder_all")}
-          </ContextMenuItem>
-        </ContextMenuGroup>
+        <Show
+          when={props.isSelected && (props.selectedCount ?? 0) > 1}
+          fallback={
+            <ContextMenuGroup>
+              <ContextMenuGroupLabel>{groupName()}</ContextMenuGroupLabel>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={handleManageFolder}
+              >
+                <div class="i-hugeicons:folder-remove h-4 w-4" />
+                {t("instances:_trn_unlink_folder")}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                class="flex items-center gap-2 text-red-400"
+                onClick={handleManageFolder}
+              >
+                <div class="i-hugeicons:delete-02 h-4 w-4" />
+                {t("instances:_trn_delete_folder_all")}
+              </ContextMenuItem>
+            </ContextMenuGroup>
+          }
+        >
+          <ContextMenuGroup>
+            <ContextMenuGroupLabel>
+              {t("content:_trn_selected_count", { count: props.selectedCount })}
+            </ContextMenuGroupLabel>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              class="flex items-center gap-2"
+              onClick={() => props.onBatchDelete?.()}
+            >
+              <div class="i-hugeicons:delete-02 h-4 w-4" />
+              {t("content:_trn_delete_selected")}
+            </ContextMenuItem>
+          </ContextMenuGroup>
+        </Show>
       </ContextMenuContent>
 
       <ContextMenuTrigger>

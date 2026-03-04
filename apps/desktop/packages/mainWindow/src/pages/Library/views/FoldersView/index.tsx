@@ -6,8 +6,7 @@
  * and expanded folder overlay.
  */
 
-import { createEffect, createMemo, Show, Accessor } from "solid-js"
-import { createAutoAnimate } from "@formkit/auto-animate/solid"
+import { createMemo, Show, Accessor } from "solid-js"
 import { useDragContext, DragType } from "../../DragContext"
 import ExpandedFolderContent from "@/components/Library/ExpandedFolderContent"
 import { LibraryGrid } from "./LibraryGrid"
@@ -27,30 +26,16 @@ interface FoldersViewProps {
   justDropped: Accessor<boolean>
   flipAnimation: FLIPAnimation
   entranceAnimation: EntranceAnimationReturn
-  autoAnimateEnabled: Accessor<boolean>
   tileRefs: Map<string, HTMLDivElement>
   newlyCreatedFolderId: Accessor<number | null>
   clearNewlyCreatedFolderId: () => void
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: (id: string) => void
 }
 
 export default function FoldersView(props: FoldersViewProps) {
   const dragContext = useDragContext()
-
-  // Auto-animate refs for grid containers
-  const [mainGridRef, setMainGridEnabled] = createAutoAnimate({
-    duration: 200,
-    easing: "ease-out"
-  })
-
-  // Sync auto-animate with prop
-  const updateAutoAnimate = (enabled: boolean) => {
-    setMainGridEnabled(enabled)
-  }
-
-  // Update when prop changes
-  createEffect(() => {
-    updateAutoAnimate(props.autoAnimateEnabled())
-  })
 
   // Get the currently open folder data
   const getOpenFolder = createMemo(() => {
@@ -76,10 +61,12 @@ export default function FoldersView(props: FoldersViewProps) {
         justDropped={props.justDropped}
         flipAnimation={props.flipAnimation}
         entranceAnimation={props.entranceAnimation}
-        gridRef={mainGridRef}
         tileRefs={props.tileRefs}
         newlyCreatedFolderId={props.newlyCreatedFolderId}
         clearNewlyCreatedFolderId={props.clearNewlyCreatedFolderId}
+        selectedCount={props.selectedCount}
+        onBatchDelete={props.onBatchDelete}
+        onSelectExclusive={props.onSelectExclusive}
       />
 
       {/* Expanded Folder Overlay */}
@@ -99,6 +86,9 @@ export default function FoldersView(props: FoldersViewProps) {
                 : [instanceId]
               dragContext.startDrag("instance", ids, e)
             }}
+            selectedCount={props.selectedCount}
+            onBatchDelete={props.onBatchDelete}
+            onSelectExclusive={props.onSelectExclusive}
           />
         )}
       </Show>

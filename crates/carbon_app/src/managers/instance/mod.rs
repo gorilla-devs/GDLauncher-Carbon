@@ -2331,6 +2331,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
         .await??;
 
+        // Get the instance's group_id before deleting, so we can check if the group becomes empty
+        let group_id = self
+            .app
+            .prisma_client
+            .instance()
+            .find_unique(db::instance::UniqueWhereParam::IdEquals(*instance_id))
+            .exec()
+            .await?
+            .map(|inst| GroupId(inst.group_id));
+
         let mut instances = self.instances.write().await;
 
         instances.remove(&instance_id);
@@ -2340,6 +2350,33 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+
+        // Auto-delete empty non-default groups after deleting the last instance
+        if let Some(group_id) = group_id {
+            let default_group_id = self.get_default_group().await?;
+
+            if group_id != default_group_id {
+                let remaining_count = self
+                    .app
+                    .prisma_client
+                    .instance()
+                    .count(vec![db::instance::WhereParam::GroupId(
+                        IntFilter::Equals(*group_id),
+                    )])
+                    .exec()
+                    .await?;
+
+                if remaining_count == 0 {
+                    self.app
+                        .prisma_client
+                        .instance_group()
+                        .delete(db::instance_group::UniqueWhereParam::IdEquals(*group_id))
+                        .exec()
+                        .await?;
+                    self.app.invalidate(GET_GROUPS, None);
+                }
+            }
+        }
 
         Ok(())
     }

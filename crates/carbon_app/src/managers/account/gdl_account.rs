@@ -396,12 +396,12 @@ pub struct TokenExchangeResponse {
 pub enum TokenExchangeError {
     #[error("Invalid or expired Microsoft token")]
     InvalidToken,
-    #[error("Token exchange service unavailable")]
-    ServiceUnavailable,
+    #[error("Token exchange service unavailable (HTTP {0})")]
+    ServiceUnavailable(u16),
     #[error("Network error: {0}")]
     Network(#[from] reqwest_middleware::Error),
-    #[error("Request failed: {0}")]
-    RequestFailed(String),
+    #[error("Request failed (HTTP {status}): {body}")]
+    RequestFailed { status: u16, body: String },
 }
 
 impl GDLAccountTask {
@@ -431,20 +431,22 @@ impl GDLAccountTask {
                 let response: TokenExchangeResponse = resp
                     .json()
                     .await
-                    .map_err(|e| TokenExchangeError::RequestFailed(e.to_string()))?;
+                    .map_err(|e| TokenExchangeError::RequestFailed {
+                        status: 200,
+                        body: e.to_string(),
+                    })?;
                 Ok(response)
             }
             StatusCode::UNAUTHORIZED => Err(TokenExchangeError::InvalidToken),
-            StatusCode::SERVICE_UNAVAILABLE | StatusCode::INTERNAL_SERVER_ERROR => {
-                Err(TokenExchangeError::ServiceUnavailable)
+            status @ (StatusCode::SERVICE_UNAVAILABLE | StatusCode::INTERNAL_SERVER_ERROR) => {
+                Err(TokenExchangeError::ServiceUnavailable(status.as_u16()))
             }
             status => {
                 let body = resp.text().await.unwrap_or_default();
-                Err(TokenExchangeError::RequestFailed(format!(
-                    "HTTP {}: {}",
-                    status.as_u16(),
-                    body
-                )))
+                Err(TokenExchangeError::RequestFailed {
+                    status: status.as_u16(),
+                    body,
+                })
             }
         }
     }

@@ -53,6 +53,7 @@ const GroupHeader = (props: GroupHeaderProps) => {
   const isBeingDragged = createMemo(
     () =>
       dragContext.isDragging() &&
+      dragContext.dragDetached() &&
       dragContext.dragType() === "group" &&
       dragContext.draggedIds().includes(props.groupId)
   )

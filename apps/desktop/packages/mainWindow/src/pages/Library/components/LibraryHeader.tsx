@@ -19,14 +19,18 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-  Input
+  Input,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsIndicator
 } from "@gd/ui"
 import { For, Match, Show, Switch } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
-import { LibraryHeaderProps } from "../types"
+import { LibraryHeaderProps, LibraryMode } from "../types"
 import { InstancesGroupBy, InstancesSortBy } from "@gd/core_module/bindings"
 
 export function LibraryHeader(props: LibraryHeaderProps) {
@@ -65,6 +69,25 @@ export function LibraryHeader(props: LibraryHeaderProps) {
 
   return (
     <div class="bg-darkSlate-800 z-5 sticky top-0 flex items-center gap-4 py-4">
+      {/* Library Mode Toggle */}
+      <Tabs value={props.libraryMode()} onChange={(v) => props.setLibraryMode(v as LibraryMode)} class="h-auto w-auto flex-shrink-0">
+        <TabsList class="p-0.5" size="small">
+          <TabsIndicator />
+          <TabsTrigger value="instances">
+            <div class="flex items-center gap-1.5">
+              <div class="i-hugeicons:play h-3.5 w-3.5" />
+              <Trans key="instances:_trn_instances" />
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="servers">
+            <div class="flex items-center gap-1.5">
+              <div class="i-hugeicons:server-stack-01 h-3.5 w-3.5" />
+              Servers
+            </div>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <Input
         ref={inputRef}
         placeholder={t("search:_trn_search_instances")}

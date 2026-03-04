@@ -71,16 +71,42 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await?
             };
 
-            app.instance_manager()
-                .create_instance(
-                    group,
-                    details.name,
-                    details.use_loaded_icon,
-                    details.version.try_into()?,
-                    details.notes,
-                )
-                .await
-                .map(FEInstanceId::from)
+            let version = details.version.try_into()?;
+
+            if let Some(icon_url) = details.icon_url {
+                let icon = match app.instance_manager().download_icon(icon_url).await {
+                    Ok(icon) => Some(icon),
+                    Err(e) => {
+                        tracing::warn!("Failed to download icon for new instance, using default: {e}");
+                        None
+                    }
+                };
+
+                app.instance_manager()
+                    .create_instance_ext(
+                        group,
+                        details.name,
+                        icon,
+                        None,
+                        None,
+                        version,
+                        details.notes,
+                        |_| async { Ok(()) },
+                    )
+                    .await
+                    .map(FEInstanceId::from)
+            } else {
+                app.instance_manager()
+                    .create_instance(
+                        group,
+                        details.name,
+                        details.use_loaded_icon,
+                        version,
+                        details.notes,
+                    )
+                    .await
+                    .map(FEInstanceId::from)
+            }
         }
 
         mutation CHANGE_MODPACK[app, details: ChangeModpack] {
@@ -1053,6 +1079,8 @@ struct CreateInstance {
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
     notes: String,
+    #[specta(optional)]
+    icon_url: Option<String>,
 }
 
 #[derive(Type, Debug, Deserialize)]

@@ -92,6 +92,10 @@ pub fn get_migrations() -> (Migrations<'static>, i32) {
             env!("CARGO_MANIFEST_DIR"),
             "/prisma/migrations/20260124000000_unify_library_view_modes/migration.sql"
         ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20260223000000_add_servers/migration.sql"
+        ))),
     ];
     let count = migration_list.len() as i32;
     (Migrations::new(migration_list), count)

@@ -52,6 +52,11 @@ mod oauth_server;
 pub mod protocol_handler;
 pub mod skin;
 
+/// Initial backoff duration for GDL token exchange retries.
+const GDL_TOKEN_INITIAL_BACKOFF: Duration = Duration::from_secs(30);
+/// Maximum backoff duration for GDL token exchange retries.
+const GDL_TOKEN_MAX_BACKOFF: Duration = Duration::from_secs(300);
+
 pub(crate) struct AccountManager {
     currently_refreshing: RwLock<HashMap<String, EnrollmentTask>>,
     active_enrollment: RwLock<Option<EnrollmentTask>>,
@@ -62,6 +67,9 @@ pub(crate) struct AccountManager {
     gdl_account_task: GDLAccountTask,
     /// Protocol handler for gdlauncher:// OAuth callbacks
     protocol_handler: protocol_handler::ProtocolHandler,
+    /// Per-account backoff state for GDL token exchange retries.
+    /// Key: account UUID, Value: (next_retry_at, current_backoff_duration)
+    gdl_token_exchange_backoff: Mutex<HashMap<String, (Instant, Duration)>>,
 }
 
 impl AccountManager {
@@ -74,6 +82,7 @@ impl AccountManager {
 
             gdl_account_task: GDLAccountTask::new(client, gdl_base_api),
             protocol_handler: protocol_handler::ProtocolHandler::new(),
+            gdl_token_exchange_backoff: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -124,7 +133,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// This should be called after enrollment or refresh completes.
     /// If the exchange fails (e.g., network error), it logs a warning but doesn't fail.
     /// The GDL token can be exchanged again later.
-    pub async fn exchange_gdl_token(self, uuid: &str) -> anyhow::Result<()> {
+    pub async fn exchange_gdl_token(self, uuid: &str) -> anyhow::Result<String> {
         use db::account::{SetParam, UniqueWhereParam};
 
         // Get the account's MS id_token
@@ -138,39 +147,97 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .ok_or_else(|| anyhow!("Account not found: {}", uuid))?;
 
         let Some(id_token) = account.id_token else {
-            warn!(
-                "No MS id_token for account {}, skipping GDL token exchange",
+            bail!(
+                "No MS id_token for account {}, cannot exchange GDL token",
                 uuid
             );
-            return Ok(());
         };
 
         // Exchange for GDL token
-        match self.gdl_account_task.exchange_token(&id_token).await {
-            Ok(response) => {
-                info!("Successfully exchanged GDL token for account {}", uuid);
+        let response = self
+            .gdl_account_task
+            .exchange_token(&id_token)
+            .await
+            .with_context(|| format!("GDL token exchange failed for account {uuid}"))?;
 
-                // Store the GDL token in the database
-                self.app
-                    .prisma_client
-                    .account()
-                    .update(
-                        UniqueWhereParam::UuidEquals(uuid.to_string()),
-                        vec![SetParam::SetGdlToken(Some(response.access_token))],
-                    )
-                    .exec()
-                    .await?;
+        info!("Successfully exchanged GDL token for account {}", uuid);
 
-                self.app
-                    .invalidate(GET_ACCOUNTS, Some(uuid.to_string().into()));
-            }
-            Err(e) => {
-                // Don't fail if GDL API is unavailable - we can try again later
-                warn!("Failed to exchange GDL token for account {}: {}", uuid, e);
+        let token = response.access_token.clone();
+
+        // Store the GDL token in the database
+        self.app
+            .prisma_client
+            .account()
+            .update(
+                UniqueWhereParam::UuidEquals(uuid.to_string()),
+                vec![SetParam::SetGdlToken(Some(response.access_token))],
+            )
+            .exec()
+            .await?;
+
+        self.app
+            .invalidate(GET_ACCOUNTS, Some(uuid.to_string().into()));
+
+        Ok(token)
+    }
+
+    /// Ensure we have a GDL auth token for the given account, lazily exchanging if needed.
+    ///
+    /// Fast path: returns the existing token if present.
+    /// Slow path: checks backoff, then calls exchange_gdl_token to obtain one.
+    async fn ensure_gdl_auth_token(self, account: &db::account::Data) -> anyhow::Result<String> {
+        // Fast path — token already present
+        if let Some(token) = &account.gdl_token {
+            return Ok(token.clone());
+        }
+
+        let uuid = &account.uuid;
+
+        // Check backoff
+        {
+            let backoff_map = self.manager.gdl_token_exchange_backoff.lock().await;
+            if let Some((next_retry_at, _)) = backoff_map.get(uuid.as_str()) {
+                let now = Instant::now();
+                if now < *next_retry_at {
+                    let remaining = next_retry_at.duration_since(now);
+                    bail!(
+                        "GDL token exchange rate-limited for account {uuid}, next retry in {}s",
+                        remaining.as_secs()
+                    );
+                }
             }
         }
 
-        Ok(())
+        let Some(_id_token) = &account.id_token else {
+            bail!("No MS id_token available for account {uuid}, cannot exchange GDL token");
+        };
+
+        // Attempt exchange
+        match self.exchange_gdl_token(uuid).await {
+            Ok(token) => {
+                // Clear backoff on success
+                self.manager
+                    .gdl_token_exchange_backoff
+                    .lock()
+                    .await
+                    .remove(uuid.as_str());
+                Ok(token)
+            }
+            Err(e) => {
+                // Set/increase backoff
+                let mut backoff_map = self.manager.gdl_token_exchange_backoff.lock().await;
+                let new_backoff = match backoff_map.get(uuid.as_str()) {
+                    Some((_, current)) => (*current * 2).min(GDL_TOKEN_MAX_BACKOFF),
+                    None => GDL_TOKEN_INITIAL_BACKOFF,
+                };
+                backoff_map.insert(uuid.clone(), (Instant::now() + new_backoff, new_backoff));
+                warn!(
+                    "GDL token exchange failed for account {uuid}, backing off for {}s: {e}",
+                    new_backoff.as_secs()
+                );
+                Err(e)
+            }
+        }
     }
 
     /// Exchange GDL tokens for all accounts that have MS id_token but no GDL token.
@@ -294,9 +361,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         info!("Waiting for account validation");
 
@@ -315,9 +380,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         Ok(self.gdl_account_task.get_account(auth_token).await?)
     }
@@ -338,13 +401,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 ),
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            return Err(RequestGDLAccountDeletionError::RequestFailed(
-                anyhow::anyhow!(
-                    "No GDL auth token available for account {uuid}. Try re-authenticating."
-                ),
-            ));
-        };
+        let auth_token = self
+            .ensure_gdl_auth_token(&account)
+            .await
+            .map_err(RequestGDLAccountDeletionError::RequestFailed)?;
 
         let deletion = self
             .gdl_account_task
@@ -374,9 +434,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         let user = self
             .gdl_account_task
@@ -411,7 +469,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 .await?
                 .into_iter()
                 .find(|account| account.uuid == account_uuid)
-                .and_then(|account| get_gdl_auth_token(&account).cloned())
+                .and_then(|account| account.gdl_token.clone())
             {
                 if let Ok(Some(user)) = self.gdl_account_task.get_account(auth_token).await {
                     info!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
@@ -459,11 +517,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get a gdl account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!(
-                "No GDL auth token available for account {saved_gdl_account_uuid}. Try re-authenticating."
-            )
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         let Some(user) = self.gdl_account_task.get_account(auth_token).await? else {
             return Ok(GDLAccountStatus::Invalid);
@@ -499,9 +553,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get a presigned url for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .get_presigned_upload_url(
@@ -536,9 +588,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to upload a share instance for an account that does not exist"
             ))?;
 
-        let Some(_auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let _auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .upload_share_instance(presigned_url, file, file_size, sha256_checksum, progress_tx, cancel_token)
@@ -559,9 +609,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to upload a share instance for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .wait_for_share_instance(file_key, auth_token)
@@ -585,9 +633,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get shares for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .get_user_shares(auth_token, limit, offset)
@@ -606,9 +652,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to delete a share for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .delete_share(auth_token, share_code)
@@ -633,9 +677,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to update a share for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .update_share(
@@ -665,9 +707,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to regenerate a share code for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .regenerate_share_code(auth_token, share_code)
@@ -686,9 +726,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get quota for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .get_quota(auth_token)
@@ -728,9 +766,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to upload background for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            bail!("No GDL auth token available for account {uuid}. Try re-authenticating.");
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .upload_share_background(auth_token, share_code, image_data)
@@ -752,13 +788,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 anyhow::anyhow!("attempted to get an account that does not exist"),
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            return Err(RequestNewVerificationTokenError::RequestFailed(
-                anyhow::anyhow!(
-                    "No GDL auth token available for account {uuid}. Try re-authenticating."
-                ),
-            ));
-        };
+        let auth_token = self
+            .ensure_gdl_auth_token(&account)
+            .await
+            .map_err(RequestNewVerificationTokenError::RequestFailed)?;
 
         let request = self
             .gdl_account_task
@@ -789,11 +822,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             )))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            return Err(RequestNewEmailChangeError::RequestFailed(anyhow::anyhow!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            )));
-        };
+        let auth_token = self
+            .ensure_gdl_auth_token(&account)
+            .await
+            .map_err(RequestNewEmailChangeError::RequestFailed)?;
 
         let request = self
             .gdl_account_task
@@ -847,11 +879,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             )))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            return Err(ChangeDisplayNameError::RequestFailed(anyhow::anyhow!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            )));
-        };
+        let auth_token = self
+            .ensure_gdl_auth_token(&account)
+            .await
+            .map_err(ChangeDisplayNameError::RequestFailed)?;
 
         self.gdl_account_task
             .change_display_name(auth_token, display_name)
@@ -883,11 +914,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            return Err(anyhow::anyhow!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            ));
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
             .clear_display_name_history(auth_token)
@@ -906,11 +933,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            return Err(anyhow::anyhow!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            ));
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         let request = self
             .gdl_account_task
@@ -937,11 +960,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to delete profile icon for an account that does not exist"
             ))?;
 
-        let Some(auth_token) = get_gdl_auth_token(&account).cloned() else {
-            return Err(anyhow::anyhow!(
-                "No GDL auth token available for account {uuid}. Try re-authenticating."
-            ));
-        };
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         let request = self.gdl_account_task.delete_profile_icon(auth_token).await;
 
@@ -1131,7 +1150,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
                         match r {
                             Ok(_) => {
                                 info!("Refreshed account {}", &self.account.uuid);
-                                // GDL token was exchanged in parallel during refresh
+                                // Clear any GDL token exchange backoff on successful refresh
+                                account_manager
+                                    .manager
+                                    .gdl_token_exchange_backoff
+                                    .lock()
+                                    .await
+                                    .remove(&self.account.uuid);
                             }
                             Err(e) => {
                                 error!({ error = ?e }, "Failed to update account information {}", &self.account.uuid)
@@ -1255,6 +1280,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
         match result {
             Ok(_) => {
                 info!("Deleted account {uuid}");
+
+                // Clean up backoff state for deleted account
+                self.manager
+                    .gdl_token_exchange_backoff
+                    .lock()
+                    .await
+                    .remove(&uuid);
 
                 self.app.invalidate(GET_ACCOUNTS, None);
 
@@ -1405,8 +1437,17 @@ impl<'s> ManagerRef<'s, AccountManager> {
                         self.set_active_uuid(Some(uuid.clone())).await?;
 
                         // Exchange MS token for GDL token (non-blocking)
-                        if let Err(e) = self.exchange_gdl_token(&uuid).await {
-                            warn!("Failed to exchange GDL token during enrollment: {}", e);
+                        match self.exchange_gdl_token(&uuid).await {
+                            Ok(_) => {
+                                self.manager
+                                    .gdl_token_exchange_backoff
+                                    .lock()
+                                    .await
+                                    .remove(&uuid);
+                            }
+                            Err(e) => {
+                                warn!("Failed to exchange GDL token during enrollment: {}", e);
+                            }
                         }
 
                         self.app.invalidate(ENROLL_GET_STATUS, None);
@@ -1475,11 +1516,20 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 self.set_active_uuid(Some(uuid.clone())).await?;
 
                 // Exchange MS token for GDL token (non-blocking)
-                if let Err(e) = self.exchange_gdl_token(&uuid).await {
-                    warn!(
-                        "Failed to exchange GDL token during resume_enrollment: {}",
-                        e
-                    );
+                match self.exchange_gdl_token(&uuid).await {
+                    Ok(_) => {
+                        self.manager
+                            .gdl_token_exchange_backoff
+                            .lock()
+                            .await
+                            .remove(&uuid);
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to exchange GDL token during resume_enrollment: {}",
+                            e
+                        );
+                    }
                 }
 
                 Ok(())
@@ -1919,15 +1969,7 @@ fn extract_email(token: Option<&String>) -> Option<String> {
     })
 }
 
-/// Get the GDL auth token for API calls.
-/// Returns None if no GDL token is available (user needs to re-authenticate).
-fn get_gdl_auth_token(account: &db::account::Data) -> Option<&String> {
-    println!(
-        "Getting GDL auth token for account {}",
-        account.gdl_token.as_ref().unwrap_or(&"".to_string())
-    );
-    account.gdl_token.as_ref()
-}
+// get_gdl_auth_token removed — replaced by ensure_gdl_auth_token on ManagerRef
 
 /*impl From<FullAccount> for db::account::Data {
     fn from(value: FullAccount) -> Self {

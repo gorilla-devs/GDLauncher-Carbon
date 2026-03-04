@@ -186,6 +186,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
   insufficientMemory: {
     component: lazy(() => import("./modals/InsufficientMemory")),
     title: t("java:_trn_insufficient_memory_title")
+  },
+  serverCreation: {
+    component: lazy(() => import("./modals/ServerCreation")),
+    title: "New Server"
   }
 })
 

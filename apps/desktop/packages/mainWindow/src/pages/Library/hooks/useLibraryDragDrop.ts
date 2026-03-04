@@ -20,8 +20,6 @@ interface UseLibraryDragDropOptions {
   flipAnimation: FLIPAnimation
   /** Current library items for order snapshot */
   libraryItems: LibraryItem[]
-  /** Callback to disable auto-animate during FLIP */
-  onBeforeDrop?: () => void
   /** Callback when drop completes */
   onAfterDrop?: () => void
 }
@@ -66,23 +64,6 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
 
     batch(() => {
       switch (target.type) {
-        case "favorites": {
-          // Toggle favorite status for all dragged instances
-          const draggedInstances = (globalStore.instances.data || []).filter(
-            (i) => draggedIds.includes(i.id)
-          )
-          const allAreFavorite = draggedInstances.every((i) => i.favorite)
-          const newFavoriteStatus = !allAreFavorite
-
-          for (const id of draggedIds) {
-            setFavoriteMutation.mutate({
-              instance: id,
-              favorite: newFavoriteStatus
-            })
-          }
-          break
-        }
-
         case "beforeInstance": {
           // Move instances before target instance
           for (const id of draggedIds) {
@@ -201,16 +182,52 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
   /**
    * Main drop handler.
    */
-  const handleDrop = (target: DropTarget, draggedIds: number[], dragType: DragType): void => {
-    if (!target || draggedIds.length === 0) return
+  const handleDrop = (target: DropTarget | null, draggedIds: number[], dragType: DragType, origin: string | null): void => {
+    if (draggedIds.length === 0) return
+
+    // Favorites-origin: dropping outside bar = unfavorite
+    if (origin === "favorites") {
+      if (target?.type === "favorites") {
+        // Dropped back on bar — no-op
+        return
+      }
+
+      // Capture positions before mutation
+      options.flipAnimation.capturePositions(
+        options.libraryItems.map((item) => item.id)
+      )
+
+      // Unfavorite all dragged instances
+      for (const id of draggedIds) {
+        setFavoriteMutation.mutate({ instance: id, favorite: false })
+      }
+      options.selection.clearSelection()
+      options.onAfterDrop?.()
+      return
+    }
+
+    // Normal flow (grid-origin) — require a target
+    if (!target) return
+
+    // For "favorites" target from grid: only ADD favorites, never remove
+    if (target.type === "favorites") {
+      const draggedInstances = (globalStore.instances.data || []).filter(
+        (i) => draggedIds.includes(i.id)
+      )
+      for (const inst of draggedInstances) {
+        if (!inst.favorite) {
+          setFavoriteMutation.mutate({ instance: inst.id, favorite: true })
+        }
+      }
+      options.selection.clearSelection()
+      options.onAfterDrop?.()
+      return
+    }
 
     // Capture positions and order BEFORE mutation for FLIP animation
     options.flipAnimation.capturePositions(
       options.libraryItems.map((item) => item.id)
     )
-
-    // Notify parent to disable auto-animate
-    options.onBeforeDrop?.()
 
     if (dragType === "instance") {
       handleInstanceDrop(target, draggedIds)

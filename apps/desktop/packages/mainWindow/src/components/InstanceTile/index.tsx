@@ -39,6 +39,9 @@ const InstanceTile = (props: {
   isDragActive?: boolean
   groupId?: number
   preventClick?: () => boolean
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: () => void
 }) => {
   const [isLoading, setIsLoading] = createSignal(false)
   const [failError, setFailError] = createSignal("")
@@ -197,6 +200,9 @@ const InstanceTile = (props: {
       onDragStart={props.onDragStart}
       isDragging={props.isDragging}
       isDragActive={props.isDragActive}
+      selectedCount={props.selectedCount}
+      onBatchDelete={props.onBatchDelete}
+      onSelectExclusive={props.onSelectExclusive}
     />
   )
 }

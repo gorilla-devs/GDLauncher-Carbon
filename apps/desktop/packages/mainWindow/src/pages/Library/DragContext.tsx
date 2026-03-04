@@ -42,9 +42,10 @@ export interface DropZone {
 }
 
 type DropHandler = (
-  target: DropTarget,
+  target: DropTarget | null,
   draggedIds: number[],
-  dragType: DragType
+  dragType: DragType,
+  origin: string | null
 ) => void
 
 interface DragContextValue {
@@ -57,14 +58,21 @@ interface DragContextValue {
   dragSelectEnabled: Accessor<boolean>
   justDropped: Accessor<boolean>
   activeScope: Accessor<string | null>
+  dropPreviewRect: Accessor<DOMRect | null>
+  dropAnimating: Accessor<{ type: string; targetX: number; targetY: number } | null>
+  dragDetached: Accessor<boolean>
 
   // Actions
-  startDrag: (type: DragType, ids: number[], e: PointerEvent) => void
+  startDrag: (type: DragType, ids: number[], e: PointerEvent, origin?: string) => void
   updateDrag: (e: PointerEvent) => void
   endDrag: () => void
   cancelDrag: () => void
   setDragSelectEnabled: (enabled: boolean) => void
   setActiveScope: (scope: string | null) => void
+  setDropPreviewRect: (rect: DOMRect | null) => void
+
+  // Origin tracking
+  getDragOrigin: () => string | null
 
   // Drop zone registration
   registerDropZone: (zone: DropZone) => void
@@ -73,18 +81,57 @@ interface DragContextValue {
 
   // Drop handler
   setOnDrop: (handler: DropHandler | null) => void
+
+  // Layout animation capture
+  addLayoutCaptureCallback: (fn: () => void) => void
+  removeLayoutCaptureCallback: (fn: () => void) => void
 }
 
 const DragContext = createContext<DragContextValue>()
 
 const MIN_DRAG_DISTANCE = 5
 
+const isSameTarget = (
+  a: DropTarget | null,
+  b: DropTarget | null
+): boolean => {
+  if (a === null && b === null) return true
+  if (a === null || b === null) return false
+  if (a.type !== b.type) return false
+  switch (a.type) {
+    case "favorites":
+    case "endOfGroups":
+    case "ungrouped":
+    case "endOfLibrary":
+      return true
+    case "beforeInstance":
+      return (
+        a.instanceId === (b as typeof a).instanceId &&
+        a.groupId === (b as typeof a).groupId
+      )
+    case "endOfGroup":
+    case "dropOnFolder":
+    case "beforeGroup":
+      return a.groupId === (b as typeof a).groupId
+    case "createFolder":
+      return a.instanceId === (b as typeof a).instanceId
+    case "beforeGroupAtInstance":
+      return a.beforeInstanceId === (b as typeof a).beforeInstanceId
+    case "beforeInstanceAtFolder":
+      return a.folderId === (b as typeof a).folderId
+    default:
+      return false
+  }
+}
+
 export function DragProvider(props: { children: JSX.Element }) {
   const [isDragging, setIsDragging] = createSignal(false)
   const [hasDragStarted, setHasDragStarted] = createSignal(false)
   const [dragType, setDragType] = createSignal<DragType | null>(null)
   const [draggedIds, setDraggedIds] = createSignal<number[]>([])
-  const [dropTarget, setDropTarget] = createSignal<DropTarget | null>(null)
+  const [dropTarget, setDropTarget] = createSignal<DropTarget | null>(null, {
+    equals: (a, b) => isSameTarget(a, b)
+  })
   const [ghostPosition, setGhostPosition] = createSignal<GhostPosition>({
     x: 0,
     y: 0
@@ -96,16 +143,39 @@ export function DragProvider(props: { children: JSX.Element }) {
   } | null>(null)
   const [justDropped, setJustDropped] = createSignal(false)
   const [activeScope, setActiveScope] = createSignal<string | null>(null)
+  const [dropPreviewRect, setDropPreviewRect] = createSignal<DOMRect | null>(
+    null
+  )
+  const [dropAnimating, setDropAnimating] = createSignal<{
+    type: string
+    targetX: number
+    targetY: number
+  } | null>(null)
+  const [dragDetached, setDragDetached] = createSignal(false)
+
+  const DETACH_THRESHOLD_SQ = 35 * 35
 
   // Drop zones registry
   let dropZones: DropZone[] = []
   let onDropHandler: DropHandler | null = null
   let scrollCleanup: (() => void) | null = null
+  let dragOrigin: string | null = null
+
+  // Layout animation capture callbacks (multiple grids can register)
+  const layoutCaptureCallbacks = new Set<() => void>()
+
+  const addLayoutCaptureCallback = (fn: () => void) => {
+    layoutCaptureCallbacks.add(fn)
+  }
+
+  const removeLayoutCaptureCallback = (fn: () => void) => {
+    layoutCaptureCallbacks.delete(fn)
+  }
 
   // Position-based stabilization: reject target changes when cursor hasn't moved
   let lastStableTarget: DropTarget | null = null
   let lastStablePosition: { x: number; y: number } | null = null
-  const POSITION_THRESHOLD = 10
+  const POSITION_THRESHOLD = 4
 
   // Throttle rect refresh to max 20 refreshes/second
   let lastRefreshTime = 0
@@ -119,10 +189,15 @@ export function DragProvider(props: { children: JSX.Element }) {
     // Remove existing zone with same id
     dropZones = dropZones.filter((z) => z.id !== zone.id)
     dropZones.push(zone)
+    // Force rect refresh on next findDropTarget — layout may have changed
+    lastRefreshTime = 0
   }
 
   const unregisterDropZone = (id: string) => {
     dropZones = dropZones.filter((z) => z.id !== id)
+    // Force rect refresh — removing a zone (e.g. DropPreviewTile unmount)
+    // causes grid reflow, so cached rects become stale.
+    lastRefreshTime = 0
   }
 
   const getDropZones = () => dropZones
@@ -144,9 +219,12 @@ export function DragProvider(props: { children: JSX.Element }) {
     refreshDropZoneRects()
 
     // Filter zones by active scope - when scope is set, only consider scoped zones
+    // Always include favorites zone so it's reachable from any context (e.g., inside folders)
     const scope = activeScope()
     const scopedZones =
-      scope !== null ? dropZones.filter((z) => z.scope === scope) : dropZones
+      scope !== null
+        ? dropZones.filter((z) => z.scope === scope || z.target.type === "favorites")
+        : dropZones
 
     // Sort drop zones by priority (favorites first, then instances, then groups)
     const sortedZones = [...scopedZones].sort((a, b) => {
@@ -179,39 +257,6 @@ export function DragProvider(props: { children: JSX.Element }) {
     }
 
     return null
-  }
-
-  const isSameTarget = (
-    a: DropTarget | null,
-    b: DropTarget | null
-  ): boolean => {
-    if (a === null && b === null) return true
-    if (a === null || b === null) return false
-    if (a.type !== b.type) return false
-    switch (a.type) {
-      case "favorites":
-      case "endOfGroups":
-      case "ungrouped":
-      case "endOfLibrary":
-        return true
-      case "beforeInstance":
-        return (
-          a.instanceId === (b as typeof a).instanceId &&
-          a.groupId === (b as typeof a).groupId
-        )
-      case "endOfGroup":
-      case "dropOnFolder":
-      case "beforeGroup":
-        return a.groupId === (b as typeof a).groupId
-      case "createFolder":
-        return a.instanceId === (b as typeof a).instanceId
-      case "beforeGroupAtInstance":
-        return a.beforeInstanceId === (b as typeof a).beforeInstanceId
-      case "beforeInstanceAtFolder":
-        return a.folderId === (b as typeof a).folderId
-      default:
-        return false
-    }
   }
 
   const resolveDropTarget = (
@@ -250,12 +295,15 @@ export function DragProvider(props: { children: JSX.Element }) {
     lastStablePosition = null
   }
 
-  const startDrag = (type: DragType, ids: number[], e: PointerEvent) => {
+  const startDrag = (type: DragType, ids: number[], e: PointerEvent, origin?: string) => {
+    dragOrigin = origin ?? null
     setDragType(type)
     setDraggedIds(ids)
     setStartPosition({ x: e.clientX, y: e.clientY })
     setGhostPosition({ x: e.clientX, y: e.clientY })
     setHasDragStarted(false)
+    // Disable drag-select immediately to prevent selection starting before threshold
+    setDragSelectEnabled(false)
 
     // Add document-level listeners
     document.addEventListener("pointermove", handlePointerMove)
@@ -263,10 +311,14 @@ export function DragProvider(props: { children: JSX.Element }) {
     document.addEventListener("keydown", handleKeyDown)
 
     const handleScroll = () => {
-      if (hasDragStarted()) {
+      if (hasDragStarted() && dragDetached()) {
         const pos = ghostPosition()
         const target = findDropTarget(pos.x, pos.y)
-        setDropTarget(resolveDropTarget(target, pos.x, pos.y, true))
+        const resolved = resolveDropTarget(target, pos.x, pos.y, true)
+        if (!isSameTarget(resolved, dropTarget())) {
+          layoutCaptureCallbacks.forEach((fn) => fn())
+        }
+        setDropTarget(resolved)
       }
     }
     document.addEventListener("scroll", handleScroll, {
@@ -297,42 +349,123 @@ export function DragProvider(props: { children: JSX.Element }) {
     if (hasDragStarted()) {
       setGhostPosition({ x: e.clientX, y: e.clientY })
 
-      // Find drop target
-      const target = findDropTarget(e.clientX, e.clientY)
-      setDropTarget(resolveDropTarget(target, e.clientX, e.clientY))
+      // Latch dragDetached once cursor moves far enough from start
+      if (!dragDetached() && start) {
+        const ddx = e.clientX - start.x
+        const ddy = e.clientY - start.y
+        if (ddx * ddx + ddy * ddy > DETACH_THRESHOLD_SQ) {
+          setDragDetached(true)
+        }
+      }
+
+      // Find drop target only after detach — suppresses all visual changes
+      // (ghost, tile hiding, DropPreviewTile, grid reflow) until the tile
+      // has been dragged far enough from its original position.
+      if (dragDetached()) {
+        const target = findDropTarget(e.clientX, e.clientY)
+        const resolved = resolveDropTarget(target, e.clientX, e.clientY)
+        if (!isSameTarget(resolved, dropTarget())) {
+          layoutCaptureCallbacks.forEach((fn) => fn())
+        }
+        setDropTarget(resolved)
+      }
     }
   }
 
-  const handlePointerUp = () => {
+  const executeDrop = () => {
     cleanup()
 
     if (hasDragStarted()) {
       setJustDropped(true)
 
+      // Use the current dropTarget — this matches what the preview was showing.
+      // Don't recalculate, as forceAccept would bypass hysteresis and could
+      // resolve a different target than the preview displayed.
       const target = dropTarget()
       const ids = draggedIds()
       const type = dragType()
 
-      if (target && ids.length > 0 && type && onDropHandler) {
-        onDropHandler(target, ids, type)
+      if (ids.length > 0 && type && onDropHandler) {
+        onDropHandler(target, ids, type, dragOrigin)
       }
 
-      setIsDragging(false)
+      // Animated exit for favorites unfavorite — keep ghost alive during animation
+      const isFavUnfavorite =
+        dragOrigin === "favorites" &&
+        (target === null || target.type !== "favorites")
 
-      // Delay clearing visual state so preview tiles and collapsed tiles persist
-      // during the settlement window, allowing data to arrive at the correct
-      // DOM positions before the layout shifts.
+      if (isFavUnfavorite) {
+        // Find the library content area to target the center of the overlay
+        const contentEl = document.querySelector<HTMLElement>(
+          "[style*='view-transition-name: library-content']"
+        )
+        const contentRect = contentEl?.getBoundingClientRect()
+        const targetX = contentRect
+          ? contentRect.left + contentRect.width / 2
+          : window.innerWidth / 2
+        const targetY = contentRect
+          ? contentRect.top + contentRect.height / 2
+          : window.innerHeight / 2
+
+        setDropAnimating({ type: "unfavorite", targetX, targetY })
+        setHasDragStarted(false)
+        setStartPosition(null)
+        setDragSelectEnabled(true)
+        resetDropTargetHysteresis()
+        // isDragging, dragType, draggedIds, dragOrigin stay alive for the ghost
+        setTimeout(() => {
+          setDropAnimating(null)
+          setIsDragging(false)
+          setDragDetached(false)
+          setDragType(null)
+          setDraggedIds([])
+          setDropTarget(null)
+          setDropPreviewRect(null)
+          dragOrigin = null
+          requestAnimationFrame(() => {
+            setJustDropped(false)
+          })
+        }, 300)
+        return
+      }
+
+      // Animate ghost to drop preview position if available
+      const previewRect = dropPreviewRect()
+      if (previewRect) {
+        const targetX = previewRect.left + previewRect.width / 2
+        const targetY = previewRect.top + previewRect.height / 2
+
+        setDropAnimating({ type: "settle", targetX, targetY })
+        setHasDragStarted(false)
+        setStartPosition(null)
+        setDragSelectEnabled(true)
+        resetDropTargetHysteresis()
+        // isDragging, dragType, draggedIds stay alive for the ghost
+        setTimeout(() => {
+          setDropAnimating(null)
+          setIsDragging(false)
+          setDragDetached(false)
+          setDragType(null)
+          setDraggedIds([])
+          setDropTarget(null)
+          setDropPreviewRect(null)
+          dragOrigin = null
+          requestAnimationFrame(() => {
+            setJustDropped(false)
+          })
+        }, 300)
+        return
+      }
+
+      // No preview rect (e.g. drop on favorites, null target) — clear immediately
+      setIsDragging(false)
       setTimeout(() => {
-        // Clear visual state first while justDropped still suppresses auto-animate.
-        // This way DOM mutations (preview unmount, tile unhide) happen with
-        // auto-animate disabled, preventing the folder grid from animating them.
         if (!isDragging()) {
           setDragType(null)
           setDraggedIds([])
           setDropTarget(null)
+          setDropPreviewRect(null)
         }
-        // Clear justDropped in the next frame so the DOM has settled before
-        // auto-animate re-enables — no mutations left to animate.
         requestAnimationFrame(() => {
           setJustDropped(false)
         })
@@ -342,12 +475,19 @@ export function DragProvider(props: { children: JSX.Element }) {
       setDragType(null)
       setDraggedIds([])
       setDropTarget(null)
+      setDropPreviewRect(null)
     }
 
+    dragOrigin = null
     setHasDragStarted(false)
+    setDragDetached(false)
     setStartPosition(null)
     setDragSelectEnabled(true)
     resetDropTargetHysteresis()
+  }
+
+  const handlePointerUp = (_e: PointerEvent) => {
+    executeDrop()
   }
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -371,16 +511,19 @@ export function DragProvider(props: { children: JSX.Element }) {
   }
 
   const endDrag = () => {
-    handlePointerUp()
+    executeDrop()
   }
 
   const cancelDrag = () => {
     cleanup()
+    dragOrigin = null
     setIsDragging(false)
     setHasDragStarted(false)
+    setDragDetached(false)
     setDragType(null)
     setDraggedIds([])
     setDropTarget(null)
+    setDropPreviewRect(null)
     setStartPosition(null)
     setDragSelectEnabled(true)
     resetDropTargetHysteresis()
@@ -397,16 +540,23 @@ export function DragProvider(props: { children: JSX.Element }) {
     dragSelectEnabled,
     justDropped,
     activeScope,
+    dropPreviewRect,
+    dropAnimating,
+    dragDetached,
     startDrag,
     updateDrag,
     endDrag,
     cancelDrag,
     setDragSelectEnabled,
     setActiveScope,
+    setDropPreviewRect,
+    getDragOrigin: () => dragOrigin,
     registerDropZone,
     unregisterDropZone,
     getDropZones,
-    setOnDrop
+    setOnDrop,
+    addLayoutCaptureCallback,
+    removeLayoutCaptureCallback
   }
 
   return (

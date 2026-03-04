@@ -49,6 +49,14 @@ model AppConfiguration {
   gdlAccountStatus                Bytes?
   // Stable installation ID for cohort-based features
   installationId                  String?
+  // Server settings
+  serversTileSize             Int      @default(2)
+  serversGroupBy              String?
+  serversGroupByAsc           Boolean  @default(true)
+  serversSortBy               String?
+  serversSortByAsc            Boolean  @default(false)
+  serversDuplicateFavorites   Boolean  @default(true)
+  defaultServerGroup          Int?
 }
 
 // Generic KV store for frontend preferences (onboarding, "don't show again" dialogs, etc.)
@@ -154,6 +162,39 @@ model InstanceGroup {
   groupIndex      Int        // Legacy field - to be removed after migration
   libraryPosition Int?       // Ordering at library root (null for default group)
   instances       Instance[]
+}
+
+model Server {
+  id              Int           @id @default(autoincrement())
+  name            String
+  shortpath       String        @unique
+  favorite        Boolean       @default(false)
+  index           Int
+  libraryPosition Int?
+  group           ServerGroup   @relation(fields: [groupId], references: [id])
+  groupId         Int
+  serverType      String        @default("vanilla")
+  gameVersion     String
+  port            Int           @default(25565)
+  motd            String        @default("A Minecraft Server")
+  maxPlayers      Int           @default(20)
+  onlineMode      Boolean       @default(true)
+  xmx             Int           @default(2048)
+  xms             Int           @default(1024)
+  extraJavaArgs   String        @default("")
+  autoRestart     Boolean       @default(false)
+  dateCreated     DateTime      @default(now())
+  lastStarted     DateTime?
+  providerType    String        @default("local")
+  hostedServerId  String?
+}
+
+model ServerGroup {
+  id              Int        @id @default(autoincrement())
+  name            String
+  groupIndex      Int
+  libraryPosition Int?
+  servers         Server[]
 }
 
 model ModFileCache {

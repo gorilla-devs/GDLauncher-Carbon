@@ -1,4 +1,4 @@
-import { createMemo, createEffect, createSignal, onCleanup, For, Show } from "solid-js"
+import { createMemo, createEffect, createSignal, onCleanup, onMount, For, Show } from "solid-js"
 import { Portal } from "solid-js/web"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
@@ -35,6 +35,38 @@ import { useDragContext } from "../DragContext"
 import adSize from "@/utils/adhelper"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import type { ValidListInstance, ListInstance } from "@gd/core_module/bindings"
+
+/** Icon + text hint centered over the library grid area */
+function UnfavoriteHint() {
+  const [pos, setPos] = createSignal<{ left: string; top: string } | null>(null)
+
+  onMount(() => {
+    const el = document.querySelector<HTMLElement>("[style*='view-transition-name: library-content']")
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      setPos({
+        left: `${rect.left + rect.width / 2}px`,
+        top: `${rect.top + rect.height / 2}px`
+      })
+    }
+  })
+
+  return (
+    <Show when={pos()}>
+      {(p) => (
+        <div
+          class="fixed flex flex-col items-center gap-3 -translate-x-1/2 -translate-y-1/2"
+          style={{ left: p().left, top: p().top }}
+        >
+          <div class="i-ri:star-off-line text-white/90 h-12 w-12" />
+          <span class="text-white/90 text-sm font-medium">
+            <Trans key="instances:_trn_drop_to_unfavorite" />
+          </span>
+        </div>
+      )}
+    </Show>
+  )
+}
 
 function formatRelativeTime(
   t: (key: string, options?: Record<string, unknown>) => string,
@@ -73,10 +105,47 @@ interface FloatingFavoritesBarProps {
   isSelectionActive: boolean
 }
 
+// Module-level set that accumulates all favorite IDs we've ever seen,
+// so the expand animation only fires on first app load and for genuinely
+// new favorites — not on page switches or instance/server mode toggles.
+let knownFavoriteIds: Set<number> | null = null
+
 export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
   const dragContext = useDragContext()
   const globalStore = useGlobalStore()
   let containerRef: HTMLDivElement | undefined
+
+  // Track newly added favorites for entrance animation
+  const [newlyAddedIds, setNewlyAddedIds] = createSignal<Set<number>>(new Set())
+  const [recentlyAdded, setRecentlyAdded] = createSignal(false)
+
+  createEffect(() => {
+    const current = props.favoriteIds
+    if (knownFavoriteIds === null) {
+      // First time ever — treat all as new (triggers expand on app load)
+      knownFavoriteIds = new Set(current)
+      if (current.length > 0) {
+        setNewlyAddedIds(new Set(current))
+        setRecentlyAdded(true)
+        setTimeout(() => {
+          setNewlyAddedIds(new Set())
+          setRecentlyAdded(false)
+        }, 600)
+      }
+      return
+    }
+    const added = current.filter((id) => !knownFavoriteIds!.has(id))
+    // Accumulate — never forget IDs we've seen
+    for (const id of current) knownFavoriteIds.add(id)
+    if (added.length > 0) {
+      setNewlyAddedIds(new Set(added))
+      setRecentlyAdded(true)
+      setTimeout(() => {
+        setNewlyAddedIds(new Set())
+        setRecentlyAdded(false)
+      }, 600)
+    }
+  })
 
   const isOver = createMemo(() => {
     const target = dragContext.dropTarget()
@@ -98,20 +167,36 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
   )
 
   // Register drop zone when dragging instances
+  // When dragging FROM favorites, scope all zones to "favorites-drag" so grid zones are ignored
   createEffect(() => {
-    if (isDragActiveForInstances()) {
-      const el = containerRef
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      dragContext.registerDropZone({
-        id: "floating-favorites-bar",
-        rect,
-        element: el,
-        target: { type: "favorites" }
-      })
-    } else {
+    if (!isDragActiveForInstances()) {
       dragContext.unregisterDropZone("floating-favorites-bar")
+      return
     }
+
+    const el = containerRef
+    if (!el) return
+
+    const fromFavorites = dragContext.getDragOrigin() === "favorites"
+
+    if (fromFavorites) {
+      dragContext.setActiveScope("favorites-drag")
+    }
+
+    const rect = el.getBoundingClientRect()
+    dragContext.registerDropZone({
+      id: "floating-favorites-bar",
+      rect,
+      element: el,
+      target: { type: "favorites" },
+      scope: fromFavorites ? "favorites-drag" : undefined
+    })
+
+    onCleanup(() => {
+      if (fromFavorites) {
+        dragContext.setActiveScope(null)
+      }
+    })
   })
 
   onCleanup(() => {
@@ -128,54 +213,102 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
   const [isExpanded, setIsExpanded] = createSignal(false)
   const [openMenuCount, setOpenMenuCount] = createSignal(0)
 
-  const expanded = () => isExpanded() || isDragActiveForInstances() || openMenuCount() > 0
+  const expanded = () => isExpanded() || isDragActiveForInstances() || openMenuCount() > 0 || recentlyAdded()
+
+  const isDraggingFromFavorites = createMemo(
+    () => dragContext.isDragging() && dragContext.getDragOrigin() === "favorites"
+  )
 
   return (
     <Show when={showBar()}>
+      {/* Backdrop overlay when dragging out of favorites — like BackdropDropZone in folders */}
+      <Show when={isDraggingFromFavorites()}>
+        <Portal>
+          <div class="fixed inset-0 z-30 pointer-events-auto">
+            <div class="absolute inset-0 bg-black/50" />
+            <div class="absolute inset-0 bg-primary-500/20 border-2 border-dashed border-primary-500" />
+            <Show when={!isOver()}>
+              <UnfavoriteHint />
+            </Show>
+          </div>
+        </Portal>
+      </Show>
       <Portal>
         <div
-          class="group/dock fixed bottom-6 left-6 z-40 flex animate-popoverEnter"
+          class="group/dock fixed bottom-6 left-6 flex animate-popoverEnter"
+          classList={{
+            "z-[10001]": isDragActiveForInstances(),
+            "z-40": !isDragActiveForInstances()
+          }}
           onMouseEnter={() => setIsExpanded(true)}
           onMouseLeave={() => setIsExpanded(false)}
         >
           <div
             ref={containerRef}
-            class="flex items-center min-h-13 min-w-13 rounded-full shadow-lg transition-all duration-250 ease-spring cursor-pointer overflow-visible group-hover/dock:py-3 group-hover/dock:pr-5"
+            class="relative flex items-center min-h-13 min-w-13 rounded-full shadow-lg transition-all duration-250 ease-spring cursor-pointer overflow-visible group-hover/dock:py-3 group-hover/dock:pr-5"
             classList={{
-              "bg-darkSlate-800 border border-white/10 shadow-darkSlate-900/50":
-                !isOver(),
-              "bg-primary-500/20 backdrop-blur-md border-2 border-solid border-primary-500":
-                isOver(),
-              "py-3 pr-5": isDragActiveForInstances() || openMenuCount() > 0
+              "bg-darkSlate-800 border border-white/10 shadow-darkSlate-900/50": true,
+              "py-3 pr-5": isDragActiveForInstances() || openMenuCount() > 0 || recentlyAdded()
             }}
           >
-            {/* Star icon - fixed w-13 container so position doesn't shift */}
+            {/* Overlay on bar — always rendered, animated via opacity */}
+            <div
+              class="absolute inset-0 rounded-full z-10 border-2 border-solid transition-all duration-250 ease-spring"
+              classList={{
+                "opacity-100 pointer-events-auto": isOver(),
+                "opacity-0 pointer-events-none": !isOver(),
+                "border-red-500 bg-red-500/60": allDraggedAreFavorite(),
+                "border-primary-500 bg-primary-500/60": !allDraggedAreFavorite()
+              }}
+            />
+
+            {/* Star / state icon - fixed w-13 container so position doesn't shift */}
             <div class="flex items-center justify-center w-13 h-13 shrink-0">
               <div
-                class="i-ri:star-fill text-yellow-500 h-6 w-6 transition-transform duration-250 ease-spring"
+                class="h-6 w-6 transition-all duration-250 ease-spring"
                 classList={{
-                  "scale-125": isOver()
+                  "i-ri:add-line text-primary-400 scale-125": isOver() && !allDraggedAreFavorite(),
+                  "i-ri:forbid-line text-red-400 scale-125": isOver() && allDraggedAreFavorite(),
+                  "i-ri:star-fill text-yellow-500": !isOver()
                 }}
               />
             </div>
 
-            {/* Drop feedback during drag */}
+            {/* Drop feedback during drag (no favorites yet) */}
             <Show when={isDragActiveForInstances() && props.favoriteIds.length === 0}>
               <span class="text-sm text-lightSlate-300 whitespace-nowrap px-2">
-                {allDraggedAreFavorite() ? (
-                  <Trans key="instances:_trn_drop_to_unfavorite" />
-                ) : (
-                  <Trans key="instances:_trn_drop_to_favorite" />
-                )}
+                <Trans key="instances:_trn_drop_to_favorite" />
               </span>
             </Show>
+
+            {/* Add to favorites text — always rendered, animated */}
+            <span
+              class="absolute inset-0 flex items-center justify-center text-sm text-white font-medium whitespace-nowrap z-20 pointer-events-none transition-all duration-250 ease-spring"
+              classList={{
+                "opacity-100 scale-100": isOver() && !allDraggedAreFavorite(),
+                "opacity-0 scale-75": !isOver() || allDraggedAreFavorite()
+              }}
+            >
+              <Trans key="instances:_trn_drop_to_favorite" />
+            </span>
+
+            {/* Already favorite text — always rendered, animated */}
+            <span
+              class="absolute inset-0 flex items-center justify-center text-sm text-white font-medium whitespace-nowrap z-20 pointer-events-none transition-all duration-250 ease-spring"
+              classList={{
+                "opacity-100 scale-100": isOver() && allDraggedAreFavorite(),
+                "opacity-0 scale-75": !isOver() || !allDraggedAreFavorite()
+              }}
+            >
+              <Trans key="instances:_trn_already_favorite" />
+            </span>
 
             {/* Avatar row - CSS group-hover drives sizing, JS signal drives child stagger */}
             <Show when={props.favoriteIds.length > 0}>
               <div
                 class="flex items-center gap-3 max-w-0 opacity-0 pointer-events-none group-hover/dock:max-w-[70vw] group-hover/dock:opacity-100 group-hover/dock:pointer-events-auto transition-all duration-250 ease-spring"
                 classList={{
-                  "!max-w-[70vw] !opacity-100 !pointer-events-auto": isDragActiveForInstances() || openMenuCount() > 0
+                  "!max-w-[70vw] !opacity-100 !pointer-events-auto": isDragActiveForInstances() || openMenuCount() > 0 || recentlyAdded()
                 }}
                 style={{
                   "scrollbar-width": "none",
@@ -190,6 +323,7 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
                       isDragActive={isDragActiveForInstances()}
                       expanded={expanded()}
                       index={index()}
+                      isNewlyAdded={newlyAddedIds().has(instanceId)}
                       onMenuOpenChange={(open) => setOpenMenuCount(c => c + (open ? 1 : -1))}
                     />
                   )}
@@ -209,6 +343,7 @@ interface DockAvatarProps {
   isDragActive: boolean
   expanded: boolean
   index: number
+  isNewlyAdded: boolean
   onMenuOpenChange: (open: boolean) => void
 }
 
@@ -218,7 +353,20 @@ function DockAvatar(props: DockAvatarProps) {
   const modalsContext = useModal()
   const globalStore = useGlobalStore()
   const searchContext = useSearchContext()
+  const dragContext = useDragContext()
   const [isMenuOpen, setIsMenuOpen] = createSignal(false)
+
+  const isBeingDragged = createMemo(() =>
+    dragContext.isDragging() &&
+    dragContext.getDragOrigin() === "favorites" &&
+    dragContext.draggedIds().includes(props.instanceId)
+  )
+
+  const handlePointerDown = (e: PointerEvent) => {
+    // Only left button, skip if context menu
+    if (e.button !== 0) return
+    dragContext.startDrag("instance", [props.instanceId], e, "favorites")
+  }
 
   const instance = createMemo(() =>
     globalStore.instances.data?.find(
@@ -354,10 +502,25 @@ function DockAvatar(props: DockAvatarProps) {
   }
 
   const staggerDelay = () => props.index * 40
+  let wrapperRef: HTMLDivElement | undefined
+
+  onMount(() => {
+    if (props.isNewlyAdded && wrapperRef) {
+      wrapperRef.animate(
+        [
+          { transform: "scale(0)", opacity: 0 },
+          { transform: "scale(1.2)", opacity: 1, offset: 0.6 },
+          { transform: "scale(1)", opacity: 1 }
+        ],
+        { duration: 300, easing: "ease-out", fill: "forwards" }
+      )
+    }
+  })
 
   return (
     <Show when={instance()}>
       <div
+        ref={wrapperRef}
         class="transition-all ease-spring"
         classList={{
           "opacity-0 scale-50 pointer-events-none": !props.expanded,
@@ -521,9 +684,11 @@ function DockAvatar(props: DockAvatarProps) {
                 classList={{
                   "opacity-50": isLoading() || isDeleting(),
                   "ring-2 ring-green-500": isRunning(),
-                  "scale-110": isMenuOpen()
+                  "scale-110": isMenuOpen(),
+                  "opacity-0 pointer-events-none": isBeingDragged()
                 }}
                 onClick={handleClick}
+                onPointerDown={handlePointerDown}
                 onMouseEnter={() =>
                   globalStore.markInstanceAsSeen(props.instanceId)
                 }

@@ -1,0 +1,67 @@
+/**
+ * View Transition API styles for Library mode switch (Instances <-> Servers)
+ *
+ * Directional horizontal slide: instances->servers slides left, servers->instances slides right.
+ * Follows the same pattern as Login/styles/viewTransitions.css.
+ */
+
+@keyframes library-slide-out-left {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes library-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes library-slide-out-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes library-slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+/* Disable root animation during library mode switch */
+::view-transition-group(root) {
+  animation: none;
+}
+
+/* Don't interpolate the group's size between old/new states */
+::view-transition-group(library-content) {
+  overflow: hidden;
+  animation: none;
+}
+
+/* Disable default crossfade */
+::view-transition-old(library-content),
+::view-transition-new(library-content) {
+  object-fit: fill;
+  overflow: clip;
+  mix-blend-mode: normal;
+}
+
+/* Forward: instances -> servers (slide left) */
+::view-transition-old(library-content.forward) {
+  animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both library-slide-out-left;
+}
+
+::view-transition-new(library-content.forward) {
+  animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both library-slide-in-right;
+}
+
+/* Backward: servers -> instances (slide right) */
+::view-transition-old(library-content.backward) {
+  animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both library-slide-out-right;
+}
+
+::view-transition-new(library-content.backward) {
+  animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both library-slide-in-left;
+}

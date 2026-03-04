@@ -1,4 +1,5 @@
 import { getModloaderIcon } from "@/utils/sidebar"
+import { bytesToMB } from "@/utils/helpers"
 import {
   ListInstance,
   CFFEModLoaderType,
@@ -74,6 +75,9 @@ interface Props {
   onDragStart?: (_e: PointerEvent) => void
   isDragging?: boolean
   isDragActive?: boolean // True when any drag operation is in progress (disables hover effects)
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: () => void
 }
 
 const Tile = (props: Props) => {
@@ -215,161 +219,185 @@ const Tile = (props: Props) => {
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
-        <ContextMenu onOpenChange={setIsMenuOpen}>
+        <ContextMenu onOpenChange={(open) => {
+            setIsMenuOpen(open)
+            if (open && !props.isMultiSelected && props.onSelectExclusive) {
+              props.onSelectExclusive()
+            }
+          }}>
           <ContextMenuContent>
-            <ContextMenuGroup>
-              <ContextMenuGroupLabel>
-                {props.instance.name}
-              </ContextMenuGroupLabel>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                class="flex items-center gap-2"
-                onClick={handlePlay}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
-              >
-                <div
-                  class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
-                />
-                {props.isRunning
-                  ? t("instances:_trn_stop")
-                  : t("instances:_trn_action_play")}
-              </ContextMenuItem>
-              <ContextMenuItem
-                class="flex items-center gap-2"
-                onClick={handleEdit}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
-              >
-                <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
-                {t("instances:_trn_action_edit")}
-              </ContextMenuItem>
-              <ContextMenuItem
-                class="flex items-center gap-2"
-                onClick={handleSettings}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
-              >
-                <div class="i-hugeicons:settings-01 h-4 w-4" />
-                {t("instances:_trn_action_settings")}
-              </ContextMenuItem>
-              <ContextMenuItem
-                class="flex items-center gap-2"
-                closeOnSelect={false}
-                onClick={() => {
-                  setFavoriteMutation.mutate({
-                    instance: props.instance.id,
-                    favorite: !props.instance.favorite
-                  })
-                }}
-              >
-                <div
-                  class="i-hugeicons:star h-4 w-4"
-                  classList={{
-                    "text-yellow-500": props.instance.favorite
-                  }}
-                />
-                {props.instance.favorite
-                  ? t("instances:_trn_remove_favorite")
-                  : t("instances:_trn_add_favorite")}
-              </ContextMenuItem>
-              <GdlFeatureContextMenuItem
-                icon={<div class="i-ri:share-line h-4 w-4" />}
-                onClick={() => {
-                  const instanceId = props.instance.id
-                  modalsContext?.openModal(
-                    {
-                      name: "shareInstance"
-                    },
-                    {
-                      instanceId: instanceId
-                    }
-                  )
-                }}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
-              >
-                {t("instances:_trn_instance_share.title")}
-              </GdlFeatureContextMenuItem>
-              <ContextMenuItem
-                class="flex items-center gap-2"
-                onClick={() => {
-                  const instanceId = props.instance.id
-                  searchContext?.setSelectedInstanceId(instanceId)
-                  setPayload({
-                    target: "Curseforge",
-                    save_path: undefined,
-                    self_contained_addons_bundling: false,
-                    filter: { entries: {} },
-                    instance_id: instanceId
-                  })
-                  setExportStep(0)
-                  setCheckedFiles([])
-                  modalsContext?.openModal(
-                    { name: "exportInstance" },
-                    { instanceId: instanceId }
-                  )
-                }}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
-              >
-                <div class="i-hugeicons:file-export h-4 w-4" />
-                {t("instances:_trn_export_instance")}
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuSub>
-                <ContextMenuSubTrigger>
-                  {t("instances:_trn_more_options")}
-                </ContextMenuSubTrigger>
-                <ContextMenuPortal>
-                  <ContextMenuSubContent>
-                    <ContextMenuItem
-                      class="flex items-center gap-2"
-                      onClick={handleOpenFolder}
-                    >
-                      <div class="i-hugeicons:folder-open h-4 w-4" />
-                      {t("instances:_trn_action_open_folder")}
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      class="flex items-center gap-2"
-                      onClick={() => {
-                        navigate.navigate(`/library/${props.instance.id}/logs`)
+            <Show
+              when={props.isMultiSelected && (props.selectedCount ?? 0) > 1}
+              fallback={
+                <ContextMenuGroup>
+                  <ContextMenuGroupLabel>
+                    {props.instance.name}
+                  </ContextMenuGroupLabel>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={handlePlay}
+                    disabled={isLoading() || isInQueue() || props.isDeleting}
+                  >
+                    <div
+                      class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
+                    />
+                    {props.isRunning
+                      ? t("instances:_trn_stop")
+                      : t("instances:_trn_action_play")}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={handleEdit}
+                    disabled={isLoading() || isInQueue() || props.isDeleting}
+                  >
+                    <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
+                    {t("instances:_trn_action_edit")}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={handleSettings}
+                    disabled={isLoading() || isInQueue() || props.isDeleting}
+                  >
+                    <div class="i-hugeicons:settings-01 h-4 w-4" />
+                    {t("instances:_trn_action_settings")}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    closeOnSelect={false}
+                    onClick={() => {
+                      setFavoriteMutation.mutate({
+                        instance: props.instance.id,
+                        favorite: !props.instance.favorite
+                      })
+                    }}
+                  >
+                    <div
+                      class="i-hugeicons:star h-4 w-4"
+                      classList={{
+                        "text-yellow-500": props.instance.favorite
                       }}
-                    >
-                      <div class="i-hugeicons:file-script h-4 w-4" />
-                      {t("instances:_trn_view_logs")}
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      class="flex items-center gap-2"
-                      onClick={() => {
-                        navigate.navigate(
-                          `/library/${props.instance.id}/addons`
-                        )
-                      }}
-                    >
-                      <div class="i-hugeicons:puzzle h-4 w-4" />
-                      {t("instances:_trn_view_mods")}
-                    </ContextMenuItem>
-                    {!props.isInvalid && (
-                      <ContextMenuItem
-                        class="flex items-center gap-2"
-                        onClick={handleDuplicate}
-                        disabled={
-                          isLoading() || isInQueue() || props.isDeleting
+                    />
+                    {props.instance.favorite
+                      ? t("instances:_trn_remove_favorite")
+                      : t("instances:_trn_add_favorite")}
+                  </ContextMenuItem>
+                  <GdlFeatureContextMenuItem
+                    icon={<div class="i-ri:share-line h-4 w-4" />}
+                    onClick={() => {
+                      const instanceId = props.instance.id
+                      modalsContext?.openModal(
+                        {
+                          name: "shareInstance"
+                        },
+                        {
+                          instanceId: instanceId
                         }
-                      >
-                        <div class="i-hugeicons:copy-01 h-4 w-4" />
-                        {t("instances:_trn_action_duplicate")}
-                      </ContextMenuItem>
-                    )}
-                  </ContextMenuSubContent>
-                </ContextMenuPortal>
-              </ContextMenuSub>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                class="flex items-center gap-2"
-                onClick={handleDelete}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
-              >
-                <div class="i-hugeicons:delete-02 h-4 w-4" />
-                {t("instances:_trn_action_delete")}
-              </ContextMenuItem>
-            </ContextMenuGroup>
+                      )
+                    }}
+                    disabled={isLoading() || isInQueue() || props.isDeleting}
+                  >
+                    {t("instances:_trn_instance_share.title")}
+                  </GdlFeatureContextMenuItem>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={() => {
+                      const instanceId = props.instance.id
+                      searchContext?.setSelectedInstanceId(instanceId)
+                      setPayload({
+                        target: "Curseforge",
+                        save_path: undefined,
+                        self_contained_addons_bundling: false,
+                        filter: { entries: {} },
+                        instance_id: instanceId
+                      })
+                      setExportStep(0)
+                      setCheckedFiles([])
+                      modalsContext?.openModal(
+                        { name: "exportInstance" },
+                        { instanceId: instanceId }
+                      )
+                    }}
+                    disabled={isLoading() || isInQueue() || props.isDeleting}
+                  >
+                    <div class="i-hugeicons:file-export h-4 w-4" />
+                    {t("instances:_trn_export_instance")}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuSub>
+                    <ContextMenuSubTrigger>
+                      {t("instances:_trn_more_options")}
+                    </ContextMenuSubTrigger>
+                    <ContextMenuPortal>
+                      <ContextMenuSubContent>
+                        <ContextMenuItem
+                          class="flex items-center gap-2"
+                          onClick={handleOpenFolder}
+                        >
+                          <div class="i-hugeicons:folder-open h-4 w-4" />
+                          {t("instances:_trn_action_open_folder")}
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          class="flex items-center gap-2"
+                          onClick={() => {
+                            navigate.navigate(`/library/${props.instance.id}/logs`)
+                          }}
+                        >
+                          <div class="i-hugeicons:file-script h-4 w-4" />
+                          {t("instances:_trn_view_logs")}
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          class="flex items-center gap-2"
+                          onClick={() => {
+                            navigate.navigate(
+                              `/library/${props.instance.id}/addons`
+                            )
+                          }}
+                        >
+                          <div class="i-hugeicons:puzzle h-4 w-4" />
+                          {t("instances:_trn_view_mods")}
+                        </ContextMenuItem>
+                        {!props.isInvalid && (
+                          <ContextMenuItem
+                            class="flex items-center gap-2"
+                            onClick={handleDuplicate}
+                            disabled={
+                              isLoading() || isInQueue() || props.isDeleting
+                            }
+                          >
+                            <div class="i-hugeicons:copy-01 h-4 w-4" />
+                            {t("instances:_trn_action_duplicate")}
+                          </ContextMenuItem>
+                        )}
+                      </ContextMenuSubContent>
+                    </ContextMenuPortal>
+                  </ContextMenuSub>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={handleDelete}
+                    disabled={isLoading() || isInQueue() || props.isDeleting}
+                  >
+                    <div class="i-hugeicons:delete-02 h-4 w-4" />
+                    {t("instances:_trn_action_delete")}
+                  </ContextMenuItem>
+                </ContextMenuGroup>
+              }
+            >
+              <ContextMenuGroup>
+                <ContextMenuGroupLabel>
+                  {t("content:_trn_selected_count", { count: props.selectedCount })}
+                </ContextMenuGroupLabel>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  class="flex items-center gap-2"
+                  onClick={() => props.onBatchDelete?.()}
+                >
+                  <div class="i-hugeicons:delete-02 h-4 w-4" />
+                  {t("content:_trn_delete_selected")}
+                </ContextMenuItem>
+              </ContextMenuGroup>
+            </Show>
           </ContextMenuContent>
           <ContextMenuTrigger>
             <div
@@ -624,7 +652,7 @@ const Tile = (props: Props) => {
                           NEW
                         </div>
                       </Show>
-                      <Show when={props.onToggleSelection}>
+                      <Show when={props.onToggleSelection && !isLoading() && !isInQueue()}>
                         <div
                           class="z-10 absolute left-2 top-2 transition-all duration-200 ease-spring"
                           classList={{
@@ -691,13 +719,12 @@ const Tile = (props: Props) => {
                       <div
                         class="z-5 absolute right-2 top-2 h-10 items-center justify-center gap-2 rounded-xl px-4 transition-all duration-200 ease-spring translate-x-3 opacity-0"
                         classList={{
-                          "translate-x-0 opacity-100 bg-red-500": isLoading(),
                           "flex bg-primary-500 hover:bg-primary-400":
                             !props.isRunning &&
                             !isLoading() &&
                             !isInQueue() &&
                             !props.isDeleting,
-                          "hidden": !props.isRunning && !isLoading(),
+                          "hidden": !props.isRunning || isLoading(),
                           "flex bg-red-500 translate-x-0 opacity-100":
                             props.isRunning,
 
@@ -759,66 +786,109 @@ const Tile = (props: Props) => {
                           <span>{props.version}</span>
                         </div>
                       </div>
+                      {/* Subtask progress bar - pinned to bottom of card */}
+                      <Show
+                        when={
+                          isLoading() &&
+                          props.subTasks?.length &&
+                          props.subTasks.find(
+                            (s) => s.progress !== "opaque"
+                          )
+                        }
+                      >
+                        <div
+                          class="z-5 animate-enterWithOpacityChange absolute bottom-0 left-0 right-0 flex items-center gap-2 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl overflow-hidden opacity-0"
+                        >
+                          {/* Progress bar track */}
+                          <div class="relative min-w-0 flex-1 overflow-hidden rounded-full h-2">
+                            <div class="bg-darkSlate-500/50 absolute inset-0 rounded-full" />
+                            <div
+                              class="bg-primary-500 absolute left-0 top-0 h-full rounded-full transition-all duration-300 ease-linear"
+                              style={{
+                                width: (() => {
+                                  const p = props.subTasks?.find(
+                                    (s) => s.progress !== "opaque"
+                                  )?.progress
+                                  if (!p || p === "opaque") return "0%"
+                                  if ("download" in p) {
+                                    const pct =
+                                      p.download.total > 0
+                                        ? (p.download.downloaded /
+                                            p.download.total) *
+                                          100
+                                        : 0
+                                    return `${Math.min(Math.max(pct, 0), 100)}%`
+                                  }
+                                  if ("item" in p) {
+                                    const pct =
+                                      p.item.total > 0
+                                        ? (p.item.current / p.item.total) * 100
+                                        : 0
+                                    return `${Math.min(Math.max(pct, 0), 100)}%`
+                                  }
+                                  return "0%"
+                                })()
+                              }}
+                            />
+                          </div>
+                          {/* Subtask progress text */}
+                          <Show when={props.size >= 2}>
+                            <span
+                              class="text-lightSlate-200 shrink-0 whitespace-nowrap font-medium"
+                              classList={{
+                                "text-sm": props.size >= 3,
+                                "text-xs": props.size === 2
+                              }}
+                            >
+                              {(() => {
+                                const p = props.subTasks?.find(
+                                  (s) => s.progress !== "opaque"
+                                )?.progress
+                                if (!p || p === "opaque") return ""
+                                if ("download" in p)
+                                  return `${Math.round(bytesToMB(p.download.downloaded))}/${Math.round(bytesToMB(p.download.total))} MB`
+                                if ("item" in p)
+                                  return `${p.item.current}/${p.item.total}`
+                                return ""
+                              })()}
+                            </span>
+                          </Show>
+                        </div>
+                      </Show>
                     </div>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <div class="b-1 border-solid border-white p-4">
-                    <div class="flex w-full justify-between pb-4 text-xl">
-                      <div>
+                <TooltipContent class="!p-0 !text-sm max-w-80 border border-solid border-darkSlate-500 shadow-lg shadow-darkSlate-900/50">
+                  <div class="flex flex-col">
+                    <div class="flex items-center justify-between gap-4 px-4 pt-3 pb-2">
+                      <div class="flex items-center gap-2 text-red-400 font-semibold">
+                        <div class="i-hugeicons:alert-01 h-4 w-4 shrink-0" />
                         <Trans key="general:_trn_error" />
                       </div>
-                      <div>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <div
-                              class={`${copiedError() ? "i-hugeicons:tick-double-02" : "i-hugeicons:copy-01"} h-6 w-6 shrink-0`}
-                              classList={{
-                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-spring":
-                                  !copiedError(),
-                                "text-green-400": copiedError()
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigator.clipboard.writeText(props.failError!)
-
-                                setCopiedError(true)
-
-                                setTimeout(() => {
-                                  setCopiedError(false)
-                                }, 2000)
-                              }}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {copiedError()
-                              ? t("notifications:_trn_copied_to_clipboard")
-                              : t("general:_trn_copy")}
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
+                      <div
+                        class={`${copiedError() ? "i-hugeicons:tick-double-02" : "i-hugeicons:copy-01"} h-4 w-4 shrink-0 cursor-pointer transition-colors duration-150`}
+                        classList={{
+                          "text-lightSlate-500 hover:text-lightSlate-200":
+                            !copiedError(),
+                          "text-green-400": copiedError()
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(props.failError!)
+                          setCopiedError(true)
+                          setTimeout(() => {
+                            setCopiedError(false)
+                          }, 2000)
+                        }}
+                      />
                     </div>
-                    <div>{props.failError}</div>
+                    <div class="h-px bg-darkSlate-600 mx-3" />
+                    <div class="px-4 py-3 text-lightSlate-300 break-words leading-relaxed max-h-40 overflow-y-auto">
+                      {props.failError}
+                    </div>
                   </div>
                 </TooltipContent>
               </Tooltip>
-              <Show
-                when={
-                  isLoading() &&
-                  props.downloaded !== 0 &&
-                  props.totalDownload !== 0
-                }
-              >
-                <p class="text-lightSlate-50 m-0 mt-2 text-center text-sm">
-                  <Trans
-                    key="content:_trn_common.download_progress_mb"
-                    options={{
-                      downloaded: Math.round(props.downloaded || 0),
-                      total: Math.round(props.totalDownload || 0)
-                    }}
-                  />
-                </p>
-              </Show>
             </div>
           </ContextMenuTrigger>
         </ContextMenu>

@@ -594,6 +594,33 @@ impl ManagerRef<'_, JavaManager> {
 
         Ok(Some(java))
     }
+
+    /// Find the best available Java for running a Minecraft server.
+    /// Prefers the highest major version available. Returns the path to the java binary.
+    pub async fn find_best_java_for_server(self) -> anyhow::Result<PathBuf> {
+        let javas = self.get_available_javas().await?;
+
+        // Get highest major version java that is valid
+        let mut best: Option<(u8, PathBuf)> = None;
+        for (major, versions) in &javas {
+            for java in versions {
+                if java.is_valid {
+                    match &best {
+                        Some((best_major, _)) if major > best_major => {
+                            best = Some((*major, PathBuf::from(&java.component.path)));
+                        }
+                        None => {
+                            best = Some((*major, PathBuf::from(&java.component.path)));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        best.map(|(_, path)| path)
+            .ok_or_else(|| anyhow::anyhow!("No Java installation found. Please install Java first."))
+    }
 }
 
 #[cfg(test)]

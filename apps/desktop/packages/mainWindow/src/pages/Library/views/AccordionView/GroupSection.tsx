@@ -23,7 +23,7 @@ import GroupHeader from "@/components/Library/GroupHeader"
 import { EndOfGroupDropZone } from "../../components/EndOfGroupDropZone"
 import DropPreviewTile from "../../components/DropPreviewTile"
 import { VirtualGroup, SelectionState } from "../../types"
-import { ANIMATION } from "../../constants"
+import { ANIMATION, TILE_SIZES, TileSize } from "../../constants"
 
 interface GroupSectionProps {
   group: VirtualGroup
@@ -36,6 +36,9 @@ interface GroupSectionProps {
   animatedInstanceIds: Set<string | number>
   initialAnimationComplete: { value: boolean }
   tileRefs: Map<string, HTMLDivElement>
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: (id: string) => void
 }
 
 export function GroupSection(props: GroupSectionProps) {
@@ -100,13 +103,19 @@ export function GroupSection(props: GroupSectionProps) {
         }
       >
         <div
-          class="mt-4 flex flex-wrap gap-x-4 pl-0.5"
+          class="mt-4 pl-0.5"
           classList={{
             "gap-y-4": props.tileSize() === 1,
             "gap-y-6": props.tileSize() === 2,
             "gap-y-8": props.tileSize() === 3,
             "gap-y-10": props.tileSize() === 4,
             "gap-y-12": props.tileSize() === 5
+          }}
+          style={{
+            display: "grid",
+            "grid-template-columns": `repeat(auto-fill, ${TILE_SIZES[props.tileSize() as TileSize]?.widthPx ?? 184}px)`,
+            "justify-content": "space-between",
+            "column-gap": "16px"
           }}
         >
           <For each={props.group.instances}>
@@ -128,11 +137,9 @@ export function GroupSection(props: GroupSectionProps) {
                 isLastGroup={
                   props.groupIndex === props.displayedGroups.length - 1
                 }
-                previousInstanceId={() => {
-                  const idx = j()
-                  if (idx === 0) return null
-                  return props.group.instances[idx - 1]?.id ?? null
-                }}
+                selectedCount={props.selectedCount}
+                onBatchDelete={props.onBatchDelete}
+                onSelectExclusive={props.onSelectExclusive}
               />
             )}
           </For>
@@ -173,7 +180,9 @@ interface InstanceTileWrapperProps {
   tileRefs: Map<string, HTMLDivElement>
   isLastInGroup: boolean
   isLastGroup: boolean
-  previousInstanceId: () => number | null
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: (id: string) => void
 }
 
 function InstanceTileWrapper(props: InstanceTileWrapperProps) {
@@ -187,6 +196,7 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
 
   const isBeingDragged = createMemo(() =>
     dragContext.isDragging() &&
+    dragContext.dragDetached() &&
     dragContext.dragType() === "instance" &&
     dragContext.draggedIds().includes(props.instance.id)
   )
@@ -215,22 +225,11 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
         return
       }
 
-      // Don't register "beforeInstance" zone if the previous item is being dragged
-      // (dropping there would be a no-op - the item is already in that position)
-      const prevId = props.previousInstanceId()
-      const prevItemIsBeingDragged =
-        prevId !== null && dragContext.draggedIds().includes(prevId)
-
-      if (prevItemIsBeingDragged) {
-        dragContext.unregisterDropZone(`before-instance-${props.instance.id}`)
-        return
-      }
-
       const rect = ref.getBoundingClientRect()
       const dropRect = new DOMRect(
         rect.left - 8,
         rect.top,
-        rect.width * 0.45 + 8,
+        rect.width + 8,
         rect.height
       )
 
@@ -239,7 +238,7 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
         rect: dropRect,
         element: ref,
         rectTransform: (r) =>
-          new DOMRect(r.left - 8, r.top, r.width * 0.45 + 8, r.height),
+          new DOMRect(r.left - 8, r.top, r.width + 8, r.height),
         target: {
           type: "beforeInstance",
           instanceId: props.instance.id,
@@ -334,6 +333,9 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
             props.onDragStart("instance", ids, e)
           }}
           preventClick={() => props.justDropped()}
+          selectedCount={props.selectedCount}
+          onBatchDelete={props.onBatchDelete}
+          onSelectExclusive={() => props.onSelectExclusive?.(instanceStringId)}
         />
       </div>
     </>

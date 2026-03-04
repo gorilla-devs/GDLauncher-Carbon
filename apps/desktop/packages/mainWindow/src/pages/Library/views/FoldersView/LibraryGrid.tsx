@@ -15,6 +15,7 @@ import {
 import { LibraryItem, SelectionState, FLIPAnimation } from "../../types"
 import { EntranceAnimationReturn } from "../../hooks/useFLIPAnimation"
 import { TILE_SIZES, TileSize } from "../../constants"
+import { useDragLayoutAnimation } from "../../hooks/useDragLayoutAnimation"
 
 interface LibraryGridProps {
   libraryItems: LibraryItem[]
@@ -27,10 +28,12 @@ interface LibraryGridProps {
   justDropped: Accessor<boolean>
   flipAnimation: FLIPAnimation
   entranceAnimation: EntranceAnimationReturn
-  gridRef?: (el: HTMLDivElement) => void
   tileRefs: Map<string, HTMLDivElement>
   newlyCreatedFolderId: Accessor<number | null>
   clearNewlyCreatedFolderId: () => void
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: (id: string) => void
 }
 
 export function LibraryGrid(props: LibraryGridProps) {
@@ -39,12 +42,19 @@ export function LibraryGrid(props: LibraryGridProps) {
   // Wrap entranceAnimation in refs object for LibraryItemTile
   const libraryItemRefs = new Map<string, HTMLDivElement>()
 
+  let gridEl: HTMLDivElement | undefined
+  useDragLayoutAnimation(() => gridEl)
+
   return (
     <div
-      ref={(el) => {
-        props.gridRef?.(el)
+      ref={gridEl}
+      class={`relative content-start ${TILE_SIZES[props.tileSize() as TileSize]?.gapY ?? "gap-y-6"}`}
+      style={{
+        display: "grid",
+        "grid-template-columns": `repeat(auto-fill, ${TILE_SIZES[props.tileSize() as TileSize]?.widthPx ?? 184}px)`,
+        "justify-content": "space-between",
+        "column-gap": "16px"
       }}
-      class={`relative flex flex-wrap content-start gap-x-4 ${TILE_SIZES[props.tileSize() as TileSize]?.gapY ?? "gap-y-6"}`}
     >
       <For each={props.libraryItems}>
         {(item, itemIndex) => (
@@ -76,13 +86,9 @@ export function LibraryGrid(props: LibraryGridProps) {
             libraryItemsLength={() => props.libraryItems.length}
             newlyCreatedFolderId={props.newlyCreatedFolderId}
             clearNewlyCreatedFolderId={props.clearNewlyCreatedFolderId}
-            previousItemId={() => {
-              const idx = itemIndex()
-              if (idx === 0) return null
-              const prevItem = props.libraryItems[idx - 1]
-              // Only return instance IDs (folders use different drop targets)
-              return prevItem?.type === "instance" ? prevItem.data.id : null
-            }}
+            selectedCount={props.selectedCount}
+            onBatchDelete={props.onBatchDelete}
+            onSelectExclusive={props.onSelectExclusive}
           />
         )}
       </For>
