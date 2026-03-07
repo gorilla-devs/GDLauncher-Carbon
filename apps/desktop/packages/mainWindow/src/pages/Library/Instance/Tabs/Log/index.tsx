@@ -202,8 +202,8 @@ const Logs = () => {
         setAutoFollowPreference={setAutoFollowPreference}
         scrollToIndex={virtualizerRef?.scrollToIndex ?? (() => {})}
         isIndexLoaded={(index: number) => {
-          const startIndex = (virtualizerRef?.findStartIndex() ?? 0) - 10
-          const endIndex = (virtualizerRef?.findEndIndex() ?? 0) + 10
+          const startIndex = (virtualizerRef?.findItemIndex(virtualizerRef.scrollOffset) ?? 0) - 10
+          const endIndex = (virtualizerRef?.findItemIndex(virtualizerRef.scrollOffset + virtualizerRef.viewportSize) ?? 0) + 10
           return index >= startIndex && index <= endIndex
         }}
       />

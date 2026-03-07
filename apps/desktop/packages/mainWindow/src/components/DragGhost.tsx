@@ -306,7 +306,7 @@ const GroupGhost = (props: GroupGhostProps) => {
             {(index) => {
               const instance = () => previewInstances()[index]
               return (
-                <div class="rounded-sm bg-darkSlate-600 overflow-hidden">
+                <div class="rounded bg-darkSlate-800 overflow-hidden">
                   <Show when={instance()}>
                     {(inst) => (
                       <img
@@ -329,7 +329,7 @@ const GroupGhost = (props: GroupGhostProps) => {
           </For>
         </div>
         {/* Folder name overlay at bottom */}
-        <div class="absolute bottom-0 left-0 right-0 px-3 pt-3 pb-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+        <div class="absolute bottom-0 left-0 right-0 px-3 pt-3 pb-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
           <h4 class="m-0 text-sm font-semibold text-white truncate">
             {firstGroup()?.name || ""}
           </h4>
