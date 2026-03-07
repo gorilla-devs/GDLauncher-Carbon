@@ -175,6 +175,9 @@ const Accounts = () => {
 
   const invalidGDLUser = () => globalStore.gdlAccount.data?.status === "invalid"
 
+  const gdlAccountUnavailable = () =>
+    globalStore.gdlAccount.isError && !!globalStore.settings.data?.gdlAccountId
+
   // Initialize avatar preview from GDL account
   createEffect(() => {
     const url = validGDLUser()?.profileIconUrl
@@ -494,8 +497,41 @@ const Accounts = () => {
           </div>
         </Match>
 
+        {/* Backend unavailable state */}
+        <Match when={gdlAccountUnavailable()}>
+          <RowsContainer>
+            <Row>
+              <Title>
+                <Trans key="accounts:_trn_gdl_account_title" />
+              </Title>
+            </Row>
+            <Row>
+              <Title>
+                <span class="text-yellow-400">
+                  <Trans key="accounts:_trn_gdl_account_unavailable" />
+                </span>
+              </Title>
+              <RightHandSide>
+                <Button
+                  type="secondary"
+                  onClick={() => {
+                    globalStore.gdlAccount.refetch()
+                  }}
+                >
+                  <div class="i-hugeicons:refresh" />
+                  <Trans key="general:_trn_retry" />
+                </Button>
+              </RightHandSide>
+            </Row>
+          </RowsContainer>
+        </Match>
+
         {/* Not logged in state */}
-        <Match when={!validGDLUser() && !invalidGDLUser()}>
+        <Match
+          when={
+            !validGDLUser() && !invalidGDLUser() && !gdlAccountUnavailable() && !globalStore.gdlAccount.isLoading
+          }
+        >
           <RowsContainer>
             <Row>
               <Title>
@@ -511,8 +547,7 @@ const Accounts = () => {
               <RightHandSide>
                 <Button
                   type="secondary"
-                  onClick={async () => {
-                    await removeGDLAccountMutation.mutateAsync(undefined)
+                  onClick={() => {
                     gdNavigator.navigate(
                       "/?addGdlAccount=true&returnTo=/settings/accounts"
                     )
