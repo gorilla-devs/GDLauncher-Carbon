@@ -240,19 +240,18 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
     }
 
-    /// Exchange GDL tokens for all accounts that have MS id_token but no GDL token.
-    /// Called on startup to migrate existing accounts that were logged in before
-    /// the GDL token system was implemented.
-    pub async fn migrate_existing_accounts_to_gdl_tokens(self) -> anyhow::Result<()> {
+    /// Re-exchange GDL tokens for all Microsoft accounts on startup.
+    /// This ensures tokens are always valid even if the backend target changed
+    /// (e.g. switching between prod and dev where JWT signing keys differ).
+    pub async fn refresh_all_gdl_tokens(self) -> anyhow::Result<()> {
         let accounts = self.get_account_entries().await?;
 
         for account in accounts {
-            // Only Microsoft accounts (have id_token) that are missing gdl_token
-            if account.id_token.is_some() && account.gdl_token.is_none() {
-                info!("Migrating account {} to GDL token", account.uuid);
+            if account.id_token.is_some() {
+                info!("Refreshing GDL token for account {}", account.uuid);
                 if let Err(e) = self.exchange_gdl_token(&account.uuid).await {
                     warn!(
-                        "Failed to migrate account {} to GDL token: {}",
+                        "Failed to refresh GDL token for account {}: {}",
                         account.uuid, e
                     );
                 }
