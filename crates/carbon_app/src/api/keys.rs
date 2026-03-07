@@ -175,6 +175,9 @@ keys! {
         GET_SEEN_ONBOARDING_TIPS                    = "getSeenOnboardingTips";
         MARK_ONBOARDING_TIP_SEEN                    = "markOnboardingTipSeen";
         RESET_ONBOARDING_TIPS                       = "resetOnboardingTips";
+        // Search sidebar
+        GET_SEARCH_SIDEBAR_DOCKED                   = "getSearchSidebarDocked";
+        SET_SEARCH_SIDEBAR_DOCKED                   = "setSearchSidebarDocked";
     }
 
     metrics {

@@ -5,7 +5,7 @@ import {
   FEUnifiedSearchType
 } from "@gd/core_module/bindings"
 
-import { createEffect, createMemo, createSignal, mergeProps, onCleanup } from "solid-js"
+import { createEffect, createMemo, createSignal, mergeProps, on, onCleanup } from "solid-js"
 import { rspc } from "./rspcClient"
 import { createAsyncEffect } from "./asyncEffect"
 import { createInfiniteQuery } from "@tanstack/solid-query"
@@ -54,6 +54,43 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   })
 
   const [viewMode, setViewMode] = createSignal<"list" | "grid">("list")
+  const [sidebarExpanded, setSidebarExpanded] = createSignal(true)
+  const [sidebarReady, setSidebarReady] = createSignal(false)
+
+  // Persist sidebar docked state via FrontendPreference
+  const sidebarDockedQuery = rspc.createQuery(() => ({
+    queryKey: ["settings.getSearchSidebarDocked"]
+  }))
+
+  let dockedHasSynced = false
+
+  createEffect(() => {
+    const data = sidebarDockedQuery.data
+    if (data !== undefined) {
+      setSidebarExpanded(data)
+      dockedHasSynced = true
+    }
+  })
+
+  const sidebarDockedMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSearchSidebarDocked"]
+  }))
+
+  let prevDockedValue: boolean | undefined
+
+  createEffect(on(() => sidebarExpanded(), (docked) => {
+    if (prevDockedValue !== undefined && dockedHasSynced) {
+      sidebarDockedMutation.mutate(docked)
+    }
+    prevDockedValue = docked
+  }, { defer: true }))
+
+  // sidebarReady: true once docked query has resolved
+  createEffect(() => {
+    if (!sidebarDockedQuery.isLoading && !sidebarReady()) {
+      setSidebarReady(true)
+    }
+  })
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(opts.parentRef)
 
   const [lastScrollOffset, setLastScrollOffset] = createSignal(0)
@@ -408,7 +445,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     if (!virtualizer || allRows().length === 0) return
 
     // Check if we're near the bottom with an increased threshold
-    const endIndex = virtualizer.findEndIndex()
+    const endIndex = virtualizer.findItemIndex(virtualizer.scrollOffset + virtualizer.viewportSize)
     const totalItems = allRows().length
 
     // Load more when user reaches 25% from the end of current items
@@ -515,6 +552,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     hasNextPage,
     viewMode,
     setViewMode,
+    sidebarExpanded,
+    setSidebarExpanded,
     searchQuery,
     setSearchQuery,
     setRef,
@@ -528,6 +567,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     selectedInstanceMods,
     setSelectedInstanceId,
     selectedInstanceId,
+    sidebarReady,
     // Direct search mode
     isDirectMode,
     parsedQuery,

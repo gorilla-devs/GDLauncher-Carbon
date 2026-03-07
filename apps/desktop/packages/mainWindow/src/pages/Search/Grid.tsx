@@ -132,7 +132,7 @@ export function Grid() {
     if (!virtualizer || (searchContext?.allRows().length ?? 0) === 0) return
 
     // Get the row-based end index and convert to item index
-    const endRowIndex = virtualizer.findEndIndex()
+    const endRowIndex = virtualizer.findItemIndex(virtualizer.scrollOffset + virtualizer.viewportSize)
     const endItemIndex = (endRowIndex + 1) * itemsPerRow()
     const totalItems = searchContext?.allRows().length || 0
 

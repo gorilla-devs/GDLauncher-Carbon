@@ -6,9 +6,10 @@ use crate::{
             settings::{
                 COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY, GET_PRIVACY_STATEMENT_BODY,
                 GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, IS_FIRST_LAUNCH,
-                MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER,
-                RESET_ONBOARDING_TIPS, SET_SETTINGS, SHOULD_SHOW_BETA_PROMPT,
-                SHOULD_SHOW_CHANGELOG,
+                GET_SEARCH_SIDEBAR_DOCKED, MARK_CHANGELOG_SEEN,
+                MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER, RESET_ONBOARDING_TIPS,
+                SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS,
+                SHOULD_SHOW_BETA_PROMPT, SHOULD_SHOW_CHANGELOG,
             },
         },
         router::router,
@@ -31,6 +32,7 @@ mod preference_keys {
     pub const BETA_PROMPT_DISMISSED: &str = "beta_prompt_dismissed_permanently";
     pub const BETA_PROMPT_LAST_SHOWN: &str = "beta_prompt_last_shown";
     pub const ONBOARDING_TIPS_SEEN: &str = "onboarding_tips_seen";
+    pub const SEARCH_SIDEBAR_DOCKED: &str = "search_sidebar_docked";
 }
 
 /// Input state for beta prompt decision logic
@@ -359,6 +361,49 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             Ok(())
         }
+
+        // Search sidebar docked state
+        query GET_SEARCH_SIDEBAR_DOCKED[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            let pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::SEARCH_SIDEBAR_DOCKED.to_string()
+                ))
+                .exec()
+                .await?;
+
+            // Default to true (docked) if no preference stored
+            match pref {
+                Some(p) => Ok(p.value == "true"),
+                None => Ok(true),
+            }
+        }
+
+        mutation SET_SEARCH_SIDEBAR_DOCKED[app, docked: bool] {
+            let db = &app.prisma_client;
+            let value = if docked { "true" } else { "false" }.to_string();
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(
+                        preference_keys::SEARCH_SIDEBAR_DOCKED.to_string()
+                    ),
+                    frontend_preference::create(
+                        preference_keys::SEARCH_SIDEBAR_DOCKED.to_string(),
+                        value.clone(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(value)],
+                )
+                .exec()
+                .await?;
+
+            app.invalidate(GET_SEARCH_SIDEBAR_DOCKED, None);
+            Ok(())
+        }
+
     }
 }
 

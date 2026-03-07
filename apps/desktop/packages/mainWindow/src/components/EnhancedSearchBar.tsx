@@ -4,8 +4,6 @@ import useSearchContext from "./SearchInputContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useMatch } from "@solidjs/router"
 import { Trans, useTransContext } from "@gd/i18n"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@gd/ui"
-import { FiltersDropdown } from "@/pages/Search/FiltersDropdown"
 import { OnboardingTip } from "@/components/Onboarding"
 
 export function EnhancedSearchBar() {
@@ -197,17 +195,26 @@ export function EnhancedSearchBar() {
             "opacity-100 delay-[110ms]": isExpanded()
           }}
         >
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              class="text-lightSlate-50 hover:bg-darkSlate-600 data-[expanded]:bg-darkSlate-600 flex items-center justify-center rounded p-1.5 transition-colors hover:text-white data-[expanded]:text-white"
-              title={t("search:_trn_filters")}
-            >
-              <div class="i-hugeicons:filter text-lg" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <FiltersDropdown />
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            class="flex items-center justify-center rounded p-1.5 transition-[colors,box-shadow] duration-200"
+            classList={{
+              "bg-darkSlate-600 text-white shadow-[inset_0_0_0_1px_rgb(var(--primary-500)/0.4)]":
+                !!searchResults?.sidebarExpanded(),
+              "text-lightSlate-50 hover:bg-darkSlate-600 hover:text-white":
+                !searchResults?.sidebarExpanded()
+            }}
+            title={t("search:_trn_filters")}
+            onClick={() => {
+              searchResults?.setSidebarExpanded((prev) => !prev)
+            }}
+          >
+            <div
+              class="i-hugeicons:filter text-lg transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+              classList={{
+                "-rotate-180": !!searchResults?.sidebarExpanded()
+              }}
+            />
+          </button>
         </div>
       </div>
     </OnboardingTip>
