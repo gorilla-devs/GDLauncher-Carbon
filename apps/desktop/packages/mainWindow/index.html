@@ -15,7 +15,7 @@
        media-src 'self' https://*.gdl.gg;
        default-src 'unsafe-inline' 'self';
        frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://i.imgur.com https://cdn.ko-fi.com;
-       connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com http://127.0.0.1:* https://unpkg.com/@rive-app/canvas@2.21.5/rive.wasm https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.21.5/rive_fallback.wasm https://*.gdl.gg;
+       connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com http://127.0.0.1:* https://unpkg.com/@rive-app/canvas@2.35.0/rive.wasm https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.35.0/rive_fallback.wasm https://*.gdl.gg;
      "
     />
 
@@ -294,7 +294,8 @@
       }
 
       .instance-tile-spinning {
-        background-image: linear-gradient(to right, transparent, transparent),
+        background-image:
+          linear-gradient(to right, transparent, transparent),
           conic-gradient(
             from var(--instance-tile-angle),
             rgb(var(--primary)) 0deg 90deg,

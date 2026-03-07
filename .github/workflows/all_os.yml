@@ -20,7 +20,7 @@ jobs:
           path: GDL
       - uses: actions/setup-node@v3
         with:
-          node-version: "22.12.0"
+          node-version: "24.14.0"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.85.1
@@ -103,7 +103,7 @@ jobs:
           path: GDL
       - uses: actions/setup-node@v3
         with:
-          node-version: "22.12.0"
+          node-version: "24.14.0"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.85.1
@@ -195,7 +195,7 @@ jobs:
           path: GDL
       - uses: actions/setup-node@v3
         with:
-          node-version: "22.12.0"
+          node-version: "24.14.0"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.85.1

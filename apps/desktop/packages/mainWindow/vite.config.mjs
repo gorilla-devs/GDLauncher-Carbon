@@ -48,17 +48,16 @@ export default defineConfig({
   },
   base: "./",
   optimizeDeps: {
-    exclude: ["@tanstack/solid-query", "path", "fs", "promises"]
+    exclude: ["@tanstack/solid-query"]
   },
   test: {
     globals: true,
     environment: "jsdom",
-    transformMode: {
-      web: [/\.[t|s]sx?$/]
-    },
     setupFiles: "./setupVitest.ts",
-    deps: {
-      inline: [/solid-js/]
+    server: {
+      deps: {
+        inline: [/solid-js/]
+      }
     }
   },
   build: {
@@ -70,9 +69,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": join(__dirname, "src"),
-      "@package_json": resolve(__dirname, "../../package.json")
-    },
-    browserField: true
+      "@package_json": resolve(__dirname, "../../package.json"),
+      path: "path-browserify"
+    }
   },
   server: {
     port: pkg.env.PORT

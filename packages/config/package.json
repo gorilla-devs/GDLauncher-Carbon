@@ -25,15 +25,15 @@
   },
   "devDependencies": {
     "@gd/i18n": "workspace:*",
-    "@iconify/json": "^2.2.397",
-    "@typescript-eslint/eslint-plugin": "^8.4.0",
-    "@unocss/preset-icons": "^0.65.1",
-    "@unocss/preset-wind": "^0.65.1",
-    "eslint": "^9.16.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.2.1",
-    "typescript": "^5.6.3",
-    "unocss": "^0.65.1",
+    "@iconify/json": "^2.2.446",
+    "@typescript-eslint/eslint-plugin": "8.20.0",
+    "@unocss/preset-icons": "^66.6.5",
+    "@unocss/preset-wind3": "^66.6.5",
+    "eslint": "^9.24.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "typescript": "^5.9.3",
+    "unocss": "^66.6.5",
     "unocss-preset-scrollbar-hide": "^1.0.1"
   }
 }

@@ -19,8 +19,8 @@
   "devDependencies": {
     "@mbarzda/solid-i18next": "^1.4.1",
     "html-parse-string": "^0.0.9",
-    "i18next": "^23.13.0",
-    "i18next-icu": "^2.3.0",
-    "intl-messageformat": "^10.5.14"
+    "i18next": "^25.8.14",
+    "i18next-icu": "^2.4.3",
+    "intl-messageformat": "^10.7.0"
   }
 }

@@ -66,7 +66,8 @@ export default defineConfig(({ mode }) => {
         external: [
           "electron",
           "@overwolf/ow-electron",
-          ...builtinModules
+          ...builtinModules,
+          ...builtinModules.map((m) => `node:${m}`)
           // ...Object.keys(pkg.dependencies || {}),
         ]
       },
