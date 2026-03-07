@@ -1,5 +1,5 @@
 import { Button, Tabs, TabsList, TabsTrigger, TabsContent, TabsIndicator } from "@gd/ui"
-import { useParams, useRouteData } from "@solidjs/router"
+import { useParams } from "@solidjs/router"
 import {
   Match,
   Show,
@@ -9,7 +9,7 @@ import {
 } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
-import fetchData from "./server.data"
+import useServerData from "./server.data"
 import Console from "./Console"
 import Metrics from "./Metrics"
 import Settings from "./Settings"
@@ -18,7 +18,7 @@ import { useModal } from "@/managers/ModalsManager"
 const Server = () => {
   const navigator = useGDNavigate()
   const params = useParams()
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useServerData()
   const modalsContext = useModal()
 
   const [activeTab, setActiveTab] = createSignal<"console" | "settings">(

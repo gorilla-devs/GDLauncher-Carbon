@@ -11,8 +11,7 @@ import {
 import { wideLogoUrl } from "@/utils/logos"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
-import SettingsData from "./settings.general.data"
-import { useRouteData } from "@solidjs/router"
+import useSettingsGeneralData from "./settings.general.data"
 import { Show, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
 import {
@@ -29,7 +28,7 @@ import { useModal } from "@/managers/ModalsManager"
 import { manualCheckForUpdates, isCheckingForUpdates } from "@/utils/updater"
 
 const General = () => {
-  const routeData: ReturnType<typeof SettingsData> = useRouteData()
+  const routeData = useSettingsGeneralData()
   const [t] = useTransContext()
   const modalsContext = useModal()
 

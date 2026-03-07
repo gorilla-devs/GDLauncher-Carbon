@@ -13,8 +13,8 @@ import {
   Slider,
   Switch
 } from "@gd/ui"
-import { useParams, useRouteData } from "@solidjs/router"
-import fetchData from "../../instance.data"
+import { useParams } from "@solidjs/router"
+import useInstanceData from "../../instance.data"
 import { Match, Show, createMemo, Switch as SolidSwitch } from "solid-js"
 import { InstanceDetails } from "@gd/core_module/bindings"
 import Title from "@/pages/Settings/components/Title"
@@ -120,7 +120,7 @@ const Settings = () => {
     queryKey: ["java.getJavaProfiles"]
   }))
 
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
 
   const initialJavaArgs = createMemo((prev: string | null) => {
     if (prev) return prev
@@ -440,6 +440,11 @@ const Settings = () => {
             steps={1000}
             value={routeData?.instanceDetails.data?.memory?.max_mb}
             marks={generateSequence(2048, mbTotalRAM())}
+            tooltipFormat={(val) =>
+              val >= 1024
+                ? `${(val / 1024).toFixed(1).replace(/\.0$/, "")} GB`
+                : `${val} MB`
+            }
             onChange={(val) => {
               if (
                 !val ||

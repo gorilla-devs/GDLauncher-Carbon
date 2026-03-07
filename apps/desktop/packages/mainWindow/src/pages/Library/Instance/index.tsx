@@ -11,7 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem
 } from "@gd/ui"
-import { Outlet, useLocation, useParams, useRouteData } from "@solidjs/router"
+import { useLocation, useParams } from "@solidjs/router"
 import {
   For,
   JSX,
@@ -26,7 +26,7 @@ import {
 } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { queryClient, rspc } from "@/utils/rspcClient"
-import fetchData from "./instance.data"
+import useInstanceData from "./instance.data"
 import { detectDuplicatedMods } from "@/utils/duplicateMods"
 import { InstanceDetails, ListInstance } from "@gd/core_module/bindings"
 import {
@@ -55,14 +55,14 @@ interface InstancePage {
   path: string
 }
 
-const Instance = () => {
+const Instance = (props: { children?: any }) => {
   const navigator = useGDNavigate()
   const params = useParams()
   const location = useLocation()
   const [editableName, setEditableName] = createSignal(false)
   const [isFavorite, setIsFavorite] = createSignal(false)
   const [isSticky, setIsSticky] = createSignal(false)
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
   )
@@ -831,7 +831,7 @@ const Instance = () => {
                   </Button>
                 </div>
               </Show>
-              <Outlet />
+              {props.children}
             </div>
           </div>
         </div>

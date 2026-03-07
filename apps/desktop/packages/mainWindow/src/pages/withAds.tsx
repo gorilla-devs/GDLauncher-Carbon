@@ -1,18 +1,16 @@
 import { AdsBanner } from "@/components/AdBanner"
 import { TopBannerAd } from "@/components/TopBannerAd"
 import AppNavbar from "@/components/Navbar"
-import { Outlet } from "@solidjs/router"
-import { Show } from "solid-js"
+import { JSX, Show } from "solid-js"
 
 import adSize, { bannerAdSize, hideAdText } from "@/utils/adhelper"
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import { SearchInputContext } from "@/components/SearchInputContext"
 import { getSearchResults } from "@/utils/platformSearch"
-import { FilterBadgesBar } from "@/components/FilterBadgesBar"
 import ThemedPatternSVG from "@/components/ThemedPatternSVG"
 
-function withAdsLayout() {
+function withAdsLayout(props: { children?: JSX.Element }) {
   const modalContext = useModal()
   const searchResults = getSearchResults({
     limit: 20,
@@ -30,8 +28,7 @@ function withAdsLayout() {
                 width: `calc(100vw - ${adSize.width}px)`
               }}
             >
-              <FilterBadgesBar />
-              <Outlet />
+              {props.children}
             </div>
             <Show when={adSize.shouldShow}>
               <div

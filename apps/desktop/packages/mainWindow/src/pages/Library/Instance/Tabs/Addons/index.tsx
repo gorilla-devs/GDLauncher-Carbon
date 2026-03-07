@@ -1,6 +1,6 @@
 import { For, Show, createMemo, createSignal } from "solid-js"
-import { useRouteData, useParams } from "@solidjs/router"
-import fetchData from "../../instance.data"
+import { useParams } from "@solidjs/router"
+import useInstanceData from "../../instance.data"
 import {
   AddonFilters,
   AddonTable,
@@ -9,7 +9,7 @@ import {
 } from "./components"
 import { useAddonData, useAddonMutations } from "./hooks"
 const Addons = () => {
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
   const params = useParams()
   let tableInstance: any = null
 

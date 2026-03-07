@@ -13,11 +13,12 @@ import {
   useContext
 } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
-import { Router, hashIntegration } from "@solidjs/router"
+import { HashRouter } from "@solidjs/router"
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient"
 import { QueryClientProvider } from "@tanstack/solid-query"
 import { i18n, TransProvider, loadLanguageFiles } from "@gd/i18n"
 import App from "@/app"
+import { routes } from "@/route"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
@@ -286,22 +287,28 @@ const TransWrapper = (props: TransWrapperProps) => {
     <Show when={!settings.isInitialLoading && isI18nReady() && i18nOptions()}>
       <TransProvider instance={_i18nInstance} options={i18nOptions()}>
         <BackendReadyContext.Provider value={props.isBackendReady}>
-          <Router source={hashIntegration()}>
-            <GlobalStoreProvider>
-              <OnboardingProvider>
-                <NavigationManager>
-                  <ContextMenuProvider>
-                    <ModalProvider>
-                      <App
-                        createInvalidateQuery={props.createInvalidateQuery}
-                      />
-                      <SpotlightOverlay />
-                    </ModalProvider>
-                  </ContextMenuProvider>
-                </NavigationManager>
-              </OnboardingProvider>
-            </GlobalStoreProvider>
-          </Router>
+          <HashRouter
+            root={(routerProps) => (
+              <GlobalStoreProvider>
+                <OnboardingProvider>
+                  <NavigationManager>
+                    <ContextMenuProvider>
+                      <ModalProvider>
+                        <App
+                          createInvalidateQuery={props.createInvalidateQuery}
+                        >
+                          {routerProps.children}
+                        </App>
+                        <SpotlightOverlay />
+                      </ModalProvider>
+                    </ContextMenuProvider>
+                  </NavigationManager>
+                </OnboardingProvider>
+              </GlobalStoreProvider>
+            )}
+          >
+            {routes}
+          </HashRouter>
         </BackendReadyContext.Provider>
       </TransProvider>
     </Show>

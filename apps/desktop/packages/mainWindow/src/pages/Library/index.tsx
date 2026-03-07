@@ -1,10 +1,9 @@
-import { Outlet } from "@solidjs/router"
 import ContentWrapper from "@/components/ContentWrapper"
-import { createEffect, createSignal } from "solid-js"
+import { createEffect, createSignal, JSX } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
 
-function Library() {
+function Library(props: { children?: JSX.Element }) {
   const modalsManager = useModal()
   const [changelogShown, setChangelogShown] = createSignal(false)
 
@@ -29,7 +28,7 @@ function Library() {
   return (
     <>
       <ContentWrapper zeroPadding>
-        <Outlet />
+        {props.children}
       </ContentWrapper>
     </>
   )

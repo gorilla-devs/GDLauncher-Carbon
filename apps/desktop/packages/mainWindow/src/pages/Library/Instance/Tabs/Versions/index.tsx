@@ -2,8 +2,7 @@ import { Button } from "@gd/ui"
 import { For, Show, createEffect, createSignal } from "solid-js"
 import { Trans } from "@gd/i18n"
 import Version from "./Version"
-import { useRouteData } from "@solidjs/router"
-import fetchData from "../../instance.data"
+import useInstanceData from "../../instance.data"
 import { rspc } from "@/utils/rspcClient"
 import { CFFEFile } from "@gd/core_module/bindings"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
@@ -40,7 +39,7 @@ const Versions = () => {
   const [mainFileId, setMainFileId] = createSignal<undefined | number>(
     undefined
   )
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
 
   const modId = () =>
     routeData.instanceDetails?.data?.modpack?.modpack?.type === "curseforge" &&

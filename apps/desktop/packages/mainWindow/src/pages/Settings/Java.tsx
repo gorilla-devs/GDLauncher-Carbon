@@ -25,9 +25,8 @@ import {
   DropdownMenuItem,
   DropdownMenu
 } from "@gd/ui"
-import { useRouteData } from "@solidjs/router"
 import { For, Match, Show, Switch, createMemo } from "solid-js"
-import SettingsJavaData from "./settings.java.data"
+import useSettingsJavaData from "./settings.java.data"
 import { useModal } from "@/managers/ModalsManager"
 import { rspc } from "@/utils/rspcClient"
 import PageTitle from "./components/PageTitle"
@@ -40,7 +39,7 @@ import Center from "./components/Center"
 import TruncatedPath from "@/components/TruncatePath"
 
 const Java = () => {
-  const routeData: ReturnType<typeof SettingsJavaData> = useRouteData()
+  const routeData = useSettingsJavaData()
   const javasData = () => routeData?.availableJavas
   const javas = () => javasData()?.data || []
   const modalsContext = useModal()
@@ -163,6 +162,11 @@ const Java = () => {
               steps={1024}
               marks={generateSequence(1024, mbTotalRAM())}
               value={settings.data?.xmx}
+              tooltipFormat={(val) =>
+                val >= 1024
+                  ? `${(val / 1024).toFixed(1).replace(/\.0$/, "")} GB`
+                  : `${val} MB`
+              }
               onChange={(val) => {
                 settingsMutation.mutate({
                   xmx: {

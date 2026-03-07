@@ -1,8 +1,10 @@
 import { rspc } from "@/utils/rspcClient"
 import { FEServerId } from "@gd/core_module/bindings"
+import { useParams } from "@solidjs/router"
 
-//@ts-ignore
-const fetchData = ({ params }) => {
+const useServerData = () => {
+  const params = useParams()
+
   const serverDetails = rspc.createQuery(() => ({
     queryKey: ["server.getServerDetails", parseInt(params.id, 10) as unknown as FEServerId]
   }))
@@ -22,4 +24,4 @@ const fetchData = ({ params }) => {
   }
 }
 
-export default fetchData
+export default useServerData

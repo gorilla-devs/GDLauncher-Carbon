@@ -13,7 +13,6 @@ import {
   TooltipTrigger
 } from "@gd/ui"
 import {
-  Outlet,
   useLocation,
   useParams,
   useSearchParams
@@ -63,7 +62,7 @@ const getTabValueFromPath = (path: string, id: string, platform: string) => {
   return `/addon/${id}/${platform}`
 }
 
-const ModsInfiniteScrollQueryWrapper = () => {
+const ModsInfiniteScrollQueryWrapper = (props: { children?: any }) => {
   const params = useParams()
   const platform = () => params.platform as FEUnifiedPlatform
 
@@ -91,7 +90,7 @@ const ModsInfiniteScrollQueryWrapper = () => {
     >
       <AddonContext.Provider value={project}>
         <ContentWrapper zeroPadding>
-          <AddonExplore />
+          <AddonExplore>{props.children}</AddonExplore>
         </ContentWrapper>
       </AddonContext.Provider>
     </InfiniteScrollVersionsQueryWrapper>
@@ -116,7 +115,7 @@ const ModContextProvider = (props: {
   )
 }
 
-const AddonExplore = () => {
+const AddonExplore = (props: { children?: any }) => {
   const navigator = useGDNavigate()
   const params = useParams()
   const platform = () => params.platform as FEUnifiedPlatform
@@ -519,7 +518,7 @@ const AddonExplore = () => {
             <div class="z-0 flex flex-1 flex-col px-0 pt-4 min-w-0">
               <StickyHeaderHeightContext.Provider value={stickyHeaderHeight}>
                 <ModContextProvider mod={project}>
-                  <Outlet />
+                  {props.children}
                 </ModContextProvider>
               </StickyHeaderHeightContext.Provider>
             </div>

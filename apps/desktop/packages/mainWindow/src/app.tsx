@@ -1,6 +1,5 @@
-import { createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js"
-import { useLocation, useRoutes } from "@solidjs/router"
-import { routes } from "./route"
+import { createEffect, createSignal, JSX, onCleanup, onMount, untrack } from "solid-js"
+import { useLocation } from "@solidjs/router"
 import initThemes from "./utils/theme"
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "./managers/ModalsManager"
@@ -11,11 +10,11 @@ import { ACCOUNT_BANNED_EVENT } from "./utils/bannedEventBridge"
 
 interface Props {
   createInvalidateQuery: () => void
+  children?: JSX.Element
 }
 
 const App = (props: Props) => {
   const [runItOnce, setRunItOnce] = createSignal(true)
-  const Route = useRoutes(routes)
   const modalsContext = useModal()
   const currentRoute = useLocation()
 
@@ -102,7 +101,7 @@ const App = (props: Props) => {
     <div class="relative w-screen">
       <div class="z-10 flex h-auto w-screen">
         <main class="max-w-screen relative grow">
-          <Route />
+          {props.children}
         </main>
       </div>
     </div>

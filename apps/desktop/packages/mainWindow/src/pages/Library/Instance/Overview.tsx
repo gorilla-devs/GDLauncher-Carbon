@@ -1,8 +1,8 @@
 import Card from "@/components/Card"
 import { Trans, useTransContext } from "@gd/i18n"
 import { For, Show } from "solid-js"
-import fetchData from "./instance.data"
-import { useParams, useRouteData } from "@solidjs/router"
+import useInstanceData from "./instance.data"
+import { useParams } from "@solidjs/router"
 import { format, formatDuration, intervalToDuration } from "date-fns"
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner"
 import { port } from "@/utils/rspcClient"
@@ -11,7 +11,7 @@ import { getModpackPlatformIcon } from "@/utils/instances"
 import { useGDNavigate } from "@/managers/NavigationManager"
 
 const Overview = () => {
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
   const params = useParams()
   const navigator = useGDNavigate()
   const [t] = useTransContext()

@@ -1,10 +1,4 @@
 import { lazy } from "solid-js"
-import { RouteDefinition } from "@solidjs/router"
-import SettingsJavaData from "@/pages/Settings/settings.java.data"
-import SettingsGeneralData from "@/pages/Settings/settings.general.data"
-import AddonVersionsData from "@/pages/AddonViewPage/changelog.data"
-import InstanceData from "@/pages/Library/Instance/instance.data"
-import ServerData from "@/pages/Library/Server/server.data"
 import Login from "@/pages/Login"
 import withAdsLayout from "@/pages/withAds"
 import Library from "@/pages/Library"
@@ -14,7 +8,7 @@ import AddonViewPage from "@/pages/AddonViewPage"
 import Search from "@/pages/Search"
 /* Defining the routes for the application. */
 
-export const routes: RouteDefinition[] = [
+export const routes = [
   {
     path: "/",
     component: Login
@@ -35,13 +29,11 @@ export const routes: RouteDefinition[] = [
             path: "/server/:id",
             component: lazy(
               () => import("@/pages/Library/Server")
-            ),
-            data: ServerData
+            )
           },
           {
             path: "/:id",
             component: Instance,
-            data: InstanceData,
             children: [
               {
                 path: "/",
@@ -132,13 +124,11 @@ export const routes: RouteDefinition[] = [
           },
           {
             path: "/versions",
-            component: lazy(() => import("@/pages/AddonViewPage/Versions")),
-            data: AddonVersionsData
+            component: lazy(() => import("@/pages/AddonViewPage/Versions"))
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/AddonViewPage/Changelog")),
-            data: AddonVersionsData
+            component: lazy(() => import("@/pages/AddonViewPage/Changelog"))
           },
           {
             path: "/screenshots",
@@ -150,7 +140,6 @@ export const routes: RouteDefinition[] = [
       {
         path: "/settings",
         component: lazy(() => import("@/pages/Settings")),
-        data: SettingsGeneralData,
         children: [
           {
             path: "/",
@@ -170,8 +159,7 @@ export const routes: RouteDefinition[] = [
           },
           {
             path: "/java",
-            component: lazy(() => import("@/pages/Settings/Java")),
-            data: SettingsJavaData
+            component: lazy(() => import("@/pages/Settings/Java"))
           },
           {
             path: "/custom-commands",

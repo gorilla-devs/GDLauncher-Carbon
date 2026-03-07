@@ -12,11 +12,11 @@ import {
 import { For, Show, createMemo, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import Mod from "./Mod"
-import { useParams, useRouteData } from "@solidjs/router"
+import { useParams } from "@solidjs/router"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { rspc } from "@/utils/rspcClient"
 import { createStore, produce, reconcile } from "solid-js/store"
-import fetchData from "../../instance.data"
+import useInstanceData from "../../instance.data"
 import { Mod as Modtype } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
@@ -33,7 +33,7 @@ const Mods = () => {
   >({})
   const [isModStatusToggleLoading, setIsModStatusToggleLoading] =
     createSignal(false)
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
 
   const isInstanceLocked = () => routeData.instanceDetails.data?.modpack?.locked
 
