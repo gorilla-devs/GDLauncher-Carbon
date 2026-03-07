@@ -26,6 +26,30 @@ import type { rspc } from "@/utils/rspcClient"
 
 type RSPCContext = ReturnType<typeof rspc.useContext>
 
+function extractErrorDisplay(error: unknown): string {
+  if (!(error instanceof Error)) return "Failed to check account"
+  try {
+    let parsed = JSON.parse(error.message) as {
+      message?: string
+      cause?: { display: string }[]
+    }
+    if (parsed.message && !parsed.cause) {
+      try {
+        const inner = JSON.parse(parsed.message) as {
+          cause?: { display: string }[]
+        }
+        if (inner.cause) parsed = inner
+      } catch {
+        // message wasn't JSON
+      }
+    }
+    if (parsed.cause?.[0]?.display) return parsed.cause[0].display
+  } catch {
+    // not JSON at all
+  }
+  return error.message
+}
+
 /**
  * FlowController Implementation
  *
@@ -533,9 +557,7 @@ export class FlowControllerImpl implements FlowController {
         return { type: "none" }
       } catch (error) {
         console.error("[FlowController] Failed to peek GDL account:", error)
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to check account"
-        return { type: "error", message: errorMessage }
+        return { type: "error", message: extractErrorDisplay(error) }
       }
     } finally {
       // Don't hide loading here - caller is responsible
@@ -620,13 +642,11 @@ export class FlowControllerImpl implements FlowController {
         })
       } catch (error) {
         console.error("[FlowController] Failed to peek GDL account:", error)
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to check account"
         this.setState({
           phase: "content",
           step: {
             type: "gdl-account",
-            gdlAccount: { type: "error", message: errorMessage }
+            gdlAccount: { type: "error", message: extractErrorDisplay(error) }
           }
         })
       }
