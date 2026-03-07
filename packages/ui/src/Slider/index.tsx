@@ -7,6 +7,7 @@ import {
   onMount,
   JSX,
   Show,
+  createEffect,
   mergeProps
 } from "solid-js"
 
@@ -22,6 +23,7 @@ interface Props {
   onChange?: (_val: number) => void
   OnRelease?: (_val: number) => void
   vertical?: boolean
+  tooltipFormat?: (_val: number) => string | JSX.Element
 }
 
 function Slider(props: Props) {
@@ -38,6 +40,13 @@ function Slider(props: Props) {
   const [handleRef, setHandleRef] = createSignal<HTMLDivElement | undefined>(
     undefined
   )
+
+  createEffect(() => {
+    const v = props.value
+    if (v !== undefined) {
+      setCurrentValue(v)
+    }
+  })
 
   const mergedProps = mergeProps({ noLabels: false, noTooltip: false }, props)
 
@@ -209,7 +218,11 @@ function Slider(props: Props) {
               transform: "translate(-50%, -40px)"
             }}
           >
-            <div class="z-10 relative">{currentValue()}</div>
+            <div class="z-10 relative whitespace-nowrap">
+              {props.tooltipFormat
+                ? props.tooltipFormat(currentValue())
+                : currentValue()}
+            </div>
             <div class="z-1 absolute left-1/2 -translate-x-1/2 -bottom-1 w-3 h-3 rotate-45 bg-darkSlate-900" />
           </div>
         </Show>
@@ -294,23 +307,21 @@ function Slider(props: Props) {
           </Show>
           <div
             ref={setHandleRef}
-            class="rounded-full border-0 bg-lightSlate-50/15 shadow-md cursor-grab z-20 transition-[color,box-shadow,transform,opacity,background-color] duration-100 ease-out group-hover:bg-lightSlate-50/80"
+            class="rounded-full border-0 bg-lightSlate-50/15 shadow-md cursor-grab z-20 transition-[color,box-shadow,transform,opacity,background-color] ease-out group-hover:bg-lightSlate-50/80"
             style={{
               position: "absolute",
               ...(props.vertical
-                ? {
-                    top: `${calcOffset(currentValue())}%`,
-                    transform: "translateY(-50%)"
-                  }
-                : {
-                    left: `${calcOffset(currentValue())}%`,
-                    transform: "translateX(-50%)"
-                  })
+                ? { top: `${calcOffset(currentValue())}%` }
+                : { left: `${calcOffset(currentValue())}%` })
             }}
             classList={{
-              "w-1.5 h-5": !props.vertical,
-              "h-1.5 w-5": props.vertical,
-              "bg-lightSlate-50/80 scale-110 cursor-grabbing": showTooptip(),
+              "w-1.5 h-5 -translate-x-1/2": !props.vertical,
+              "h-1.5 w-5 -translate-y-1/2": props.vertical,
+              "bg-lightSlate-50/80 scale-110": showTooptip() && !dragging(),
+              "bg-lightSlate-50 scale-90 shadow-lg shadow-primary-500/40 cursor-grabbing":
+                dragging(),
+              "duration-200": !dragging(),
+              "duration-75": dragging(),
               "-top-0.5": !props.vertical,
               "-left-0.5": props.vertical
             }}

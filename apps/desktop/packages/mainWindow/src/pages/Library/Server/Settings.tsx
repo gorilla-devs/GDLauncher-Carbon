@@ -199,6 +199,11 @@ const Settings = (props: SettingsProps) => {
               max={Math.min(totalRamMb(), 32768)}
               steps={256}
               value={xmx()}
+              tooltipFormat={(val) =>
+                val >= 1024
+                  ? `${(val / 1024).toFixed(1).replace(/\.0$/, "")} GB`
+                  : `${val} MB`
+              }
               onChange={(val) => {
                 setXmx(val)
                 if (xms() > val) setXms(val)
@@ -221,6 +226,11 @@ const Settings = (props: SettingsProps) => {
               max={xmx()}
               steps={256}
               value={xms()}
+              tooltipFormat={(val) =>
+                val >= 1024
+                  ? `${(val / 1024).toFixed(1).replace(/\.0$/, "")} GB`
+                  : `${val} MB`
+              }
               onChange={(val) => {
                 setXms(val)
                 markDirty()
