@@ -1069,7 +1069,7 @@ function AuthFlowContent() {
             <Show
               when={
                 getStepAs("gdl-account")?.gdlAccount?.type === "none" &&
-                flow.data.gdlAccountId !== ""
+                (flow.data.gdlAccountId !== "" || flow.data.isAddingGdlFromSettings)
               }
             >
               <Button
@@ -1090,7 +1090,8 @@ function AuthFlowContent() {
               when={
                 getStepAs("gdl-account")?.gdlAccount?.type === "linked" ||
                 (getStepAs("gdl-account")?.gdlAccount?.type === "none" &&
-                  flow.data.gdlAccountId === "")
+                  flow.data.gdlAccountId === "" &&
+                  !flow.data.isAddingGdlFromSettings)
               }
             >
               <Button
