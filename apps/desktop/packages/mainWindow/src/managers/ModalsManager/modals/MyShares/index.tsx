@@ -25,6 +25,8 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { createInfiniteQuery } from "@tanstack/solid-query"
 import { formatDownloadCount } from "@/utils/helpers"
 import { MAX_DOWNLOADS_LIMIT, validateMaxDownloads } from "@/utils/validation"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
+import VerificationRequiredPlaceholder from "@/components/VerificationRequiredPlaceholder"
 
 const PAGE_SIZE = 20
 
@@ -99,6 +101,12 @@ const getQuotaBarColor = (percentage: number): string => {
 function MyShares(props: ModalProps) {
   const [t] = useTransContext()
   const rspcContext = rspc.useContext()
+  const globalStore = useGlobalStore()
+
+  const isVerified = () => {
+    const data = globalStore.gdlAccount.data
+    return data?.status === "valid" && data.value.isEmailVerified
+  }
   const [regeneratingShareCode, setRegeneratingShareCode] = createSignal<string | null>(null)
   const [updatingShare, setUpdatingShare] = createSignal<{
     shareCode: string
@@ -404,6 +412,9 @@ function MyShares(props: ModalProps) {
         </Show>
 
         <Switch>
+          <Match when={!isVerified()}>
+            <VerificationRequiredPlaceholder />
+          </Match>
           <Match when={sharesQuery.isLoading}>
             <div class="flex flex-1 flex-col overflow-hidden">
               <TableHeader />

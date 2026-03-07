@@ -55,5 +55,13 @@
 "_trn_nickname_history": "履歴",
 "_trn_clear_nickname_history": "履歴を消去",
 "_trn_nickname_history_cleared": "ニックネームの履歴を消去しました",
-"_trn_nickname_history_clear_failed": "ニックネーム履歴の消去に失敗しました"
+"_trn_nickname_history_clear_failed": "ニックネーム履歴の消去に失敗しました",
+"_trn_gdl_account_unavailable": "GDLアカウント利用不可",
+"_trn_verification_required_title": "メール認証が必要です",
+"_trn_verification_required_description": "この機能を利用するにはメールアドレスの認証が必要です。受信トレイで認証リンクをご確認ください。",
+"_trn_verification_sent_to_email": "認証メールは {{email}} に送信されました",
+"_trn_resend_verification_email": "認証メールを再送信",
+"_trn_resend_verification_cooldown": "{{time}} 後に再送信",
+"_trn_verification_email_sent": "認証メールを送信しました",
+"_trn_verification_email_failed": "認証メールの送信に失敗しました"
 }

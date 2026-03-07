@@ -39,5 +39,13 @@
   "_trn_change_recovery_email_title": "Cambia Email di Recupero",
   "_trn_change_recovery_email_description": "Inserisci la nuova email di recupero per il tuo account GDLauncher",
   "_trn_cancel": "Annulla",
-  "_trn_confirm": "Conferma"
+  "_trn_confirm": "Conferma",
+  "_trn_gdl_account_unavailable": "Account GDL Non Disponibile",
+  "_trn_verification_required_title": "Verifica Email Necessaria",
+  "_trn_verification_required_description": "Verifica il tuo indirizzo email per sbloccare questa funzionalità. Controlla la tua casella di posta per il link di verifica.",
+  "_trn_verification_sent_to_email": "Email di verifica inviata a {{email}}",
+  "_trn_resend_verification_email": "Reinvia Email di Verifica",
+  "_trn_resend_verification_cooldown": "Reinvia tra {{time}}",
+  "_trn_verification_email_sent": "Email di verifica inviata",
+  "_trn_verification_email_failed": "Invio email di verifica fallito"
 }

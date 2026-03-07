@@ -87,5 +87,13 @@
   "_trn_requires_gdl_account_tooltip": "Link your GDLauncher account to use this feature",
   "_trn_click_to_link": "Click to link your account",
   "_trn_requires_gdl_account_modal_description": "This feature requires a GDLauncher account. Link your account to unlock sharing, cloud saves, and more.",
-  "_trn_link_account": "Link Account"
+  "_trn_link_account": "Link Account",
+  "_trn_gdl_account_unavailable": "GDL Account Unavailable",
+  "_trn_verification_required_title": "Email Verification Required",
+  "_trn_verification_required_description": "Verify your email address to unlock this feature. Check your inbox for a verification link.",
+  "_trn_verification_sent_to_email": "Verification email was sent to {{email}}",
+  "_trn_resend_verification_email": "Resend Verification Email",
+  "_trn_resend_verification_cooldown": "Resend in {{time}}",
+  "_trn_verification_email_sent": "Verification email sent",
+  "_trn_verification_email_failed": "Failed to send verification email"
 }

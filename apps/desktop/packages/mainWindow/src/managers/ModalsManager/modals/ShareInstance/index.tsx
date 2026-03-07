@@ -26,6 +26,8 @@ import { FEWaitForInstanceShareResponse } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useNavigate } from "@solidjs/router"
 import { MAX_DOWNLOADS_LIMIT, validateMaxDownloads } from "@/utils/validation"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
+import VerificationRequiredPlaceholder from "@/components/VerificationRequiredPlaceholder"
 
 // Map error codes to translation keys for share instance errors
 type ShareErrorKey =
@@ -70,6 +72,12 @@ function ShareInstance(props: ModalProps) {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const navigate = useNavigate()
+  const globalStore = useGlobalStore()
+
+  const isVerified = () => {
+    const d = globalStore.gdlAccount.data
+    return d?.status === "valid" && d.value.isEmailVerified
+  }
   const [shareObject, setShareObject] =
     createSignal<FEWaitForInstanceShareResponse>()
   const [fileKey, setFileKey] = createSignal<string>()
@@ -162,6 +170,9 @@ function ShareInstance(props: ModalProps) {
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="w-120 flex flex-col gap-4">
         <Switch>
+          <Match when={!isVerified()}>
+            <VerificationRequiredPlaceholder />
+          </Match>
           <Match when={!shareObject()}>
             <div class="text-lightSlate-50">
               <div class="mb-2 text-lg">
