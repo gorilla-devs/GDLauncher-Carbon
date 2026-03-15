@@ -21,6 +21,8 @@ export function ModloadersFilter() {
       })) || []
   )
 
+  const selectedCount = () => searchResults?.searchQuery().modloaders?.length ?? 0
+
   const handleToggle = (value: string, checked: boolean) => {
     searchResults?.setSearchQuery((prev) => {
       const prevModloaders = prev.modloaders || []
@@ -43,8 +45,19 @@ export function ModloadersFilter() {
   }
 
   return (
-    <Collapsable title={<div class="flex items-center gap-2"><div class="i-hugeicons:puzzle h-4 w-4" /><Trans key="search:_trn_modloaders" /></div>} defaultOpened noPadding>
-      <div class="flex flex-col gap-1 px-2">
+    <Collapsable
+      title={<div class="flex items-center gap-2"><div class="i-hugeicons:puzzle h-4 w-4" /><Trans key="search:_trn_modloaders" /></div>}
+      defaultOpened
+      noPadding
+      count={selectedCount()}
+      onClear={() => {
+        searchResults?.setSearchQuery((prev) => ({
+          ...prev,
+          modloaders: null
+        }))
+      }}
+    >
+      <div class="flex flex-col gap-2 px-2">
         <Show when={!!searchResults?.selectedInstanceId()}>
           <FilterWarning />
         </Show>

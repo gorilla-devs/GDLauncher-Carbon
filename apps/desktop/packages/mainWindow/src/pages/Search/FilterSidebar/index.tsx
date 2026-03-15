@@ -1,4 +1,5 @@
-import { createSignal, createEffect, on, onCleanup } from "solid-js"
+import { createSignal, createEffect, on, onCleanup, Show } from "solid-js"
+import { Button } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import useSearchContext from "@/components/SearchInputContext"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
@@ -17,6 +18,7 @@ const COLLAPSED_WIDTH = 48
 function ExpandedPanel(props: {
   onResetFilters: () => void
   onCollapse: () => void
+  hasActiveFilters: boolean
 }) {
   return (
     <div
@@ -30,13 +32,18 @@ function ExpandedPanel(props: {
         </span>
         <div class="flex items-center gap-2">
           <div
-            class="text-lightSlate-900 hover:text-lightSlate-50 cursor-pointer text-xs transition-colors"
-            onClick={props.onResetFilters}
+            class="transition-opacity duration-150"
+            classList={{
+              "opacity-100 pointer-events-auto": props.hasActiveFilters,
+              "opacity-0 pointer-events-none": !props.hasActiveFilters
+            }}
           >
-            <Trans key="search:_trn_clear_all_filters" />
+            <Button type="text" size="small" onClick={props.onResetFilters}>
+              <Trans key="search:_trn_clear_all_filters" />
+            </Button>
           </div>
           <button
-            class="hover:bg-darkSlate-600 flex items-center justify-center rounded p-1 transition-colors"
+            class="hover:bg-darkSlate-700 flex items-center justify-center rounded p-1 transition-colors border-none bg-transparent text-inherit"
             onClick={props.onCollapse}
           >
             <div class="i-hugeicons:sidebar-left h-4 w-4" />
@@ -53,17 +60,22 @@ function ExpandedPanel(props: {
       </div>
 
       {/* Scrollable Filter Sections */}
-      <div class="flex-1 overflow-y-auto px-2">
-        <div data-filter-section="platform"><PlatformFilter /></div>
-        <div class="bg-darkSlate-700/50 mx-2 h-px" />
-        <div data-filter-section="categories"><CategoriesFilter /></div>
-        <div class="bg-darkSlate-700/50 mx-2 h-px" />
-        <div data-filter-section="modloaders"><ModloadersFilter /></div>
-        <div class="bg-darkSlate-700/50 mx-2 h-px" />
-        <div data-filter-section="gameVersions"><GameVersionsFilter /></div>
-        <div class="bg-darkSlate-700/50 mx-2 h-px" />
-        <div data-filter-section="environment"><EnvironmentFilter /></div>
-        <div data-filter-section="sort"><SortFilter /></div>
+      <div class="relative flex-1 overflow-hidden">
+        <div class="h-full overflow-y-auto px-2 pb-4">
+          <div data-filter-section="platform"><PlatformFilter /></div>
+          <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
+          <div data-filter-section="categories"><CategoriesFilter /></div>
+          <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
+          <div data-filter-section="modloaders"><ModloadersFilter /></div>
+          <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
+          <div data-filter-section="gameVersions"><GameVersionsFilter /></div>
+          <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
+          <div data-filter-section="environment"><EnvironmentFilter /></div>
+          <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
+          <div data-filter-section="sort"><SortFilter /></div>
+        </div>
+        {/* Scroll fade at bottom */}
+        <div class="from-darkSlate-800 pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t to-transparent" />
       </div>
     </div>
   )
@@ -75,6 +87,19 @@ export function FilterSidebar() {
 
   const isDocked = () => searchResults?.sidebarExpanded() ?? false
   const reducedMotion = () => globalStore.settings.data?.reducedMotion ?? false
+
+  const hasActiveFilters = () => {
+    const q = searchResults?.searchQuery()
+    if (!q) return false
+    return !!(
+      q.searchApi ||
+      q.categories?.length ||
+      q.modloaders?.length ||
+      q.gameVersions?.length ||
+      q.environment ||
+      q.platformFilters
+    )
+  }
 
   const [isHovered, setIsHovered] = createSignal(false)
 
@@ -178,6 +203,7 @@ export function FilterSidebar() {
         <ExpandedPanel
           onResetFilters={resetAllFilters}
           onCollapse={() => searchResults?.setSidebarExpanded(false)}
+          hasActiveFilters={hasActiveFilters()}
         />
       </div>
 
@@ -199,6 +225,7 @@ export function FilterSidebar() {
         <ExpandedPanel
           onResetFilters={resetAllFilters}
           onCollapse={() => searchResults?.setSidebarExpanded(true)}
+          hasActiveFilters={hasActiveFilters()}
         />
       </div>
     </div>

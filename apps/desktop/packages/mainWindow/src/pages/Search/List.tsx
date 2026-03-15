@@ -40,12 +40,15 @@ export function List() {
   }
 
   const type = () =>
-    (params.type || defaultFallbackType()) as FEUnifiedSearchType
+    (params.type ||
+      searchContext?.searchQuery().projectType ||
+      defaultFallbackType()) as FEUnifiedSearchType
 
-  if (type() !== searchContext?.searchQuery().projectType) {
+  // Only override projectType when the URL has an explicit :type param
+  if (params.type && params.type !== searchContext?.searchQuery().projectType) {
     searchContext?.setSearchQuery((prev) => ({
       ...prev,
-      projectType: type()
+      projectType: params.type as FEUnifiedSearchType
     }))
   }
 

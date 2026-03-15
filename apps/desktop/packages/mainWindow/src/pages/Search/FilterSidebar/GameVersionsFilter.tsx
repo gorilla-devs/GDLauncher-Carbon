@@ -18,6 +18,8 @@ export function GameVersionsFilter() {
       })) || []
   )
 
+  const selectedCount = () => searchResults?.searchQuery().gameVersions?.length ?? 0
+
   const handleToggle = (value: string, checked: boolean) => {
     searchResults?.setSearchQuery((prev) => {
       const prevGameVersions = prev.gameVersions || []
@@ -44,8 +46,15 @@ export function GameVersionsFilter() {
       title={<div class="flex items-center gap-2"><div class="i-hugeicons:gameboy h-4 w-4" /><Trans key="search:_trn_game_versions" /></div>}
       defaultOpened={false}
       noPadding
+      count={selectedCount()}
+      onClear={() => {
+        searchResults?.setSearchQuery((prev) => ({
+          ...prev,
+          gameVersions: null
+        }))
+      }}
     >
-      <div class="flex flex-col gap-1 px-2">
+      <div class="flex flex-col gap-2 px-2">
         <Show when={!!searchResults?.selectedInstanceId()}>
           <FilterWarning />
         </Show>

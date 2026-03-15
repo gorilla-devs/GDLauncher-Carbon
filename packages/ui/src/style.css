@@ -28,6 +28,8 @@ html,
 body {
   background: rgb(var(--darkSlate-800));
   color: white;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .potato-pc *,
@@ -215,39 +217,34 @@ a {
 
 /* Scale transitions with rendering optimizations:
    - interpolate-size: allow-keywords on :root enables smoother transforms
-   - 125ms ease-out for scale (fast but smooth)
+   - 150ms Material Design standard easing cubic-bezier(.4, 0, .2, 1)
    - backface-visibility: hidden forces 3D compositing layer
    - transform-origin: center ensures consistent scaling point
-   - will-change on hover pre-promotes to GPU before animation */
+   - will-change: transform keeps element on GPU layer to prevent hover re-rasterization shift */
 .press-effect {
   transition:
-    opacity 0.2s ease-in-out,
-    filter 0.2s ease-in-out,
-    scale 0.125s ease-out,
-    transform 0.125s ease-out;
+    opacity 0.15s cubic-bezier(.4, 0, .2, 1),
+    filter 0.15s cubic-bezier(.4, 0, .2, 1),
+    color 0.15s cubic-bezier(.4, 0, .2, 1),
+    background-color 0.15s cubic-bezier(.4, 0, .2, 1),
+    border-color 0.15s cubic-bezier(.4, 0, .2, 1),
+    scale 0.15s cubic-bezier(.4, 0, .2, 1),
+    transform 0.15s cubic-bezier(.4, 0, .2, 1);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   transform-origin: center center;
-}
-
-.press-effect:hover,
-.press-effect:focus {
   will-change: transform;
 }
 
 [class*="active:scale-"],
 [class*="hover:scale-"],
 [class*="group-hover:scale-"] {
-  transition-property: scale, transform, opacity, filter;
-  transition-duration: 0.125s, 0.125s, 0.2s, 0.2s;
-  transition-timing-function: ease-out, ease-out, ease-in-out, ease-in-out;
+  transition-property: scale, transform, opacity, filter, color, background-color, border-color;
+  transition-duration: 0.15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   transform-origin: center center;
-}
-
-[class*="hover:scale-"]:hover,
-[class*="group-hover:scale-"]:hover {
   will-change: transform;
 }
 

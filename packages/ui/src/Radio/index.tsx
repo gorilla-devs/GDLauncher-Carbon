@@ -15,6 +15,7 @@ interface Props {
   checked: boolean
   onChange?: OnChange
   buttonStyle?: ButtonStyle
+  allowDeselect?: boolean
   children?: JSX.Element
 }
 
@@ -37,7 +38,7 @@ interface GroupProps {
 let nextId = 1
 
 const Radio = (props: Props) => {
-  const [local, otherProps] = splitProps(props, ["buttonStyle", "onChange"])
+  const [local, otherProps] = splitProps(props, ["buttonStyle", "onChange", "allowDeselect"])
   const [isHovered, setIsHovered] = createSignal(false) // Track hover state
 
   const id = `radio-${nextId++}`
@@ -65,7 +66,7 @@ const Radio = (props: Props) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => {
-          if (!props.checked) {
+          if (props.allowDeselect || !props.checked) {
             local?.onChange?.(props.value)
           }
         }}

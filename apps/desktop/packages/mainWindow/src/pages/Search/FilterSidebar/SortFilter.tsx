@@ -1,24 +1,30 @@
 import { Collapsable, Radio } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Show, Switch, Match } from "solid-js"
+import { Show, Switch, Match, For } from "solid-js"
 import useSearchContext from "@/components/SearchInputContext"
 import { capitalize } from "@/utils/helpers"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
+
+const CF_SORT_FIELDS = [
+  { value: "featured", key: "search:_trn_featured" },
+  { value: "popularity", key: "search:_trn_popularity" },
+  { value: "totalDownloads", key: "search:_trn_downloads" },
+  { value: "lastUpdated", key: "search:_trn_last_updated" },
+  { value: "name", key: "search:_trn_name" },
+  { value: "author", key: "search:_trn_author" }
+] as const
+
+const CF_ORDER_OPTIONS = ["ascending", "descending"] as const
+
+const MR_SORT_OPTIONS = [
+  { value: "relevance", key: "search:_trn_relevance" },
+  { value: "downloads", key: "search:_trn_downloads" },
+  { value: "follows", key: "search:_trn_follows" },
+  { value: "newest", key: "search:_trn_newest" },
+  { value: "updated", key: "search:_trn_updated" }
+] as const
 
 function CurseforgeSortFilter() {
   const searchResults = useSearchContext()
-
-  const sortFieldOptions = [
-    { value: "featured", key: "search:_trn_featured" },
-    { value: "popularity", key: "search:_trn_popularity" },
-    { value: "totalDownloads", key: "search:_trn_downloads" },
-    { value: "lastUpdated", key: "search:_trn_last_updated" },
-    { value: "name", key: "search:_trn_name" },
-    { value: "author", key: "search:_trn_author" }
-  ] as const
-
-  const orderOptions = ["ascending", "descending"] as const
 
   const currentFilters = () => {
     const filters = searchResults?.searchQuery().platformFilters
@@ -52,23 +58,26 @@ function CurseforgeSortFilter() {
         noPadding
       >
         <div class="flex flex-col">
-          {sortFieldOptions.map((option) => (
-            <Radio
-              value={option.value}
-              checked={currentFilters().sort_field === option.value}
-              onChange={() => {
-                if (option.value === currentFilters().sort_field) {
-                  updateFilters({ sort_field: null })
-                } else {
-                  updateFilters({ sort_field: option.value })
-                }
-              }}
-            >
-              <span class="text-sm">
-                <Trans key={option.key} />
-              </span>
-            </Radio>
-          ))}
+          <For each={CF_SORT_FIELDS}>
+            {(option) => (
+              <Radio
+                value={option.value}
+                checked={currentFilters().sort_field === option.value}
+                allowDeselect
+                onChange={() => {
+                  if (option.value === currentFilters().sort_field) {
+                    updateFilters({ sort_field: null })
+                  } else {
+                    updateFilters({ sort_field: option.value })
+                  }
+                }}
+              >
+                <span class="text-sm">
+                  <Trans key={option.key} />
+                </span>
+              </Radio>
+            )}
+          </For>
         </div>
       </Collapsable>
 
@@ -79,21 +88,24 @@ function CurseforgeSortFilter() {
         noPadding
       >
         <div class="flex flex-col">
-          {orderOptions.map((value) => (
-            <Radio
-              value={value}
-              checked={currentFilters().sort_order === value}
-              onChange={() => {
-                if (value === currentFilters().sort_order) {
-                  updateFilters({ sort_order: null })
-                } else {
-                  updateFilters({ sort_order: value })
-                }
-              }}
-            >
-              <span class="text-sm">{capitalize(value)}</span>
-            </Radio>
-          ))}
+          <For each={[...CF_ORDER_OPTIONS]}>
+            {(value) => (
+              <Radio
+                value={value}
+                checked={currentFilters().sort_order === value}
+                allowDeselect
+                onChange={() => {
+                  if (value === currentFilters().sort_order) {
+                    updateFilters({ sort_order: null })
+                  } else {
+                    updateFilters({ sort_order: value })
+                  }
+                }}
+              >
+                <span class="text-sm">{capitalize(value)}</span>
+              </Radio>
+            )}
+          </For>
         </div>
       </Collapsable>
     </div>
@@ -102,14 +114,6 @@ function CurseforgeSortFilter() {
 
 function ModrinthSortFilter() {
   const searchResults = useSearchContext()
-
-  const sortOptions = [
-    { value: "relevance", key: "search:_trn_relevance" },
-    { value: "downloads", key: "search:_trn_downloads" },
-    { value: "follows", key: "search:_trn_follows" },
-    { value: "newest", key: "search:_trn_newest" },
-    { value: "updated", key: "search:_trn_updated" }
-  ] as const
 
   const currentFilters = () => {
     const filters = searchResults?.searchQuery().platformFilters
@@ -136,23 +140,26 @@ function ModrinthSortFilter() {
 
   return (
     <div class="flex flex-col">
-      {sortOptions.map((option) => (
-        <Radio
-          value={option.value}
-          checked={currentFilters().sort_index === option.value}
-          onChange={() => {
-            if (option.value === currentFilters().sort_index) {
-              updateFilters({ sort_index: null })
-            } else {
-              updateFilters({ sort_index: option.value })
-            }
-          }}
-        >
-          <span class="text-sm">
-            <Trans key={option.key} />
-          </span>
-        </Radio>
-      ))}
+      <For each={MR_SORT_OPTIONS}>
+        {(option) => (
+          <Radio
+            value={option.value}
+            checked={currentFilters().sort_index === option.value}
+            allowDeselect
+            onChange={() => {
+              if (option.value === currentFilters().sort_index) {
+                updateFilters({ sort_index: null })
+              } else {
+                updateFilters({ sort_index: option.value })
+              }
+            }}
+          >
+            <span class="text-sm">
+              <Trans key={option.key} />
+            </span>
+          </Radio>
+        )}
+      </For>
     </div>
   )
 }
@@ -161,6 +168,8 @@ export function SortFilter() {
   const searchResults = useSearchContext()
   const [t] = useTransContext()
   const selectedApi = () => searchResults?.searchQuery().searchApi
+
+  const hasActiveSort = () => !!searchResults?.searchQuery().platformFilters
 
   return (
     <Show when={selectedApi()}>
@@ -175,15 +184,24 @@ export function SortFilter() {
         }
         defaultOpened
         noPadding
+        count={hasActiveSort() ? 1 : 0}
+        onClear={() => {
+          searchResults?.setSearchQuery((prev) => ({
+            ...prev,
+            platformFilters: null
+          }))
+        }}
       >
-        <Switch>
-          <Match when={selectedApi() === "curseforge"}>
-            <CurseforgeSortFilter />
-          </Match>
-          <Match when={selectedApi() === "modrinth"}>
-            <ModrinthSortFilter />
-          </Match>
-        </Switch>
+        <div class="px-2">
+          <Switch>
+            <Match when={selectedApi() === "curseforge"}>
+              <CurseforgeSortFilter />
+            </Match>
+            <Match when={selectedApi() === "modrinth"}>
+              <ModrinthSortFilter />
+            </Match>
+          </Switch>
+        </div>
       </Collapsable>
     </Show>
   )

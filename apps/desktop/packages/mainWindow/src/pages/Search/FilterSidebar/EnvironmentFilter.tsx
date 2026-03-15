@@ -22,12 +22,24 @@ export function EnvironmentFilter() {
   }
 
   return (
-    <Collapsable title={<div class="flex items-center gap-2"><div class="i-hugeicons:computer h-4 w-4" /><Trans key="search:_trn_environment" /></div>} defaultOpened noPadding>
-      <div class="flex flex-col">
+    <Collapsable
+      title={<div class="flex items-center gap-2"><div class="i-hugeicons:computer h-4 w-4" /><Trans key="search:_trn_environment" /></div>}
+      defaultOpened
+      noPadding
+      count={searchResults?.searchQuery().environment ? 1 : 0}
+      onClear={() => {
+        searchResults?.setSearchQuery((prev) => ({
+          ...prev,
+          environment: null
+        }))
+      }}
+    >
+      <div class="flex flex-col px-2">
         <Radio
           value="server"
           checked={searchResults?.searchQuery().environment === "server"}
           onChange={handleSelect}
+          allowDeselect
         >
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:server-stack-01 h-4 w-4" />
@@ -38,6 +50,7 @@ export function EnvironmentFilter() {
           value="client"
           checked={searchResults?.searchQuery().environment === "client"}
           onChange={handleSelect}
+          allowDeselect
         >
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:computer h-4 w-4" />

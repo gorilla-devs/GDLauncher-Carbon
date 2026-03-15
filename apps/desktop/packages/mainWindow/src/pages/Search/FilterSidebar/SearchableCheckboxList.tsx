@@ -1,6 +1,6 @@
 import { Checkbox } from "@gd/ui"
 import {
-  For,
+  Index,
   Show,
   createSignal,
   createMemo,
@@ -25,7 +25,11 @@ interface SearchableCheckboxListProps {
   maxHeight?: number
   virtualizeThreshold?: number
   emptyMessage?: JSX.Element
+  /** Hide search when item count is below this threshold (default: 10) */
+  searchThreshold?: number
 }
+
+const SEARCH_THRESHOLD = 10
 
 export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
   const [searchQuery, setSearchQuery] = createSignal("")
@@ -48,10 +52,15 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
   const shouldVirtualize = createMemo(
     () => filteredItems().length > (props.virtualizeThreshold ?? 100)
   )
-  const showSearch = () => props.showSearch !== false
+
+  const shouldShowSearch = () => {
+    if (props.showSearch === false) return false
+    const threshold = props.searchThreshold ?? SEARCH_THRESHOLD
+    return props.items.length >= threshold
+  }
 
   const renderItem = (item: CheckboxItem) => (
-    <div class="hover:bg-darkSlate-700 rounded-sm py-1 transition-colors">
+    <div class="hover:bg-darkSlate-700 rounded-md px-1.5 py-1 transition-colors">
       <Checkbox
         checked={props.selectedValues().includes(item.value)}
         onChange={(checked) => props.onToggle(item.value, checked)}
@@ -60,15 +69,15 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
           <Show when={item.icon}>
             <div class="h-4 w-4">{item.icon}</div>
           </Show>
-          <span>{item.label}</span>
+          <span class="truncate">{item.label}</span>
         </div>
       </Checkbox>
     </div>
   )
 
   return (
-    <div class="flex flex-col gap-1">
-      <Show when={showSearch()}>
+    <div class="flex flex-col gap-2">
+      <Show when={shouldShowSearch()}>
         <div
           class="bg-darkSlate-700 flex items-center gap-2 rounded-md px-3 ring-1 ring-darkSlate-600"
           style={{ height: "32px" }}
@@ -108,7 +117,7 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
               class="flex flex-col gap-0.5 overflow-y-auto"
               style={{ "max-height": `${maxHeight()}px` }}
             >
-              <For each={filteredItems()}>{(item) => renderItem(item)}</For>
+              <Index each={filteredItems()}>{(item) => renderItem(item())}</Index>
             </div>
           }
         >

@@ -10,23 +10,76 @@ import {
   RowSelectionState
 } from "@tanstack/solid-table"
 
+type PlatformFilter = "all" | "curseforge" | "modrinth" | "local"
+
+interface FilterCacheEntry {
+  enabledAddonTypes: Record<AddonType, boolean>
+  platformFilter: PlatformFilter
+  searchQuery: string
+}
+
+const DEFAULT_ADDON_TYPES: Record<AddonType, boolean> = {
+  mods: true,
+  shaders: true,
+  resourcepacks: true,
+  datapacks: true,
+  worlds: true
+}
+
+// Module-level cache for filter state across component mounts
+const filterCache = new Map<string, FilterCacheEntry>()
+
 export const useAddonData = () => {
   const params = useParams()
+  const cached = filterCache.get(params.id)
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = createSignal("")
-  const [enabledAddonTypes, setEnabledAddonTypes] = createStore<
+  // Create fresh signals/store each mount
+  const [searchQuery, _setSearchQuery] = createSignal(
+    cached?.searchQuery ?? ""
+  )
+  const [enabledAddonTypes, _setEnabledAddonTypes] = createStore<
     Record<AddonType, boolean>
-  >({
-    mods: true,
-    shaders: true,
-    resourcepacks: true,
-    datapacks: true,
-    worlds: true
-  })
-  const [platformFilter, setPlatformFilter] = createSignal<
-    "all" | "curseforge" | "modrinth" | "local"
-  >("all")
+  >({ ...DEFAULT_ADDON_TYPES })
+  const [platformFilter, _setPlatformFilter] = createSignal<PlatformFilter>(
+    cached?.platformFilter ?? "all"
+  )
+
+  // Restore addon types from cache after store creation
+  if (cached) {
+    for (const type of Object.keys(cached.enabledAddonTypes) as AddonType[]) {
+      _setEnabledAddonTypes(type, cached.enabledAddonTypes[type])
+    }
+  }
+
+  // Helper to get or init cache entry
+  const getCache = (): FilterCacheEntry => {
+    let entry = filterCache.get(params.id)
+    if (!entry) {
+      entry = {
+        enabledAddonTypes: { ...DEFAULT_ADDON_TYPES },
+        platformFilter: "all",
+        searchQuery: ""
+      }
+      filterCache.set(params.id, entry)
+    }
+    return entry
+  }
+
+  // Wrapped setters that imperatively sync to cache
+  const setSearchQuery = (query: string) => {
+    _setSearchQuery(query)
+    getCache().searchQuery = query
+  }
+
+  const setEnabledAddonTypes = (type: AddonType, enabled: boolean) => {
+    _setEnabledAddonTypes(type, enabled)
+    getCache().enabledAddonTypes[type] = enabled
+  }
+
+  const setPlatformFilter = (filter: PlatformFilter) => {
+    _setPlatformFilter(filter)
+    getCache().platformFilter = filter
+  }
 
   // Table states
   const [sorting, setSorting] = createSignal<SortingState>([
@@ -178,9 +231,7 @@ export const useAddonData = () => {
     searchQuery,
     setSearchQuery,
     enabledAddonTypes,
-    setEnabledAddonTypes: (type: AddonType, enabled: boolean) => {
-      setEnabledAddonTypes(type, enabled)
-    },
+    setEnabledAddonTypes,
     platformFilter,
     setPlatformFilter,
 

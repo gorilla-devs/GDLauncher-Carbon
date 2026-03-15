@@ -43,12 +43,13 @@ const getVariant = (
   uppercase: boolean,
   iconRight: boolean,
   isLoading: boolean,
-  variant: string,
+  variant: string | undefined,
   cursor: string | undefined,
   textColor?: string,
   backgroundColor?: string,
   fullWidth?: boolean
 ) => {
+  const v = variant || "primary"
   const isLarge = size === "large"
   const isMedium = size === "medium"
   const isSmall = size === "small"
@@ -95,9 +96,9 @@ const getVariant = (
     primary: {
       ...commonStyle,
       [`${
-        !isDisabled && !backgroundColor ? `bg-${variant}-500` : "bg-[#1D2028]"
+        !isDisabled && !backgroundColor ? `bg-${v}-500` : "bg-[#1D2028]"
       }`]: true,
-      [`${!isDisabled && !backgroundColor ? `hover:bg-${variant}-700` : ""}`]:
+      [`${!isDisabled && !backgroundColor ? `hover:bg-${v}-700` : ""}`]:
         true,
       "text-[#404759]": isDisabled,
       "disabled-stripes": isDisabled,
@@ -116,8 +117,8 @@ const getVariant = (
     },
     glow: {
       ...commonStyle,
-      [`bg-${variant}-500`]: !isDisabled,
-      [`drop-shadow-[0_0px_12px_rgb(var(--${variant}-500))]`]: !isDisabled,
+      [`bg-${v}-500`]: !isDisabled,
+      [`drop-shadow-[0_0px_12px_rgb(var(--${v}-500))]`]: !isDisabled,
       "bg-[#404759]": isDisabled,
       "text-[#8A8B8F]": isDisabled,
       "disabled-stripes": isDisabled,
@@ -136,6 +137,8 @@ const getVariant = (
     text: {
       ...getPressEffectClasses(isDisabled),
       "font-main": true,
+      "font-medium": true,
+      "text-sm": true,
       flex: true,
       "items-center": true,
       "gap-2": true,
@@ -143,12 +146,14 @@ const getVariant = (
       "px-2": true,
       "rounded-md": true,
       "bg-transparent": true,
-      "text-lightSlate-400": !isDisabled,
-      "hover:text-lightSlate-100": !isDisabled,
+      "hover:bg-darkSlate-700": !isDisabled,
+      [`text-${variant}-400`]: !isDisabled && !!variant,
+      [`hover:text-${variant}-300`]: !isDisabled && !!variant,
+      "text-lightSlate-400": !isDisabled && !variant,
+      "hover:text-lightSlate-100": !isDisabled && !variant,
       "text-lightSlate-700": isDisabled,
       "disabled-stripes": isDisabled,
       "border-0": true,
-      "transition-colors": true,
       "cursor-pointer": !isDisabled,
       "cursor-not-allowed": isDisabled
     },
@@ -242,7 +247,7 @@ function Button(props: Props) {
           mergedProps.uppercase,
           !!props.iconRight,
           !!props.loading,
-          props.variant || "primary",
+          props.variant,
           props.cursor,
           props.textColor,
           props.backgroundColor,
