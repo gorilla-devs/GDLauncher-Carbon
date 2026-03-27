@@ -717,7 +717,7 @@ const Tile = (props: Props) => {
                         />
                       </Show>
                       <div
-                        class="z-5 absolute right-2 top-2 h-10 items-center justify-center gap-2 rounded-xl px-4 transition-all duration-200 ease-spring translate-x-3 opacity-0"
+                        class="z-5 absolute right-3 top-3 h-10 items-center justify-center gap-2 rounded-xl px-4 transition-all duration-200 ease-spring translate-x-3 opacity-0"
                         classList={{
                           "flex bg-primary-500 hover:bg-primary-400":
                             !props.isRunning &&

@@ -7,7 +7,7 @@ import {
   onCleanup
 } from "solid-js"
 
-export type DragType = "instance" | "group"
+export type DragType = "instance" | "group" | "server" | "serverGroup"
 
 export type DropTarget =
   | { type: "favorites" }
@@ -21,6 +21,7 @@ export type DropTarget =
   | { type: "beforeGroupAtInstance"; beforeInstanceId: number } // Position group before an ungrouped instance
   | { type: "endOfLibrary" } // Position group at end of library
   | { type: "beforeInstanceAtFolder"; folderId: number } // Position instance before a folder
+  | { type: "folderContentArea"; groupId: number } // Catch-all inside folder scroll container
 
 export interface DraggedItem {
   type: DragType
@@ -110,6 +111,7 @@ const isSameTarget = (
         a.groupId === (b as typeof a).groupId
       )
     case "endOfGroup":
+    case "folderContentArea":
     case "dropOnFolder":
     case "beforeGroup":
       return a.groupId === (b as typeof a).groupId
@@ -239,6 +241,7 @@ export function DragProvider(props: { children: JSX.Element }) {
         beforeGroup: 5,
         endOfGroups: 5.5,
         endOfLibrary: 5.5,
+        folderContentArea: 6,
         ungrouped: 7
       }
       return priority[a.target.type] - priority[b.target.type]

@@ -205,6 +205,30 @@ keys! {
         GET_SERVER_METRICS                          = "getServerMetrics";
         SET_FAVORITE                                = "setFavorite";
         UPDATE_SERVER                               = "updateServer";
+        SET_SERVER_ICON                             = "setServerIcon";
+        MOVE_SERVER                                 = "moveServer";
+        MOVE_SERVER_GROUP                           = "moveServerGroup";
+        CREATE_FOLDER_FROM_SERVERS                  = "createFolderFromServers";
+        ARRANGE_SERVER_LIBRARY                      = "arrangeServerLibrary";
+        RENAME_SERVER_GROUP                         = "renameServerGroup";
+        DELETE_SERVER_GROUP                         = "deleteServerGroup";
+        GET_SERVER_PROPERTIES                       = "getServerProperties";
+        UPDATE_SERVER_PROPERTIES                    = "updateServerProperties";
+        GET_WHITELIST                               = "getWhitelist";
+        ADD_TO_WHITELIST                            = "addToWhitelist";
+        REMOVE_FROM_WHITELIST                       = "removeFromWhitelist";
+        GET_OPS                                     = "getOps";
+        ADD_OP                                      = "addOp";
+        REMOVE_OP                                   = "removeOp";
+        GET_BANNED_PLAYERS                          = "getBannedPlayers";
+        BAN_PLAYER                                  = "banPlayer";
+        UNBAN_PLAYER                                = "unbanPlayer";
+        GET_BANNED_IPS                              = "getBannedIps";
+        BAN_IP                                      = "banIp";
+        UNBAN_IP                                    = "unbanIp";
+        GET_SERVER_ADDONS                           = "getServerAddons";
+        ENABLE_SERVER_ADDON                         = "enableServerAddon";
+        DELETE_SERVER_ADDON                         = "deleteServerAddon";
     }
 
     modplatforms {

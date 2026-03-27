@@ -35,6 +35,7 @@ pub enum ServerState {
     Stopped {
         failed_task: Option<VisualTaskId>,
     },
+    Installing(VisualTaskId),
     Starting(VisualTaskId),
     Running {
         start_time: DateTime<Utc>,
@@ -49,36 +50,45 @@ pub enum ServerState {
 #[serde(rename_all = "lowercase")]
 pub enum ServerType {
     Vanilla,
+    Forge,
+    NeoForge,
+    Fabric,
+    Quilt,
 }
 
 impl ServerType {
     pub fn to_db_string(&self) -> &'static str {
         match self {
             Self::Vanilla => "vanilla",
+            Self::Forge => "forge",
+            Self::NeoForge => "neoforge",
+            Self::Fabric => "fabric",
+            Self::Quilt => "quilt",
         }
     }
 
     pub fn from_db_string(s: &str) -> Option<Self> {
         match s {
             "vanilla" => Some(Self::Vanilla),
+            "forge" => Some(Self::Forge),
+            "neoforge" => Some(Self::NeoForge),
+            "fabric" => Some(Self::Fabric),
+            "quilt" => Some(Self::Quilt),
             _ => None,
         }
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct ServerConfig {
-    pub name: String,
-    pub server_type: ServerType,
-    pub game_version: String,
-    pub port: i32,
-    pub motd: String,
-    pub max_players: i32,
-    pub online_mode: bool,
-    pub xmx: i32,
-    pub xms: i32,
-    pub extra_java_args: String,
-    pub auto_restart: bool,
+    /// Construct from database fields (serverType column + modloaderType column)
+    pub fn from_db_fields(server_type: &str, modloader_type: Option<&str>) -> Option<Self> {
+        match modloader_type {
+            Some(ml) => Self::from_db_string(ml),
+            None => Self::from_db_string(server_type),
+        }
+    }
+
+    pub fn is_modded(&self) -> bool {
+        !matches!(self, Self::Vanilla)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -99,16 +109,15 @@ pub struct ServerDetails {
     pub date_created: DateTime<Utc>,
     pub last_started: Option<DateTime<Utc>>,
     pub state: ServerState,
+    pub icon_revision: Option<u32>,
+    pub modloader_type: Option<String>,
+    pub modloader_version: Option<String>,
 }
 
 #[derive(Debug)]
 pub struct ServerSettingsUpdate {
     pub server_id: ServerId,
     pub name: Option<String>,
-    pub port: Option<i32>,
-    pub motd: Option<String>,
-    pub max_players: Option<i32>,
-    pub online_mode: Option<bool>,
     pub xmx: Option<i32>,
     pub xms: Option<i32>,
     pub extra_java_args: Option<Option<String>>,
@@ -137,10 +146,105 @@ pub struct ServerListEntry {
     pub port: i32,
     pub date_created: DateTime<Utc>,
     pub last_started: Option<DateTime<Utc>>,
+    pub icon_revision: Option<u32>,
+    pub modloader_type: Option<String>,
+    pub modloader_version: Option<String>,
+}
+
+#[derive(Debug)]
+pub enum ServerMoveTarget {
+    BeforeServer(ServerId),
+    EndOfGroup(ServerGroupId),
+    BeforeGroup(ServerGroupId),
+}
+
+#[derive(Debug)]
+pub enum ServerGroupMoveTarget {
+    BeforeGroup(ServerGroupId),
+    BeforeServer(ServerId),
+    EndOfLibrary,
 }
 
 #[derive(Debug, Clone)]
 pub struct ProcessMetrics {
     pub cpu_percent: f32,
     pub memory_bytes: u64,
+}
+
+// Player list types for whitelist.json, ops.json, banned-players.json
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WhitelistEntry {
+    pub uuid: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct OpsEntry {
+    pub uuid: String,
+    pub name: String,
+    pub level: i32,
+    #[serde(default)]
+    pub bypasses_player_limit: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BannedPlayerEntry {
+    pub uuid: String,
+    pub name: String,
+    pub created: String,
+    pub source: String,
+    pub expires: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct BannedIpEntry {
+    pub ip: String,
+    pub created: String,
+    pub source: String,
+    pub expires: String,
+    pub reason: String,
+}
+
+/// A server addon (mod or datapack) scanned from filesystem
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerAddon {
+    pub id: String,
+    pub filename: String,
+    pub display_name: String,
+    pub enabled: bool,
+    pub addon_type: String,
+    pub file_size: i32,
+}
+
+/// Launch configuration for modded servers, persisted to modloader_config.json
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LaunchConfig {
+    /// Override for server.jar path (e.g. "fabric-server-launch.jar"), relative to data dir
+    pub jar_path: Option<String>,
+    /// Override main class (Forge/NeoForge use this)
+    pub main_class: Option<String>,
+    /// Additional classpath entries (library paths)
+    pub classpath: Vec<String>,
+    /// Additional JVM arguments
+    pub extra_jvm_args: Vec<String>,
+    /// Additional game arguments (after main class)
+    pub extra_game_args: Vec<String>,
+}
+
+impl LaunchConfig {
+    pub fn vanilla() -> Self {
+        Self {
+            jar_path: None,
+            main_class: None,
+            classpath: Vec::new(),
+            extra_jvm_args: Vec::new(),
+            extra_game_args: Vec::new(),
+        }
+    }
 }

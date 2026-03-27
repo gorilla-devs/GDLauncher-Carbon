@@ -1,4 +1,5 @@
 use super::provider::{ServerHandle, ServerProvider};
+use crate::domain::server::LaunchConfig;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use carbon_rt_path::ServerPath;
@@ -19,14 +20,10 @@ impl ServerProvider for LocalServerProvider {
         xmx: i32,
         xms: i32,
         extra_args: &str,
+        launch_config: &LaunchConfig,
         log_tx: mpsc::UnboundedSender<String>,
     ) -> Result<ServerHandle> {
         let data_path = server_path.get_data_path();
-        let jar_path = server_path.get_server_jar_path();
-
-        if !jar_path.exists() {
-            anyhow::bail!("Server jar not found at {}", jar_path.display());
-        }
 
         // Accept EULA automatically
         let eula_path = server_path.get_eula_path();
@@ -40,7 +37,12 @@ impl ServerProvider for LocalServerProvider {
         cmd.arg(format!("-Xmx{}m", xmx))
             .arg(format!("-Xms{}m", xms));
 
-        // Add extra Java args if present
+        // Add extra JVM args from modloader config
+        for arg in &launch_config.extra_jvm_args {
+            cmd.arg(arg);
+        }
+
+        // Add user extra Java args
         if !extra_args.is_empty() {
             if let Some(args) = shlex::split(extra_args) {
                 for arg in args {
@@ -49,9 +51,40 @@ impl ServerProvider for LocalServerProvider {
             }
         }
 
-        cmd.arg("-jar")
-            .arg(&jar_path)
-            .arg("nogui")
+        if let Some(main_class) = &launch_config.main_class {
+            // Modded: use classpath + main class (Forge/NeoForge pattern)
+            if !launch_config.classpath.is_empty() {
+                let separator = if cfg!(windows) { ";" } else { ":" };
+                let classpath = launch_config.classpath.join(separator);
+                cmd.arg("-cp").arg(&classpath);
+            }
+            cmd.arg(main_class);
+        } else {
+            // Vanilla or Fabric/Quilt: use -jar
+            let jar_name = launch_config
+                .jar_path
+                .as_deref()
+                .unwrap_or("server.jar");
+            let jar_path = data_path.join(jar_name);
+
+            if !jar_path.exists() {
+                // Fallback to default server.jar
+                let default_jar = server_path.get_server_jar_path();
+                if !default_jar.exists() {
+                    anyhow::bail!("Server jar not found at {}", jar_path.display());
+                }
+                cmd.arg("-jar").arg(&default_jar);
+            } else {
+                cmd.arg("-jar").arg(&jar_path);
+            }
+        }
+
+        // Add extra game args from modloader config
+        for arg in &launch_config.extra_game_args {
+            cmd.arg(arg);
+        }
+
+        cmd.arg("nogui")
             .current_dir(&data_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

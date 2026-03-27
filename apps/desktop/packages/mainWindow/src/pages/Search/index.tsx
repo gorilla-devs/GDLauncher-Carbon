@@ -21,15 +21,21 @@ export function Search(props: { children?: JSX.Element }) {
         <div class="flex h-full flex-1 overflow-hidden">
           <FilterSidebar />
           <div class="flex h-full flex-1 flex-col overflow-hidden">
-            <Show when={searchContext?.selectedInstanceId()}>
+            <Show when={searchContext?.selectedInstanceId() || searchContext?.selectedServerId()}>
               <div class="border-darkSlate-700/50 flex items-center border-b px-6 py-2">
                 <Button
                   size="small"
                   type="secondary"
                   onClick={() => {
-                    navigator.navigate(
-                      `/library/${searchContext?.selectedInstanceId()}/addons`
-                    )
+                    if (searchContext?.selectedServerId()) {
+                      navigator.navigate(
+                        `/library/server/${searchContext?.selectedServerId()}/addons`
+                      )
+                    } else {
+                      navigator.navigate(
+                        `/library/${searchContext?.selectedInstanceId()}/addons`
+                      )
+                    }
                   }}
                 >
                   <div class="i-hugeicons:arrow-left-01" />

@@ -97,7 +97,7 @@ export function LibraryGrid(props: LibraryGridProps) {
       <Show
         when={
           (dragContext.isDragging() || dragContext.justDropped()) &&
-          dragContext.dragType() === "instance" &&
+          (dragContext.dragType() === "instance" || dragContext.dragType() === "server") &&
           props.defaultGroupId
         }
       >
@@ -114,7 +114,7 @@ export function LibraryGrid(props: LibraryGridProps) {
       <Show
         when={
           (dragContext.isDragging() || dragContext.justDropped()) &&
-          dragContext.dragType() === "group"
+          (dragContext.dragType() === "group" || dragContext.dragType() === "serverGroup")
         }
       >
         <EndOfGroupsDropZone tileSize={props.tileSize} />

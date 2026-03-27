@@ -28,6 +28,8 @@ export function Grid() {
   const navigator = useGDNavigate()
   const params = useParams()
 
+  const allRows = () => searchContext?.allRows() || []
+
   const [containerWidth, setContainerWidth] = createSignal(800)
   let containerRef: HTMLDivElement | undefined
 
@@ -113,7 +115,7 @@ export function Grid() {
 
   // Group items into rows for virtualization
   const rows = createMemo(() => {
-    const items = searchContext?.allRows() || []
+    const items = allRows()
     const perRow = itemsPerRow()
     const result: SearchResultItem[][] = []
 
@@ -191,11 +193,11 @@ export function Grid() {
     <div ref={containerRef} class="flex h-full flex-col overflow-hidden">
       <div class="flex-1 overflow-hidden">
         <Show
-          when={!searchContext?.isInitialLoading() || (searchContext?.allRows() || []).some(r => r.type === 'value')}
+          when={!searchContext?.isInitialLoading() || allRows().some(r => r.type === 'value')}
           fallback={<GridSkeleton />}
         >
           <Show
-            when={(searchContext?.allRows() || []).length > 0}
+            when={allRows().length > 0}
             fallback={
               <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
                 <PlaceholderGorilla

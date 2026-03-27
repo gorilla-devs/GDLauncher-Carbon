@@ -32,9 +32,10 @@ import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/
 import useSearchContext from "@/components/SearchInputContext"
 import GdlFeatureContextMenuItem from "@/components/GdlFeatureContextMenuItem"
 import { useDragContext } from "../DragContext"
+import { LibraryMode } from "../types"
 import adSize from "@/utils/adhelper"
 import DefaultImg from "/assets/images/default-instance-img.png"
-import type { ValidListInstance, ListInstance } from "@gd/core_module/bindings"
+import type { ValidListInstance, ListInstance, ListServer } from "@gd/core_module/bindings"
 
 /** Icon + text hint centered over the library grid area */
 function UnfavoriteHint() {
@@ -103,6 +104,7 @@ function formatPlaytime(
 interface FloatingFavoritesBarProps {
   favoriteIds: number[]
   isSelectionActive: boolean
+  libraryMode: LibraryMode
 }
 
 // Module-level set that accumulates all favorite IDs we've ever seen,
@@ -155,6 +157,13 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
   const allDraggedAreFavorite = createMemo(() => {
     const draggedIds = dragContext.draggedIds()
     if (draggedIds.length === 0) return false
+    if (props.libraryMode === "servers") {
+      const servers = globalStore.servers.data || []
+      const draggedServers = servers.filter((s) =>
+        draggedIds.includes(s.id)
+      )
+      return draggedServers.every((s) => s.favorite)
+    }
     const instances = globalStore.instances.data || []
     const draggedInstances = instances.filter((i) =>
       draggedIds.includes(i.id)
@@ -162,14 +171,17 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
     return draggedInstances.every((i) => i.favorite)
   })
 
-  const isDragActiveForInstances = createMemo(
-    () => dragContext.isDragging() && dragContext.dragType() === "instance"
+  const isDragActiveForItems = createMemo(
+    () => dragContext.isDragging() && (
+      dragContext.dragType() === "instance" ||
+      (props.libraryMode === "servers" && dragContext.dragType() === "server")
+    )
   )
 
   // Register drop zone when dragging instances
   // When dragging FROM favorites, scope all zones to "favorites-drag" so grid zones are ignored
   createEffect(() => {
-    if (!isDragActiveForInstances()) {
+    if (!isDragActiveForItems()) {
       dragContext.unregisterDropZone("floating-favorites-bar")
       return
     }
@@ -205,7 +217,7 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
 
   const showBar = createMemo(
     () =>
-      (props.favoriteIds.length > 0 || isDragActiveForInstances()) &&
+      (props.favoriteIds.length > 0 || isDragActiveForItems()) &&
       !props.isSelectionActive
   )
 
@@ -213,7 +225,7 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
   const [isExpanded, setIsExpanded] = createSignal(false)
   const [openMenuCount, setOpenMenuCount] = createSignal(0)
 
-  const expanded = () => isExpanded() || isDragActiveForInstances() || openMenuCount() > 0 || recentlyAdded()
+  const expanded = () => isExpanded() || isDragActiveForItems() || openMenuCount() > 0 || recentlyAdded()
 
   const isDraggingFromFavorites = createMemo(
     () => dragContext.isDragging() && dragContext.getDragOrigin() === "favorites"
@@ -237,8 +249,8 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
         <div
           class="group/dock fixed bottom-6 left-6 flex animate-popoverEnter"
           classList={{
-            "z-[10001]": isDragActiveForInstances(),
-            "z-40": !isDragActiveForInstances()
+            "z-[10001]": isDragActiveForItems(),
+            "z-40": !isDragActiveForItems()
           }}
           onMouseEnter={() => setIsExpanded(true)}
           onMouseLeave={() => setIsExpanded(false)}
@@ -248,7 +260,7 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
             class="relative flex items-center min-h-13 min-w-13 rounded-full shadow-lg transition-all duration-250 ease-spring cursor-pointer overflow-visible group-hover/dock:py-3 group-hover/dock:pr-5"
             classList={{
               "bg-darkSlate-800 border border-white/10 shadow-darkSlate-900/50": true,
-              "py-3 pr-5": isDragActiveForInstances() || openMenuCount() > 0 || recentlyAdded()
+              "py-3 pr-5": isDragActiveForItems() || openMenuCount() > 0 || recentlyAdded()
             }}
           >
             {/* Overlay on bar — always rendered, animated via opacity */}
@@ -275,7 +287,7 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
             </div>
 
             {/* Drop feedback during drag (no favorites yet) */}
-            <Show when={isDragActiveForInstances() && props.favoriteIds.length === 0}>
+            <Show when={isDragActiveForItems() && props.favoriteIds.length === 0}>
               <span class="text-sm text-lightSlate-300 whitespace-nowrap px-2">
                 <Trans key="instances:_trn_drop_to_favorite" />
               </span>
@@ -308,7 +320,7 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
               <div
                 class="flex items-center gap-3 max-w-0 opacity-0 pointer-events-none group-hover/dock:max-w-[70vw] group-hover/dock:opacity-100 group-hover/dock:pointer-events-auto transition-all duration-250 ease-spring"
                 classList={{
-                  "!max-w-[70vw] !opacity-100 !pointer-events-auto": isDragActiveForInstances() || openMenuCount() > 0 || recentlyAdded()
+                  "!max-w-[70vw] !opacity-100 !pointer-events-auto": isDragActiveForItems() || openMenuCount() > 0 || recentlyAdded()
                 }}
                 style={{
                   "scrollbar-width": "none",
@@ -320,11 +332,12 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
                   {(instanceId, index) => (
                     <DockAvatar
                       instanceId={instanceId}
-                      isDragActive={isDragActiveForInstances()}
+                      isDragActive={isDragActiveForItems()}
                       expanded={expanded()}
                       index={index()}
                       isNewlyAdded={newlyAddedIds().has(instanceId)}
                       onMenuOpenChange={(open) => setOpenMenuCount(c => c + (open ? 1 : -1))}
+                      libraryMode={props.libraryMode}
                     />
                   )}
                 </For>
@@ -345,6 +358,7 @@ interface DockAvatarProps {
   index: number
   isNewlyAdded: boolean
   onMenuOpenChange: (open: boolean) => void
+  libraryMode: LibraryMode
 }
 
 function DockAvatar(props: DockAvatarProps) {
@@ -356,6 +370,8 @@ function DockAvatar(props: DockAvatarProps) {
   const dragContext = useDragContext()
   const [isMenuOpen, setIsMenuOpen] = createSignal(false)
 
+  const isServerMode = () => props.libraryMode === "servers"
+
   const isBeingDragged = createMemo(() =>
     dragContext.isDragging() &&
     dragContext.getDragOrigin() === "favorites" &&
@@ -365,10 +381,13 @@ function DockAvatar(props: DockAvatarProps) {
   const handlePointerDown = (e: PointerEvent) => {
     // Only left button, skip if context menu
     if (e.button !== 0) return
-    dragContext.startDrag("instance", [props.instanceId], e, "favorites")
+    const type = isServerMode() ? "server" : "instance"
+    dragContext.startDrag(type, [props.instanceId], e, "favorites")
   }
 
+  // --- Instance mode data ---
   const instance = createMemo(() =>
+    isServerMode() ? undefined :
     globalStore.instances.data?.find(
       (i) => (i.id as unknown as number) === props.instanceId
     )
@@ -396,7 +415,22 @@ function DockAvatar(props: DockAvatarProps) {
     formatPlaytime(t, instance()?.seconds_played)
   )
 
-  // Mutations
+  // --- Server mode data ---
+  const server = createMemo((): ListServer | undefined =>
+    isServerMode()
+      ? globalStore.servers.data?.find((s) => s.id === props.instanceId)
+      : undefined
+  )
+
+  const serverStatus = () => server()?.state.status
+  const isServerRunning = () => serverStatus() === "running"
+
+  // --- Unified accessors ---
+  const itemName = () => isServerMode() ? server()?.name : instance()?.name
+  const itemExists = () => isServerMode() ? !!server() : !!instance()
+  const isFavorite = () => isServerMode() ? server()?.favorite : instance()?.favorite
+
+  // Instance mutations
   const launchInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.launchInstance"]
   }))
@@ -413,29 +447,61 @@ function DockAvatar(props: DockAvatarProps) {
     mutationKey: ["instance.duplicateInstance"]
   }))
 
-  const setFavoriteMutation = rspc.createMutation(() => ({
+  const instanceSetFavoriteMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.setFavorite"]
+  }))
+
+  // Server mutations
+  const startServerMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.startServer"]
+  }))
+
+  const stopServerMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.stopServer"]
+  }))
+
+  const serverSetFavoriteMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.setFavorite"]
   }))
 
   // State checks
   const instanceState = createMemo(() => validInstance()?.state?.state)
-  const isRunning = () => instanceState() === "running"
-  const isQueued = () => instanceState() === "queued"
-  const isPreparing = () => instanceState() === "preparing"
-  const isDeleting = () => instanceState() === "deleting"
+  const isRunning = () => isServerMode() ? isServerRunning() : instanceState() === "running"
+  const isQueued = () => !isServerMode() && instanceState() === "queued"
+  const isPreparing = () => !isServerMode() && instanceState() === "preparing"
+  const isDeleting = () =>
+    isServerMode() ? serverStatus() === "deleting" : instanceState() === "deleting"
   const isLoading = () => isQueued() || isPreparing()
+  const isBusy = () =>
+    isServerMode()
+      ? serverStatus() === "starting" || serverStatus() === "stopping"
+      : isLoading()
 
   const handleClick = () => {
-    if (isLoading() || isDeleting()) return
-    globalStore.markInstanceAsSeen(props.instanceId)
-    setClickedInstanceId(`favorites-${props.instanceId}`)
-    requestAnimationFrame(() => {
-      navigate.navigate(`/library/${props.instanceId}`)
-    })
+    if (isBusy() || isDeleting()) return
+    if (isServerMode()) {
+      navigate.navigate(`/library/server/${props.instanceId}`)
+    } else {
+      globalStore.markInstanceAsSeen(props.instanceId)
+      setClickedInstanceId(`favorites-${props.instanceId}`)
+      requestAnimationFrame(() => {
+        navigate.navigate(`/library/${props.instanceId}`)
+      })
+    }
   }
 
   const handlePlay = (e?: MouseEvent) => {
     e?.stopPropagation()
+
+    if (isServerMode()) {
+      if (isServerRunning()) {
+        stopServerMutation.mutate(props.instanceId)
+      } else {
+        startServerMutation.mutate(props.instanceId)
+      }
+      return
+    }
+
     if (isQueued() || isPreparing()) return
 
     if (isRunning()) {
@@ -460,15 +526,37 @@ function DockAvatar(props: DockAvatarProps) {
   const handleDelete = () => {
     modalsContext?.openModal(
       { name: "confirmInstanceDeletion" },
-      { id: props.instanceId, name: instance()?.name || "" }
+      {
+        id: props.instanceId,
+        name: itemName() || "",
+        isServer: isServerMode()
+      }
     )
   }
 
+  const handleToggleFavorite = () => {
+    if (isServerMode()) {
+      serverSetFavoriteMutation.mutate({
+        id: props.instanceId,
+        favorite: !server()?.favorite
+      })
+    } else {
+      instanceSetFavoriteMutation.mutate({
+        instance: props.instanceId,
+        favorite: !instance()?.favorite
+      })
+    }
+  }
+
   const handleSettings = () => {
-    setClickedInstanceId(`favorites-${props.instanceId}`)
-    requestAnimationFrame(() => {
-      navigate.navigate(`/library/${props.instanceId}/settings`)
-    })
+    if (isServerMode()) {
+      navigate.navigate(`/library/server/${props.instanceId}/settings`)
+    } else {
+      setClickedInstanceId(`favorites-${props.instanceId}`)
+      requestAnimationFrame(() => {
+        navigate.navigate(`/library/${props.instanceId}/settings`)
+      })
+    }
   }
 
   const handleEdit = () => {
@@ -518,7 +606,7 @@ function DockAvatar(props: DockAvatarProps) {
   })
 
   return (
-    <Show when={instance()}>
+    <Show when={itemExists()}>
       <div
         ref={wrapperRef}
         class="transition-all ease-spring"
@@ -537,12 +625,12 @@ function DockAvatar(props: DockAvatarProps) {
       }}>
         <ContextMenuContent>
           <ContextMenuGroup>
-            <ContextMenuGroupLabel>{instance()?.name}</ContextMenuGroupLabel>
+            <ContextMenuGroupLabel>{itemName()}</ContextMenuGroupLabel>
             <ContextMenuSeparator />
             <ContextMenuItem
               class="flex items-center gap-2"
               onClick={() => handlePlay()}
-              disabled={isLoading() || isDeleting()}
+              disabled={isBusy() || isDeleting()}
             >
               <div
                 class={`${isRunning() ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
@@ -551,18 +639,20 @@ function DockAvatar(props: DockAvatarProps) {
                 ? t("instances:_trn_stop")
                 : t("instances:_trn_action_play")}
             </ContextMenuItem>
-            <ContextMenuItem
-              class="flex items-center gap-2"
-              onClick={handleEdit}
-              disabled={isLoading() || isDeleting()}
-            >
-              <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
-              {t("instances:_trn_action_edit")}
-            </ContextMenuItem>
+            <Show when={!isServerMode()}>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={handleEdit}
+                disabled={isLoading() || isDeleting()}
+              >
+                <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
+                {t("instances:_trn_action_edit")}
+              </ContextMenuItem>
+            </Show>
             <ContextMenuItem
               class="flex items-center gap-2"
               onClick={handleSettings}
-              disabled={isLoading() || isDeleting()}
+              disabled={isBusy() || isDeleting()}
             >
               <div class="i-hugeicons:settings-01 h-4 w-4" />
               {t("instances:_trn_action_settings")}
@@ -570,106 +660,103 @@ function DockAvatar(props: DockAvatarProps) {
             <ContextMenuItem
               class="flex items-center gap-2"
               closeOnSelect={false}
-              onClick={() => {
-                setFavoriteMutation.mutate({
-                  instance: props.instanceId,
-                  favorite: !instance()?.favorite
-                })
-              }}
+              onClick={handleToggleFavorite}
             >
               <div
                 class="i-hugeicons:star h-4 w-4"
-                classList={{ "text-yellow-500": instance()?.favorite }}
+                classList={{ "text-yellow-500": isFavorite() }}
               />
-              {instance()?.favorite
+              {isFavorite()
                 ? t("instances:_trn_remove_favorite")
                 : t("instances:_trn_add_favorite")}
             </ContextMenuItem>
-            <GdlFeatureContextMenuItem
-              icon={<div class="i-ri:share-line h-4 w-4" />}
-              onClick={() => {
-                modalsContext?.openModal(
-                  { name: "shareInstance" },
-                  { instanceId: props.instanceId }
-                )
-              }}
-              disabled={isLoading() || isDeleting()}
-            >
-              {t("instances:_trn_instance_share.title")}
-            </GdlFeatureContextMenuItem>
-            <ContextMenuItem
-              class="flex items-center gap-2"
-              onClick={() => {
-                searchContext?.setSelectedInstanceId(props.instanceId)
-                setPayload({
-                  target: "Curseforge",
-                  save_path: undefined,
-                  self_contained_addons_bundling: false,
-                  filter: { entries: {} },
-                  instance_id: props.instanceId
-                })
-                setExportStep(0)
-                setCheckedFiles([])
-                modalsContext?.openModal(
-                  { name: "exportInstance" },
-                  { instanceId: props.instanceId }
-                )
-              }}
-              disabled={isLoading() || isDeleting()}
-            >
-              <div class="i-hugeicons:file-export h-4 w-4" />
-              {t("instances:_trn_export_instance")}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>
-                {t("instances:_trn_more_options")}
-              </ContextMenuSubTrigger>
-              <ContextMenuPortal>
-                <ContextMenuSubContent>
-                  <ContextMenuItem
-                    class="flex items-center gap-2"
-                    onClick={handleOpenFolder}
-                  >
-                    <div class="i-hugeicons:folder-open h-4 w-4" />
-                    {t("instances:_trn_action_open_folder")}
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    class="flex items-center gap-2"
-                    onClick={() => {
-                      navigate.navigate(`/library/${props.instanceId}/logs`)
-                    }}
-                  >
-                    <div class="i-hugeicons:file-script h-4 w-4" />
-                    {t("instances:_trn_view_logs")}
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    class="flex items-center gap-2"
-                    onClick={() => {
-                      navigate.navigate(`/library/${props.instanceId}/addons`)
-                    }}
-                  >
-                    <div class="i-hugeicons:puzzle h-4 w-4" />
-                    {t("instances:_trn_view_mods")}
-                  </ContextMenuItem>
-                  <Show when={instance()?.status.status !== "invalid"}>
+            <Show when={!isServerMode()}>
+              <GdlFeatureContextMenuItem
+                icon={<div class="i-ri:share-line h-4 w-4" />}
+                onClick={() => {
+                  modalsContext?.openModal(
+                    { name: "shareInstance" },
+                    { instanceId: props.instanceId }
+                  )
+                }}
+                disabled={isLoading() || isDeleting()}
+              >
+                {t("instances:_trn_instance_share.title")}
+              </GdlFeatureContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={() => {
+                  searchContext?.setSelectedInstanceId(props.instanceId)
+                  setPayload({
+                    target: "Curseforge",
+                    save_path: undefined,
+                    self_contained_addons_bundling: false,
+                    filter: { entries: {} },
+                    instance_id: props.instanceId
+                  })
+                  setExportStep(0)
+                  setCheckedFiles([])
+                  modalsContext?.openModal(
+                    { name: "exportInstance" },
+                    { instanceId: props.instanceId }
+                  )
+                }}
+                disabled={isLoading() || isDeleting()}
+              >
+                <div class="i-hugeicons:file-export h-4 w-4" />
+                {t("instances:_trn_export_instance")}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  {t("instances:_trn_more_options")}
+                </ContextMenuSubTrigger>
+                <ContextMenuPortal>
+                  <ContextMenuSubContent>
                     <ContextMenuItem
                       class="flex items-center gap-2"
-                      onClick={handleDuplicate}
-                      disabled={isLoading() || isDeleting()}
+                      onClick={handleOpenFolder}
                     >
-                      <div class="i-hugeicons:copy-01 h-4 w-4" />
-                      {t("instances:_trn_action_duplicate")}
+                      <div class="i-hugeicons:folder-open h-4 w-4" />
+                      {t("instances:_trn_action_open_folder")}
                     </ContextMenuItem>
-                  </Show>
-                </ContextMenuSubContent>
-              </ContextMenuPortal>
-            </ContextMenuSub>
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={() => {
+                        navigate.navigate(`/library/${props.instanceId}/logs`)
+                      }}
+                    >
+                      <div class="i-hugeicons:file-script h-4 w-4" />
+                      {t("instances:_trn_view_logs")}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={() => {
+                        navigate.navigate(`/library/${props.instanceId}/addons`)
+                      }}
+                    >
+                      <div class="i-hugeicons:puzzle h-4 w-4" />
+                      {t("instances:_trn_view_mods")}
+                    </ContextMenuItem>
+                    <Show when={instance()?.status.status !== "invalid"}>
+                      <ContextMenuItem
+                        class="flex items-center gap-2"
+                        onClick={handleDuplicate}
+                        disabled={isLoading() || isDeleting()}
+                      >
+                        <div class="i-hugeicons:copy-01 h-4 w-4" />
+                        {t("instances:_trn_action_duplicate")}
+                      </ContextMenuItem>
+                    </Show>
+                  </ContextMenuSubContent>
+                </ContextMenuPortal>
+              </ContextMenuSub>
+            </Show>
             <ContextMenuSeparator />
             <ContextMenuItem
               class="flex items-center gap-2"
               onClick={handleDelete}
-              disabled={isLoading() || isDeleting()}
+              disabled={isBusy() || isDeleting()}
             >
               <div class="i-hugeicons:delete-02 h-4 w-4" />
               {t("instances:_trn_action_delete")}
@@ -682,23 +769,34 @@ function DockAvatar(props: DockAvatarProps) {
               <div
                 class="group relative h-12 w-12 shrink-0 cursor-pointer rounded-full transition-all duration-200 hover:scale-110"
                 classList={{
-                  "opacity-50": isLoading() || isDeleting(),
+                  "opacity-50": isBusy() || isDeleting(),
                   "ring-2 ring-green-500": isRunning(),
                   "scale-110": isMenuOpen(),
                   "opacity-0 pointer-events-none": isBeingDragged()
                 }}
                 onClick={handleClick}
                 onPointerDown={handlePointerDown}
-                onMouseEnter={() =>
-                  globalStore.markInstanceAsSeen(props.instanceId)
-                }
+                onMouseEnter={() => {
+                  if (!isServerMode()) {
+                    globalStore.markInstanceAsSeen(props.instanceId)
+                  }
+                }}
               >
                 {/* Avatar image */}
-                <img
-                  src={instanceImageUrl() || DefaultImg}
-                  alt={instance()?.name || ""}
-                  class="h-full w-full rounded-full object-cover"
-                />
+                <Show
+                  when={!isServerMode()}
+                  fallback={
+                    <div class="h-full w-full rounded-full bg-darkSlate-600 flex items-center justify-center">
+                      <div class="i-hugeicons:server text-lightSlate-400 h-6 w-6" />
+                    </div>
+                  }
+                >
+                  <img
+                    src={instanceImageUrl() || DefaultImg}
+                    alt={instance()?.name || ""}
+                    class="h-full w-full rounded-full object-cover"
+                  />
+                </Show>
 
                 {/* Running pulse dot */}
                 <Show when={isRunning()}>
@@ -712,8 +810,8 @@ function DockAvatar(props: DockAvatarProps) {
                   class="absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-all duration-200"
                   classList={{
                     "group-hover:opacity-100":
-                      !isLoading() && !isDeleting() && !props.isDragActive,
-                    "!opacity-100": isMenuOpen() && !isLoading() && !isDeleting(),
+                      !isBusy() && !isDeleting() && !props.isDragActive,
+                    "!opacity-100": isMenuOpen() && !isBusy() && !isDeleting(),
                     "bg-red-500/80": isRunning(),
                     "bg-primary-500/80": !isRunning()
                   }}
@@ -727,31 +825,45 @@ function DockAvatar(props: DockAvatarProps) {
             </TooltipTrigger>
             <TooltipContent class="min-w-48 px-3 py-2.5">
               <div class="text-sm font-bold text-white truncate max-w-48">
-                {instance()?.name}
+                {itemName()}
               </div>
-              <div class="flex flex-col gap-0.5 mt-1.5 text-[11px] text-lightSlate-600">
-                <Show when={mcVersion() || modloader()}>
-                  <div class="flex items-center gap-1.5">
-                    <Show when={mcVersion()}>
-                      <span>MC {mcVersion()}</span>
-                    </Show>
-                    <Show when={modloader() && mcVersion()}>
+              <Show
+                when={!isServerMode()}
+                fallback={
+                  <div class="flex flex-col gap-0.5 mt-1.5 text-[11px] text-lightSlate-600">
+                    <div class="flex items-center gap-1.5">
+                      <span>MC {server()?.gameVersion}</span>
                       <span>·</span>
-                    </Show>
-                    <Show when={modloader()}>
-                      <div class="flex items-center gap-1">
-                        <img class="h-3 w-3" src={getModloaderIcon(modloader()!)} alt="" />
-                        <span class="capitalize">{modloader()}</span>
-                        <Show when={modloaderVersion()}>
-                          <span>{modloaderVersion()}</span>
-                        </Show>
-                      </div>
-                    </Show>
+                      <span>:{server()?.port}</span>
+                    </div>
+                    <div class="capitalize">{serverStatus()}</div>
                   </div>
-                </Show>
-                <div>{lastPlayed()}</div>
-                <div>{playtime()}</div>
-              </div>
+                }
+              >
+                <div class="flex flex-col gap-0.5 mt-1.5 text-[11px] text-lightSlate-600">
+                  <Show when={mcVersion() || modloader()}>
+                    <div class="flex items-center gap-1.5">
+                      <Show when={mcVersion()}>
+                        <span>MC {mcVersion()}</span>
+                      </Show>
+                      <Show when={modloader() && mcVersion()}>
+                        <span>·</span>
+                      </Show>
+                      <Show when={modloader()}>
+                        <div class="flex items-center gap-1">
+                          <img class="h-3 w-3" src={getModloaderIcon(modloader()!)} alt="" />
+                          <span class="capitalize">{modloader()}</span>
+                          <Show when={modloaderVersion()}>
+                            <span>{modloaderVersion()}</span>
+                          </Show>
+                        </div>
+                      </Show>
+                    </div>
+                  </Show>
+                  <div>{lastPlayed()}</div>
+                  <div>{playtime()}</div>
+                </div>
+              </Show>
               <Show when={isRunning()}>
                 <div class="flex items-center gap-1 mt-1.5 text-[11px] text-green-400 font-medium">
                   <div class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />

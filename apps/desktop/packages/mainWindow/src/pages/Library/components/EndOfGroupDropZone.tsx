@@ -34,7 +34,7 @@ export function EndOfGroupDropZone(props: EndOfGroupDropZoneProps) {
     const zoneId = `${zoneIdPrefix()}-${props.groupId}`
     if (
       dragContext.isDragging() &&
-      dragContext.dragType() === "instance" &&
+      (dragContext.dragType() === "instance" || dragContext.dragType() === "server") &&
       ref
     ) {
       const rect = ref.getBoundingClientRect()

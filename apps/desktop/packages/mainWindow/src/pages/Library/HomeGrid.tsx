@@ -20,6 +20,7 @@ import {
   onMount
 } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
+import { rspc } from "@/utils/rspcClient"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -44,11 +45,12 @@ import {
   injectFolderTransitionCSS,
   removeFolderTransitionCSS
 } from "./utils/folderViewTransition"
-import { parseInstanceIds, parseFolderIds } from "./utils/selectionIds"
+import { parseInstanceIds, parseFolderIds, parseServerIds } from "./utils/selectionIds"
 import "@/components/Library/folderTransitions.css"
 import "./styles/modeTransitions.css"
 
 import { clickedInstanceId, setClickedInstanceId } from "@/components/InstanceTile"
+import { setClickedServerId } from "@/components/Server/Tile"
 import { DragProvider, useDragContext } from "./DragContext"
 import { FloatingFavoritesBar } from "./components/FloatingFavoritesBar"
 import { LibraryHeader } from "./components/LibraryHeader"
@@ -76,14 +78,13 @@ const HomeGridInner = () => {
   const dragContext = useDragContext()
   const navigator = useGDNavigate()
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // UI State
   const [filter, setFilter] = createSignal("")
   const [tileSize, setTileSize] = createSignal(2)
   const [openFolderId, setOpenFolderId] = createSignal<number | null>(null)
-  const initialMode: LibraryMode = searchParams.mode === "servers" ? "servers" : "instances"
-  const [libraryMode, setLibraryMode] = createSignal<LibraryMode>(initialMode)
+  const libraryMode = (): LibraryMode => searchParams.mode === "servers" ? "servers" : "instances"
   const [modeDirection, setModeDirection] = createSignal<"forward" | "backward" | null>(null)
 
   // Refs for drag selection - keyed by type-prefixed string ID (e.g., "instance-5", "folder-3")
@@ -189,6 +190,7 @@ const HomeGridInner = () => {
     // tile with its view-transition-name before it's removed.
     requestAnimationFrame(() => {
       setClickedInstanceId(undefined)
+      setClickedServerId(undefined)
     })
   })
 
@@ -232,6 +234,7 @@ const HomeGridInner = () => {
       !dragContext.dragSelectEnabled() ||
       openFolderId() !== null ||
       target.closest("[data-instance-tile]") !== null ||
+      target.closest("[data-server-tile]") !== null ||
       target.closest("[data-folder-tile]") !== null ||
       target.closest("input") !== null ||
       target.closest("button") !== null ||
@@ -261,19 +264,20 @@ const HomeGridInner = () => {
       !globalStore.settings.data?.reducedMotion && document.startViewTransition
 
     if (shouldTransition) {
+      const isClosing = openFolderId() === folderId
       const folder = data().libraryItems.find(
         (i) => i.type === "folder" && i.data.id === folderId
       )
       const instanceCount =
         folder?.type === "folder" ? folder.data.instances.length : 0
-      const maxVisibleOnOpen = Math.min(instanceCount, 4)
+      const maxVisible = Math.min(instanceCount, 4)
       const visibleIndices = Array.from(
-        { length: maxVisibleOnOpen },
+        { length: maxVisible },
         (_, i) => i
       )
 
       setVisibleFolderIndices(visibleIndices)
-      injectFolderTransitionCSS(visibleIndices, "open")
+      injectFolderTransitionCSS(visibleIndices, isClosing ? "close" : "open")
       setClickedFolderId(folderId)
 
       // Show overlay BEFORE view transition captures states
@@ -310,17 +314,17 @@ const HomeGridInner = () => {
 
   // Library mode switch with slide transition
   const handleModeSwitch = async (newMode: LibraryMode) => {
-    const currentMode = libraryMode()
-    if (currentMode === newMode) return
+    if (libraryMode() === newMode) return
 
     const reducedMotion = globalStore.settings.data?.reducedMotion
+    const modeParam = newMode === "servers" ? "servers" : undefined
 
     if (!reducedMotion && document.startViewTransition) {
       const direction = newMode === "servers" ? "forward" : "backward"
       setModeDirection(direction)
 
       const transition = document.startViewTransition(() => {
-        setLibraryMode(newMode)
+        setSearchParams({ mode: modeParam }, { replace: true })
       })
 
       transition.finished.then(() => {
@@ -329,7 +333,7 @@ const HomeGridInner = () => {
         setModeDirection(null)
       })
     } else {
-      setLibraryMode(newMode)
+      setSearchParams({ mode: modeParam }, { replace: true })
     }
   }
 
@@ -338,8 +342,22 @@ const HomeGridInner = () => {
     selection.toggleSelection(id)
   }
 
+  const deleteServerMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.deleteServer"]
+  }))
+
   const handleBatchDelete = () => {
     const selectedStringIds = selection.selectedIds()
+
+    // Server mode: delete servers directly (batch modal not implemented for servers yet)
+    if (libraryMode() === "servers") {
+      const selectedServerIds = parseServerIds(selectedStringIds)
+      for (const id of selectedServerIds) {
+        deleteServerMutation.mutate(id)
+      }
+      selection.clearSelection()
+      return
+    }
 
     // Parse string IDs to separate instances from folders
     const selectedInstanceIds = parseInstanceIds(selectedStringIds)
@@ -470,6 +488,7 @@ const HomeGridInner = () => {
                         selectedCount={selection.selectedIds().size}
                         onBatchDelete={handleBatchDelete}
                         onSelectExclusive={handleSelectExclusive}
+                        libraryMode={libraryMode()}
                       />
                     </Match>
                     <Match when={!showFoldersView()}>
@@ -550,6 +569,7 @@ const HomeGridInner = () => {
       <FloatingFavoritesBar
         favoriteIds={data().favoriteIds}
         isSelectionActive={selection.selectedIds().size > 0}
+        libraryMode={libraryMode()}
       />
 
       <Show when={dragSelect.selectionRect()}>
@@ -568,6 +588,7 @@ const HomeGridInner = () => {
 
       <DragGhost
         instances={globalStore.instances.data || []}
+        servers={globalStore.servers.data || []}
         groups={data().libraryItems
           .filter(
             (item): item is LibraryItem & { type: "folder" } =>

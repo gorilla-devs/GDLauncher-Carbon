@@ -139,6 +139,34 @@ impl ServerPath {
     pub fn get_eula_path(&self) -> PathBuf {
         self.get_data_path().join("eula.txt")
     }
+
+    pub fn get_mods_path(&self) -> PathBuf {
+        self.get_data_path().join("mods")
+    }
+
+    pub fn get_datapacks_path(&self) -> PathBuf {
+        self.get_data_path().join("world").join("datapacks")
+    }
+
+    pub fn get_whitelist_path(&self) -> PathBuf {
+        self.get_data_path().join("whitelist.json")
+    }
+
+    pub fn get_ops_path(&self) -> PathBuf {
+        self.get_data_path().join("ops.json")
+    }
+
+    pub fn get_banned_players_path(&self) -> PathBuf {
+        self.get_data_path().join("banned-players.json")
+    }
+
+    pub fn get_banned_ips_path(&self) -> PathBuf {
+        self.get_data_path().join("banned-ips.json")
+    }
+
+    pub fn get_modloader_config_path(&self) -> PathBuf {
+        self.0.join("modloader_config.json")
+    }
 }
 
 // TODO: WIP

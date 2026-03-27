@@ -1,13 +1,14 @@
 import { Show, For, createMemo } from "solid-js"
 import { Portal } from "solid-js/web"
 import { useDragContext } from "@/pages/Library/DragContext"
-import { ListInstance } from "@gd/core_module/bindings"
+import { ListInstance, ListServer } from "@gd/core_module/bindings"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { getInstanceImageUrl } from "@/utils/instances"
 import { getModloaderIcon } from "@/utils/sidebar"
 
 interface DragGhostProps {
   instances: ListInstance[]
+  servers: ListServer[]
   groups: { id: number; name: string; instances: ListInstance[] }[]
   tileSize: 1 | 2 | 3 | 4 | 5
 }
@@ -41,7 +42,11 @@ const DragGhost = (props: DragGhostProps) => {
       return props.instances.filter((i) => ids.includes(i.id))
     }
 
-    if (type === "group") {
+    if (type === "server") {
+      return props.servers.filter((s) => ids.includes(s.id))
+    }
+
+    if (type === "group" || type === "serverGroup") {
       return props.groups.filter((g) => ids.includes(g.id))
     }
 
@@ -138,7 +143,13 @@ const DragGhost = (props: DragGhostProps) => {
                 tileSize={props.tileSize}
               />
             </Show>
-            <Show when={dragContext.dragType() === "group"}>
+            <Show when={dragContext.dragType() === "server"}>
+              <ServerGhost
+                servers={draggedItems() as ListServer[]}
+                tileSize={props.tileSize}
+              />
+            </Show>
+            <Show when={dragContext.dragType() === "group" || dragContext.dragType() === "serverGroup"}>
               <GroupGhost
                 groups={
                   draggedItems() as {
@@ -249,6 +260,82 @@ const InstanceGhost = (props: InstanceGhostProps) => {
       </div>
 
       {/* Count badge */}
+      <Show when={count() > 1}>
+        <div class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md">
+          {count()}
+        </div>
+      </Show>
+    </div>
+  )
+}
+
+interface ServerGhostProps {
+  servers: ListServer[]
+  tileSize: 1 | 2 | 3 | 4 | 5
+}
+
+const ServerGhost = (props: ServerGhostProps) => {
+  const firstServer = () => props.servers[0]
+  const count = () => props.servers.length
+  const dim = () => getTileDimensions(props.tileSize)
+
+  const STATUS_COLORS: Record<string, string> = {
+    stopped: "bg-gray-500",
+    starting: "bg-yellow-500",
+    running: "bg-green-500",
+    stopping: "bg-yellow-500",
+    deleting: "bg-red-500"
+  }
+
+  return (
+    <div class="relative">
+      <Show when={count() > 1}>
+        <div
+          class="absolute rounded-xl bg-darkSlate-700 opacity-60"
+          style={{
+            width: `${dim().width}px`,
+            height: `${dim().height}px`,
+            right: "-4px",
+            bottom: "-4px"
+          }}
+        />
+        <div
+          class="absolute rounded-xl bg-darkSlate-600 opacity-80"
+          style={{
+            width: `${dim().width}px`,
+            height: `${dim().height}px`,
+            right: "-2px",
+            bottom: "-2px"
+          }}
+        />
+      </Show>
+
+      <div
+        class="relative rounded-2xl overflow-hidden shadow-2xl bg-darkSlate-800"
+        style={{
+          width: `${dim().width}px`,
+          height: `${dim().height}px`,
+          "background-image": `url("${DefaultImg}")`,
+          "background-size": "cover",
+          "background-position": "center"
+        }}
+      >
+        <div class="absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl">
+          <div class="flex items-center gap-2">
+            <div
+              class={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_COLORS[firstServer()?.state.status] || STATUS_COLORS.stopped}`}
+            />
+            <h4 class="m-0 text-left text-sm font-semibold text-white truncate">
+              {firstServer()?.name || ""}
+            </h4>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-white/70">
+            <span>{firstServer()?.gameVersion}</span>
+            <span class="text-white/40">:{firstServer()?.port}</span>
+          </div>
+        </div>
+      </div>
+
       <Show when={count() > 1}>
         <div class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md">
           {count()}

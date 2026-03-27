@@ -151,7 +151,7 @@ export function useServerData(filter: Accessor<string>): UseServerDataReturn {
 
 function computeServerLibraryItems(
   servers: ListServer[],
-  groups: { id: number; name: string; library_position: number | null }[],
+  groups: { id: number; name: string; libraryPosition: number | null }[],
   filterValue: string,
   defaultGroupId: number
 ): LibraryItem[] {
@@ -181,25 +181,17 @@ function computeServerLibraryItems(
         })
       }
     } else if (groupServers.length === 0 || filteredServers.length > 0) {
-      // Show as folder
+      // Show as folder — servers inside are rendered by ExpandedFolderContent
       items.push({
         id: `folder-${group.id}`,
         type: "folder",
         data: {
           id: group.id,
           name: group.name,
-          libraryPosition: group.library_position,
-          instances: [] // Folders in server mode don't have instances
+          libraryPosition: group.libraryPosition,
+          instances: filteredServers
         }
       })
-      // Add servers under this group as flat items
-      for (const server of filteredServers) {
-        items.push({
-          id: `server-${server.id}`,
-          type: "server",
-          data: server
-        })
-      }
     }
   }
 

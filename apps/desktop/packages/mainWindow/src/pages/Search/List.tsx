@@ -19,6 +19,8 @@ export function List() {
   const navigator = useGDNavigate()
   const params = useParams()
 
+  const allRows = () => searchContext?.allRows() || []
+
   const instanceId = () => searchContext?.selectedInstanceId() || NaN
   const instanceMods = () => searchContext?.selectedInstanceMods
 
@@ -99,11 +101,11 @@ export function List() {
           </Match>
           <Match when={searchContext?.viewMode() === "list"}>
             <Show
-              when={!searchContext?.isInitialLoading() || (searchContext?.allRows() || []).some(r => r.type === 'value')}
+              when={!searchContext?.isInitialLoading() || allRows().some(r => r.type === 'value')}
               fallback={<Skeleton.searchList />}
             >
               <Show
-                when={(searchContext?.allRows() || []).length > 0}
+                when={allRows().length > 0}
                 fallback={
                   <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
                     <PlaceholderGorilla
@@ -123,7 +125,7 @@ export function List() {
                 }
               >
                 <VList
-                  data={searchContext?.allRows() || []}
+                  data={allRows()}
                   class="flex h-full max-w-full flex-col gap-4 overflow-auto px-6 pb-6"
                   ref={(v) => {
                     if (v) {

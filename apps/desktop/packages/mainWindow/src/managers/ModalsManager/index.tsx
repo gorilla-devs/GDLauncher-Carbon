@@ -190,6 +190,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
   serverCreation: {
     component: lazy(() => import("./modals/ServerCreation")),
     title: "New Server"
+  },
+  serverRename: {
+    component: lazy(() => import("./modals/ServerRename")),
+    title: t("modals:_trn_server_rename")
   }
 })
 

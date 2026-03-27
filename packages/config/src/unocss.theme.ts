@@ -175,7 +175,9 @@ const theme = {
       }`,
       modalEnter:
         "{ 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }",
-      fadeIn: "{ 0% { opacity: 0; } 100% { opacity: 1; } }"
+      fadeIn: "{ 0% { opacity: 0; } 100% { opacity: 1; } }",
+      searchItemExit: "{ 0% { opacity: 1; } 100% { opacity: 0; } }",
+      searchItemEnter: "{ 0% { opacity: 0; } 100% { opacity: 1; } }"
     },
 
     durations: {
@@ -194,7 +196,9 @@ const theme = {
       searchbarLeave: "150ms",
       logoReveal: "1.3s",
       modalEnter: "300ms",
-      fadeIn: "200ms"
+      fadeIn: "200ms",
+      searchItemExit: "150ms",
+      searchItemEnter: "200ms"
     },
     timingFns: {
       // Standard spring easing - use for enter animations and interactive elements
@@ -214,7 +218,9 @@ const theme = {
       searchbarLeave: "cubic-bezier(.4,0,.2,1)",
       logoReveal: "cubic-bezier(0.22, 1, 0.36, 1)",
       modalEnter: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-      fadeIn: "ease-out"
+      fadeIn: "ease-out",
+      searchItemExit: "ease-out",
+      searchItemEnter: "ease-in"
     },
     counts: {
       loadingbar: "infinite",
@@ -230,7 +236,9 @@ const theme = {
       searchbarLeave: "forwards",
       logoReveal: "forwards",
       modalEnter: "forwards",
-      fadeIn: "forwards"
+      fadeIn: "forwards",
+      searchItemExit: "forwards",
+      searchItemEnter: "forwards"
     }
   },
   screens: {

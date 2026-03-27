@@ -1,29 +1,30 @@
-import { Button, Tabs, TabsList, TabsTrigger, TabsContent, TabsIndicator } from "@gd/ui"
-import { useParams } from "@solidjs/router"
+import { Button, Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
+import { useLocation, useParams } from "@solidjs/router"
 import {
+  For,
   Match,
   Show,
   Switch,
-  createEffect,
-  createSignal
+  createEffect
 } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import useServerData from "./server.data"
-import Console from "./Console"
-import Metrics from "./Metrics"
-import Settings from "./Settings"
 import { useModal } from "@/managers/ModalsManager"
+import DefaultImg from "/assets/images/default-instance-img.png"
+import getRouteIndex from "@/route/getRouteIndex"
 
-const Server = () => {
+interface ServerPage {
+  label: string
+  path: string
+}
+
+const Server = (props: { children?: any }) => {
   const navigator = useGDNavigate()
   const params = useParams()
+  const location = useLocation()
   const routeData = useServerData()
   const modalsContext = useModal()
-
-  const [activeTab, setActiveTab] = createSignal<"console" | "settings">(
-    "console"
-  )
 
   const startServerMutation = rspc.createMutation(() => ({
     mutationKey: ["server.startServer"]
@@ -68,6 +69,42 @@ const Server = () => {
     )
   }
 
+  const serverPages = (): ServerPage[] => {
+    const pages: ServerPage[] = [
+      {
+        label: "Console",
+        path: `/library/server/${params.id}`
+      },
+      {
+        label: "Properties",
+        path: `/library/server/${params.id}/properties`
+      },
+      {
+        label: "Players",
+        path: `/library/server/${params.id}/players`
+      },
+      {
+        label: "Settings",
+        path: `/library/server/${params.id}/settings`
+      }
+    ]
+
+    // Show Addons tab only for modded servers
+    if (details()?.modloaderType) {
+      pages.splice(3, 0, {
+        label: "Addons",
+        path: `/library/server/${params.id}/addons`
+      })
+    }
+
+    return pages
+  }
+
+  const selectedValue = () => {
+    const index = getRouteIndex(serverPages(), location.pathname, true)
+    return serverPages()[index]?.path || serverPages()[0]?.path
+  }
+
   // Navigate back if server was deleted
   createEffect(() => {
     if (
@@ -95,9 +132,15 @@ const Server = () => {
           </Button>
 
           <div class="flex items-center gap-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-darkSlate-700">
-              <div class="i-hugeicons:server h-5 w-5 text-lightSlate-400" />
-            </div>
+            <img
+              src={DefaultImg}
+              alt="Server icon"
+              class="h-16 w-16 rounded-xl object-cover"
+              style={{
+                "view-transition-name": "server-tile-image",
+                contain: "layout"
+              }}
+            />
             <div class="flex flex-col">
               <h1 class="m-0 text-lg font-semibold">
                 {details()?.name ?? "Loading..."}
@@ -105,7 +148,10 @@ const Server = () => {
               <div class="flex items-center gap-2 text-xs text-lightSlate-600">
                 <Show when={details()}>
                   <span class="rounded bg-darkSlate-700 px-1.5 py-0.5 text-lightSlate-400">
-                    Vanilla {details()!.gameVersion}
+                    {details()!.modloaderType
+                      ? `${details()!.modloaderType![0].toUpperCase()}${details()!.modloaderType!.slice(1)}`
+                      : "Vanilla"}{" "}
+                    {details()!.gameVersion}
                   </span>
                   <span>Port: {details()!.port}</span>
                 </Show>
@@ -167,6 +213,10 @@ const Server = () => {
             size="large"
             variant={isRunning() ? "red" : undefined}
             loading={isBusy()}
+            style={{
+              "view-transition-name": "server-tile-play-button",
+              contain: "layout"
+            }}
             onClick={handleStartStop}
           >
             <Switch>
@@ -189,54 +239,39 @@ const Server = () => {
         </div>
       </header>
 
-      <Tabs value={activeTab()} onChange={(v) => setActiveTab(v as "console" | "settings")}>
-        <div class="border-b border-darkSlate-600 px-6">
+      <div class="border-b border-darkSlate-600 px-6">
+        <Tabs value={selectedValue()} class="h-auto">
           <TabsList class="w-fit gap-0 bg-transparent h-auto">
             <TabsIndicator />
-            <TabsTrigger value="console">
-              <div class="flex items-center gap-2 py-1">
-                <div class="i-hugeicons:computer-terminal-01 h-4 w-4" />
-                Console
-              </div>
-            </TabsTrigger>
-            <TabsTrigger value="settings">
-              <div class="flex items-center gap-2 py-1">
-                <div class="i-hugeicons:settings-01 h-4 w-4" />
-                Settings
-              </div>
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        <div class="flex flex-1 overflow-hidden p-4">
-          <TabsContent value="console" class="flex gap-4">
-            <div class="flex-1">
-              <Console
-                serverId={serverId()}
-                isRunning={isRunning()}
-              />
-            </div>
-            <div class="w-64 flex-shrink-0">
-              <Metrics
-                serverId={serverId()}
-                isRunning={isRunning()}
-                xmx={details()?.xmx ?? 2048}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="settings" class="overflow-y-auto">
-            <Show when={details()}>
-              {(d) => (
-                <Settings
-                  serverDetails={d()}
-                  totalRam={routeData.totalRam.data ?? undefined}
-                />
+            <For each={serverPages()}>
+              {(page: ServerPage) => (
+                <TabsTrigger
+                  value={page.path}
+                  onClick={() => navigator.navigate(page.path)}
+                >
+                  <div class="flex items-center gap-2 py-1">
+                    <div
+                      class="h-4 w-4"
+                      classList={{
+                        "i-hugeicons:computer-terminal-01": page.label === "Console",
+                        "i-hugeicons:settings-02": page.label === "Properties",
+                        "i-hugeicons:user-group": page.label === "Players",
+                        "i-hugeicons:puzzle": page.label === "Addons",
+                        "i-hugeicons:settings-01": page.label === "Settings"
+                      }}
+                    />
+                    {page.label}
+                  </div>
+                </TabsTrigger>
               )}
-            </Show>
-          </TabsContent>
-        </div>
-      </Tabs>
+            </For>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      <div class="flex min-h-0 flex-1 overflow-hidden p-4">
+        {props.children}
+      </div>
     </main>
   )
 }

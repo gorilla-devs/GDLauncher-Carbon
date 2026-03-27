@@ -14,7 +14,7 @@ export interface UseDropIndicatorsOptions {
   /** The ID of the item (instance or folder) */
   itemId: number
   /** The type of item */
-  itemType: "instance" | "folder"
+  itemType: "instance" | "folder" | "server"
   /** Drag context value */
   dragContext: DragContextValue
 }
@@ -51,6 +51,13 @@ export function useDropIndicators(
   const { itemId, itemType, dragContext } = options
   const isFolder = itemType === "folder"
   const isInstance = itemType === "instance"
+  const isServer = itemType === "server"
+  const isReorderable = isInstance || isServer
+
+  const isReorderableDrag = () => {
+    const t = dragContext.dragType()
+    return t === "instance" || t === "server"
+  }
 
   const isDragActive = () =>
     dragContext.isDragging() || dragContext.justDropped()
@@ -67,33 +74,33 @@ export function useDropIndicators(
     )
   })
 
-  // Drop indicator for instances before folders
+  // Drop indicator for instances/servers before folders
   const showInstanceAtFolderDropIndicator = createMemo(() => {
     if (!isFolder) return false
     const target = dragContext.dropTarget()
     return (
       isDragActive() &&
-      dragContext.dragType() === "instance" &&
+      isReorderableDrag() &&
       target?.type === "beforeInstanceAtFolder" &&
       target.folderId === itemId
     )
   })
 
-  // Drop indicator logic for instances
+  // Drop indicator logic for instances/servers
   const showInstanceDropIndicator = createMemo(() => {
-    if (!isInstance) return false
+    if (!isReorderable) return false
     const target = dragContext.dropTarget()
     return (
       isDragActive() &&
-      dragContext.dragType() === "instance" &&
+      isReorderableDrag() &&
       target?.type === "beforeInstance" &&
       target.instanceId === itemId
     )
   })
 
-  // Group drop indicator at instance position
+  // Group drop indicator at instance/server position
   const showGroupDropIndicator = createMemo(() => {
-    if (!isInstance) return false
+    if (!isReorderable) return false
     const target = dragContext.dropTarget()
     return (
       isDragActive() &&
@@ -105,22 +112,22 @@ export function useDropIndicators(
 
   // Create folder indicator
   const showCreateFolderIndicator = createMemo(() => {
-    if (!isInstance) return false
+    if (!isReorderable) return false
     const target = dragContext.dropTarget()
     return (
       isDragActive() &&
-      dragContext.dragType() === "instance" &&
+      isReorderableDrag() &&
       target?.type === "createFolder" &&
       target.instanceId === itemId
     )
   })
 
   const isBeingDragged = createMemo(() => {
-    if (!isInstance) return false
+    if (!isReorderable) return false
     return (
       isDragActive() &&
       dragContext.dragDetached() &&
-      dragContext.dragType() === "instance" &&
+      isReorderableDrag() &&
       dragContext.draggedIds().includes(itemId)
     )
   })
@@ -130,9 +137,9 @@ export function useDropIndicators(
   const isItemBeingDragged = createMemo(() => {
     if (!isDragActive() || !dragContext.dragDetached()) return false
 
-    if (isInstance) {
+    if (isReorderable) {
       return (
-        dragContext.dragType() === "instance" &&
+        isReorderableDrag() &&
         dragContext.draggedIds().includes(itemId)
       )
     }

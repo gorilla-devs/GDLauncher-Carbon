@@ -12,7 +12,7 @@ import {
   useDropZoneRegistration,
   useLibraryItemAnimation
 } from "@/pages/Library/hooks"
-import { parseInstanceIds } from "@/pages/Library/utils/selectionIds"
+import { parseInstanceIds, parseServerIds } from "@/pages/Library/utils/selectionIds"
 import { DropOverlayIndicator } from "@/pages/Library/components/DropOverlayIndicator"
 
 interface LibraryItemTileProps {
@@ -26,7 +26,7 @@ interface LibraryItemTileProps {
   toggleSelection: (id: string) => void
   selectedIds: () => Set<string>
   onDragStart: (
-    type: "instance" | "group",
+    type: "instance" | "group" | "server" | "serverGroup",
     ids: number[],
     e: PointerEvent
   ) => void
@@ -66,17 +66,19 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
       ? (props.item as { type: "server"; data: ListServer }).data
       : null
 
+  const itemType = isFolder ? "folder" as const : isServer ? "server" as const : "instance" as const
+
   // Extracted hooks for drop indicators
   const dropIndicators = useDropIndicators({
     itemId,
-    itemType: isFolder ? "folder" : "instance",
+    itemType,
     dragContext
   })
 
   // Extracted hook for drop zone registration
   useDropZoneRegistration({
     itemId,
-    itemType: isFolder ? "folder" : "instance",
+    itemType,
     ref: () => ref,
     dragContext,
     defaultGroupId: props.defaultGroupId
@@ -86,7 +88,7 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
   useLibraryItemAnimation({
     itemKey,
     itemId,
-    itemType: isFolder ? "folder" : "instance",
+    itemType,
     ref: () => ref,
     itemIndex: props.itemIndex,
     reducedMotion: () => globalStore.settings.data?.reducedMotion ?? false,
@@ -116,6 +118,7 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
         }}
         data-library-item
         data-instance-tile={isInstance || undefined}
+        data-server-tile={isServer || undefined}
         class="relative"
         classList={{
           hidden: dropIndicators.shouldCollapseTile()
@@ -179,9 +182,17 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
               identifier={`server-${itemId}`}
               size={props.tileSize() as 1 | 2 | 3 | 4 | 5}
               isMultiSelected={props.isSelected(props.item.id)}
+              onToggleSelection={() => props.toggleSelection(props.item.id)}
               isDragging={dropIndicators.isBeingDragged()}
               isDragActive={dragContext.isDragging()}
               groupId={props.defaultGroupId() ?? undefined}
+              onDragStart={(e) => {
+                const ids = props.isSelected(props.item.id)
+                  ? parseServerIds(props.selectedIds())
+                  : [itemId]
+                props.onDragStart("server", ids, e)
+              }}
+              preventClick={props.justDropped()}
             />
           )}
         </Show>

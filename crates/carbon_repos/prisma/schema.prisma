@@ -165,28 +165,32 @@ model InstanceGroup {
 }
 
 model Server {
-  id              Int           @id @default(autoincrement())
-  name            String
-  shortpath       String        @unique
-  favorite        Boolean       @default(false)
-  index           Int
-  libraryPosition Int?
-  group           ServerGroup   @relation(fields: [groupId], references: [id])
-  groupId         Int
-  serverType      String        @default("vanilla")
-  gameVersion     String
-  port            Int           @default(25565)
-  motd            String        @default("A Minecraft Server")
-  maxPlayers      Int           @default(20)
-  onlineMode      Boolean       @default(true)
-  xmx             Int           @default(2048)
-  xms             Int           @default(1024)
-  extraJavaArgs   String        @default("")
-  autoRestart     Boolean       @default(false)
-  dateCreated     DateTime      @default(now())
-  lastStarted     DateTime?
-  providerType    String        @default("local")
-  hostedServerId  String?
+  id               Int                  @id @default(autoincrement())
+  name             String
+  shortpath        String               @unique
+  favorite         Boolean              @default(false)
+  index            Int
+  libraryPosition  Int?
+  group            ServerGroup          @relation(fields: [groupId], references: [id])
+  groupId          Int
+  serverType       String               @default("vanilla")
+  gameVersion      String
+  port             Int                  @default(25565)
+  motd             String               @default("A Minecraft Server")
+  maxPlayers       Int                  @default(20)
+  onlineMode       Boolean              @default(true)
+  xmx              Int                  @default(2048)
+  xms              Int                  @default(1024)
+  extraJavaArgs    String               @default("")
+  autoRestart      Boolean              @default(false)
+  dateCreated      DateTime             @default(now())
+  lastStarted      DateTime?
+  providerType     String               @default("local")
+  hostedServerId   String?
+  iconRevision     Int?
+  modloaderType    String?
+  modloaderVersion String?
+  mods             ServerModFileCache[]
 }
 
 model ServerGroup {
@@ -212,22 +216,38 @@ model ModFileCache {
   @@unique([instanceId, filename])
 }
 
+model ServerModFileCache {
+  id            String      @id @default(uuid())
+  lastUpdatedAt DateTime    @default(now()) @updatedAt
+  serverId      Int
+  server        Server      @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  filename      String
+  filesize      Int
+  enabled       Boolean     @default(true)
+  addonType     String      @default("mods") // "mods", "datapacks"
+  metadataId    String
+  metadata      ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Restrict)
+
+  @@unique([serverId, filename])
+}
+
 model ModMetadata {
-  id            String              @id
-  lastUpdatedAt DateTime            @default(now()) @updatedAt
-  murmur2       Int
-  sha512        Bytes
-  sha1          Bytes
-  name          String?
-  modid         String?
-  version       String?
-  description   String?
-  authors       String?
-  modloaders    String
-  logoImage     LocalModImageCache?
-  curseforge    CurseForgeModCache?
-  modrinth      ModrinthModCache?
-  cachedFiles   ModFileCache[]
+  id               String              @id
+  lastUpdatedAt    DateTime            @default(now()) @updatedAt
+  murmur2          Int
+  sha512           Bytes
+  sha1             Bytes
+  name             String?
+  modid            String?
+  version          String?
+  description      String?
+  authors          String?
+  modloaders       String
+  logoImage        LocalModImageCache?
+  curseforge       CurseForgeModCache?
+  modrinth         ModrinthModCache?
+  cachedFiles      ModFileCache[]
+  serverCachedFiles ServerModFileCache[]
 }
 
 model CurseForgeModCache {

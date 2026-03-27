@@ -274,12 +274,13 @@
         will-change: transform; */
       }
 
-      *:not(#instance_logs_container *) {
+      *:not(#instance_logs_container *):not(#server_console_container *) {
         user-select: none;
         cursor: default;
       }
 
-      #instance_logs_container * {
+      #instance_logs_container *,
+      #server_console_container * {
         user-select: text;
         cursor: auto;
         font-family: var(--font-mono);

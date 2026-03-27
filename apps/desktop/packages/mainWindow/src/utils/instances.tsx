@@ -94,6 +94,13 @@ export const getInstanceImageUrl = (
   return `http://127.0.0.1:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`
 }
 
+export const getServerImageUrl = (
+  serverId: string | number,
+  rev: string | number
+) => {
+  return `http://127.0.0.1:${port}/server/serverIcon?id=${serverId}&rev=${rev}`
+}
+
 export const getModImageUrl = (
   instanceId: string,
   modId: string,

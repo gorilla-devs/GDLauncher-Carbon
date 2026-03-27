@@ -42,6 +42,7 @@ function ExpandedPanel(props: {
               <Trans key="search:_trn_clear_all_filters" />
             </Button>
           </div>
+          <ViewModeToggle />
           <button
             class="hover:bg-darkSlate-700 flex items-center justify-center rounded p-1 transition-colors border-none bg-transparent text-inherit"
             onClick={props.onCollapse}
@@ -49,14 +50,6 @@ function ExpandedPanel(props: {
             <div class="i-hugeicons:sidebar-left h-4 w-4" />
           </button>
         </div>
-      </div>
-
-      {/* View Mode */}
-      <div class="border-darkSlate-700/50 flex items-center justify-between border-b px-4 py-2">
-        <span class="text-lightSlate-700 text-xs uppercase">
-          <Trans key="search:_trn_view_mode" />
-        </span>
-        <ViewModeToggle />
       </div>
 
       {/* Scrollable Filter Sections */}

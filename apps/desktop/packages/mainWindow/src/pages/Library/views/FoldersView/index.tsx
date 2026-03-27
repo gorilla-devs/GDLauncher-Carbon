@@ -10,9 +10,9 @@ import { createMemo, Show, Accessor } from "solid-js"
 import { useDragContext, DragType } from "../../DragContext"
 import ExpandedFolderContent from "@/components/Library/ExpandedFolderContent"
 import { LibraryGrid } from "./LibraryGrid"
-import { LibraryItem, SelectionState, FLIPAnimation } from "../../types"
+import { LibraryItem, LibraryMode, SelectionState, FLIPAnimation } from "../../types"
 import { EntranceAnimationReturn } from "../../hooks/useFLIPAnimation"
-import { parseInstanceIds } from "../../utils/selectionIds"
+import { parseInstanceIds, parseServerIds } from "../../utils/selectionIds"
 
 interface FoldersViewProps {
   libraryItems: LibraryItem[]
@@ -32,6 +32,7 @@ interface FoldersViewProps {
   selectedCount?: number
   onBatchDelete?: () => void
   onSelectExclusive?: (id: string) => void
+  libraryMode?: LibraryMode
 }
 
 export default function FoldersView(props: FoldersViewProps) {
@@ -77,14 +78,18 @@ export default function FoldersView(props: FoldersViewProps) {
             onClose={() => props.setOpenFolderId(null)}
             tileSize={props.tileSize() as 1 | 2 | 3 | 4 | 5}
             isDefaultGroup={false}
+            isServerMode={props.libraryMode === "servers"}
             selectedIds={props.selection.selectedIds()}
             onToggleSelection={props.selection.toggleSelection}
             onSetSelection={(ids) => props.selection.selectAll(ids)}
-            onDragStart={(instanceId, isInstanceSelected, e) => {
-              const ids = isInstanceSelected
-                ? parseInstanceIds(props.selection.selectedIds())
-                : [instanceId]
-              dragContext.startDrag("instance", ids, e)
+            onDragStart={(itemId, isItemSelected, e) => {
+              const isServer = props.libraryMode === "servers"
+              const ids = isItemSelected
+                ? isServer
+                  ? parseServerIds(props.selection.selectedIds())
+                  : parseInstanceIds(props.selection.selectedIds())
+                : [itemId]
+              dragContext.startDrag(isServer ? "server" : "instance", ids, e)
             }}
             selectedCount={props.selectedCount}
             onBatchDelete={props.onBatchDelete}

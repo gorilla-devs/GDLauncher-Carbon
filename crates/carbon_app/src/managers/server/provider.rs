@@ -1,3 +1,4 @@
+use crate::domain::server::LaunchConfig;
 use anyhow::Result;
 use async_trait::async_trait;
 use carbon_rt_path::ServerPath;
@@ -20,6 +21,7 @@ pub trait ServerProvider: Send + Sync {
         xmx: i32,
         xms: i32,
         extra_args: &str,
+        launch_config: &LaunchConfig,
         log_tx: mpsc::UnboundedSender<String>,
     ) -> Result<ServerHandle>;
 

@@ -15,8 +15,9 @@ import {
   ContextMenuTrigger
 } from "@gd/ui"
 import { Trans } from "@gd/i18n"
-import { ListInstance } from "@gd/core_module/bindings"
+import { ListInstance, ListServer } from "@gd/core_module/bindings"
 import InstanceTile from "@/components/InstanceTile"
+import ServerTile from "@/components/Server/Tile"
 import { useDragContext } from "@/pages/Library/DragContext"
 import { useDragSelect } from "@/hooks/useDragSelect"
 import { rspc } from "@/utils/rspcClient"
@@ -39,10 +40,11 @@ import DropPreviewTile from "@/pages/Library/components/DropPreviewTile"
 import { FolderHeader } from "./FolderHeader"
 
 interface ExpandedFolderContentProps {
-  group: { id: number; name: string; instances: ListInstance[] }
+  group: { id: number; name: string; instances: (ListInstance | ListServer)[] }
   onClose: () => void
   tileSize: 1 | 2 | 3 | 4 | 5
   isDefaultGroup: boolean
+  isServerMode?: boolean
   selectedIds: Set<string>
   onToggleSelection: (id: string) => void
   onSetSelection: (ids: string[]) => void
@@ -66,11 +68,12 @@ const BackdropDropZone = (props: { onClose: () => void; folderId: number }) => {
     return target?.type === "ungrouped"
   }
 
-  // Register drop zone when dragging instances
+  // Register drop zone when dragging instances or servers
   createEffect(() => {
+    const dtype = dragContext.dragType()
     if (
       dragContext.isDragging() &&
-      dragContext.dragType() === "instance" &&
+      (dtype === "instance" || dtype === "server") &&
       ref
     ) {
       const rect = ref.getBoundingClientRect()
@@ -153,11 +156,12 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   // Excludes instances that are queued or downloading (preparing).
   const getItemRects = (): Map<string, DOMRect> => {
     const nonSelectable = new Set<string>()
+    const idPrefix = props.isServerMode ? "server" : "instance"
     for (const inst of safeInstances()) {
-      if (inst.status.status === "valid") {
+      if ("status" in inst && inst.status.status === "valid") {
         const s = inst.status.value.state.state
         if (s === "queued" || s === "preparing") {
-          nonSelectable.add(`instance-${inst.id}`)
+          nonSelectable.add(`${idPrefix}-${inst.id}`)
         }
       }
     }
@@ -179,16 +183,18 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   // Track registered drop zone IDs to clean up properly without accessing stale props
   const registeredDropZoneIds = new Set<string>()
 
-  // Register drop zones for instance reordering within folder
+  // Register drop zones for instance/server reordering within folder
   createEffect(() => {
-    if (dragContext.isDragging() && dragContext.dragType() === "instance") {
+    const dtype = dragContext.dragType()
+    if (dragContext.isDragging() && (dtype === "instance" || dtype === "server")) {
       const draggedIds = dragContext.draggedIds()
       // Use safeInstances which handles stale props gracefully
       const instances = safeInstances()
+      const idPrefix = props.isServerMode ? "server" : "instance"
 
       instances.forEach((instance, index) => {
         const zoneId = `before-folder-instance-${instance.id}`
-        const instanceStringId = `instance-${instance.id}`
+        const instanceStringId = `${idPrefix}-${instance.id}`
         const el = folderTileRefs.get(instanceStringId)
         if (!el) return
 
@@ -243,9 +249,10 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   // Register content area as endOfGroup zone to prevent cursor from falling through
   // to the backdrop's "ungrouped" zone when not on a specific instance's beforeInstance zone
   createEffect(() => {
+    const dtype = dragContext.dragType()
     if (
       dragContext.isDragging() &&
-      dragContext.dragType() === "instance" &&
+      (dtype === "instance" || dtype === "server") &&
       scrollContainerRef
     ) {
       const rect = scrollContainerRef.getBoundingClientRect()
@@ -253,7 +260,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
         id: `folder-content-area-${groupId}`,
         rect,
         element: scrollContainerRef,
-        target: { type: "endOfGroup", groupId: groupId },
+        target: { type: "folderContentArea", groupId: groupId },
         scope: `folder-${groupId}`
       })
       registeredDropZoneIds.add(`folder-content-area-${groupId}`)
@@ -435,6 +442,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
               const target = e.target as HTMLElement
               if (
                 target.closest("[data-instance-tile]") ||
+                target.closest("[data-server-tile]") ||
                 target.closest("button") ||
                 target.closest("input") ||
                 target.closest("[data-kb-menu]") ||
@@ -488,12 +496,13 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                 >
                   <For each={safeInstances()}>
                     {(instance, index) => {
-                      const instanceStringId = `instance-${instance.id}`
+                      const idPrefix = props.isServerMode ? "server" : "instance"
+                      const instanceStringId = `${idPrefix}-${instance.id}`
                       const isBeingDragged = () =>
                         (dragContext.isDragging() ||
                           dragContext.justDropped()) &&
                         dragContext.dragDetached() &&
-                        dragContext.dragType() === "instance" &&
+                        (dragContext.dragType() === "instance" || dragContext.dragType() === "server") &&
                         dragContext.draggedIds().includes(instance.id)
 
                       const isSelected = () =>
@@ -544,7 +553,8 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                           {/* Remove dragged tile from DOM so the grid collapses the gap */}
                           <Show when={!isBeingDragged()}>
                             <div
-                              data-instance-tile
+                              data-instance-tile={!props.isServerMode || undefined}
+                              data-server-tile={props.isServerMode || undefined}
                               class="relative"
                               style={getFolderPreviewStyle()}
                               ref={(el) => {
@@ -554,29 +564,55 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                                 )
                               }}
                             >
-                              <InstanceTile
-                                instance={instance}
-                                identifier={`folder-${groupId}-${instance.id}`}
-                                size={props.tileSize}
-                                isMultiSelected={isSelected()}
-                                onToggleSelection={() =>
-                                  props.onToggleSelection(instanceStringId)
+                              <Show
+                                when={props.isServerMode}
+                                fallback={
+                                  <InstanceTile
+                                    instance={instance as ListInstance}
+                                    identifier={`folder-${groupId}-${instance.id}`}
+                                    size={props.tileSize}
+                                    isMultiSelected={isSelected()}
+                                    onToggleSelection={() =>
+                                      props.onToggleSelection(instanceStringId)
+                                    }
+                                    isDragging={isBeingDragged()}
+                                    isDragActive={dragContext.isDragging()}
+                                    groupId={groupId}
+                                    onDragStart={(e) =>
+                                      props.onDragStart(
+                                        instance.id,
+                                        isSelected(),
+                                        e
+                                      )
+                                    }
+                                    preventClick={() => dragContext.justDropped()}
+                                    selectedCount={props.selectedCount}
+                                    onBatchDelete={props.onBatchDelete}
+                                    onSelectExclusive={() => props.onSelectExclusive?.(`instance-${instance.id}`)}
+                                  />
                                 }
-                                isDragging={isBeingDragged()}
-                                isDragActive={dragContext.isDragging()}
-                                groupId={groupId}
-                                onDragStart={(e) =>
-                                  props.onDragStart(
-                                    instance.id,
-                                    isSelected(),
-                                    e
-                                  )
-                                }
-                                preventClick={() => dragContext.justDropped()}
-                                selectedCount={props.selectedCount}
-                                onBatchDelete={props.onBatchDelete}
-                                onSelectExclusive={() => props.onSelectExclusive?.(`instance-${instance.id}`)}
-                              />
+                              >
+                                <ServerTile
+                                  server={instance as unknown as ListServer}
+                                  identifier={`folder-${groupId}-${instance.id}`}
+                                  size={props.tileSize}
+                                  isMultiSelected={isSelected()}
+                                  onToggleSelection={() =>
+                                    props.onToggleSelection(instanceStringId)
+                                  }
+                                  isDragging={isBeingDragged()}
+                                  isDragActive={dragContext.isDragging()}
+                                  groupId={groupId}
+                                  onDragStart={(e) =>
+                                    props.onDragStart(
+                                      instance.id,
+                                      isSelected(),
+                                      e
+                                    )
+                                  }
+                                  preventClick={dragContext.justDropped()}
+                                />
+                              </Show>
                             </div>
                           </Show>
                         </>
@@ -595,7 +631,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                   <Show
                     when={
                       (dragContext.isDragging() || dragContext.justDropped()) &&
-                      dragContext.dragType() === "instance"
+                      (dragContext.dragType() === "instance" || dragContext.dragType() === "server")
                     }
                   >
                     <EndOfGroupDropZone

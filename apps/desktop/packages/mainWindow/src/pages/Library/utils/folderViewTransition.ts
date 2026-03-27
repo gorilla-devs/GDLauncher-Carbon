@@ -23,18 +23,6 @@ export function injectFolderTransitionCSS(
     dynamicStyleElement.remove()
   }
 
-  if (indices.length === 0) return
-
-  const groupSelectors = indices
-    .map((i) => `::view-transition-group(folder-preview-${i})`)
-    .join(",\n")
-  const oldNewSelectors = indices
-    .flatMap((i) => [
-      `::view-transition-old(folder-preview-${i})`,
-      `::view-transition-new(folder-preview-${i})`
-    ])
-    .join(",\n")
-
   // Direction-specific CSS for folder-tile old/new snapshots
   const folderTileCSS =
     direction === "close"
@@ -68,18 +56,36 @@ export function injectFolderTransitionCSS(
   `
       : ""
 
+  // Preview-specific CSS (only when there are preview indices)
+  let previewCSS = ""
+  if (indices.length > 0) {
+    const groupSelectors = indices
+      .map((i) => `::view-transition-group(folder-preview-${i})`)
+      .join(",\n")
+    const oldNewSelectors = indices
+      .flatMap((i) => [
+        `::view-transition-old(folder-preview-${i})`,
+        `::view-transition-new(folder-preview-${i})`
+      ])
+      .join(",\n")
+
+    previewCSS = `
+      ${groupSelectors} {
+        animation-duration: 300ms;
+        animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+        z-index: 1;
+      }
+      ${oldNewSelectors} {
+        animation-duration: 300ms;
+        animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+        mix-blend-mode: normal;
+      }
+    `
+  }
+
   const css = `
     ${emptySlotKeyframes}
-    ${groupSelectors} {
-      animation-duration: 300ms;
-      animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
-      z-index: 1;
-    }
-    ${oldNewSelectors} {
-      animation-duration: 300ms;
-      animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
-      mix-blend-mode: normal;
-    }
+    ${previewCSS}
     ${folderTileCSS}
     ::view-transition-group(folder-name) {
       animation-duration: 300ms;

@@ -1,9 +1,16 @@
 use super::keys::server::*;
 use super::router::router;
-use crate::domain::server::{self as domain, ServerGroupId, ServerId, ServerSettingsUpdate};
+use crate::domain::server::{
+    self as domain, ServerGroupId, ServerGroupMoveTarget, ServerId, ServerMoveTarget,
+    ServerSettingsUpdate, WhitelistEntry, OpsEntry, BannedPlayerEntry, BannedIpEntry,
+    ServerAddon,
+};
+use crate::error::{AxumError, FeError};
 use crate::managers::{App, AppInner};
+use anyhow::anyhow;
 use axum::extract::ws::Message;
 use axum::extract::{Query, State, WebSocketUpgrade};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
 use rspc::RouterBuilder;
@@ -77,6 +84,9 @@ pub struct ListServer {
     date_created: DateTime<Utc>,
     last_started: Option<DateTime<Utc>>,
     state: FEServerState,
+    icon_revision: Option<i32>,
+    modloader_type: Option<String>,
+    modloader_version: Option<String>,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -84,6 +94,7 @@ pub struct ListServer {
 #[serde(tag = "status")]
 pub enum FEServerState {
     Stopped,
+    Installing,
     Starting,
     Running {
         uptime_seconds: i32,
@@ -112,6 +123,9 @@ pub struct FEServerDetails {
     date_created: DateTime<Utc>,
     last_started: Option<DateTime<Utc>>,
     state: FEServerState,
+    icon_revision: Option<i32>,
+    modloader_type: Option<String>,
+    modloader_version: Option<String>,
 }
 
 impl From<domain::ServerDetails> for FEServerDetails {
@@ -133,6 +147,9 @@ impl From<domain::ServerDetails> for FEServerDetails {
             date_created: d.date_created,
             last_started: d.last_started,
             state: convert_state(&d.state),
+            icon_revision: d.icon_revision.map(|v| v as i32),
+            modloader_type: d.modloader_type,
+            modloader_version: d.modloader_version,
         }
     }
 }
@@ -152,6 +169,8 @@ struct CreateServer {
     game_version: String,
     port: Option<i32>,
     group: Option<FEServerGroupId>,
+    modloader_type: Option<String>,
+    modloader_version: Option<String>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -159,10 +178,6 @@ struct CreateServer {
 struct UpdateServer {
     id: FEServerId,
     name: Option<String>,
-    port: Option<i32>,
-    motd: Option<String>,
-    max_players: Option<i32>,
-    online_mode: Option<bool>,
     xmx: Option<i32>,
     xms: Option<i32>,
     extra_java_args: Option<Option<String>>,
@@ -183,9 +198,129 @@ struct SendCommand {
     command: String,
 }
 
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SetServerIcon {
+    id: FEServerId,
+    base64_data: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MoveServer {
+    server: FEServerId,
+    target: FEMoveServerTarget,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum FEMoveServerTarget {
+    BeforeServer(FEServerId),
+    EndOfGroup(FEServerGroupId),
+    BeforeGroup(FEServerGroupId),
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MoveServerGroup {
+    group: FEServerGroupId,
+    target: FEMoveServerGroupTarget,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum FEMoveServerGroupTarget {
+    BeforeGroup(FEServerGroupId),
+    BeforeServer(FEServerId),
+    EndOfLibrary,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateFolderFromServers {
+    servers: Vec<FEServerId>,
+    #[specta(optional)]
+    target_server_id: Option<FEServerId>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RenameServerGroup {
+    group: FEServerGroupId,
+    name: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateServerProperties {
+    id: FEServerId,
+    properties: std::collections::HashMap<String, String>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AddPlayerRequest {
+    server_id: FEServerId,
+    username: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RemovePlayerRequest {
+    server_id: FEServerId,
+    uuid: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AddOpRequest {
+    server_id: FEServerId,
+    username: String,
+    level: i32,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BanPlayerRequest {
+    server_id: FEServerId,
+    username: String,
+    reason: Option<String>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BanIpRequest {
+    server_id: FEServerId,
+    ip: String,
+    reason: Option<String>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UnbanIpRequest {
+    server_id: FEServerId,
+    ip: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EnableServerAddonRequest {
+    server_id: FEServerId,
+    addon_id: String,
+    enabled: bool,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeleteServerAddonRequest {
+    server_id: FEServerId,
+    addon_id: String,
+}
+
 fn convert_state(state: &domain::ServerState) -> FEServerState {
     match state {
         domain::ServerState::Stopped { .. } => FEServerState::Stopped,
+        domain::ServerState::Installing(_) => FEServerState::Installing,
         domain::ServerState::Starting(_) => FEServerState::Starting,
         domain::ServerState::Running {
             start_time,
@@ -246,6 +381,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
                             date_created: s.date_created,
                             last_started: s.last_started,
                             state,
+                            icon_revision: s.icon_revision.map(|v| v as i32),
+                            modloader_type: s.modloader_type,
+                            modloader_version: s.modloader_version,
                         }
                     })
                 })
@@ -272,6 +410,8 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     details.name,
                     details.game_version,
                     details.port,
+                    details.modloader_type,
+                    details.modloader_version,
                 )
                 .await
                 .map(FEServerId::from)
@@ -348,15 +488,254 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .update_server(ServerSettingsUpdate {
                     server_id: update.id.into(),
                     name: update.name,
-                    port: update.port,
-                    motd: update.motd,
-                    max_players: update.max_players,
-                    online_mode: update.online_mode,
                     xmx: update.xmx,
                     xms: update.xms,
                     extra_java_args: update.extra_java_args,
                     auto_restart: update.auto_restart,
                 })
+                .await
+        }
+
+        mutation SET_SERVER_ICON[app, args: SetServerIcon] {
+            app.server_manager()
+                .set_server_icon(args.id.into(), args.base64_data)
+                .await
+        }
+
+        mutation MOVE_SERVER[app, move_server: MoveServer] {
+            let target = match move_server.target {
+                FEMoveServerTarget::BeforeServer(id) => ServerMoveTarget::BeforeServer(id.into()),
+                FEMoveServerTarget::EndOfGroup(group) => ServerMoveTarget::EndOfGroup(group.into()),
+                FEMoveServerTarget::BeforeGroup(group) => ServerMoveTarget::BeforeGroup(group.into()),
+            };
+            app.server_manager()
+                .move_server(move_server.server.into(), target)
+                .await
+        }
+
+        mutation MOVE_SERVER_GROUP[app, move_data: MoveServerGroup] {
+            let target = match move_data.target {
+                FEMoveServerGroupTarget::BeforeGroup(id) => ServerGroupMoveTarget::BeforeGroup(id.into()),
+                FEMoveServerGroupTarget::BeforeServer(id) => ServerGroupMoveTarget::BeforeServer(id.into()),
+                FEMoveServerGroupTarget::EndOfLibrary => ServerGroupMoveTarget::EndOfLibrary,
+            };
+            app.server_manager()
+                .move_server_group(move_data.group.into(), target)
+                .await
+        }
+
+        mutation CREATE_FOLDER_FROM_SERVERS[app, data: CreateFolderFromServers] {
+            app.server_manager()
+                .create_folder_from_servers(
+                    data.servers.into_iter().map(|id| id.into()).collect(),
+                    data.target_server_id.map(|id| id.into()),
+                )
+                .await
+                .map(FEServerGroupId::from)
+        }
+
+        mutation ARRANGE_SERVER_LIBRARY[app, args: ()] {
+            app.server_manager()
+                .arrange_server_library()
+                .await
+        }
+
+        mutation RENAME_SERVER_GROUP[app, rename: RenameServerGroup] {
+            app.server_manager()
+                .rename_server_group(rename.group.into(), rename.name)
+                .await
+        }
+
+        mutation DELETE_SERVER_GROUP[app, id: FEServerGroupId] {
+            app.server_manager()
+                .delete_server_group(id.into())
+                .await
+        }
+
+        // server.properties
+        query GET_SERVER_PROPERTIES[app, id: FEServerId] {
+            app.server_manager()
+                .get_server_properties(id.into())
+                .await
+                .map(|props| props.into_iter().collect::<std::collections::HashMap<String, String>>())
+        }
+
+        mutation UPDATE_SERVER_PROPERTIES[app, req: UpdateServerProperties] {
+            app.server_manager()
+                .update_server_properties(req.id.into(), req.properties)
+                .await
+        }
+
+        // Whitelist
+        query GET_WHITELIST[app, id: FEServerId] {
+            app.server_manager()
+                .get_player_list::<WhitelistEntry>(id.into(), "whitelist.json")
+                .await
+        }
+
+        mutation ADD_TO_WHITELIST[app, req: AddPlayerRequest] {
+            let id: ServerId = req.server_id.into();
+            let (uuid, name) = app.server_manager()
+                .resolve_player_uuid(&req.username).await?;
+            let entry = WhitelistEntry { uuid, name: name.clone() };
+            let mut list = app.server_manager()
+                .get_player_list::<WhitelistEntry>(id, "whitelist.json").await?;
+            list.push(entry);
+            app.server_manager()
+                .write_player_list(id, "whitelist.json", &list).await?;
+            app.server_manager()
+                .send_console_if_running(id, format!("whitelist add {}", name)).await;
+            Ok(())
+        }
+
+        mutation REMOVE_FROM_WHITELIST[app, req: RemovePlayerRequest] {
+            let id: ServerId = req.server_id.into();
+            let mut list = app.server_manager()
+                .get_player_list::<WhitelistEntry>(id, "whitelist.json").await?;
+            let removed_name = list.iter().find(|e| e.uuid == req.uuid).map(|e| e.name.clone());
+            list.retain(|e| e.uuid != req.uuid);
+            app.server_manager()
+                .write_player_list(id, "whitelist.json", &list).await?;
+            if let Some(name) = removed_name {
+                app.server_manager()
+                    .send_console_if_running(id, format!("whitelist remove {}", name)).await;
+            }
+            Ok(())
+        }
+
+        // Ops
+        query GET_OPS[app, id: FEServerId] {
+            app.server_manager()
+                .get_player_list::<OpsEntry>(id.into(), "ops.json").await
+        }
+
+        mutation ADD_OP[app, req: AddOpRequest] {
+            let id: ServerId = req.server_id.into();
+            let (uuid, name) = app.server_manager()
+                .resolve_player_uuid(&req.username).await?;
+            let entry = OpsEntry { uuid, name: name.clone(), level: req.level, bypasses_player_limit: false };
+            let mut list = app.server_manager()
+                .get_player_list::<OpsEntry>(id, "ops.json").await?;
+            list.push(entry);
+            app.server_manager()
+                .write_player_list(id, "ops.json", &list).await?;
+            app.server_manager()
+                .send_console_if_running(id, format!("op {}", name)).await;
+            Ok(())
+        }
+
+        mutation REMOVE_OP[app, req: RemovePlayerRequest] {
+            let id: ServerId = req.server_id.into();
+            let mut list = app.server_manager()
+                .get_player_list::<OpsEntry>(id, "ops.json").await?;
+            let removed_name = list.iter().find(|e| e.uuid == req.uuid).map(|e| e.name.clone());
+            list.retain(|e| e.uuid != req.uuid);
+            app.server_manager()
+                .write_player_list(id, "ops.json", &list).await?;
+            if let Some(name) = removed_name {
+                app.server_manager()
+                    .send_console_if_running(id, format!("deop {}", name)).await;
+            }
+            Ok(())
+        }
+
+        // Banned players
+        query GET_BANNED_PLAYERS[app, id: FEServerId] {
+            app.server_manager()
+                .get_player_list::<BannedPlayerEntry>(id.into(), "banned-players.json").await
+        }
+
+        mutation BAN_PLAYER[app, req: BanPlayerRequest] {
+            let id: ServerId = req.server_id.into();
+            let (uuid, name) = app.server_manager()
+                .resolve_player_uuid(&req.username).await?;
+            let reason = req.reason.unwrap_or_else(|| "Banned by operator".to_string());
+            let entry = BannedPlayerEntry {
+                uuid, name: name.clone(),
+                created: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S %z").to_string(),
+                source: "GDLauncher".to_string(),
+                expires: "forever".to_string(),
+                reason: reason.clone(),
+            };
+            let mut list = app.server_manager()
+                .get_player_list::<BannedPlayerEntry>(id, "banned-players.json").await?;
+            list.push(entry);
+            app.server_manager()
+                .write_player_list(id, "banned-players.json", &list).await?;
+            app.server_manager()
+                .send_console_if_running(id, format!("ban {} {}", name, reason)).await;
+            Ok(())
+        }
+
+        mutation UNBAN_PLAYER[app, req: RemovePlayerRequest] {
+            let id: ServerId = req.server_id.into();
+            let mut list = app.server_manager()
+                .get_player_list::<BannedPlayerEntry>(id, "banned-players.json").await?;
+            let removed_name = list.iter().find(|e| e.uuid == req.uuid).map(|e| e.name.clone());
+            list.retain(|e| e.uuid != req.uuid);
+            app.server_manager()
+                .write_player_list(id, "banned-players.json", &list).await?;
+            if let Some(name) = removed_name {
+                app.server_manager()
+                    .send_console_if_running(id, format!("pardon {}", name)).await;
+            }
+            Ok(())
+        }
+
+        // Banned IPs
+        query GET_BANNED_IPS[app, id: FEServerId] {
+            app.server_manager()
+                .get_player_list::<BannedIpEntry>(id.into(), "banned-ips.json").await
+        }
+
+        mutation BAN_IP[app, req: BanIpRequest] {
+            let id: ServerId = req.server_id.into();
+            let reason = req.reason.unwrap_or_else(|| "Banned by operator".to_string());
+            let entry = BannedIpEntry {
+                ip: req.ip.clone(),
+                created: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S %z").to_string(),
+                source: "GDLauncher".to_string(),
+                expires: "forever".to_string(),
+                reason: reason.clone(),
+            };
+            let mut list = app.server_manager()
+                .get_player_list::<BannedIpEntry>(id, "banned-ips.json").await?;
+            list.push(entry);
+            app.server_manager()
+                .write_player_list(id, "banned-ips.json", &list).await?;
+            app.server_manager()
+                .send_console_if_running(id, format!("ban-ip {} {}", req.ip, reason)).await;
+            Ok(())
+        }
+
+        mutation UNBAN_IP[app, req: UnbanIpRequest] {
+            let id: ServerId = req.server_id.into();
+            let mut list = app.server_manager()
+                .get_player_list::<BannedIpEntry>(id, "banned-ips.json").await?;
+            list.retain(|e| e.ip != req.ip);
+            app.server_manager()
+                .write_player_list(id, "banned-ips.json", &list).await?;
+            app.server_manager()
+                .send_console_if_running(id, format!("pardon-ip {}", req.ip)).await;
+            Ok(())
+        }
+
+        // Server Addons
+        query GET_SERVER_ADDONS[app, id: FEServerId] {
+            app.server_manager()
+                .list_server_addons(id.into())
+                .await
+        }
+
+        mutation ENABLE_SERVER_ADDON[app, req: EnableServerAddonRequest] {
+            app.server_manager()
+                .enable_server_addon(req.server_id.into(), req.addon_id, req.enabled)
+                .await
+        }
+
+        mutation DELETE_SERVER_ADDON[app, req: DeleteServerAddonRequest] {
+            app.server_manager()
+                .delete_server_addon(req.server_id.into(), req.addon_id)
                 .await
         }
     }
@@ -372,10 +751,44 @@ struct ServerMetricsQuery {
     id: i32,
 }
 
+#[derive(Deserialize)]
+struct ServerIconQuery {
+    id: i32,
+    rev: Option<i32>,
+}
+
+async fn server_icon(
+    State(app): State<Arc<AppInner>>,
+    Query(query): Query<ServerIconQuery>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let icon = app
+        .server_manager()
+        .server_icon(ServerId(query.id))
+        .await
+        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+    let res = match icon {
+        Some((name, icon)) => {
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                "filename",
+                name.parse::<HeaderValue>()
+                    .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
+            );
+
+            (StatusCode::OK, headers, icon)
+        }
+        None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
+    };
+
+    Ok::<_, AxumError>(res)
+}
+
 pub fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new()
         .route("/log", axum::routing::get(server_log_ws_handler))
         .route("/metrics", axum::routing::get(server_metrics_ws_handler))
+        .route("/serverIcon", axum::routing::get(server_icon))
 }
 
 async fn server_log_ws_handler(

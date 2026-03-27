@@ -14,10 +14,6 @@ interface SettingsProps {
 
 const Settings = (props: SettingsProps) => {
   const [name, setName] = createSignal("")
-  const [port, setPort] = createSignal(25565)
-  const [motd, setMotd] = createSignal("")
-  const [maxPlayers, setMaxPlayers] = createSignal(20)
-  const [onlineMode, setOnlineMode] = createSignal(true)
   const [xmx, setXmx] = createSignal(2048)
   const [xms, setXms] = createSignal(1024)
   const [extraJavaArgs, setExtraJavaArgs] = createSignal("")
@@ -33,10 +29,6 @@ const Settings = (props: SettingsProps) => {
     const d = props.serverDetails
     if (!d) return
     setName(d.name)
-    setPort(d.port)
-    setMotd(d.motd)
-    setMaxPlayers(d.maxPlayers)
-    setOnlineMode(d.onlineMode)
     setXmx(d.xmx)
     setXms(d.xms)
     setExtraJavaArgs(d.extraJavaArgs)
@@ -50,16 +42,6 @@ const Settings = (props: SettingsProps) => {
     updateServerMutation.mutate({
       id: props.serverDetails.id,
       name: name() !== props.serverDetails.name ? name() : undefined,
-      port: port() !== props.serverDetails.port ? port() : undefined,
-      motd: motd() !== props.serverDetails.motd ? motd() : undefined,
-      maxPlayers:
-        maxPlayers() !== props.serverDetails.maxPlayers
-          ? maxPlayers()
-          : undefined,
-      onlineMode:
-        onlineMode() !== props.serverDetails.onlineMode
-          ? onlineMode()
-          : undefined,
       xmx: xmx() !== props.serverDetails.xmx ? xmx() : undefined,
       xms: xms() !== props.serverDetails.xms ? xms() : undefined,
       extraJavaArgs:
@@ -82,7 +64,7 @@ const Settings = (props: SettingsProps) => {
   return (
     <div class="flex flex-col gap-6 rounded-xl border border-darkSlate-600 bg-darkSlate-900 p-4">
       <div class="flex items-center justify-between">
-        <h3 class="m-0 text-sm font-medium text-lightSlate-400">Settings</h3>
+        <h3 class="m-0 text-sm font-medium text-lightSlate-400">Launcher Settings</h3>
         <Show when={dirty()}>
           <Button
             type="primary"
@@ -95,10 +77,10 @@ const Settings = (props: SettingsProps) => {
         </Show>
       </div>
 
-      {/* Server Properties */}
+      {/* General */}
       <div class="flex flex-col gap-4">
         <h4 class="m-0 text-xs font-medium text-lightSlate-600 uppercase tracking-wider">
-          Server Properties
+          General
         </h4>
 
         <div class="grid grid-cols-2 gap-4">
@@ -113,66 +95,27 @@ const Settings = (props: SettingsProps) => {
             />
           </div>
 
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-lightSlate-500">Port</label>
-            <Input
-              value={port().toString()}
-              onInput={(e) => {
-                const val = parseInt(e.target.value, 10)
-                if (!isNaN(val) && val > 0 && val <= 65535) {
-                  setPort(val)
-                  markDirty()
-                }
-              }}
-            />
-          </div>
-
-          <div class="flex flex-col gap-1 col-span-2">
-            <label class="text-xs text-lightSlate-500">MOTD</label>
-            <Input
-              value={motd()}
-              onInput={(e) => {
-                setMotd(e.target.value)
-                markDirty()
-              }}
-            />
-          </div>
-
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-lightSlate-500">Max Players</label>
-            <Input
-              value={maxPlayers().toString()}
-              onInput={(e) => {
-                const val = parseInt(e.target.value, 10)
-                if (!isNaN(val) && val > 0) {
-                  setMaxPlayers(val)
-                  markDirty()
-                }
-              }}
-            />
-          </div>
-
           <div class="flex flex-col gap-2">
-            <label class="text-xs text-lightSlate-500">Online Mode</label>
+            <label class="text-xs text-lightSlate-500">Auto Restart</label>
             <button
               class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors"
               classList={{
-                "bg-green-900/30 text-green-400": onlineMode(),
-                "bg-darkSlate-700 text-lightSlate-500": !onlineMode()
+                "bg-green-900/30 text-green-400": autoRestart(),
+                "bg-darkSlate-700 text-lightSlate-500": !autoRestart()
               }}
               onClick={() => {
-                setOnlineMode(!onlineMode())
+                setAutoRestart(!autoRestart())
                 markDirty()
               }}
             >
               <div
                 classList={{
-                  "i-hugeicons:tick-02": onlineMode(),
-                  "i-hugeicons:cancel-01": !onlineMode()
+                  "i-hugeicons:tick-02": autoRestart(),
+                  "i-hugeicons:cancel-01": !autoRestart()
                 }}
                 class="h-4 w-4"
               />
-              {onlineMode() ? "Enabled" : "Disabled"}
+              {autoRestart() ? "Enabled" : "Disabled"}
             </button>
           </div>
         </div>
@@ -248,30 +191,6 @@ const Settings = (props: SettingsProps) => {
                 markDirty()
               }}
             />
-          </div>
-
-          <div class="flex flex-col gap-2">
-            <label class="text-xs text-lightSlate-500">Auto Restart</label>
-            <button
-              class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors"
-              classList={{
-                "bg-green-900/30 text-green-400": autoRestart(),
-                "bg-darkSlate-700 text-lightSlate-500": !autoRestart()
-              }}
-              onClick={() => {
-                setAutoRestart(!autoRestart())
-                markDirty()
-              }}
-            >
-              <div
-                classList={{
-                  "i-hugeicons:tick-02": autoRestart(),
-                  "i-hugeicons:cancel-01": !autoRestart()
-                }}
-                class="h-4 w-4"
-              />
-              {autoRestart() ? "Enabled" : "Disabled"}
-            </button>
           </div>
         </div>
       </div>

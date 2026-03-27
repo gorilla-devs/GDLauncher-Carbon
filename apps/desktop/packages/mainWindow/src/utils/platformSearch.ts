@@ -91,6 +91,19 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       setSidebarReady(true)
     }
   })
+  // Increments when search-relevant params change (not pagination), used to
+  // trigger crossfade transitions in the list/grid views.
+  const [searchGeneration, setSearchGeneration] = createSignal(0)
+  let prevCacheKeyStr = ""
+
+  createEffect(() => {
+    const key = JSON.stringify(searchCacheKey(debouncedSearchQuery()))
+    if (prevCacheKeyStr && key !== prevCacheKeyStr) {
+      setSearchGeneration((g) => g + 1)
+    }
+    prevCacheKeyStr = key
+  })
+
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(opts.parentRef)
 
   const [lastScrollOffset, setLastScrollOffset] = createSignal(0)
@@ -106,6 +119,18 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     _setSearchParams({
       ...searchParams,
       instanceId
+    })
+  }
+
+  const selectedServerId = () => {
+    const id = parseInt(searchParams.serverId, 10)
+    return isNaN(id) ? undefined : id
+  }
+
+  const setSelectedServerId = (serverId: number | undefined) => {
+    _setSearchParams({
+      ...searchParams,
+      serverId
     })
   }
 
@@ -567,13 +592,17 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     selectedInstanceMods,
     setSelectedInstanceId,
     selectedInstanceId,
+    selectedServerId,
+    setSelectedServerId,
     sidebarReady,
     // Direct search mode
     isDirectMode,
     parsedQuery,
     // Share mode
     isShareMode,
-    shareCode
+    shareCode,
+    // Search generation counter for crossfade transitions
+    searchGeneration
   }
 }
 

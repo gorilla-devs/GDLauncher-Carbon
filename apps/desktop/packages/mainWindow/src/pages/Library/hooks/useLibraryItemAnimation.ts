@@ -14,7 +14,7 @@ export interface UseLibraryItemAnimationOptions {
   /** The ID of the item */
   itemId: number
   /** The type of item */
-  itemType: "instance" | "folder"
+  itemType: "instance" | "folder" | "server"
   /** Ref accessor for the DOM element */
   ref: Accessor<HTMLDivElement | undefined>
   /** Index of this item in the list */

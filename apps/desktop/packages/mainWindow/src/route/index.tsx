@@ -4,6 +4,7 @@ import withAdsLayout from "@/pages/withAds"
 import Library from "@/pages/Library"
 import Home from "@/pages/Library/Home"
 import Instance from "@/pages/Library/Instance"
+import Server from "@/pages/Library/Server"
 import AddonViewPage from "@/pages/AddonViewPage"
 import Search from "@/pages/Search"
 /* Defining the routes for the application. */
@@ -27,9 +28,39 @@ export const routes = [
           },
           {
             path: "/server/:id",
-            component: lazy(
-              () => import("@/pages/Library/Server")
-            )
+            component: Server,
+            children: [
+              {
+                path: "/",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/ConsoleTab")
+                )
+              },
+              {
+                path: "/settings",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/SettingsTab")
+                )
+              },
+              {
+                path: "/properties",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/PropertiesTab")
+                )
+              },
+              {
+                path: "/players",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/PlayersTab")
+                )
+              },
+              {
+                path: "/addons",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/AddonsTab")
+                )
+              }
+            ]
           },
           {
             path: "/:id",

@@ -14,7 +14,7 @@ export interface UseDropZoneRegistrationOptions {
   /** The ID of the item (instance or folder) */
   itemId: number
   /** The type of item */
-  itemType: "instance" | "folder"
+  itemType: "instance" | "folder" | "server"
   /** Ref accessor for the DOM element */
   ref: Accessor<HTMLDivElement | undefined>
   /** Drag context value */
@@ -32,6 +32,8 @@ export function useDropZoneRegistration(
   const { itemId, itemType, ref, dragContext, defaultGroupId } = options
   const isFolder = itemType === "folder"
   const isInstance = itemType === "instance"
+  const isServer = itemType === "server"
+  const isReorderable = isInstance || isServer
 
   // Register drop zones for folders (group reordering)
   createEffect(() => {
@@ -66,12 +68,13 @@ export function useDropZoneRegistration(
     }
   })
 
-  // Register drop zone for instance positioning before folders
+  // Register drop zone for instance/server positioning before folders
   createEffect(() => {
     const el = ref()
     if (!isFolder || !el) return
 
-    if (dragContext.isDragging() && dragContext.dragType() === "instance") {
+    const dtype = dragContext.dragType()
+    if (dragContext.isDragging() && (dtype === "instance" || dtype === "server")) {
       const rect = el.getBoundingClientRect()
       // Register drop zone on left edge
       const dropRect = new DOMRect(
@@ -93,12 +96,13 @@ export function useDropZoneRegistration(
     }
   })
 
-  // Register drop zones for ungrouped instances
+  // Register drop zones for ungrouped instances/servers
   createEffect(() => {
     const el = ref()
-    if (!isInstance || !el) return
+    if (!isReorderable || !el) return
 
-    if (dragContext.isDragging() && dragContext.dragType() === "instance") {
+    const dtype = dragContext.dragType()
+    if (dragContext.isDragging() && (dtype === "instance" || dtype === "server")) {
       // Don't register drop zone for dragged instances
       if (dragContext.draggedIds().includes(itemId)) {
         dragContext.unregisterDropZone(`before-instance-${itemId}`)
@@ -148,10 +152,10 @@ export function useDropZoneRegistration(
     }
   })
 
-  // Register drop zone for group positioning when dragging groups (at instance position)
+  // Register drop zone for group positioning when dragging groups (at instance/server position)
   createEffect(() => {
     const el = ref()
-    if (!isInstance || !el) return
+    if (!isReorderable || !el) return
 
     if (dragContext.isDragging() && dragContext.dragType() === "group") {
       const rect = el.getBoundingClientRect()
@@ -181,7 +185,7 @@ export function useDropZoneRegistration(
       dragContext.unregisterDropZone(`before-group-${itemId}`)
       dragContext.unregisterDropZone(`before-instance-at-folder-${itemId}`)
     }
-    if (isInstance) {
+    if (isReorderable) {
       dragContext.unregisterDropZone(`before-instance-${itemId}`)
       dragContext.unregisterDropZone(`create-folder-${itemId}`)
       dragContext.unregisterDropZone(`before-group-at-instance-${itemId}`)

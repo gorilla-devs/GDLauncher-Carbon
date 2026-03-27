@@ -42,6 +42,10 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
     mutationKey: ["instance.setFavorite"]
   }))
 
+  const setServerFavoriteMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.setFavorite"]
+  }))
+
   const moveGroupMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.moveGroup"]
   }))
@@ -53,6 +57,19 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
 
   const arrangeLibraryMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.arrangeLibrary"]
+  }))
+
+  const moveServerMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.moveServer"]
+  }))
+
+  const moveServerGroupMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.moveServerGroup"]
+  }))
+
+  const createFolderFromServersMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.createFolderFromServers"],
+    onSuccess: (groupId: number) => setNewlyCreatedFolderId(groupId)
   }))
 
   /**
@@ -77,7 +94,8 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
           break
         }
 
-        case "endOfGroup": {
+        case "endOfGroup":
+        case "folderContentArea": {
           // Move instances to end of group
           for (const id of draggedIds) {
             moveInstanceMutation.mutate({
@@ -143,6 +161,86 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
   }
 
   /**
+   * Handle server drop events (mirrors handleInstanceDrop with server mutations).
+   */
+  const handleServerDrop = (target: DropTarget, draggedIds: number[]): void => {
+    const _defaultGroupId = options.defaultGroupId()
+
+    batch(() => {
+      switch (target.type) {
+        case "beforeInstance": {
+          for (const id of draggedIds) {
+            if (id !== target.instanceId) {
+              moveServerMutation.mutate({
+                server: id,
+                target: { beforeServer: target.instanceId }
+              })
+            }
+          }
+          break
+        }
+
+        case "endOfGroup":
+        case "folderContentArea": {
+          for (const id of draggedIds) {
+            moveServerMutation.mutate({
+              server: id,
+              target: { endOfGroup: target.groupId }
+            })
+          }
+          break
+        }
+
+        case "dropOnFolder": {
+          for (const id of draggedIds) {
+            moveServerMutation.mutate({
+              server: id,
+              target: { endOfGroup: target.groupId }
+            })
+          }
+          break
+        }
+
+        case "createFolder": {
+          const allServerIds = [
+            target.instanceId,
+            ...draggedIds.filter((id) => id !== target.instanceId)
+          ]
+          createFolderFromServersMutation.mutate({
+            servers: allServerIds,
+            targetServerId: target.instanceId
+          })
+          break
+        }
+
+        case "ungrouped": {
+          if (_defaultGroupId) {
+            for (const id of draggedIds) {
+              moveServerMutation.mutate({
+                server: id,
+                target: { endOfGroup: _defaultGroupId }
+              })
+            }
+          }
+          break
+        }
+
+        case "beforeInstanceAtFolder": {
+          for (const id of draggedIds) {
+            moveServerMutation.mutate({
+              server: id,
+              target: { beforeGroup: target.folderId }
+            })
+          }
+          break
+        }
+      }
+
+      options.selection.clearSelection()
+    })
+  }
+
+  /**
    * Handle group drop events.
    */
   const handleGroupDrop = (target: DropTarget, groupId: number): void => {
@@ -185,6 +283,8 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
   const handleDrop = (target: DropTarget | null, draggedIds: number[], dragType: DragType, origin: string | null): void => {
     if (draggedIds.length === 0) return
 
+    const isServerDrag = dragType === "server"
+
     // Favorites-origin: dropping outside bar = unfavorite
     if (origin === "favorites") {
       if (target?.type === "favorites") {
@@ -197,9 +297,13 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
         options.libraryItems.map((item) => item.id)
       )
 
-      // Unfavorite all dragged instances
+      // Unfavorite all dragged items
       for (const id of draggedIds) {
-        setFavoriteMutation.mutate({ instance: id, favorite: false })
+        if (isServerDrag) {
+          setServerFavoriteMutation.mutate({ id, favorite: false })
+        } else {
+          setFavoriteMutation.mutate({ instance: id, favorite: false })
+        }
       }
       options.selection.clearSelection()
       options.onAfterDrop?.()
@@ -211,12 +315,23 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
 
     // For "favorites" target from grid: only ADD favorites, never remove
     if (target.type === "favorites") {
-      const draggedInstances = (globalStore.instances.data || []).filter(
-        (i) => draggedIds.includes(i.id)
-      )
-      for (const inst of draggedInstances) {
-        if (!inst.favorite) {
-          setFavoriteMutation.mutate({ instance: inst.id, favorite: true })
+      if (isServerDrag) {
+        const draggedServers = (globalStore.servers.data || []).filter(
+          (s) => draggedIds.includes(s.id)
+        )
+        for (const srv of draggedServers) {
+          if (!srv.favorite) {
+            setServerFavoriteMutation.mutate({ id: srv.id, favorite: true })
+          }
+        }
+      } else {
+        const draggedInstances = (globalStore.instances.data || []).filter(
+          (i) => draggedIds.includes(i.id)
+        )
+        for (const inst of draggedInstances) {
+          if (!inst.favorite) {
+            setFavoriteMutation.mutate({ instance: inst.id, favorite: true })
+          }
         }
       }
       options.selection.clearSelection()
@@ -231,6 +346,8 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
 
     if (dragType === "instance") {
       handleInstanceDrop(target, draggedIds)
+    } else if (dragType === "server") {
+      handleServerDrop(target, draggedIds)
     } else if (dragType === "group") {
       handleGroupDrop(target, draggedIds[0])
     }
@@ -247,7 +364,10 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
       setFavorite: setFavoriteMutation,
       moveGroup: moveGroupMutation,
       createFolder: createFolderFromInstancesMutation,
-      arrangeLibrary: arrangeLibraryMutation
+      arrangeLibrary: arrangeLibraryMutation,
+      moveServer: moveServerMutation,
+      moveServerGroup: moveServerGroupMutation,
+      createServerFolder: createFolderFromServersMutation
     }
   }
 }

@@ -3,6 +3,7 @@
  *
  * Search, filter, sort controls for the Library view.
  * Handles both folders mode and accordion mode UI states.
+ * Mode-aware: uses instance or server settings based on libraryMode.
  */
 
 import {
@@ -47,8 +48,36 @@ export function LibraryHeader(props: LibraryHeaderProps) {
     mutationKey: ["instance.arrangeLibrary"]
   }))
 
+  const isServerMode = () => props.libraryMode() === "servers"
+
+  // Mode-aware settings accessors
+  const currentTileSize = () =>
+    isServerMode()
+      ? globalStore.settings.data?.serversTileSize
+      : globalStore.settings.data?.instancesTileSize
+
+  const currentGroupBy = () =>
+    isServerMode()
+      ? globalStore.settings.data?.serversGroupBy
+      : globalStore.settings.data?.instancesGroupBy
+
+  const currentGroupByAsc = () =>
+    isServerMode()
+      ? globalStore.settings.data?.serversGroupByAsc
+      : globalStore.settings.data?.instancesGroupByAsc
+
+  const currentSortBy = () =>
+    isServerMode()
+      ? globalStore.settings.data?.serversSortBy
+      : globalStore.settings.data?.instancesSortBy
+
+  const currentSortByAsc = () =>
+    isServerMode()
+      ? globalStore.settings.data?.serversSortByAsc
+      : globalStore.settings.data?.instancesSortByAsc
+
   // Sort by options for accordion mode
-  const sortByOptions: { key: InstancesSortBy; label: string }[] = [
+  const instanceSortByOptions: { key: InstancesSortBy; label: string }[] = [
     { key: "name", label: t("ui:_trn_name") },
     { key: "mostPlayed", label: t("ui:_trn_most_played") },
     { key: "lastPlayed", label: t("ui:_trn_last_played") },
@@ -57,15 +86,122 @@ export function LibraryHeader(props: LibraryHeaderProps) {
     { key: "created", label: t("ui:_trn_created") }
   ]
 
+  const serverSortByOptions: { key: string; label: string }[] = [
+    { key: "name", label: t("ui:_trn_name") },
+    { key: "gameVersion", label: t("ui:_trn_game_version") },
+    { key: "created", label: t("ui:_trn_created") }
+  ]
+
+  const sortByOptions = () => isServerMode() ? serverSortByOptions : instanceSortByOptions
+
   // Group by options
-  const groupByOptions: { key: InstancesGroupBy | null; label: string }[] = [
+  const instanceGroupByOptions: { key: InstancesGroupBy | null; label: string }[] = [
     { key: null, label: t("ui:_trn_folders") },
     { key: "gameVersion", label: t("ui:_trn_game_version") },
     { key: "modloader", label: t("ui:_trn_modloader") },
     { key: "modplatform", label: t("content:_trn_modplatform") }
   ]
 
+  const serverGroupByOptions: { key: string | null; label: string }[] = [
+    { key: null, label: t("ui:_trn_folders") },
+    { key: "gameVersion", label: t("ui:_trn_game_version") }
+  ]
+
+  const groupByOptions = () => isServerMode() ? serverGroupByOptions : instanceGroupByOptions
+
   const isFoldersView = () => props.viewMode() === "folders"
+
+  // Mode-aware setting helpers
+  const setTileSizeSetting = (size: number) => {
+    if (isServerMode()) {
+      settingsMutation.mutate({ serversTileSize: { Set: size } })
+    } else {
+      settingsMutation.mutate({ instancesTileSize: { Set: size } })
+    }
+  }
+
+  const setSortBySetting = (key: string, asc: boolean) => {
+    if (isServerMode()) {
+      settingsMutation.mutate({
+        serversSortBy: { Set: key },
+        serversSortByAsc: { Set: asc }
+      })
+    } else {
+      settingsMutation.mutate({
+        instancesSortBy: { Set: key },
+        instancesSortByAsc: { Set: asc }
+      })
+    }
+  }
+
+  const setSortByAsc = (asc: boolean) => {
+    if (isServerMode()) {
+      settingsMutation.mutate({ serversSortByAsc: { Set: asc } })
+    } else {
+      settingsMutation.mutate({ instancesSortByAsc: { Set: asc } })
+    }
+  }
+
+  const setGroupBySetting = (key: string | null) => {
+    if (isServerMode()) {
+      if (key === null) {
+        settingsMutation.mutate({
+          serversGroupBy: { Set: null },
+          serversSortBy: { Set: null },
+          serversGroupByAsc: { Set: true }
+        })
+      } else {
+        settingsMutation.mutate({
+          serversGroupBy: { Set: key },
+          serversSortBy: { Set: "name" },
+          serversGroupByAsc: { Set: true }
+        })
+      }
+    } else {
+      if (key === null) {
+        settingsMutation.mutate({
+          instancesGroupBy: { Set: null },
+          instancesSortBy: { Set: null },
+          instancesGroupByAsc: { Set: true }
+        })
+      } else {
+        settingsMutation.mutate({
+          instancesGroupBy: { Set: key },
+          instancesSortBy: { Set: "name" },
+          instancesGroupByAsc: { Set: true }
+        })
+      }
+    }
+  }
+
+  const setGroupByAsc = (asc: boolean) => {
+    if (isServerMode()) {
+      settingsMutation.mutate({ serversGroupByAsc: { Set: asc } })
+    } else {
+      settingsMutation.mutate({ instancesGroupByAsc: { Set: asc } })
+    }
+  }
+
+  const resetFilters = () => {
+    if (isServerMode()) {
+      settingsMutation.mutate({
+        serversTileSize: { Set: 2 },
+        serversSortBy: { Set: null },
+        serversSortByAsc: { Set: false },
+        serversGroupBy: { Set: null },
+        serversGroupByAsc: { Set: true }
+      })
+    } else {
+      settingsMutation.mutate({
+        instancesTileSize: { Set: 2 },
+        instancesSortBy: { Set: null },
+        instancesSortByAsc: { Set: false },
+        instancesGroupBy: { Set: null },
+        instancesGroupByAsc: { Set: true }
+      })
+    }
+    props.setTileSize(2)
+  }
 
   return (
     <div class="bg-darkSlate-800 z-5 sticky top-0 flex items-center gap-4 py-4">
@@ -75,7 +211,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
           <TabsIndicator />
           <TabsTrigger value="instances">
             <div class="flex items-center gap-1.5">
-              <div class="i-hugeicons:play h-3.5 w-3.5" />
+              <div class="i-hugeicons:computer h-3.5 w-3.5" />
               <Trans key="instances:_trn_instances" />
             </div>
           </TabsTrigger>
@@ -124,16 +260,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
               </div>
               <div
                 class="text-lightSlate-900 hover:text-lightSlate-50 text-xs transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)] cursor-pointer"
-                onClick={() => {
-                  settingsMutation.mutate({
-                    instancesTileSize: { Set: 2 },
-                    instancesSortBy: { Set: null },
-                    instancesSortByAsc: { Set: false },
-                    instancesGroupBy: { Set: null },
-                    instancesGroupByAsc: { Set: true }
-                  })
-                  props.setTileSize(2)
-                }}
+                onClick={resetFilters}
               >
                 <Trans key="instances:_trn_reset_filters" />
               </div>
@@ -164,9 +291,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
                           value={size.toString()}
                           onSelect={() => {
                             props.setTileSize(size)
-                            settingsMutation.mutate({
-                              instancesTileSize: { Set: size }
-                            })
+                            setTileSizeSetting(size)
                           }}
                         >
                           {size}
@@ -187,22 +312,19 @@ export function LibraryHeader(props: LibraryHeaderProps) {
                     <span>
                       {isFoldersView()
                         ? t("ui:_trn_manual")
-                        : sortByOptions.find(
-                            (opt) =>
-                              opt.key ===
-                              globalStore.settings.data?.instancesSortBy
+                        : sortByOptions().find(
+                            (opt) => opt.key === currentSortBy()
                           )?.label || t("ui:_trn_name")}
                     </span>
-                    {!isFoldersView() &&
-                      globalStore.settings.data?.instancesSortBy && (
-                        <div
-                          class={`ml-2 h-4 w-4 ${
-                            globalStore.settings.data?.instancesSortByAsc
-                              ? "i-hugeicons:arrange-by-letters-a-z"
-                              : "i-hugeicons:arrange-by-letters-z-a"
-                          }`}
-                        />
-                      )}
+                    {!isFoldersView() && currentSortBy() && (
+                      <div
+                        class={`ml-2 h-4 w-4 ${
+                          currentSortByAsc()
+                            ? "i-hugeicons:arrange-by-letters-a-z"
+                            : "i-hugeicons:arrange-by-letters-z-a"
+                        }`}
+                      />
+                    )}
                   </div>
                 </div>
               </DropdownMenuSubTrigger>
@@ -211,38 +333,25 @@ export function LibraryHeader(props: LibraryHeaderProps) {
                   <DropdownMenuLabel>
                     <Trans key="ui:_trn_sort_options" />
                   </DropdownMenuLabel>
-                  <DropdownMenuRadioGroup
-                    value={globalStore.settings.data?.instancesSortBy || ""}
-                  >
-                    <For each={sortByOptions}>
+                  <DropdownMenuRadioGroup value={currentSortBy() || ""}>
+                    <For each={sortByOptions()}>
                       {(option) => (
                         <DropdownMenuRadioItem
                           value={option.key}
                           onSelect={() => {
-                            const currentOption =
-                              globalStore.settings.data?.instancesSortBy
-                            const currentDirection =
-                              globalStore.settings.data?.instancesSortByAsc
-
-                            if (currentOption === option.key) {
-                              settingsMutation.mutate({
-                                instancesSortByAsc: { Set: !currentDirection }
-                              })
+                            if (currentSortBy() === option.key) {
+                              setSortByAsc(!currentSortByAsc())
                             } else {
-                              settingsMutation.mutate({
-                                instancesSortBy: { Set: option.key },
-                                instancesSortByAsc: { Set: true }
-                              })
+                              setSortBySetting(option.key, true)
                             }
                           }}
                         >
                           <div class="flex w-full items-center justify-between">
                             <span>{option.label}</span>
-                            {globalStore.settings.data?.instancesSortBy ===
-                              option.key && (
+                            {currentSortBy() === option.key && (
                               <div
                                 class={`ml-4 h-4 w-4 ${
-                                  globalStore.settings.data?.instancesSortByAsc
+                                  currentSortByAsc()
                                     ? "i-hugeicons:arrange-by-letters-a-z"
                                     : "i-hugeicons:arrange-by-letters-z-a"
                                 }`}
@@ -264,16 +373,14 @@ export function LibraryHeader(props: LibraryHeaderProps) {
                   <Trans key="search:_trn_group_by" />
                   <div class="flex items-center gap-2">
                     <span>
-                      {groupByOptions.find(
-                        (opt) =>
-                          opt.key ===
-                          (globalStore.settings.data?.instancesGroupBy ?? null)
+                      {groupByOptions().find(
+                        (opt) => opt.key === (currentGroupBy() ?? null)
                       )?.label || t("ui:_trn_folders")}
                     </span>
                     {!isFoldersView() && (
                       <div
                         class={`ml-2 h-4 w-4 ${
-                          globalStore.settings.data?.instancesGroupByAsc
+                          currentGroupByAsc()
                             ? "i-hugeicons:arrange-by-letters-a-z"
                             : "i-hugeicons:arrange-by-letters-z-a"
                         }`}
@@ -288,51 +395,30 @@ export function LibraryHeader(props: LibraryHeaderProps) {
                     <Trans key="ui:_trn_group_options" />
                   </DropdownMenuLabel>
                   <DropdownMenuRadioGroup
-                    value={
-                      globalStore.settings.data?.instancesGroupBy ?? "__folders__"
-                    }
+                    value={currentGroupBy() ?? "__folders__"}
                   >
-                    <For each={groupByOptions}>
+                    <For each={groupByOptions()}>
                       {(option) => (
                         <DropdownMenuRadioItem
                           value={option.key ?? "__folders__"}
                           onSelect={() => {
-                            const currentOption =
-                              globalStore.settings.data?.instancesGroupBy ?? null
-                            const currentDirection =
-                              globalStore.settings.data?.instancesGroupByAsc
-
-                            if (currentOption === option.key) {
+                            const current = currentGroupBy() ?? null
+                            if (current === option.key) {
                               if (option.key !== null) {
-                                settingsMutation.mutate({
-                                  instancesGroupByAsc: { Set: !currentDirection }
-                                })
+                                setGroupByAsc(!currentGroupByAsc())
                               }
                             } else {
-                              if (option.key === null) {
-                                settingsMutation.mutate({
-                                  instancesGroupBy: { Set: null },
-                                  instancesSortBy: { Set: null },
-                                  instancesGroupByAsc: { Set: true }
-                                })
-                              } else {
-                                settingsMutation.mutate({
-                                  instancesGroupBy: { Set: option.key },
-                                  instancesSortBy: { Set: "name" },
-                                  instancesGroupByAsc: { Set: true }
-                                })
-                              }
+                              setGroupBySetting(option.key)
                             }
                           }}
                         >
                           <div class="flex w-full items-center justify-between">
                             <span>{option.label}</span>
-                            {(globalStore.settings.data?.instancesGroupBy ??
-                              null) === option.key &&
+                            {(currentGroupBy() ?? null) === option.key &&
                               option.key !== null && (
                                 <div
                                   class={`ml-4 h-4 w-4 ${
-                                    globalStore.settings.data?.instancesGroupByAsc
+                                    currentGroupByAsc()
                                       ? "i-hugeicons:arrange-by-letters-a-z"
                                       : "i-hugeicons:arrange-by-letters-z-a"
                                   }`}
@@ -350,7 +436,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Rearrange and Create Folder buttons - only in folders mode */}
+      {/* Rearrange button - only in folders mode */}
       <Show when={isFoldersView()}>
         <DropdownMenu>
           <DropdownMenuTrigger>
@@ -375,22 +461,24 @@ export function LibraryHeader(props: LibraryHeaderProps) {
                 <Trans key="ui:_trn_by_name" />
               </div>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => arrangeLibraryMutation.mutate("lastPlayed")}
-            >
-              <div class="flex items-center gap-2">
-                <div class="i-hugeicons:clock-01 h-4 w-4" />
-                <Trans key="ui:_trn_by_last_played" />
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => arrangeLibraryMutation.mutate("mostPlayed")}
-            >
-              <div class="flex items-center gap-2">
-                <div class="i-hugeicons:time-02 h-4 w-4" />
-                <Trans key="ui:_trn_by_most_played" />
-              </div>
-            </DropdownMenuItem>
+            <Show when={!isServerMode()}>
+              <DropdownMenuItem
+                onClick={() => arrangeLibraryMutation.mutate("lastPlayed")}
+              >
+                <div class="flex items-center gap-2">
+                  <div class="i-hugeicons:clock-01 h-4 w-4" />
+                  <Trans key="ui:_trn_by_last_played" />
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => arrangeLibraryMutation.mutate("mostPlayed")}
+              >
+                <div class="flex items-center gap-2">
+                  <div class="i-hugeicons:time-02 h-4 w-4" />
+                  <Trans key="ui:_trn_by_most_played" />
+                </div>
+              </DropdownMenuItem>
+            </Show>
             <DropdownMenuItem
               onClick={() => arrangeLibraryMutation.mutate("dateCreated")}
             >

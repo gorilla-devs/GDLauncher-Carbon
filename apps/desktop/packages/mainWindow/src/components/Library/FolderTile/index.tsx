@@ -51,9 +51,16 @@ const FolderTile = (props: FolderTileProps) => {
   const [isHovering, setIsHovering] = createSignal(false)
   const [isMenuOpen, setIsMenuOpen] = createSignal(false)
 
+  // Detect whether this folder is a server group or instance group
+  const isServerGroup = createMemo(() =>
+    globalStore.serverGroups.data?.some((g) => g.id === props.groupId) ?? false
+  )
+
   // Look up group from globalStore - creates reactive dependency
   const group = createMemo(() =>
-    globalStore.instanceGroups.data?.find((g) => g.id === props.groupId)
+    isServerGroup()
+      ? globalStore.serverGroups.data?.find((g) => g.id === props.groupId)
+      : globalStore.instanceGroups.data?.find((g) => g.id === props.groupId)
   )
 
   const groupName = createMemo(() => {
@@ -62,14 +69,18 @@ const FolderTile = (props: FolderTileProps) => {
     return g.name === "localize➽default" ? t("general:_trn_default") : g.name
   })
 
-  // Get instances for this group - REACTIVE DEPENDENCY on globalStore.instances
+  // Get items for this group - REACTIVE DEPENDENCY on globalStore
   const groupInstances = createMemo(() =>
-    (globalStore.instances.data || []).filter(
-      (i) => i.group_id === props.groupId
-    )
+    isServerGroup()
+      ? (globalStore.servers.data || []).filter(
+          (s) => s.groupId === props.groupId
+        )
+      : (globalStore.instances.data || []).filter(
+          (i) => i.group_id === props.groupId
+        )
   )
 
-  // Preview instances - now reactive via groupInstances()
+  // Preview items - now reactive via groupInstances()
   const previewInstances = createMemo(() => groupInstances().slice(0, 4))
 
   const instanceCount = createMemo(() => groupInstances().length)
@@ -102,11 +113,12 @@ const FolderTile = (props: FolderTileProps) => {
     dragContext.startDrag("group", [props.groupId], e)
   }
 
-  // Register as drop target when dragging instances
+  // Register as drop target when dragging instances or servers
   createEffect(() => {
+    const dtype = dragContext.dragType()
     if (
       dragContext.isDragging() &&
-      dragContext.dragType() === "instance" &&
+      (dtype === "instance" || dtype === "server") &&
       ref
     ) {
       const rect = ref.getBoundingClientRect()

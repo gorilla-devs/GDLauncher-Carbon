@@ -9,3 +9,9 @@ export function parseFolderIds(stringIds: Iterable<string>): number[] {
     .filter((id) => id.startsWith("folder-"))
     .map((id) => parseInt(id.replace("folder-", ""), 10))
 }
+
+export function parseServerIds(stringIds: Iterable<string>): number[] {
+  return Array.from(stringIds)
+    .filter((id) => id.startsWith("server-"))
+    .map((id) => parseInt(id.replace("server-", ""), 10))
+}
