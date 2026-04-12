@@ -51,10 +51,16 @@ impl SystemInfoManager {
 
         let mut lock = self.system.lock().await;
         let pid = Pid::from_u32(pid);
-        lock.refresh_processes(ProcessesToUpdate::Some(&[pid]));
+
+        // Use ProcessesToUpdate::All so that sysinfo's clear_procs runs,
+        // which is required for compute_cpu_usage to execute.
+        // ProcessesToUpdate::Some skips clear_procs entirely, leaving cpu_usage at 0.
+        lock.refresh_processes(ProcessesToUpdate::All);
+
         let process = lock.process(pid)?;
+        let num_cpus = lock.cpus().len().max(1) as f32;
         Some(crate::domain::server::ProcessMetrics {
-            cpu_percent: process.cpu_usage(),
+            cpu_percent: process.cpu_usage() / num_cpus,
             memory_bytes: process.memory(),
         })
     }

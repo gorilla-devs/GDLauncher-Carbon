@@ -4,7 +4,8 @@ use super::ManagerRef;
 use crate::api::keys::server::*;
 use crate::domain::server::{
     self, ServerAddon, ServerDetails, ServerGroupId, ServerGroupMoveTarget, ServerId,
-    ServerListEntry, ServerLogId, ServerMoveTarget, ServerSettingsUpdate, ServerState, ServerType,
+    ServerListEntry, ServerLogId, ServerModpackInfo, ServerMoveTarget, ServerSettingsUpdate,
+    ServerState, ServerType,
 };
 use crate::domain::vtask::VisualTaskId;
 use anyhow::{Context, anyhow, bail};
@@ -16,13 +17,14 @@ use dashmap::DashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock, mpsc, watch};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use unicode_segmentation::UnicodeSegmentation;
 
 pub mod jars;
 pub mod local;
 pub mod modloader_install;
 pub mod modloader_launch;
+pub mod modpack;
 pub mod properties;
 pub mod provider;
 
@@ -76,6 +78,18 @@ impl ManagerRef<'_, ServerManager> {
     pub async fn launch_background_tasks(self) {
         if let Err(e) = self.load_servers().await {
             error!("Failed to load servers: {}", e);
+        }
+
+        // Queue caching for all servers on startup
+        let servers = self.servers.read().await;
+        for (&server_id, _) in servers.iter() {
+            self.app
+                .meta_cache_manager()
+                .queue_caching(
+                    crate::managers::metadata::cache::CacheEntityId::Server(server_id.0),
+                    false,
+                )
+                .await;
         }
     }
 
@@ -186,6 +200,13 @@ impl ManagerRef<'_, ServerManager> {
                         icon_revision: s.icon_revision.map(|v| v as u32),
                         modloader_type: s.modloader_type,
                         modloader_version: s.modloader_version,
+                        modpack_info: s.modpack_platform.map(|platform| {
+                            ServerModpackInfo {
+                                platform,
+                                project_id: s.modpack_project_id.unwrap_or_default(),
+                                file_id: s.modpack_file_id.unwrap_or_default(),
+                            }
+                        }),
                     })
                     .collect(),
             })
@@ -201,6 +222,9 @@ impl ManagerRef<'_, ServerManager> {
         modloader_type: Option<String>,
         modloader_version: Option<String>,
     ) -> anyhow::Result<ServerId> {
+        use crate::api::translation::Translation;
+        use crate::managers::vtask::VisualTask;
+
         if name.is_empty() {
             bail!("Server name cannot be empty");
         }
@@ -217,20 +241,6 @@ impl ManagerRef<'_, ServerManager> {
         tokio::fs::create_dir_all(server_path.get_data_path())
             .await
             .context("Failed to create server directory")?;
-
-        // Download server jar
-        jars::download_vanilla_server_jar(
-            &self.app.reqwest_client,
-            &game_version,
-            &server_path,
-        )
-        .await
-        .context("Failed to download server jar")?;
-
-        // Write initial server.properties
-        let props_content = properties::generate_properties(port, "A Minecraft Server", 20, true);
-        properties::write_properties(&server_path.get_server_properties_path(), &props_content)
-            .await?;
 
         // Get next index
         let count = self
@@ -266,48 +276,395 @@ impl ManagerRef<'_, ServerManager> {
 
         let server_id = ServerId(db_server.id);
 
-        // Register in memory
+        // Create a visual task for install progress
+        let task = VisualTask::new(Translation::ServerTaskInstall {
+            server_name: name.clone(),
+        });
+        let task_id = self.app.task_manager().spawn_task(&task).await;
+
+        // Register in memory as Installing
         self.servers.write().await.insert(
             server_id,
             ServerData {
                 shortpath: shortpath.clone(),
-                state: ServerState::Stopped { failed_task: None },
+                state: ServerState::Installing(task_id),
                 handle: None,
             },
         );
 
-        // Install modloader if specified
-        if let (Some(ml_type), Some(ml_version)) = (&modloader_type, &modloader_version) {
-            let runtime_path = &self.app.settings_manager().runtime_path;
+        self.app.invalidate(GET_ALL_SERVERS, None);
+        self.app.invalidate(GET_GROUPS, None);
+
+        // Do the heavy work (jar download, modloader install) in background
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            let runtime_path = &app.settings_manager().runtime_path;
             let server_path = runtime_path
                 .get_servers()
                 .get_server_path(&shortpath);
 
-            info!("Installing modloader {} {} for server {}", ml_type, ml_version, server_id.0);
+            // Create subtasks for progress reporting — only create ones that will run
+            let t_download_jar = task.subtask(Translation::ServerTaskDownloadServerJar);
+            t_download_jar.set_weight(10.0);
+            let t_install_modloader = if modloader_type.is_some() && modloader_version.is_some() {
+                let sub = task.subtask(Translation::ServerTaskInstallModloader);
+                sub.set_weight(5.0);
+                Some(sub)
+            } else {
+                None
+            };
+            task.edit(|data| data.state = crate::managers::vtask::TaskState::KnownProgress).await;
 
-            match modloader_install::install_modloader(
-                &self.app.reqwest_client,
-                &server_path,
-                &game_version,
-                ml_type,
-                ml_version,
-            )
-            .await
-            {
-                Ok(launch_config) => {
+            let install_result: anyhow::Result<()> = async {
+                // Download server jar
+                jars::download_vanilla_server_jar(
+                    &app.reqwest_client,
+                    &game_version,
+                    &server_path,
+                    Some(&t_download_jar),
+                )
+                .await
+                .context("Failed to download server jar")?;
+
+                // Write initial server.properties
+                let props_content =
+                    properties::generate_properties(port, "A Minecraft Server", 20, true);
+                properties::write_properties(
+                    &server_path.get_server_properties_path(),
+                    &props_content,
+                )
+                .await?;
+
+                // Install modloader if specified
+                if let (Some(ml_type), Some(ml_version), Some(t_install)) =
+                    (&modloader_type, &modloader_version, &t_install_modloader)
+                {
+                    let java_path = app
+                        .java_manager()
+                        .find_best_java_for_server()
+                        .await
+                        .context("Cannot install modloader: no Java available")?;
+
+                    info!(
+                        "Installing modloader {} {} for server {}",
+                        ml_type, ml_version, server_id.0
+                    );
+
+                    let launch_config = modloader_install::install_modloader(
+                        &app.reqwest_client,
+                        &server_path,
+                        &game_version,
+                        ml_type,
+                        ml_version,
+                        &java_path,
+                        Some(t_install),
+                    )
+                    .await
+                    .context(format!("Failed to install {} {}", ml_type, ml_version))?;
+
                     modloader_launch::save_launch_config(&server_path, &launch_config).await?;
                     info!("Modloader installed successfully for server {}", server_id.0);
                 }
+
+                Ok(())
+            }
+            .await;
+
+            let failed_task = match install_result {
+                Ok(()) => {
+                    info!("Server {} created successfully", server_id.0);
+                    drop(task);
+                    None
+                }
                 Err(e) => {
-                    error!("Failed to install modloader for server {}: {}", server_id.0, e);
-                    // Don't fail server creation - it can still run vanilla
-                    // But we should let the user know
+                    error!("Failed to create server {}: {}", server_id.0, e);
+                    task.fail(e).await;
+                    Some(task_id)
+                }
+            };
+
+            // Transition to Stopped
+            if let Some(server_data) =
+                app.server_manager.servers.write().await.get_mut(&server_id)
+            {
+                server_data.state = ServerState::Stopped { failed_task };
+            }
+
+            app.invalidate(GET_ALL_SERVERS, None);
+            app.invalidate(GET_GROUPS, None);
+            app.invalidate(GET_SERVER_DETAILS, None);
+        });
+
+        Ok(server_id)
+    }
+
+    pub async fn create_server_from_modpack(
+        self,
+        group_id: ServerGroupId,
+        name: String,
+        modpack_source: modpack::ServerModpackSource,
+        port: Option<i32>,
+        icon_url: Option<String>,
+    ) -> anyhow::Result<ServerId> {
+        use crate::api::translation::Translation;
+        use crate::managers::vtask::VisualTask;
+
+        if name.is_empty() {
+            bail!("Server name cannot be empty");
+        }
+
+        let port = port.unwrap_or(25565);
+        let shortpath = generate_shortpath(&name);
+        let runtime_path = &self.app.settings_manager().runtime_path;
+        let servers_path = runtime_path.get_servers();
+        let server_path = servers_path.get_server_path(&shortpath);
+
+        // Create directory structure
+        tokio::fs::create_dir_all(server_path.get_data_path())
+            .await
+            .context("Failed to create server directory")?;
+
+        // Determine modpack metadata for DB
+        let (modpack_platform, modpack_project_id, modpack_file_id) = match &modpack_source {
+            modpack::ServerModpackSource::Curseforge {
+                server_pack_file_id,
+                project_id,
+                ..
+            } => (
+                "curseforge".to_string(),
+                project_id.to_string(),
+                server_pack_file_id.to_string(),
+            ),
+            modpack::ServerModpackSource::Modrinth {
+                project_id,
+                version_id,
+            } => (
+                "modrinth".to_string(),
+                project_id.clone(),
+                version_id.clone(),
+            ),
+        };
+
+        // Get next index
+        let count = self
+            .app
+            .prisma_client
+            .server()
+            .count(vec![db::server::group_id::equals(group_id.0)])
+            .exec()
+            .await? as i32;
+
+        // Create DB record with a placeholder game_version — will be updated after processing
+        let db_server = self
+            .app
+            .prisma_client
+            .server()
+            .create(
+                name.clone(),
+                shortpath.clone(),
+                count,
+                db::server_group::id::equals(group_id.0),
+                "unknown".to_string(),
+                vec![
+                    db::server::port::set(port),
+                    db::server::server_type::set("modded".to_string()),
+                    db::server::modpack_platform::set(Some(modpack_platform)),
+                    db::server::modpack_project_id::set(Some(modpack_project_id)),
+                    db::server::modpack_file_id::set(Some(modpack_file_id)),
+                ],
+            )
+            .exec()
+            .await?;
+
+        let server_id = ServerId(db_server.id);
+
+        // Create a visual task for install progress
+        let task = VisualTask::new(Translation::ServerTaskInstallFromModpack {
+            server_name: name.clone(),
+        });
+        let task_id = self.app.task_manager().spawn_task(&task).await;
+
+        // Register in memory as Installing
+        self.servers.write().await.insert(
+            server_id,
+            ServerData {
+                shortpath: shortpath.clone(),
+                state: ServerState::Installing(task_id),
+                handle: None,
+            },
+        );
+
+        // Download and save the modpack icon before spawning (small thumbnail, won't block)
+        if let Some(ref url) = icon_url {
+            match self.app.reqwest_client.get(url).send().await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        if let Ok(bytes) = response.bytes().await {
+                            let icon_path = server_path.get_root().join("icon.png");
+                            if let Err(e) = tokio::fs::write(&icon_path, &bytes).await {
+                                warn!("Failed to write server icon: {}", e);
+                            } else {
+                                let _ = self
+                                    .app
+                                    .prisma_client
+                                    .server()
+                                    .update(
+                                        db::server::id::equals(server_id.0),
+                                        vec![db::server::icon_revision::set(Some(1))],
+                                    )
+                                    .exec()
+                                    .await;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to download server icon: {}", e);
                 }
             }
         }
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_GROUPS, None);
+
+        // Process the modpack in background
+        let app = self.app.clone();
+        let shortpath_clone = shortpath.clone();
+        tokio::spawn(async move {
+            let runtime_path = &app.settings_manager().runtime_path;
+            let server_path = runtime_path
+                .get_servers()
+                .get_server_path(&shortpath_clone);
+
+            // Set KnownProgress so the frontend shows percentage — the process_* functions
+            // will create their own subtasks for download/extract phases, and we create
+            // subtasks lazily below for jar/modloader only if they're needed.
+            task.edit(|data| data.state = crate::managers::vtask::TaskState::KnownProgress).await;
+
+            let result: anyhow::Result<()> = async {
+                let pack_result = match modpack_source {
+                    modpack::ServerModpackSource::Curseforge {
+                        project_id,
+                        server_pack_file_id,
+                        ..
+                    } => {
+                        modpack::process_curseforge_server_pack(
+                            &app,
+                            &server_path,
+                            project_id,
+                            server_pack_file_id,
+                            &task,
+                        )
+                        .await?
+                    }
+                    modpack::ServerModpackSource::Modrinth {
+                        project_id,
+                        version_id,
+                    } => {
+                        modpack::process_modrinth_server_pack(
+                            &app,
+                            &server_path,
+                            &project_id,
+                            &version_id,
+                            &task,
+                        )
+                        .await?
+                    }
+                };
+
+                // Download vanilla server jar only if not already present (CF server packs
+                // usually bundle it, Modrinth mrpacks don't).
+                if !server_path.get_server_jar_path().exists() {
+                    let t_download_jar = task.subtask(Translation::ServerTaskDownloadServerJar);
+                    t_download_jar.set_weight(5.0);
+                    jars::download_vanilla_server_jar(
+                        &app.reqwest_client,
+                        &pack_result.game_version,
+                        &server_path,
+                        Some(&t_download_jar),
+                    )
+                    .await
+                    .context("Failed to download vanilla server jar")?;
+                }
+
+                // Install modloader only if detected
+                if let (Some(ml_type), Some(ml_version)) =
+                    (&pack_result.modloader_type, &pack_result.modloader_version)
+                {
+                    let t_install_modloader =
+                        task.subtask(Translation::ServerTaskInstallModloader);
+                    t_install_modloader.set_weight(5.0);
+                    let java_path = app
+                        .java_manager()
+                        .find_best_java_for_server()
+                        .await
+                        .context("Cannot install modloader: no Java available")?;
+
+                    let launch_config = modloader_install::install_modloader(
+                        &app.reqwest_client,
+                        &server_path,
+                        &pack_result.game_version,
+                        ml_type,
+                        ml_version,
+                        &java_path,
+                        Some(&t_install_modloader),
+                    )
+                    .await
+                    .context(format!("Failed to install {} {}", ml_type, ml_version))?;
+
+                    modloader_launch::save_launch_config(&server_path, &launch_config).await?;
+                }
+
+                // Write server.properties if not present
+                let props_path = server_path.get_server_properties_path();
+                if !props_path.exists() {
+                    let props =
+                        properties::generate_properties(port, "A Minecraft Server", 20, true);
+                    properties::write_properties(&props_path, &props).await?;
+                }
+
+                // Update DB with detected versions
+                let _ = app
+                    .prisma_client
+                    .server()
+                    .update(
+                        db::server::id::equals(server_id.0),
+                        vec![
+                            db::server::game_version::set(pack_result.game_version),
+                            db::server::modloader_type::set(pack_result.modloader_type),
+                            db::server::modloader_version::set(pack_result.modloader_version),
+                        ],
+                    )
+                    .exec()
+                    .await;
+
+                Ok(())
+            }
+            .await;
+
+            let failed_task = match result {
+                Ok(()) => {
+                    info!("Server from modpack created successfully: {}", server_id.0);
+                    drop(task);
+                    None
+                }
+                Err(e) => {
+                    error!("Failed to create server from modpack: {}", e);
+                    task.fail(e).await;
+                    Some(task_id)
+                }
+            };
+
+            // Transition to Stopped state
+            if let Some(server_data) = app.server_manager.servers.write().await.get_mut(&server_id)
+            {
+                server_data.state = ServerState::Stopped { failed_task };
+            }
+
+            app.invalidate(GET_ALL_SERVERS, None);
+            app.invalidate(GET_GROUPS, None);
+            app.invalidate(GET_SERVER_DETAILS, None);
+        });
 
         Ok(server_id)
     }
@@ -487,6 +844,10 @@ impl ManagerRef<'_, ServerManager> {
             .exec()
             .await;
 
+        // Pre-warm CPU metrics tracking so the first WebSocket poll gets non-zero values.
+        // sysinfo needs two refresh calls to compute cpu_usage delta.
+        self.app.system_info_manager().get_process_metrics(process_id).await;
+
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app
             .invalidate(GET_SERVER_DETAILS, None);
@@ -635,6 +996,13 @@ impl ManagerRef<'_, ServerManager> {
             icon_revision: db_server.icon_revision.map(|v| v as u32),
             modloader_type: db_server.modloader_type,
             modloader_version: db_server.modloader_version,
+            modpack_info: db_server.modpack_platform.map(|platform| {
+                ServerModpackInfo {
+                    platform,
+                    project_id: db_server.modpack_project_id.unwrap_or_default(),
+                    file_id: db_server.modpack_file_id.unwrap_or_default(),
+                }
+            }),
         })
     }
 
@@ -863,11 +1231,18 @@ impl ManagerRef<'_, ServerManager> {
         }
     }
 
-    /// List server addons (mods and datapacks) by scanning filesystem
+    /// List server addons from database cache. Triggers caching if needed.
     pub async fn list_server_addons(
         self,
         id: ServerId,
     ) -> anyhow::Result<Vec<ServerAddon>> {
+        use carbon_repos::db::{
+            server_mod_file_cache as sfcdb,
+            mod_metadata as metadb,
+            curse_forge_mod_cache as cfdb,
+            modrinth_mod_cache as mrdb,
+        };
+
         let db_server = self
             .app
             .prisma_client
@@ -877,62 +1252,67 @@ impl ManagerRef<'_, ServerManager> {
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
-        let runtime_path = &self.app.settings_manager().runtime_path;
-        let server_path = runtime_path
-            .get_servers()
-            .get_server_path(&db_server.shortpath);
+        // Query from cache with metadata joins
+        // Caching is handled by the queue system (triggered on install, startup, and tab navigation)
+        let cached_mods = self
+            .app
+            .prisma_client
+            .server_mod_file_cache()
+            .find_many(vec![sfcdb::server_id::equals(id.0)])
+            .with(
+                sfcdb::metadata::fetch()
+                    .with(metadb::logo_image::fetch())
+                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
+                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
+            )
+            .exec()
+            .await?;
 
-        let mut addons = Vec::new();
+        let mut addons: Vec<ServerAddon> = cached_mods
+            .into_iter()
+            .map(|entry| {
+                let metadata = entry.metadata.as_ref().expect("metadata should be fetched");
 
-        // Scan mods directory
-        let mods_path = server_path.get_mods_path();
-        if mods_path.exists() {
-            let mut entries = tokio::fs::read_dir(&mods_path).await?;
-            while let Some(entry) = entries.next_entry().await? {
-                let filename = entry.file_name().to_string_lossy().to_string();
-                if filename.ends_with(".jar") || filename.ends_with(".jar.disabled") {
-                    let metadata = entry.metadata().await?;
-                    let enabled = !filename.ends_with(".disabled");
-                    let display_name = filename
-                        .trim_end_matches(".disabled")
+                let display_name = metadata.name.clone().unwrap_or_else(|| {
+                    entry.filename
                         .trim_end_matches(".jar")
-                        .to_string();
-                    addons.push(ServerAddon {
-                        id: filename.clone(),
-                        filename,
-                        display_name,
-                        enabled,
-                        addon_type: "mods".to_string(),
-                        file_size: metadata.len() as i32,
-                    });
-                }
-            }
-        }
-
-        // Scan datapacks directory
-        let datapacks_path = server_path.get_datapacks_path();
-        if datapacks_path.exists() {
-            let mut entries = tokio::fs::read_dir(&datapacks_path).await?;
-            while let Some(entry) = entries.next_entry().await? {
-                let filename = entry.file_name().to_string_lossy().to_string();
-                if filename.ends_with(".zip") || filename.ends_with(".zip.disabled") {
-                    let metadata = entry.metadata().await?;
-                    let enabled = !filename.ends_with(".disabled");
-                    let display_name = filename
-                        .trim_end_matches(".disabled")
                         .trim_end_matches(".zip")
-                        .to_string();
-                    addons.push(ServerAddon {
-                        id: filename.clone(),
-                        filename,
-                        display_name,
-                        enabled,
-                        addon_type: "datapacks".to_string(),
-                        file_size: metadata.len() as i32,
-                    });
+                        .to_string()
+                });
+
+                let has_local_image = metadata.logo_image.as_ref()
+                    .and_then(|opt| opt.as_ref())
+                    .is_some();
+
+                let cf = metadata.curseforge.as_ref().and_then(|opt| opt.as_ref());
+                let mr = metadata.modrinth.as_ref().and_then(|opt| opt.as_ref());
+
+                let has_cf_image = cf
+                    .and_then(|c| c.logo_image.as_ref())
+                    .and_then(|opt| opt.as_ref())
+                    .is_some();
+
+                let has_mr_image = mr
+                    .and_then(|m| m.logo_image.as_ref())
+                    .and_then(|opt| opt.as_ref())
+                    .is_some();
+
+                ServerAddon {
+                    id: entry.id,
+                    filename: entry.filename,
+                    display_name,
+                    enabled: entry.enabled,
+                    addon_type: entry.addon_type,
+                    file_size: entry.filesize,
+                    has_image: has_local_image || has_cf_image || has_mr_image,
+                    curseforge_project_id: cf.map(|c| c.project_id as u32),
+                    modrinth_project_id: mr.map(|m| m.project_id.clone()),
                 }
-            }
-        }
+            })
+            .collect();
+
+        // Sort by filename for consistent ordering
+        addons.sort_by(|a, b| a.filename.cmp(&b.filename));
 
         Ok(addons)
     }
@@ -944,6 +1324,8 @@ impl ManagerRef<'_, ServerManager> {
         addon_id: String,
         enabled: bool,
     ) -> anyhow::Result<()> {
+        use carbon_repos::db::server_mod_file_cache as sfcdb;
+
         let db_server = self
             .app
             .prisma_client
@@ -953,32 +1335,43 @@ impl ManagerRef<'_, ServerManager> {
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
+        // Look up the cache entry to get the filename
+        let cache_entry = self.app.prisma_client
+            .server_mod_file_cache()
+            .find_unique(sfcdb::UniqueWhereParam::IdEquals(addon_id.clone()))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
+
+        let base_filename = &cache_entry.filename;
+
         let runtime_path = &self.app.settings_manager().runtime_path;
         let server_path = runtime_path
             .get_servers()
             .get_server_path(&db_server.shortpath);
 
-        // Try mods/ first, then datapacks/
-        let file_path = {
-            let mods_path = server_path.get_mods_path().join(&addon_id);
-            if mods_path.exists() {
-                mods_path
-            } else {
-                let dp_path = server_path.get_datapacks_path().join(&addon_id);
-                if dp_path.exists() {
-                    dp_path
-                } else {
-                    bail!("Addon file not found: {}", addon_id);
-                }
+        // Find the actual file on disk (enabled or disabled variant)
+        let disabled_name = format!("{}.disabled", base_filename);
+        let dirs = [server_path.get_mods_path(), server_path.get_datapacks_path()];
+        let mut file_path = None;
+        for dir in &dirs {
+            let enabled_path = dir.join(base_filename);
+            let disabled_path = dir.join(&disabled_name);
+            if enabled_path.exists() {
+                file_path = Some(enabled_path);
+                break;
             }
-        };
+            if disabled_path.exists() {
+                file_path = Some(disabled_path);
+                break;
+            }
+        }
+        let file_path = file_path.ok_or_else(|| anyhow!("Addon file not found: {}", base_filename))?;
 
         let new_path = if enabled {
-            // Remove .disabled suffix
             let name = file_path.to_string_lossy().trim_end_matches(".disabled").to_string();
             std::path::PathBuf::from(name)
         } else {
-            // Add .disabled suffix
             let mut name = file_path.to_string_lossy().to_string();
             if !name.ends_with(".disabled") {
                 name.push_str(".disabled");
@@ -989,6 +1382,16 @@ impl ManagerRef<'_, ServerManager> {
         if file_path != new_path {
             tokio::fs::rename(&file_path, &new_path).await?;
         }
+
+        // Update cache entry's enabled state directly (no re-hash needed)
+        let _ = self.app.prisma_client
+            .server_mod_file_cache()
+            .update(
+                sfcdb::UniqueWhereParam::IdEquals(addon_id),
+                vec![sfcdb::enabled::set(enabled)],
+            )
+            .exec()
+            .await;
 
         self.app.invalidate(GET_SERVER_ADDONS, None);
 
@@ -1001,6 +1404,79 @@ impl ManagerRef<'_, ServerManager> {
         id: ServerId,
         addon_id: String,
     ) -> anyhow::Result<()> {
+        use carbon_repos::db::server_mod_file_cache as sfcdb;
+
+        let db_server = self
+            .app
+            .prisma_client
+            .server()
+            .find_unique(db::server::id::equals(id.0))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Server not found"))?;
+
+        // Look up the cache entry to get the filename
+        let cache_entry = self.app.prisma_client
+            .server_mod_file_cache()
+            .find_unique(sfcdb::UniqueWhereParam::IdEquals(addon_id.clone()))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
+
+        let base_filename = &cache_entry.filename;
+
+        let runtime_path = &self.app.settings_manager().runtime_path;
+        let server_path = runtime_path
+            .get_servers()
+            .get_server_path(&db_server.shortpath);
+
+        // Find the actual file on disk
+        let disabled_name = format!("{}.disabled", base_filename);
+        let dirs = [server_path.get_mods_path(), server_path.get_datapacks_path()];
+        let mut file_path = None;
+        for dir in &dirs {
+            let enabled_path = dir.join(base_filename);
+            let disabled_path = dir.join(&disabled_name);
+            if enabled_path.exists() {
+                file_path = Some(enabled_path);
+                break;
+            }
+            if disabled_path.exists() {
+                file_path = Some(disabled_path);
+                break;
+            }
+        }
+        let file_path = file_path.ok_or_else(|| anyhow!("Addon file not found: {}", base_filename))?;
+
+        tokio::fs::remove_file(&file_path).await?;
+
+        // Remove cache entry
+        let _ = self.app.prisma_client
+            .server_mod_file_cache()
+            .delete(sfcdb::UniqueWhereParam::IdEquals(addon_id))
+            .exec()
+            .await;
+
+        // GC orphaned metadata
+        self.app.meta_cache_manager().gc_mod_metadata().await;
+
+        self.app.invalidate(GET_SERVER_ADDONS, None);
+
+        Ok(())
+    }
+
+    /// Install a CurseForge mod on a server by project_id + file_id
+    pub async fn install_curseforge_mod(
+        self,
+        id: ServerId,
+        project_id: u32,
+        file_id: u32,
+    ) -> anyhow::Result<VisualTaskId> {
+        use carbon_net::{Downloadable, DownloadOptions, Checksum};
+        use carbon_platforms::curseforge::filters::ModFileParameters;
+        use crate::api::translation::Translation;
+        use crate::managers::vtask::VisualTask;
+
         let db_server = self
             .app
             .prisma_client
@@ -1015,25 +1491,246 @@ impl ManagerRef<'_, ServerManager> {
             .get_servers()
             .get_server_path(&db_server.shortpath);
 
-        // Try mods/ first, then datapacks/
-        let file_path = {
-            let mods_path = server_path.get_mods_path().join(&addon_id);
-            if mods_path.exists() {
-                mods_path
-            } else {
-                let dp_path = server_path.get_datapacks_path().join(&addon_id);
-                if dp_path.exists() {
-                    dp_path
-                } else {
-                    bail!("Addon file not found: {}", addon_id);
-                }
+        // Fetch file info from CurseForge
+        let file = self
+            .app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod_file(ModFileParameters {
+                mod_id: project_id as i32,
+                file_id: file_id as i32,
+            })
+            .await?
+            .data;
+
+        let download_url = file.download_url.clone().ok_or_else(|| {
+            anyhow!("Mod cannot be downloaded without privileged API key")
+        })?;
+
+        let mods_path = server_path.get_mods_path();
+        tokio::fs::create_dir_all(&mods_path).await?;
+        let install_path = mods_path.join(&file.file_name);
+
+        let checksums = file
+            .hashes
+            .iter()
+            .map(|hash| match hash.algo {
+                carbon_platforms::curseforge::HashAlgo::Sha1 => Checksum::Sha1(hash.value.clone()),
+                carbon_platforms::curseforge::HashAlgo::Md5 => Checksum::Md5(hash.value.clone()),
+            })
+            .collect::<Vec<_>>();
+
+        let downloadable = Downloadable::new(&download_url, &install_path)
+            .with_checksum(checksums.first().cloned())
+            .with_size(file.file_length as u64);
+
+        // Create visual task for progress
+        let task = VisualTask::new(Translation::ServerTaskInstallMod {
+            mod_name: file.display_name.clone(),
+            server_name: db_server.name.clone(),
+        });
+        let task_id = self.app.task_manager().spawn_task(&task).await;
+
+        let server_id_val = id.0;
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            let result = carbon_net::download_multiple(
+                &[downloadable],
+                DownloadOptions::builder().concurrency(1).build(),
+            )
+            .await;
+
+            if let Err(e) = result {
+                error!("Failed to download server mod: {e}");
             }
-        };
 
-        tokio::fs::remove_file(&file_path).await?;
-        self.app.invalidate(GET_SERVER_ADDONS, None);
+            // Queue caching for server addons after download
+            app.meta_cache_manager()
+                .queue_caching(crate::managers::metadata::cache::CacheEntityId::Server(server_id_val), true)
+                .await;
 
-        Ok(())
+            app.invalidate(GET_SERVER_ADDONS, None);
+            drop(task);
+        });
+
+        Ok(task_id)
+    }
+
+    /// Install the latest compatible CurseForge mod on a server
+    pub async fn install_latest_curseforge_mod(
+        self,
+        id: ServerId,
+        project_id: u32,
+    ) -> anyhow::Result<VisualTaskId> {
+        use carbon_platforms::curseforge::filters::{ModFilesParameters, ModFilesParametersQuery};
+
+        let db_server = self
+            .app
+            .prisma_client
+            .server()
+            .find_unique(db::server::id::equals(id.0))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Server not found"))?;
+
+        let game_version = db_server.game_version.clone();
+        let modloader_type = db_server.modloader_type.as_deref()
+            .and_then(|ml| match ml {
+                "forge" => Some(carbon_platforms::curseforge::ModLoaderType::Forge),
+                "fabric" => Some(carbon_platforms::curseforge::ModLoaderType::Fabric),
+                "quilt" => Some(carbon_platforms::curseforge::ModLoaderType::Quilt),
+                "neoforge" => Some(carbon_platforms::curseforge::ModLoaderType::NeoForge),
+                _ => None,
+            });
+
+        let files = self
+            .app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod_files(ModFilesParameters {
+                mod_id: project_id as i32,
+                query: ModFilesParametersQuery {
+                    game_version: Some(game_version.clone()),
+                    game_version_type_id: None,
+                    mod_loader_type: modloader_type,
+                    index: None,
+                    page_size: Some(200),
+                },
+            })
+            .await?;
+
+        let file = files
+            .data
+            .iter()
+            .find(|f| f.game_versions.contains(&game_version))
+            .ok_or_else(|| anyhow!("Can't find a compatible version for this server"))?;
+
+        let file_id: u32 = file.id.try_into()?;
+        self.install_curseforge_mod(id, project_id, file_id).await
+    }
+
+    /// Install a Modrinth mod on a server by project_id + version_id
+    pub async fn install_modrinth_mod(
+        self,
+        id: ServerId,
+        project_id: String,
+        version_id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        use carbon_net::{Downloadable, DownloadOptions, Checksum};
+        use carbon_platforms::modrinth::search::VersionID;
+        use crate::api::translation::Translation;
+        use crate::managers::vtask::VisualTask;
+
+        let db_server = self
+            .app
+            .prisma_client
+            .server()
+            .find_unique(db::server::id::equals(id.0))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Server not found"))?;
+
+        let runtime_path = &self.app.settings_manager().runtime_path;
+        let server_path = runtime_path
+            .get_servers()
+            .get_server_path(&db_server.shortpath);
+
+        // Fetch version info from Modrinth
+        let version = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_version(VersionID(version_id.clone()))
+            .await?;
+
+        let file = version
+            .files
+            .iter()
+            .reduce(|a, b| if b.primary { b } else { a })
+            .ok_or_else(|| anyhow!("Modrinth version has no files"))?;
+
+        let mods_path = server_path.get_mods_path();
+        tokio::fs::create_dir_all(&mods_path).await?;
+        let install_path = mods_path.join(&file.filename);
+
+        let checksum = Checksum::Sha1(file.hashes.sha1.clone());
+
+        let downloadable = Downloadable::new(&file.url, &install_path)
+            .with_checksum(Some(checksum))
+            .with_size(file.size as u64);
+
+        // Create visual task for progress
+        let task = VisualTask::new(Translation::ServerTaskInstallMod {
+            mod_name: file.filename.clone(),
+            server_name: db_server.name.clone(),
+        });
+        let task_id = self.app.task_manager().spawn_task(&task).await;
+
+        let server_id_val = id.0;
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            let result = carbon_net::download_multiple(
+                &[downloadable],
+                DownloadOptions::builder().concurrency(1).build(),
+            )
+            .await;
+
+            if let Err(e) = result {
+                error!("Failed to download server mod: {e}");
+            }
+
+            // Queue caching for server addons after download
+            app.meta_cache_manager()
+                .queue_caching(crate::managers::metadata::cache::CacheEntityId::Server(server_id_val), true)
+                .await;
+
+            app.invalidate(GET_SERVER_ADDONS, None);
+            drop(task);
+        });
+
+        Ok(task_id)
+    }
+
+    /// Install the latest compatible Modrinth mod on a server
+    pub async fn install_latest_modrinth_mod(
+        self,
+        id: ServerId,
+        project_id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        use carbon_platforms::modrinth::project::ProjectVersionsFilters;
+        use carbon_platforms::modrinth::search::ProjectID;
+
+        let db_server = self
+            .app
+            .prisma_client
+            .server()
+            .find_unique(db::server::id::equals(id.0))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Server not found"))?;
+
+        let game_version = db_server.game_version.clone();
+        let loaders = db_server.modloader_type.as_ref().map(|ml| vec![ml.clone()]);
+
+        let versions = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_project_versions(ProjectVersionsFilters {
+                project_id: ProjectID(project_id.clone()),
+                game_versions: Some(vec![game_version]),
+                loaders,
+                limit: None,
+                offset: None,
+            })
+            .await?;
+
+        let version = versions
+            .first()
+            .ok_or_else(|| anyhow!("Can't find a compatible version for this server"))?;
+
+        let version_id = version.id.clone();
+        self.install_modrinth_mod(id, project_id, version_id).await
     }
 
     /// Write a player list JSON file
@@ -1075,6 +1772,7 @@ impl ManagerRef<'_, ServerManager> {
             .await?;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
+        self.app.invalidate(GET_SERVER_DETAILS, None);
 
         Ok(())
     }
@@ -1124,6 +1822,34 @@ impl ManagerRef<'_, ServerManager> {
             .get(&id)
             .ok_or_else(|| anyhow!("Server not found"))?;
         Ok(server.state.clone())
+    }
+
+    pub async fn open_folder(self, id: ServerId) -> anyhow::Result<()> {
+        let db_server = self
+            .app
+            .prisma_client
+            .server()
+            .find_unique(db::server::id::equals(id.0))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Server not found in database"))?;
+
+        let runtime_path = &self.app.settings_manager().runtime_path;
+        let server_path = runtime_path
+            .get_servers()
+            .get_server_path(&db_server.shortpath);
+
+        let path = server_path.get_data_path();
+
+        if !path.is_dir() {
+            tokio::fs::create_dir_all(&path).await.with_context(|| {
+                format!("Creating server folder at `{}`", path.to_string_lossy())
+            })?;
+        }
+
+        opener::open(path)?;
+
+        Ok(())
     }
 
     pub async fn set_server_icon(

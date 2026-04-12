@@ -89,6 +89,7 @@ export function formatModloader(
 interface SharePreviewContentProps {
   shareCode: string | null
   onImportSuccess?: () => void
+  expandMods?: boolean
 }
 
 const SharePreviewContent = (props: SharePreviewContentProps) => {
@@ -180,7 +181,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
   }
 
   return (
-    <div class="text-lightSlate-50 flex flex-col">
+    <div class="text-lightSlate-50 flex flex-col" classList={{ "h-full": props.expandMods }}>
       <Switch>
         {/* Loading state - skeleton preview (also shown while debounce pending) */}
         <Match when={!props.shareCode || previewQuery.isLoading}>
@@ -188,7 +189,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
             {/* Hero header skeleton */}
             <div class="relative shrink-0 overflow-hidden rounded-lg">
               {/* Background shimmer */}
-              <div class="bg-darkSlate-700 h-32 w-full animate-pulse" />
+              <div class="bg-darkSlate-700 h-40 w-full animate-pulse" />
               {/* Gradient overlay */}
               <div class="absolute inset-0 bg-gradient-to-t from-darkSlate-900 via-darkSlate-900/60 to-transparent" />
 
@@ -278,7 +279,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
 
         {/* Preview content */}
         <Match when={preview()}>
-          <div class="text-lightSlate-50 flex flex-col">
+          <div class="text-lightSlate-50 flex flex-col" classList={{ "min-h-0 flex-1": props.expandMods }}>
             {/* Hero header with background image */}
             <div class="relative shrink-0 overflow-hidden rounded-lg">
               <img
@@ -287,7 +288,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                   "/assets/images/default-instance-img.png"
                 }
                 alt={preview()?.title || "Instance preview"}
-                class="h-32 w-full object-cover"
+                class="h-40 w-full object-cover"
               />
               {/* Gradient overlay */}
               <div class="absolute inset-0 bg-gradient-to-t from-darkSlate-900 via-darkSlate-900/60 to-transparent" />
@@ -308,7 +309,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                 {/* Metadata chips */}
                 <div class="flex flex-wrap gap-1.5">
                   <Show when={preview()?.minecraftVersion}>
-                    <div class="bg-darkSlate-800/80 rounded px-2 py-0.5 text-xs backdrop-blur-sm">
+                    <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
                       <span class="text-lightSlate-400">MC </span>
                       <span class="font-medium">
                         {preview()!.minecraftVersion}
@@ -317,12 +318,12 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                   </Show>
 
                   <Show when={modloader()}>
-                    <div class="bg-darkSlate-800/80 rounded px-2 py-0.5 text-xs backdrop-blur-sm">
+                    <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
                       <span class="font-medium">{modloader()}</span>
                     </div>
                   </Show>
 
-                  <div class="bg-darkSlate-800/80 rounded px-2 py-0.5 text-xs backdrop-blur-sm">
+                  <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
                     <span class="font-medium">
                       {preview()?.mods?.length || 0}
                     </span>
@@ -330,13 +331,13 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                   </div>
 
                   <Show when={fileSize()}>
-                    <div class="bg-darkSlate-800/80 rounded px-2 py-0.5 text-xs backdrop-blur-sm">
+                    <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
                       <span class="font-medium">{fileSize()}</span>
                     </div>
                   </Show>
 
                   <Show when={!isExpired() && preview()?.expiresAt}>
-                    <div class="bg-darkSlate-800/80 rounded px-2 py-0.5 text-xs backdrop-blur-sm">
+                    <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
                       <span class="text-lightSlate-400">Expires </span>
                       <span class="font-medium">
                         {new Date(preview()!.expiresAt).toLocaleDateString(
@@ -362,7 +363,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
 
             {/* Mods list - fills remaining space */}
             <Show when={(preview()?.mods?.length || 0) > 0}>
-              <div class="mt-3 flex h-60 flex-col">
+              <div class="mt-4 flex flex-col" classList={{ "min-h-48 flex-1": props.expandMods, "h-48": !props.expandMods }}>
                 <div class="text-lightSlate-500 mb-1.5 shrink-0 text-xs uppercase tracking-wide">
                   <Trans key="instances:_trn_share_preview.mods_list" /> (
                   {preview()!.mods.length})
@@ -374,12 +375,34 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                   {(mod) => (
                     <div class="border-darkSlate-600 flex items-center justify-between border-b px-3 py-1.5">
                       <span class="flex-1 truncate text-sm">{mod.name}</span>
-                      <div class="ml-2 flex gap-2">
+                      <div class="ml-2 flex gap-1">
                         <Show when={mod.curseforgeSlug}>
-                          <img src={CurseforgeLogo} class="h-4 w-4" />
+                          <button
+                            class="hover:bg-darkSlate-500 flex items-center justify-center rounded p-1 transition-colors"
+                            onClick={() =>
+                              window.open(
+                                `https://www.curseforge.com/minecraft/mc-mods/${mod.curseforgeSlug}`,
+                                "_blank"
+                              )
+                            }
+                            title="View on CurseForge"
+                          >
+                            <img src={CurseforgeLogo} class="h-4 w-4" />
+                          </button>
                         </Show>
                         <Show when={mod.modrinthSlug}>
-                          <img src={ModrinthLogo} class="h-4 w-4" />
+                          <button
+                            class="hover:bg-darkSlate-500 flex items-center justify-center rounded p-1 transition-colors"
+                            onClick={() =>
+                              window.open(
+                                `https://modrinth.com/mod/${mod.modrinthSlug}`,
+                                "_blank"
+                              )
+                            }
+                            title="View on Modrinth"
+                          >
+                            <img src={ModrinthLogo} class="h-4 w-4" />
+                          </button>
                         </Show>
                       </div>
                     </div>
@@ -390,7 +413,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
 
             {/* Disclaimer - compact */}
             <Show when={!isExpired()}>
-              <div class="bg-yellow-500/10 border-yellow-500/30 text-yellow-200 mt-3 flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs">
+              <div class="bg-yellow-500/10 border-yellow-500/30 text-yellow-200 mt-4 flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs">
                 <div class="i-ri:alert-line shrink-0 text-yellow-400" />
                 <span>
                   <Trans key="instances:_trn_share_preview.disclaimer" />
@@ -399,7 +422,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
             </Show>
 
             {/* Import button */}
-            <div class="mt-3 flex justify-end">
+            <div class="mt-4 flex justify-end">
               <Button
                 type="primary"
                 disabled={!canImport()}

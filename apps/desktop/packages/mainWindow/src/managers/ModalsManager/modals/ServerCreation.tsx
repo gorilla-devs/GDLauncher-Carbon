@@ -10,20 +10,23 @@ import {
 } from "@gd/ui"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { rspc } from "@/utils/rspcClient"
+import { Trans, useTransContext } from "@gd/i18n"
+import { queryClient, rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { getModloaderIcon } from "@/utils/sidebar"
 
 type ModloaderOption = "vanilla" | "forge" | "neoforge" | "fabric" | "quilt"
 
-const modloaderOptions: { id: ModloaderOption; label: string; icon: string }[] = [
-  { id: "vanilla", label: "Vanilla", icon: "i-hugeicons:cube-01" },
-  { id: "forge", label: "Forge", icon: "i-hugeicons:anvil" },
-  { id: "neoforge", label: "NeoForge", icon: "i-hugeicons:anvil" },
-  { id: "fabric", label: "Fabric", icon: "i-hugeicons:thread" },
-  { id: "quilt", label: "Quilt", icon: "i-hugeicons:quilt" }
+const modloaderOptions: { id: ModloaderOption; label: string }[] = [
+  { id: "vanilla", label: "Vanilla" },
+  { id: "forge", label: "Forge" },
+  { id: "neoforge", label: "NeoForge" },
+  { id: "fabric", label: "Fabric" },
+  { id: "quilt", label: "Quilt" }
 ]
 
 const ServerCreation = (props: ModalProps) => {
+  const [t] = useTransContext()
   const modalsContext = useModal()
   const globalStore = useGlobalStore()
 
@@ -36,7 +39,11 @@ const ServerCreation = (props: ModalProps) => {
   const [modloaderVersion, setModloaderVersion] = createSignal("")
 
   const createServerMutation = rspc.createMutation(() => ({
-    mutationKey: ["server.createServer"]
+    mutationKey: ["server.createServer"],
+    onSuccess() {
+      queryClient.invalidateQueries({ queryKey: ["server.getAllServers"] })
+      queryClient.invalidateQueries({ queryKey: ["server.getGroups"] })
+    }
   }))
 
   // Modloader version queries
@@ -74,26 +81,45 @@ const ServerCreation = (props: ModalProps) => {
     return versions.length > 0 ? versions[0] : ""
   })
 
+  const DUMMY_META_VERSION = "${gdlauncher.gameVersion}"
+
+  const modloaderQueryData = createMemo(() => {
+    const ml = modloaderType()
+    if (ml === "forge") return forgeVersions
+    if (ml === "neoforge") return neoforgeVersions
+    if (ml === "fabric") return fabricVersions
+    if (ml === "quilt") return quiltVersions
+    return undefined
+  })
+
+  const isModloaderDataLoading = createMemo(() => {
+    const q = modloaderQueryData()
+    if (!q || modloaderType() === "vanilla") return false
+    return !q.data
+  })
+
   // Get available modloader versions for selected MC version
+  // Forge/NeoForge: loaders are stored per game version entry
+  // Fabric/Quilt: game version entries indicate support, loaders are under a dummy "${gdlauncher.gameVersion}" entry
   const availableModloaderVersions = createMemo(() => {
     const ml = modloaderType()
     const gameVer = selectedVersion()
     if (ml === "vanilla" || !gameVer) return []
 
-    let versions: any[] | undefined
-    if (ml === "forge") versions = forgeVersions.data
-    else if (ml === "neoforge") versions = neoforgeVersions.data
-    else if (ml === "fabric") versions = fabricVersions.data
-    else if (ml === "quilt") versions = quiltVersions.data
+    const data = modloaderQueryData()?.data as any
+    if (!data?.gameVersions) return []
 
-    if (!versions) return []
+    if (ml === "fabric" || ml === "quilt") {
+      const supported = data.gameVersions.find((v: any) => v.id === gameVer)
+      if (!supported) return []
+      const loaders = data.gameVersions.find((v: any) => v.id === DUMMY_META_VERSION)?.loaders
+      return (loaders || []).map((l: any) => l.id).slice(0, 50)
+    }
 
-    // Filter versions by game version
-    // The structure varies by modloader, but generally they have gameVersion and version fields
-    return versions
-      .filter((v: any) => v.gameVersion === gameVer)
-      .map((v: any) => v.version || v.loaderVersion || v.id)
-      .slice(0, 50) // Limit for performance
+    // Forge / NeoForge
+    const match = data.gameVersions.find((v: any) => v.id === gameVer)
+    if (!match?.loaders) return []
+    return match.loaders.map((l: any) => l.id).slice(0, 50)
   })
 
   // Reset modloader version when changing type or game version
@@ -113,7 +139,7 @@ const ServerCreation = (props: ModalProps) => {
 
   const validatePort = (value: number) => {
     if (isNaN(value) || value < 1 || value > 65535) {
-      setPortError("Port must be between 1 and 65535")
+      setPortError(t("instances:_trn_server_port_error"))
       return false
     }
     setPortError("")
@@ -150,7 +176,7 @@ const ServerCreation = (props: ModalProps) => {
       modalsContext?.closeModal()
     } catch (err) {
       console.error(err)
-      setError("Failed to create server. Please try again.")
+      setError(t("instances:_trn_server_creation_error"))
     }
   }
 
@@ -165,7 +191,7 @@ const ServerCreation = (props: ModalProps) => {
         {/* Server Name */}
         <div class="flex flex-col gap-2">
           <label class="text-lightSlate-400 text-xs font-medium">
-            Server Name
+            <Trans key="instances:_trn_server_creation_name" />
           </label>
           <Input
             placeholder="Minecraft Server"
@@ -178,7 +204,7 @@ const ServerCreation = (props: ModalProps) => {
         {/* Modloader Selection */}
         <div class="flex flex-col gap-2">
           <label class="text-lightSlate-400 text-xs font-medium">
-            Server Type
+            <Trans key="instances:_trn_server_select_modloader" />
           </label>
           <div class="grid grid-cols-5 gap-2">
             <For each={modloaderOptions}>
@@ -191,7 +217,7 @@ const ServerCreation = (props: ModalProps) => {
                   }}
                   onClick={() => setModloaderType(option.id)}
                 >
-                  <div class={`h-5 w-5 ${option.icon}`} />
+                  <img class="h-5 w-5" src={getModloaderIcon(option.id)} />
                   {option.label}
                 </button>
               )}
@@ -202,7 +228,7 @@ const ServerCreation = (props: ModalProps) => {
         {/* Game Version */}
         <div class="flex flex-col gap-2">
           <label class="text-lightSlate-400 text-xs font-medium">
-            Game Version
+            <Trans key="instances:_trn_server_creation_version" />
           </label>
           <Select
             value={selectedVersion()}
@@ -232,14 +258,23 @@ const ServerCreation = (props: ModalProps) => {
         <Show when={modloaderType() !== "vanilla"}>
           <div class="flex flex-col gap-2">
             <label class="text-lightSlate-400 text-xs font-medium">
-              {modloaderType()[0].toUpperCase() + modloaderType().slice(1)} Version
+              <Trans key="instances:_trn_server_modloader_version" />
             </label>
             <Show
               when={availableModloaderVersions().length > 0}
               fallback={
                 <div class="flex items-center gap-2 rounded-lg bg-darkSlate-800 px-3 py-2 text-sm text-lightSlate-600">
-                  <div class="i-hugeicons:loading-03 h-4 w-4 animate-spin" />
-                  Loading versions...
+                  <Show
+                    when={!isModloaderDataLoading()}
+                    fallback={
+                      <>
+                        <div class="i-hugeicons:loading-03 h-4 w-4 animate-spin" />
+                        <Trans key="instances:_trn_server_creation_loading_versions" />
+                      </>
+                    }
+                  >
+                    <Trans key="instances:_trn_server_creation_no_versions" />
+                  </Show>
                 </div>
               }
             >
@@ -270,7 +305,7 @@ const ServerCreation = (props: ModalProps) => {
 
         {/* Port */}
         <div class="flex flex-col gap-2">
-          <label class="text-lightSlate-400 text-xs font-medium">Port</label>
+          <label class="text-lightSlate-400 text-xs font-medium"><Trans key="instances:_trn_server_creation_port" /></label>
           <Input
             type="number"
             placeholder="25565"
@@ -301,7 +336,7 @@ const ServerCreation = (props: ModalProps) => {
               modalsContext?.closeModal()
             }}
           >
-            Cancel
+            <Trans key="instances:_trn_server_creation_cancel" />
           </Button>
           <Button
             disabled={!isFormValid() || createServerMutation.isPending}
@@ -310,7 +345,7 @@ const ServerCreation = (props: ModalProps) => {
           >
             <div class="flex items-center gap-2">
               <div class="i-hugeicons:add-circle-half-dot h-4 w-4" />
-              Create Server
+              <Trans key="instances:_trn_server_creation_create" />
             </div>
           </Button>
         </div>

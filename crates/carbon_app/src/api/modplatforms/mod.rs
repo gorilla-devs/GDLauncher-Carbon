@@ -370,7 +370,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
             )?;
 
             let cf_categories = cf_categories.data.into_iter().map(|category| (category.id, FEUnifiedCategory::from(category))).collect();
-            let mr_categories = mr_categories.into_iter().map(|category| (category.name.clone(), FEUnifiedCategory::from(category))).collect();
+            let mr_categories = mr_categories.into_iter().map(|category| {
+                let fe_type: FEUnifiedSearchType = category.project_type.clone().into();
+                let type_str = serde_plain::to_string(&fe_type).unwrap_or_default();
+                let key = format!("{}:{}", type_str, category.name);
+                (key, FEUnifiedCategory::from(category))
+            }).collect();
 
             Ok(FEUnifiedCategories {
                 modrinth: mr_categories,

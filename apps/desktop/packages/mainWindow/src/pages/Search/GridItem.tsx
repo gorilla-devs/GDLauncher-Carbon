@@ -1,10 +1,11 @@
-import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings"
+import { FEUnifiedSearchResult, Mod, ServerAddon } from "@gd/core_module/bindings"
 import { createSignal, Match, Show, Switch } from "solid-js"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
+import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 import { Badge } from "@gd/ui"
 
@@ -14,6 +15,8 @@ interface GridItemProps {
   isInstalled: boolean
   instanceId?: number
   instanceMods?: Mod[]
+  serverAddons?: ServerAddon[]
+  serverId?: number
 }
 
 export function GridItem(props: GridItemProps) {
@@ -149,12 +152,19 @@ export function GridItem(props: GridItemProps) {
               </div>
             </Match>
             <Match when={props.result.type === "modpack"}>
-              <ModpackDownloadButton addon={props.result} />
+              <div class="flex items-center gap-2">
+                <ModpackDownloadButton addon={props.result} />
+                <Show when={props.result.serverPackFileId}>
+                  <ServerPackDownloadButton addon={props.result} />
+                </Show>
+              </div>
             </Match>
             <Match when={props.result.type !== "modpack"}>
               <ModDownloadButton
                 selectedInstanceId={props.instanceId}
                 selectedInstanceMods={props.instanceMods}
+                selectedServerAddons={props.serverAddons}
+                selectedServerId={props.serverId}
                 addon={props.result}
                 onDropdownOpenChange={(isOpen) => {
                   setIsHoverActive(isOpen)

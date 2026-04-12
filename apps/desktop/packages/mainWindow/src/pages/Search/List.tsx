@@ -23,6 +23,8 @@ export function List() {
 
   const instanceId = () => searchContext?.selectedInstanceId() || NaN
   const instanceMods = () => searchContext?.selectedInstanceMods
+  const serverId = () => searchContext?.selectedServerId() || NaN
+  const serverAddons = () => searchContext?.selectedServerAddons
 
   const instance = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceDetails", instanceId()],
@@ -62,6 +64,31 @@ export function List() {
     enabled: !isNaN(instanceId()) && instanceId() > 0
   }))
 
+  // For servers: check if a search result matches any installed server addon
+  // Uses project IDs from metadata (for newly installed mods) and
+  // slug-based filename matching as fallback (for pre-existing mods)
+  const isServerAddonInstalled = (resultId: string, slug?: string) => {
+    const addons = serverAddons()?.data
+    if (!addons) return false
+
+    // Check by platform project ID (reliable, from metadata)
+    for (const addon of addons) {
+      if (addon.curseforgeProjectId?.toString() === resultId) return true
+      if (addon.modrinthProjectId === resultId) return true
+    }
+
+    // Fallback: check if any addon filename starts with the slug
+    if (slug) {
+      const slugLower = slug.toLowerCase()
+      for (const addon of addons) {
+        const name = addon.displayName.toLowerCase()
+        if (name === slugLower || name.startsWith(slugLower + "-")) return true
+      }
+    }
+
+    return false
+  }
+
   const lookupTableInstalledMods = createMemo(() => {
     const curseforgeMods =
       installedMods.data?.reduce((acc: string[], mod) => {
@@ -79,18 +106,16 @@ export function List() {
         return acc
       }, []) || []
 
-    const map = new Set([...curseforgeMods, ...modrinthMods])
-
-    return map
+    return new Set([...curseforgeMods, ...modrinthMods])
   })
 
   return (
     <div class="flex h-full flex-col overflow-hidden">
       <div class="flex-1 overflow-hidden">
         <Show when={searchContext?.isShareMode() && searchContext?.shareCode()}>
-          <div class="flex h-full items-start justify-center overflow-auto px-6 pt-6">
-            <div class="w-full max-w-md">
-              <SharePreviewContent shareCode={searchContext!.shareCode()!} />
+          <div class="flex h-full justify-center overflow-auto px-6 pt-6">
+            <div class="w-full max-w-2xl h-full pb-6">
+              <SharePreviewContent shareCode={searchContext!.shareCode()!} expandMods />
             </div>
           </div>
         </Show>
@@ -188,14 +213,23 @@ export function List() {
                     return (
                       <ListItem
                         instanceMods={instanceMods()?.data ?? undefined}
+                        serverAddons={serverAddons()?.data ?? undefined}
                         instanceId={instanceId()}
+                        serverId={serverId()}
                         result={result.value!}
-                        isInstalled={lookupTableInstalledMods().has(
-                          result.value!.id
-                        )}
+                        isInstalled={
+                          !isNaN(serverId()) && serverId() > 0
+                            ? isServerAddonInstalled(result.value!.id, result.value!.slug)
+                            : lookupTableInstalledMods().has(result.value!.id)
+                        }
                         onItemClick={() => {
+                          const sid = serverId()
+                          const iid = instanceId()
+                          const idParam = !isNaN(sid) && sid > 0
+                            ? `serverId=${sid}`
+                            : `instanceId=${iid}`
                           navigator.navigate(
-                            `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`
+                            `/addon/${result.value!.id}/${result.value!.platform}?${idParam}`
                           )
                         }}
                       />

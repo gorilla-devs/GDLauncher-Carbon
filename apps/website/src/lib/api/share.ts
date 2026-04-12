@@ -2,7 +2,7 @@
  * Share preview API
  */
 
-const ENDERIUM_API_BASE = "https://api.gdl.gg/v1";
+const ENDERIUM_API_BASE = import.meta.env.ENDERIUM_API_BASE;
 
 export interface SharedMod {
   name: string;
@@ -26,6 +26,8 @@ export interface SharePreview {
   expires_at: string;
   download_count: number;
   max_downloads: number | null;
+  sharer_display_name: string;
+  sharer_friend_code: string;
 }
 
 export async function fetchSharePreview(

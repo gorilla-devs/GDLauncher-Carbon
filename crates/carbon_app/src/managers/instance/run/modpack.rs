@@ -630,7 +630,7 @@ pub async fn process_modpack(
         t_fill_cache.start_opaque();
 
         app.meta_cache_manager()
-            .queue_caching(instance_id, true)
+            .queue_caching(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), true)
             .await;
 
         t_fill_cache.complete_opaque();
@@ -887,7 +887,7 @@ pub async fn process_modpack_staging(
 
         // Trigger caching now that modpack installation is complete
         app.meta_cache_manager()
-            .watch_and_prioritize(Some(instance_id))
+            .watch_and_prioritize(Some(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id)))
             .await;
     }
 

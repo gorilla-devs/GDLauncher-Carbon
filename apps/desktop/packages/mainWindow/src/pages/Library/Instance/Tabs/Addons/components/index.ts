@@ -1,5 +1,2 @@
-export { AddonFilters } from "./AddonFilters"
-export { AddonTable } from "./AddonTable"
-export { BulkActions } from "./BulkActions"
-export { NoAddons } from "./NoAddons"
-export { createAddonColumns } from "./AddonTableColumns"
+// Instance-specific columns are now part of the shared createAddonColumns.
+// This file is kept for barrel export compatibility.

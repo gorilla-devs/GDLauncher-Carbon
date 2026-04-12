@@ -50,14 +50,59 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
     />
     <style>
       .preview-card {
-        max-width: 600px;
+        max-width: 650px;
         margin: 0 auto;
       }
 
-      .background-image {
+      .hero-section {
+        position: relative;
+        overflow: hidden;
+        border-radius: 12px 12px 0 0;
+        background: rgb(var(--darkSlate-700));
+      }
+
+      .hero-image {
         aspect-ratio: 16 / 9;
         object-fit: cover;
         width: 100%;
+        max-height: 240px;
+        display: block;
+      }
+
+      .hero-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to top,
+          rgb(var(--darkSlate-800)) 0%,
+          rgb(var(--darkSlate-800) / 0.7) 40%,
+          transparent 100%
+        );
+      }
+
+      .hero-content {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 1.5rem;
+      }
+
+      .hero-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+
+      .hero-fallback {
+        height: 120px;
+      }
+
+      .card-body {
+        padding: 1.5rem;
+        background: rgb(var(--darkSlate-800));
+        border-radius: 0 0 12px 12px;
       }
 
       .metadata-grid {
@@ -74,14 +119,15 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
 
       .metadata-item {
         text-align: center;
-        padding: 0.75rem;
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 8px;
+        padding: 0.875rem;
+        background: rgb(var(--darkSlate-700));
+        border-radius: 10px;
+        border: 1px solid rgb(var(--darkSlate-600) / 0.5);
       }
 
       .metadata-label {
         font-size: 0.75rem;
-        color: #9ca3af;
+        color: rgb(var(--lightSlate-500));
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
@@ -90,6 +136,7 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
         font-size: 1.125rem;
         font-weight: 600;
         margin-top: 0.25rem;
+        color: rgb(var(--lightSlate-50));
       }
 
       .cta-buttons {
@@ -106,7 +153,7 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
         }
       }
 
-      .btn-primary {
+      .btn-cta-primary {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -114,18 +161,18 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
         font-size: 1rem;
         font-weight: 600;
         border-radius: 8px;
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
+        background: linear-gradient(135deg, rgb(var(--primary-300)) 0%, rgb(var(--primary-500)) 100%);
+        color: rgb(var(--lightSlate-50));
         text-decoration: none;
         transition: all 0.2s ease;
       }
 
-      .btn-primary:hover {
+      .btn-cta-primary:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+        box-shadow: 0 8px 24px rgb(var(--primary-400) / 0.4);
       }
 
-      .btn-secondary {
+      .btn-cta-secondary {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -133,21 +180,21 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
         font-size: 1rem;
         font-weight: 600;
         border-radius: 8px;
-        background: rgba(255, 255, 255, 0.1);
-        color: white;
+        background: rgb(var(--darkSlate-600));
+        color: rgb(var(--lightSlate-50));
         text-decoration: none;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgb(var(--darkSlate-500));
         transition: all 0.2s ease;
       }
 
-      .btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.15);
+      .btn-cta-secondary:hover {
+        background: rgb(var(--darkSlate-500));
       }
 
       .expired-banner {
-        background: rgba(239, 68, 68, 0.2);
-        border: 1px solid rgba(239, 68, 68, 0.3);
-        color: #fca5a5;
+        background: rgb(var(--red-500) / 0.15);
+        border: 1px solid rgb(var(--red-500) / 0.3);
+        color: rgb(var(--red-100));
         padding: 1rem;
         border-radius: 8px;
         text-align: center;
@@ -160,30 +207,31 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
       }
 
       .mods-section {
-        margin-top: 1.5rem;
+        margin-top: 1.75rem;
       }
 
       .mods-header {
         font-size: 0.75rem;
-        color: #9ca3af;
+        color: rgb(var(--lightSlate-500));
         text-transform: uppercase;
         letter-spacing: 0.05em;
         margin-bottom: 0.5rem;
       }
 
       .mods-list {
-        max-height: 200px;
+        max-height: 280px;
         overflow-y: auto;
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 8px;
+        background: rgb(var(--darkSlate-700));
+        border-radius: 10px;
+        border: 1px solid rgb(var(--darkSlate-600) / 0.5);
       }
 
       .mod-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0.625rem 0.875rem;
+        border-bottom: 1px solid rgb(var(--darkSlate-600) / 0.5);
       }
 
       .mod-item:last-child {
@@ -214,33 +262,27 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
         transition: all 0.2s ease;
       }
 
-      .mod-link-curseforge {
-        color: #f16436;
+      .mod-link:hover {
+        background: rgb(var(--darkSlate-500));
       }
 
-      .mod-link-curseforge:hover {
-        background: rgba(241, 100, 54, 0.2);
-      }
-
-      .mod-link-modrinth {
-        color: #1bd96a;
-      }
-
-      .mod-link-modrinth:hover {
-        background: rgba(27, 217, 106, 0.2);
+      .mod-platform-icon {
+        width: 16px;
+        height: 16px;
+        display: block;
       }
 
       .disclaimer {
         display: flex;
         align-items: flex-start;
         gap: 0.5rem;
-        margin-top: 1.5rem;
+        margin-top: 1.75rem;
         padding: 0.75rem;
-        background: rgba(234, 179, 8, 0.1);
-        border: 1px solid rgba(234, 179, 8, 0.3);
+        background: rgb(var(--yellow-500) / 0.1);
+        border: 1px solid rgb(var(--yellow-500) / 0.3);
         border-radius: 8px;
         font-size: 0.75rem;
-        color: #fde047;
+        color: rgb(var(--yellow-300));
       }
 
       .disclaimer-icon {
@@ -275,7 +317,7 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
             <p class="text-lightSlate-400 mb-8">
               This share link may have expired or doesn't exist.
             </p>
-            <a href="/" class="btn-secondary">
+            <a href="/" class="btn-cta-secondary">
               Go to Homepage
             </a>
           </div>
@@ -290,20 +332,27 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
               </div>
             )}
 
-            {preview.background_url && (
-              <img
-                src={preview.background_url}
-                alt={title}
-                class="background-image rounded-t-xl"
-              />
-            )}
+            <div class="hero-section">
+              {preview.background_url ? (
+                <img
+                  src={preview.background_url}
+                  alt={title}
+                  class="hero-image"
+                />
+              ) : (
+                <div class="hero-fallback" />
+              )}
+              <div class="hero-overlay" />
+              <div class="hero-content">
+                <h1 class="hero-title">{title}</h1>
+                <p class="text-sm text-lightSlate-400 mt-1">
+                  Shared by <span class="text-lightSlate-200 font-medium">{preview.sharer_display_name}</span>
+                </p>
+              </div>
+            </div>
 
-            <div
-              class={`p-6 bg-darkSlate-800 ${preview.background_url ? "rounded-b-xl" : "rounded-xl"}`}
-            >
-              <h1 class="text-2xl font-bold mb-2">{title}</h1>
-
-              <div class="metadata-grid mt-6">
+            <div class="card-body">
+              <div class="metadata-grid">
                 {preview.minecraft_version && (
                   <div class="metadata-item">
                     <div class="metadata-label">Minecraft</div>
@@ -346,17 +395,14 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
                               href={`https://www.curseforge.com/minecraft/mc-mods/${mod.curseforge_slug}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              class="mod-link mod-link-curseforge"
+                              class="mod-link"
                               title="View on CurseForge"
                             >
-                              <svg
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                width="16"
-                                height="16"
-                              >
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                              </svg>
+                              <img
+                                src="/assets/icons/curseforge_logo.svg"
+                                alt="CurseForge"
+                                class="mod-platform-icon"
+                              />
                             </a>
                           )}
                           {mod.modrinth_slug && (
@@ -364,17 +410,14 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
                               href={`https://modrinth.com/mod/${mod.modrinth_slug}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              class="mod-link mod-link-modrinth"
+                              class="mod-link"
                               title="View on Modrinth"
                             >
-                              <svg
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                width="16"
-                                height="16"
-                              >
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-                              </svg>
+                              <img
+                                src="/assets/icons/modrinth_logo.svg"
+                                alt="Modrinth"
+                                class="mod-platform-icon"
+                              />
                             </a>
                           )}
                         </div>
@@ -403,7 +446,7 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
 
               {!isExpired && (
                 <div class="cta-buttons">
-                  <a href={deepLinkUrl} class="btn-primary">
+                  <a href={deepLinkUrl} class="btn-cta-primary">
                     <svg
                       class="w-5 h-5 mr-2"
                       fill="none"
@@ -419,7 +462,7 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
                     </svg>
                     Open in GDLauncher
                   </a>
-                  <a href="/" class="btn-secondary">
+                  <a href="/" class="btn-cta-secondary">
                     Download GDLauncher
                   </a>
                 </div>

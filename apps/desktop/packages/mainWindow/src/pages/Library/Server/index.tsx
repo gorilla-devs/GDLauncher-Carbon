@@ -1,30 +1,62 @@
-import { Button, Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
+import { Button } from "@gd/ui"
 import { useLocation, useParams } from "@solidjs/router"
-import {
-  For,
-  Match,
-  Show,
-  Switch,
-  createEffect
-} from "solid-js"
+import { Match, Show, Switch, createEffect, createMemo } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
+import { Trans, useTransContext, type NamespacedTranslationKey } from "@gd/i18n"
 import useServerData from "./server.data"
-import { useModal } from "@/managers/ModalsManager"
 import DefaultImg from "/assets/images/default-instance-img.png"
-import getRouteIndex from "@/route/getRouteIndex"
+import DetailPageLayout, {
+  type DetailPageTab
+} from "@/pages/Library/shared/DetailPageLayout"
+import { isConsoleFullScreen } from "./Tabs/ConsoleTab"
 
-interface ServerPage {
-  label: string
-  path: string
+interface ServerTab {
+  id: string
+  translationKey: NamespacedTranslationKey
+  icon: string
+  segment: string
 }
 
+const ALL_TABS: ServerTab[] = [
+  {
+    id: "console",
+    translationKey: "instances:_trn_server_tab_console",
+    icon: "i-hugeicons:computer-terminal-01",
+    segment: ""
+  },
+  {
+    id: "addons",
+    translationKey: "instances:_trn_server_tab_addons",
+    icon: "i-hugeicons:puzzle",
+    segment: "addons"
+  },
+  {
+    id: "properties",
+    translationKey: "instances:_trn_server_tab_properties",
+    icon: "i-hugeicons:settings-02",
+    segment: "properties"
+  },
+  {
+    id: "players",
+    translationKey: "instances:_trn_server_tab_players",
+    icon: "i-hugeicons:user-group",
+    segment: "players"
+  },
+  {
+    id: "settings",
+    translationKey: "instances:_trn_server_tab_settings",
+    icon: "i-hugeicons:settings-01",
+    segment: "settings"
+  }
+]
+
 const Server = (props: { children?: any }) => {
+  const [t] = useTransContext()
   const navigator = useGDNavigate()
   const params = useParams()
   const location = useLocation()
   const routeData = useServerData()
-  const modalsContext = useModal()
 
   const startServerMutation = rspc.createMutation(() => ({
     mutationKey: ["server.startServer"]
@@ -34,15 +66,11 @@ const Server = (props: { children?: any }) => {
     mutationKey: ["server.stopServer"]
   }))
 
-  const killServerMutation = rspc.createMutation(() => ({
-    mutationKey: ["server.killServer"]
-  }))
-
   const setFavoriteMutation = rspc.createMutation(() => ({
     mutationKey: ["server.setFavorite"]
   }))
 
-  const serverId = () => parseInt(params.id, 10)
+  const serverId = () => parseInt(params.id!, 10)
   const details = () => routeData.serverDetails.data
 
   const isRunning = () => details()?.state?.status === "running"
@@ -58,51 +86,25 @@ const Server = (props: { children?: any }) => {
     }
   }
 
-  const handleDelete = () => {
-    modalsContext?.openModal(
-      { name: "confirmInstanceDeletion" },
-      {
-        id: serverId(),
-        name: details()?.name,
-        isServer: true
-      }
-    )
-  }
+  const visibleTabs = createMemo(() => {
+    if (details()?.modloaderType) return ALL_TABS
+    return ALL_TABS.filter((t) => t.id !== "addons")
+  })
 
-  const serverPages = (): ServerPage[] => {
-    const pages: ServerPage[] = [
-      {
-        label: "Console",
-        path: `/library/server/${params.id}`
-      },
-      {
-        label: "Properties",
-        path: `/library/server/${params.id}/properties`
-      },
-      {
-        label: "Players",
-        path: `/library/server/${params.id}/players`
-      },
-      {
-        label: "Settings",
-        path: `/library/server/${params.id}/settings`
-      }
-    ]
+  const basePath = () => `/library/server/${params.id}`
 
-    // Show Addons tab only for modded servers
-    if (details()?.modloaderType) {
-      pages.splice(3, 0, {
-        label: "Addons",
-        path: `/library/server/${params.id}/addons`
-      })
-    }
+  const activeTabId = createMemo(() => {
+    const pathname = location.pathname.replace(/\/$/, "")
+    const base = basePath()
+    const suffix = pathname.startsWith(base)
+      ? pathname.slice(base.length).replace(/^\//, "")
+      : ""
+    return visibleTabs().find((t) => t.segment === suffix)?.id || "console"
+  })
 
-    return pages
-  }
-
-  const selectedValue = () => {
-    const index = getRouteIndex(serverPages(), location.pathname, true)
-    return serverPages()[index]?.path || serverPages()[0]?.path
+  const navigateToTab = (tab: ServerTab) => {
+    const path = tab.segment ? `${basePath()}/${tab.segment}` : basePath()
+    navigator.navigate(path)
   }
 
   // Navigate back if server was deleted
@@ -110,85 +112,97 @@ const Server = (props: { children?: any }) => {
     if (
       routeData.allServers.data &&
       !routeData.allServers.data?.find(
-        (s) => s.id === serverId()
+        (s: { id: number }) => s.id === serverId()
       )
     ) {
       navigator.navigate("/library?mode=servers")
     }
   })
 
-  return (
-    <main class="bg-darkSlate-800 relative flex h-full flex-col overflow-y-auto overflow-x-hidden">
-      {/* Header */}
-      <header class="flex items-center justify-between border-b border-darkSlate-600 px-6 py-4">
-        <div class="flex items-center gap-4">
-          <Button
-            rounded
-            onClick={() => navigator.navigate("/library?mode=servers")}
-            size="small"
-            type="transparent"
-          >
-            <div class="i-hugeicons:arrow-left-01 text-xl" />
-          </Button>
+  const tabs = (): DetailPageTab[] =>
+    visibleTabs().map((tab) => ({
+      id: tab.id,
+      label: (
+        <div class="flex items-center gap-2">
+          <div class={`h-4 w-4 ${tab.icon}`} />
+          <Trans key={tab.translationKey} />
+        </div>
+      )
+    }))
 
-          <div class="flex items-center gap-3">
-            <img
-              src={DefaultImg}
-              alt="Server icon"
-              class="h-16 w-16 rounded-xl object-cover"
-              style={{
-                "view-transition-name": "server-tile-image",
-                contain: "layout"
-              }}
-            />
-            <div class="flex flex-col">
-              <h1 class="m-0 text-lg font-semibold">
-                {details()?.name ?? "Loading..."}
-              </h1>
-              <div class="flex items-center gap-2 text-xs text-lightSlate-600">
-                <Show when={details()}>
-                  <span class="rounded bg-darkSlate-700 px-1.5 py-0.5 text-lightSlate-400">
+  return (
+    <DetailPageLayout
+      containerId="main-container-server-details"
+      headerImage={DefaultImg}
+      icon={DefaultImg}
+      headerInfoContent={
+        <>
+          <h1
+            class="border-box z-10 m-0 min-h-10"
+            style={{
+              "view-transition-name": "server-tile-title",
+              contain: "layout"
+            }}
+          >
+            {details()?.name ?? t("instances:_trn_server_loading")}
+          </h1>
+          <div class="flex cursor-default flex-row justify-between">
+            <div class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4">
+              <Show when={details()}>
+                <div class="m-0 flex min-h-6 items-center gap-2">
+                  <span class="bg-darkSlate-700 text-lightSlate-400 rounded px-1.5 py-0.5">
                     {details()!.modloaderType
                       ? `${details()!.modloaderType![0].toUpperCase()}${details()!.modloaderType!.slice(1)}`
-                      : "Vanilla"}{" "}
+                      : t("instances:_trn_server_type_vanilla")}{" "}
                     {details()!.gameVersion}
                   </span>
-                  <span>Port: {details()!.port}</span>
-                </Show>
+                  <span>
+                    {t("instances:_trn_server_port_label")}: {details()!.port}
+                  </span>
+                </div>
+              </Show>
+              {/* Status badge */}
+              <div
+                class="flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-medium"
+                classList={{
+                  "bg-green-900/30 text-green-400": isRunning(),
+                  "bg-yellow-900/30 text-yellow-400": isStarting(),
+                  "bg-orange-900/30 text-orange-400": isStopping(),
+                  "bg-darkSlate-700 text-lightSlate-500":
+                    !isRunning() && !isStarting() && !isStopping()
+                }}
+              >
+                <div
+                  class="h-2 w-2 rounded-full"
+                  classList={{
+                    "bg-green-400": isRunning(),
+                    "bg-yellow-400 animate-pulse": isStarting(),
+                    "bg-orange-400": isStopping(),
+                    "bg-lightSlate-600":
+                      !isRunning() && !isStarting() && !isStopping()
+                  }}
+                />
+                <Switch>
+                  <Match when={isRunning()}>
+                    <Trans key="instances:_trn_server_status_running" />
+                  </Match>
+                  <Match when={isStarting()}>
+                    <Trans key="instances:_trn_server_status_starting" />
+                  </Match>
+                  <Match when={isStopping()}>
+                    <Trans key="instances:_trn_server_status_stopping" />
+                  </Match>
+                  <Match when={true}>
+                    <Trans key="instances:_trn_server_status_stopped" />
+                  </Match>
+                </Switch>
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          {/* Status badge */}
-          <div
-            class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
-            classList={{
-              "bg-green-900/30 text-green-400": isRunning(),
-              "bg-yellow-900/30 text-yellow-400": isStarting(),
-              "bg-orange-900/30 text-orange-400": isStopping(),
-              "bg-darkSlate-700 text-lightSlate-500":
-                !isRunning() && !isStarting() && !isStopping()
-            }}
-          >
-            <div
-              class="h-2 w-2 rounded-full"
-              classList={{
-                "bg-green-400": isRunning(),
-                "bg-yellow-400 animate-pulse": isStarting(),
-                "bg-orange-400": isStopping(),
-                "bg-lightSlate-600": !isRunning() && !isStarting() && !isStopping()
-              }}
-            />
-            <Switch>
-              <Match when={isRunning()}>Running</Match>
-              <Match when={isStarting()}>Starting</Match>
-              <Match when={isStopping()}>Stopping</Match>
-              <Match when={true}>Stopped</Match>
-            </Switch>
-          </div>
-
+        </>
+      }
+      headerActions={
+        <>
           <Show when={details()}>
             <Button
               rounded
@@ -207,7 +221,6 @@ const Server = (props: { children?: any }) => {
               />
             </Button>
           </Show>
-
           <Button
             uppercase
             size="large"
@@ -222,57 +235,51 @@ const Server = (props: { children?: any }) => {
             <Switch>
               <Match when={isRunning()}>
                 <div class="i-hugeicons:stop text-xl" />
-                Stop
+                <Trans key="instances:_trn_server_action_stop" />
               </Match>
               <Match when={isStarting()}>
-                Starting...
+                <Trans key="instances:_trn_server_action_starting" />
               </Match>
               <Match when={isStopping()}>
-                Stopping...
+                <Trans key="instances:_trn_server_action_stopping" />
               </Match>
               <Match when={true}>
                 <div class="i-hugeicons:play text-xl" />
-                Start
+                <Trans key="instances:_trn_server_action_start" />
               </Match>
             </Switch>
           </Button>
-        </div>
-      </header>
-
-      <div class="border-b border-darkSlate-600 px-6">
-        <Tabs value={selectedValue()} class="h-auto">
-          <TabsList class="w-fit gap-0 bg-transparent h-auto">
-            <TabsIndicator />
-            <For each={serverPages()}>
-              {(page: ServerPage) => (
-                <TabsTrigger
-                  value={page.path}
-                  onClick={() => navigator.navigate(page.path)}
-                >
-                  <div class="flex items-center gap-2 py-1">
-                    <div
-                      class="h-4 w-4"
-                      classList={{
-                        "i-hugeicons:computer-terminal-01": page.label === "Console",
-                        "i-hugeicons:settings-02": page.label === "Properties",
-                        "i-hugeicons:user-group": page.label === "Players",
-                        "i-hugeicons:puzzle": page.label === "Addons",
-                        "i-hugeicons:settings-01": page.label === "Settings"
-                      }}
-                    />
-                    {page.label}
-                  </div>
-                </TabsTrigger>
-              )}
-            </For>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <div class="flex min-h-0 flex-1 overflow-hidden p-4">
-        {props.children}
-      </div>
-    </main>
+        </>
+      }
+      tabs={tabs()}
+      activeTabId={activeTabId()}
+      onTabClick={(tab) => {
+        const serverTab = visibleTabs().find((t) => t.id === tab.id)
+        if (serverTab) navigateToTab(serverTab)
+      }}
+      onBackClick={() => navigator.navigate("/library?mode=servers")}
+      stickyRightButton={
+        <Button
+          size="small"
+          variant={isRunning() ? "red" : undefined}
+          loading={isBusy()}
+          onClick={handleStartStop}
+        >
+          <Switch>
+            <Match when={isRunning()}>
+              <div class="i-hugeicons:stop text-xl" />
+            </Match>
+            <Match when={true}>
+              <div class="i-hugeicons:play text-xl" />
+            </Match>
+          </Switch>
+        </Button>
+      }
+      noPaddingPaths={["/addons"]}
+      isFullScreen={isConsoleFullScreen}
+    >
+      {props.children}
+    </DetailPageLayout>
   )
 }
 

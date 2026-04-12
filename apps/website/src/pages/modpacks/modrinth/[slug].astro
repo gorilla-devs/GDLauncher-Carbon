@@ -1,19 +1,16 @@
 ---
 import type { GetStaticPaths } from "astro"
 import AddonInstallLayout from "../../../components/AddonInstallLayout.astro"
-import { fetchTopModrinthAddons } from "../../../lib/api/modrinth"
 import type { AddonInfo } from "../../../lib/api/types"
 import { marked } from "marked"
+import addonsData from "../../../data/addons.json"
 
 import modpackInstructions from "../../../content/addon-instructions/modpacks.md?raw"
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  const limit = import.meta.env.DEV ? 5 : 1000
-  const addons = await fetchTopModrinthAddons("modpacks", limit)
-
-  return addons.map((addon) => ({
+  return addonsData.modrinth.modpacks.map((addon) => ({
     params: { slug: addon.slug },
-    props: { addon },
+    props: { addon: { ...addon, platform: "modrinth" as const, type: "modpacks" as const } },
   }))
 }
 
@@ -32,6 +29,11 @@ const instructionsHtml = await marked(modpackInstructions)
   platform="modrinth"
   imageUrl={addon.imageUrl}
   websiteUrl={addon.websiteUrl}
+  description={addon.description}
+  authors={addon.authors}
+  author={addon.author}
+  categories={addon.categories}
+  dateModified={addon.dateModified}
 >
   <Fragment set:html={instructionsHtml} />
 </AddonInstallLayout>

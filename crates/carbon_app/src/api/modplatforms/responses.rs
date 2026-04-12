@@ -1,5 +1,5 @@
 use carbon_platforms::curseforge::{CurseForgeResponse, Mod, ModLoaderType};
-use carbon_platforms::modrinth::project::{Project, ProjectType};
+use carbon_platforms::modrinth::project::{Project, ProjectSupportRange, ProjectType};
 use carbon_platforms::modrinth::search::ProjectSearchResult;
 use carbon_platforms::modrinth::tag::LoaderType;
 use carbon_platforms::{curseforge::ClassId, modrinth::search::ProjectSearchResponse};
@@ -385,6 +385,7 @@ pub struct FEUnifiedSearchResult {
     pub minecraft_versions: Vec<String>,
     pub versions: Option<Vec<String>>,
     pub main_file_id: Option<String>,
+    pub server_pack_file_id: Option<String>,
 }
 
 impl From<ProjectSearchResponse> for FEUnifiedSearchResponse {
@@ -503,6 +504,11 @@ impl From<Mod> for FEUnifiedSearchResult {
                     .map(|v| v.file_id.to_string())
                     .collect(),
             ),
+            server_pack_file_id: value
+                .latest_files
+                .iter()
+                .find(|f| f.server_pack_file_id.is_some() && f.is_server_pack != Some(true))
+                .and_then(|f| f.server_pack_file_id.map(|id| id.to_string())),
         }
     }
 }
@@ -541,6 +547,13 @@ impl From<Project> for FEUnifiedSearchResult {
                 .collect(),
             minecraft_versions: value.game_versions,
             versions: Some(value.versions),
+            server_pack_file_id: if value.project_type == ProjectType::Modpack
+                && !matches!(value.server_side, ProjectSupportRange::Unsupported)
+            {
+                Some("mrpack-server".to_string())
+            } else {
+                None
+            },
         }
     }
 }
@@ -594,6 +607,13 @@ impl FEUnifiedSearchResult {
                 .collect(),
             minecraft_versions: value.game_versions,
             versions: Some(value.versions),
+            server_pack_file_id: if value.project_type == ProjectType::Modpack
+                && !matches!(value.server_side, ProjectSupportRange::Unsupported)
+            {
+                Some("mrpack-server".to_string())
+            } else {
+                None
+            },
         }
     }
 }
@@ -632,6 +652,13 @@ impl From<ProjectSearchResult> for FEUnifiedSearchResult {
             screenshot_urls: value.gallery.unwrap_or_default(),
             minecraft_versions: value.versions,
             versions: None,
+            server_pack_file_id: if value.project_type == ProjectType::Modpack
+                && !matches!(value.server_side, ProjectSupportRange::Unsupported)
+            {
+                Some("mrpack-server".to_string())
+            } else {
+                None
+            },
         }
     }
 }

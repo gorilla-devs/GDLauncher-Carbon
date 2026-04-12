@@ -1,25 +1,33 @@
 use crate::domain::server::LaunchConfig;
+use crate::managers::vtask::Subtask;
 use anyhow::{Context, Result, bail};
 use carbon_rt_path::ServerPath;
 use reqwest_middleware::ClientWithMiddleware;
+use std::path::Path;
 use tracing::info;
 
 /// Install a modloader for a server. Returns the LaunchConfig to use for launching.
 ///
 /// Currently supports Fabric and Quilt (self-contained server jars).
 /// Forge and NeoForge require processor execution and are more complex.
+///
+/// If `progress` is provided, reports staged item-based progress:
+/// - Fabric/Quilt: 2 stages (download, extract)
+/// - Forge/NeoForge: 3 stages (download installer, run installer, finalize)
 pub async fn install_modloader(
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
     game_version: &str,
     modloader_type: &str,
     modloader_version: &str,
+    java_path: &Path,
+    progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
     match modloader_type {
-        "fabric" => install_fabric(reqwest_client, server_path, game_version, modloader_version).await,
-        "quilt" => install_quilt(reqwest_client, server_path, game_version, modloader_version).await,
-        "forge" => install_forge(reqwest_client, server_path, game_version, modloader_version).await,
-        "neoforge" => install_neoforge(reqwest_client, server_path, game_version, modloader_version).await,
+        "fabric" => install_fabric(reqwest_client, server_path, game_version, modloader_version, progress).await,
+        "quilt" => install_quilt(reqwest_client, server_path, game_version, modloader_version, progress).await,
+        "forge" => install_forge(reqwest_client, server_path, game_version, modloader_version, java_path, progress).await,
+        "neoforge" => install_neoforge(reqwest_client, server_path, game_version, modloader_version, java_path, progress).await,
         other => bail!("Unsupported modloader type: {}", other),
     }
 }
@@ -32,7 +40,12 @@ async fn install_fabric(
     server_path: &ServerPath,
     game_version: &str,
     loader_version: &str,
+    progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
+    if let Some(p) = progress {
+        p.update_items(0, 2);
+    }
+
     let url = format!(
         "https://meta.fabricmc.net/v2/versions/loader/{}/{}/server/jar",
         game_version, loader_version
@@ -54,6 +67,9 @@ async fn install_fabric(
     }
 
     let bytes = response.bytes().await?;
+    if let Some(p) = progress {
+        p.update_items(1, 2);
+    }
     let jar_path = server_path.get_data_path().join("fabric-server-launch.jar");
     tokio::fs::write(&jar_path, &bytes)
         .await
@@ -64,6 +80,9 @@ async fn install_fabric(
         .await
         .context("Failed to create mods directory")?;
 
+    if let Some(p) = progress {
+        p.update_items(2, 2);
+    }
     info!("Fabric server jar installed successfully");
 
     Ok(LaunchConfig {
@@ -83,7 +102,12 @@ async fn install_quilt(
     server_path: &ServerPath,
     game_version: &str,
     loader_version: &str,
+    progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
+    if let Some(p) = progress {
+        p.update_items(0, 2);
+    }
+
     let url = format!(
         "https://meta.quiltmc.org/v3/versions/loader/{}/{}/server/jar",
         game_version, loader_version
@@ -105,6 +129,9 @@ async fn install_quilt(
     }
 
     let bytes = response.bytes().await?;
+    if let Some(p) = progress {
+        p.update_items(1, 2);
+    }
     let jar_path = server_path.get_data_path().join("quilt-server-launch.jar");
     tokio::fs::write(&jar_path, &bytes)
         .await
@@ -115,6 +142,9 @@ async fn install_quilt(
         .await
         .context("Failed to create mods directory")?;
 
+    if let Some(p) = progress {
+        p.update_items(2, 2);
+    }
     info!("Quilt server jar installed successfully");
 
     Ok(LaunchConfig {
@@ -132,14 +162,15 @@ async fn install_quilt(
 async fn install_forge(
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
-    game_version: &str,
+    _game_version: &str,
     forge_version: &str,
+    java_path: &Path,
+    progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
-    // Forge installer URL format: https://maven.minecraftforge.net/net/minecraftforge/forge/{mc}-{forge}/forge-{mc}-{forge}-installer.jar
-    let version_string = format!("{}-{}", game_version, forge_version);
+    // Forge version ID from daedalus already includes the MC version (e.g. "1.20.1-47.2.0")
     let url = format!(
         "https://maven.minecraftforge.net/net/minecraftforge/forge/{}/forge-{}-installer.jar",
-        version_string, version_string
+        forge_version, forge_version
     );
 
     info!("Downloading Forge installer from {}", url);
@@ -163,23 +194,14 @@ async fn install_forge(
         .await
         .context("Failed to write Forge installer")?;
 
-    // Run the installer with --installServer
+    // Run the installer with --installServer using the managed Java, streaming stdout
+    // to track processor progress. The Forge installer emits lines like:
+    //   "Considering library xxx"
+    //   "Processing: xxx" / "  MainClass: xxx" / "  Output: xxx"
+    // We count "Processing:" lines as processor steps.
     info!("Running Forge installer...");
     let data_path = server_path.get_data_path();
-    let status = tokio::process::Command::new("java")
-        .arg("-jar")
-        .arg("forge-installer.jar")
-        .arg("--installServer")
-        .current_dir(&data_path)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .status()
-        .await
-        .context("Failed to run Forge installer")?;
-
-    if !status.success() {
-        bail!("Forge installer failed with exit code: {:?}", status.code());
-    }
+    run_installer_with_progress(java_path, &data_path, "forge-installer.jar", progress).await?;
 
     // Clean up installer
     let _ = tokio::fs::remove_file(&installer_path).await;
@@ -255,6 +277,8 @@ async fn install_neoforge(
     server_path: &ServerPath,
     _game_version: &str,
     neoforge_version: &str,
+    java_path: &Path,
+    progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
     // NeoForge installer URL: https://maven.neoforged.net/releases/net/neoforged/neoforge/{version}/neoforge-{version}-installer.jar
     let url = format!(
@@ -283,26 +307,10 @@ async fn install_neoforge(
         .await
         .context("Failed to write NeoForge installer")?;
 
-    // Run the installer with --installServer
+    // Run the installer with --installServer using the managed Java, streaming stdout
     info!("Running NeoForge installer...");
     let data_path = server_path.get_data_path();
-    let status = tokio::process::Command::new("java")
-        .arg("-jar")
-        .arg("neoforge-installer.jar")
-        .arg("--installServer")
-        .current_dir(&data_path)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .status()
-        .await
-        .context("Failed to run NeoForge installer")?;
-
-    if !status.success() {
-        bail!(
-            "NeoForge installer failed with exit code: {:?}",
-            status.code()
-        );
-    }
+    run_installer_with_progress(java_path, &data_path, "neoforge-installer.jar", progress).await?;
 
     // Clean up installer
     let _ = tokio::fs::remove_file(&installer_path).await;
@@ -331,6 +339,126 @@ async fn install_neoforge(
 
     // Fallback
     Ok(LaunchConfig::vanilla())
+}
+
+/// Run a Forge/NeoForge installer jar with --installServer, streaming stdout to track
+/// processor progress. The installer emits "Processing: ..." lines for each processor
+/// it runs. We count these to report granular item-based progress.
+///
+/// We use a two-phase report:
+/// - Before any "Processing:" line is seen, we show item progress 1/N (started, no processors yet).
+/// - Once processors start appearing, we update to (1 + seen)/estimated_total and adjust
+///   estimated_total if `seen` exceeds it.
+async fn run_installer_with_progress(
+    java_path: &Path,
+    data_path: &Path,
+    jar_name: &str,
+    progress: Option<&Subtask>,
+) -> Result<()> {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::process::Command;
+
+    // Rough initial estimate — most Forge/NeoForge installers run 30-60 processors.
+    // We auto-expand if we go over.
+    let initial_estimate: u32 = 50;
+
+    if let Some(p) = progress {
+        p.update_items(0, initial_estimate);
+    }
+
+    let mut child = Command::new(java_path)
+        .arg("-jar")
+        .arg(jar_name)
+        .arg("--installServer")
+        .current_dir(data_path)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("Failed to spawn installer")?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .context("Failed to capture installer stdout")?;
+    let stderr = child
+        .stderr
+        .take()
+        .context("Failed to capture installer stderr")?;
+
+    // Read stderr to buffer in case of failure
+    let stderr_handle = tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr);
+        let mut buf = String::new();
+        let mut full = String::new();
+        while reader.read_line(&mut buf).await.unwrap_or(0) > 0 {
+            full.push_str(&buf);
+            buf.clear();
+        }
+        full
+    });
+
+    // Read stdout line by line, updating progress on "Processing:" lines.
+    // Also keep a tail of recent lines so we can include context in error messages.
+    let mut reader = BufReader::new(stdout).lines();
+    let mut processors_seen: u32 = 0;
+    let mut total_estimate: u32 = initial_estimate;
+    let mut stdout_tail: std::collections::VecDeque<String> =
+        std::collections::VecDeque::with_capacity(30);
+    while let Some(line) = reader
+        .next_line()
+        .await
+        .context("Error reading installer stdout")?
+    {
+        // Forge: "Processing: <library>"
+        // NeoForge: also uses "Processing: <library>"
+        if line.starts_with("Processing:")
+            || line.starts_with("  Processing:")
+            || line.contains("] Processing:")
+        {
+            processors_seen += 1;
+            if processors_seen > total_estimate {
+                total_estimate = processors_seen + 10;
+            }
+            if let Some(p) = progress {
+                p.update_items(processors_seen, total_estimate);
+            }
+        }
+
+        // Keep the last 30 lines of stdout for error context
+        if stdout_tail.len() >= 30 {
+            stdout_tail.pop_front();
+        }
+        stdout_tail.push_back(line);
+    }
+
+    let status = child.wait().await.context("Failed to wait for installer")?;
+    let stderr_output = stderr_handle.await.unwrap_or_default();
+
+    if !status.success() {
+        let stdout_tail_str: String = stdout_tail.iter().cloned().collect::<Vec<_>>().join("\n");
+        let stderr_trimmed = stderr_output.trim();
+        let combined = if stderr_trimmed.is_empty() {
+            stdout_tail_str
+        } else if stdout_tail_str.is_empty() {
+            stderr_trimmed.to_string()
+        } else {
+            format!(
+                "stderr:\n{}\n\nstdout (last lines):\n{}",
+                stderr_trimmed, stdout_tail_str
+            )
+        };
+        bail!(
+            "Installer exited with code {:?}.\n{}",
+            status.code(),
+            combined
+        );
+    }
+
+    if let Some(p) = progress {
+        p.complete_items();
+    }
+
+    Ok(())
 }
 
 /// Parse Forge/NeoForge unix_args.txt or win_args.txt into a LaunchConfig.

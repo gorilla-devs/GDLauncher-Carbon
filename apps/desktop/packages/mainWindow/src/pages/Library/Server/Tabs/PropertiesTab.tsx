@@ -1,22 +1,51 @@
-import { createSignal, createEffect, For, Show, createMemo } from "solid-js"
+import { createSignal, createEffect, createMemo, For, Show } from "solid-js"
 import { useParams } from "@solidjs/router"
-import { Button, Input, Tabs, TabsList, TabsTrigger, TabsContent, TabsIndicator } from "@gd/ui"
+import {
+  Button,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+  Switch,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent
+} from "@gd/ui"
+import { Trans, useTransContext, type NamespacedTranslationKey } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import useServerData from "../server.data"
-import { propertyGroups, type PropertyDefinition } from "../Properties/propertyDefinitions"
-import PropertyField from "../Properties/PropertyField"
+import {
+  propertyGroups,
+  isAvailableForVersion,
+  type PropertyDefinition
+} from "../Properties/propertyDefinitions"
+import Title from "@/pages/Settings/components/Title"
+import Row from "@/pages/Settings/components/Row"
+import RowsContainer from "@/pages/Settings/components/RowsContainer"
+import RightHandSide from "@/pages/Settings/components/RightHandSide"
+
+const GROUP_TRANSLATION_KEYS: Record<string, NamespacedTranslationKey> = {
+  gameplay: "instances:_trn_server_properties_gameplay",
+  world: "instances:_trn_server_properties_world",
+  network: "instances:_trn_server_properties_network",
+  performance: "instances:_trn_server_properties_performance",
+  security: "instances:_trn_server_properties_security"
+}
 
 const PropertiesTab = () => {
+  const [t] = useTransContext()
   const params = useParams()
   const routeData = useServerData()
-  const serverId = () => parseInt(params.id, 10)
+  const serverId = () => parseInt(params.id!, 10)
 
   const [properties, setProperties] = createSignal<Record<string, string>>({})
-  const [originalProperties, setOriginalProperties] = createSignal<Record<string, string>>({})
+  const [originalProperties, setOriginalProperties] = createSignal<
+    Record<string, string>
+  >({})
   const [dirty, setDirty] = createSignal(false)
-  const [activeGroup, setActiveGroup] = createSignal("gameplay")
-  const [showRaw, setShowRaw] = createSignal(false)
-  const [rawText, setRawText] = createSignal("")
+  const [searchQuery, setSearchQuery] = createSignal("")
 
   const propertiesQuery = rspc.createQuery(() => ({
     queryKey: ["server.getServerProperties", serverId()]
@@ -26,7 +55,6 @@ const PropertiesTab = () => {
     mutationKey: ["server.updateServerProperties"]
   }))
 
-  // Load properties from query
   createEffect(() => {
     const data = propertiesQuery.data
     if (data) {
@@ -36,7 +64,31 @@ const PropertiesTab = () => {
     }
   })
 
-  const isRunning = () => routeData.serverDetails.data?.state?.status === "running"
+  const isRunning = () =>
+    routeData.serverDetails.data?.state?.status === "running"
+  const gameVersion = () => routeData.serverDetails.data?.gameVersion
+
+  const filteredGroups = createMemo(() => {
+    const ver = gameVersion()
+    const query = searchQuery().toLowerCase().trim()
+
+    return propertyGroups
+      .map((group) => ({
+        ...group,
+        properties: group.properties.filter((p) => {
+          if (ver && !isAvailableForVersion(p, ver)) return false
+          if (query) {
+            return (
+              p.label.toLowerCase().includes(query) ||
+              p.key.toLowerCase().includes(query) ||
+              p.description?.toLowerCase().includes(query)
+            )
+          }
+          return true
+        })
+      }))
+      .filter((group) => group.properties.length > 0)
+  })
 
   const updateProperty = (key: string, value: string) => {
     setProperties((prev) => ({ ...prev, [key]: value }))
@@ -44,18 +96,11 @@ const PropertiesTab = () => {
   }
 
   const handleSave = async () => {
-    // Only send changed properties
     const current = properties()
     const original = originalProperties()
     const changes: Record<string, string> = {}
     for (const key of Object.keys(current)) {
-      if (current[key] !== original[key]) {
-        changes[key] = current[key]
-      }
-    }
-    // Also include new keys
-    for (const key of Object.keys(current)) {
-      if (!(key in original)) {
+      if (current[key] !== original[key] || !(key in original)) {
         changes[key] = current[key]
       }
     }
@@ -74,62 +119,108 @@ const PropertiesTab = () => {
     setDirty(false)
   }
 
-  const handleRawSave = () => {
-    const lines = rawText().split("\n")
-    const newProps: Record<string, string> = {}
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith("#")) continue
-      const idx = trimmed.indexOf("=")
-      if (idx > 0) {
-        newProps[trimmed.substring(0, idx).trim()] = trimmed.substring(idx + 1).trim()
-      }
-    }
-    setProperties(newProps)
-    setDirty(true)
-    setShowRaw(false)
+  const renderField = (prop: PropertyDefinition) => {
+    const value = () => properties()[prop.key] ?? prop.defaultValue
+
+    return (
+      <Row>
+        <Title description={prop.description}>
+          <span class="inline-flex items-center gap-1.5">
+            {prop.label}
+            <Show when={prop.info}>
+              <Tooltip placement="top">
+                <TooltipTrigger class="inline-flex items-center">
+                  <div class="i-hugeicons:information-circle text-lightSlate-600 hover:text-lightSlate-400 h-4 w-4 shrink-0 cursor-help transition-colors" />
+                </TooltipTrigger>
+                <TooltipContent class="max-w-80">
+                  <p class="m-0 text-xs leading-relaxed">{prop.info}</p>
+                </TooltipContent>
+              </Tooltip>
+            </Show>
+          </span>
+        </Title>
+        <RightHandSide>
+          <Show when={prop.type === "boolean"}>
+            <Switch
+              checked={value() === "true"}
+              onChange={(checked) =>
+                updateProperty(prop.key, checked ? "true" : "false")
+              }
+            />
+          </Show>
+          <Show when={prop.type === "string"}>
+            <Input
+              class="w-60"
+              value={value()}
+              onInput={(e) => updateProperty(prop.key, e.currentTarget.value)}
+            />
+          </Show>
+          <Show when={prop.type === "number"}>
+            <Input
+              class="w-40"
+              type="number"
+              value={value()}
+              onInput={(e) => {
+                const val = e.currentTarget.value
+                if (prop.min !== undefined && Number(val) < prop.min) return
+                if (prop.max !== undefined && Number(val) > prop.max) return
+                updateProperty(prop.key, val)
+              }}
+            />
+          </Show>
+          <Show when={prop.type === "enum" && prop.enumValues}>
+            <Select
+              value={value()}
+              onChange={(v) => {
+                if (v) updateProperty(prop.key, v)
+              }}
+              options={prop.enumValues!}
+              disallowEmptySelection={true}
+              itemComponent={(itemProps) => {
+                const idx = prop.enumValues!.indexOf(itemProps.item.rawValue)
+                const label = prop.enumLabels?.[idx]
+                return (
+                  <SelectItem item={itemProps.item}>
+                    {label || itemProps.item.rawValue}
+                  </SelectItem>
+                )
+              }}
+            >
+              <SelectTrigger class="min-w-50">
+                <SelectValue<string>>
+                  {(state) => {
+                    const idx = prop.enumValues!.indexOf(state.selectedOption())
+                    return prop.enumLabels?.[idx] || state.selectedOption()
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent />
+            </Select>
+          </Show>
+        </RightHandSide>
+      </Row>
+    )
   }
 
-  const currentGroupDefs = createMemo(() => {
-    const group = propertyGroups.find((g) => g.id === activeGroup())
-    return group?.properties ?? []
-  })
-
   return (
-    <div class="h-full w-full overflow-y-auto">
+    <div class="w-full">
       <Show when={isRunning()}>
         <div class="mb-4 flex items-center gap-3 rounded-xl border border-yellow-600/30 bg-yellow-900/20 p-3">
           <div class="i-hugeicons:alert-01 text-xl text-yellow-500" />
           <span class="text-sm text-yellow-300/70">
-            Some changes require a server restart to take effect.
+            <Trans key="instances:_trn_server_properties_restart_warning" />
           </span>
         </div>
       </Show>
 
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-          <Button
-            size="small"
-            type={showRaw() ? "primary" : "secondary"}
-            onClick={() => {
-              if (!showRaw()) {
-                // Convert to raw text
-                const text = Object.entries(properties())
-                  .map(([k, v]) => `${k}=${v}`)
-                  .join("\n")
-                setRawText(text)
-              }
-              setShowRaw(!showRaw())
-            }}
-          >
-            <div class="i-hugeicons:source-code h-4 w-4" />
-            Raw Editor
-          </Button>
-        </div>
-        <div class="flex items-center gap-2">
-          <Show when={dirty()}>
+      <Show when={dirty()}>
+        <div class="border-primary-600/30 bg-primary-900/20 sticky top-0 z-20 mb-4 flex items-center justify-between rounded-xl border p-3">
+          <span class="text-lightSlate-300 text-sm">
+            <Trans key="instances:_trn_server_properties_unsaved_changes" />
+          </span>
+          <div class="flex items-center gap-2">
             <Button size="small" type="secondary" onClick={handleReset}>
-              Reset
+              <Trans key="instances:_trn_server_properties_reset" />
             </Button>
             <Button
               size="small"
@@ -137,68 +228,39 @@ const PropertiesTab = () => {
               onClick={handleSave}
               loading={updatePropertiesMutation.isPending}
             >
-              Save Changes
+              <Trans key="instances:_trn_server_properties_save" />
             </Button>
-          </Show>
-        </div>
-      </div>
-
-      <Show
-        when={!showRaw()}
-        fallback={
-          <div class="flex flex-col gap-4">
-            <textarea
-              class="h-96 w-full rounded-xl border border-darkSlate-600 bg-darkSlate-900 p-4 font-mono text-sm text-lightSlate-200 outline-none"
-              value={rawText()}
-              onInput={(e) => setRawText(e.currentTarget.value)}
-            />
-            <div class="flex justify-end gap-2">
-              <Button size="small" type="secondary" onClick={() => setShowRaw(false)}>
-                Cancel
-              </Button>
-              <Button size="small" type="primary" onClick={handleRawSave}>
-                Apply
-              </Button>
-            </div>
-          </div>
-        }
-      >
-        <div class="flex gap-4">
-          {/* Category sidebar */}
-          <div class="flex w-40 flex-shrink-0 flex-col gap-1">
-            <For each={propertyGroups}>
-              {(group) => (
-                <button
-                  class="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
-                  classList={{
-                    "bg-primary-500/20 text-primary-400": activeGroup() === group.id,
-                    "text-lightSlate-500 hover:bg-darkSlate-700 hover:text-lightSlate-300": activeGroup() !== group.id
-                  }}
-                  onClick={() => setActiveGroup(group.id)}
-                >
-                  <div class={`h-4 w-4 ${group.icon}`} />
-                  {group.label}
-                </button>
-              )}
-            </For>
-          </div>
-
-          {/* Properties grid */}
-          <div class="flex-1 rounded-xl border border-darkSlate-600 bg-darkSlate-900 p-4">
-            <div class="flex flex-col gap-4">
-              <For each={currentGroupDefs()}>
-                {(prop) => (
-                  <PropertyField
-                    definition={prop}
-                    value={properties()[prop.key] ?? prop.defaultValue}
-                    onChange={(val) => updateProperty(prop.key, val)}
-                  />
-                )}
-              </For>
-            </div>
           </div>
         </div>
       </Show>
+
+      <div class="bg-darkSlate-800 sticky top-20 z-10 mb-4 pb-2 pt-2">
+        <Input
+          placeholder={
+            t("instances:_trn_server_properties_search_placeholder") ||
+            "Search properties..."
+          }
+          icon={<div class="i-hugeicons:search-01 h-4 w-4" />}
+          value={searchQuery()}
+          onInput={(e) => setSearchQuery(e.currentTarget.value)}
+        />
+      </div>
+
+      <For each={filteredGroups()}>
+        {(group) => (
+          <div class="mb-2">
+            <h3 class="text-lightSlate-100 mb-0 mt-8 flex items-center gap-2 text-xl font-medium">
+              <div class={`h-5 w-5 ${group.icon}`} />
+              {GROUP_TRANSLATION_KEYS[group.id]
+                ? t(GROUP_TRANSLATION_KEYS[group.id])
+                : group.label}
+            </h3>
+            <RowsContainer>
+              <For each={group.properties}>{(prop) => renderField(prop)}</For>
+            </RowsContainer>
+          </div>
+        )}
+      </For>
     </div>
   )
 }

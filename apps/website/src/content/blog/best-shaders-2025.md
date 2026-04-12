@@ -82,7 +82,7 @@ For powerful PCs that can handle demanding graphics.
 - **Compatibility:** OptiFine
 - **Style:** Photorealistic
 
-Path-traced global illumination for the most realistic lighting in Minecraft. Requires RTX graphics card for decent performance. Absolutely stunning results.
+Path-traced global illumination for the most realistic lighting in Minecraft. Uses software-based path tracing, so no RTX card is required, but a powerful NVIDIA GPU is recommended. Absolutely stunning results.
 
 ### Continuum
 
@@ -135,7 +135,7 @@ Unique colorful style with bloom and fantasy-like lighting. Great for creative w
 | Complementary Reimagined | Scalable | Everyone |
 | BSL | Medium | Vibrant colors |
 | Tea | Very Light | Low-end PCs |
-| SEUS PTGI | Heavy | RTX owners |
+| SEUS PTGI | Heavy | High-end NVIDIA GPUs |
 | Continuum | Heavy | Screenshots/Videos |
 
 ## How to Install Shaders

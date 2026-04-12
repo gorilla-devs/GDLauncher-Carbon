@@ -6,6 +6,7 @@ import useSearchContext from "@/components/SearchInputContext"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { SearchableCheckboxList } from "./SearchableCheckboxList"
+import { formatModrinthCategory } from "@/utils/modrinthCategories"
 
 export function CategoriesFilter() {
   const searchResults = useSearchContext()
@@ -31,7 +32,7 @@ export function CategoriesFilter() {
         (v) => v.projectType === searchResults?.searchQuery().projectType
       )
       .map((category) => ({
-        label: category.name,
+        label: formatModrinthCategory(category.name),
         value: category.id,
         icon: (
           // eslint-disable-next-line solid/no-innerhtml

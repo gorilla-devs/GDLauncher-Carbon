@@ -454,11 +454,11 @@ impl GDLAccountTask {
     pub async fn register_account(
         &self,
         body: RegisterAccountBody,
-        id_token: String,
+        gdl_token: String,
     ) -> anyhow::Result<GDLUser> {
         let url = format!("{}/v1/users/user", self.base_api);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
@@ -481,7 +481,7 @@ impl GDLAccountTask {
         Ok(user)
     }
 
-    pub async fn wait_for_account_validation(&self, id_token: String) -> anyhow::Result<()> {
+    pub async fn wait_for_account_validation(&self, gdl_token: String) -> anyhow::Result<()> {
         let url = format!("{}/v1/users/wait-for-user-verification", self.base_api);
 
         // Cloudflare's 524 status code is used to indicate that the request timed out
@@ -493,7 +493,7 @@ impl GDLAccountTask {
                 .client
                 .get(&url)
                 .header("avoid-caching", "")
-                .header("Authorization", format!("Bearer {}", id_token))
+                .header("Authorization", format!("Bearer {}", gdl_token))
                 .send()
                 .await?;
 
@@ -508,9 +508,9 @@ impl GDLAccountTask {
         }
     }
 
-    pub async fn get_account(&self, id_token: String) -> anyhow::Result<Option<GDLUser>> {
+    pub async fn get_account(&self, gdl_token: String) -> anyhow::Result<Option<GDLUser>> {
         let url = format!("{}/v1/users/user", self.base_api);
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse().unwrap());
 
@@ -529,10 +529,10 @@ impl GDLAccountTask {
 
     pub async fn request_new_verification_token(
         &self,
-        id_token: String,
+        gdl_token: String,
     ) -> Result<(), RequestNewVerificationTokenError> {
         let url = format!("{}/v1/users/request-new-verification-token", self.base_api);
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse().unwrap());
 
@@ -569,14 +569,14 @@ impl GDLAccountTask {
 
     pub async fn request_email_change(
         &self,
-        id_token: String,
+        gdl_token: String,
         email: String,
     ) -> Result<(), RequestNewEmailChangeError> {
         let body = serde_json::to_string(&RequestEmailChangeBody { new_email: email })
             .map_err(|err| RequestNewEmailChangeError::RequestFailed(err.into()))?;
 
         let url = format!("{}/v1/users/request-email-change", self.base_api);
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse().unwrap());
         headers.insert(
@@ -620,11 +620,11 @@ impl GDLAccountTask {
 
     pub async fn request_deletion(
         &self,
-        id_token: String,
+        gdl_token: String,
     ) -> Result<(), RequestGDLAccountDeletionError> {
         let url = format!("{}/v1/users/user", self.base_api);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse().unwrap());
 
@@ -670,12 +670,12 @@ impl GDLAccountTask {
 
     pub async fn change_display_name(
         &self,
-        id_token: String,
+        gdl_token: String,
         display_name: String,
     ) -> Result<(), ChangeDisplayNameError> {
         let url = format!("{}/v1/users/user/nickname", self.base_api);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(
             AUTHORIZATION,
@@ -738,10 +738,10 @@ impl GDLAccountTask {
         Ok(history)
     }
 
-    pub async fn clear_display_name_history(&self, id_token: String) -> anyhow::Result<()> {
+    pub async fn clear_display_name_history(&self, gdl_token: String) -> anyhow::Result<()> {
         let url = format!("{}/v1/users/user/nickname-history", self.base_api);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
 
@@ -754,7 +754,7 @@ impl GDLAccountTask {
 
     pub async fn upload_profile_icon(
         &self,
-        id_token: String,
+        gdl_token: String,
         icon_path: String,
     ) -> anyhow::Result<()> {
         // reqwest-middleware does not support multipart form data
@@ -765,7 +765,7 @@ impl GDLAccountTask {
 
         let form = Form::new().file("avatar", icon_path).await?;
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
 
         let resp = client
             .put(url)
@@ -780,10 +780,10 @@ impl GDLAccountTask {
         Ok(())
     }
 
-    pub async fn delete_profile_icon(&self, id_token: String) -> anyhow::Result<()> {
+    pub async fn delete_profile_icon(&self, gdl_token: String) -> anyhow::Result<()> {
         let url = format!("{}/v1/users/user/avatar", self.base_api);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
 
@@ -826,7 +826,7 @@ impl GDLAccountTask {
 
     pub async fn get_presigned_upload_url(
         &self,
-        id_token: String,
+        gdl_token: String,
         content_length: u64,
         sha256_checksum: String,
         title: Option<String>,
@@ -836,7 +836,7 @@ impl GDLAccountTask {
     ) -> Result<GetPresignedUploadUrlResponse, InstanceShareError> {
         let url = format!("{}/v1/instance-share/presigned-upload-url", self.base_api);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
         headers.insert(
@@ -920,14 +920,14 @@ impl GDLAccountTask {
     pub async fn wait_for_share_instance(
         &self,
         file_key: String,
-        id_token: String,
+        gdl_token: String,
     ) -> Result<WaitForShareInstanceResponse, InstanceShareError> {
         let url = format!(
             "{}/v1/instance-share/wait-for-upload-complete",
             self.base_api
         );
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
         headers.insert(
@@ -953,7 +953,7 @@ impl GDLAccountTask {
     /// Get paginated list of user's shares
     pub async fn get_user_shares(
         &self,
-        id_token: String,
+        gdl_token: String,
         limit: Option<i64>,
         offset: Option<i64>,
     ) -> Result<PaginatedShares, InstanceShareError> {
@@ -971,7 +971,7 @@ impl GDLAccountTask {
             url = format!("{}?{}", url, params.join("&"));
         }
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
 
@@ -983,12 +983,12 @@ impl GDLAccountTask {
     /// Delete a share by its code
     pub async fn delete_share(
         &self,
-        id_token: String,
+        gdl_token: String,
         share_code: String,
     ) -> Result<(), InstanceShareError> {
         let url = format!("{}/v1/instance-share/share/{}", self.base_api, share_code);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
 
@@ -997,10 +997,10 @@ impl GDLAccountTask {
         handle_instance_share_response_empty(resp).await
     }
 
-    pub async fn get_quota(&self, id_token: String) -> Result<QuotaInfo, InstanceShareError> {
+    pub async fn get_quota(&self, gdl_token: String) -> Result<QuotaInfo, InstanceShareError> {
         let url = format!("{}/v1/instance-share/quota", self.base_api);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
 
         let resp = self
             .client
@@ -1015,13 +1015,13 @@ impl GDLAccountTask {
     /// Update a share's metadata (title and/or max_downloads)
     pub async fn update_share(
         &self,
-        id_token: String,
+        gdl_token: String,
         share_code: String,
         body: UpdateShareBody,
     ) -> Result<(), InstanceShareError> {
         let url = format!("{}/v1/instance-share/share/{}", self.base_api, share_code);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
         headers.insert(
@@ -1047,7 +1047,7 @@ impl GDLAccountTask {
     /// Regenerate a share code (invalidates the old code)
     pub async fn regenerate_share_code(
         &self,
-        id_token: String,
+        gdl_token: String,
         share_code: String,
     ) -> Result<RegenerateShareCodeResponse, InstanceShareError> {
         let url = format!(
@@ -1055,7 +1055,7 @@ impl GDLAccountTask {
             self.base_api, share_code
         );
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse()?);
 
@@ -1105,7 +1105,7 @@ impl GDLAccountTask {
     /// Returns the background URL on success
     pub async fn upload_share_background(
         &self,
-        id_token: String,
+        gdl_token: String,
         share_code: String,
         image_data: Vec<u8>,
     ) -> Result<String, InstanceShareError> {
@@ -1125,7 +1125,7 @@ impl GDLAccountTask {
 
         let form = Form::new().part("file", part);
 
-        let authorization = format!("Bearer {}", id_token);
+        let authorization = format!("Bearer {}", gdl_token);
 
         let resp = client
             .post(url)

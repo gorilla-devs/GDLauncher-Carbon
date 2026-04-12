@@ -1,11 +1,13 @@
 import { rspc } from "@/utils/rspcClient"
-import { Button, Input, Slider } from "@gd/ui"
-import {
-  createEffect,
-  createSignal,
-  Show
-} from "solid-js"
+import { Input, Slider, Switch } from "@gd/ui"
+import { Trans, useTransContext } from "@gd/i18n"
+import { createEffect, createSignal, Show } from "solid-js"
 import { FEServerDetails } from "@gd/core_module/bindings"
+import { generateSequence } from "@/utils/helpers"
+import Title from "@/pages/Settings/components/Title"
+import Row from "@/pages/Settings/components/Row"
+import RowsContainer from "@/pages/Settings/components/RowsContainer"
+import RightHandSide from "@/pages/Settings/components/RightHandSide"
 
 interface SettingsProps {
   serverDetails: FEServerDetails
@@ -13,18 +15,17 @@ interface SettingsProps {
 }
 
 const Settings = (props: SettingsProps) => {
+  const [t] = useTransContext()
   const [name, setName] = createSignal("")
   const [xmx, setXmx] = createSignal(2048)
   const [xms, setXms] = createSignal(1024)
   const [extraJavaArgs, setExtraJavaArgs] = createSignal("")
   const [autoRestart, setAutoRestart] = createSignal(false)
-  const [dirty, setDirty] = createSignal(false)
 
   const updateServerMutation = rspc.createMutation(() => ({
     mutationKey: ["server.updateServer"]
   }))
 
-  // Sync from props when server details load/change
   createEffect(() => {
     const d = props.serverDetails
     if (!d) return
@@ -33,27 +34,13 @@ const Settings = (props: SettingsProps) => {
     setXms(d.xms)
     setExtraJavaArgs(d.extraJavaArgs)
     setAutoRestart(d.autoRestart)
-    setDirty(false)
   })
 
-  const markDirty = () => setDirty(true)
-
-  const handleSave = () => {
+  const save = (update: Record<string, unknown>) => {
     updateServerMutation.mutate({
       id: props.serverDetails.id,
-      name: name() !== props.serverDetails.name ? name() : undefined,
-      xmx: xmx() !== props.serverDetails.xmx ? xmx() : undefined,
-      xms: xms() !== props.serverDetails.xms ? xms() : undefined,
-      extraJavaArgs:
-        extraJavaArgs() !== props.serverDetails.extraJavaArgs
-          ? extraJavaArgs() || null
-          : undefined,
-      autoRestart:
-        autoRestart() !== props.serverDetails.autoRestart
-          ? autoRestart()
-          : undefined
+      ...update
     })
-    setDirty(false)
   }
 
   const totalRamMb = () => {
@@ -62,86 +49,83 @@ const Settings = (props: SettingsProps) => {
   }
 
   return (
-    <div class="flex flex-col gap-6 rounded-xl border border-darkSlate-600 bg-darkSlate-900 p-4">
-      <div class="flex items-center justify-between">
-        <h3 class="m-0 text-sm font-medium text-lightSlate-400">Launcher Settings</h3>
-        <Show when={dirty()}>
-          <Button
-            type="primary"
-            size="small"
-            onClick={handleSave}
-            loading={updateServerMutation.isPending}
+    <div>
+      <h3 class="text-lightSlate-100 mb-0 mt-4 flex items-center gap-2 text-xl font-medium">
+        <div class="i-hugeicons:settings-02 h-5 w-5" />
+        <Trans key="instances:_trn_server_settings_general" />
+      </h3>
+      <RowsContainer>
+        <Row>
+          <Title
+            description={
+              t(
+                "instances:_trn_server_settings_name_description" as Parameters<
+                  typeof t
+                >[0]
+              ) || undefined
+            }
           >
-            Save Changes
-          </Button>
-        </Show>
-      </div>
-
-      {/* General */}
-      <div class="flex flex-col gap-4">
-        <h4 class="m-0 text-xs font-medium text-lightSlate-600 uppercase tracking-wider">
-          General
-        </h4>
-
-        <div class="grid grid-cols-2 gap-4">
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-lightSlate-500">Server Name</label>
+            <Trans key="instances:_trn_server_settings_name" />
+          </Title>
+          <RightHandSide>
             <Input
+              class="w-60"
               value={name()}
-              onInput={(e) => {
-                setName(e.target.value)
-                markDirty()
+              onInput={(e) => setName(e.target.value)}
+              onBlur={() => {
+                if (name() !== props.serverDetails.name) {
+                  save({ name: name() })
+                }
+              }}
+              onKeyDown={(e: KeyboardEvent) => {
+                if (e.key === "Enter") {
+                  if (name() !== props.serverDetails.name) {
+                    save({ name: name() })
+                  }
+                }
               }}
             />
-          </div>
+          </RightHandSide>
+        </Row>
 
-          <div class="flex flex-col gap-2">
-            <label class="text-xs text-lightSlate-500">Auto Restart</label>
-            <button
-              class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors"
-              classList={{
-                "bg-green-900/30 text-green-400": autoRestart(),
-                "bg-darkSlate-700 text-lightSlate-500": !autoRestart()
+        <Row>
+          <Title>
+            <Trans key="instances:_trn_server_settings_auto_restart" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={autoRestart()}
+              onChange={(val) => {
+                setAutoRestart(val)
+                save({ autoRestart: val })
               }}
-              onClick={() => {
-                setAutoRestart(!autoRestart())
-                markDirty()
-              }}
-            >
-              <div
-                classList={{
-                  "i-hugeicons:tick-02": autoRestart(),
-                  "i-hugeicons:cancel-01": !autoRestart()
-                }}
-                class="h-4 w-4"
-              />
-              {autoRestart() ? "Enabled" : "Disabled"}
-            </button>
-          </div>
-        </div>
-      </div>
+            />
+          </RightHandSide>
+        </Row>
+      </RowsContainer>
 
-      {/* Java Settings */}
-      <div class="flex flex-col gap-4">
-        <h4 class="m-0 text-xs font-medium text-lightSlate-600 uppercase tracking-wider">
-          Java Settings
-        </h4>
-
-        <div class="flex flex-col gap-3">
-          <div class="flex flex-col gap-1">
-            <div class="flex items-center justify-between">
-              <label class="text-xs text-lightSlate-500">
-                Max Memory (Xmx)
-              </label>
-              <span class="text-xs font-mono text-lightSlate-300">
-                {xmx()} MB
-              </span>
-            </div>
+      <h3 class="text-lightSlate-100 mb-0 mt-8 flex items-center gap-2 text-xl font-medium">
+        <div class="i-hugeicons:coffee-beans h-5 w-5" />
+        <Trans key="instances:_trn_server_settings_java" />
+      </h3>
+      <RowsContainer>
+        <Row>
+          <Title
+            description={
+              xmx() >= 1024
+                ? `${(xmx() / 1024).toFixed(1).replace(/\.0$/, "")} GB`
+                : `${xmx()} MB`
+            }
+          >
+            <Trans key="instances:_trn_server_settings_xmx" />
+          </Title>
+          <RightHandSide class="max-w-100 flex-1">
             <Slider
               min={512}
               max={Math.min(totalRamMb(), 32768)}
               steps={256}
               value={xmx()}
+              marks={generateSequence(2048, Math.min(totalRamMb(), 32768))}
               tooltipFormat={(val) =>
                 val >= 1024
                   ? `${(val / 1024).toFixed(1).replace(/\.0$/, "")} GB`
@@ -150,25 +134,42 @@ const Settings = (props: SettingsProps) => {
               onChange={(val) => {
                 setXmx(val)
                 if (xms() > val) setXms(val)
-                markDirty()
+              }}
+              OnRelease={(val) => {
+                if (val !== props.serverDetails.xmx) {
+                  save({
+                    xmx: val,
+                    ...(xms() > val ? { xms: val } : {})
+                  })
+                }
               }}
             />
+          </RightHandSide>
+        </Row>
+        <Show when={xmx() > totalRamMb() * 0.8}>
+          <div class="flex items-center gap-2 px-2 pb-4 text-sm text-yellow-500">
+            <div class="i-hugeicons:alert-02 h-4 w-4 shrink-0" />
+            <Trans key="java:_trn_ram_warning_high_allocation" />
           </div>
+        </Show>
 
-          <div class="flex flex-col gap-1">
-            <div class="flex items-center justify-between">
-              <label class="text-xs text-lightSlate-500">
-                Min Memory (Xms)
-              </label>
-              <span class="text-xs font-mono text-lightSlate-300">
-                {xms()} MB
-              </span>
-            </div>
+        <Row>
+          <Title
+            description={
+              xms() >= 1024
+                ? `${(xms() / 1024).toFixed(1).replace(/\.0$/, "")} GB`
+                : `${xms()} MB`
+            }
+          >
+            <Trans key="instances:_trn_server_settings_xms" />
+          </Title>
+          <RightHandSide class="max-w-100 flex-1">
             <Slider
               min={256}
               max={xmx()}
               steps={256}
               value={xms()}
+              marks={generateSequence(1024, xmx())}
               tooltipFormat={(val) =>
                 val >= 1024
                   ? `${(val / 1024).toFixed(1).replace(/\.0$/, "")} GB`
@@ -176,24 +177,42 @@ const Settings = (props: SettingsProps) => {
               }
               onChange={(val) => {
                 setXms(val)
-                markDirty()
+              }}
+              OnRelease={(val) => {
+                if (val !== props.serverDetails.xms) {
+                  save({ xms: val })
+                }
               }}
             />
-          </div>
+          </RightHandSide>
+        </Row>
 
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-lightSlate-500">Extra Java Args</label>
+        <Row>
+          <Title>
+            <Trans key="instances:_trn_server_settings_extra_args" />
+          </Title>
+          <RightHandSide>
             <Input
+              class="w-80"
               value={extraJavaArgs()}
               placeholder="-XX:+UseG1GC ..."
-              onInput={(e) => {
-                setExtraJavaArgs(e.target.value)
-                markDirty()
+              onInput={(e) => setExtraJavaArgs(e.target.value)}
+              onBlur={() => {
+                if (extraJavaArgs() !== props.serverDetails.extraJavaArgs) {
+                  save({ extraJavaArgs: extraJavaArgs() || null })
+                }
+              }}
+              onKeyDown={(e: KeyboardEvent) => {
+                if (e.key === "Enter") {
+                  if (extraJavaArgs() !== props.serverDetails.extraJavaArgs) {
+                    save({ extraJavaArgs: extraJavaArgs() || null })
+                  }
+                }
               }}
             />
-          </div>
-        </div>
-      </div>
+          </RightHandSide>
+        </Row>
+      </RowsContainer>
     </div>
   )
 }

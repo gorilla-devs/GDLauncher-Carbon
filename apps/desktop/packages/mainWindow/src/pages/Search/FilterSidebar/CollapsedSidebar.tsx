@@ -1,5 +1,6 @@
 import { Show } from "solid-js"
 import useSearchContext from "@/components/SearchInputContext"
+import { useGDNavigate } from "@/managers/NavigationManager"
 
 function FilterIcon(props: {
   icon: string
@@ -29,11 +30,35 @@ export function CollapsedSidebar(props: {
   onFilterIconClick?: (sectionId: string) => void
 }) {
   const searchResults = useSearchContext()
+  const navigator = useGDNavigate()
 
   const query = () => searchResults?.searchQuery()
 
+  const hasContext = () =>
+    !!(searchResults?.selectedInstanceId() || searchResults?.selectedServerId())
+
+  const handleGoBack = () => {
+    if (searchResults?.selectedServerId()) {
+      navigator.navigate(
+        `/library/server/${searchResults?.selectedServerId()}/addons`
+      )
+    } else if (searchResults?.selectedInstanceId()) {
+      navigator.navigate(
+        `/library/${searchResults?.selectedInstanceId()}/addons`
+      )
+    }
+  }
+
   return (
     <div class="flex w-12 flex-col items-center gap-1 py-2">
+      <Show when={hasContext()}>
+        <FilterIcon
+          icon="i-hugeicons:arrow-left-01"
+          hasActive={false}
+          onClick={handleGoBack}
+        />
+        <div class="bg-darkSlate-700/50 mx-1 my-1 h-px w-8" />
+      </Show>
       <FilterIcon
         icon="i-hugeicons:sidebar-right"
         hasActive={false}

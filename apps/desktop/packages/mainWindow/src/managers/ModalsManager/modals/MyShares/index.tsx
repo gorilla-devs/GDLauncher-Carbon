@@ -4,11 +4,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Input,
   Progress,
   toast
 } from "@gd/ui"
-import { ModalProps } from "../.."
+import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { rspc } from "@/utils/rspcClient"
 import {
@@ -24,7 +23,6 @@ import { FEPaginatedShares, FEShareInfo } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
 import { createInfiniteQuery } from "@tanstack/solid-query"
 import { formatDownloadCount } from "@/utils/helpers"
-import { MAX_DOWNLOADS_LIMIT, validateMaxDownloads } from "@/utils/validation"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import VerificationRequiredPlaceholder from "@/components/VerificationRequiredPlaceholder"
 
@@ -102,6 +100,7 @@ function MyShares(props: ModalProps) {
   const [t] = useTransContext()
   const rspcContext = rspc.useContext()
   const globalStore = useGlobalStore()
+  const modalsContext = useModal()
 
   const isVerified = () => {
     const data = globalStore.gdlAccount.data
@@ -112,11 +111,6 @@ function MyShares(props: ModalProps) {
     shareCode: string
     fields: { title?: boolean; maxDownloads?: boolean }
   } | null>(null)
-
-  // Edit state
-  const [editingShare, setEditingShare] = createSignal<string | null>(null)
-  const [editTitle, setEditTitle] = createSignal("")
-  const [editMaxDownloads, setEditMaxDownloads] = createSignal("")
 
   // Quota query
   const quotaQuery = rspc.createQuery(() => ({
@@ -145,10 +139,6 @@ function MyShares(props: ModalProps) {
   // Mutations
   const deleteMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteShare"]
-  }))
-
-  const updateMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.updateShare"]
   }))
 
   const regenerateMutation = rspc.createMutation(() => ({
@@ -191,61 +181,14 @@ function MyShares(props: ModalProps) {
     }
   }
 
-  const openEditDialog = (share: FEShareInfo) => {
-    setEditingShare(share.shareCode)
-    setEditTitle(share.title || "")
-    setEditMaxDownloads(share.maxDownloads?.toString() || "")
-  }
-
-  const closeEditDialog = () => {
-    setEditingShare(null)
-    setEditTitle("")
-    setEditMaxDownloads("")
-  }
-
-  const handleSaveEdit = async () => {
-    const shareCode = editingShare()
-    if (!shareCode) return
-
-    // Find current share to compare values
-    const currentShare = allShares().find((s) => s.shareCode === shareCode)
-    if (!currentShare) return
-
-    const newTitle = editTitle().trim() || null
-    const maxDownloadsValue = editMaxDownloads().trim()
-    const newMaxDownloads = maxDownloadsValue
-      ? parseInt(maxDownloadsValue) >= 1
-        ? parseInt(maxDownloadsValue)
-        : null
-      : null
-
-    // Determine which fields changed
-    const titleChanged = newTitle !== (currentShare.title || null)
-    const maxDownloadsChanged = newMaxDownloads !== currentShare.maxDownloads
-
-    // Close dialog first, then set loading state
-    closeEditDialog()
-    setUpdatingShare({
-      shareCode,
-      fields: { title: titleChanged, maxDownloads: maxDownloadsChanged }
+  const openEditModal = (share: FEShareInfo) => {
+    modalsContext?.openModal({ name: "editShare" }, {
+      share,
+      onUpdated: () => {
+        sharesQuery.refetch()
+        quotaQuery.refetch()
+      }
     })
-
-    try {
-      await updateMutation.mutateAsync({
-        shareCode,
-        title: newTitle,
-        maxDownloads: newMaxDownloads
-      })
-      toast.success(t("instances:_trn_my_shares.updated"))
-      await sharesQuery.refetch()
-    } catch (err) {
-      const errorCode = getErrorCode(err)
-      toast.error(
-        t(getShareErrorKey(errorCode, "instances:_trn_my_shares.update_failed"))
-      )
-    } finally {
-      setUpdatingShare(null)
-    }
   }
 
   const copyToClipboard = async (shareCode: string) => {
@@ -349,68 +292,6 @@ function MyShares(props: ModalProps) {
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="w-160 h-120 flex flex-col">
-        {/* Edit Dialog Overlay */}
-        <Show when={editingShare()}>
-          <div class="bg-darkSlate-900/80 absolute inset-0 z-10 flex items-center justify-center">
-            <div class="bg-darkSlate-800 w-80 rounded-lg p-4 shadow-lg">
-              <h3 class="text-lightSlate-100 mb-4 text-lg font-medium">
-                <Trans key="instances:_trn_my_shares.edit" />
-              </h3>
-
-              <div class="mb-3">
-                <label class="text-lightSlate-400 mb-1 block text-sm">
-                  <Trans key="instances:_trn_my_shares.edit_title_label" />
-                </label>
-                <Input
-                  value={editTitle()}
-                  onInput={(e) => setEditTitle(e.currentTarget.value)}
-                  placeholder={t("instances:_trn_my_shares.name")}
-                  inputColor="bg-darkSlate-700"
-                  class="w-full"
-                />
-              </div>
-
-              <div class="mb-4">
-                <label class="text-lightSlate-400 mb-1 block text-sm">
-                  <Trans key="instances:_trn_my_shares.edit_max_downloads_label" />
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  max={MAX_DOWNLOADS_LIMIT}
-                  value={editMaxDownloads()}
-                  onInput={(e) => {
-                    const validated = validateMaxDownloads(
-                      e.currentTarget.value
-                    )
-                    setEditMaxDownloads(validated)
-                    e.currentTarget.value = validated
-                  }}
-                  placeholder={t(
-                    "instances:_trn_my_shares.edit_max_downloads_placeholder"
-                  )}
-                  inputColor="bg-darkSlate-700"
-                  class="w-full"
-                />
-              </div>
-
-              <div class="flex justify-end gap-2">
-                <Button type="secondary" size="small" onClick={closeEditDialog}>
-                  <Trans key="instances:_trn_instance_share.cancel" />
-                </Button>
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={handleSaveEdit}
-                  loading={updateMutation.isPending}
-                >
-                  <Trans key="instances:_trn_my_shares.save" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Show>
-
         <Switch>
           <Match when={!isVerified()}>
             <VerificationRequiredPlaceholder />
@@ -550,7 +431,7 @@ function MyShares(props: ModalProps) {
                                 <Trans key="instances:_trn_my_shares.copy_code" />
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onSelect={() => openEditDialog(share)}
+                                onSelect={() => openEditModal(share)}
                               >
                                 <div class="i-ri:edit-line mr-2" />
                                 <Trans key="instances:_trn_my_shares.edit" />

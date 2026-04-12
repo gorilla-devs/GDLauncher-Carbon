@@ -190,6 +190,9 @@ model Server {
   iconRevision     Int?
   modloaderType    String?
   modloaderVersion String?
+  modpackPlatform  String?
+  modpackProjectId String?
+  modpackFileId    String?
   mods             ServerModFileCache[]
 }
 

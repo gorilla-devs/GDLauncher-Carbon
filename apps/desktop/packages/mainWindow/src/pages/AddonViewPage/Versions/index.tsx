@@ -23,6 +23,11 @@ const Versions = () => {
     return isNaN(id) ? undefined : id
   }
 
+  const serverId = () => {
+    const id = parseInt(searchParams.serverId, 10)
+    return isNaN(id) ? undefined : id
+  }
+
   const instanceMods = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceMods", instanceId() ?? 0],
     enabled: instanceId() !== undefined && instanceId()! > 0
@@ -175,6 +180,7 @@ const Versions = () => {
                       modVersion={version}
                       installedFile={installedMod()}
                       instanceId={instanceId()}
+                      serverId={serverId()}
                       type={mod?.data?.type}
                       instanceMods={instanceMods.data || undefined}
                       instanceDetails={instanceDetails.data || undefined}

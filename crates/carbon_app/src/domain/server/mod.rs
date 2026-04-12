@@ -112,6 +112,15 @@ pub struct ServerDetails {
     pub icon_revision: Option<u32>,
     pub modloader_type: Option<String>,
     pub modloader_version: Option<String>,
+    pub modpack_info: Option<ServerModpackInfo>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerModpackInfo {
+    pub platform: String,
+    pub project_id: String,
+    pub file_id: String,
 }
 
 #[derive(Debug)]
@@ -149,6 +158,7 @@ pub struct ServerListEntry {
     pub icon_revision: Option<u32>,
     pub modloader_type: Option<String>,
     pub modloader_version: Option<String>,
+    pub modpack_info: Option<ServerModpackInfo>,
 }
 
 #[derive(Debug)]
@@ -210,7 +220,7 @@ pub struct BannedIpEntry {
     pub reason: String,
 }
 
-/// A server addon (mod or datapack) scanned from filesystem
+/// A server addon (mod or datapack) from the database cache
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerAddon {
@@ -220,6 +230,9 @@ pub struct ServerAddon {
     pub enabled: bool,
     pub addon_type: String,
     pub file_size: i32,
+    pub has_image: bool,
+    pub curseforge_project_id: Option<u32>,
+    pub modrinth_project_id: Option<String>,
 }
 
 /// Launch configuration for modded servers, persisted to modloader_config.json

@@ -264,6 +264,15 @@ impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
             _ => Some(SearchIndex::Downloads), // Default to Downloads when no platform filters
         };
 
+        let filters = value.environment.map(|env| match env {
+            FEUnifiedEnvironment::Client => {
+                r#"client_side != "unsupported""#.to_string()
+            }
+            FEUnifiedEnvironment::Server => {
+                r#"server_side != "unsupported""#.to_string()
+            }
+        });
+
         ProjectSearchParameters {
             query: value.search_query,
             facets: if facets.is_empty() {
@@ -274,7 +283,7 @@ impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
             index: sort_index,
             offset: value.index,
             limit: value.page_size,
-            filters: None,
+            filters,
         }
     }
 }

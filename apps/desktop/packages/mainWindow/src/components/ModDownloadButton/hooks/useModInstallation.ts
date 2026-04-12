@@ -5,6 +5,7 @@ import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 interface UseModInstallationProps {
   addon: FEUnifiedSearchResult | undefined
   fileId?: number | string
+  selectedServerId?: number
 }
 
 export const useModInstallation = (props: UseModInstallationProps) => {
@@ -29,6 +30,15 @@ export const useModInstallation = (props: UseModInstallationProps) => {
 
   const installModMutation = rspc.createMutation(() => ({
     mutationKey: "instance.installMod"
+  }))
+
+  // Server mutations
+  const installLatestServerModMutation = rspc.createMutation(() => ({
+    mutationKey: "server.installLatestServerMod"
+  }))
+
+  const installServerModMutation = rspc.createMutation(() => ({
+    mutationKey: "server.installServerMod"
   }))
 
   const latestModInstallObj = () => {
@@ -114,12 +124,40 @@ export const useModInstallation = (props: UseModInstallationProps) => {
     })
   }
 
+  // Server install handler - uses server mutations with server_id
+  const handleServerInstall = async (serverId: number) => {
+    if (!props.addon) return
+
+    try {
+      let taskId: number
+
+      if (!props.fileId) {
+        taskId = await installLatestServerModMutation.mutateAsync({
+          serverId,
+          modSource: latestModInstallObj()
+        })
+      } else {
+        taskId = await installServerModMutation.mutateAsync({
+          serverId,
+          modSource: modInstallObj()
+        })
+      }
+
+      return taskId
+    } catch (_error) {
+      // Error handled by caller
+    }
+  }
+
   return {
     instanceLoadingStates,
     instanceTaskIds,
     installLatestModMutation,
     installModMutation,
+    installLatestServerModMutation,
+    installServerModMutation,
     handleInstanceSelection,
+    handleServerInstall,
     clearInstanceLoadingState,
     latestModInstallObj,
     modInstallObj

@@ -144,8 +144,19 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     enabled: !!selectedInstanceId()
   }))
 
-  // Track previous instance ID to detect changes
+  const selectedServer = rspc.createQuery(() => ({
+    queryKey: ["server.getServerDetails", selectedServerId() ?? null],
+    enabled: !!selectedServerId()
+  }))
+
+  const selectedServerAddons = rspc.createQuery(() => ({
+    queryKey: ["server.getServerAddons", selectedServerId() ?? 0],
+    enabled: !!selectedServerId()
+  }))
+
+  // Track previous instance/server ID to detect changes
   let prevInstanceId: number | undefined = undefined
+  let prevServerId: number | undefined = undefined
 
   // Use cached instance data to populate filters instantly
   createEffect(() => {
@@ -159,11 +170,30 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       setSearchQuery((prev) => ({
         ...prev,
         modloaders: modloader ? [modloader.type_] : null,
-        gameVersions: gameVersion ? [gameVersion] : null
+        gameVersions: gameVersion ? [gameVersion] : null,
+        environment: null
       }))
       prevInstanceId = currentId
     } else if (!currentId) {
       prevInstanceId = undefined
+    }
+  })
+
+  // Use server data to populate filters when server is selected
+  createEffect(() => {
+    const currentId = selectedServerId()
+    const serverData = selectedServer.data
+
+    if (currentId && currentId !== prevServerId && serverData) {
+      setSearchQuery((prev) => ({
+        ...prev,
+        modloaders: serverData.modloaderType ? [serverData.modloaderType] : null,
+        gameVersions: serverData.gameVersion ? [serverData.gameVersion] : null,
+        environment: "server"
+      }))
+      prevServerId = currentId
+    } else if (!currentId) {
+      prevServerId = undefined
     }
   })
 
@@ -594,6 +624,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     selectedInstanceId,
     selectedServerId,
     setSelectedServerId,
+    selectedServer,
+    selectedServerAddons,
     sidebarReady,
     // Direct search mode
     isDirectMode,

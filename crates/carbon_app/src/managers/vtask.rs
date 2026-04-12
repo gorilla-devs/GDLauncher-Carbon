@@ -454,7 +454,7 @@ pub struct TaskData {
     checked_progress: f32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TaskState {
     Indeterminate,
     KnownProgress,
@@ -482,7 +482,7 @@ pub struct SubtaskData {
     checked_progress: Mutex<f32>,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Progress {
     // Download progress numbers are added to the overall task downloaded number,
     // shown after the subtask text as `(<downloaded>/<total>)` in mb.

@@ -44,6 +44,7 @@ import {
 import { CreateQueryResult } from "@tanstack/solid-query"
 import { RSPCError } from "@/utils/rspcClient"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
+import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import AuthorAvatars, { Author } from "@/components/AuthorAvatars"
 
 const getTabValueFromPath = (path: string, id: string, platform: string) => {
@@ -130,9 +131,19 @@ const AddonExplore = (props: { children?: any }) => {
     return isNaN(id) ? undefined : id
   }
 
+  const selectedServerId = () => {
+    const id = parseInt(searchParams.serverId, 10)
+    return isNaN(id) ? undefined : id
+  }
+
   const instanceMods = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceMods", selectedInstanceId() ?? 0],
     enabled: selectedInstanceId() !== undefined
+  }))
+
+  const serverAddons = rspc.createQuery(() => ({
+    queryKey: ["server.getServerAddons", selectedServerId() ?? 0],
+    enabled: selectedServerId() !== undefined
   }))
 
   // Use the hoisted project query from context
@@ -395,6 +406,9 @@ const AddonExplore = (props: { children?: any }) => {
                         }
                       >
                         <ModpackDownloadButton addon={project.data} />
+                        <Show when={project.data?.serverPackFileId}>
+                          <ServerPackDownloadButton addon={project.data} />
+                        </Show>
                       </Match>
                       <Match
                         when={
@@ -405,6 +419,8 @@ const AddonExplore = (props: { children?: any }) => {
                           addon={project.data}
                           selectedInstanceId={selectedInstanceId()}
                           selectedInstanceMods={instanceMods.data ?? undefined}
+                          selectedServerAddons={serverAddons.data ?? undefined}
+                          selectedServerId={selectedServerId()}
                         />
                       </Match>
                     </Switch>
@@ -479,11 +495,19 @@ const AddonExplore = (props: { children?: any }) => {
                         project.data?.type && project.data?.type === "modpack"
                       }
                     >
-                      <ModpackDownloadButton
-                        addon={project.data}
-                        size="small"
-                        iconOnly
-                      />
+                      <div class="flex items-center gap-1">
+                        <ModpackDownloadButton
+                          addon={project.data}
+                          size="small"
+                          iconOnly
+                        />
+                        <Show when={project.data?.serverPackFileId}>
+                          <ServerPackDownloadButton
+                            addon={project.data}
+                            size="small"
+                          />
+                        </Show>
+                      </div>
                     </Match>
                     <Match
                       when={
@@ -494,6 +518,7 @@ const AddonExplore = (props: { children?: any }) => {
                         addon={project.data}
                         selectedInstanceId={selectedInstanceId()}
                         selectedInstanceMods={instanceMods.data ?? undefined}
+                        selectedServerId={selectedServerId()}
                         size="small"
                         iconOnly
                       />

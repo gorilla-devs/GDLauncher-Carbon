@@ -41,9 +41,9 @@ const MODRINTH_PROTOCOL_REGEX =
 // GDLauncher share protocol: gdlauncher://share/ABC123
 const GDLAUNCHER_SHARE_PROTOCOL_REGEX = /^gdlauncher:\/\/share\/([a-zA-Z0-9]+)/
 
-// GDLauncher share link: gdl.gg/i/ABC123, gdl.gg/iABC123, or gdlauncher.com/instance-share/ABC123
+// GDLauncher share link: gdl.gg/i/ABC123 or gdlauncher.com/instance-share/ABC123
 const GDLAUNCHER_SHARE_LINK_REGEX =
-  /(?:https?:\/\/)?(?:gdl\.gg\/i\/?|gdlauncher\.com\/instance-share\/)([a-zA-Z0-9]+)/i
+  /(?:https?:\/\/)?(?:gdl\.gg\/i\/|gdlauncher\.com\/instance-share\/)([a-zA-Z0-9]+)/i
 
 // Numeric ID pattern (4+ digits = likely CurseForge ID)
 const NUMERIC_ID_REGEX = /^\d{4,}$/

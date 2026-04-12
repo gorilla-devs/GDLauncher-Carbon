@@ -33,6 +33,7 @@ import {
   PopoverTrigger
 } from "@gd/ui"
 import useKeyboardShortcut from "@/hooks/useKeyboardShortcut"
+import { isConsoleFullScreen, setIsConsoleFullScreen } from "./Tabs/ConsoleTab"
 
 interface ConsoleProps {
   serverId: number
@@ -711,6 +712,18 @@ const Console = (props: ConsoleProps) => {
             autoFollowPreference={autoFollowPreference()}
             setAutoFollowPreference={setAutoFollowPreference}
           />
+          <div
+            class="animate-icons-on-hover cursor-pointer"
+            onClick={() => setIsConsoleFullScreen((v) => !v)}
+          >
+            <div
+              class={`h-5 w-5 bg-lightSlate-800 transition-colors duration-200 ease-spring ${
+                isConsoleFullScreen()
+                  ? "i-hugeicons:minimize-screen"
+                  : "i-hugeicons:maximize-screen"
+              }`}
+            />
+          </div>
         </div>
       </div>
 

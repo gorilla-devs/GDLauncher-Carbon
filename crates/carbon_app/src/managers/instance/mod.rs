@@ -244,7 +244,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             self.app
                 .meta_cache_manager()
-                .queue_caching(instance_id, false)
+                .queue_caching(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), false)
                 .await;
 
             let app = self.app.clone();
@@ -2473,7 +2473,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
-        self.app.meta_cache_manager().queue_caching(id, false).await;
+        self.app.meta_cache_manager().queue_caching(crate::managers::metadata::cache::CacheEntityId::Instance(id), false).await;
 
         Ok(id)
     }

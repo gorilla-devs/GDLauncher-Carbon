@@ -3,6 +3,9 @@ import { Button } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import useSearchContext from "@/components/SearchInputContext"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { useGDNavigate } from "@/managers/NavigationManager"
+import { getInstanceImageUrl, getServerImageUrl } from "@/utils/instances"
+import DefaultImg from "/assets/images/default-instance-img.png"
 import { ViewModeToggle } from "../ViewModeToggle"
 import { CollapsedSidebar } from "./CollapsedSidebar"
 import { PlatformFilter } from "./PlatformFilter"
@@ -20,11 +23,108 @@ function ExpandedPanel(props: {
   onCollapse: () => void
   hasActiveFilters: boolean
 }) {
+  const searchContext = useSearchContext()
+  const navigator = useGDNavigate()
+
+  const hasContext = () =>
+    !!(searchContext?.selectedInstanceId() || searchContext?.selectedServerId())
+
+  const contextName = () =>
+    searchContext?.selectedServer?.data?.name ||
+    searchContext?.selectedInstance?.data?.name ||
+    "..."
+
+  const contextImageUrl = () => {
+    const serverId = searchContext?.selectedServerId()
+    const serverRev = searchContext?.selectedServer?.data?.iconRevision
+    if (serverId && serverRev) {
+      return getServerImageUrl(serverId, serverRev)
+    }
+
+    const instanceId = searchContext?.selectedInstanceId()
+    const instanceRev = searchContext?.selectedInstance?.data?.iconRevision
+    if (instanceId && instanceRev) {
+      return getInstanceImageUrl(instanceId, instanceRev)
+    }
+
+    return DefaultImg
+  }
+
+  const handleGoBack = () => {
+    if (searchContext?.selectedServerId()) {
+      navigator.navigate(
+        `/library/server/${searchContext?.selectedServerId()}/addons`
+      )
+    } else if (searchContext?.selectedInstanceId()) {
+      navigator.navigate(
+        `/library/${searchContext?.selectedInstanceId()}/addons`
+      )
+    }
+  }
+
   return (
     <div
       class="bg-darkSlate-800 flex h-full flex-col"
       style={{ width: `${SIDEBAR_WIDTH}px`, "min-width": `${SIDEBAR_WIDTH}px` }}
     >
+      {/* Instance/Server context */}
+      <Show when={hasContext()}>
+        <div class="relative overflow-hidden border-b border-darkSlate-700/50">
+          {/* Background image */}
+          <div
+            class="absolute inset-0 bg-cover bg-center"
+            style={{ "background-image": `url("${contextImageUrl()}")` }}
+          />
+          <div class="from-darkSlate-800 absolute inset-0 bg-gradient-to-r from-40%" />
+          <div class="from-darkSlate-800/80 absolute inset-0 bg-gradient-to-t" />
+
+          {/* Content */}
+          <div class="relative flex items-center gap-2 px-3 py-3">
+            <button
+              class="hover:bg-darkSlate-600/50 flex shrink-0 items-center justify-center rounded p-1 transition-colors border-none bg-transparent cursor-pointer"
+              onClick={handleGoBack}
+            >
+              <div class="i-hugeicons:arrow-left-01 text-lightSlate-400 h-4 w-4" />
+            </button>
+            <div
+              class="h-8 w-8 shrink-0 rounded-md bg-cover bg-center"
+              style={{ "background-image": `url("${contextImageUrl()}")` }}
+            />
+            <div class="flex min-w-0 flex-1 flex-col">
+              <span class="text-lightSlate-100 truncate text-sm font-medium">
+                {contextName()}
+              </span>
+              <span class="text-lightSlate-500 text-xs">
+                <Show
+                  when={searchContext?.selectedServerId()}
+                  fallback="Instance"
+                >
+                  Server
+                </Show>
+              </span>
+            </div>
+            <button
+              class="hover:bg-darkSlate-600/50 flex shrink-0 items-center justify-center rounded p-1 transition-colors border-none bg-transparent cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (searchContext?.selectedServerId()) {
+                  searchContext.setSelectedServerId(undefined)
+                } else {
+                  searchContext?.setSelectedInstanceId(undefined)
+                }
+                searchContext?.setSearchQuery((prev) => ({
+                  ...prev,
+                  modloaders: null,
+                  gameVersions: null
+                }))
+              }}
+            >
+              <div class="i-hugeicons:cancel-01 text-lightSlate-600 hover:text-lightSlate-300 h-4 w-4 transition-colors" />
+            </button>
+          </div>
+        </div>
+      </Show>
+
       {/* Header */}
       <div class="border-darkSlate-700/50 flex items-center justify-between border-b px-4 py-3">
         <span class="text-sm font-medium">

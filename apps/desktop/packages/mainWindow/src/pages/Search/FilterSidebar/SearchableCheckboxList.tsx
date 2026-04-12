@@ -65,9 +65,9 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
         checked={props.selectedValues().includes(item.value)}
         onChange={(checked) => props.onToggle(item.value, checked)}
       >
-        <div class="flex items-center gap-2 text-sm">
+        <div class="flex min-w-0 items-center gap-2 text-sm">
           <Show when={item.icon}>
-            <div class="h-4 w-4">{item.icon}</div>
+            <div class="h-4 w-4 shrink-0">{item.icon}</div>
           </Show>
           <span class="truncate">{item.label}</span>
         </div>

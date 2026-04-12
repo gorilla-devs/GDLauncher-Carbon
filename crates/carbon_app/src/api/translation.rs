@@ -37,6 +37,25 @@ pub enum Translation {
         instance_name: String,
     },
     InstanceTaskInstallModDownloadFile,
+    ServerTaskInstall {
+        server_name: String,
+    },
+    ServerTaskInstallFromModpack {
+        server_name: String,
+    },
+    ServerTaskDownloadServerPack {
+        server_name: String,
+    },
+    ServerTaskExtractServerPack,
+    ServerTaskDownloadModpackFiles,
+    ServerTaskExtractModpackOverrides,
+    ServerTaskDownloadServerJar,
+    ServerTaskInstallModloader,
+    ServerTaskInstallMod {
+        mod_name: String,
+        server_name: String,
+    },
+    ServerTaskInstallModDownloadFile,
     FinalizingImport,
     InstanceImportLegacyBadConfigFile,
     InstanceImportCfZipMalformed,

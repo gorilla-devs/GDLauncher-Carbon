@@ -40,5 +40,6 @@
   "_trn_delete": "Delete",
   "_trn_edit": "Edit",
   "_trn_ok": "OK",
-  "_trn_field_required": "This field is required"
+  "_trn_field_required": "This field is required",
+  "_trn_dismiss": "Dismiss"
 }

@@ -87,14 +87,38 @@ pub struct ListServer {
     icon_revision: Option<i32>,
     modloader_type: Option<String>,
     modloader_version: Option<String>,
+    modpack_info: Option<FEServerModpackInfo>,
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FEServerModpackInfo {
+    platform: String,
+    project_id: String,
+    file_id: String,
+}
+
+impl From<domain::ServerModpackInfo> for FEServerModpackInfo {
+    fn from(info: domain::ServerModpackInfo) -> Self {
+        Self {
+            platform: info.platform,
+            project_id: info.project_id,
+            file_id: info.file_id,
+        }
+    }
 }
 
 #[derive(Type, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "status")]
 pub enum FEServerState {
-    Stopped,
-    Installing,
+    Stopped {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        failed_task: Option<i32>,
+    },
+    Installing {
+        task_id: i32,
+    },
     Starting,
     Running {
         uptime_seconds: i32,
@@ -126,6 +150,7 @@ pub struct FEServerDetails {
     icon_revision: Option<i32>,
     modloader_type: Option<String>,
     modloader_version: Option<String>,
+    modpack_info: Option<FEServerModpackInfo>,
 }
 
 impl From<domain::ServerDetails> for FEServerDetails {
@@ -150,6 +175,7 @@ impl From<domain::ServerDetails> for FEServerDetails {
             icon_revision: d.icon_revision.map(|v| v as i32),
             modloader_type: d.modloader_type,
             modloader_version: d.modloader_version,
+            modpack_info: d.modpack_info.map(FEServerModpackInfo::from),
         }
     }
 }
@@ -317,10 +343,76 @@ struct DeleteServerAddonRequest {
     addon_id: String,
 }
 
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallServerMod {
+    server_id: FEServerId,
+    mod_source: ServerModSource,
+}
+
+#[derive(Type, Debug, Deserialize)]
+enum ServerModSource {
+    Curseforge(ServerCurseforgeMod),
+    Modrinth(ServerModrinthMod),
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ServerCurseforgeMod {
+    project_id: u32,
+    file_id: u32,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ServerModrinthMod {
+    project_id: String,
+    version_id: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallLatestServerMod {
+    server_id: FEServerId,
+    mod_source: ServerLatestModSource,
+}
+
+#[derive(Type, Debug, Deserialize)]
+enum ServerLatestModSource {
+    Curseforge(u32),
+    Modrinth(String),
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateServerFromModpack {
+    name: String,
+    port: Option<i32>,
+    group: Option<FEServerGroupId>,
+    modpack_source: FEServerModpackSource,
+    icon_url: Option<String>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum FEServerModpackSource {
+    Curseforge {
+        project_id: u32,
+        file_id: u32,
+        server_pack_file_id: u32,
+    },
+    Modrinth {
+        project_id: String,
+        version_id: String,
+    },
+}
+
 fn convert_state(state: &domain::ServerState) -> FEServerState {
     match state {
-        domain::ServerState::Stopped { .. } => FEServerState::Stopped,
-        domain::ServerState::Installing(_) => FEServerState::Installing,
+        domain::ServerState::Stopped { failed_task } => FEServerState::Stopped {
+            failed_task: failed_task.map(|t| t.0),
+        },
+        domain::ServerState::Installing(task_id) => FEServerState::Installing {
+            task_id: task_id.0,
+        },
         domain::ServerState::Starting(_) => FEServerState::Starting,
         domain::ServerState::Running {
             start_time,
@@ -366,7 +458,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                         let state = active_servers
                             .get(&s.id)
                             .map(|sd| convert_state(&sd.state))
-                            .unwrap_or(FEServerState::Stopped);
+                            .unwrap_or(FEServerState::Stopped { failed_task: None });
 
                         ListServer {
                             id: FEServerId(s.id.0),
@@ -384,6 +476,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                             icon_revision: s.icon_revision.map(|v| v as i32),
                             modloader_type: s.modloader_type,
                             modloader_version: s.modloader_version,
+                            modpack_info: s.modpack_info.map(FEServerModpackInfo::from),
                         }
                     })
                 })
@@ -412,6 +505,46 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     details.port,
                     details.modloader_type,
                     details.modloader_version,
+                )
+                .await
+                .map(FEServerId::from)
+        }
+
+        mutation CREATE_SERVER_FROM_MODPACK[app, details: CreateServerFromModpack] {
+            if details.name.is_empty() {
+                return Err(anyhow::anyhow!("server name cannot be empty"));
+            }
+
+            let group: domain::ServerGroupId = match details.group {
+                Some(group) => group.into(),
+                None => app.server_manager()
+                    .get_default_group()
+                    .await?
+            };
+
+            let modpack_source = match details.modpack_source {
+                FEServerModpackSource::Curseforge { project_id, file_id, server_pack_file_id } => {
+                    crate::managers::server::modpack::ServerModpackSource::Curseforge {
+                        project_id,
+                        file_id,
+                        server_pack_file_id,
+                    }
+                }
+                FEServerModpackSource::Modrinth { project_id, version_id } => {
+                    crate::managers::server::modpack::ServerModpackSource::Modrinth {
+                        project_id,
+                        version_id,
+                    }
+                }
+            };
+
+            app.server_manager()
+                .create_server_from_modpack(
+                    group,
+                    details.name,
+                    modpack_source,
+                    details.port,
+                    details.icon_url,
                 )
                 .await
                 .map(FEServerId::from)
@@ -738,6 +871,68 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .delete_server_addon(req.server_id.into(), req.addon_id)
                 .await
         }
+
+        mutation INSTALL_SERVER_MOD[app, req: InstallServerMod] {
+            let task = match req.mod_source {
+                ServerModSource::Curseforge(cf_mod) => {
+                    app.server_manager()
+                        .install_curseforge_mod(
+                            req.server_id.into(),
+                            cf_mod.project_id,
+                            cf_mod.file_id,
+                        )
+                        .await?
+                }
+                ServerModSource::Modrinth(mdr_mod) => {
+                    app.server_manager()
+                        .install_modrinth_mod(
+                            req.server_id.into(),
+                            mdr_mod.project_id,
+                            mdr_mod.version_id,
+                        )
+                        .await?
+                }
+            };
+            Ok(super::vtask::FETaskId::from(task))
+        }
+
+        mutation INSTALL_LATEST_SERVER_MOD[app, req: InstallLatestServerMod] {
+            let task = match req.mod_source {
+                ServerLatestModSource::Curseforge(project_id) => {
+                    app.server_manager()
+                        .install_latest_curseforge_mod(
+                            req.server_id.into(),
+                            project_id,
+                        )
+                        .await?
+                }
+                ServerLatestModSource::Modrinth(project_id) => {
+                    app.server_manager()
+                        .install_latest_modrinth_mod(
+                            req.server_id.into(),
+                            project_id,
+                        )
+                        .await?
+                }
+            };
+            Ok(super::vtask::FETaskId::from(task))
+        }
+
+        mutation OPEN_SERVER_FOLDER[app, id: FEServerId] {
+            app.server_manager()
+                .open_folder(id.into())
+                .await
+        }
+
+        mutation PRIORITIZE_SERVER_CACHE[app, server_id: Option<FEServerId>] {
+            use crate::managers::metadata::cache::CacheEntityId;
+            app.meta_cache_manager()
+                .watch_and_prioritize(server_id.map(|id| CacheEntityId::Server(id.0)))
+                .await;
+
+            Ok(())
+        }
+
     }
 }
 
@@ -789,6 +984,70 @@ pub fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         .route("/log", axum::routing::get(server_log_ws_handler))
         .route("/metrics", axum::routing::get(server_metrics_ws_handler))
         .route("/serverIcon", axum::routing::get(server_icon))
+        .route(
+            "/serverModIcon",
+            axum::routing::get(
+                |State(app): State<Arc<AppInner>>,
+                 Query(query): Query<ServerModIconQuery>| async move {
+                    use carbon_repos::db::{
+                        server_mod_file_cache as sfcdb,
+                        mod_metadata as metadb,
+                        curse_forge_mod_cache as cfdb,
+                        modrinth_mod_cache as mrdb,
+                    };
+
+                    let entry = app
+                        .prisma_client
+                        .server_mod_file_cache()
+                        .find_unique(sfcdb::UniqueWhereParam::IdEquals(query.mod_id.clone()))
+                        .with(
+                            sfcdb::metadata::fetch()
+                                .with(metadb::logo_image::fetch())
+                                .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
+                                .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
+                        )
+                        .exec()
+                        .await
+                        .map_err(|e| FeError::from_anyhow(&e.into()).make_axum())?
+                        .ok_or_else(|| FeError::from_anyhow(
+                            &anyhow::anyhow!("Server mod not found: {}", query.mod_id)
+                        ).make_axum())?;
+
+                    let metadata = entry.metadata
+                        .ok_or_else(|| FeError::from_anyhow(
+                            &anyhow::anyhow!("broken db state")
+                        ).make_axum())?;
+
+                    // Try all platforms in priority order (curseforge → modrinth → metadata)
+                    // since ServerAddon only has a single has_image flag
+                    let cf_icon = metadata.curseforge.flatten()
+                        .and_then(|cf| cf.logo_image.flatten())
+                        .and_then(|img| img.data);
+                    let mr_icon = metadata.modrinth.flatten()
+                        .and_then(|mr| mr.logo_image.flatten())
+                        .and_then(|img| img.data);
+                    let meta_icon = metadata.logo_image.flatten().map(|m| m.data);
+
+                    let icon = cf_icon.or(mr_icon).or(meta_icon);
+
+                    let res = match icon {
+                        Some(data) => (StatusCode::OK, data),
+                        None => (StatusCode::NO_CONTENT, Vec::new()),
+                    };
+
+                    Ok::<_, AxumError>(res)
+                },
+            ),
+        )
+}
+
+#[derive(Deserialize)]
+struct ServerModIconQuery {
+    #[allow(dead_code)]
+    server_id: i32,
+    mod_id: String,
+    #[allow(dead_code)]
+    platform: String,
 }
 
 async fn server_log_ws_handler(

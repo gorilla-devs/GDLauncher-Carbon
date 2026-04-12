@@ -3,12 +3,7 @@ import { createStore, reconcile } from "solid-js/store"
 import { useParams } from "@solidjs/router"
 import { rspc } from "@/utils/rspcClient"
 import { AddonType, Mod } from "@gd/core_module/bindings"
-import {
-  SortingState,
-  ColumnFiltersState,
-  VisibilityState,
-  RowSelectionState
-} from "@tanstack/solid-table"
+import { useAddonTableState } from "@/pages/Library/shared/addons/hooks"
 
 type PlatformFilter = "all" | "curseforge" | "modrinth" | "local"
 
@@ -82,14 +77,7 @@ export const useAddonData = () => {
   }
 
   // Table states
-  const [sorting, setSorting] = createSignal<SortingState>([
-    { id: "filename", desc: false }
-  ])
-  const [columnFilters, setColumnFilters] = createSignal<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
-    {}
-  )
-  const [rowSelection, setRowSelection] = createSignal<RowSelectionState>({})
+  const tableState = useAddonTableState()
 
   // Reconciled store for addons to maintain stable object references
   const [addonsStore, setAddonsStore] = createStore<Mod[]>([])
@@ -236,14 +224,7 @@ export const useAddonData = () => {
     setPlatformFilter,
 
     // Table states
-    sorting,
-    setSorting,
-    columnFilters,
-    setColumnFilters,
-    columnVisibility,
-    setColumnVisibility,
-    rowSelection,
-    setRowSelection,
+    ...tableState,
 
     // Optimistic updates
     optimisticToggleAddon,

@@ -170,6 +170,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/MyShares")),
     title: t("instances:_trn_my_shares.title")
   },
+  editShare: {
+    component: lazy(() => import("./modals/EditShare")),
+    title: t("instances:_trn_my_shares.edit")
+  },
   sharePreview: {
     component: lazy(() => import("./modals/SharePreview")),
     title: t("instances:_trn_share_preview.title")

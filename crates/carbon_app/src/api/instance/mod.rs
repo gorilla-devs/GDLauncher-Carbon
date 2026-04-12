@@ -266,8 +266,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation PRIORITIZE_INSTANCE_CACHE[app, instance_id: Option<FEInstanceId>] {
+            use crate::managers::metadata::cache::CacheEntityId;
             app.meta_cache_manager()
-                .watch_and_prioritize(instance_id.map(|id| id.into()))
+                .watch_and_prioritize(instance_id.map(|id| CacheEntityId::Instance(id.into())))
                 .await;
 
             Ok(())

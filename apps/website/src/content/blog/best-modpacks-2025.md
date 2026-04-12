@@ -12,13 +12,21 @@ Whether you're new to modded Minecraft or a seasoned veteran, there's a modpack 
 
 Kitchen sink packs include a wide variety of mods with no specific theme - perfect for players who want options.
 
-### All The Mods 9 (ATM9)
+### All The Mods 10 (ATM10)
 
-- **Minecraft Version:** 1.20.1
+- **Minecraft Version:** 1.21.1
 - **Mod Loader:** NeoForge
 - **Recommended RAM:** 8-12 GB
 
-The latest in the legendary ATM series. Features hundreds of mods including Create, Mekanism, and new additions. The ATM Star progression adds goals for long-term play.
+The latest in the legendary ATM series. Features around 500 mods including Create, Mekanism, and new additions. The ATM Star progression adds goals for long-term play.
+
+### All The Mods 9 (ATM9)
+
+- **Minecraft Version:** 1.20.1
+- **Mod Loader:** Forge
+- **Recommended RAM:** 8-12 GB
+
+The previous ATM entry, still popular and actively maintained. A great option if your favorite mods haven't updated to 1.21 yet.
 
 ### Better Minecraft [PLUS]
 
@@ -78,8 +86,8 @@ The infamous hardcore survival pack. Dragons roam the skies, thirst and temperat
 
 ### Cobblemon
 
-- **Minecraft Version:** 1.20.1
-- **Mod Loader:** Fabric/Forge
+- **Minecraft Version:** 1.21.1
+- **Mod Loader:** Fabric/Forge/NeoForge
 - **Recommended RAM:** 4-6 GB
 
 Pokemon in Minecraft! Catch, train, and battle Pokemon in a seamlessly integrated experience.
@@ -112,13 +120,6 @@ The ultimate expert pack. Thousands of hours of gameplay with heavily modified r
 
 A GregTech modpack with streamlined progression. Less grindy than GTNH while still being challenging.
 
-### Create: Dreams & Desires
-
-- **Minecraft Version:** 1.20.1
-- **Mod Loader:** Forge
-- **Recommended RAM:** 6-8 GB
-
-Expert-style progression using Create as the foundation. Custom recipes and unique challenges.
 
 ## Best Lightweight Modpacks
 
@@ -126,7 +127,7 @@ For players with older PCs or those who want a simpler experience.
 
 ### Fabulously Optimized
 
-- **Minecraft Version:** 1.20.4
+- **Minecraft Version:** 1.21.1
 - **Mod Loader:** Fabric
 - **Recommended RAM:** 2-4 GB
 
@@ -134,7 +135,7 @@ Performance optimization pack that matches OptiFine features. Great baseline for
 
 ### Simply Optimized
 
-- **Minecraft Version:** 1.20.4
+- **Minecraft Version:** 1.21.1
 - **Mod Loader:** Fabric
 - **Recommended RAM:** 2-3 GB
 

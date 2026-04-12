@@ -11,12 +11,14 @@ import { format } from "date-fns"
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import ModDownloadButton from "../ModDownloadButton"
 import ModpackDownloadButton from "../ModpackDownloadButton"
+import ServerPackDownloadButton from "../ServerPackDownloadButton"
 
 export interface Props {
   modVersion: VersionRowTypeData
   project: FEUnifiedSearchResultWithDescription | undefined
   isCurseforge?: boolean
   instanceId?: number | null
+  serverId?: number
   instanceDetails?: InstanceDetails
   instanceMods?: Mod[]
   installedFile:
@@ -148,17 +150,28 @@ const RowContainer = (props: Props & AdditionalProps) => {
           <div class="flex items-center justify-end">
             <Switch>
               <Match when={props.type === "modpack"}>
-                <ModpackDownloadButton
-                  addon={props.project}
-                  name={props.modVersion.name}
-                  fileId={fileId()}
-                  size="small"
-                />
+                <div class="flex items-center gap-1">
+                  <ModpackDownloadButton
+                    addon={props.project}
+                    name={props.modVersion.name}
+                    fileId={fileId()}
+                    size="small"
+                  />
+                  <Show when={props.modVersion.serverPackFileId}>
+                    <ServerPackDownloadButton
+                      addon={props.project}
+                      fileId={fileId()}
+                      serverPackFileId={props.modVersion.serverPackFileId}
+                      size="small"
+                    />
+                  </Show>
+                </div>
               </Match>
               <Match when={props.type !== "modpack"}>
                 <ModDownloadButton
                   selectedInstanceId={props.instanceId ?? undefined}
                   selectedInstanceMods={props.instanceMods}
+                  selectedServerId={props.serverId}
                   addon={props.project}
                   fileId={fileId()}
                   size="small"

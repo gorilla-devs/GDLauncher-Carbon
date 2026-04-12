@@ -101,7 +101,7 @@ pub async fn export_modrinth(
                     let mods_filter = mods_filter.as_mut().map(|v| &mut v.0).unwrap();
 
                     app.meta_cache_manager()
-                        .override_caching_and_wait(instance_id, false, true)
+                        .override_caching_and_wait(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), false, true)
                         .await?;
 
                     let mods2 = app

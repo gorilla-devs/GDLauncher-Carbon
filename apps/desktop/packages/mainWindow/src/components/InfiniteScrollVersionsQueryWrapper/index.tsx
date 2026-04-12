@@ -35,6 +35,7 @@ export interface VersionRowTypeData {
   hash: string
   status: string
   mainThumbnail?: string
+  serverPackFileId?: string | null
 }
 
 export const [versionsQuery, setVersionsQuery] = useVersionsQuery()
@@ -117,7 +118,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             size: v.fileLength,
             hash: v.fileFingerprint,
             status: v.fileStatus,
-            mainThumbnail: project.data.logo?.url
+            mainThumbnail: project.data.logo?.url,
+            serverPackFileId: v.serverPackFileId?.toString() ?? null
           })),
           index: response.pagination?.index || 0,
           total: response.pagination?.totalCount || 0
@@ -156,7 +158,12 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             size: v.files[0].size,
             hash: v.files[0].hashes.sha512,
             status: v.status || "",
-            mainThumbnail: project.icon_url || undefined
+            mainThumbnail: project.icon_url || undefined,
+            serverPackFileId:
+              project.project_type === "modpack" &&
+              project.server_side !== "unsupported"
+                ? "mrpack-server"
+                : null
           })),
           index: 0,
           total: response.length

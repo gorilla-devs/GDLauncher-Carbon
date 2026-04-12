@@ -27,7 +27,7 @@ pub mod account;
 pub mod download;
 pub mod instance;
 pub mod java;
-mod metadata;
+pub(crate) mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;

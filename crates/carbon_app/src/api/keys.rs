@@ -196,6 +196,7 @@ keys! {
         GET_GROUPS                                  = "getGroups";
         GET_ALL_SERVERS                             = "getAllServers";
         CREATE_SERVER                               = "createServer";
+        CREATE_SERVER_FROM_MODPACK                  = "createServerFromModpack";
         DELETE_SERVER                               = "deleteServer";
         START_SERVER                                = "startServer";
         STOP_SERVER                                 = "stopServer";
@@ -229,6 +230,10 @@ keys! {
         GET_SERVER_ADDONS                           = "getServerAddons";
         ENABLE_SERVER_ADDON                         = "enableServerAddon";
         DELETE_SERVER_ADDON                         = "deleteServerAddon";
+        INSTALL_SERVER_MOD                          = "installServerMod";
+        INSTALL_LATEST_SERVER_MOD                   = "installLatestServerMod";
+        OPEN_SERVER_FOLDER                          = "openServerFolder";
+        PRIORITIZE_SERVER_CACHE                     = "prioritizeServerCache";
     }
 
     modplatforms {

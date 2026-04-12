@@ -193,6 +193,7 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
                 props.onDragStart("server", ids, e)
               }}
               preventClick={props.justDropped()}
+              onSelectExclusive={() => props.onSelectExclusive?.(props.item.id)}
             />
           )}
         </Show>

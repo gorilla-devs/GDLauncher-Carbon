@@ -22,16 +22,34 @@ interface Props {
   platform: Platform
   imageUrl: string | null
   websiteUrl: string
+  description?: string | null
+  authors?: string[] | null
+  author?: string | null
+  categories?: string[] | null
+  dateModified?: string | null
 }
 
-const { addonName, addonSlug, addonType, platform, imageUrl, websiteUrl } = Astro.props
+const {
+  addonName, addonSlug, addonType, platform, imageUrl, websiteUrl,
+  description, authors, author, categories, dateModified
+} = Astro.props
+
+const authorDisplay = authors?.length ? authors.join(", ") : author || null
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+  } catch { return dateStr }
+}
 
 const platformLabel = platform === "curseforge" ? "CurseForge" : "Modrinth"
 const typeLabel = ADDON_TYPE_LABELS[addonType]
 const typePlural = ADDON_TYPE_PLURAL[addonType]
 
 const seoTitle = `Install ${addonName} ${typeLabel} with GDLauncher`
-const seoDescription = `Download and install ${addonName} for Minecraft using GDLauncher. One-click installation from ${platformLabel}.`
+const seoDescription = description
+  ? `${description} Install ${addonName} for Minecraft with GDLauncher.`
+  : `Download and install ${addonName} for Minecraft using GDLauncher. One-click installation from ${platformLabel}.`
 const seoKeywords = `${addonName}, minecraft ${addonType}, install ${addonName}, ${platformLabel} ${addonType}, gdlauncher`
 const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlug}`
 ---
@@ -91,6 +109,7 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
                   height="128"
                   class="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 object-cover"
                   loading="eager"
+                  onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\"w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 flex items-center justify-center\"><span class=\"text-4xl text-darkSlate-400\">?</span></div>'"
                 />
               </div>
             ) : (
@@ -110,12 +129,44 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
               <h1 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-3">
                 How to install "{addonName}"
               </h1>
-              <p class="text-lg text-darkSlate-100">
-                Install this {typeLabel.toLowerCase()} in Minecraft using GDLauncher
-              </p>
+              {description ? (
+                <p class="text-lg text-darkSlate-100">{description}</p>
+              ) : (
+                <p class="text-lg text-darkSlate-100">
+                  Install this {typeLabel.toLowerCase()} in Minecraft using GDLauncher
+                </p>
+              )}
             </div>
           </div>
         </header>
+
+        <!-- Addon metadata -->
+        {(authorDisplay || dateModified) && (
+          <div class="mb-8 grid grid-cols-2 md:grid-cols-3 gap-4">
+            {authorDisplay && (
+              <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg">
+                <p class="text-xs text-darkSlate-300 mb-1">Author</p>
+                <p class="text-lightSlate-50 font-semibold truncate">{authorDisplay}</p>
+              </div>
+            )}
+            {dateModified && (
+              <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg">
+                <p class="text-xs text-darkSlate-300 mb-1">Last Updated</p>
+                <p class="text-lightSlate-50 font-semibold">{formatDate(dateModified)}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {categories?.length > 0 && (
+          <div class="mb-8 flex flex-wrap gap-2">
+            {categories.map((cat) => (
+              <span class="px-3 py-1 bg-darkSlate-700/50 rounded-full text-xs text-darkSlate-100 border border-darkSlate-600">
+                {cat}
+              </span>
+            ))}
+          </div>
+        )}
 
         <!-- Quick Install ID -->
         <div class="mb-8 px-4 py-3 bg-darkSlate-700/50 rounded-lg border border-darkSlate-600">

@@ -109,6 +109,14 @@ export const getModImageUrl = (
   return `http://127.0.0.1:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`
 }
 
+export const getServerModImageUrl = (
+  serverId: string,
+  modId: string,
+  platform: string
+) => {
+  return `http://127.0.0.1:${port}/server/serverModIcon?server_id=${serverId}&mod_id=${modId}&platform=${platform}`
+}
+
 export const getUrlType = (url: string) => {
   return /^\/(modpacks|mods)\/[a-zA-Z0-9]+\/(curseforge|modrinth)(\/[^/]+)*$/.exec(
     url

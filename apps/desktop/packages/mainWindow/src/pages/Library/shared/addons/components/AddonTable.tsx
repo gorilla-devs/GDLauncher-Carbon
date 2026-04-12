@@ -4,41 +4,17 @@ import {
   onMount,
   createSignal,
   onCleanup,
-  createMemo,
-  Accessor
+  createMemo
 } from "solid-js"
 import {
   flexRender,
   getCoreRowModel,
   createSolidTable,
   getSortedRowModel,
-  getFilteredRowModel,
-  SortingState,
-  ColumnFiltersState,
-  VisibilityState,
-  ColumnDef,
-  RowSelectionState,
-  Table
+  getFilteredRowModel
 } from "@tanstack/solid-table"
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubTrigger,
-  ContextMenuSubContent,
-  ContextMenuPortal
-} from "@gd/ui"
-import { useTransContext } from "@gd/i18n"
-import { getViewOnKey } from "@gd/i18n/helpers"
-import { Mod as ModType } from "@gd/core_module/bindings"
-import { toast } from "@gd/ui"
-import { useModal } from "@/managers/ModalsManager"
-import { useGDNavigate } from "@/managers/NavigationManager"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent } from "@gd/ui"
+import { AddonTableItem, AddonTableProps } from "../types"
 
 interface VirtualizationConfig {
   /** Fixed row height or function to get height for each row index */
@@ -47,41 +23,6 @@ interface VirtualizationConfig {
   bufferSize?: number
   /** Enable dynamic height measurement for rows */
   enableDynamicHeight?: boolean
-}
-
-interface AddonTableProps {
-  data: Accessor<ModType[]>
-  columns: ColumnDef<ModType, any>[]
-  sorting: Accessor<SortingState>
-  setSorting: (sorting: SortingState) => void
-  columnFilters: Accessor<ColumnFiltersState>
-  setColumnFilters: (filters: ColumnFiltersState) => void
-  columnVisibility: Accessor<VisibilityState>
-  setColumnVisibility: (visibility: VisibilityState) => void
-  rowSelection: Accessor<RowSelectionState>
-  setRowSelection: (
-    selection:
-      | RowSelectionState
-      | ((prev: RowSelectionState) => RowSelectionState)
-  ) => void
-  onTableReady?: (table: Table<ModType>) => void
-  /** Optional reference to scroll container, defaults to finding closest scrollable parent */
-  scrollContainerRef?: HTMLElement
-  /** Configuration for virtualization behavior */
-  virtualizationConfig?: VirtualizationConfig
-  isInstanceLocked: () => boolean
-  /** Dynamic top offset for sticky header based on filter height */
-  headerTopOffset?: number
-  /** Mutation handlers */
-  mutations?: {
-    handleToggleMod: (mod: ModType) => Promise<void>
-    handleUpdateMod: (mod: ModType) => Promise<void>
-    handleDeleteMod: (mod: ModType) => Promise<void>
-    handleDeleteSelected: (mods: ModType[]) => Promise<void>
-    handleUpdateSelected: (mods: ModType[]) => Promise<void>
-    handleOpenFolder: () => void
-    instanceId: number
-  }
 }
 
 class RowHeightCache {
@@ -121,10 +62,9 @@ class RowHeightCache {
   }
 }
 
-export const AddonTable = (props: AddonTableProps) => {
-  const [t] = useTransContext()
-  const modalsContext = useModal()
-  const navigator = useGDNavigate()
+export function AddonTable<T extends AddonTableItem>(
+  props: AddonTableProps<T> & { virtualizationConfig?: VirtualizationConfig }
+) {
   const [scrollTop, setScrollTop] = createSignal(0)
   const [containerHeight, setContainerHeight] = createSignal(window.innerHeight)
   let tableRef: HTMLDivElement | undefined
@@ -502,375 +442,11 @@ export const AddonTable = (props: AddonTableProps) => {
     }
   }
 
-  const getContextMenuItems = (): {
-    type: "item" | "separator" | "submenu"
-    label?: string
-    action?: () => void
-    icon?: string
-    rightIcon?: string
-    id?: string
-    destructive?: boolean
-    disabled?: boolean
-    children?: {
-      type: "item" | "separator"
-      label?: string
-      action?: () => void
-      icon?: string
-      rightIcon?: string
-      id?: string
-      destructive?: boolean
-      disabled?: boolean
-    }[]
-  }[] => {
-    const selectedCount = contextMenuSelection().size
+  const getContextMenuAddons = (): T[] => {
     const selectedIds = Array.from(contextMenuSelection())
-    const mods = rows()
+    return rows()
       .filter((row) => selectedIds.includes(row.id))
       .map((row) => row.original)
-
-    if (selectedCount === 1 && mods.length > 0) {
-      // Single item menu
-      const mod = mods[0]
-      const displayName = mod.metadata?.name || mod.filename
-
-      const items: {
-        type: "item" | "separator" | "submenu"
-        label?: string
-        action?: () => void
-        icon?: string
-        id?: string
-        destructive?: boolean
-        disabled?: boolean
-        children?: {
-          type: "item" | "separator"
-          label?: string
-          action?: () => void
-          icon?: string
-          rightIcon?: string
-          id?: string
-          destructive?: boolean
-          disabled?: boolean
-        }[]
-      }[] = [
-        {
-          type: "item",
-          label: t("content:_trn_copy_name"),
-          action: () => {
-            window.navigator.clipboard.writeText(displayName)
-            toast.success(t("notifications:_trn_copied_to_clipboard"))
-          },
-          icon: "i-hugeicons:clipboard",
-          id: "copy"
-        },
-        { type: "separator" },
-        {
-          type: "item",
-          label: mod.enabled
-            ? t("content:_trn_disable_mod")
-            : t("content:_trn_enable_mod"),
-          action: async () => {
-            if (props.mutations) {
-              await props.mutations.handleToggleMod(mod)
-            }
-          },
-          icon: mod.enabled
-            ? "i-hugeicons:toggle-off"
-            : "i-hugeicons:toggle-off",
-          id: "toggle",
-          disabled: props.isInstanceLocked()
-        }
-      ]
-
-      if (mod.has_update) {
-        items.push({
-          type: "item",
-          label: t("content:_trn_update_mod"),
-          action: async () => {
-            if (props.mutations) {
-              await props.mutations.handleUpdateMod(mod)
-            }
-          },
-          icon: "i-hugeicons:download-02",
-          id: "update",
-          disabled: props.isInstanceLocked()
-        })
-      }
-
-      items.push(
-        { type: "separator" },
-        {
-          type: "item",
-          label: t("content:_trn_view_details"),
-          action: () => {
-            modalsContext?.openModal(
-              {
-                name: "modDetails"
-              },
-              {
-                mod,
-                instanceId: props.mutations?.instanceId
-              }
-            )
-          },
-          icon: "i-hugeicons:information-circle",
-          id: "details"
-        },
-        {
-          type: "item",
-          label: t("instances:_trn_open_folder"),
-          action: () => {
-            if (props.mutations) {
-              props.mutations.handleOpenFolder()
-            }
-          },
-          icon: "i-hugeicons:folder-open",
-          id: "folder"
-        }
-      )
-
-      if (mod.curseforge || mod.modrinth) {
-        // If both platforms exist, show them as a submenu with flattened items
-        if (mod.curseforge && mod.modrinth) {
-          items.push({
-            type: "submenu",
-            label: t("content:_trn_view_on_platform"),
-            icon: "i-hugeicons:link-square-02",
-            id: "platform",
-            children: [
-              {
-                type: "item",
-                label: t("content:_trn_curseforge_open_in_app"),
-                action: () => {
-                  const projectId = mod.curseforge!.project_id
-                  navigator.navigate(`/addon/${projectId}/curseforge`)
-                },
-                icon: "curseforge",
-                id: "platform-curseforge-app"
-              },
-              {
-                type: "item",
-                label: t("content:_trn_curseforge_open_in_browser"),
-                action: () => {
-                  const slug = mod.curseforge!.urlslug
-                  window.open(
-                    `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
-                    "_blank"
-                  )
-                },
-                icon: "curseforge",
-                rightIcon: "i-hugeicons:link-square-02",
-                id: "platform-curseforge-browser"
-              },
-              { type: "separator" },
-              {
-                type: "item",
-                label: t("content:_trn_modrinth_open_in_app"),
-                action: () => {
-                  navigator.navigate(
-                    `/addon/${mod.modrinth!.project_id}/modrinth`
-                  )
-                },
-                icon: "modrinth",
-                id: "platform-modrinth-app"
-              },
-              {
-                type: "item",
-                label: t("content:_trn_modrinth_open_in_browser"),
-                action: () => {
-                  window.open(
-                    `https://modrinth.com/mod/${mod.modrinth!.project_id}`,
-                    "_blank"
-                  )
-                },
-                icon: "modrinth",
-                rightIcon: "i-hugeicons:link-square-02",
-                id: "platform-modrinth-browser"
-              }
-            ]
-          })
-        } else {
-          // Single platform - create submenu with both options
-          const platformName = mod.curseforge ? "curseforge" : "modrinth"
-          items.push({
-            type: "submenu",
-            label: t(getViewOnKey(platformName)),
-            icon: platformName,
-            id: "platform",
-            children: [
-              {
-                type: "item",
-                label: t("content:_trn_open_in_app"),
-                action: () => {
-                  if (mod.curseforge) {
-                    const projectId = mod.curseforge.project_id
-                    navigator.navigate(`/addon/${projectId}/curseforge`)
-                  } else if (mod.modrinth) {
-                    navigator.navigate(
-                      `/addon/${mod.modrinth.project_id}/modrinth`
-                    )
-                  }
-                },
-                icon: "i-hugeicons:dashboard-square-01",
-                id: "platform-app"
-              },
-              {
-                type: "item",
-                label: t("content:_trn_open_in_browser"),
-                action: () => {
-                  if (mod.curseforge) {
-                    const slug = mod.curseforge.urlslug
-                    window.open(
-                      `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
-                      "_blank"
-                    )
-                  } else if (mod.modrinth) {
-                    window.open(
-                      `https://modrinth.com/mod/${mod.modrinth.project_id}`,
-                      "_blank"
-                    )
-                  }
-                },
-                icon: "i-hugeicons:dashboard-square-01",
-                rightIcon: "i-hugeicons:link-square-02",
-                id: "platform-browser"
-              }
-            ]
-          })
-        }
-      }
-
-      items.push({ type: "separator" })
-
-      // Add delete item at the end with extra separator for spacing
-      const deleteItem = {
-        type: "item" as const,
-        label: t("content:_trn_delete_mod"),
-        action: async () => {
-          if (props.mutations) {
-            await props.mutations.handleDeleteMod(mod)
-          }
-        },
-        destructive: true,
-        icon: "i-hugeicons:delete-02",
-        id: "delete",
-        disabled: props.isInstanceLocked()
-      }
-
-      // Add some spacing items if platform submenu exists
-      if (mod.curseforge || mod.modrinth) {
-        items.push({ type: "separator" })
-      }
-
-      items.push(deleteItem)
-
-      return items
-    } else {
-      // Multiple items menu
-      const allEnabled = mods.every((mod) => mod.enabled)
-      const allDisabled = mods.every((mod) => !mod.enabled)
-
-      const items: {
-        type: "item" | "separator" | "submenu"
-        label?: string
-        action?: () => void
-        icon?: string
-        id?: string
-        destructive?: boolean
-        disabled?: boolean
-        children?: {
-          type: "item" | "separator"
-          label?: string
-          action?: () => void
-          icon?: string
-          rightIcon?: string
-          id?: string
-          destructive?: boolean
-          disabled?: boolean
-        }[]
-      }[] = [
-        {
-          type: "item",
-          label: t("content:_trn_selected_count", { count: selectedCount }),
-          disabled: true,
-          id: "header"
-        },
-        { type: "separator" }
-      ]
-
-      if (!allEnabled) {
-        items.push({
-          type: "item",
-          label: t("content:_trn_enable_all"),
-          action: async () => {
-            if (props.mutations) {
-              await Promise.all(
-                mods
-                  .filter((mod) => !mod.enabled)
-                  .map((mod) => props.mutations!.handleToggleMod(mod))
-              )
-            }
-          },
-          icon: "i-hugeicons:toggle-off",
-          id: "enable-all",
-          disabled: props.isInstanceLocked()
-        })
-      }
-
-      if (!allDisabled) {
-        items.push({
-          type: "item",
-          label: t("content:_trn_disable_all"),
-          action: async () => {
-            if (props.mutations) {
-              await Promise.all(
-                mods
-                  .filter((mod) => mod.enabled)
-                  .map((mod) => props.mutations!.handleToggleMod(mod))
-              )
-            }
-          },
-          icon: "i-hugeicons:toggle-off",
-          id: "disable-all",
-          disabled: props.isInstanceLocked()
-        })
-      }
-
-      // Add update option if any selected mods have updates
-      const hasUpdates = mods.some((mod) => mod.has_update)
-      if (hasUpdates) {
-        items.push({
-          type: "item",
-          label: t("content:_trn_update_selected"),
-          action: async () => {
-            if (props.mutations) {
-              await props.mutations.handleUpdateSelected(mods)
-            }
-          },
-          icon: "i-hugeicons:download-02",
-          id: "update-selected",
-          disabled: props.isInstanceLocked()
-        })
-      }
-
-      items.push(
-        { type: "separator" },
-        {
-          type: "item",
-          label: t("content:_trn_delete_selected"),
-          action: async () => {
-            if (props.mutations) {
-              await props.mutations.handleDeleteSelected(mods)
-            }
-          },
-          destructive: true,
-          icon: "i-hugeicons:delete-02",
-          id: "delete",
-          disabled: props.isInstanceLocked()
-        }
-      )
-
-      return items
-    }
   }
 
   const getRowClasses = (rowId: string) => {
@@ -895,10 +471,10 @@ export const AddonTable = (props: AddonTableProps) => {
   }
 
   const findScrollContainer = (): HTMLElement | null => {
-    if (props.scrollContainerRef) return props.scrollContainerRef
-
-    const byId = document.getElementById("main-container-instance-details")
-    if (byId) return byId
+    if (props.scrollContainerId) {
+      const byId = document.getElementById(props.scrollContainerId)
+      if (byId) return byId
+    }
 
     let parent = tableRef?.parentElement
     while (parent) {
@@ -1185,142 +761,10 @@ export const AddonTable = (props: AddonTableProps) => {
 
       <ContextMenuContent>
         <Show when={shouldShowContextMenu()}>
-          <For each={getContextMenuItems()}>
-            {(item) => (
-              <Show
-                when={item && item.type === "separator"}
-                fallback={
-                  <Show
-                    when={item && item.type === "submenu"}
-                    fallback={
-                      item && (
-                        <ContextMenuItem
-                          disabled={item.disabled}
-                          class={
-                            item.destructive
-                              ? "text-red-400 focus:text-red-300"
-                              : ""
-                          }
-                          onSelect={item.action}
-                        >
-                          <div class="flex items-center justify-between gap-2 flex-1">
-                            <div class="flex items-center gap-2">
-                              <Show when={item.icon}>
-                                <Show
-                                  when={item.icon === "curseforge"}
-                                  fallback={
-                                    <Show
-                                      when={item.icon === "modrinth"}
-                                      fallback={
-                                        <div class={`${item.icon} h-4 w-4`} />
-                                      }
-                                    >
-                                      <img
-                                        src={ModrinthLogo}
-                                        class="h-4 w-4"
-                                        alt="Modrinth"
-                                      />
-                                    </Show>
-                                  }
-                                >
-                                  <img
-                                    src={CurseforgeLogo}
-                                    class="h-4 w-4"
-                                    alt="CurseForge"
-                                  />
-                                </Show>
-                              </Show>
-                              <span>{item.label}</span>
-                            </div>
-                            <Show when={item.rightIcon}>
-                              <div
-                                class={`${item.rightIcon} h-4 w-4 text-lightSlate-500`}
-                              />
-                            </Show>
-                          </div>
-                        </ContextMenuItem>
-                      )
-                    }
-                  >
-                    <ContextMenuSub gutter={8} shift={-5}>
-                      <ContextMenuSubTrigger class="data-[state=open]:bg-darkSlate-700 relative">
-                        <div class="flex items-center gap-2">
-                          <Show when={item.icon}>
-                            <div class={`${item.icon} h-4 w-4`} />
-                          </Show>
-                          <span>{item.label}</span>
-                        </div>
-                      </ContextMenuSubTrigger>
-                      <ContextMenuPortal>
-                        <ContextMenuSubContent>
-                          <For each={item.children || []}>
-                            {(child) => (
-                              <Show
-                                when={child.type === "separator"}
-                                fallback={
-                                  <ContextMenuItem
-                                    disabled={child.disabled}
-                                    class={
-                                      child.destructive
-                                        ? "text-red-400 focus:text-red-300"
-                                        : ""
-                                    }
-                                    onSelect={child.action}
-                                  >
-                                    <div class="flex items-center justify-between gap-2 flex-1">
-                                      <div class="flex items-center gap-2">
-                                        <Show when={child.icon}>
-                                          <Show
-                                            when={child.icon === "curseforge"}
-                                            fallback={
-                                              <Show
-                                                when={child.icon === "modrinth"}
-                                                fallback={
-                                                  <div
-                                                    class={`${child.icon} h-4 w-4`}
-                                                  />
-                                                }
-                                              >
-                                                <img
-                                                  src={ModrinthLogo}
-                                                  class="h-4 w-4"
-                                                  alt="Modrinth"
-                                                />
-                                              </Show>
-                                            }
-                                          >
-                                            <img
-                                              src={CurseforgeLogo}
-                                              class="h-4 w-4"
-                                              alt="CurseForge"
-                                            />
-                                          </Show>
-                                        </Show>
-                                        <span>{child.label}</span>
-                                      </div>
-                                      <Show when={child.rightIcon}>
-                                        <div
-                                          class={`${child.rightIcon} h-4 w-4 text-lightSlate-500`}
-                                        />
-                                      </Show>
-                                    </div>
-                                  </ContextMenuItem>
-                                }
-                              >
-                                <ContextMenuSeparator />
-                              </Show>
-                            )}
-                          </For>
-                        </ContextMenuSubContent>
-                      </ContextMenuPortal>
-                    </ContextMenuSub>
-                  </Show>
-                }
-              >
-                <ContextMenuSeparator />
-              </Show>
-            )}
-          </For>
+          {props.contextMenuContent({
+            selectedAddons: getContextMenuAddons,
+            selectionCount: () => contextMenuSelection().size
+          })}
         </Show>
       </ContextMenuContent>
     </ContextMenu>

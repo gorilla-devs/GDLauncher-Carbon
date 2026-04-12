@@ -2,12 +2,12 @@ import { ModalProps } from "../../"
 import ModalLayout from "../../ModalLayout"
 
 import { Trans } from "@gd/i18n"
-import { For, Show, createSignal, onMount, createMemo } from "solid-js"
+import { For, Show, createSignal, onMount } from "solid-js"
 import changelogs, { Changelog, ChangelogEntry } from "./changelogs"
 import { Button, Badge } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 
-type CategoryType = keyof Changelog
+type CategoryType = "new" | "improved" | "fixed"
 
 interface FeatureCardProps {
   entry: ChangelogEntry
@@ -70,44 +70,12 @@ const FeatureCard = (props: FeatureCardProps) => {
 
 interface HeroFeatureCardProps {
   entry: ChangelogEntry
-  type: CategoryType
+  reverse?: boolean
+  index: number
 }
 
 const HeroFeatureCard = (props: HeroFeatureCardProps) => {
   const [mediaLoaded, setMediaLoaded] = createSignal(false)
-
-  const getGradient = () => {
-    switch (props.type) {
-      case "new":
-        return "from-primary-500/20 to-primary-600/5"
-      case "improved":
-        return "from-yellow-500/20 to-yellow-600/5"
-      case "fixed":
-        return "from-red-500/20 to-red-600/5"
-    }
-  }
-
-  const getIconColor = () => {
-    switch (props.type) {
-      case "new":
-        return "text-primary-400"
-      case "improved":
-        return "text-yellow-400"
-      case "fixed":
-        return "text-red-400"
-    }
-  }
-
-  const getIcon = () => {
-    switch (props.type) {
-      case "new":
-        return "i-hugeicons:sparkles"
-      case "improved":
-        return "i-hugeicons:rocket-02"
-      case "fixed":
-        return "i-hugeicons:checkmark-badge-01"
-    }
-  }
 
   const isVideo = () => {
     const media = props.entry.media
@@ -119,91 +87,101 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
     )
   }
 
-  return (
+  const ContentSection = () => (
     <div
-      class={`bg-gradient-to-br ${getGradient()} relative overflow-hidden rounded-2xl border border-primary-500/20`}
-      style={{
-        animation: "fadeInScale 0.5s ease-out both"
+      classList={{
+        "p-6": !!props.entry.media
       }}
     >
-      <div
-        class="relative z-10"
-        classList={{
-          "p-6": !props.entry.media,
-          "grid grid-cols-1 md:grid-cols-2 gap-6": !!props.entry.media
-        }}
-      >
-        {/* Content Section */}
-        <div
-          classList={{
-            "p-6": !!props.entry.media
-          }}
+      <div class="mb-4 flex items-center gap-3">
+        <div class="i-hugeicons:sparkles text-primary-400 h-8 w-8" />
+        <Badge variant="secondary" class="text-xs font-semibold">
+          <Trans key="news:_trn_changelogs.major_feature" />
+        </Badge>
+      </div>
+      <h2 class="text-lightSlate-50 mb-3 text-2xl font-bold">
+        {props.entry.title}
+      </h2>
+      <Show when={props.entry.description}>
+        <p class="text-lightSlate-300 text-base leading-7">
+          {props.entry.description}
+        </p>
+      </Show>
+    </div>
+  )
+
+  const MediaSection = () => (
+    <div class="relative overflow-hidden rounded-xl p-6 flex items-center">
+      <div class="relative aspect-[4/3] w-full">
+        <Show when={!mediaLoaded()}>
+          <div class="bg-darkSlate-700 absolute inset-0 animate-pulse rounded-lg" />
+        </Show>
+
+        <Show
+          when={isVideo()}
+          fallback={
+            <img
+              src={props.entry.media}
+              alt={props.entry.title}
+              class="absolute inset-0 h-full w-full rounded-lg object-cover shadow-lg transition-opacity duration-500"
+              classList={{
+                "opacity-0": !mediaLoaded(),
+                "opacity-100": mediaLoaded()
+              }}
+              onLoad={() => setMediaLoaded(true)}
+            />
+          }
         >
-          <div class="mb-4 flex items-center gap-3">
-            <div class={`${getIcon()} ${getIconColor()} h-8 w-8`} />
-            <Badge variant="secondary" class="text-xs font-semibold">
-              <Trans key="news:_trn_changelogs.major_feature" />
-            </Badge>
-          </div>
-          <h2 class="text-lightSlate-50 mb-3 text-2xl font-bold">
-            {props.entry.title}
-          </h2>
-          <Show when={props.entry.description}>
-            <p class="text-lightSlate-300 text-base leading-7">
-              {props.entry.description}
-            </p>
-          </Show>
-        </div>
-
-        {/* Media Section */}
-        <Show when={props.entry.media}>
-          <div class="relative overflow-hidden rounded-xl p-6 flex items-center">
-            <div class="relative aspect-[4/3] w-full">
-              {/* Loading skeleton - absolute positioned as background */}
-              <Show when={!mediaLoaded()}>
-                <div class="bg-darkSlate-700 absolute inset-0 animate-pulse rounded-lg" />
-              </Show>
-
-              {/* Media - absolute positioned on top */}
-              <Show
-                when={isVideo()}
-                fallback={
-                  <img
-                    src={props.entry.media}
-                    alt={props.entry.title}
-                    class="absolute inset-0 h-full w-full rounded-lg object-cover shadow-lg transition-opacity duration-500"
-                    classList={{
-                      "opacity-0": !mediaLoaded(),
-                      "opacity-100": mediaLoaded()
-                    }}
-                    onLoad={() => setMediaLoaded(true)}
-                  />
-                }
-              >
-                <video
-                  src={props.entry.media}
-                  autoplay
-                  loop
-                  muted
-                  playsinline
-                  class="absolute inset-0 h-full w-full rounded-lg object-cover shadow-lg transition-opacity duration-500"
-                  classList={{
-                    "opacity-0": !mediaLoaded(),
-                    "opacity-100": mediaLoaded()
-                  }}
-                  onLoadedData={() => setMediaLoaded(true)}
-                />
-              </Show>
-            </div>
-          </div>
+          <video
+            src={props.entry.media}
+            autoplay
+            loop
+            muted
+            playsinline
+            class="absolute inset-0 h-full w-full rounded-lg object-cover shadow-lg transition-opacity duration-500"
+            classList={{
+              "opacity-0": !mediaLoaded(),
+              "opacity-100": mediaLoaded()
+            }}
+            onLoadedData={() => setMediaLoaded(true)}
+          />
         </Show>
       </div>
+    </div>
+  )
 
-      {/* Decorative background element - only show when no media */}
-      <Show when={!props.entry.media}>
+  return (
+    <div
+      class="bg-gradient-to-br from-primary-500/20 to-primary-600/5 relative overflow-hidden rounded-2xl border border-primary-500/20"
+      style={{
+        animation: `fadeInScale 0.5s ease-out ${props.index * 0.15}s both`
+      }}
+    >
+      <Show
+        when={props.entry.media}
+        fallback={
+          <div class="relative z-10 p-6">
+            <ContentSection />
+            <div class="i-hugeicons:sparkles text-primary-400 absolute -right-8 -top-8 opacity-10 h-32 w-32" />
+          </div>
+        }
+      >
         <div
-          class={`${getIcon()} ${getIconColor()} absolute -right-8 -top-8 opacity-10 h-32 w-32`}
-        />
+          class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6"
+        >
+          <Show
+            when={!props.reverse}
+            fallback={
+              <>
+                <MediaSection />
+                <ContentSection />
+              </>
+            }
+          >
+            <ContentSection />
+            <MediaSection />
+          </Show>
+        </div>
       </Show>
     </div>
   )
@@ -295,16 +273,12 @@ const Changelogs = (props: ModalProps) => {
     })
   }
 
-  // Get hero feature (first new feature)
-  const heroFeature = createMemo(() => changelogs.new[0])
-
-  // Get remaining features based on active filters
+  // Get filtered features based on active filters
   const getFilteredFeatures = () => {
     const features: { entry: ChangelogEntry; type: CategoryType }[] = []
 
-    // Skip first new feature (it's the hero)
     if (activeFilters().has("new")) {
-      changelogs.new.slice(1).forEach((entry) => {
+      changelogs.new.forEach((entry) => {
         features.push({ entry, type: "new" })
       })
     }
@@ -383,13 +357,19 @@ const Changelogs = (props: ModalProps) => {
 
         {/* Scrollable Content */}
         <div class="flex-1 overflow-y-auto overflow-x-hidden px-8 py-6">
-          {/* Hero Feature */}
-          <Show when={heroFeature()}>
-            {(hero) => (
-              <div class="mb-8">
-                <HeroFeatureCard entry={hero()} type="new" />
-              </div>
-            )}
+          {/* Highlighted Features - alternating layout */}
+          <Show when={changelogs.highlights.length > 0}>
+            <div class="mb-8 flex flex-col gap-6">
+              <For each={changelogs.highlights}>
+                {(highlight, index) => (
+                  <HeroFeatureCard
+                    entry={highlight}
+                    reverse={index() % 2 !== 0}
+                    index={index()}
+                  />
+                )}
+              </For>
+            </div>
           </Show>
 
           {/* Category Filters */}

@@ -35,6 +35,8 @@ export function Grid() {
 
   const instanceId = () => searchContext?.selectedInstanceId() || NaN
   const instanceMods = () => searchContext?.selectedInstanceMods
+  const serverId = () => searchContext?.selectedServerId() || NaN
+  const serverAddons = () => searchContext?.selectedServerAddons
 
   const instance = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceDetails", instanceId()],
@@ -84,6 +86,26 @@ export function Grid() {
     enabled: !isNaN(instanceId()) && instanceId() > 0
   }))
 
+  const isServerAddonInstalled = (resultId: string, slug?: string) => {
+    const addons = serverAddons()?.data
+    if (!addons) return false
+
+    for (const addon of addons) {
+      if (addon.curseforgeProjectId?.toString() === resultId) return true
+      if (addon.modrinthProjectId === resultId) return true
+    }
+
+    if (slug) {
+      const slugLower = slug.toLowerCase()
+      for (const addon of addons) {
+        const name = addon.displayName.toLowerCase()
+        if (name === slugLower || name.startsWith(slugLower + "-")) return true
+      }
+    }
+
+    return false
+  }
+
   const lookupTableInstalledMods = createMemo(() => {
     const curseforgeMods =
       installedMods.data?.reduce((acc: string[], mod) => {
@@ -101,9 +123,7 @@ export function Grid() {
         return acc
       }, []) || []
 
-    const map = new Set([...curseforgeMods, ...modrinthMods])
-
-    return map
+    return new Set([...curseforgeMods, ...modrinthMods])
   })
 
   // Calculate items per row based on container width
@@ -246,14 +266,23 @@ export function Grid() {
                       return (
                         <GridItem
                           instanceMods={instanceMods()?.data ?? undefined}
+                          serverAddons={serverAddons()?.data ?? undefined}
                           instanceId={instanceId()}
+                          serverId={serverId()}
                           result={item.value!}
-                          isInstalled={lookupTableInstalledMods().has(
-                            item.value!.id
-                          )}
+                          isInstalled={
+                            !isNaN(serverId()) && serverId() > 0
+                              ? isServerAddonInstalled(item.value!.id, item.value!.slug)
+                              : lookupTableInstalledMods().has(item.value!.id)
+                          }
                           onItemClick={() => {
+                            const sid = serverId()
+                            const iid = instanceId()
+                            const idParam = !isNaN(sid) && sid > 0
+                              ? `serverId=${sid}`
+                              : `instanceId=${iid}`
                             navigator.navigate(
-                              `/addon/${item.value!.id}/${item.value!.platform}?instanceId=${instanceId()}`
+                              `/addon/${item.value!.id}/${item.value!.platform}?${idParam}`
                             )
                           }}
                         />

@@ -25,6 +25,7 @@ import {
 } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { capitalize } from "@/utils/helpers"
+import { formatModrinthCategory } from "@/utils/modrinthCategories"
 import { ModloaderIcon } from "@/utils/sidebar"
 import { useGlobalStore } from "./GlobalStoreContext"
 import useSearchContext from "./SearchInputContext"
@@ -128,7 +129,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
         (v) => v.projectType === searchResults?.searchQuery().projectType
       )
       .map((category) => ({
-        label: category.name,
+        label: formatModrinthCategory(category.name),
         value: category.id,
         icon: (
           // eslint-disable-next-line solid/no-innerhtml

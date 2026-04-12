@@ -154,7 +154,7 @@ pub async fn export_gdlauncher(
 
                         // Ensure cache is up to date
                         app.meta_cache_manager()
-                            .override_caching_and_wait(instance_id, true, false)
+                            .override_caching_and_wait(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), true, false)
                             .await?;
 
                         // Query ModFileCache for tracked files

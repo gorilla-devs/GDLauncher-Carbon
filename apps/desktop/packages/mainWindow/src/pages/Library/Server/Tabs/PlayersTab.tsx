@@ -14,11 +14,25 @@ import {
   SelectItem,
   SelectValue
 } from "@gd/ui"
+import { Trans, useTransContext, type NamespacedTranslationKey } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 
+const OP_LEVEL_KEYS: Record<string, string> = {
+  "1": "instances:_trn_server_players_op_level_1",
+  "2": "instances:_trn_server_players_op_level_2",
+  "3": "instances:_trn_server_players_op_level_3",
+  "4": "instances:_trn_server_players_op_level_4"
+}
+
 const PlayersTab = () => {
+  const [t] = useTransContext()
   const params = useParams()
-  const serverId = () => parseInt(params.id, 10)
+  const serverId = () => parseInt(params.id!, 10)
+
+  const opLevelLabel = (level: string) =>
+    OP_LEVEL_KEYS[level]
+      ? t(OP_LEVEL_KEYS[level] as NamespacedTranslationKey)
+      : level
 
   const [activeList, setActiveList] = createSignal("whitelist")
   const [newUsername, setNewUsername] = createSignal("")
@@ -77,7 +91,10 @@ const PlayersTab = () => {
   const handleAddWhitelist = async () => {
     const name = newUsername().trim()
     if (!name) return
-    await addWhitelistMutation.mutateAsync({ serverId: serverId(), username: name })
+    await addWhitelistMutation.mutateAsync({
+      serverId: serverId(),
+      username: name
+    })
     setNewUsername("")
     whitelistQuery.refetch()
   }
@@ -122,31 +139,31 @@ const PlayersTab = () => {
 
   return (
     <div class="h-full w-full overflow-y-auto">
-      <Tabs value={activeList()} onChange={(v) => setActiveList(v as string)}>
-        <TabsList class="w-fit gap-0 mb-4">
+      <Tabs value={activeList()} onChange={(v) => setActiveList(v)}>
+        <TabsList class="mb-4 w-fit gap-0">
           <TabsIndicator />
           <TabsTrigger value="whitelist">
             <div class="flex items-center gap-2 py-1">
               <div class="i-hugeicons:shield-check h-4 w-4" />
-              Whitelist
+              <Trans key="instances:_trn_server_players_whitelist" />
             </div>
           </TabsTrigger>
           <TabsTrigger value="ops">
             <div class="flex items-center gap-2 py-1">
               <div class="i-hugeicons:crown h-4 w-4" />
-              Operators
+              <Trans key="instances:_trn_server_players_operators" />
             </div>
           </TabsTrigger>
           <TabsTrigger value="banned">
             <div class="flex items-center gap-2 py-1">
               <div class="i-hugeicons:cancel-circle h-4 w-4" />
-              Banned Players
+              <Trans key="instances:_trn_server_players_banned" />
             </div>
           </TabsTrigger>
           <TabsTrigger value="banned-ips">
             <div class="flex items-center gap-2 py-1">
               <div class="i-hugeicons:global-reject h-4 w-4" />
-              Banned IPs
+              <Trans key="instances:_trn_server_players_banned_ips" />
             </div>
           </TabsTrigger>
         </TabsList>
@@ -156,10 +173,14 @@ const PlayersTab = () => {
             <div class="flex items-center gap-2">
               <Input
                 class="flex-1"
-                placeholder="Player username"
+                placeholder={t(
+                  "instances:_trn_server_players_username_placeholder"
+                )}
                 value={newUsername()}
                 onInput={(e) => setNewUsername(e.currentTarget.value)}
-                onKeyDown={(e: KeyboardEvent) => e.key === "Enter" && handleAddWhitelist()}
+                onKeyDown={(e: KeyboardEvent) =>
+                  e.key === "Enter" && handleAddWhitelist()
+                }
               />
               <Button
                 size="small"
@@ -168,13 +189,16 @@ const PlayersTab = () => {
                 disabled={!newUsername().trim()}
               >
                 <div class="i-hugeicons:add-circle-half-dot h-4 w-4" />
-                Add
+                <Trans key="instances:_trn_server_players_add" />
               </Button>
             </div>
             <PlayerList
               entries={whitelistQuery.data ?? []}
               onRemove={async (uuid) => {
-                await removeWhitelistMutation.mutateAsync({ serverId: serverId(), uuid })
+                await removeWhitelistMutation.mutateAsync({
+                  serverId: serverId(),
+                  uuid
+                })
                 whitelistQuery.refetch()
               }}
               nameField="name"
@@ -188,23 +212,31 @@ const PlayersTab = () => {
             <div class="flex items-center gap-2">
               <Input
                 class="flex-1"
-                placeholder="Player username"
+                placeholder={t(
+                  "instances:_trn_server_players_username_placeholder"
+                )}
                 value={newUsername()}
                 onInput={(e) => setNewUsername(e.currentTarget.value)}
-                onKeyDown={(e: KeyboardEvent) => e.key === "Enter" && handleAddOp()}
+                onKeyDown={(e: KeyboardEvent) =>
+                  e.key === "Enter" && handleAddOp()
+                }
               />
               <Select
                 value={opLevel()}
-                onChange={(v) => { if (v) setOpLevel(v) }}
+                onChange={(v) => {
+                  if (v) setOpLevel(v)
+                }}
                 options={["1", "2", "3", "4"]}
                 disallowEmptySelection
                 itemComponent={(itemProps) => (
-                  <SelectItem item={itemProps.item}>Level {itemProps.item.rawValue}</SelectItem>
+                  <SelectItem item={itemProps.item}>
+                    {opLevelLabel(itemProps.item.rawValue)}
+                  </SelectItem>
                 )}
               >
-                <SelectTrigger class="w-28">
+                <SelectTrigger class="min-w-50">
                   <SelectValue<string>>
-                    {(state) => `Level ${state.selectedOption()}`}
+                    {(state) => opLevelLabel(state.selectedOption())}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent />
@@ -216,16 +248,19 @@ const PlayersTab = () => {
                 disabled={!newUsername().trim()}
               >
                 <div class="i-hugeicons:add-circle-half-dot h-4 w-4" />
-                Add
+                <Trans key="instances:_trn_server_players_add" />
               </Button>
             </div>
             <PlayerList
               entries={(opsQuery.data ?? []).map((e: any) => ({
                 ...e,
-                extra: `Level ${e.level}`
+                extra: opLevelLabel(String(e.level))
               }))}
               onRemove={async (uuid) => {
-                await removeOpMutation.mutateAsync({ serverId: serverId(), uuid })
+                await removeOpMutation.mutateAsync({
+                  serverId: serverId(),
+                  uuid
+                })
                 opsQuery.refetch()
               }}
               nameField="name"
@@ -239,14 +274,20 @@ const PlayersTab = () => {
             <div class="flex items-center gap-2">
               <Input
                 class="flex-1"
-                placeholder="Player username"
+                placeholder={t(
+                  "instances:_trn_server_players_username_placeholder"
+                )}
                 value={newUsername()}
                 onInput={(e) => setNewUsername(e.currentTarget.value)}
-                onKeyDown={(e: KeyboardEvent) => e.key === "Enter" && handleBanPlayer()}
+                onKeyDown={(e: KeyboardEvent) =>
+                  e.key === "Enter" && handleBanPlayer()
+                }
               />
               <Input
                 class="flex-1"
-                placeholder="Reason (optional)"
+                placeholder={t(
+                  "instances:_trn_server_players_reason_placeholder"
+                )}
                 value={banReason()}
                 onInput={(e) => setBanReason(e.currentTarget.value)}
               />
@@ -258,7 +299,7 @@ const PlayersTab = () => {
                 disabled={!newUsername().trim()}
               >
                 <div class="i-hugeicons:cancel-circle h-4 w-4" />
-                Ban
+                <Trans key="instances:_trn_server_players_ban" />
               </Button>
             </div>
             <PlayerList
@@ -267,12 +308,15 @@ const PlayersTab = () => {
                 extra: e.reason !== "Banned by operator" ? e.reason : undefined
               }))}
               onRemove={async (uuid) => {
-                await unbanPlayerMutation.mutateAsync({ serverId: serverId(), uuid })
+                await unbanPlayerMutation.mutateAsync({
+                  serverId: serverId(),
+                  uuid
+                })
                 bannedQuery.refetch()
               }}
               nameField="name"
               idField="uuid"
-              removeLabel="Unban"
+              removeLabel="instances:_trn_server_players_unban"
             />
           </div>
         </TabsContent>
@@ -282,14 +326,18 @@ const PlayersTab = () => {
             <div class="flex items-center gap-2">
               <Input
                 class="flex-1"
-                placeholder="IP address"
+                placeholder={t("instances:_trn_server_players_ip_placeholder")}
                 value={banIp()}
                 onInput={(e) => setBanIp(e.currentTarget.value)}
-                onKeyDown={(e: KeyboardEvent) => e.key === "Enter" && handleBanIp()}
+                onKeyDown={(e: KeyboardEvent) =>
+                  e.key === "Enter" && handleBanIp()
+                }
               />
               <Input
                 class="flex-1"
-                placeholder="Reason (optional)"
+                placeholder={t(
+                  "instances:_trn_server_players_reason_placeholder"
+                )}
                 value={banReason()}
                 onInput={(e) => setBanReason(e.currentTarget.value)}
               />
@@ -301,7 +349,7 @@ const PlayersTab = () => {
                 disabled={!banIp().trim()}
               >
                 <div class="i-hugeicons:cancel-circle h-4 w-4" />
-                Ban
+                <Trans key="instances:_trn_server_players_ban" />
               </Button>
             </div>
             <PlayerList
@@ -316,7 +364,7 @@ const PlayersTab = () => {
               }}
               nameField="name"
               idField="uuid"
-              removeLabel="Unban"
+              removeLabel="instances:_trn_server_players_unban"
             />
           </div>
         </TabsContent>
@@ -336,23 +384,23 @@ interface PlayerListProps {
   onRemove: (id: string) => Promise<void>
   nameField: string
   idField: string
-  removeLabel?: string
+  removeLabel?: NamespacedTranslationKey
 }
 
 const PlayerList = (props: PlayerListProps) => {
   return (
-    <div class="rounded-xl border border-darkSlate-600 bg-darkSlate-900">
+    <div class="border-darkSlate-600 bg-darkSlate-900 rounded-xl border">
       <Show
         when={props.entries.length > 0}
         fallback={
-          <div class="flex items-center justify-center py-8 text-sm text-lightSlate-700">
-            No entries
+          <div class="text-lightSlate-700 flex items-center justify-center py-8 text-sm">
+            <Trans key="instances:_trn_server_players_no_entries" />
           </div>
         }
       >
         <For each={props.entries}>
           {(entry) => (
-            <div class="flex items-center justify-between border-b border-darkSlate-600 px-4 py-3 last:border-b-0">
+            <div class="border-darkSlate-600 flex items-center justify-between border-b px-4 py-3 last:border-b-0">
               <div class="flex items-center gap-3">
                 <img
                   src={`https://mc-heads.net/avatar/${entry.name}/24`}
@@ -360,9 +408,9 @@ const PlayerList = (props: PlayerListProps) => {
                   class="h-6 w-6 rounded"
                   loading="lazy"
                 />
-                <span class="text-sm text-lightSlate-200">{entry.name}</span>
+                <span class="text-lightSlate-200 text-sm">{entry.name}</span>
                 <Show when={entry.extra}>
-                  <span class="rounded bg-darkSlate-700 px-1.5 py-0.5 text-xs text-lightSlate-500">
+                  <span class="bg-darkSlate-700 text-lightSlate-500 rounded px-1.5 py-0.5 text-xs">
                     {entry.extra}
                   </span>
                 </Show>
@@ -373,7 +421,11 @@ const PlayerList = (props: PlayerListProps) => {
                 onClick={() => props.onRemove(entry.uuid)}
               >
                 <div class="i-hugeicons:delete-02 h-4 w-4 text-red-400" />
-                {props.removeLabel ?? "Remove"}
+                <Trans
+                  key={
+                    props.removeLabel ?? "instances:_trn_server_players_remove"
+                  }
+                />
               </Button>
             </div>
           )}

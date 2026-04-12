@@ -1,6 +1,6 @@
 import { rspc } from "@/utils/rspcClient"
 import { Switch, Match, createSignal, createEffect, createMemo } from "solid-js"
-import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings"
+import { FEUnifiedSearchResult, Mod, ServerAddon } from "@gd/core_module/bindings"
 import { useModInstallation } from "./hooks/useModInstallation"
 import { useInstanceSearch } from "./hooks/useInstanceSearch"
 import { useTaskProgress } from "./hooks/useTaskProgress"
@@ -14,7 +14,9 @@ interface ModDownloadButtonProps {
   onDropdownOpenChange?: (isOpen: boolean) => void
   selectedInstanceId?: number
   selectedInstanceMods?: Mod[]
+  selectedServerAddons?: ServerAddon[]
   instanceLocked?: boolean
+  selectedServerId?: number
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
 }
@@ -27,7 +29,10 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     instanceTaskIds,
     installLatestModMutation,
     installModMutation,
+    installLatestServerModMutation,
+    installServerModMutation,
     handleInstanceSelection,
+    handleServerInstall,
     clearInstanceLoadingState,
     latestModInstallObj,
     modInstallObj
@@ -87,19 +92,48 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   })
 
   const installedMod = createMemo(() => {
-    const mods = props.selectedInstanceMods || []
+    if (!props.addon) return undefined
 
-    const found = mods.find((mod) => {
-      if (!props.addon) return false
+    // Check server addons first (when browsing for a server)
+    const serverAddons = props.selectedServerAddons
+    if (serverAddons && serverAddons.length > 0) {
+      // Match by platform project ID (reliable, from metadata)
+      const byId = serverAddons.find((addon) => {
+        if (props.addon!.platform === "curseforge") {
+          return (
+            addon.curseforgeProjectId !== null &&
+            addon.curseforgeProjectId.toString() === props.addon!.id.toString()
+          )
+        } else if (props.addon!.platform === "modrinth") {
+          return addon.modrinthProjectId === props.addon!.id.toString()
+        }
+        return false
+      })
+      if (byId) return { id: byId.id } as any
 
-      if (props.addon.platform === "curseforge") {
-        return (
-          mod.curseforge?.project_id === parseInt(props.addon.id.toString(), 10)
-        )
-      } else if (props.addon.platform === "modrinth") {
-        return mod.modrinth?.project_id === props.addon.id.toString()
+      // Fallback: match by slug against display name
+      const slug = props.addon!.slug?.toLowerCase()
+      if (slug) {
+        const bySlug = serverAddons.find((addon) => {
+          const name = addon.displayName.toLowerCase()
+          return name === slug || name.startsWith(slug + "-")
+        })
+        if (bySlug) return { id: bySlug.id } as any
       }
 
+      return undefined
+    }
+
+    // Check instance mods
+    const mods = props.selectedInstanceMods || []
+    const found = mods.find((mod) => {
+      if (props.addon!.platform === "curseforge") {
+        return (
+          mod.curseforge?.project_id === parseInt(props.addon!.id.toString(), 10)
+        )
+      } else if (props.addon!.platform === "modrinth") {
+        return mod.modrinth?.project_id === props.addon!.id.toString()
+      }
       return false
     })
 
@@ -132,6 +166,26 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const handleDownload = async () => {
     if (!props.addon) return
 
+    // Server install path — fire-and-forget, no task tracking
+    const serverId = props.selectedServerId
+    if (serverId) {
+      setLoading(true)
+      try {
+        await handleServerInstall(serverId)
+        toast.success(
+          `${props.addon?.title || "Addon"} downloading to server`,
+          { duration: 2000 }
+        )
+      } catch {
+        // mutation error handled internally
+      } finally {
+        setLoading(false)
+        setProgress(null)
+      }
+      return
+    }
+
+    // Instance install path
     const instanceId = props.selectedInstanceId
     if (!instanceId || isInstalled()) return
 
@@ -199,6 +253,19 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
   return (
     <Switch>
+      <Match when={props.selectedServerId}>
+        <InstallButton
+          loading={loading}
+          progress={progress}
+          isInstalled={isInstalled}
+          instanceLocked={() => false}
+          fileId={props.fileId}
+          installedMod={installedMod}
+          onDownload={handleDownload}
+          size={props.size}
+          iconOnly={props.iconOnly}
+        />
+      </Match>
       <Match when={!props.selectedInstanceId}>
         <InstanceDropdown
           addon={props.addon}

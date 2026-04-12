@@ -70,17 +70,19 @@ function Checkbox(props: Props) {
           hover: !props.disabled
         })}
       >
-        <div
-          class="i-hugeicons:tick-02 h-4 w-4 transition-transform duration-200 ease-spring"
-          classList={{
-            "scale-100": checked(),
-            "scale-0": !checked(),
-            "text-lightSlate-50": !props.disabled,
-            "text-lightSlate-700": props.disabled
-          }}
-        />
         <Show when={!checked() && props.indeterminate}>
           <div class="bg-primary-500 h-3 min-h-3 w-3 min-w-3 rounded-sm" />
+        </Show>
+        <Show when={!props.indeterminate || checked()}>
+          <div
+            class="i-hugeicons:tick-02 h-4 w-4 transition-transform duration-200 ease-spring"
+            classList={{
+              "scale-100": checked(),
+              "scale-0": !checked(),
+              "text-lightSlate-50": !props.disabled,
+              "text-lightSlate-700": props.disabled
+            }}
+          />
         </Show>
       </div>
       <Show when={props.children}>{props.children}</Show>

@@ -5,6 +5,7 @@ import { CategoryIcon } from "@/utils/instances"
 import { FEUnifiedCategory } from "@gd/core_module/bindings"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import useSearchContext from "@/components/SearchInputContext"
+import { formatModrinthCategory } from "@/utils/modrinthCategories"
 
 /**
  * DynamicBadgeContainer - Shows badges that fit within available space
@@ -81,7 +82,7 @@ export default function DynamicBadgeContainer(props: {
                   type={category.icon?.type}
                   value={category.icon?.value}
                 />
-                {category.name}
+                {category.platform === "modrinth" ? formatModrinthCategory(category.name) : category.name}
               </Badge>
             )
           }}
@@ -146,7 +147,7 @@ export default function DynamicBadgeContainer(props: {
                             type={category.icon?.type}
                             value={category.icon?.value}
                           />
-                          <span class="text-xs">{category.name}</span>
+                          <span class="text-xs">{category.platform === "modrinth" ? formatModrinthCategory(category.name) : category.name}</span>
                         </div>
                       </Badge>
                     )

@@ -16,6 +16,7 @@ import ModalLayout from "../../ModalLayout"
 import { port, rspc } from "@/utils/rspcClient"
 import {
   createEffect,
+  createMemo,
   createSignal,
   Match,
   onCleanup,
@@ -91,6 +92,15 @@ function ShareInstance(props: ModalProps) {
       sseStream.close()
       sseStream = null
     }
+  })
+
+  const [copyMode, setCopyMode] = createSignal<"code" | "link">("code")
+  const copyValue = createMemo(() => {
+    const obj = shareObject()
+    if (!obj) return ""
+    return copyMode() === "link"
+      ? `https://gdl.gg/i/${obj.share_code}`
+      : obj.share_code
   })
 
   // New state for title, expiration, and max downloads
@@ -281,14 +291,36 @@ function ShareInstance(props: ModalProps) {
               <div class="text-lightSlate-500 mb-4 text-sm">
                 <Trans key="instances:_trn_instance_share.share_code_details" />
               </div>
-              <CopyText
-                size="large"
-                value={shareObject()!.share_code}
-                onCopy={() =>
-                  toast.success(t("general:_trn_general_copied_to_clipboard"))
-                }
-                class="!bg-darkSlate-800"
-              />
+              <div class="flex items-stretch gap-2">
+                <CopyText
+                  size="large"
+                  value={copyValue()}
+                  onCopy={() =>
+                    toast.success(t("general:_trn_general_copied_to_clipboard"))
+                  }
+                  class="!bg-darkSlate-800 flex-1 min-w-0"
+                />
+                <Select
+                  class="flex shrink-0"
+                  value={copyMode()}
+                  onChange={(val) => val && setCopyMode(val as "code" | "link")}
+                  options={["code", "link"]}
+                  itemComponent={(itemProps) => (
+                    <SelectItem item={itemProps.item}>
+                      {itemProps.item.rawValue === "code" ? "Code" : "Link"}
+                    </SelectItem>
+                  )}
+                >
+                  <SelectTrigger class="w-24 !h-full">
+                    <SelectValue<string>>
+                      {(state) =>
+                        state.selectedOption() === "code" ? "Code" : "Link"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent />
+                </Select>
+              </div>
               <div class="text-lightSlate-500 mt-4 text-sm">
                 <Trans key="instances:_trn_instance_share.expires_at" />{" "}
                 {new Date(shareObject()!.expires_at).toLocaleString()}

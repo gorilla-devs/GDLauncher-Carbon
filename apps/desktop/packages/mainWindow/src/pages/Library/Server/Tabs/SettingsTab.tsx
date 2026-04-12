@@ -7,16 +7,14 @@ const SettingsTab = () => {
   const details = () => routeData.serverDetails.data
 
   return (
-    <div class="h-full w-full overflow-y-auto">
-      <Show when={details()}>
-        {(d) => (
-          <Settings
-            serverDetails={d()}
-            totalRam={routeData.totalRam.data ?? undefined}
-          />
-        )}
-      </Show>
-    </div>
+    <Show when={details()}>
+      {(d) => (
+        <Settings
+          serverDetails={d()}
+          totalRam={routeData.totalRam.data ?? undefined}
+        />
+      )}
+    </Show>
   )
 }
 

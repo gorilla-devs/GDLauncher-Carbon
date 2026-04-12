@@ -8,7 +8,7 @@ To enable it in-game: Options → Video Settings → Shader Packs. Pick your sha
 
 ## Hardware requirements
 
-Shaders are demanding. You'll want at least a GTX 960 or RX 470, 4GB of VRAM, and 4GB+ of RAM allocated to Minecraft. Heavier shaders need beefier hardware.
+Shaders are demanding. You'll want at least a mid-range dedicated GPU, 4GB of VRAM, and 4GB+ of RAM allocated to Minecraft. Heavier shaders need beefier hardware.
 
 ## Need help?
 

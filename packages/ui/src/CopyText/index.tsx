@@ -75,7 +75,7 @@ export const CopyText: Component<CopyTextProps> = (props) => {
       {...others}
     >
       {/* Text content */}
-      <span class={cn("text-lightSlate-400 select-all flex-1", styles().text)}>
+      <span class={cn("text-lightSlate-400 select-all flex-1 min-w-0 truncate", styles().text)}>
         {local.value}
       </span>
 

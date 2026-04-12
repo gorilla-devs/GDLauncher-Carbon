@@ -1,25 +1,16 @@
 ---
 import type { GetStaticPaths } from "astro"
 import AddonInstallLayout from "../../../components/AddonInstallLayout.astro"
-import { fetchTopCurseForgeAddons } from "../../../lib/api/curseforge"
 import type { AddonInfo } from "../../../lib/api/types"
 import { marked } from "marked"
+import addonsData from "../../../data/addons.json"
 
 import worldsInstructions from "../../../content/addon-instructions/worlds.md?raw"
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  const apiKey = import.meta.env.CURSEFORGE_API_KEY
-  if (!apiKey) {
-    console.warn("CURSEFORGE_API_KEY not set, skipping CurseForge worlds pages")
-    return []
-  }
-
-  const limit = import.meta.env.DEV ? 5 : 1000
-  const addons = await fetchTopCurseForgeAddons("worlds", apiKey, limit)
-
-  return addons.map((addon) => ({
+  return addonsData.curseforge.worlds.map((addon) => ({
     params: { slug: addon.slug },
-    props: { addon },
+    props: { addon: { ...addon, platform: "curseforge" as const, type: "worlds" as const } },
   }))
 }
 
@@ -38,6 +29,11 @@ const instructionsHtml = await marked(worldsInstructions)
   platform="curseforge"
   imageUrl={addon.imageUrl}
   websiteUrl={addon.websiteUrl}
+  description={addon.description}
+  authors={addon.authors}
+  author={addon.author}
+  categories={addon.categories}
+  dateModified={addon.dateModified}
 >
   <Fragment set:html={instructionsHtml} />
 </AddonInstallLayout>

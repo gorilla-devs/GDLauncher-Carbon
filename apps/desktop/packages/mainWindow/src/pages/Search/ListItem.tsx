@@ -1,12 +1,13 @@
-import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings"
+import { FEUnifiedSearchResult, Mod, ServerAddon } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DynamicBadgeContainer from "./DynamicBadgeContainer"
-import { createMemo, createSignal, Match, Switch } from "solid-js"
+import { createMemo, createSignal, Match, Show, Switch } from "solid-js"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
+import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 
 interface SearchResultItemProps {
@@ -15,6 +16,8 @@ interface SearchResultItemProps {
   isInstalled: boolean
   instanceId?: number
   instanceMods?: Mod[]
+  serverAddons?: ServerAddon[]
+  serverId?: number
 }
 
 export function ListItem(props: SearchResultItemProps) {
@@ -28,7 +31,11 @@ export function ListItem(props: SearchResultItemProps) {
         : globalStore.categories.data?.modrinth
 
     return props.result.categories
-      .map((cat) => cats?.[cat as number])
+      .map((cat) =>
+        props.result.platform === "curseforge"
+          ? cats?.[cat as number]
+          : cats?.[`${props.result.type}:${cat}`]
+      )
       .filter((cat) => cat !== undefined)
   })
 
@@ -123,12 +130,19 @@ export function ListItem(props: SearchResultItemProps) {
                     </div>
                   </Match>
                   <Match when={props.result.type === "modpack"}>
-                    <ModpackDownloadButton addon={props.result} />
+                    <div class="flex items-center gap-2">
+                      <ModpackDownloadButton addon={props.result} />
+                      <Show when={props.result.serverPackFileId}>
+                        <ServerPackDownloadButton addon={props.result} />
+                      </Show>
+                    </div>
                   </Match>
                   <Match when={props.result.type !== "modpack"}>
                     <ModDownloadButton
                       selectedInstanceId={props.instanceId}
                       selectedInstanceMods={props.instanceMods}
+                      selectedServerAddons={props.serverAddons}
+                      selectedServerId={props.serverId}
                       addon={props.result}
                       onDropdownOpenChange={(isOpen) => {
                         if (isOpen) {

@@ -426,7 +426,7 @@ const HomeGridInner = () => {
       />
       <div
         ref={contentRef}
-        class="flex-1"
+        class="flex flex-1 flex-col"
         style={{
           "view-transition-name": modeDirection() ? "library-content" : "none",
           // @ts-expect-error - view-transition-class not in TS types yet
@@ -438,7 +438,7 @@ const HomeGridInner = () => {
         </Show>
         <Show when={!isLoading()}>
           <ContextMenu>
-            <ContextMenuTrigger class="flex-1">
+            <ContextMenuTrigger class="flex flex-1 flex-col">
               <Show
                 when={!isEmpty()}
                 fallback={
@@ -546,7 +546,7 @@ const HomeGridInner = () => {
                 <Match when={libraryMode() === "servers"}>
                   <ContextMenuGroup>
                     <ContextMenuGroupLabel>
-                      Create Server
+                      <Trans key="instances:_trn_server_create_title" />
                     </ContextMenuGroupLabel>
                     <ContextMenuSeparator />
                     <ContextMenuItem
@@ -556,7 +556,7 @@ const HomeGridInner = () => {
                       }
                     >
                       <div class="i-hugeicons:server h-4 w-4" />
-                      New Server
+                      <Trans key="instances:_trn_server_create" />
                     </ContextMenuItem>
                   </ContextMenuGroup>
                 </Match>
