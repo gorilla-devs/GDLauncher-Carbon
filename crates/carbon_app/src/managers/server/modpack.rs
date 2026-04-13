@@ -35,6 +35,16 @@ pub async fn process_curseforge_server_pack(
     server_pack_file_id: u32,
     task: &VisualTask,
 ) -> anyhow::Result<ServerPackResult> {
+    // Create all subtasks upfront so the total weight is fixed and progress
+    // only moves forward. The display_name isn't known yet — use a placeholder
+    // that we'll replace once we've fetched the file info.
+    let t_download = task.subtask(Translation::ServerTaskDownloadServerPack {
+        server_name: String::new(),
+    });
+    t_download.set_weight(10.0);
+    let t_extract = task.subtask(Translation::ServerTaskExtractServerPack);
+    t_extract.set_weight(3.0);
+
     // Fetch the server pack file info
     let file_info = app
         .modplatforms_manager
@@ -52,11 +62,12 @@ pub async fn process_curseforge_server_pack(
         .as_ref()
         .context("Server pack file has no download URL")?;
 
-    // --- Subtask: Download server pack ---
-    let t_download = task.subtask(Translation::ServerTaskDownloadServerPack {
-        server_name: file_info.data.display_name.clone(),
+    // Update the subtask name with the actual server pack display name
+    t_download.update(|data| {
+        data.name = Translation::ServerTaskDownloadServerPack {
+            server_name: file_info.data.display_name.clone(),
+        };
     });
-    t_download.set_weight(10.0);
 
     info!("Downloading CurseForge server pack from {}", download_url);
 
@@ -118,9 +129,7 @@ pub async fn process_curseforge_server_pack(
 
     info!("Server pack downloaded ({} bytes), extracting...", downloaded);
 
-    // --- Subtask: Extract server pack ---
-    let t_extract = task.subtask(Translation::ServerTaskExtractServerPack);
-    t_extract.set_weight(3.0);
+    // --- Extract server pack (subtask already created upfront) ---
     t_extract.start_opaque();
 
     let data_path = server_path.get_data_path();
@@ -165,6 +174,16 @@ pub async fn process_modrinth_server_pack(
 ) -> anyhow::Result<ServerPackResult> {
     use carbon_platforms::modrinth::search::VersionID;
 
+    // Create all subtasks upfront so the total weight is fixed from the start
+    // and progress only moves forward. Use a placeholder name for now.
+    let t_download_mrpack = task.subtask(Translation::ServerTaskDownloadServerPack {
+        server_name: String::new(),
+    });
+    t_download_mrpack.set_weight(5.0);
+    let t_download_files = task.subtask(Translation::ServerTaskDownloadModpackFiles);
+    t_download_files.set_weight(10.0);
+    let t_extract = task.subtask(Translation::ServerTaskExtractModpackOverrides);
+
     // Fetch version info
     let version = app
         .modplatforms_manager
@@ -181,11 +200,12 @@ pub async fn process_modrinth_server_pack(
         .or_else(|| version.files.first())
         .context("Modrinth version has no files")?;
 
-    // --- Subtask: Download mrpack ---
-    let t_download_mrpack = task.subtask(Translation::ServerTaskDownloadServerPack {
-        server_name: version.name.clone(),
+    // Update the download subtask name with the actual server name
+    t_download_mrpack.update(|data| {
+        data.name = Translation::ServerTaskDownloadServerPack {
+            server_name: version.name.clone(),
+        };
     });
-    t_download_mrpack.set_weight(5.0);
 
     info!("Downloading Modrinth mrpack from {}", mrpack_file.url);
 
@@ -280,10 +300,7 @@ pub async fn process_modrinth_server_pack(
         index.files.len()
     );
 
-    // --- Subtask: Download modpack files ---
-    let t_download_files = task.subtask(Translation::ServerTaskDownloadModpackFiles);
-    t_download_files.set_weight(10.0);
-
+    // --- Download modpack files (subtask already created upfront) ---
     let total_files = server_files.len() as u32;
     for (i, modpack_file) in server_files.iter().enumerate() {
         t_download_files.update_items(i as u32, total_files);
@@ -310,8 +327,7 @@ pub async fn process_modrinth_server_pack(
     }
     t_download_files.complete_items();
 
-    // --- Subtask: Extract overrides ---
-    let t_extract = task.subtask(Translation::ServerTaskExtractModpackOverrides);
+    // --- Extract overrides (subtask already created upfront) ---
     t_extract.start_opaque();
 
     let mrpack_path_clone = mrpack_path.clone();

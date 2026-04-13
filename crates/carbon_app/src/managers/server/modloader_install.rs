@@ -162,15 +162,23 @@ async fn install_quilt(
 async fn install_forge(
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
-    _game_version: &str,
+    game_version: &str,
     forge_version: &str,
     java_path: &Path,
     progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
-    // Forge version ID from daedalus already includes the MC version (e.g. "1.20.1-47.2.0")
+    // The Forge maven requires the full `{mc}-{loader}` version in the path,
+    // e.g. `1.20.1-47.4.10`. Different callers pass the version in different
+    // shapes (modpacks sometimes give only the loader part, the creation modal
+    // gives only the loader part too), so normalize here.
+    let full_version = if forge_version.starts_with(&format!("{}-", game_version)) {
+        forge_version.to_string()
+    } else {
+        format!("{}-{}", game_version, forge_version)
+    };
     let url = format!(
         "https://maven.minecraftforge.net/net/minecraftforge/forge/{}/forge-{}-installer.jar",
-        forge_version, forge_version
+        full_version, full_version
     );
 
     info!("Downloading Forge installer from {}", url);

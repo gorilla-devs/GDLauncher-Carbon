@@ -25,14 +25,22 @@ const ServerPackDownloadButton = (props: ServerPackDownloadButtonProps) => {
 
   const createServerMutation = rspc.createMutation(() => ({
     mutationKey: ["server.createServerFromModpack"],
-    onSuccess() {
+    onSuccess(serverId) {
+      console.log(
+        `[ServerPackDownloadButton] createServerFromModpack succeeded, serverId=`,
+        serverId
+      )
       setLoading(false)
       queryClient.invalidateQueries({ queryKey: ["server.getAllServers"] })
       queryClient.invalidateQueries({ queryKey: ["server.getGroups"] })
       toast.success(t("notifications:_trn_server_from_modpack_success"))
       navigator.navigate(`/library?mode=servers`)
     },
-    onError() {
+    onError(err) {
+      console.error(
+        `[ServerPackDownloadButton] createServerFromModpack failed:`,
+        err
+      )
       setLoading(false)
       toast.error(t("notifications:_trn_server_from_modpack_error"))
     }

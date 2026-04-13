@@ -40,9 +40,16 @@ const ServerCreation = (props: ModalProps) => {
 
   const createServerMutation = rspc.createMutation(() => ({
     mutationKey: ["server.createServer"],
-    onSuccess() {
+    onSuccess(serverId) {
+      console.log(
+        `[ServerCreation] createServer succeeded, serverId=`,
+        serverId
+      )
       queryClient.invalidateQueries({ queryKey: ["server.getAllServers"] })
       queryClient.invalidateQueries({ queryKey: ["server.getGroups"] })
+    },
+    onError(err) {
+      console.error(`[ServerCreation] createServer failed:`, err)
     }
   }))
 

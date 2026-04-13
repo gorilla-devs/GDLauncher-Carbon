@@ -133,6 +133,19 @@ const ServerTile = (props: Props) => {
     enabled: false
   }))
 
+  // Log server state changes
+  createEffect(() => {
+    console.log(
+      `[ServerTile #${props.server.id}] state=${statusKey()}${
+        taskId() !== null ? ` taskId=${taskId()}` : ""
+      }${
+        failedTaskId() !== null && failedTaskId() !== undefined
+          ? ` failedTask=${failedTaskId()}`
+          : ""
+      }`
+    )
+  })
+
   createEffect(() => {
     setFailError("")
 
@@ -144,10 +157,34 @@ const ServerTile = (props: Props) => {
         setProgress("subTasks", data.active_subtasks)
         setProgress("percentage", data.progress.value)
         setIsLoading(true)
+
+        const subtaskInfo = data.active_subtasks
+          .map((st: FESubtask) => {
+            const p = st.progress
+            let progressStr = ""
+            if (p === "opaque") progressStr = "opaque"
+            else if ("download" in p)
+              progressStr = `${p.download.downloaded}/${p.download.total} bytes`
+            else if ("item" in p) progressStr = `${p.item.current}/${p.item.total}`
+            return `${st.name.translation} (${progressStr})`
+          })
+          .join(", ")
+        console.log(
+          `[ServerTile #${props.server.id}] progress=${(
+            data.progress.value * 100
+          ).toFixed(1)}% downloaded=${data.downloaded}/${data.download_total} subtasks=[${subtaskInfo}]`
+        )
       } else if (data.progress.type === "Failed") {
         setIsLoading(false)
+        console.error(
+          `[ServerTile #${props.server.id}] task failed:`,
+          data.progress.value
+        )
       } else {
         setIsLoading(isInstalling())
+        console.log(
+          `[ServerTile #${props.server.id}] progress=${data.progress.type}`
+        )
       }
     } else {
       setIsLoading(isInstalling())
@@ -162,6 +199,9 @@ const ServerTile = (props: Props) => {
 
   createEffect(() => {
     if (failedTaskId() !== null && failedTaskId() !== undefined) {
+      console.log(
+        `[ServerTile #${props.server.id}] refetching failed task ${failedTaskId()}`
+      )
       failedTask.refetch()
     }
   })
@@ -173,6 +213,9 @@ const ServerTile = (props: Props) => {
       const chain = failedTask.data.progress.value.cause
         .map((c: { display: string }) => c.display)
         .join("\n  → ")
+      console.error(
+        `[ServerTile #${props.server.id}] failed task error chain:\n  → ${chain}`
+      )
       setFailError(chain)
     }
   })

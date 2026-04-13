@@ -536,9 +536,16 @@ impl ManagerRef<'_, ServerManager> {
                 .get_servers()
                 .get_server_path(&shortpath_clone);
 
-            // Set KnownProgress so the frontend shows percentage — the process_* functions
-            // will create their own subtasks for download/extract phases, and we create
-            // subtasks lazily below for jar/modloader only if they're needed.
+            // Create ALL subtasks upfront so the total weight is fixed from the start
+            // and progress only moves forward. The process_* functions will create their
+            // own internal subtasks for download/extract phases, but we pre-create the
+            // jar download and modloader install subtasks here so their weight is already
+            // accounted for. Skipped subtasks are marked complete with no work.
+            let t_download_jar = task.subtask(Translation::ServerTaskDownloadServerJar);
+            t_download_jar.set_weight(5.0);
+            let t_install_modloader = task.subtask(Translation::ServerTaskInstallModloader);
+            t_install_modloader.set_weight(5.0);
+
             task.edit(|data| data.state = crate::managers::vtask::TaskState::KnownProgress).await;
 
             let result: anyhow::Result<()> = async {
@@ -573,10 +580,9 @@ impl ManagerRef<'_, ServerManager> {
                 };
 
                 // Download vanilla server jar only if not already present (CF server packs
-                // usually bundle it, Modrinth mrpacks don't).
+                // usually bundle it, Modrinth mrpacks don't). Either way, complete the
+                // pre-created subtask so its weight is accounted for.
                 if !server_path.get_server_jar_path().exists() {
-                    let t_download_jar = task.subtask(Translation::ServerTaskDownloadServerJar);
-                    t_download_jar.set_weight(5.0);
                     jars::download_vanilla_server_jar(
                         &app.reqwest_client,
                         &pack_result.game_version,
@@ -585,15 +591,15 @@ impl ManagerRef<'_, ServerManager> {
                     )
                     .await
                     .context("Failed to download vanilla server jar")?;
+                } else {
+                    t_download_jar.complete_opaque();
                 }
 
-                // Install modloader only if detected
+                // Install modloader only if detected. Complete the pre-created subtask
+                // either way to reach 100%.
                 if let (Some(ml_type), Some(ml_version)) =
                     (&pack_result.modloader_type, &pack_result.modloader_version)
                 {
-                    let t_install_modloader =
-                        task.subtask(Translation::ServerTaskInstallModloader);
-                    t_install_modloader.set_weight(5.0);
                     let java_path = app
                         .java_manager()
                         .find_best_java_for_server()
@@ -613,6 +619,8 @@ impl ManagerRef<'_, ServerManager> {
                     .context(format!("Failed to install {} {}", ml_type, ml_version))?;
 
                     modloader_launch::save_launch_config(&server_path, &launch_config).await?;
+                } else {
+                    t_install_modloader.complete_opaque();
                 }
 
                 // Write server.properties if not present
