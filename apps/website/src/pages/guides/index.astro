@@ -2,14 +2,8 @@
 /**
  * Guides Hub Page
  */
-import BaseHead from "../../components/BaseHead.astro"
-import Header from "../../components/Header.astro"
-import Footer from "../../components/Footer.astro"
-import LoadingBar from "../../components/LoadingBar.astro"
+import PageShell from "../../components/PageShell.astro"
 import Breadcrumb from "../../components/Breadcrumb.astro"
-import "@fontsource/ubuntu"
-import "@fontsource/ubuntu/500.css"
-import "@fontsource/ubuntu/700.css"
 
 const guides = [
   {
@@ -83,25 +77,11 @@ const guides = [
 const categories = [...new Set(guides.map(g => g.category))]
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <BaseHead
-      title="Minecraft Modding Guides | GDLauncher"
-      description="Learn how to install modpacks, mods, shaders, and more for Minecraft. Step-by-step tutorials and guides for modded Minecraft."
-      keywords="minecraft guides, how to install mods, minecraft modding tutorial, minecraft modpack guide, forge tutorial, fabric tutorial"
-    />
-  </head>
-
-  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
-    <LoadingBar />
-    <!-- Background layers -->
-    <div class="fixed inset-0 -z-10">
-      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
-    </div>
-    <Header />
-
+<PageShell
+  title="Minecraft Modding Guides | GDLauncher"
+  description="Learn how to install modpacks, mods, shaders, and more for Minecraft. Step-by-step tutorials and guides for modded Minecraft."
+  keywords="minecraft guides, how to install mods, minecraft modding tutorial, minecraft modpack guide, forge tutorial, fabric tutorial"
+>
     <main class="py-8">
       <Breadcrumb items={[{ label: "Guides" }]} maxWidth="max-w-6xl" />
       <div class="max-w-6xl mx-auto px-4">
@@ -143,7 +123,4 @@ const categories = [...new Set(guides.map(g => g.category))]
       </div>
       </div>
     </main>
-
-    <Footer />
-  </body>
-</html>
+</PageShell>

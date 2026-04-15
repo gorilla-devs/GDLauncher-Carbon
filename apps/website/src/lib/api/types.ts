@@ -20,6 +20,11 @@ export interface AddonInfo {
   websiteUrl: string;
   platform: Platform;
   type: AddonType;
+  description?: string | null;
+  authors?: string[] | null;
+  author?: string | null;
+  categories?: string[] | null;
+  dateModified?: string | null;
 }
 
 // CurseForge class ID mapping

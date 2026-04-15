@@ -1,23 +1,11 @@
 ---
 import Logo from "../assets/logo.svg";
 import { Image } from "astro:assets";
-import Button from "./button/Button";
 import HeaderLink from "./HeaderLink.astro";
 import Twitter from "../assets/twitter.svg";
 import Discord from "../assets/discord.svg";
 import NewsLetter from "./Newsletter";
 import { APP_URLS } from "../consts";
-import yaml from "js-yaml";
-
-const response = await Promise.all([
-  fetch("https://cdn-raw.gdl.gg/launcher/alpha.yml"),
-  fetch("https://cdn-raw.gdl.gg/launcher/alpha-mac.yml"),
-  fetch("https://cdn-raw.gdl.gg/launcher/alpha-linux.yml"),
-]);
-const yamlfiles = await Promise.all(response.map((val) => val.text()));
-const downloadLinks = yamlfiles
-  .map((val) => yaml.load(val))
-  .map((val: any) => `https://cdn-raw.gdl.gg/launcher/${val.path}`);
 ---
 
 <footer class="flex flex-col">
@@ -34,13 +22,13 @@ const downloadLinks = yamlfiles
       <span class="text-white font-medium">Download</span>
       <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
         <li>
-          <HeaderLink href={downloadLinks[0]}>Windows</HeaderLink>
+          <HeaderLink href="/download/windows">Windows</HeaderLink>
         </li>
         <li>
-          <HeaderLink href={downloadLinks[1]}>MacOs</HeaderLink>
+          <HeaderLink href="/download/mac">MacOs</HeaderLink>
         </li>
         <li>
-          <HeaderLink href={downloadLinks[2]}>Linux</HeaderLink>
+          <HeaderLink href="/download/linux">Linux</HeaderLink>
         </li>
       </ul>
     </div>
@@ -102,13 +90,13 @@ const downloadLinks = yamlfiles
 <style>
   a {
     cursor: pointer;
-    color: rgba(147, 153, 170, 1);
+    color: rgb(var(--darkSlate-50));
   }
   ul {
     list-style: none;
   }
   footer {
-    background-color: rgba(29, 32, 40, 1);
+    background-color: rgb(var(--darkSlate-800));
   }
   @media screen and (max-width: 768px) {
     footer > div {

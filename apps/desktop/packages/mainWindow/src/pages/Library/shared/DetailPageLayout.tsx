@@ -12,6 +12,7 @@ interface DetailPageLayoutProps {
   containerId: string
   headerImage: string
   icon: string
+  iconViewTransitionName?: string
   headerInfoContent: JSX.Element
   headerActions: JSX.Element
   headerTopRight?: JSX.Element
@@ -107,6 +108,14 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
                     src={props.icon}
                     alt="Icon"
                     class="h-16 w-16 rounded-xl object-cover"
+                    style={
+                      props.iconViewTransitionName
+                        ? {
+                            "view-transition-name": props.iconViewTransitionName,
+                            contain: "layout"
+                          }
+                        : {}
+                    }
                   />
                   <div class="flex flex-1 flex-col">
                     {props.headerInfoContent}

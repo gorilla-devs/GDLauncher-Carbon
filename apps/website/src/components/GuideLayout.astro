@@ -2,14 +2,8 @@
 /**
  * GuideLayout - Layout for guide/tutorial pages
  */
-import BaseHead from "./BaseHead.astro"
-import Header from "./Header.astro"
-import Footer from "./Footer.astro"
-import LoadingBar from "./LoadingBar.astro"
+import PageShell from "./PageShell.astro"
 import Breadcrumb from "./Breadcrumb.astro"
-import "@fontsource/ubuntu"
-import "@fontsource/ubuntu/500.css"
-import "@fontsource/ubuntu/700.css"
 
 interface Props {
   title: string
@@ -23,25 +17,11 @@ const { title, description, keywords, lastUpdated } = Astro.props
 const seoTitle = `${title} | GDLauncher Guides`
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <BaseHead
-      title={seoTitle}
-      description={description}
-      keywords={keywords}
-    />
-  </head>
-
-  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
-    <LoadingBar />
-    <!-- Background layers -->
-    <div class="fixed inset-0 -z-10">
-      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
-    </div>
-    <Header />
-
+<PageShell
+  title={seoTitle}
+  description={description}
+  keywords={keywords}
+>
     <main class="py-8">
       <Breadcrumb items={[
         { label: "Guides", href: "/guides" },
@@ -92,10 +72,7 @@ const seoTitle = `${title} | GDLauncher Guides`
         </div>
       </div>
     </main>
-
-    <Footer />
-  </body>
-</html>
+</PageShell>
 
 <style is:global>
   .prose {

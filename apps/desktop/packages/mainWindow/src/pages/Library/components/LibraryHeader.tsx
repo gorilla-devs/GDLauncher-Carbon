@@ -33,6 +33,7 @@ import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
 import { LibraryHeaderProps, LibraryMode } from "../types"
 import { InstancesGroupBy, InstancesSortBy } from "@gd/core_module/bindings"
+import FeatureStatusBadge from "@/components/FeatureStatusBadge"
 
 export function LibraryHeader(props: LibraryHeaderProps) {
   const [t] = useTransContext()
@@ -216,9 +217,12 @@ export function LibraryHeader(props: LibraryHeaderProps) {
             </div>
           </TabsTrigger>
           <TabsTrigger value="servers">
-            <div class="flex items-center gap-1.5">
+            <div class="relative flex items-center gap-1.5">
               <div class="i-hugeicons:server-stack-01 h-3.5 w-3.5" />
               Servers
+              <div class="absolute -top-5 -right-4">
+                <FeatureStatusBadge type="beta" />
+              </div>
             </div>
           </TabsTrigger>
         </TabsList>
@@ -490,6 +494,27 @@ export function LibraryHeader(props: LibraryHeaderProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </Show>
+
+      {/* Add new instance/server button */}
+      <Button
+        type="primary"
+        size="small"
+        class="shrink-0"
+        onClick={() => {
+          if (isServerMode()) {
+            modals?.openModal({ name: "serverCreation" })
+          } else {
+            modals?.openModal({ name: "instanceCreation" })
+          }
+        }}
+      >
+        <div class="i-hugeicons:add-01 h-4 w-4 shrink-0" />
+        <span class="whitespace-nowrap">
+          {isServerMode()
+            ? t("instances:_trn_server_create_title")
+            : t("library:_trn_create_new_instance")}
+        </span>
+      </Button>
     </div>
   )
 }

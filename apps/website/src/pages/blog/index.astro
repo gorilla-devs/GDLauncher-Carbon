@@ -1,13 +1,8 @@
 ---
-import BaseHead from "../../components/BaseHead.astro";
-import "@fontsource/ubuntu";
-import Header from "../../components/Header.astro";
-import Footer from "../../components/Footer.astro";
-import LoadingBar from "../../components/LoadingBar.astro";
+import PageShell from "../../components/PageShell.astro";
 import Breadcrumb from "../../components/Breadcrumb.astro";
 import { SITE_TITLE, SITE_DESCRIPTION } from "../../consts";
 import { getCollection } from "astro:content";
-import FormattedDate from "../../components/FormattedDate.astro";
 import ArticleCard from "../../components/ArticleCard.astro";
 
 const posts = (await getCollection("blog")).sort(
@@ -15,10 +10,8 @@ const posts = (await getCollection("blog")).sort(
 );
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+<PageShell title={SITE_TITLE} description={SITE_DESCRIPTION}>
+  <Fragment slot="head">
     <style>
       .blog-content {
         display: flex;
@@ -75,17 +68,10 @@ const posts = (await getCollection("blog")).sort(
         }
       }
     </style>
-  </head>
-  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
-    <LoadingBar />
-    <!-- Background layers -->
-    <div class="fixed inset-0 -z-10">
-      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
-    </div>
-    <Header />
+  </Fragment>
+
     <main class="py-8">
-      <Breadcrumb items={[{ label: "Blog" }]} maxWidth="max-w-[1200px]" />
+      <Breadcrumb items={[{ label: "Blog" }]} maxWidth="max-w-6xl" />
       <div class="blog-content">
         <section class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
           <ul>
@@ -94,6 +80,4 @@ const posts = (await getCollection("blog")).sort(
         </section>
       </div>
     </main>
-    <Footer />
-  </body>
-</html>
+</PageShell>

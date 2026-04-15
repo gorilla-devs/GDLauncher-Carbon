@@ -205,14 +205,6 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
           return
         }
 
-        // Don't register if previous instance is being dragged (no-op drop)
-        const prevInstance = instances[index - 1]
-        if (prevInstance && draggedIds.includes(prevInstance.id)) {
-          dragContext.unregisterDropZone(zoneId)
-          registeredDropZoneIds.delete(zoneId)
-          return
-        }
-
         const rect = el.getBoundingClientRect()
         // Full tile width - no createFolder zones inside folders
         const dropRect = new DOMRect(
@@ -490,7 +482,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                   style={{
                     display: "grid",
                     "grid-template-columns": `repeat(auto-fill, ${TILE_SIZES[props.tileSize]?.widthPx ?? 184}px)`,
-                    "justify-content": "space-between",
+                    "justify-content": "space-evenly",
                     "column-gap": "16px"
                   }}
                 >

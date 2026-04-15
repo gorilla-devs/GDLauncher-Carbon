@@ -3,14 +3,8 @@
  * AddonInstallLayout - Layout for addon installation pages
  * SEO-optimized with dynamic addon name and platform branding
  */
-import BaseHead from "./BaseHead.astro"
-import Header from "./Header.astro"
-import Footer from "./Footer.astro"
-import LoadingBar from "./LoadingBar.astro"
+import PageShell from "./PageShell.astro"
 import Breadcrumb from "./Breadcrumb.astro"
-import "@fontsource/ubuntu"
-import "@fontsource/ubuntu/500.css"
-import "@fontsource/ubuntu/700.css"
 
 import type { AddonType, Platform } from "../lib/api/types"
 import { ADDON_TYPE_LABELS, ADDON_TYPE_PLURAL } from "../lib/api/types"
@@ -54,17 +48,14 @@ const seoKeywords = `${addonName}, minecraft ${addonType}, install ${addonName},
 const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlug}`
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <BaseHead
-      title={seoTitle}
-      description={seoDescription}
-      keywords={seoKeywords}
-      image={imageUrl || undefined}
-    />
-    <link rel="canonical" href={canonicalUrl} />
-
+<PageShell
+  title={seoTitle}
+  description={seoDescription}
+  keywords={seoKeywords}
+  image={imageUrl || undefined}
+  canonicalUrl={canonicalUrl}
+>
+  <Fragment slot="head">
     <!-- Structured data for SEO -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
@@ -78,16 +69,7 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
         "priceCurrency": "USD"
       }
     })} />
-  </head>
-
-  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
-    <LoadingBar />
-    <!-- Background layers -->
-    <div class="fixed inset-0 -z-10">
-      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
-    </div>
-    <Header />
+  </Fragment>
 
     <main class="py-8">
       <Breadcrumb items={[
@@ -109,8 +91,11 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
                   height="128"
                   class="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 object-cover"
                   loading="eager"
-                  onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\"w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 flex items-center justify-center\"><span class=\"text-4xl text-darkSlate-400\">?</span></div>'"
+                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
                 />
+                <div class="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 items-center justify-center hidden">
+                  <span class="text-4xl text-darkSlate-400">?</span>
+                </div>
               </div>
             ) : (
               <div class="flex-shrink-0 w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 flex items-center justify-center">
@@ -158,7 +143,7 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
           </div>
         )}
 
-        {categories?.length > 0 && (
+        {categories && categories.length > 0 && (
           <div class="mb-8 flex flex-wrap gap-2">
             {categories.map((cat) => (
               <span class="px-3 py-1 bg-darkSlate-700/50 rounded-full text-xs text-darkSlate-100 border border-darkSlate-600">
@@ -220,10 +205,7 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
         </div>
       </div>
     </main>
-
-    <Footer />
-  </body>
-</html>
+</PageShell>
 
 <style is:global>
   /* Reuse prose styles from GuideLayout */

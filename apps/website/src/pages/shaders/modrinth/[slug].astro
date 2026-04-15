@@ -19,7 +19,7 @@ interface Props {
 }
 
 const { addon } = Astro.props
-const instructionsHtml = await marked(shadersInstructions)
+const instructionsHtml = marked(shadersInstructions)
 ---
 
 <AddonInstallLayout

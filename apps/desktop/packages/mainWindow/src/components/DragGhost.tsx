@@ -1,4 +1,4 @@
-import { Show, For, createMemo } from "solid-js"
+import { Show, For, createMemo, type Accessor } from "solid-js"
 import { Portal } from "solid-js/web"
 import { useDragContext } from "@/pages/Library/DragContext"
 import { ListInstance, ListServer } from "@gd/core_module/bindings"
@@ -30,6 +30,13 @@ const clamp = (v: number, min: number, max: number) =>
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
+const SCATTER_CONFIG = [
+  { xFrac: 0, yFrac: 0, rotation: 0, opacity: 1.0 },
+  { xFrac: 0.08, yFrac: -0.06, rotation: 4, opacity: 0.9 },
+  { xFrac: -0.06, yFrac: -0.10, rotation: -3, opacity: 0.8 }
+]
+const MAX_SCATTER_TILES = 3
 
 const DragGhost = (props: DragGhostProps) => {
   const dragContext = useDragContext()
@@ -141,12 +148,14 @@ const DragGhost = (props: DragGhostProps) => {
               <InstanceGhost
                 instances={draggedItems() as ListInstance[]}
                 tileSize={props.tileSize}
+                blendFactor={blendFactor}
               />
             </Show>
             <Show when={dragContext.dragType() === "server"}>
               <ServerGhost
                 servers={draggedItems() as ListServer[]}
                 tileSize={props.tileSize}
+                blendFactor={blendFactor}
               />
             </Show>
             <Show when={dragContext.dragType() === "group" || dragContext.dragType() === "serverGroup"}>
@@ -184,12 +193,14 @@ const DragGhost = (props: DragGhostProps) => {
 interface InstanceGhostProps {
   instances: ListInstance[]
   tileSize: 1 | 2 | 3 | 4 | 5
+  blendFactor: Accessor<number>
 }
 
 const InstanceGhost = (props: InstanceGhostProps) => {
   const firstInstance = () => props.instances[0]
   const count = () => props.instances.length
   const dim = () => getTileDimensions(props.tileSize)
+  const visibleInstances = () => props.instances.slice(0, MAX_SCATTER_TILES)
 
   const validFirstInstance = () => {
     const inst = firstInstance()
@@ -197,71 +208,78 @@ const InstanceGhost = (props: InstanceGhostProps) => {
     return inst.status.status === "valid" ? inst.status.value : undefined
   }
 
-  const imageUrl = createMemo(() => {
-    const instance = firstInstance()
-    if (!instance) return DefaultImg
+  const getImageUrl = (instance: ListInstance) => {
     return instance.icon_revision
       ? getInstanceImageUrl(instance.id, instance.icon_revision)
       : DefaultImg
-  })
+  }
+
+  const getScatterTransform = (index: number) => {
+    const config = SCATTER_CONFIG[index]
+    if (!config) return { x: 0, y: 0, rotation: 0, opacity: 1 }
+    const collapse = 1 - props.blendFactor()
+    return {
+      x: config.xFrac * dim().width * collapse,
+      y: config.yFrac * dim().height * collapse,
+      rotation: config.rotation * collapse,
+      opacity: config.opacity
+    }
+  }
 
   return (
-    <div class="relative">
-      {/* Stacked effect for multiple items */}
-      <Show when={count() > 1}>
-        <div
-          class="absolute rounded-xl bg-darkSlate-700 opacity-60"
-          style={{
-            width: `${dim().width}px`,
-            height: `${dim().height}px`,
-            right: "-4px",
-            bottom: "-4px"
-          }}
-        />
-        <div
-          class="absolute rounded-xl bg-darkSlate-600 opacity-80"
-          style={{
-            width: `${dim().width}px`,
-            height: `${dim().height}px`,
-            right: "-2px",
-            bottom: "-2px"
-          }}
-        />
-      </Show>
+    <div
+      class="relative"
+      style={{ width: `${dim().width}px`, height: `${dim().height}px` }}
+    >
+      <For each={visibleInstances()}>
+        {(instance, index) => {
+          const transform = () => getScatterTransform(index())
+          const isFront = () => index() === 0
 
-      {/* Main ghost tile - dynamic size */}
-      <div
-        class="relative rounded-2xl overflow-hidden shadow-2xl bg-darkSlate-800"
-        style={{
-          width: `${dim().width}px`,
-          height: `${dim().height}px`,
-          "background-image": `url("${imageUrl()}")`,
-          "background-size": "cover",
-          "background-position": "center"
-        }}
-      >
-        {/* Bottom gradient with name and subtitle */}
-        <div class="absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl">
-          <h4 class="m-0 text-left text-sm font-semibold text-white truncate">
-            {firstInstance()?.name || ""}
-          </h4>
-          <Show when={validFirstInstance()}>
-            <div class="flex items-center gap-2 text-xs text-white/70">
-              <Show when={validFirstInstance()?.modloader}>
-                <img
-                  class="h-3 w-3"
-                  src={getModloaderIcon(validFirstInstance()!.modloader!)}
-                />
+          return (
+            <div
+              class="absolute top-0 left-0 rounded-2xl overflow-hidden shadow-2xl bg-darkSlate-800"
+              style={{
+                width: `${dim().width}px`,
+                height: `${dim().height}px`,
+                transform: `translate(${transform().x}px, ${transform().y}px) rotate(${transform().rotation}deg)`,
+                opacity: transform().opacity,
+                "z-index": MAX_SCATTER_TILES - index(),
+                "background-image": `url("${getImageUrl(instance)}")`,
+                "background-size": "cover",
+                "background-position": "center"
+              }}
+            >
+              {/* Name/modloader overlay only on front tile */}
+              <Show when={isFront()}>
+                <div class="absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl">
+                  <h4 class="m-0 text-left text-sm font-semibold text-white truncate">
+                    {firstInstance()?.name || ""}
+                  </h4>
+                  <Show when={validFirstInstance()}>
+                    <div class="flex items-center gap-2 text-xs text-white/70">
+                      <Show when={validFirstInstance()?.modloader}>
+                        <img
+                          class="h-3 w-3"
+                          src={getModloaderIcon(validFirstInstance()!.modloader!)}
+                        />
+                      </Show>
+                      <span>{validFirstInstance()?.mc_version}</span>
+                    </div>
+                  </Show>
+                </div>
               </Show>
-              <span>{validFirstInstance()?.mc_version}</span>
             </div>
-          </Show>
-        </div>
-      </div>
+          )
+        }}
+      </For>
 
       {/* Count badge */}
       <Show when={count() > 1}>
-        <div class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md">
+        <div
+          class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md"
+          style={{ "z-index": MAX_SCATTER_TILES + 1 }}
+        >
           {count()}
         </div>
       </Show>
@@ -272,12 +290,14 @@ const InstanceGhost = (props: InstanceGhostProps) => {
 interface ServerGhostProps {
   servers: ListServer[]
   tileSize: 1 | 2 | 3 | 4 | 5
+  blendFactor: Accessor<number>
 }
 
 const ServerGhost = (props: ServerGhostProps) => {
   const firstServer = () => props.servers[0]
   const count = () => props.servers.length
   const dim = () => getTileDimensions(props.tileSize)
+  const visibleServers = () => props.servers.slice(0, MAX_SCATTER_TILES)
 
   const STATUS_COLORS: Record<string, string> = {
     stopped: "bg-gray-500",
@@ -287,57 +307,70 @@ const ServerGhost = (props: ServerGhostProps) => {
     deleting: "bg-red-500"
   }
 
+  const getScatterTransform = (index: number) => {
+    const config = SCATTER_CONFIG[index]
+    if (!config) return { x: 0, y: 0, rotation: 0, opacity: 1 }
+    const collapse = 1 - props.blendFactor()
+    return {
+      x: config.xFrac * dim().width * collapse,
+      y: config.yFrac * dim().height * collapse,
+      rotation: config.rotation * collapse,
+      opacity: config.opacity
+    }
+  }
+
   return (
-    <div class="relative">
-      <Show when={count() > 1}>
-        <div
-          class="absolute rounded-xl bg-darkSlate-700 opacity-60"
-          style={{
-            width: `${dim().width}px`,
-            height: `${dim().height}px`,
-            right: "-4px",
-            bottom: "-4px"
-          }}
-        />
-        <div
-          class="absolute rounded-xl bg-darkSlate-600 opacity-80"
-          style={{
-            width: `${dim().width}px`,
-            height: `${dim().height}px`,
-            right: "-2px",
-            bottom: "-2px"
-          }}
-        />
-      </Show>
+    <div
+      class="relative"
+      style={{ width: `${dim().width}px`, height: `${dim().height}px` }}
+    >
+      <For each={visibleServers()}>
+        {(server, index) => {
+          const transform = () => getScatterTransform(index())
+          const isFront = () => index() === 0
 
-      <div
-        class="relative rounded-2xl overflow-hidden shadow-2xl bg-darkSlate-800"
-        style={{
-          width: `${dim().width}px`,
-          height: `${dim().height}px`,
-          "background-image": `url("${DefaultImg}")`,
-          "background-size": "cover",
-          "background-position": "center"
-        }}
-      >
-        <div class="absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl">
-          <div class="flex items-center gap-2">
+          return (
             <div
-              class={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_COLORS[firstServer()?.state.status] || STATUS_COLORS.stopped}`}
-            />
-            <h4 class="m-0 text-left text-sm font-semibold text-white truncate">
-              {firstServer()?.name || ""}
-            </h4>
-          </div>
-          <div class="flex items-center gap-2 text-xs text-white/70">
-            <span>{firstServer()?.gameVersion}</span>
-            <span class="text-white/40">:{firstServer()?.port}</span>
-          </div>
-        </div>
-      </div>
+              class="absolute top-0 left-0 rounded-2xl overflow-hidden shadow-2xl bg-darkSlate-800"
+              style={{
+                width: `${dim().width}px`,
+                height: `${dim().height}px`,
+                transform: `translate(${transform().x}px, ${transform().y}px) rotate(${transform().rotation}deg)`,
+                opacity: transform().opacity,
+                "z-index": MAX_SCATTER_TILES - index(),
+                "background-image": `url("${DefaultImg}")`,
+                "background-size": "cover",
+                "background-position": "center"
+              }}
+            >
+              {/* Status/name overlay only on front tile */}
+              <Show when={isFront()}>
+                <div class="absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl">
+                  <div class="flex items-center gap-2">
+                    <div
+                      class={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_COLORS[firstServer()?.state.status] || STATUS_COLORS.stopped}`}
+                    />
+                    <h4 class="m-0 text-left text-sm font-semibold text-white truncate">
+                      {firstServer()?.name || ""}
+                    </h4>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs text-white/70">
+                    <span>{firstServer()?.gameVersion}</span>
+                    <span class="text-white/40">:{firstServer()?.port}</span>
+                  </div>
+                </div>
+              </Show>
+            </div>
+          )
+        }}
+      </For>
 
+      {/* Count badge */}
       <Show when={count() > 1}>
-        <div class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md">
+        <div
+          class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md"
+          style={{ "z-index": MAX_SCATTER_TILES + 1 }}
+        >
           {count()}
         </div>
       </Show>

@@ -418,6 +418,7 @@ const Instance = (props: { children?: any }) => {
       containerId="main-container-instance-details"
       headerImage={iconUrl()}
       icon={iconUrl()}
+      iconViewTransitionName="instance-tile-image"
       headerInfoContent={
         <>
           <div

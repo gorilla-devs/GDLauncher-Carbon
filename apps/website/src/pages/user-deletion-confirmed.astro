@@ -1,32 +1,13 @@
 ---
-import BaseHead from "../components/BaseHead.astro";
-import Header from "../components/Header.astro";
-import Footer from "../components/Footer.astro";
-import LoadingBar from "../components/LoadingBar.astro";
-import "@fontsource/ubuntu";
+import PageShell from "../components/PageShell.astro";
 import { SITE_DESCRIPTION } from "../consts";
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <BaseHead
-      title="Account Deleted - GDLauncher"
-      description={SITE_DESCRIPTION}
-    />
-  </head>
-
-  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
-    <LoadingBar />
-    <!-- Background layers -->
-    <div class="fixed inset-0 -z-10">
-      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
-    </div>
-
+<PageShell
+  title="Account Deleted - GDLauncher"
+  description={SITE_DESCRIPTION}
+>
     <div class="min-h-screen flex flex-col">
-      <Header />
-
       <div class="flex-1 flex items-center justify-center p-6">
         <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 max-w-lg text-center">
           <!-- Icon -->
@@ -54,8 +35,5 @@ import { SITE_DESCRIPTION } from "../consts";
           </a>
         </div>
       </div>
-
-      <Footer />
     </div>
-  </body>
-</html>
+</PageShell>

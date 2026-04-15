@@ -77,7 +77,7 @@ const ArticleInteractiveMarkdown = () => {
 
       const li = document.createElement("li");
       const a = document.createElement("a");
-      const textnode = document.createTextNode(item.innerHTML);
+      const textnode = document.createTextNode(item.textContent || "");
       a.appendChild(textnode);
       a.style.fontSize = "1rem";
       a.style.maxWidth = "fit-content";

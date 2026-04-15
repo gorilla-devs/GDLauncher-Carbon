@@ -8,7 +8,7 @@ import addonsData from "../../../data/addons.json"
 import datapacksInstructions from "../../../content/addon-instructions/datapacks.md?raw"
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  return addonsData.modrinth.datapacks.map((addon) => ({
+  return (addonsData.modrinth.datapacks as Array<{name: string; slug: string; imageUrl: string | null; websiteUrl: string}>).map((addon) => ({
     params: { slug: addon.slug },
     props: { addon: { ...addon, platform: "modrinth" as const, type: "datapacks" as const } },
   }))
@@ -19,7 +19,7 @@ interface Props {
 }
 
 const { addon } = Astro.props
-const instructionsHtml = await marked(datapacksInstructions)
+const instructionsHtml = marked(datapacksInstructions)
 ---
 
 <AddonInstallLayout

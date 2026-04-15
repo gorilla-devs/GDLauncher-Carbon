@@ -76,56 +76,54 @@ const { pathname } = Astro.url;
       <div class="i-hugeicons:menu-02 w-6 h-6 text-lightSlate-100"></div>
     </button>
   </div>
-
-  <!-- Mobile Navigation Overlay -->
-  <nav id="sidebar" class="mobile-nav">
-    <div class="flex items-center justify-between p-4 border-b border-darkSlate-700">
-      <a href="/">
-        <Image src={Logo} alt="gdlauncher logo" width="140" height="32" loading="eager" />
-      </a>
-      <button class="p-2 rounded-lg hover:bg-darkSlate-700 transition-colors" onclick="closeNav()">
-        <div class="i-hugeicons:cancel-01 w-6 h-6 text-lightSlate-100"></div>
-      </button>
-    </div>
-
-    <div class="flex flex-col p-4 gap-2">
-      <HeaderLink class="mobile-nav-link" href="/">
-        <div class="i-hugeicons:home-01 w-5 h-5"></div>
-        <span>Home</span>
-      </HeaderLink>
-
-      <HeaderLink class="mobile-nav-link" href="/blog">
-        <div class="i-hugeicons:news w-5 h-5"></div>
-        <span>Blog</span>
-      </HeaderLink>
-
-      <HeaderLink class="mobile-nav-link" href="/guides">
-        <div class="i-hugeicons:book-open-01 w-5 h-5"></div>
-        <span>Guides</span>
-      </HeaderLink>
-
-      <HeaderLink class="mobile-nav-link" href="/docs">
-        <div class="i-hugeicons:book-02 w-5 h-5"></div>
-        <span>Docs</span>
-      </HeaderLink>
-
-      <a class="mobile-nav-link" href={APP_URLS.socials.github} target="_blank" rel="noopener noreferrer">
-        <div class="i-hugeicons:github w-5 h-5"></div>
-        <span>GitHub</span>
-      </a>
-    </div>
-
-    {pathname.includes("docs") && (
-      <div class="p-4 border-t border-darkSlate-700">
-        <DocsSideNav />
-      </div>
-    )}
-
-    <div class="p-4 mt-auto">
-      <DownloadButton />
-    </div>
-  </nav>
 </header>
+
+<!-- Mobile Navigation Overlay (outside header to avoid backdrop-blur stacking context) -->
+<nav id="sidebar" class="mobile-nav">
+  <div class="flex items-center justify-between px-4 h-16 border-b border-darkSlate-700">
+    <a href="/" class="px-3 py-2">
+      <Image src={Logo} alt="gdlauncher logo" width="150" height="35" loading="eager" />
+    </a>
+    <button class="p-2 rounded-lg hover:bg-darkSlate-700 transition-colors" onclick="closeNav()">
+      <div class="i-hugeicons:cancel-01 w-6 h-6 text-lightSlate-100"></div>
+    </button>
+  </div>
+
+  <div class="flex flex-col p-4 gap-2">
+    <HeaderLink class="mobile-nav-link" href="/">
+      <div class="i-hugeicons:home-01 w-5 h-5"></div>
+      <span>Home</span>
+    </HeaderLink>
+
+    <HeaderLink class="mobile-nav-link" href="/blog">
+      <div class="i-hugeicons:news w-5 h-5"></div>
+      <span>Blog</span>
+    </HeaderLink>
+
+    <HeaderLink class="mobile-nav-link" href="/guides">
+      <div class="i-hugeicons:book-open-01 w-5 h-5"></div>
+      <span>Guides</span>
+    </HeaderLink>
+
+    <HeaderLink class="mobile-nav-link" href="/docs">
+      <div class="i-hugeicons:book-02 w-5 h-5"></div>
+      <span>Docs</span>
+    </HeaderLink>
+
+    <a class="mobile-nav-link" href={APP_URLS.socials.github} target="_blank" rel="noopener noreferrer">
+      <div class="i-hugeicons:github w-5 h-5"></div>
+      <span>GitHub</span>
+    </a>
+  </div>
+
+  {pathname.includes("docs") && (
+    <div class="p-4 border-t border-darkSlate-700">
+      <DocsSideNav />
+    </div>
+  )}
+
+</nav>
+
 
 <style is:global>
   .nav-tab {

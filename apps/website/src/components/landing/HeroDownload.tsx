@@ -1,6 +1,6 @@
 import { createSignal, onMount, For, Show } from "solid-js"
-
-type OS = "Windows" | "MacOS" | "Linux"
+import { detectOS } from "../../utils/detectOS"
+import type { OS } from "../../utils/detectOS"
 
 const OS_CONFIG = {
   Windows: {
@@ -22,16 +22,6 @@ const OS_CONFIG = {
     url: "/download/linux"
   }
 } as const
-
-const detectOS = (): OS => {
-  if (typeof window === "undefined") return "Windows"
-
-  const ua = window.navigator.userAgent.toLowerCase()
-  if (ua.includes("windows")) return "Windows"
-  if (ua.includes("mac")) return "MacOS"
-  if (ua.includes("linux")) return "Linux"
-  return "Windows" // Default fallback
-}
 
 export default function HeroDownload() {
   const [currentOS, setCurrentOS] = createSignal<OS>("Windows")
@@ -72,7 +62,7 @@ export default function HeroDownload() {
         <span class="text-xs text-darkSlate-200 uppercase tracking-wider">Also available for</span>
         <div class="flex items-center gap-2">
           <For each={Object.entries(OS_CONFIG)}>
-            {([os, cfg]) => (
+            {([_os, cfg]) => (
               <a
                 href={cfg.url}
                 title={`Download for ${cfg.label}`}

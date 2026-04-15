@@ -135,10 +135,11 @@ const Server = (props: { children?: any }) => {
       containerId="main-container-server-details"
       headerImage={DefaultImg}
       icon={DefaultImg}
+      iconViewTransitionName="server-tile-image"
       headerInfoContent={
         <>
           <h1
-            class="border-box z-10 m-0 min-h-10"
+            class="border-box z-10 m-0 min-h-10 w-fit"
             style={{
               "view-transition-name": "server-tile-title",
               contain: "layout"
@@ -149,7 +150,13 @@ const Server = (props: { children?: any }) => {
           <div class="flex cursor-default flex-row justify-between">
             <div class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4">
               <Show when={details()}>
-                <div class="m-0 flex min-h-6 items-center gap-2">
+                <div
+                  class="m-0 flex min-h-6 items-center gap-2"
+                  style={{
+                    "view-transition-name": "server-tile-modloader",
+                    contain: "layout"
+                  }}
+                >
                   <span class="bg-darkSlate-700 text-lightSlate-400 rounded px-1.5 py-0.5">
                     {details()!.modloaderType
                       ? `${details()!.modloaderType![0].toUpperCase()}${details()!.modloaderType!.slice(1)}`

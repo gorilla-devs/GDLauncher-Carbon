@@ -3,6 +3,7 @@
 
 interface ImportMetaEnv {
   readonly CURSEFORGE_API_KEY: string;
+  readonly ENDERIUM_API_BASE: string;
 }
 
 interface ImportMeta {

@@ -773,10 +773,30 @@ const Tile = (props: Props) => {
                             isLoading() || isInQueue() || props.isDeleting
                         }}
                       >
-                        <h4 class="m-0 text-left text-sm font-semibold text-white truncate">
+                        <h4
+                          class="m-0 text-left text-sm font-semibold text-white truncate"
+                          style={
+                            props.shouldSetViewTransition
+                              ? {
+                                  "view-transition-name": `instance-tile-title`,
+                                  contain: "layout"
+                                }
+                              : {}
+                          }
+                        >
                           {props.instance.name}
                         </h4>
-                        <div class="flex items-center gap-2 text-xs text-white/70">
+                        <div
+                          class="flex items-center gap-2 text-xs text-white/70"
+                          style={
+                            props.shouldSetViewTransition
+                              ? {
+                                  "view-transition-name": `instance-tile-modloader`,
+                                  contain: "layout"
+                                }
+                              : {}
+                          }
+                        >
                           <Show when={props.modloader}>
                             <img
                               class="h-3 w-3"

@@ -1,7 +1,7 @@
 ---
 ---
 
-<div id="page-loading-bar" transition:persist></div>
+<div id="page-loading-bar"></div>
 
 <style is:global>
   #page-loading-bar {
@@ -14,23 +14,8 @@
     z-index: 9999;
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform 0.2s ease;
     pointer-events: none;
-  }
-
-  #page-loading-bar.loading {
-    transform: scaleX(0.7);
-    transition: transform 8s cubic-bezier(0.1, 0.5, 0.1, 1);
-  }
-
-  #page-loading-bar.complete {
-    transform: scaleX(1);
-    transition: transform 0.1s ease;
-  }
-
-  #page-loading-bar.fade-out {
     opacity: 0;
-    transition: opacity 0.3s ease;
   }
 </style>
 
@@ -39,24 +24,30 @@
     if (window.__loadingBarInitialized) return;
     window.__loadingBarInitialized = true;
 
-    document.addEventListener('astro:before-preparation', () => {
-      const bar = document.getElementById('page-loading-bar');
+    document.addEventListener('astro:before-preparation', function() {
+      var bar = document.getElementById('page-loading-bar');
       if (!bar) return;
-      bar.classList.remove('complete', 'fade-out', 'loading');
-      bar.style.cssText = 'transition: none; transform: scaleX(0); opacity: 1;';
-      void bar.offsetWidth;
-      bar.style.cssText = '';
-      bar.classList.add('loading');
+      bar.style.transition = 'none';
+      bar.style.transform = 'scaleX(0)';
+      bar.style.opacity = '1';
+      bar.offsetWidth;
+      bar.style.transition = 'transform 8s cubic-bezier(0.1, 0.5, 0.1, 1)';
+      bar.style.transform = 'scaleX(0.7)';
     });
 
-    document.addEventListener('astro:after-swap', () => {
-      const bar = document.getElementById('page-loading-bar');
+    document.addEventListener('astro:after-swap', function() {
+      // After swap, the old bar is gone. The new page has a fresh bar at scaleX(0).
+      // Snap it to full width instantly, then fade out.
+      var bar = document.getElementById('page-loading-bar');
       if (!bar) return;
-      bar.classList.remove('loading');
-      bar.classList.add('complete');
-      setTimeout(() => {
-        bar.classList.add('fade-out');
-      }, 100);
+      bar.style.transition = 'none';
+      bar.style.transform = 'scaleX(1)';
+      bar.style.opacity = '1';
+      bar.offsetWidth;
+      setTimeout(function() {
+        bar.style.transition = 'opacity 0.3s ease';
+        bar.style.opacity = '0';
+      }, 50);
     });
   })();
 </script>

@@ -52,7 +52,7 @@ export function LibraryGrid(props: LibraryGridProps) {
       style={{
         display: "grid",
         "grid-template-columns": `repeat(auto-fill, ${TILE_SIZES[props.tileSize() as TileSize]?.widthPx ?? 184}px)`,
-        "justify-content": "space-between",
+        "justify-content": "space-evenly",
         "column-gap": "16px"
       }}
     >

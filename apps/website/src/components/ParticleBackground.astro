@@ -19,14 +19,16 @@
   }
 
   function initLasers() {
-    const bgContainer = document.querySelector('.fixed.inset-0.-z-10');
-    if (!bgContainer) return;
+    const maybeBgContainer = document.querySelector('.fixed.inset-0.-z-10');
+    if (!maybeBgContainer) return;
+    const bgContainer: Element = maybeBgContainer;
 
     const canvas = document.getElementById('laser-canvas') as HTMLCanvasElement;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const maybeCtx = canvas.getContext('2d');
+    if (!maybeCtx) return;
+    const ctx: CanvasRenderingContext2D = maybeCtx;
 
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 

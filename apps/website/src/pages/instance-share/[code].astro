@@ -1,9 +1,5 @@
 ---
-import BaseHead from "../../components/BaseHead.astro";
-import Header from "../../components/Header.astro";
-import Footer from "../../components/Footer.astro";
-import LoadingBar from "../../components/LoadingBar.astro";
-import ParticleBackground from "../../components/ParticleBackground.astro";
+import PageShell from "../../components/PageShell.astro";
 import {
   fetchSharePreview,
   formatFileSize,
@@ -41,13 +37,13 @@ const isExpired = expiresAt ? expiresAt < new Date() : false;
 const deepLinkUrl = `gdlauncher://share/${code}`;
 ---
 
-<html lang="en">
-  <head>
-    <BaseHead
-      title={`${title} | GDLauncher`}
-      description={description}
-      image={ogImage}
-    />
+<PageShell
+  title={`${title} | GDLauncher`}
+  description={description}
+  image={ogImage}
+  particles
+>
+  <Fragment slot="head">
     <style>
       .preview-card {
         max-width: 650px;
@@ -292,22 +288,7 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
         margin-top: 1px;
       }
     </style>
-  </head>
-
-  <body class="bg-darkSlate-900 text-lightSlate-50 min-h-screen">
-    <LoadingBar />
-    <div class="fixed inset-0 -z-10">
-      <div
-        class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"
-      >
-      </div>
-      <div
-        class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"
-      >
-      </div>
-    </div>
-    <ParticleBackground />
-    <Header />
+  </Fragment>
 
     <main class="px-4 py-8 md:py-16">
       {
@@ -484,8 +465,6 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
       }
     </main>
 
-    <Footer />
-
     <script define:vars={{ deepLinkUrl }}>
       // Try to open the app automatically when the page loads
       // This uses a hidden iframe technique to avoid navigation issues
@@ -510,5 +489,4 @@ const deepLinkUrl = `gdlauncher://share/${code}`;
         }
       });
     </script>
-  </body>
-</html>
+</PageShell>

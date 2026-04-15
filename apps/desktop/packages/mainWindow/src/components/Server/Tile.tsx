@@ -606,7 +606,7 @@ const ServerTile = (props: Props) => {
                 <div
                   class="z-5 absolute right-3 top-3 h-10 items-center justify-center gap-2 rounded-xl px-4 transition-all duration-200 ease-spring translate-x-3 opacity-0"
                   classList={{
-                    "flex bg-green-500 hover:bg-green-400":
+                    "flex bg-primary-500 hover:bg-primary-400":
                       !isRunning() && !isBusy() && !isDeleting(),
                     hidden: isRunning() || isBusy(),
                     "flex bg-red-500 translate-x-0 opacity-100":
@@ -681,11 +681,31 @@ const ServerTile = (props: Props) => {
                   <Show when={props.server.favorite}>
                     <div class="i-hugeicons:star h-3 w-3 shrink-0 text-yellow-400" />
                   </Show>
-                  <h4 class="m-0 truncate text-left text-sm font-semibold text-white">
+                  <h4
+                    class="m-0 truncate text-left text-sm font-semibold text-white"
+                    style={
+                      shouldSetViewTransition()
+                        ? {
+                            "view-transition-name": "server-tile-title",
+                            contain: "layout"
+                          }
+                        : {}
+                    }
+                  >
                     {props.server.name}
                   </h4>
                 </div>
-                <div class="flex items-center gap-2 text-xs text-white/70">
+                <div
+                  class="flex items-center gap-2 text-xs text-white/70"
+                  style={
+                    shouldSetViewTransition()
+                      ? {
+                          "view-transition-name": "server-tile-modloader",
+                          contain: "layout"
+                        }
+                      : {}
+                  }
+                >
                   <Show when={props.server.modloaderType}>
                     <img
                       class="h-3 w-3"

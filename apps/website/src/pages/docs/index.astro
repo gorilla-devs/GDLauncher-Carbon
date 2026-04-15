@@ -1,6 +1,5 @@
 ---
-import { type CollectionEntry, getCollection } from "astro:content";
-import BlogPost from "../../layouts/BlogPost.astro";
+import { getCollection } from "astro:content";
 import Docs from "../../layouts/Docs.astro";
 
 export async function getStaticPaths() {
@@ -13,8 +12,8 @@ export async function getStaticPaths() {
 ---
 
 <Docs
-  title="gdlauncher documentation"
-  category="full documented page for gdlauncher"
+  title="GDLauncher Documentation"
+  category="Installation guides, features, and troubleshooting for GDLauncher."
 >
   <style></style>
   <header>
