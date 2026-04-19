@@ -2,7 +2,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { FEUnifiedSearchResult, Modpack } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Button, toast, Spinner } from "@gd/ui"
+import { Button, toast, Spinner, Tooltip, TooltipTrigger, TooltipContent } from "@gd/ui"
 import { Show, createSignal, getOwner, runWithOwner } from "solid-js"
 
 interface ModDownloadButtonProps {
@@ -11,6 +11,7 @@ interface ModDownloadButtonProps {
   addon: FEUnifiedSearchResult | undefined
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
+  splitPosition?: "left" | "right"
 }
 
 const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
@@ -107,30 +108,38 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
   }
 
   return (
-    <div class="relative">
-      <Button
-        disabled={loading()}
-        size={props.size || "medium"}
-        onClick={handleDownload}
-      >
-        <Show when={loading()}>
-          <Spinner />
-        </Show>
-        <Show when={!loading()}>
-          <Show
-            when={props.iconOnly}
-            fallback={
-              <div class="flex items-center gap-1.5">
-                <div class="i-hugeicons:download-02" />
-                <Trans key="instances:_trn_download" />
-              </div>
-            }
+    <Tooltip>
+      <TooltipTrigger>
+        <div class="relative">
+          <Button
+            disabled={loading()}
+            size={props.size || "medium"}
+            onClick={handleDownload}
+            class={props.splitPosition === "left" ? "!rounded-r-none" : props.splitPosition === "right" ? "!rounded-l-none" : ""}
           >
-            <div class="i-hugeicons:download-02 text-xl" />
-          </Show>
-        </Show>
-      </Button>
-    </div>
+            <Show when={loading()}>
+              <Spinner />
+            </Show>
+            <Show when={!loading()}>
+              <Show
+                when={props.iconOnly}
+                fallback={
+                  <div class="flex items-center gap-1.5">
+                    <div class="i-hugeicons:download-02" />
+                    <Trans key="instances:_trn_download" />
+                  </div>
+                }
+              >
+                <div class="i-hugeicons:download-02 text-xl" />
+              </Show>
+            </Show>
+          </Button>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <Trans key="instances:_trn_download_instance" />
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

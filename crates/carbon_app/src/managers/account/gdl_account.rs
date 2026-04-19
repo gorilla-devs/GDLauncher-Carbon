@@ -878,6 +878,13 @@ impl GDLAccountTask {
         progress_tx: tokio::sync::mpsc::Sender<i32>,
         cancel_token: CancellationToken,
     ) -> anyhow::Result<()> {
+        // reqwest-middleware's retry layer clones requests, which fails for
+        // streaming bodies (wrap_stream is not cloneable). The upload goes to
+        // a presigned S3 URL, so no GDL middleware is needed — use reqwest
+        // directly. Retrying a streaming upload automatically would be wrong
+        // regardless (stream is single-use and progress would reset).
+        let client = reqwest::Client::new();
+
         let mut reader_stream = tokio_util::io::ReaderStream::new(file);
         let mut uploaded = 0u64;
         let tx_clone = progress_tx.clone();
@@ -898,8 +905,7 @@ impl GDLAccountTask {
             }
         };
 
-        let resp = self
-            .client
+        let resp = client
             .put(presigned_url)
             .header("Content-Type", "application/vnd.gdlauncher.gdlpack")
             .header("Content-Length", file_size)

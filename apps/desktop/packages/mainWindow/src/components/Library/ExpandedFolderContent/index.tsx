@@ -32,7 +32,7 @@ import {
 } from "@/pages/Library/utils/folderViewTransition"
 import { TILE_SIZES } from "@/pages/Library/constants"
 import { useDragLayoutAnimation } from "@/pages/Library/hooks/useDragLayoutAnimation"
-import { getInstanceImageUrl } from "@/utils/instances"
+import { getInstanceImageUrl, getServerImageUrl } from "@/utils/instances"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
 import { EndOfGroupDropZone } from "@/pages/Library/components/EndOfGroupDropZone"
@@ -318,12 +318,17 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
       const previewInstances = safeInstances().slice(0, 4)
       await Promise.all(
         previewInstances.map((inst) => {
-          if (!inst.icon_revision) return Promise.resolve()
+          // Determine icon revision and URL based on item type
+          const rev = "icon_revision" in inst ? inst.icon_revision : (inst as ListServer).iconRevision
+          if (!rev) return Promise.resolve()
+          const src = "icon_revision" in inst
+            ? getInstanceImageUrl(inst.id, rev)
+            : getServerImageUrl(inst.id, rev)
           return new Promise<void>((resolve) => {
             const img = new Image()
             img.onload = () => resolve()
             img.onerror = () => resolve()
-            img.src = getInstanceImageUrl(inst.id, inst.icon_revision!)
+            img.src = src
             setTimeout(resolve, 300) // Don't wait forever
           })
         })

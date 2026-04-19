@@ -4,11 +4,12 @@ use crate::{
         keys::{
             self,
             settings::{
-                COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY, GET_PRIVACY_STATEMENT_BODY,
-                GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, IS_FIRST_LAUNCH,
-                GET_SEARCH_SIDEBAR_DOCKED, MARK_CHANGELOG_SEEN,
-                MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER, RESET_ONBOARDING_TIPS,
-                SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS,
+                CLEANUP_CACHES, COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY,
+                GET_CACHE_BREAKDOWN, GET_DB_SIZE, GET_PRIVACY_STATEMENT_BODY,
+                GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY,
+                GET_TOTAL_CACHE_SIZE, IS_FIRST_LAUNCH, GET_SEARCH_SIDEBAR_DOCKED,
+                MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER,
+                RESET_ONBOARDING_TIPS, SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS,
                 SHOULD_SHOW_BETA_PROMPT, SHOULD_SHOW_CHANGELOG,
             },
         },
@@ -362,6 +363,24 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(())
         }
 
+        // Cache maintenance
+        query GET_TOTAL_CACHE_SIZE[app, _args: ()] {
+            Ok::<f64, anyhow::Error>(app.settings_manager().get_total_cache_size().await)
+        }
+
+        query GET_DB_SIZE[app, _args: ()] {
+            Ok::<f64, anyhow::Error>(app.settings_manager().get_db_size().await)
+        }
+
+        query GET_CACHE_BREAKDOWN[app, _args: ()] {
+            Ok::<CacheBreakdown, anyhow::Error>(app.settings_manager().get_cache_breakdown().await)
+        }
+
+        mutation CLEANUP_CACHES[app, selection: CacheCleanupSelection] {
+            let task_id = app.settings_manager().cleanup_caches(selection).await?;
+            Ok(super::vtask::FETaskId::from(task_id))
+        }
+
         // Search sidebar docked state
         query GET_SEARCH_SIDEBAR_DOCKED[app, _args: ()] {
             let db = &app.prisma_client;
@@ -405,6 +424,67 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
     }
+}
+
+/// Approximate sizes (bytes) of every clearable cache. Each field maps to a
+/// checkbox in the Cache Cleanup dialog. Sent as f64 because rspc doesn't
+/// support u64 in its TS bindings; f64 is lossless for integers up to 2^53.
+#[derive(Type, Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheBreakdown {
+    // Database tables
+    pub http_cache: f64,
+    pub curseforge_mod_metadata: f64,
+    pub curseforge_mod_icons: f64,
+    pub curseforge_modpack_metadata: f64,
+    pub curseforge_modpack_icons: f64,
+    pub modrinth_mod_metadata: f64,
+    pub modrinth_mod_icons: f64,
+    pub modrinth_modpack_metadata: f64,
+    pub modrinth_modpack_icons: f64,
+    pub local_mod_icons: f64,
+    pub mc_version_manifests: f64,
+    pub modloader_versions: f64,
+    pub lwjgl_configs: f64,
+    pub asset_indices: f64,
+    // Disk
+    pub temp_files: f64,
+    pub old_logs: f64,
+    pub mc_assets: f64,
+    pub mc_libraries: f64,
+    pub mc_natives: f64,
+    // Sum of every per-item cache size above. Equals the sum the user gets
+    // when they tick all the checkboxes, and matches what the settings
+    // row's `getTotalCacheSize` returns. Intentionally excludes DB
+    // overhead (indexes, non-cache tables like ModMetadata, freelist, WAL)
+    // — those aren't cache content and the user can't selectively clear
+    // them, though VACUUM does reclaim them when a cache table is emptied.
+    pub total_size: f64,
+}
+
+/// Selection of caches the user has ticked in the cleanup dialog.
+#[derive(Type, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheCleanupSelection {
+    pub http_cache: bool,
+    pub curseforge_mod_metadata: bool,
+    pub curseforge_mod_icons: bool,
+    pub curseforge_modpack_metadata: bool,
+    pub curseforge_modpack_icons: bool,
+    pub modrinth_mod_metadata: bool,
+    pub modrinth_mod_icons: bool,
+    pub modrinth_modpack_metadata: bool,
+    pub modrinth_modpack_icons: bool,
+    pub local_mod_icons: bool,
+    pub mc_version_manifests: bool,
+    pub modloader_versions: bool,
+    pub lwjgl_configs: bool,
+    pub asset_indices: bool,
+    pub temp_files: bool,
+    pub old_logs: bool,
+    pub mc_assets: bool,
+    pub mc_libraries: bool,
+    pub mc_natives: bool,
 }
 
 #[derive(Type, Serialize, Deserialize, Debug)]

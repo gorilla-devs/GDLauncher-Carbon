@@ -128,6 +128,21 @@ pub(super) async fn load_and_migrate(
         .await
         .unwrap();
 
+    // Sweep expired HTTPCache rows on every launch. Previously the cache layer
+    // only read `expiresAt` to decide whether to serve a row, never to delete
+    // one, so stale entries accumulated indefinitely. Best-effort: never fail
+    // startup on this.
+    match db_client
+        ._execute_raw(raw!(
+            "DELETE FROM HTTPCache WHERE expiresAt IS NOT NULL AND expiresAt < datetime('now')"
+        ))
+        .exec()
+        .await
+    {
+        Ok(deleted) => debug!("Swept {deleted} expired HTTPCache rows at startup"),
+        Err(e) => tracing::warn!("Failed to sweep expired HTTPCache rows: {e}"),
+    }
+
     seed_init_db(&db_client, latest_consent_sha).await?;
 
     Ok(db_client)

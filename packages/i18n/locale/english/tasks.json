@@ -41,5 +41,9 @@
   "_trn_server_task_download_modpack_files": "Downloading modpack files",
   "_trn_server_task_extract_modpack_overrides": "Extracting overrides",
   "_trn_server_task_download_server_jar": "Downloading server jar",
-  "_trn_server_task_install_modloader": "Installing modloader"
+  "_trn_server_task_install_modloader": "Installing modloader",
+  "_trn_cache_cleanup": "Cleaning up caches",
+  "_trn_cache_cleanup_clearing_table": "Clearing cached data",
+  "_trn_cache_cleanup_clearing_disk": "Clearing cached files",
+  "_trn_cache_cleanup_vacuuming": "Reclaiming space"
 }

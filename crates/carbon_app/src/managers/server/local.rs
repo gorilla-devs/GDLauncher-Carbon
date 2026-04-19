@@ -5,8 +5,9 @@ use async_trait::async_trait;
 use carbon_rt_path::ServerPath;
 use std::path::Path;
 use std::process::Stdio;
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 use tracing::{error, info};
 
 pub struct LocalServerProvider;
@@ -24,14 +25,6 @@ impl ServerProvider for LocalServerProvider {
         log_tx: mpsc::UnboundedSender<String>,
     ) -> Result<ServerHandle> {
         let data_path = server_path.get_data_path();
-
-        // Accept EULA automatically
-        let eula_path = server_path.get_eula_path();
-        if !eula_path.exists() {
-            tokio::fs::write(&eula_path, "eula=true\n")
-                .await
-                .context("Failed to write eula.txt")?;
-        }
 
         let mut cmd = tokio::process::Command::new(java_path);
         cmd.arg(format!("-Xmx{}m", xmx))
@@ -140,13 +133,17 @@ impl ServerProvider for LocalServerProvider {
             }
         });
 
-        // Set up kill channel
+        // Set up kill channel and exit notification
         let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
+        let exit_notify = Arc::new(Notify::new());
+        let exit_notify_clone = exit_notify.clone();
         tokio::spawn(async move {
             tokio::select! {
                 _ = kill_rx.recv() => {
                     info!("Kill signal received, terminating server process");
                     let _ = child.kill().await;
+                    // Wait for process to fully exit after kill
+                    let _ = child.wait().await;
                 }
                 status = child.wait() => {
                     match status {
@@ -155,12 +152,14 @@ impl ServerProvider for LocalServerProvider {
                     }
                 }
             }
+            exit_notify_clone.notify_waiters();
         });
 
         Ok(ServerHandle {
             process_id: pid,
             kill_tx,
             stdin_tx,
+            exit_notify,
         })
     }
 

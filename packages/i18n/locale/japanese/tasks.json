@@ -33,5 +33,13 @@
 "_trn_instance_task_launch_waiting": "他のインスタンスの起動を待機中",
 "_trn_instance_task_prepare": "{{name}} を準備中",
 "_trn_instance_task_launch_apply_staged_patches": "適用待ちのパッチを適用中",
-"_trn_finalizing_import": "インポートを完了中"
+"_trn_finalizing_import": "インポートを完了中",
+"_trn_server_task_install": "サーバー {{server_name}} をインストール中",
+"_trn_server_task_install_from_modpack": "Modパックからサーバー {{server_name}} をインストール中",
+"_trn_server_task_download_server_pack": "サーバーパックをダウンロード中",
+"_trn_server_task_extract_server_pack": "サーバーパックを展開中",
+"_trn_server_task_download_modpack_files": "Modパックファイルをダウンロード中",
+"_trn_server_task_extract_modpack_overrides": "オーバーライドを展開中",
+"_trn_server_task_download_server_jar": "サーバーJARをダウンロード中",
+"_trn_server_task_install_modloader": "Modローダーをインストール中"
 }

@@ -1,6 +1,6 @@
 import { Button, Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
 import { useLocation } from "@solidjs/router"
-import { For, JSX, Show, createSignal, onMount, onCleanup } from "solid-js"
+import { Index, JSX, Show, createSignal, onMount, onCleanup } from "solid-js"
 
 export interface DetailPageTab {
   id: string
@@ -183,16 +183,16 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
                   <Tabs value={props.activeTabId} class="h-auto">
                     <TabsList class="w-fit gap-0">
                       <TabsIndicator />
-                      <For each={props.tabs}>
+                      <Index each={props.tabs}>
                         {(tab) => (
                           <TabsTrigger
-                            value={tab.id}
-                            onClick={() => props.onTabClick(tab)}
+                            value={tab().id}
+                            onClick={() => props.onTabClick(tab())}
                           >
-                            {tab.label}
+                            {tab().label}
                           </TabsTrigger>
                         )}
-                      </For>
+                      </Index>
                     </TabsList>
                   </Tabs>
                 </div>

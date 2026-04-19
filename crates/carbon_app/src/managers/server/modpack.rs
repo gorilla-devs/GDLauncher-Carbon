@@ -1,4 +1,5 @@
 use crate::api::translation::Translation;
+use crate::managers::minecraft::modrinth::secure_path_join;
 use crate::managers::vtask::VisualTask;
 use anyhow::{Context, bail};
 use carbon_platforms::curseforge::filters::ModFileParameters;
@@ -42,6 +43,7 @@ pub async fn process_curseforge_server_pack(
         server_name: String::new(),
     });
     t_download.set_weight(10.0);
+    t_download.start_opaque(); // Show activity while fetching file info
     let t_extract = task.subtask(Translation::ServerTaskExtractServerPack);
     t_extract.set_weight(3.0);
 
@@ -166,7 +168,7 @@ pub async fn process_curseforge_server_pack(
 /// Process a Modrinth modpack for server use: download the mrpack,
 /// filter for server-compatible files, and extract.
 pub async fn process_modrinth_server_pack(
-    app: &crate::managers::AppInner,
+    app: &crate::managers::App,
     server_path: &ServerPath,
     project_id: &str,
     version_id: &str,
@@ -180,6 +182,7 @@ pub async fn process_modrinth_server_pack(
         server_name: String::new(),
     });
     t_download_mrpack.set_weight(5.0);
+    t_download_mrpack.start_opaque(); // Show activity while fetching version info
     let t_download_files = task.subtask(Translation::ServerTaskDownloadModpackFiles);
     t_download_files.set_weight(10.0);
     let t_extract = task.subtask(Translation::ServerTaskExtractModpackOverrides);
@@ -300,32 +303,62 @@ pub async fn process_modrinth_server_pack(
         index.files.len()
     );
 
-    // --- Download modpack files (subtask already created upfront) ---
-    let total_files = server_files.len() as u32;
-    for (i, modpack_file) in server_files.iter().enumerate() {
-        t_download_files.update_items(i as u32, total_files);
-
+    // --- Download modpack files concurrently (subtask already created upfront) ---
+    let mut downloadables = Vec::with_capacity(server_files.len());
+    for modpack_file in &server_files {
         let download_url = modpack_file
             .downloads
             .first()
             .context("Modpack file has no download URLs")?;
 
-        let file_path = data_path.join(&modpack_file.path);
+        let file_path = secure_path_join(&data_path, &modpack_file.path)?;
         if let Some(parent) = file_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
 
-        let response = app
-            .reqwest_client
-            .get(download_url.as_str())
-            .send()
-            .await
-            .with_context(|| format!("Failed to download {}", modpack_file.path))?;
-
-        let bytes = response.bytes().await?;
-        tokio::fs::write(&file_path, &bytes).await?;
+        downloadables.push(carbon_net::Downloadable::new(
+            download_url.as_str(),
+            &file_path,
+        ));
     }
-    t_download_files.complete_items();
+
+    let concurrency = app
+        .settings_manager()
+        .get_settings()
+        .await?
+        .concurrent_downloads;
+
+    let (progress_tx, mut progress_rx) =
+        tokio::sync::watch::channel(carbon_net::Progress::new());
+
+    t_download_files.start_opaque();
+
+    let progress_task = tokio::spawn(async move {
+        while progress_rx.changed().await.is_ok() {
+            {
+                let progress = progress_rx.borrow();
+                t_download_files.update_download(
+                    progress.current_size as u32,
+                    progress.total_size as u32,
+                    false,
+                );
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        t_download_files.complete_opaque();
+    });
+
+    carbon_net::download_multiple(
+        &downloadables,
+        carbon_net::DownloadOptions::builder()
+            .concurrency(concurrency as usize)
+            .progress_sender(progress_tx)
+            .build(),
+    )
+    .await
+    .context("Failed to download modpack files")?;
+
+    let _ = progress_task.await;
 
     // --- Extract overrides (subtask already created upfront) ---
     t_extract.start_opaque();
@@ -523,6 +556,7 @@ async fn detect_modloader_from_files(data_path: &Path) -> (Option<String>, Optio
                 let version = name
                     .strip_prefix("forge-")
                     .and_then(|s| s.strip_suffix(".jar"))
+                    .map(|s| s.strip_suffix("-installer").unwrap_or(s))
                     .map(|s| s.to_string());
                 return (Some("forge".to_string()), version);
             }

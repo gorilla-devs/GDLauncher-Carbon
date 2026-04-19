@@ -6,6 +6,7 @@ import { rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext, type NamespacedTranslationKey } from "@gd/i18n"
 import useServerData from "./server.data"
 import DefaultImg from "/assets/images/default-instance-img.png"
+import { getServerImageUrl } from "@/utils/instances"
 import DetailPageLayout, {
   type DetailPageTab
 } from "@/pages/Library/shared/DetailPageLayout"
@@ -73,6 +74,14 @@ const Server = (props: { children?: any }) => {
   const serverId = () => parseInt(params.id!, 10)
   const details = () => routeData.serverDetails.data
 
+  const iconUrl = createMemo(() => {
+    const d = details()
+    if (d?.iconRevision) {
+      return getServerImageUrl(d.id, d.iconRevision)
+    }
+    return DefaultImg
+  })
+
   const isRunning = () => details()?.state?.status === "running"
   const isStarting = () => details()?.state?.status === "starting"
   const isStopping = () => details()?.state?.status === "stopping"
@@ -133,8 +142,8 @@ const Server = (props: { children?: any }) => {
   return (
     <DetailPageLayout
       containerId="main-container-server-details"
-      headerImage={DefaultImg}
-      icon={DefaultImg}
+      headerImage={iconUrl()}
+      icon={iconUrl()}
       iconViewTransitionName="server-tile-image"
       headerInfoContent={
         <>

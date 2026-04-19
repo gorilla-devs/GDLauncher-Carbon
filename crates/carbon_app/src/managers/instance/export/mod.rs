@@ -166,50 +166,80 @@ async fn enrich_share_metadata(
     app: &crate::managers::App,
     mut metadata: ShareMetadata,
 ) -> ShareMetadata {
-    // Collect CurseForge project IDs to query
+    // --- Enrich from CurseForge cache ---
     let cf_project_ids: Vec<i32> = metadata
         .mods
         .iter()
         .filter_map(|m| m.curseforge_project_id)
         .collect();
 
-    if cf_project_ids.is_empty() {
-        return metadata;
+    if !cf_project_ids.is_empty() {
+        let cf_cache_results = app
+            .prisma_client
+            .curse_forge_mod_cache()
+            .find_many(vec![cfdb::project_id::in_vec(cf_project_ids)])
+            .with(cfdb::metadata::fetch().with(metadb::modrinth::fetch()))
+            .exec()
+            .await;
+
+        if let Ok(cf_entries) = cf_cache_results {
+            let cf_map: HashMap<i32, _> = cf_entries
+                .into_iter()
+                .map(|entry| (entry.project_id, entry))
+                .collect();
+
+            for shared_mod in &mut metadata.mods {
+                if let Some(cf_project_id) = shared_mod.curseforge_project_id {
+                    if let Some(cf_entry) = cf_map.get(&cf_project_id) {
+                        shared_mod.name = cf_entry.name.clone();
+                        shared_mod.curseforge_slug = Some(cf_entry.urlslug.clone());
+
+                        // Check for Modrinth cross-reference via metadata
+                        if let Some(Some(mr_data)) = cf_entry
+                            .metadata
+                            .as_ref()
+                            .and_then(|m| m.modrinth.as_ref())
+                        {
+                            shared_mod.modrinth_project_id = Some(mr_data.project_id.clone());
+                            shared_mod.modrinth_version_id = Some(mr_data.version_id.clone());
+                            shared_mod.modrinth_slug = Some(mr_data.urlslug.clone());
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    // Query CurseForge cache for all project IDs in one batch
-    let cf_cache_results = app
-        .prisma_client
-        .curse_forge_mod_cache()
-        .find_many(vec![cfdb::project_id::in_vec(cf_project_ids)])
-        .with(cfdb::metadata::fetch().with(metadb::modrinth::fetch()))
-        .exec()
-        .await;
+    // --- Enrich Modrinth-only mods (not already enriched via CurseForge) ---
+    let mr_project_ids: Vec<String> = metadata
+        .mods
+        .iter()
+        .filter(|m| m.curseforge_project_id.is_none())
+        .filter_map(|m| m.modrinth_project_id.clone())
+        .collect();
 
-    if let Ok(cf_entries) = cf_cache_results {
-        // Build a map of project_id -> cache data for fast lookup
-        let cf_map: HashMap<i32, _> = cf_entries
-            .into_iter()
-            .map(|entry| (entry.project_id, entry))
-            .collect();
+    if !mr_project_ids.is_empty() {
+        let mr_cache_results = app
+            .prisma_client
+            .modrinth_mod_cache()
+            .find_many(vec![mrdb::project_id::in_vec(mr_project_ids)])
+            .exec()
+            .await;
 
-        // Enrich each mod with data from the cache
-        for shared_mod in &mut metadata.mods {
-            if let Some(cf_project_id) = shared_mod.curseforge_project_id {
-                if let Some(cf_entry) = cf_map.get(&cf_project_id) {
-                    // Update name and CurseForge slug
-                    shared_mod.name = cf_entry.name.clone();
-                    shared_mod.curseforge_slug = Some(cf_entry.urlslug.clone());
+        if let Ok(mr_entries) = mr_cache_results {
+            let mr_map: HashMap<String, _> = mr_entries
+                .into_iter()
+                .map(|entry| (entry.project_id.clone(), entry))
+                .collect();
 
-                    // Check for Modrinth cross-reference via metadata
-                    if let Some(Some(mr_data)) = cf_entry
-                        .metadata
-                        .as_ref()
-                        .and_then(|m| m.modrinth.as_ref())
-                    {
-                        shared_mod.modrinth_project_id = Some(mr_data.project_id.clone());
-                        shared_mod.modrinth_version_id = Some(mr_data.version_id.clone());
-                        shared_mod.modrinth_slug = Some(mr_data.urlslug.clone());
+            for shared_mod in &mut metadata.mods {
+                if shared_mod.curseforge_project_id.is_some() {
+                    continue; // Already enriched via CurseForge path
+                }
+                if let Some(mr_project_id) = &shared_mod.modrinth_project_id {
+                    if let Some(mr_entry) = mr_map.get(mr_project_id) {
+                        shared_mod.name = mr_entry.title.clone();
+                        shared_mod.modrinth_slug = Some(mr_entry.urlslug.clone());
                     }
                 }
             }
@@ -586,7 +616,6 @@ impl ManagerRef<'_, InstanceExportManager> {
         Ok(response)
     }
 
-    /// Upload the instance background to the share (best-effort)
     /// Upload the instance background to the share (best-effort)
     async fn upload_instance_background(
         &self,

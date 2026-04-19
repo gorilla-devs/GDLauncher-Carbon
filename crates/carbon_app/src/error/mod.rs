@@ -39,6 +39,7 @@ pub type AxumError = (axum::http::StatusCode, String);
 fn extract_fe_error(entry: &(dyn std::error::Error + 'static)) -> (Option<String>, Option<serde_json::Value>) {
     use crate::managers::account::gdl_account::InstanceShareError;
     use crate::managers::instance::run::InsufficientMemoryError;
+    use crate::managers::server::EulaNotAcceptedError;
 
     macro_rules! try_downcast {
         ($entry:expr, $($ty:ty),+ $(,)?) => {
@@ -50,7 +51,7 @@ fn extract_fe_error(entry: &(dyn std::error::Error + 'static)) -> (Option<String
         };
     }
 
-    try_downcast!(entry, InstanceShareError, InsufficientMemoryError);
+    try_downcast!(entry, InstanceShareError, InsufficientMemoryError, EulaNotAcceptedError);
 
     (None, None)
 }

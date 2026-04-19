@@ -31,11 +31,52 @@ pub mod provider;
 const MAX_PATH: usize = if cfg!(windows) { 260 } else { 4096 };
 const ILLEGAL_CHARS: &[char] = &['/', ':', '\\', '<', '>', '*', '|', '"', '?', '^'];
 
+#[derive(Debug, thiserror::Error)]
+#[error("Minecraft server EULA has not been accepted for server {server_id}")]
+pub struct EulaNotAcceptedError {
+    pub server_id: i32,
+}
+
+impl crate::error::FeErrorCode for EulaNotAcceptedError {
+    fn error_code(&self) -> &'static str {
+        "EULA_NOT_ACCEPTED"
+    }
+
+    fn error_data(&self) -> Option<serde_json::Value> {
+        Some(serde_json::json!({
+            "server_id": self.server_id,
+        }))
+    }
+}
+
+/// Known Minecraft server player list files.
+#[derive(Debug, Clone, Copy)]
+pub enum PlayerListFile {
+    Whitelist,
+    Ops,
+    BannedPlayers,
+    BannedIps,
+}
+
+impl PlayerListFile {
+    pub fn filename(self) -> &'static str {
+        match self {
+            Self::Whitelist => "whitelist.json",
+            Self::Ops => "ops.json",
+            Self::BannedPlayers => "banned-players.json",
+            Self::BannedIps => "banned-ips.json",
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ServerData {
     pub shortpath: String,
     pub state: ServerState,
     pub handle: Option<ServerHandle>,
+    /// Log ID from the previous (or current) session, used to clean up
+    /// stale entries from `server_logs` when the server is started again.
+    pub last_log_id: Option<ServerLogId>,
 }
 
 pub struct ServerManager {
@@ -110,6 +151,7 @@ impl ManagerRef<'_, ServerManager> {
                     shortpath: db_server.shortpath,
                     state: ServerState::Stopped { failed_task: None },
                     handle: None,
+                    last_log_id: None,
                 },
             );
         }
@@ -242,6 +284,9 @@ impl ManagerRef<'_, ServerManager> {
             .await
             .context("Failed to create server directory")?;
 
+        // Hold index_lock to make count+create atomic
+        let _index_guard = self.index_lock.lock().await;
+
         // Get next index
         let count = self
             .app
@@ -274,6 +319,8 @@ impl ManagerRef<'_, ServerManager> {
             .exec()
             .await?;
 
+        drop(_index_guard);
+
         let server_id = ServerId(db_server.id);
 
         // Create a visual task for install progress
@@ -289,6 +336,7 @@ impl ManagerRef<'_, ServerManager> {
                 shortpath: shortpath.clone(),
                 state: ServerState::Installing(task_id),
                 handle: None,
+                last_log_id: None,
             },
         );
 
@@ -445,6 +493,9 @@ impl ManagerRef<'_, ServerManager> {
             ),
         };
 
+        // Hold index_lock to make count+create atomic
+        let _index_guard = self.index_lock.lock().await;
+
         // Get next index
         let count = self
             .app
@@ -476,6 +527,8 @@ impl ManagerRef<'_, ServerManager> {
             .exec()
             .await?;
 
+        drop(_index_guard);
+
         let server_id = ServerId(db_server.id);
 
         // Create a visual task for install progress
@@ -491,6 +544,7 @@ impl ManagerRef<'_, ServerManager> {
                 shortpath: shortpath.clone(),
                 state: ServerState::Installing(task_id),
                 handle: None,
+                last_log_id: None,
             },
         );
 
@@ -771,6 +825,21 @@ impl ManagerRef<'_, ServerManager> {
             .get_servers()
             .get_server_path(&db_server.shortpath);
 
+        // Check EULA acceptance
+        let eula_path = server_path.get_eula_path();
+        let eula_accepted = if eula_path.exists() {
+            tokio::fs::read_to_string(&eula_path)
+                .await
+                .map(|content| content.contains("eula=true"))
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
+        if !eula_accepted {
+            return Err(EulaNotAcceptedError { server_id: id.0 }.into());
+        }
+
         // Find Java
         let java_path = self
             .app
@@ -778,12 +847,21 @@ impl ManagerRef<'_, ServerManager> {
             .find_best_java_for_server()
             .await?;
 
-        // Set up log streaming
+        // Set up log streaming — clean up previous session's log entry first
         let log_id = {
             let mut counter = self.log_counter.lock().await;
             *counter += 1;
             ServerLogId(*counter)
         };
+
+        {
+            let servers = self.servers.read().await;
+            if let Some(server) = servers.get(&id) {
+                if let Some(old_log_id) = server.last_log_id {
+                    self.server_logs.write().await.remove(&old_log_id);
+                }
+            }
+        }
 
         let (log_watch_tx, _log_watch_rx) = watch::channel(Vec::new());
         self.server_logs
@@ -827,6 +905,8 @@ impl ManagerRef<'_, ServerManager> {
 
         let process_id = handle.process_id;
 
+        let exit_notify = handle.exit_notify.clone();
+
         // Update state
         {
             let mut servers = self.servers.write().await;
@@ -837,6 +917,7 @@ impl ManagerRef<'_, ServerManager> {
                     process_id,
                 };
                 server.handle = Some(handle);
+                server.last_log_id = Some(log_id);
             }
         }
 
@@ -860,24 +941,88 @@ impl ManagerRef<'_, ServerManager> {
         self.app
             .invalidate(GET_SERVER_DETAILS, None);
 
+        // Spawn a watcher for unexpected exits (crash/normal exit not triggered by stop/kill).
+        // If auto_restart is enabled, restart the server automatically.
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            exit_notify.notified().await;
+
+            // Check if the exit was unexpected (state is still Running).
+            // If stop_server/kill_server initiated the shutdown, they will have
+            // already transitioned the state away from Running.
+            let should_restart = {
+                let mut servers = app.server_manager.servers.write().await;
+                let Some(server) = servers.get_mut(&id) else {
+                    return;
+                };
+                if !matches!(server.state, ServerState::Running { .. }) {
+                    // stop_server or kill_server already handling cleanup
+                    return;
+                }
+                // Unexpected exit — clean up the handle
+                server.handle = None;
+                server.state = ServerState::Stopped { failed_task: None };
+
+                // Check auto_restart setting from DB
+                app.prisma_client
+                    .server()
+                    .find_unique(db::server::id::equals(id.0))
+                    .exec()
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|s| s.auto_restart)
+                    .unwrap_or(false)
+            };
+
+            app.invalidate(GET_ALL_SERVERS, None);
+            app.invalidate(GET_SERVER_DETAILS, None);
+
+            if should_restart {
+                info!("Server {} exited unexpectedly, auto-restarting", id.0);
+                // Brief delay to avoid tight crash loops
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                // ManagerRef's future is not Send, so we use a oneshot to
+                // bridge into a context where we can call start_server.
+                let (tx, rx) = tokio::sync::oneshot::channel::<anyhow::Result<()>>();
+                let app2 = app.clone();
+                // This inner task owns the Arc and can create a ManagerRef locally
+                std::thread::spawn(move || {
+                    let rt = tokio::runtime::Handle::current();
+                    let result = rt.block_on(app2.server_manager().start_server(id));
+                    let _ = tx.send(result);
+                });
+                match rx.await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => error!("Failed to auto-restart server {}: {}", id.0, e),
+                    Err(_) => error!("Auto-restart channel dropped for server {}", id.0),
+                }
+            } else {
+                warn!("Server {} exited unexpectedly", id.0);
+            }
+        });
+
         info!("Server {} started with PID {}", id.0, process_id);
         Ok(())
     }
 
     pub async fn stop_server(self, id: ServerId) -> anyhow::Result<()> {
+        let lock = self.get_op_lock(id);
+        let _guard = lock.lock().await;
+
         let provider = self.get_provider();
 
-        let handle_exists = {
+        let exit_notify = {
             let servers = self.servers.read().await;
             let server = servers
                 .get(&id)
                 .ok_or_else(|| anyhow!("Server not found"))?;
-            server.handle.is_some()
+            let handle = server
+                .handle
+                .as_ref()
+                .ok_or_else(|| anyhow!("Server is not running"))?;
+            handle.exit_notify.clone()
         };
-
-        if !handle_exists {
-            bail!("Server is not running");
-        }
 
         // Send stop command
         {
@@ -889,7 +1034,7 @@ impl ManagerRef<'_, ServerManager> {
             }
         }
 
-        // Update state
+        // Update state to Stopping
         {
             let mut servers = self.servers.write().await;
             if let Some(server) = servers.get_mut(&id) {
@@ -898,29 +1043,60 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         self.app.invalidate(GET_ALL_SERVERS, None);
-        self.app
-            .invalidate(GET_SERVER_DETAILS, None);
+        self.app.invalidate(GET_SERVER_DETAILS, None);
 
-        // Wait for process to exit, then clean up
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        // Wait for actual process exit in the background
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            const GRACEFUL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-        {
-            let mut servers = self.servers.write().await;
-            if let Some(server) = servers.get_mut(&id) {
-                server.state = ServerState::Stopped { failed_task: None };
-                server.handle = None;
+            match tokio::time::timeout(GRACEFUL_TIMEOUT, exit_notify.notified()).await {
+                Ok(()) => {
+                    info!("Server {} process exited gracefully", id.0);
+                }
+                Err(_) => {
+                    warn!(
+                        "Server {} did not stop within {}s, force killing",
+                        id.0,
+                        GRACEFUL_TIMEOUT.as_secs()
+                    );
+                    let servers = app.server_manager.servers.read().await;
+                    if let Some(server) = servers.get(&id) {
+                        if let Some(handle) = &server.handle {
+                            let _ = handle.kill_tx.send(()).await;
+                        }
+                    }
+                    drop(servers);
+                    // Brief wait for the kill to complete
+                    let _ = tokio::time::timeout(
+                        std::time::Duration::from_secs(5),
+                        exit_notify.notified(),
+                    )
+                    .await;
+                }
             }
-        }
 
-        self.app.invalidate(GET_ALL_SERVERS, None);
-        self.app
-            .invalidate(GET_SERVER_DETAILS, None);
+            // Clean up state
+            {
+                let mut servers = app.server_manager.servers.write().await;
+                if let Some(server) = servers.get_mut(&id) {
+                    server.state = ServerState::Stopped { failed_task: None };
+                    server.handle = None;
+                }
+            }
 
-        info!("Server {} stopped", id.0);
+            app.invalidate(GET_ALL_SERVERS, None);
+            app.invalidate(GET_SERVER_DETAILS, None);
+            info!("Server {} stopped", id.0);
+        });
+
         Ok(())
     }
 
     pub async fn kill_server(self, id: ServerId) -> anyhow::Result<()> {
+        let lock = self.get_op_lock(id);
+        let _guard = lock.lock().await;
+
         let provider = self.get_provider();
 
         {
@@ -943,6 +1119,29 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app
             .invalidate(GET_SERVER_DETAILS, None);
+
+        Ok(())
+    }
+
+    pub async fn accept_eula(self, id: ServerId) -> anyhow::Result<()> {
+        let db_server = self
+            .app
+            .prisma_client
+            .server()
+            .find_unique(db::server::id::equals(id.0))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Server not found"))?;
+
+        let runtime_path = &self.app.settings_manager().runtime_path;
+        let server_path = runtime_path
+            .get_servers()
+            .get_server_path(&db_server.shortpath);
+
+        let eula_path = server_path.get_eula_path();
+        tokio::fs::write(&eula_path, "eula=true\n")
+            .await
+            .context("Failed to write eula.txt")?;
 
         Ok(())
     }
@@ -1149,11 +1348,11 @@ impl ManagerRef<'_, ServerManager> {
         Ok(())
     }
 
-    /// Read a player list JSON file (whitelist, ops, banned-players)
+    /// Read a player list JSON file (whitelist, ops, banned-players, banned-ips)
     pub async fn get_player_list<T: serde::de::DeserializeOwned>(
         self,
         id: ServerId,
-        filename: &str,
+        list: PlayerListFile,
     ) -> anyhow::Result<Vec<T>> {
         let db_server = self
             .app
@@ -1168,7 +1367,7 @@ impl ManagerRef<'_, ServerManager> {
         let server_path = runtime_path
             .get_servers()
             .get_server_path(&db_server.shortpath);
-        let file_path = server_path.get_data_path().join(filename);
+        let file_path = server_path.get_data_path().join(list.filename());
 
         if !file_path.exists() {
             return Ok(Vec::new());
@@ -1176,7 +1375,7 @@ impl ManagerRef<'_, ServerManager> {
 
         let content = tokio::fs::read_to_string(&file_path).await?;
         let entries: Vec<T> = serde_json::from_str(&content)
-            .with_context(|| format!("Failed to parse {}", filename))?;
+            .with_context(|| format!("Failed to parse {}", list.filename()))?;
         Ok(entries)
     }
 
@@ -1278,8 +1477,14 @@ impl ManagerRef<'_, ServerManager> {
 
         let mut addons: Vec<ServerAddon> = cached_mods
             .into_iter()
-            .map(|entry| {
-                let metadata = entry.metadata.as_ref().expect("metadata should be fetched");
+            .filter_map(|entry| {
+                let metadata = match entry.metadata.as_ref() {
+                    Some(m) => m,
+                    None => {
+                        warn!("ServerModFileCache entry {} has no metadata, skipping", entry.id);
+                        return None;
+                    }
+                };
 
                 let display_name = metadata.name.clone().unwrap_or_else(|| {
                     entry.filename
@@ -1305,7 +1510,7 @@ impl ManagerRef<'_, ServerManager> {
                     .and_then(|opt| opt.as_ref())
                     .is_some();
 
-                ServerAddon {
+                Some(ServerAddon {
                     id: entry.id,
                     filename: entry.filename,
                     display_name,
@@ -1315,7 +1520,7 @@ impl ManagerRef<'_, ServerManager> {
                     has_image: has_local_image || has_cf_image || has_mr_image,
                     curseforge_project_id: cf.map(|c| c.project_id as u32),
                     modrinth_project_id: mr.map(|m| m.project_id.clone()),
-                }
+                })
             })
             .collect();
 
@@ -1350,6 +1555,10 @@ impl ManagerRef<'_, ServerManager> {
             .exec()
             .await?
             .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
+
+        if cache_entry.server_id != id.0 {
+            bail!("Addon {} does not belong to server {}", addon_id, id.0);
+        }
 
         let base_filename = &cache_entry.filename;
 
@@ -1430,6 +1639,10 @@ impl ManagerRef<'_, ServerManager> {
             .exec()
             .await?
             .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
+
+        if cache_entry.server_id != id.0 {
+            bail!("Addon {} does not belong to server {}", addon_id, id.0);
+        }
 
         let base_filename = &cache_entry.filename;
 
@@ -1745,7 +1958,7 @@ impl ManagerRef<'_, ServerManager> {
     pub async fn write_player_list<T: serde::Serialize>(
         self,
         id: ServerId,
-        filename: &str,
+        list: PlayerListFile,
         entries: &[T],
     ) -> anyhow::Result<()> {
         let db_server = self
@@ -1761,7 +1974,7 @@ impl ManagerRef<'_, ServerManager> {
         let server_path = runtime_path
             .get_servers()
             .get_server_path(&db_server.shortpath);
-        let file_path = server_path.get_data_path().join(filename);
+        let file_path = server_path.get_data_path().join(list.filename());
 
         let content = serde_json::to_string_pretty(entries)?;
         tokio::fs::write(&file_path, content).await?;
@@ -1867,9 +2080,24 @@ impl ManagerRef<'_, ServerManager> {
     ) -> anyhow::Result<()> {
         use base64::Engine;
 
+        const MAX_ICON_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+        const PNG_SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
         let image_data = base64::engine::general_purpose::STANDARD
             .decode(&base64_data)
             .context("Invalid base64 image data")?;
+
+        if image_data.len() > MAX_ICON_SIZE {
+            bail!(
+                "Icon is too large ({:.1} MB, max {} MB)",
+                image_data.len() as f64 / (1024.0 * 1024.0),
+                MAX_ICON_SIZE / (1024 * 1024)
+            );
+        }
+
+        if !image_data.starts_with(PNG_SIGNATURE) {
+            bail!("Icon must be a valid PNG image");
+        }
 
         // Get the server's shortpath
         let shortpath = {
@@ -2828,8 +3056,8 @@ fn generate_shortpath(name: &str) -> String {
 
     let base = if sanitized.is_empty() {
         "server".to_string()
-    } else if sanitized.len() > 64 {
-        sanitized[..64].to_string()
+    } else if sanitized.graphemes(true).count() > 64 {
+        sanitized.graphemes(true).take(64).collect::<String>()
     } else {
         sanitized
     };

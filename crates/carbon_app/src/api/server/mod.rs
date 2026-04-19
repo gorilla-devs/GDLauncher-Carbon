@@ -6,6 +6,7 @@ use crate::domain::server::{
     ServerAddon,
 };
 use crate::error::{AxumError, FeError};
+use crate::managers::server::PlayerListFile;
 use crate::managers::{App, AppInner};
 use anyhow::anyhow;
 use axum::extract::ws::Message;
@@ -556,6 +557,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        mutation ACCEPT_EULA[app, id: FEServerId] {
+            app.server_manager()
+                .accept_eula(id.into())
+                .await
+        }
+
         mutation START_SERVER[app, id: FEServerId] {
             app.server_manager()
                 .start_server(id.into())
@@ -702,7 +709,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         // Whitelist
         query GET_WHITELIST[app, id: FEServerId] {
             app.server_manager()
-                .get_player_list::<WhitelistEntry>(id.into(), "whitelist.json")
+                .get_player_list::<WhitelistEntry>(id.into(), PlayerListFile::Whitelist)
                 .await
         }
 
@@ -712,10 +719,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .resolve_player_uuid(&req.username).await?;
             let entry = WhitelistEntry { uuid, name: name.clone() };
             let mut list = app.server_manager()
-                .get_player_list::<WhitelistEntry>(id, "whitelist.json").await?;
+                .get_player_list::<WhitelistEntry>(id, PlayerListFile::Whitelist).await?;
             list.push(entry);
             app.server_manager()
-                .write_player_list(id, "whitelist.json", &list).await?;
+                .write_player_list(id, PlayerListFile::Whitelist, &list).await?;
             app.server_manager()
                 .send_console_if_running(id, format!("whitelist add {}", name)).await;
             Ok(())
@@ -724,11 +731,11 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation REMOVE_FROM_WHITELIST[app, req: RemovePlayerRequest] {
             let id: ServerId = req.server_id.into();
             let mut list = app.server_manager()
-                .get_player_list::<WhitelistEntry>(id, "whitelist.json").await?;
+                .get_player_list::<WhitelistEntry>(id, PlayerListFile::Whitelist).await?;
             let removed_name = list.iter().find(|e| e.uuid == req.uuid).map(|e| e.name.clone());
             list.retain(|e| e.uuid != req.uuid);
             app.server_manager()
-                .write_player_list(id, "whitelist.json", &list).await?;
+                .write_player_list(id, PlayerListFile::Whitelist, &list).await?;
             if let Some(name) = removed_name {
                 app.server_manager()
                     .send_console_if_running(id, format!("whitelist remove {}", name)).await;
@@ -739,7 +746,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         // Ops
         query GET_OPS[app, id: FEServerId] {
             app.server_manager()
-                .get_player_list::<OpsEntry>(id.into(), "ops.json").await
+                .get_player_list::<OpsEntry>(id.into(), PlayerListFile::Ops).await
         }
 
         mutation ADD_OP[app, req: AddOpRequest] {
@@ -748,10 +755,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .resolve_player_uuid(&req.username).await?;
             let entry = OpsEntry { uuid, name: name.clone(), level: req.level, bypasses_player_limit: false };
             let mut list = app.server_manager()
-                .get_player_list::<OpsEntry>(id, "ops.json").await?;
+                .get_player_list::<OpsEntry>(id, PlayerListFile::Ops).await?;
             list.push(entry);
             app.server_manager()
-                .write_player_list(id, "ops.json", &list).await?;
+                .write_player_list(id, PlayerListFile::Ops, &list).await?;
             app.server_manager()
                 .send_console_if_running(id, format!("op {}", name)).await;
             Ok(())
@@ -760,11 +767,11 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation REMOVE_OP[app, req: RemovePlayerRequest] {
             let id: ServerId = req.server_id.into();
             let mut list = app.server_manager()
-                .get_player_list::<OpsEntry>(id, "ops.json").await?;
+                .get_player_list::<OpsEntry>(id, PlayerListFile::Ops).await?;
             let removed_name = list.iter().find(|e| e.uuid == req.uuid).map(|e| e.name.clone());
             list.retain(|e| e.uuid != req.uuid);
             app.server_manager()
-                .write_player_list(id, "ops.json", &list).await?;
+                .write_player_list(id, PlayerListFile::Ops, &list).await?;
             if let Some(name) = removed_name {
                 app.server_manager()
                     .send_console_if_running(id, format!("deop {}", name)).await;
@@ -775,7 +782,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         // Banned players
         query GET_BANNED_PLAYERS[app, id: FEServerId] {
             app.server_manager()
-                .get_player_list::<BannedPlayerEntry>(id.into(), "banned-players.json").await
+                .get_player_list::<BannedPlayerEntry>(id.into(), PlayerListFile::BannedPlayers).await
         }
 
         mutation BAN_PLAYER[app, req: BanPlayerRequest] {
@@ -791,10 +798,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 reason: reason.clone(),
             };
             let mut list = app.server_manager()
-                .get_player_list::<BannedPlayerEntry>(id, "banned-players.json").await?;
+                .get_player_list::<BannedPlayerEntry>(id, PlayerListFile::BannedPlayers).await?;
             list.push(entry);
             app.server_manager()
-                .write_player_list(id, "banned-players.json", &list).await?;
+                .write_player_list(id, PlayerListFile::BannedPlayers, &list).await?;
             app.server_manager()
                 .send_console_if_running(id, format!("ban {} {}", name, reason)).await;
             Ok(())
@@ -803,11 +810,11 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation UNBAN_PLAYER[app, req: RemovePlayerRequest] {
             let id: ServerId = req.server_id.into();
             let mut list = app.server_manager()
-                .get_player_list::<BannedPlayerEntry>(id, "banned-players.json").await?;
+                .get_player_list::<BannedPlayerEntry>(id, PlayerListFile::BannedPlayers).await?;
             let removed_name = list.iter().find(|e| e.uuid == req.uuid).map(|e| e.name.clone());
             list.retain(|e| e.uuid != req.uuid);
             app.server_manager()
-                .write_player_list(id, "banned-players.json", &list).await?;
+                .write_player_list(id, PlayerListFile::BannedPlayers, &list).await?;
             if let Some(name) = removed_name {
                 app.server_manager()
                     .send_console_if_running(id, format!("pardon {}", name)).await;
@@ -818,7 +825,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         // Banned IPs
         query GET_BANNED_IPS[app, id: FEServerId] {
             app.server_manager()
-                .get_player_list::<BannedIpEntry>(id.into(), "banned-ips.json").await
+                .get_player_list::<BannedIpEntry>(id.into(), PlayerListFile::BannedIps).await
         }
 
         mutation BAN_IP[app, req: BanIpRequest] {
@@ -832,10 +839,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 reason: reason.clone(),
             };
             let mut list = app.server_manager()
-                .get_player_list::<BannedIpEntry>(id, "banned-ips.json").await?;
+                .get_player_list::<BannedIpEntry>(id, PlayerListFile::BannedIps).await?;
             list.push(entry);
             app.server_manager()
-                .write_player_list(id, "banned-ips.json", &list).await?;
+                .write_player_list(id, PlayerListFile::BannedIps, &list).await?;
             app.server_manager()
                 .send_console_if_running(id, format!("ban-ip {} {}", req.ip, reason)).await;
             Ok(())
@@ -844,10 +851,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation UNBAN_IP[app, req: UnbanIpRequest] {
             let id: ServerId = req.server_id.into();
             let mut list = app.server_manager()
-                .get_player_list::<BannedIpEntry>(id, "banned-ips.json").await?;
+                .get_player_list::<BannedIpEntry>(id, PlayerListFile::BannedIps).await?;
             list.retain(|e| e.ip != req.ip);
             app.server_manager()
-                .write_player_list(id, "banned-ips.json", &list).await?;
+                .write_player_list(id, PlayerListFile::BannedIps, &list).await?;
             app.server_manager()
                 .send_console_if_running(id, format!("pardon-ip {}", req.ip)).await;
             Ok(())

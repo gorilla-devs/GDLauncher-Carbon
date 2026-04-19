@@ -6,6 +6,7 @@ import {
   SelectItem,
   SelectValue,
   Input,
+  Skeleton,
   Switch
 } from "@gd/ui"
 import { wideLogoUrl } from "@/utils/logos"
@@ -26,6 +27,7 @@ import Title from "./components/Title"
 import RowsContainer from "./components/RowsContainer"
 import { useModal } from "@/managers/ModalsManager"
 import { manualCheckForUpdates, isCheckingForUpdates } from "@/utils/updater"
+import { formatBytes } from "@/utils/formatBytes"
 
 const General = () => {
   const routeData = useSettingsGeneralData()
@@ -39,6 +41,13 @@ const General = () => {
 
   const settingsMutation = rspc.createMutation(() => ({
     mutationKey: ["settings.setSettings"]
+  }))
+
+  // Cheap: just stats the db/wal files. The full breakdown (which runs
+  // SUM(length(col)) across every cache table + walks the assets/libs dirs)
+  // only runs when the user opens the cleanup modal.
+  const totalCacheSize = rspc.createQuery(() => ({
+    queryKey: ["settings.getTotalCacheSize"]
   }))
 
   createEffect(() => {
@@ -456,6 +465,34 @@ const General = () => {
               <div class="i-hugeicons:refresh text-lg" />
               <Trans key="settings:_trn_rerun_onboarding" />
             </Button>
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title description={<Trans key="settings:_trn_cache_storage_text" />}>
+            <Trans key="settings:_trn_cache_storage_title" />
+          </Title>
+          <RightHandSide>
+            <div class="flex flex-col items-center gap-2">
+              <Button
+                type="secondary"
+                size="small"
+                rounded={false}
+                onClick={() => {
+                  modalsContext?.openModal({ name: "cacheCleanup" })
+                }}
+              >
+                <div class="i-hugeicons:delete-02 h-4 w-4" />
+                <Trans key="settings:_trn_cache_storage_clean_up" />
+              </Button>
+              <Show
+                when={totalCacheSize.data !== undefined}
+                fallback={<Skeleton class="h-3 w-16" />}
+              >
+                <div class="text-lightSlate-400 text-xs tabular-nums">
+                  {formatBytes(totalCacheSize.data!)}
+                </div>
+              </Show>
+            </div>
           </RightHandSide>
         </Row>
         <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">

@@ -203,6 +203,13 @@ const InstanceTile = (props: {
       selectedCount={props.selectedCount}
       onBatchDelete={props.onBatchDelete}
       onSelectExclusive={props.onSelectExclusive}
+      onDismissError={() => {
+        const taskIdVal = inactiveState()
+        if (taskIdVal) {
+          dismissTaskMutation.mutate(taskIdVal)
+        }
+        setFailError("")
+      }}
     />
   )
 }

@@ -130,10 +130,14 @@ export function ListItem(props: SearchResultItemProps) {
                     </div>
                   </Match>
                   <Match when={props.result.type === "modpack"}>
-                    <div class="flex items-center gap-2">
-                      <ModpackDownloadButton addon={props.result} />
+                    <div class="flex items-center">
+                      <ModpackDownloadButton
+                        addon={props.result}
+                        splitPosition={props.result.serverPackFileId ? "left" : undefined}
+                      />
                       <Show when={props.result.serverPackFileId}>
-                        <ServerPackDownloadButton addon={props.result} />
+                        <div class="w-px self-stretch bg-primary-700 shrink-0" />
+                        <ServerPackDownloadButton addon={props.result} splitPosition="right" />
                       </Show>
                     </div>
                   </Match>

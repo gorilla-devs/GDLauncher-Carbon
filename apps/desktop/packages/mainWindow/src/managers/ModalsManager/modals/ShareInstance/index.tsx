@@ -125,6 +125,7 @@ function ShareInstance(props: ModalProps) {
   })
 
   const handleShare = async () => {
+    if (isLoading()) return
     setIsLoading(true)
 
     // Build URL with new parameters
@@ -150,7 +151,6 @@ function ShareInstance(props: ModalProps) {
 
     sseStream.onmessage = (event) => {
       const data = JSON.parse(event.data)
-      console.log("data", data)
       if (data.progress) {
         setProgress(data.progress)
       }
@@ -161,7 +161,6 @@ function ShareInstance(props: ModalProps) {
     }
 
     sseStream.addEventListener("error", (event) => {
-      console.log("error", event)
       try {
         const data = JSON.parse((event as MessageEvent).data)
         // New format: { error: { code: string, message: string } }

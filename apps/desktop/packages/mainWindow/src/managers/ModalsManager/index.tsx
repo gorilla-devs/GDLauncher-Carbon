@@ -14,6 +14,7 @@ import { useTransContext, TypedTFunction } from "@gd/i18n"
 import { useGDNavigate } from "../NavigationManager"
 import adSize from "@/utils/adhelper"
 import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
+import { cleanupRunning } from "./modals/CacheCleanup/state"
 
 export interface ModalProps {
   title: string
@@ -27,7 +28,12 @@ type Hash = Record<
     component: ((_props: ModalProps) => JSX.Element) & {
       preload: () => Promise<{ default: (_props: ModalProps) => JSX.Element }>
     }
-    preventClose?: boolean
+    /**
+     * When `true` (or the function returns `true`), the backdrop click and
+     * side panel will not close the modal. Pass a function for modals whose
+     * closability depends on internal state (e.g. "running" vs "idle" phase).
+     */
+    preventClose?: boolean | (() => boolean)
     title?: string
     noHeader?: boolean
   }
@@ -198,6 +204,15 @@ const getDefaultModals = (t: TypedTFunction) => ({
   serverRename: {
     component: lazy(() => import("./modals/ServerRename")),
     title: t("modals:_trn_server_rename")
+  },
+  cacheCleanup: {
+    component: lazy(() => import("./modals/CacheCleanup")),
+    // Block backdrop/side-panel close only while a cleanup is actively
+    // running; closing mid-VACUUM reveals a frozen UI (connection_limit=1
+    // serializes every other DB query) and the modal can't be reopened onto
+    // the in-flight task. All other phases close normally.
+    preventClose: () => cleanupRunning(),
+    title: t("modals:_trn_cache_cleanup_title")
   }
 })
 
@@ -326,15 +341,21 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               const noHeader =
                 (defaultModals as Hash)[modal.name].noHeader || false
               const title = (defaultModals as Hash)[modal.name].title || ""
-              const preventClose = (defaultModals as Hash)[modal.name]
+              const preventCloseRaw = (defaultModals as Hash)[modal.name]
                 .preventClose
+              // Evaluate at click time so function-based preventClose stays
+              // reactive across phase changes inside the modal.
+              const shouldPreventClose = () =>
+                typeof preventCloseRaw === "function"
+                  ? preventCloseRaw()
+                  : preventCloseRaw === true
 
               return (
                 <div class="absolute inset-0 flex h-screen w-screen">
                   <div
                     class="z-999 relative flex h-full grow items-center justify-center"
                     onMouseDown={() => {
-                      if (!preventClose) {
+                      if (!shouldPreventClose()) {
                         closeModal()
                       }
                     }}
@@ -360,7 +381,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                       width: `${adSize.width}px`
                     }}
                     onMouseDown={() => {
-                      if (!preventClose) {
+                      if (!shouldPreventClose()) {
                         closeModal()
                       }
                     }}

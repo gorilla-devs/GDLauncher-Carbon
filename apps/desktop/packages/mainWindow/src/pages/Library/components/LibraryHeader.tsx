@@ -230,7 +230,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
 
       <Input
         ref={inputRef}
-        placeholder={t("search:_trn_search_instances")}
+        placeholder={isServerMode() ? t("search:_trn_search_servers") : t("search:_trn_search_instances")}
         value={props.filter()}
         class="w-full rounded-full"
         onInput={(e) => props.setFilter(e.target.value)}
@@ -509,7 +509,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
         }}
       >
         <div class="i-hugeicons:add-01 h-4 w-4 shrink-0" />
-        <span class="whitespace-nowrap">
+        <span class="whitespace-nowrap hidden xl:inline">
           {isServerMode()
             ? t("instances:_trn_server_create_title")
             : t("library:_trn_create_new_instance")}

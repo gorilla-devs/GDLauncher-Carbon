@@ -4,7 +4,7 @@
  * Append-only addon registry updater.
  *
  * Fetches the top addons from CurseForge and Modrinth, then merges them into
- * src/data/addons.json. New entries are added, existing entries are updated
+ * data/addons.json. New entries are added, existing entries are updated
  * (name, imageUrl, websiteUrl), but nothing is ever removed. This prevents
  * broken links that would hurt SEO.
  *
@@ -19,7 +19,7 @@ import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const DATA_PATH = resolve(__dirname, "../src/data/addons.json")
+const DATA_PATH = resolve(__dirname, "../data/addons.json")
 
 // ---------------------------------------------------------------------------
 // CLI args

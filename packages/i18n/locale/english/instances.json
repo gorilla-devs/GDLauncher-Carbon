@@ -204,6 +204,8 @@
   "_trn_instance_unlock_confirmation": "Unlocking allows you to install additional content onto this instance. If not done correctly, that could potentially leading to the instance not launching anymore. This action cannot be undone.",
   "_trn_sidebar.add_instance": "Add Instance",
   "_trn_download": "Download",
+  "_trn_download_instance": "Download Instance",
+  "_trn_download_server": "Download Server",
   "_trn_download_version": "Download Version",
   "_trn_add_to_an_instance": "Add to an Instance",
   "_trn_explore_modpack": "Explore Modpack",

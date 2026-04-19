@@ -245,7 +245,6 @@ a {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   transform-origin: center center;
-  will-change: transform;
 }
 
 /* Disabled input stripes pattern */

@@ -40,6 +40,9 @@ export function useDragSelect(options: UseDragSelectOptions) {
   let autoScrollRAF: number | null = null
   let lastMouseY = 0
 
+  // Cached item rects — snapshot once at drag start, invalidated on scroll
+  let cachedItemRects: Map<string, DOMRect> | null = null
+
   const resolveScrollContainer = (): HTMLElement | null => {
     const explicit = options.containerRef()
     if (explicit) return explicit
@@ -99,7 +102,10 @@ export function useDragSelect(options: UseDragSelectOptions) {
   }
 
   const getSelectedIds = (rect: SelectionRect): string[] => {
-    const itemRects = options.getItemRects()
+    if (!cachedItemRects) {
+      cachedItemRects = options.getItemRects()
+    }
+    const itemRects = cachedItemRects
     const dragSelected: string[] = []
 
     itemRects.forEach((itemRect, id) => {
@@ -165,6 +171,8 @@ export function useDragSelect(options: UseDragSelectOptions) {
 
     if (scrollAmount !== 0) {
       container.scrollTop += scrollAmount
+      // Invalidate cached rects since scroll moved the elements
+      cachedItemRects = null
       // Re-evaluate selection after scrolling
       updateSelection()
     }
@@ -253,6 +261,7 @@ export function useDragSelect(options: UseDragSelectOptions) {
     setHasMovedEnough(false)
     shiftHeld = false
     baseSelection = new Set<string>()
+    cachedItemRects = null
   }
 
   onCleanup(() => {

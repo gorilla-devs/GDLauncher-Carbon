@@ -128,9 +128,12 @@ impl Modrinth {
         let query = projects.into_query_parameters()?;
         url.set_query(Some(&query));
 
+        // HashMap-ordered ID lists produce different URLs for the same data,
+        // making the URL-keyed HTTP cache balloon without ever hitting. Skip it.
         let projects = self
             .client
             .get(url.as_str())
+            .header("avoid-caching", "")
             .send()
             .await?
             .json_with_context_reporting("modrinth::get_projects")
@@ -158,9 +161,12 @@ impl Modrinth {
         let query = version_ids.into_query_parameters()?;
         url.set_query(Some(&query));
 
+        // HashMap-ordered ID lists produce different URLs for the same data,
+        // making the URL-keyed HTTP cache balloon without ever hitting. Skip it.
         let versions = self
             .client
             .get(url.as_str())
+            .header("avoid-caching", "")
             .send()
             .await?
             .json_with_context_reporting("modrinth::get_versions")
@@ -211,9 +217,12 @@ impl Modrinth {
         let query = team_ids.into_query_parameters()?;
         url.set_query(Some(&query));
 
+        // HashMap-ordered ID lists produce different URLs for the same data,
+        // making the URL-keyed HTTP cache balloon without ever hitting. Skip it.
         let teams = self
             .client
             .get(url.as_str())
+            .header("avoid-caching", "")
             .send()
             .await?
             .json_with_context_reporting::<Vec<TeamResponse>>("modrinth::get_teams")

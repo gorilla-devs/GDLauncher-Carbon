@@ -155,10 +155,16 @@ export function DragProvider(props: { children: JSX.Element }) {
   } | null>(null)
   const [dragDetached, setDragDetached] = createSignal(false)
 
+  let dropTimers: ReturnType<typeof setTimeout>[] = []
+  const clearDropTimers = () => {
+    for (const id of dropTimers) clearTimeout(id)
+    dropTimers = []
+  }
+
   const DETACH_THRESHOLD_SQ = 35 * 35
 
   // Drop zones registry
-  let dropZones: DropZone[] = []
+  const dropZonesMap = new Map<string, DropZone>()
   let onDropHandler: DropHandler | null = null
   let scrollCleanup: (() => void) | null = null
   let dragOrigin: string | null = null
@@ -188,28 +194,26 @@ export function DragProvider(props: { children: JSX.Element }) {
   }
 
   const registerDropZone = (zone: DropZone) => {
-    // Remove existing zone with same id
-    dropZones = dropZones.filter((z) => z.id !== zone.id)
-    dropZones.push(zone)
+    dropZonesMap.set(zone.id, zone)
     // Force rect refresh on next findDropTarget — layout may have changed
     lastRefreshTime = 0
   }
 
   const unregisterDropZone = (id: string) => {
-    dropZones = dropZones.filter((z) => z.id !== id)
+    dropZonesMap.delete(id)
     // Force rect refresh — removing a zone (e.g. DropPreviewTile unmount)
     // causes grid reflow, so cached rects become stale.
     lastRefreshTime = 0
   }
 
-  const getDropZones = () => dropZones
+  const getDropZones = () => Array.from(dropZonesMap.values())
 
   const refreshDropZoneRects = () => {
     const now = performance.now()
     if (now - lastRefreshTime < REFRESH_THROTTLE) return
     lastRefreshTime = now
 
-    for (const zone of dropZones) {
+    for (const zone of dropZonesMap.values()) {
       if (zone.element?.isConnected) {
         const rawRect = zone.element.getBoundingClientRect()
         zone.rect = zone.rectTransform ? zone.rectTransform(rawRect) : rawRect
@@ -223,10 +227,11 @@ export function DragProvider(props: { children: JSX.Element }) {
     // Filter zones by active scope - when scope is set, only consider scoped zones
     // Always include favorites zone so it's reachable from any context (e.g., inside folders)
     const scope = activeScope()
+    const allZones = Array.from(dropZonesMap.values())
     const scopedZones =
       scope !== null
-        ? dropZones.filter((z) => z.scope === scope || z.target.type === "favorites")
-        : dropZones
+        ? allZones.filter((z) => z.scope === scope || z.target.type === "favorites")
+        : allZones
 
     // Sort drop zones by priority (favorites first, then instances, then groups)
     const sortedZones = [...scopedZones].sort((a, b) => {
@@ -416,7 +421,7 @@ export function DragProvider(props: { children: JSX.Element }) {
         setDragSelectEnabled(true)
         resetDropTargetHysteresis()
         // isDragging, dragType, draggedIds, dragOrigin stay alive for the ghost
-        setTimeout(() => {
+        dropTimers.push(setTimeout(() => {
           setDropAnimating(null)
           setIsDragging(false)
           setDragDetached(false)
@@ -428,7 +433,7 @@ export function DragProvider(props: { children: JSX.Element }) {
           requestAnimationFrame(() => {
             setJustDropped(false)
           })
-        }, 300)
+        }, 300))
         return
       }
 
@@ -444,7 +449,7 @@ export function DragProvider(props: { children: JSX.Element }) {
         setDragSelectEnabled(true)
         resetDropTargetHysteresis()
         // isDragging, dragType, draggedIds stay alive for the ghost
-        setTimeout(() => {
+        dropTimers.push(setTimeout(() => {
           setDropAnimating(null)
           setIsDragging(false)
           setDragDetached(false)
@@ -456,13 +461,13 @@ export function DragProvider(props: { children: JSX.Element }) {
           requestAnimationFrame(() => {
             setJustDropped(false)
           })
-        }, 300)
+        }, 300))
         return
       }
 
       // No preview rect (e.g. drop on favorites, null target) — clear immediately
       setIsDragging(false)
-      setTimeout(() => {
+      dropTimers.push(setTimeout(() => {
         if (!isDragging()) {
           setDragType(null)
           setDraggedIds([])
@@ -472,7 +477,7 @@ export function DragProvider(props: { children: JSX.Element }) {
         requestAnimationFrame(() => {
           setJustDropped(false)
         })
-      }, 100)
+      }, 100))
     } else {
       // No drag started — clear immediately
       setDragType(null)
@@ -518,6 +523,7 @@ export function DragProvider(props: { children: JSX.Element }) {
   }
 
   const cancelDrag = () => {
+    clearDropTimers()
     cleanup()
     dragOrigin = null
     setIsDragging(false)
@@ -532,7 +538,10 @@ export function DragProvider(props: { children: JSX.Element }) {
     resetDropTargetHysteresis()
   }
 
-  onCleanup(cleanup)
+  onCleanup(() => {
+    clearDropTimers()
+    cleanup()
+  })
 
   const value: DragContextValue = {
     isDragging,

@@ -405,10 +405,16 @@ const AddonExplore = (props: { children?: any }) => {
                           project.data?.type && project.data?.type === "modpack"
                         }
                       >
-                        <ModpackDownloadButton addon={project.data} />
-                        <Show when={project.data?.serverPackFileId}>
-                          <ServerPackDownloadButton addon={project.data} />
-                        </Show>
+                        <div class="flex items-center">
+                          <ModpackDownloadButton
+                            addon={project.data}
+                            splitPosition={project.data?.serverPackFileId ? "left" : undefined}
+                          />
+                          <Show when={project.data?.serverPackFileId}>
+                            <div class="w-px self-stretch bg-primary-700 shrink-0" />
+                            <ServerPackDownloadButton addon={project.data} splitPosition="right" />
+                          </Show>
+                        </div>
                       </Match>
                       <Match
                         when={
@@ -495,16 +501,19 @@ const AddonExplore = (props: { children?: any }) => {
                         project.data?.type && project.data?.type === "modpack"
                       }
                     >
-                      <div class="flex items-center gap-1">
+                      <div class="flex items-center">
                         <ModpackDownloadButton
                           addon={project.data}
                           size="small"
                           iconOnly
+                          splitPosition={project.data?.serverPackFileId ? "left" : undefined}
                         />
                         <Show when={project.data?.serverPackFileId}>
+                          <div class="w-px self-stretch bg-primary-700 shrink-0" />
                           <ServerPackDownloadButton
                             addon={project.data}
                             size="small"
+                            splitPosition="right"
                           />
                         </Show>
                       </div>

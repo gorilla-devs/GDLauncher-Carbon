@@ -178,6 +178,11 @@ keys! {
         // Search sidebar
         GET_SEARCH_SIDEBAR_DOCKED                   = "getSearchSidebarDocked";
         SET_SEARCH_SIDEBAR_DOCKED                   = "setSearchSidebarDocked";
+        // Cache cleanup
+        GET_TOTAL_CACHE_SIZE                        = "getTotalCacheSize";
+        GET_DB_SIZE                                 = "getDbSize";
+        GET_CACHE_BREAKDOWN                         = "getCacheBreakdown";
+        CLEANUP_CACHES                              = "cleanupCaches";
     }
 
     metrics {
@@ -198,6 +203,7 @@ keys! {
         CREATE_SERVER                               = "createServer";
         CREATE_SERVER_FROM_MODPACK                  = "createServerFromModpack";
         DELETE_SERVER                               = "deleteServer";
+        ACCEPT_EULA                                 = "acceptEula";
         START_SERVER                                = "startServer";
         STOP_SERVER                                 = "stopServer";
         KILL_SERVER                                 = "killServer";

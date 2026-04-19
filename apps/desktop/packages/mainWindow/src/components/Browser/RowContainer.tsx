@@ -150,19 +150,22 @@ const RowContainer = (props: Props & AdditionalProps) => {
           <div class="flex items-center justify-end">
             <Switch>
               <Match when={props.type === "modpack"}>
-                <div class="flex items-center gap-1">
+                <div class="flex items-center">
                   <ModpackDownloadButton
                     addon={props.project}
                     name={props.modVersion.name}
                     fileId={fileId()}
                     size="small"
+                    splitPosition={props.modVersion.serverPackFileId ? "left" : undefined}
                   />
                   <Show when={props.modVersion.serverPackFileId}>
+                    <div class="w-px self-stretch bg-primary-700 shrink-0" />
                     <ServerPackDownloadButton
                       addon={props.project}
                       fileId={fileId()}
                       serverPackFileId={props.modVersion.serverPackFileId}
                       size="small"
+                      splitPosition="right"
                     />
                   </Show>
                 </div>
