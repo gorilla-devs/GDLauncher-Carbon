@@ -184,6 +184,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/SharePreview")),
     title: t("instances:_trn_share_preview.title")
   },
+  report: {
+    component: lazy(() => import("./modals/Report")),
+    title: t("instances:_trn_report.title")
+  },
   accountBanned: {
     component: lazy(() => import("./modals/AccountBanned")),
     preventClose: true,

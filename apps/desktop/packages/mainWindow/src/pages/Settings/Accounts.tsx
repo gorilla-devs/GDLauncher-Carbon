@@ -30,6 +30,7 @@ import {
   createSignal,
   For,
   Match,
+  onCleanup,
   Show,
   Switch
 } from "solid-js"
@@ -205,6 +206,25 @@ const Accounts = () => {
     const user = validGDLUser()
     return getRemainingSeconds(user?.deletionTimeoutAt, user?.deletionTimeout)
   }
+
+  // Local ticker so the scheduled-deletion countdown visibly updates
+  // without depending on server refetches. 30s cadence is fine for a
+  // 7-day window (display precision is "6d 23h 42m"). Cleaned up when
+  // the component unmounts.
+  const [now, setNow] = createSignal(Date.now())
+  const nowTicker = setInterval(() => setNow(Date.now()), 30_000)
+  onCleanup(() => clearInterval(nowTicker))
+
+  const scheduledDeletionRemaining = () => {
+    const at = validGDLUser()?.scheduledDeletionEffectiveAt
+    if (!at) return 0
+    const expiresAt = new Date(at).getTime()
+    return Math.max(0, Math.floor((expiresAt - now()) / 1000))
+  }
+
+  const cancelAccountDeletionMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.cancelGdlAccountDeletion"]
+  }))
 
   const deleteAccountContent = () => {
     const remaining = deletionCooldownRemaining()
@@ -395,7 +415,7 @@ const Accounts = () => {
                     <span>
                       {
                         globalStore.accounts.data?.find(
-                          (account) =>
+                          (account: AccountEntry) =>
                             account.uuid ===
                             globalStore.settings.data?.gdlAccountId
                         )?.username
@@ -456,13 +476,92 @@ const Accounts = () => {
                 noPadding
                 size="small"
               >
-                <div class="flex items-center justify-between py-2">
-                  <p class="text-lightSlate-500 text-sm">
-                    <Trans key="accounts:_trn_delete_account_description" />
-                  </p>
-                  <Show
-                    when={deletionCooldownRemaining() > 0}
-                    fallback={
+                <Switch>
+                  <Match
+                    when={validGDLUser()?.scheduledDeletionEffectiveAt}
+                  >
+                    <div class="border-red-900/40 bg-red-950/30 flex flex-col gap-2 rounded-md border p-3">
+                      <div class="flex items-center gap-2">
+                        <div class="i-ri:alert-line text-red-400" />
+                        <span class="text-sm font-medium text-red-300">
+                          <Trans key="accounts:_trn_account_scheduled_for_deletion_title" />
+                        </span>
+                      </div>
+                      <p class="text-lightSlate-500 text-xs">
+                        <Trans
+                          key="accounts:_trn_account_scheduled_for_deletion_description"
+                          options={{
+                            time: convertSecondsToHumanTime(
+                              scheduledDeletionRemaining()
+                            )
+                          }}
+                        />
+                      </p>
+                      <div class="flex justify-end">
+                        <Button
+                          type="secondary"
+                          size="small"
+                          disabled={cancelAccountDeletionMutation.isPending}
+                          onClick={async () => {
+                            const uuid = globalStore.accounts.data?.find(
+                              (a: AccountEntry) =>
+                                a.uuid === globalStore.settings.data?.gdlAccountId
+                            )?.uuid
+                            if (!uuid) return
+                            const result =
+                              await cancelAccountDeletionMutation.mutateAsync(
+                                uuid
+                              )
+                            if (result === "success") {
+                              toast.success(
+                                t("accounts:_trn_cancel_deletion_success")
+                              )
+                            } else if (result === "noScheduledDeletion") {
+                              toast.info(
+                                t(
+                                  "accounts:_trn_cancel_deletion_already_completed"
+                                )
+                              )
+                            } else {
+                              toast.error(
+                                result.failed ??
+                                  t("accounts:_trn_cancel_deletion_failed")
+                              )
+                            }
+                          }}
+                        >
+                          <Trans key="accounts:_trn_cancel_account_deletion" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Match>
+                  <Match when={deletionCooldownRemaining() > 0}>
+                    <div class="flex items-center justify-between py-2">
+                      <p class="text-lightSlate-500 text-sm">
+                        <Trans key="accounts:_trn_delete_account_description" />
+                      </p>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Button
+                            type="secondary"
+                            size="small"
+                            class="text-red-400 hover:text-red-300"
+                            disabled
+                          >
+                            <Trans key="accounts:_trn_request_account_deletion" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {deleteAccountContent()}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </Match>
+                  <Match when={true}>
+                    <div class="flex items-center justify-between py-2">
+                      <p class="text-lightSlate-500 text-sm">
+                        <Trans key="accounts:_trn_delete_account_description" />
+                      </p>
                       <Button
                         type="secondary"
                         size="small"
@@ -475,23 +574,9 @@ const Accounts = () => {
                       >
                         <Trans key="accounts:_trn_request_account_deletion" />
                       </Button>
-                    }
-                  >
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Button
-                          type="secondary"
-                          size="small"
-                          class="text-red-400 hover:text-red-300"
-                          disabled
-                        >
-                          <Trans key="accounts:_trn_request_account_deletion" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{deleteAccountContent()}</TooltipContent>
-                    </Tooltip>
-                  </Show>
-                </div>
+                    </div>
+                  </Match>
+                </Switch>
               </Collapsable>
             </div>
           </div>

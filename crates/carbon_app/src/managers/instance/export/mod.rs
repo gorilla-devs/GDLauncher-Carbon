@@ -27,7 +27,9 @@ use crate::{
         vtask::{Progress, VisualTaskId},
     },
     managers::{
-        account::gdl_account::{SharedMod, ShareMetadata, WaitForShareInstanceResponse},
+        account::gdl_account::{
+            InstanceShareError, SharedMod, ShareMetadata, WaitForShareInstanceResponse,
+        },
         vtask::{Subtask, VisualTask},
         ManagerRef,
     },
@@ -599,12 +601,45 @@ impl ManagerRef<'_, InstanceExportManager> {
             .wait_for_share_instance(gdl_account_uuid.clone(), file_key)
             .await?;
 
-        // Upload instance background if available (best-effort, don't fail the share)
+        // Upload instance background if available. Transient failures (network,
+        // unknown) are best-effort — the share stays. A content-moderation or
+        // format rejection of the background fails the whole share and we roll
+        // back the just-created share so the user can try again with a
+        // different background.
         if let Some(instance_id) = instance_id {
             if let Err(e) = self
                 .upload_instance_background(&gdl_account_uuid, &response.share_code, instance_id)
                 .await
             {
+                let is_rejection = e
+                    .downcast_ref::<InstanceShareError>()
+                    .is_some_and(|se| {
+                        matches!(
+                            se,
+                            InstanceShareError::ImageRejectedByModeration
+                                | InstanceShareError::ModerationUnavailable
+                                | InstanceShareError::ModerationRateLimited
+                                | InstanceShareError::ImageTooLarge
+                                | InstanceShareError::InvalidImageFormat
+                        )
+                    });
+
+                if is_rejection {
+                    if let Err(del_err) = self
+                        .app
+                        .account_manager()
+                        .delete_share(gdl_account_uuid.clone(), response.share_code.clone())
+                        .await
+                    {
+                        tracing::error!(
+                            "Failed to roll back share {} after background rejection: {}",
+                            response.share_code,
+                            del_err
+                        );
+                    }
+                    return Err(e);
+                }
+
                 tracing::warn!(
                     "Failed to upload instance background for share {}: {}",
                     response.share_code,

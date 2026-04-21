@@ -4,6 +4,7 @@ import ModalLayout from "../ModalLayout"
 import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { AccountEntry } from "@gd/core_module/bindings"
 
 const ConfirmGDLAccountDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
@@ -38,7 +39,7 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
             type="secondary"
             onClick={async () => {
               const uuid = globalStore.accounts.data?.find(
-                (account) =>
+                (account: AccountEntry) =>
                   account.uuid === globalStore.settings.data?.gdlAccountId
               )?.uuid
 

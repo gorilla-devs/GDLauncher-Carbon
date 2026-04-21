@@ -7,12 +7,39 @@ import {
   createMemo,
   createSignal,
   onCleanup,
-  Show
+  Show,
+  untrack
 } from "solid-js"
 import { queryClient, rspc, port } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import ImagePicker from "@/components/ImagePicker"
 import { convertSecondsToHumanTime, blobToBase64 } from "@/utils/helpers"
+import { getErrorCode } from "@/components/SharePreviewContent"
+
+type AvatarUploadErrorKey =
+  | "accounts:_trn_avatar_upload_rejected"
+  | "accounts:_trn_avatar_upload_moderation_unavailable"
+  | "accounts:_trn_avatar_upload_rate_limited"
+  | "accounts:_trn_avatar_upload_too_large"
+  | "accounts:_trn_avatar_upload_invalid_format"
+  | "accounts:_trn_avatar_upload_failed"
+
+function getAvatarUploadErrorKey(code: string | null): AvatarUploadErrorKey {
+  switch (code) {
+    case "IMAGE_REJECTED_BY_MODERATION":
+      return "accounts:_trn_avatar_upload_rejected"
+    case "MODERATION_UNAVAILABLE":
+      return "accounts:_trn_avatar_upload_moderation_unavailable"
+    case "MODERATION_RATE_LIMITED":
+      return "accounts:_trn_avatar_upload_rate_limited"
+    case "IMAGE_TOO_LARGE":
+      return "accounts:_trn_avatar_upload_too_large"
+    case "INVALID_IMAGE_FORMAT":
+      return "accounts:_trn_avatar_upload_invalid_format"
+    default:
+      return "accounts:_trn_avatar_upload_failed"
+  }
+}
 
 const EditGDLProfile = () => {
   const [t] = useTransContext()
@@ -89,7 +116,12 @@ const EditGDLProfile = () => {
     if (user) {
       setDisplayName(user.displayName || "")
       setRecoveryEmail(user.email || "")
-      if (user.profileIconUrl) {
+      // Don't clobber a pending local selection (e.g. after an upload failure
+      // where we keep the dialog open and want to preserve the user's choice).
+      const hasPendingLocalAvatar = untrack(
+        () => avatarFilePath() !== null || avatarDeleted()
+      )
+      if (!hasPendingLocalAvatar && user.profileIconUrl) {
         setAvatarPreview(user.profileIconUrl)
       }
 
@@ -235,7 +267,8 @@ const EditGDLProfile = () => {
     setIsLoading(true)
 
     try {
-      // Handle avatar changes first
+      // Handle avatar changes first. If one fails we bail out before closing
+      // the dialog so the user can correct the image / try a different file.
       if (avatarDeleted()) {
         setAvatarLoading(true)
         try {
@@ -244,6 +277,9 @@ const EditGDLProfile = () => {
         } catch (err) {
           console.error("Avatar deletion failed:", err)
           toast.error(t("accounts:_trn_avatar_delete_failed"))
+          setAvatarLoading(false)
+          setIsLoading(false)
+          return
         }
         setAvatarLoading(false)
       } else if (avatarFilePath()) {
@@ -256,7 +292,10 @@ const EditGDLProfile = () => {
           toast.success(t("accounts:_trn_avatar_upload_success"))
         } catch (err) {
           console.error("Avatar upload failed:", err)
-          toast.error(t("accounts:_trn_avatar_upload_failed"))
+          toast.error(t(getAvatarUploadErrorKey(getErrorCode(err))))
+          setAvatarLoading(false)
+          setIsLoading(false)
+          return
         }
         setAvatarLoading(false)
       }

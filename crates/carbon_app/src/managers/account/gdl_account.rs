@@ -61,6 +61,21 @@ pub enum RequestGDLAccountDeletionError {
 }
 
 #[derive(Error, Debug)]
+pub enum CancelGDLAccountDeletionError {
+    /// Backend says there's nothing to cancel — either the user never
+    /// scheduled, or the sweep already promoted the row. Treated as an
+    /// info-level "already done" on the UI side.
+    #[error("No scheduled deletion to cancel")]
+    NoScheduledDeletion,
+
+    #[error("Server error: {0}")]
+    ServerError(String),
+
+    #[error("request failed: {0}")]
+    RequestFailed(anyhow::Error),
+}
+
+#[derive(Error, Debug)]
 pub enum ChangeDisplayNameError {
     #[error("Too many requests")]
     TooManyRequests(u32),
@@ -98,6 +113,16 @@ pub enum InstanceShareError {
     TooManyActiveShares,
     #[error("Account is banned")]
     AccountBanned,
+    #[error("Image rejected by content moderation")]
+    ImageRejectedByModeration,
+    #[error("Image moderation temporarily unavailable, please try again")]
+    ModerationUnavailable,
+    #[error("Too many image uploads, please wait a bit before trying again")]
+    ModerationRateLimited,
+    #[error("Image too large, maximum size is 5MB")]
+    ImageTooLarge,
+    #[error("Invalid image format, must be PNG or JPEG")]
+    InvalidImageFormat,
     #[error("Invalid header: {0}")]
     InvalidHeader(#[from] InvalidHeaderValue),
     #[error("JSON error: {0}")]
@@ -120,6 +145,11 @@ impl crate::error::FeErrorCode for InstanceShareError {
             Self::UserNotVerified => "USER_NOT_VERIFIED",
             Self::TooManyActiveShares => "TOO_MANY_ACTIVE_SHARES",
             Self::AccountBanned => "ACCOUNT_BANNED",
+            Self::ImageRejectedByModeration => "IMAGE_REJECTED_BY_MODERATION",
+            Self::ModerationUnavailable => "MODERATION_UNAVAILABLE",
+            Self::ModerationRateLimited => "MODERATION_RATE_LIMITED",
+            Self::ImageTooLarge => "IMAGE_TOO_LARGE",
+            Self::InvalidImageFormat => "INVALID_IMAGE_FORMAT",
             Self::InvalidHeader(_) => "INVALID_HEADER",
             Self::Json(_) => "JSON_ERROR",
             Self::Network(_) | Self::NetworkMiddleware(_) => "NETWORK_ERROR",
@@ -139,6 +169,67 @@ impl InstanceShareError {
                 "USER_NOT_VERIFIED" => Self::UserNotVerified,
                 "TOO_MANY_ACTIVE_SHARES" => Self::TooManyActiveShares,
                 "ACCOUNT_BANNED" => Self::AccountBanned,
+                "IMAGE_REJECTED_BY_MODERATION" => Self::ImageRejectedByModeration,
+                "MODERATION_UNAVAILABLE" => Self::ModerationUnavailable,
+                "MODERATION_RATE_LIMITED" => Self::ModerationRateLimited,
+                "IMAGE_TOO_LARGE" => Self::ImageTooLarge,
+                "INVALID_IMAGE_FORMAT" => Self::InvalidImageFormat,
+                _ => Self::Unknown(resp.error.message),
+            }
+        } else {
+            Self::Unknown(format!("HTTP {}: {}", status.as_u16(), body))
+        }
+    }
+}
+
+/// Typed error for avatar upload operations. Mirrors the error codes the
+/// enderium backend returns from `/v1/users/user/avatar` so the frontend can
+/// show a specific toast per failure mode.
+#[derive(Error, Debug)]
+pub enum AvatarUploadError {
+    #[error("Image rejected by content moderation")]
+    ImageRejectedByModeration,
+    #[error("Image moderation temporarily unavailable, please try again")]
+    ModerationUnavailable,
+    #[error("Too many image uploads, please wait a bit before trying again")]
+    ModerationRateLimited,
+    #[error("Image too large, maximum size is 5MB")]
+    ImageTooLarge,
+    #[error("Invalid image format, must be PNG or JPEG")]
+    InvalidImageFormat,
+    #[error("No file provided")]
+    NoFileProvided,
+    #[error("Network error: {0}")]
+    Network(#[from] reqwest::Error),
+    #[error("{0}")]
+    Unknown(String),
+}
+
+impl crate::error::FeErrorCode for AvatarUploadError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::ImageRejectedByModeration => "IMAGE_REJECTED_BY_MODERATION",
+            Self::ModerationUnavailable => "MODERATION_UNAVAILABLE",
+            Self::ModerationRateLimited => "MODERATION_RATE_LIMITED",
+            Self::ImageTooLarge => "IMAGE_TOO_LARGE",
+            Self::InvalidImageFormat => "INVALID_IMAGE_FORMAT",
+            Self::NoFileProvided => "NO_FILE_PROVIDED",
+            Self::Network(_) => "NETWORK_ERROR",
+            Self::Unknown(_) => "UNKNOWN_ERROR",
+        }
+    }
+}
+
+impl AvatarUploadError {
+    fn from_response(status: StatusCode, body: &str) -> Self {
+        if let Ok(resp) = serde_json::from_str::<EnderiumErrorResponse>(body) {
+            match resp.error.code.as_str() {
+                "IMAGE_REJECTED_BY_MODERATION" => Self::ImageRejectedByModeration,
+                "MODERATION_UNAVAILABLE" => Self::ModerationUnavailable,
+                "MODERATION_RATE_LIMITED" => Self::ModerationRateLimited,
+                "IMAGE_TOO_LARGE" => Self::ImageTooLarge,
+                "INVALID_IMAGE_FORMAT" => Self::InvalidImageFormat,
+                "NO_FILE_PROVIDED" => Self::NoFileProvided,
                 _ => Self::Unknown(resp.error.message),
             }
         } else {
@@ -227,6 +318,14 @@ pub struct GDLUser {
     pub deletion_timeout_at: Option<String>,
     pub email_change_timeout_at: Option<String>,
     pub display_name_change_timeout_at: Option<String>,
+
+    // Set iff the user has clicked the deletion-confirm email and is
+    // inside the 7-day cancel window. Presence is the whole signal —
+    // the backend used to expose a parallel `has_scheduled_deletion`
+    // boolean but collapsed to this single Option. Value is the
+    // absolute UTC time at which the sweep will hard-delete.
+    #[serde(default)]
+    pub scheduled_deletion_effective_at: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -364,6 +463,16 @@ pub struct PaginatedShares {
 pub struct QuotaInfo {
     pub used_kilobytes: i64,
     pub total_kilobytes: i64,
+}
+
+/// Request body for reporting a share.
+/// `report_type` must be one of: "share_background", "share_title", "share_content".
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct ReportShareBody {
+    pub report_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Request body for updating a share
@@ -668,6 +777,50 @@ impl GDLAccountTask {
         Ok(())
     }
 
+    pub async fn cancel_deletion(
+        &self,
+        gdl_token: String,
+    ) -> Result<(), CancelGDLAccountDeletionError> {
+        let url = format!("{}/v1/users/cancel-account-deletion", self.base_api);
+
+        let authorization = format!("Bearer {}", gdl_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+
+        let resp = self
+            .client
+            .post(url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|err| CancelGDLAccountDeletionError::RequestFailed(err.into()))?;
+
+        let status = resp.status();
+
+        if status.is_success() {
+            return Ok(());
+        }
+
+        // Parse the typed error code from the body so the frontend can
+        // distinguish "nothing to cancel" (info, auto-resync) from a
+        // real server error.
+        let body = resp.bytes().await.ok();
+        if let Some(bytes) = body {
+            if let Ok(error_resp) = serde_json::from_slice::<EnderiumErrorResponse>(&bytes) {
+                if error_resp.error.code == "NO_SCHEDULED_DELETION" {
+                    return Err(CancelGDLAccountDeletionError::NoScheduledDeletion);
+                }
+                return Err(CancelGDLAccountDeletionError::ServerError(
+                    error_resp.error.message,
+                ));
+            }
+        }
+
+        Err(CancelGDLAccountDeletionError::RequestFailed(
+            anyhow::anyhow!("Request failed with status: {}", status),
+        ))
+    }
+
     pub async fn change_display_name(
         &self,
         gdl_token: String,
@@ -756,14 +909,16 @@ impl GDLAccountTask {
         &self,
         gdl_token: String,
         icon_path: String,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), AvatarUploadError> {
         // reqwest-middleware does not support multipart form data
         // so we need to use reqwest directly
         let client = reqwest::Client::new();
 
         let url = format!("{}/v1/users/user/avatar", self.base_api);
 
-        let form = Form::new().file("avatar", icon_path).await?;
+        let form = Form::new().file("avatar", icon_path).await.map_err(|e| {
+            AvatarUploadError::Unknown(format!("failed to build multipart form: {}", e))
+        })?;
 
         let authorization = format!("Bearer {}", gdl_token);
 
@@ -775,9 +930,13 @@ impl GDLAccountTask {
             .send()
             .await?;
 
-        resp.error_for_status()?;
-
-        Ok(())
+        let status = resp.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            let body = resp.text().await.unwrap_or_default();
+            Err(AvatarUploadError::from_response(status, &body))
+        }
     }
 
     pub async fn delete_profile_icon(&self, gdl_token: String) -> anyhow::Result<()> {
@@ -1068,6 +1227,42 @@ impl GDLAccountTask {
         let resp = self.client.post(url).headers(headers).send().await?;
 
         handle_instance_share_response(resp).await
+    }
+
+    /// Report a share. `report_type` is one of "share_background",
+    /// "share_title", "share_content".
+    pub async fn report_share(
+        &self,
+        gdl_token: String,
+        share_code: String,
+        body: ReportShareBody,
+    ) -> Result<(), InstanceShareError> {
+        let url = format!(
+            "{}/v1/instance-share/share/{}/report",
+            self.base_api, share_code
+        );
+
+        let authorization = format!("Bearer {}", gdl_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+        headers.insert(
+            CONTENT_TYPE,
+            "application/json"
+                .parse()
+                .expect("failed to parse content type"),
+        );
+
+        let body_str = serde_json::to_string(&body)?;
+
+        let resp = self
+            .client
+            .post(url)
+            .headers(headers)
+            .body(reqwest::Body::from(body_str))
+            .send()
+            .await?;
+
+        handle_instance_share_response_empty(resp).await
     }
 
     /// Validate if a share code exists and is not expired (no auth required)

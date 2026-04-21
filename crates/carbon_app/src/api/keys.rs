@@ -57,6 +57,7 @@ keys! {
         REMOVE_GDL_ACCOUNT                          = "removeGdlAccount";
         SAVE_GDL_ACCOUNT                            = "saveGdlAccount";
         REQUEST_GDL_ACCOUNT_DELETION                = "requestGdlAccountDeletion";
+        CANCEL_GDL_ACCOUNT_DELETION                 = "cancelGdlAccountDeletion";
         CHANGE_GDL_ACCOUNT_DISPLAY_NAME             = "changeGdlAccountDisplayName";
         UPLOAD_PROFILE_ICON                         = "uploadProfileIcon";
         DELETE_PROFILE_ICON                         = "deleteProfileIcon";
@@ -146,6 +147,7 @@ keys! {
         GET_USER_QUOTA                              = "getUserQuota";
         DELETE_SHARE                                = "deleteShare";
         UPDATE_SHARE                                = "updateShare";
+        REPORT_SHARE                                = "reportShare";
         REGENERATE_SHARE_CODE                       = "regenerateShareCode";
         GET_MODPACK_INFO                            = "getModpackInfo";
     }

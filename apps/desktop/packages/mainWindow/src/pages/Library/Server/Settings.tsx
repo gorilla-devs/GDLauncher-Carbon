@@ -58,11 +58,7 @@ const Settings = (props: SettingsProps) => {
         <Row>
           <Title
             description={
-              t(
-                "instances:_trn_server_settings_name_description" as Parameters<
-                  typeof t
-                >[0]
-              ) || undefined
+              t("instances:_trn_server_settings_name_description") || undefined
             }
           >
             <Trans key="instances:_trn_server_settings_name" />

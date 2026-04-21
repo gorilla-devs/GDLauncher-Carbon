@@ -1,13 +1,28 @@
 import { Button, toast, Progress } from "@gd/ui"
 import { port, rspc } from "@/utils/rspcClient"
-import { createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js"
+import {
+  createMemo,
+  createSignal,
+  Match,
+  onCleanup,
+  Show,
+  Switch
+} from "solid-js"
 import { VList } from "@/components/VirtuaWrapper"
 import { Trans, useTransContext } from "@gd/i18n"
 import { FESharePreview } from "@gd/core_module/bindings"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
+import { useModal } from "@/managers/ModalsManager"
+import type { ReportModalData } from "@/managers/ModalsManager/modals/Report"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
 
-// Helper to extract error code from rspc error
+// Helper to extract error code from rspc error.
+//
+// rspc wraps errors as `{code, message}` where `message` is itself a JSON
+// string of the backend's FeError (`{cause: [...], backtrace}`). We need to
+// unwrap both layers before walking `cause[].code`. Same logic as the
+// global handler in `utils/rspcClient.ts`.
 export const getErrorCode = (error: unknown): string | null => {
   try {
     if (
@@ -16,8 +31,27 @@ export const getErrorCode = (error: unknown): string | null => {
       "message" in error &&
       typeof error.message === "string"
     ) {
-      const parsed = JSON.parse(error.message)
-      if (parsed?.cause && Array.isArray(parsed.cause)) {
+      let parsed = JSON.parse(error.message) as {
+        message?: string
+        cause?: { code?: string }[]
+      }
+
+      // Outer-wrap case: parsed has a `message` string but no `cause` — the
+      // real FeError is nested inside `parsed.message` as another JSON string.
+      if (parsed.message && !parsed.cause) {
+        try {
+          const inner = JSON.parse(parsed.message) as {
+            cause?: { code?: string }[]
+          }
+          if (inner.cause) {
+            parsed = inner
+          }
+        } catch {
+          // inner wasn't JSON; keep outer
+        }
+      }
+
+      if (parsed.cause && Array.isArray(parsed.cause)) {
         for (const segment of parsed.cause) {
           if (segment?.code) {
             return segment.code
@@ -94,6 +128,8 @@ interface SharePreviewContentProps {
 
 const SharePreviewContent = (props: SharePreviewContentProps) => {
   const [t] = useTransContext()
+  const modals = useModal()
+  const globalStore = useGlobalStore()
 
   const previewQuery = rspc.createQuery(() => ({
     queryKey: ["instance.getSharePreview", props.shareCode ?? ""],
@@ -143,6 +179,17 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
     return t(getShareImportErrorKey(errorCode))
   })
 
+  // Hide the Report button when the preview is the current user's own share.
+  // `sharerFriendCode` is a base62-encoded OID; `friendCode` on the GDL
+  // account is the same encoding.
+  const isOwnShare = createMemo(() => {
+    const p = preview()
+    if (!p) return false
+    const account = globalStore.gdlAccount.data
+    if (account?.status !== "valid") return false
+    return p.sharerFriendCode === account.value.friendCode
+  })
+
   const handleImport = () => {
     if (!props.shareCode) return
     setIsImporting(true)
@@ -181,7 +228,10 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
   }
 
   return (
-    <div class="text-lightSlate-50 flex flex-col" classList={{ "h-full": props.expandMods }}>
+    <div
+      class="text-lightSlate-50 flex flex-col"
+      classList={{ "h-full": props.expandMods }}
+    >
       <Switch>
         {/* Loading state - skeleton preview (also shown while debounce pending) */}
         <Match when={!props.shareCode || previewQuery.isLoading}>
@@ -191,7 +241,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
               {/* Background shimmer */}
               <div class="bg-darkSlate-700 h-40 w-full animate-pulse" />
               {/* Gradient overlay */}
-              <div class="absolute inset-0 bg-gradient-to-t from-darkSlate-900 via-darkSlate-900/60 to-transparent" />
+              <div class="from-darkSlate-900 via-darkSlate-900/60 absolute inset-0 bg-gradient-to-t to-transparent" />
 
               {/* Title and metadata skeleton overlay */}
               <div class="absolute inset-x-0 bottom-0 p-3">
@@ -254,7 +304,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
             </div>
 
             {/* Disclaimer - static, no loading needed */}
-            <div class="bg-yellow-500/10 border-yellow-500/30 text-yellow-200 mt-3 flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs">
+            <div class="mt-3 flex shrink-0 items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
               <div class="i-ri:alert-line shrink-0 text-yellow-400" />
               <span>
                 <Trans key="instances:_trn_share_preview.disclaimer" />
@@ -266,7 +316,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
         {/* Error state */}
         <Match when={previewQuery.isError}>
           <div class="flex flex-col items-center justify-center py-8 text-center">
-            <div class="text-red-400 mb-2 text-lg">
+            <div class="mb-2 text-lg text-red-400">
               <Trans key="instances:_trn_share_preview.not_found_title" />
             </div>
             <div class="text-lightSlate-500 text-sm">
@@ -279,7 +329,10 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
 
         {/* Preview content */}
         <Match when={preview()}>
-          <div class="text-lightSlate-50 flex flex-col" classList={{ "min-h-0 flex-1": props.expandMods }}>
+          <div
+            class="text-lightSlate-50 flex flex-col"
+            classList={{ "min-h-0 flex-1": props.expandMods }}
+          >
             {/* Hero header with background image */}
             <div class="relative shrink-0 overflow-hidden rounded-lg">
               <img
@@ -291,7 +344,30 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                 class="h-40 w-full object-cover"
               />
               {/* Gradient overlay */}
-              <div class="absolute inset-0 bg-gradient-to-t from-darkSlate-900 via-darkSlate-900/60 to-transparent" />
+              <div class="from-darkSlate-900 via-darkSlate-900/60 absolute inset-0 bg-gradient-to-t to-transparent" />
+
+              {/* Report button — hidden for the user's own share. */}
+              <Show when={props.shareCode && !isOwnShare()}>
+                <button
+                  type="button"
+                  class="bg-darkSlate-900/70 hover:bg-darkSlate-800/90 text-lightSlate-200 hover:text-lightSlate-50 border-darkSlate-600/40 absolute right-2 top-2 flex items-center gap-1 rounded-md border px-2 py-1 text-xs backdrop-blur-sm transition-colors"
+                  title={t("instances:_trn_share_preview.report_button")}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const data: ReportModalData = {
+                      target: {
+                        kind: "share",
+                        shareCode: props.shareCode!,
+                        displayName: preview()?.title ?? undefined
+                      }
+                    }
+                    modals?.openModal({ name: "report" }, data)
+                  }}
+                >
+                  <div class="i-hugeicons:flag-03 h-4 w-4" />
+                  <Trans key="instances:_trn_share_preview.report_button" />
+                </button>
+              </Show>
 
               {/* Title and metadata overlay */}
               <div class="absolute inset-x-0 bottom-0 p-3">
@@ -309,7 +385,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                 {/* Metadata chips */}
                 <div class="flex flex-wrap gap-1.5">
                   <Show when={preview()?.minecraftVersion}>
-                    <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
+                    <div class="bg-darkSlate-800/80 border-darkSlate-600/40 rounded border px-2.5 py-1 text-xs backdrop-blur-sm">
                       <span class="text-lightSlate-400">MC </span>
                       <span class="font-medium">
                         {preview()!.minecraftVersion}
@@ -318,12 +394,12 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                   </Show>
 
                   <Show when={modloader()}>
-                    <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
+                    <div class="bg-darkSlate-800/80 border-darkSlate-600/40 rounded border px-2.5 py-1 text-xs backdrop-blur-sm">
                       <span class="font-medium">{modloader()}</span>
                     </div>
                   </Show>
 
-                  <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
+                  <div class="bg-darkSlate-800/80 border-darkSlate-600/40 rounded border px-2.5 py-1 text-xs backdrop-blur-sm">
                     <span class="font-medium">
                       {preview()?.mods?.length || 0}
                     </span>
@@ -331,13 +407,13 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                   </div>
 
                   <Show when={fileSize()}>
-                    <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
+                    <div class="bg-darkSlate-800/80 border-darkSlate-600/40 rounded border px-2.5 py-1 text-xs backdrop-blur-sm">
                       <span class="font-medium">{fileSize()}</span>
                     </div>
                   </Show>
 
                   <Show when={!isExpired() && preview()?.expiresAt}>
-                    <div class="bg-darkSlate-800/80 border border-darkSlate-600/40 rounded px-2.5 py-1 text-xs backdrop-blur-sm">
+                    <div class="bg-darkSlate-800/80 border-darkSlate-600/40 rounded border px-2.5 py-1 text-xs backdrop-blur-sm">
                       <span class="text-lightSlate-400">Expires </span>
                       <span class="font-medium">
                         {new Date(preview()!.expiresAt).toLocaleDateString(
@@ -356,14 +432,20 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
 
             {/* Expired banner */}
             <Show when={isExpired()}>
-              <div class="bg-red-500/20 border-red-500/30 text-red-300 mt-3 shrink-0 rounded-lg border p-2 text-center text-sm">
+              <div class="mt-3 shrink-0 rounded-lg border border-red-500/30 bg-red-500/20 p-2 text-center text-sm text-red-300">
                 <Trans key="instances:_trn_share_preview.expired" />
               </div>
             </Show>
 
             {/* Mods list - fills remaining space */}
             <Show when={(preview()?.mods?.length || 0) > 0}>
-              <div class="mt-4 flex flex-col" classList={{ "min-h-48 flex-1": props.expandMods, "h-48": !props.expandMods }}>
+              <div
+                class="mt-4 flex flex-col"
+                classList={{
+                  "min-h-48 flex-1": props.expandMods,
+                  "h-48": !props.expandMods
+                }}
+              >
                 <div class="text-lightSlate-500 mb-1.5 shrink-0 text-xs uppercase tracking-wide">
                   <Trans key="instances:_trn_share_preview.mods_list" /> (
                   {preview()!.mods.length})
@@ -413,7 +495,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
 
             {/* Disclaimer - compact */}
             <Show when={!isExpired()}>
-              <div class="bg-yellow-500/10 border-yellow-500/30 text-yellow-200 mt-4 flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs">
+              <div class="mt-4 flex shrink-0 items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
                 <div class="i-ri:alert-line shrink-0 text-yellow-400" />
                 <span>
                   <Trans key="instances:_trn_share_preview.disclaimer" />
@@ -431,7 +513,10 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                 <Switch>
                   <Match when={isImporting()}>
                     <div class="w-20">
-                      <Progress color="bg-primary-400" value={importProgress()} />
+                      <Progress
+                        color="bg-primary-400"
+                        value={importProgress()}
+                      />
                     </div>
                   </Match>
                   <Match when={!isImporting()}>

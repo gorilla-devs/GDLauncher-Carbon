@@ -4,9 +4,9 @@ use crate::domain::account as domain;
 use crate::error::{AxumError, FeError};
 use crate::managers::account::api::{UsernameAvailability, XboxError};
 use crate::managers::account::gdl_account::{
-    ChangeDisplayNameError, DisplayNameHistoryEntry, GDLAccountStatus, GDLUser,
-    RegisterAccountBody, RequestGDLAccountDeletionError, RequestNewEmailChangeError,
-    RequestNewVerificationTokenError,
+    CancelGDLAccountDeletionError, ChangeDisplayNameError, DisplayNameHistoryEntry,
+    GDLAccountStatus, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
+    RequestNewEmailChangeError, RequestNewVerificationTokenError,
 };
 use crate::managers::{App, AppInner, account};
 use axum::extract::{Query, State};
@@ -136,6 +136,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await;
 
             Ok(FERequestDeletionStatus::from(result))
+        }
+
+        mutation CANCEL_GDL_ACCOUNT_DELETION[app, uuid: String] {
+            let result = app.account_manager()
+                .cancel_gdl_account_deletion(uuid)
+                .await;
+
+            Ok(FECancelDeletionStatus::from(result))
         }
 
         mutation CHANGE_GDL_ACCOUNT_DISPLAY_NAME[app, args: FEChangeGdlAccountDisplayName] {
@@ -511,6 +519,12 @@ struct FEGDLAccount {
     deletion_timeout_at: Option<String>,
     email_change_timeout_at: Option<String>,
     display_name_change_timeout_at: Option<String>,
+
+    // Absolute UTC time at which the sweep will hard-delete the account,
+    // iff the user has clicked the deletion-confirm email and is inside
+    // the 7-day cancel window. `None` means no pending scheduled
+    // deletion.
+    scheduled_deletion_effective_at: Option<String>,
 }
 
 impl From<GDLUser> for FEGDLAccount {
@@ -534,6 +548,7 @@ impl From<GDLUser> for FEGDLAccount {
             deletion_timeout_at: value.deletion_timeout_at,
             email_change_timeout_at: value.email_change_timeout_at,
             display_name_change_timeout_at: value.display_name_change_timeout_at,
+            scheduled_deletion_effective_at: value.scheduled_deletion_effective_at,
         }
     }
 }
@@ -637,6 +652,31 @@ impl From<Result<(), RequestGDLAccountDeletionError>> for FERequestDeletionStatu
                     message: None,
                 })
             }
+        }
+    }
+}
+
+/// Result shape for the cancel-deletion mutation. `NoScheduledDeletion`
+/// is an info-level outcome (the sweep already promoted or the user
+/// wasn't scheduled) and the UI should auto-resync against the server
+/// state rather than surface it as an error. Shape mirrors
+/// `FERequestDeletionStatus` (untagged enum) so the TS union is
+/// `"success" | "noScheduledDeletion" | { failed: string | null }`.
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FECancelDeletionStatus {
+    Success,
+    NoScheduledDeletion,
+    Failed(Option<String>),
+}
+
+impl From<Result<(), CancelGDLAccountDeletionError>> for FECancelDeletionStatus {
+    fn from(value: Result<(), CancelGDLAccountDeletionError>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(CancelGDLAccountDeletionError::NoScheduledDeletion) => Self::NoScheduledDeletion,
+            Err(CancelGDLAccountDeletionError::ServerError(msg)) => Self::Failed(Some(msg)),
+            Err(CancelGDLAccountDeletionError::RequestFailed(_)) => Self::Failed(None),
         }
     }
 }

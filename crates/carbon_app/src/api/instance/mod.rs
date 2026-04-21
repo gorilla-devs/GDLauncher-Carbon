@@ -655,6 +655,28 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(())
         }
 
+        mutation REPORT_SHARE[app, args: FEReportShareArgs] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            app.account_manager()
+                .report_share(
+                    gdl_account_uuid,
+                    args.share_code,
+                    args.report_type,
+                    args.reason,
+                )
+                .await?;
+
+            Ok(())
+        }
+
         mutation REGENERATE_SHARE_CODE[app, share_code: String] {
             let Some(gdl_account_uuid) = app
                 .settings_manager()
@@ -2554,6 +2576,17 @@ struct FEUpdateShareArgs {
     title: Option<String>,
     #[specta(optional)]
     max_downloads: Option<Option<i32>>,
+}
+
+// Args for REPORT_SHARE mutation
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEReportShareArgs {
+    share_code: String,
+    /// One of: "share_background", "share_title", "share_content"
+    report_type: String,
+    #[specta(optional)]
+    reason: Option<String>,
 }
 
 // Response for REGENERATE_SHARE_CODE mutation

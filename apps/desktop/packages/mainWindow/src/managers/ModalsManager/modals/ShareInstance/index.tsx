@@ -29,6 +29,18 @@ import { useNavigate } from "@solidjs/router"
 import { MAX_DOWNLOADS_LIMIT, validateMaxDownloads } from "@/utils/validation"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import VerificationRequiredPlaceholder from "@/components/VerificationRequiredPlaceholder"
+import { getErrorCode } from "@/components/SharePreviewContent"
+
+const PERMANENT_SHARE_ERROR_CODES = new Set([
+  "IMAGE_REJECTED_BY_MODERATION",
+  "IMAGE_TOO_LARGE",
+  "INVALID_IMAGE_FORMAT",
+  "MODERATION_RATE_LIMITED",
+  "QUOTA_EXCEEDED",
+  "TOO_MANY_ACTIVE_SHARES",
+  "USER_NOT_VERIFIED",
+  "ACCOUNT_BANNED"
+])
 
 // Map error codes to translation keys for share instance errors
 type ShareErrorKey =
@@ -38,6 +50,11 @@ type ShareErrorKey =
   | "instances:_trn_share_errors.network_error"
   | "instances:_trn_share_errors.upload_timeout"
   | "instances:_trn_share_errors.upload_failed"
+  | "instances:_trn_share_errors.background_rejected"
+  | "instances:_trn_share_errors.background_moderation_unavailable"
+  | "instances:_trn_share_errors.background_rate_limited"
+  | "instances:_trn_share_errors.background_too_large"
+  | "instances:_trn_share_errors.background_invalid_format"
 
 const getShareErrorKey = (code: string | null): ShareErrorKey => {
   switch (code) {
@@ -51,6 +68,16 @@ const getShareErrorKey = (code: string | null): ShareErrorKey => {
       return "instances:_trn_share_errors.network_error"
     case "UPLOAD_TIMEOUT":
       return "instances:_trn_share_errors.upload_timeout"
+    case "IMAGE_REJECTED_BY_MODERATION":
+      return "instances:_trn_share_errors.background_rejected"
+    case "MODERATION_UNAVAILABLE":
+      return "instances:_trn_share_errors.background_moderation_unavailable"
+    case "MODERATION_RATE_LIMITED":
+      return "instances:_trn_share_errors.background_rate_limited"
+    case "IMAGE_TOO_LARGE":
+      return "instances:_trn_share_errors.background_too_large"
+    case "INVALID_IMAGE_FORMAT":
+      return "instances:_trn_share_errors.background_invalid_format"
     default:
       return "instances:_trn_share_errors.upload_failed"
   }
@@ -113,7 +140,8 @@ function ShareInstance(props: ModalProps) {
       "instance.waitForShareInstance",
       { fileKey: fileKey()!, instanceId: data()?.instanceId }
     ],
-    retry: true,
+    retry: (_failureCount, error) =>
+      !PERMANENT_SHARE_ERROR_CODES.has(getErrorCode(error) ?? ""),
     enabled: !!fileKey()
   }))
 
@@ -122,6 +150,14 @@ function ShareInstance(props: ModalProps) {
       setShareObject(waitForShareInstanceMutation.data)
       setIsLoading(false)
     }
+  })
+
+  createEffect(() => {
+    const err = waitForShareInstanceMutation.error
+    if (!err) return
+    toast.error(t(getShareErrorKey(getErrorCode(err))))
+    setFileKey(undefined)
+    setIsLoading(false)
   })
 
   const handleShare = async () => {

@@ -16,10 +16,11 @@ use carbon_repos::pcr::{
 };
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
-    ChangeDisplayNameError, DisplayNameHistoryEntry, GDLAccountStatus, GDLAccountTask, GDLUser,
-    GetPresignedUploadUrlResponse, PaginatedShares, QuotaInfo, RegisterAccountBody,
-    RequestGDLAccountDeletionError, RequestNewEmailChangeError, RequestNewVerificationTokenError,
-    ShareInfo, ShareMetadata, SharePreview, WaitForShareInstanceResponse,
+    CancelGDLAccountDeletionError, ChangeDisplayNameError, DisplayNameHistoryEntry,
+    GDLAccountStatus, GDLAccountTask, GDLUser, GetPresignedUploadUrlResponse, PaginatedShares,
+    QuotaInfo, RegisterAccountBody, RequestGDLAccountDeletionError, RequestNewEmailChangeError,
+    RequestNewVerificationTokenError, ShareInfo, ShareMetadata, SharePreview,
+    WaitForShareInstanceResponse,
 };
 use jwt::{Header, Token};
 use reqwest::Client;
@@ -419,6 +420,39 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
+    pub async fn cancel_gdl_account_deletion(
+        self,
+        uuid: String,
+    ) -> Result<(), CancelGDLAccountDeletionError> {
+        let account = self
+            .get_account_entries()
+            .await
+            .map_err(CancelGDLAccountDeletionError::RequestFailed)?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(CancelGDLAccountDeletionError::RequestFailed(anyhow::anyhow!(
+                "attempted to cancel a gdl account deletion for an account that does not exist"
+            )))?;
+
+        let auth_token = self
+            .ensure_gdl_auth_token(&account)
+            .await
+            .map_err(CancelGDLAccountDeletionError::RequestFailed)?;
+
+        let result = self.gdl_account_task.cancel_deletion(auth_token).await;
+
+        // Invalidate regardless of outcome: success = row cleared,
+        // `NoScheduledDeletion` = our local copy is stale, server error
+        // = a refetch can't hurt.
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        result?;
+
+        Ok(())
+    }
+
     pub async fn register_gdl_account(
         self,
         uuid: String,
@@ -685,6 +719,39 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 gdl_account::UpdateShareBody {
                     title,
                     max_downloads,
+                },
+            )
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Report a share. Forwards to enderium's
+    /// `POST /v1/instance-share/share/{code}/report`.
+    pub async fn report_share(
+        self,
+        uuid: String,
+        share_code: String,
+        report_type: String,
+        reason: Option<String>,
+    ) -> anyhow::Result<()> {
+        let account = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to report a share for an account that does not exist"
+            ))?;
+
+        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+
+        self.gdl_account_task
+            .report_share(
+                auth_token,
+                share_code,
+                gdl_account::ReportShareBody {
+                    report_type,
+                    reason,
                 },
             )
             .await
