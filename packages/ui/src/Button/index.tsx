@@ -14,8 +14,10 @@ import { getPressEffectClasses } from "../Clickable"
 type Size = "small" | "medium" | "large"
 type Type = "primary" | "secondary" | "glow" | "transparent" | "glass" | "text"
 
-interface Props
-  extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
+interface Props extends Omit<
+  JSX.ButtonHTMLAttributes<HTMLButtonElement>,
+  "type"
+> {
   as?: "button" | "a" | "span" | "div"
   children: HTMLElement | string | JSX.Element
   style?: JSX.CSSProperties
@@ -95,11 +97,8 @@ const getVariant = (
   const variants = {
     primary: {
       ...commonStyle,
-      [`${
-        !isDisabled && !backgroundColor ? `bg-${v}-500` : "bg-[#1D2028]"
-      }`]: true,
-      [`${!isDisabled && !backgroundColor ? `hover:bg-${v}-700` : ""}`]:
-        true,
+      [`${!isDisabled && !backgroundColor ? `bg-${v}-500` : "bg-[#1D2028]"}`]: true,
+      [`${!isDisabled && !backgroundColor ? `hover:bg-${v}-700` : ""}`]: true,
       "text-[#404759]": isDisabled,
       "disabled-stripes": isDisabled,
       "border-0": true

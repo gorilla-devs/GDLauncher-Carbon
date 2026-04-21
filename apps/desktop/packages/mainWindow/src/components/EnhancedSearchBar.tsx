@@ -5,6 +5,47 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { useMatch } from "@solidjs/router"
 import { Trans, useTransContext } from "@gd/i18n"
 import { OnboardingTip } from "@/components/Onboarding"
+import { Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
+
+const SearchSyntaxTips = () => (
+  <div class="space-y-2 text-sm">
+    <p>
+      <Trans key="onboarding:_trn_search_syntax_description" />
+    </p>
+    <ul class="list-disc space-y-1 pl-4">
+      <li>
+        <strong>
+          <Trans key="general:_trn_text" />:
+        </strong>{" "}
+        <Trans key="onboarding:_trn_search_syntax_text" />
+      </li>
+      <li>
+        <strong>
+          <Trans key="onboarding:_trn_search_syntax_urls_label" />:
+        </strong>{" "}
+        <Trans key="onboarding:_trn_search_syntax_urls" />
+      </li>
+      <li>
+        <strong>
+          <Trans key="onboarding:_trn_search_syntax_id_label" />:
+        </strong>{" "}
+        <Trans key="onboarding:_trn_search_syntax_ids" />
+      </li>
+      <li>
+        <strong>
+          <Trans key="onboarding:_trn_search_syntax_share_label" />:
+        </strong>{" "}
+        <Trans key="onboarding:_trn_search_syntax_share" />
+      </li>
+    </ul>
+    <p class="mt-2">
+      <Trans key="onboarding:_trn_search_syntax_addon_type" />
+    </p>
+    <p>
+      <Trans key="onboarding:_trn_search_syntax_filters" />
+    </p>
+  </div>
+)
 
 export function EnhancedSearchBar() {
   const searchResults = useSearchContext()
@@ -44,39 +85,7 @@ export function EnhancedSearchBar() {
       id="search-input-syntax"
       title={t("onboarding:_trn_search_syntax_title")}
       delay={200}
-      description={
-        <div class="space-y-2">
-          <p>
-            <Trans key="onboarding:_trn_search_syntax_description" />
-          </p>
-          <ul class="list-disc space-y-1 pl-4">
-            <li>
-              <strong>
-                <Trans key="general:_trn_text" />:
-              </strong>{" "}
-              <Trans key="onboarding:_trn_search_syntax_text" />
-            </li>
-            <li>
-              <strong>
-                <Trans key="onboarding:_trn_search_syntax_urls_label" />:
-              </strong>{" "}
-              <Trans key="onboarding:_trn_search_syntax_urls" />
-            </li>
-            <li>
-              <strong>
-                <Trans key="onboarding:_trn_search_syntax_id_label" />:
-              </strong>{" "}
-              <Trans key="onboarding:_trn_search_syntax_ids" />
-            </li>
-          </ul>
-          <p class="mt-2">
-            <Trans key="onboarding:_trn_search_syntax_addon_type" />
-          </p>
-          <p>
-            <Trans key="onboarding:_trn_search_syntax_filters" />
-          </p>
-        </div>
-      }
+      description={<SearchSyntaxTips />}
       trigger="onClick"
       placement="bottom"
     >
@@ -150,7 +159,13 @@ export function EnhancedSearchBar() {
             <span>{t("search:_trn_share")}</span>
           </div>
         </Show>
-        <Show when={isExpanded() && searchResults?.isDirectMode() && !searchResults?.isShareMode()}>
+        <Show
+          when={
+            isExpanded() &&
+            searchResults?.isDirectMode() &&
+            !searchResults?.isShareMode()
+          }
+        >
           <div class="bg-primary-600/20 text-primary-400 flex shrink-0 items-center gap-1 rounded px-2 py-0.5 text-xs">
             <div class="i-hugeicons:link-01 text-sm" />
             <span>{t("search:_trn_direct")}</span>
@@ -186,6 +201,30 @@ export function EnhancedSearchBar() {
             "opacity-100 w-px delay-[75ms]": isExpanded()
           }}
         />
+
+        <div
+          class="shrink-0 transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+          classList={{
+            "opacity-0 pointer-events-none max-w-0 overflow-hidden":
+              !isExpanded(),
+            "opacity-100 delay-[100ms]": isExpanded()
+          }}
+        >
+          <Popover gutter={8} placement="bottom-end">
+            <PopoverTrigger
+              class="text-lightSlate-50 hover:bg-darkSlate-600 hover:text-white flex items-center justify-center rounded p-1.5 transition-colors duration-200"
+              title={t("onboarding:_trn_search_syntax_title")}
+            >
+              <div class="i-hugeicons:help-circle text-lg" />
+            </PopoverTrigger>
+            <PopoverContent class="w-80" hideCloseButton>
+              <div class="text-lightSlate-50 mb-2 font-semibold">
+                {t("onboarding:_trn_search_syntax_title")}
+              </div>
+              <SearchSyntaxTips />
+            </PopoverContent>
+          </Popover>
+        </div>
 
         <div
           class="shrink-0 transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"

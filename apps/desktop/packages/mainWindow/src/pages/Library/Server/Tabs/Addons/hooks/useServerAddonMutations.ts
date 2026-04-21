@@ -16,7 +16,7 @@ export const useServerAddonMutations = (
     fn: RowSelectionState | ((prev: RowSelectionState) => RowSelectionState)
   ) => void
 ) => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
 
   const serverId = () => parseInt(params.id ?? "0", 10)

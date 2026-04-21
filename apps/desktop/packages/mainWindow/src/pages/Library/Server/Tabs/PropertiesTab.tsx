@@ -36,9 +36,9 @@ const GROUP_TRANSLATION_KEYS: Record<string, NamespacedTranslationKey> = {
 
 const PropertiesTab = () => {
   const [t] = useTransContext()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const routeData = useServerData()
-  const serverId = () => parseInt(params.id!, 10)
+  const serverId = () => parseInt(params.id, 10)
 
   const [properties, setProperties] = createSignal<Record<string, string>>({})
   const [originalProperties, setOriginalProperties] = createSignal<

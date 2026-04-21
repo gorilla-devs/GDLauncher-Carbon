@@ -60,11 +60,20 @@ interface DragContextValue {
   justDropped: Accessor<boolean>
   activeScope: Accessor<string | null>
   dropPreviewRect: Accessor<DOMRect | null>
-  dropAnimating: Accessor<{ type: string; targetX: number; targetY: number } | null>
+  dropAnimating: Accessor<{
+    type: string
+    targetX: number
+    targetY: number
+  } | null>
   dragDetached: Accessor<boolean>
 
   // Actions
-  startDrag: (type: DragType, ids: number[], e: PointerEvent, origin?: string) => void
+  startDrag: (
+    type: DragType,
+    ids: number[],
+    e: PointerEvent,
+    origin?: string
+  ) => void
   updateDrag: (e: PointerEvent) => void
   endDrag: () => void
   cancelDrag: () => void
@@ -92,10 +101,7 @@ const DragContext = createContext<DragContextValue>()
 
 const MIN_DRAG_DISTANCE = 5
 
-const isSameTarget = (
-  a: DropTarget | null,
-  b: DropTarget | null
-): boolean => {
+const isSameTarget = (a: DropTarget | null, b: DropTarget | null): boolean => {
   if (a === null && b === null) return true
   if (a === null || b === null) return false
   if (a.type !== b.type) return false
@@ -230,7 +236,9 @@ export function DragProvider(props: { children: JSX.Element }) {
     const allZones = Array.from(dropZonesMap.values())
     const scopedZones =
       scope !== null
-        ? allZones.filter((z) => z.scope === scope || z.target.type === "favorites")
+        ? allZones.filter(
+            (z) => z.scope === scope || z.target.type === "favorites"
+          )
         : allZones
 
     // Sort drop zones by priority (favorites first, then instances, then groups)
@@ -303,7 +311,12 @@ export function DragProvider(props: { children: JSX.Element }) {
     lastStablePosition = null
   }
 
-  const startDrag = (type: DragType, ids: number[], e: PointerEvent, origin?: string) => {
+  const startDrag = (
+    type: DragType,
+    ids: number[],
+    e: PointerEvent,
+    origin?: string
+  ) => {
     dragOrigin = origin ?? null
     setDragType(type)
     setDraggedIds(ids)
@@ -399,8 +412,7 @@ export function DragProvider(props: { children: JSX.Element }) {
 
       // Animated exit for favorites unfavorite — keep ghost alive during animation
       const isFavUnfavorite =
-        dragOrigin === "favorites" &&
-        (target === null || target.type !== "favorites")
+        dragOrigin === "favorites" && target?.type !== "favorites"
 
       if (isFavUnfavorite) {
         // Find the library content area to target the center of the overlay
@@ -421,19 +433,21 @@ export function DragProvider(props: { children: JSX.Element }) {
         setDragSelectEnabled(true)
         resetDropTargetHysteresis()
         // isDragging, dragType, draggedIds, dragOrigin stay alive for the ghost
-        dropTimers.push(setTimeout(() => {
-          setDropAnimating(null)
-          setIsDragging(false)
-          setDragDetached(false)
-          setDragType(null)
-          setDraggedIds([])
-          setDropTarget(null)
-          setDropPreviewRect(null)
-          dragOrigin = null
-          requestAnimationFrame(() => {
-            setJustDropped(false)
-          })
-        }, 300))
+        dropTimers.push(
+          setTimeout(() => {
+            setDropAnimating(null)
+            setIsDragging(false)
+            setDragDetached(false)
+            setDragType(null)
+            setDraggedIds([])
+            setDropTarget(null)
+            setDropPreviewRect(null)
+            dragOrigin = null
+            requestAnimationFrame(() => {
+              setJustDropped(false)
+            })
+          }, 300)
+        )
         return
       }
 
@@ -449,35 +463,39 @@ export function DragProvider(props: { children: JSX.Element }) {
         setDragSelectEnabled(true)
         resetDropTargetHysteresis()
         // isDragging, dragType, draggedIds stay alive for the ghost
-        dropTimers.push(setTimeout(() => {
-          setDropAnimating(null)
-          setIsDragging(false)
-          setDragDetached(false)
-          setDragType(null)
-          setDraggedIds([])
-          setDropTarget(null)
-          setDropPreviewRect(null)
-          dragOrigin = null
-          requestAnimationFrame(() => {
-            setJustDropped(false)
-          })
-        }, 300))
+        dropTimers.push(
+          setTimeout(() => {
+            setDropAnimating(null)
+            setIsDragging(false)
+            setDragDetached(false)
+            setDragType(null)
+            setDraggedIds([])
+            setDropTarget(null)
+            setDropPreviewRect(null)
+            dragOrigin = null
+            requestAnimationFrame(() => {
+              setJustDropped(false)
+            })
+          }, 300)
+        )
         return
       }
 
       // No preview rect (e.g. drop on favorites, null target) — clear immediately
       setIsDragging(false)
-      dropTimers.push(setTimeout(() => {
-        if (!isDragging()) {
-          setDragType(null)
-          setDraggedIds([])
-          setDropTarget(null)
-          setDropPreviewRect(null)
-        }
-        requestAnimationFrame(() => {
-          setJustDropped(false)
-        })
-      }, 100))
+      dropTimers.push(
+        setTimeout(() => {
+          if (!isDragging()) {
+            setDragType(null)
+            setDraggedIds([])
+            setDropTarget(null)
+            setDropPreviewRect(null)
+          }
+          requestAnimationFrame(() => {
+            setJustDropped(false)
+          })
+        }, 100)
+      )
     } else {
       // No drag started — clear immediately
       setDragType(null)

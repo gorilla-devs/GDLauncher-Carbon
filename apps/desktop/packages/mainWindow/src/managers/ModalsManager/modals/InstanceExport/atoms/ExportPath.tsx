@@ -4,7 +4,11 @@ import { createSignal } from "solid-js"
 import { setPayload, payload } from ".."
 
 const getExpectedExtension = (target: string) =>
-  target === "Curseforge" ? ".zip" : target === "Gdlauncher" ? ".gdlpack" : ".mrpack"
+  target === "Curseforge"
+    ? ".zip"
+    : target === "Gdlauncher"
+      ? ".gdlpack"
+      : ".mrpack"
 
 const ensureExtension = (filePath: string, target: string) => {
   const ext = getExpectedExtension(target)
@@ -75,7 +79,7 @@ const ExportPath = () => {
                 return
               }
 
-              const filePath = ensureExtension(result.filePath!, payload.target)
+              const filePath = ensureExtension(result.filePath, payload.target)
               setPath(filePath)
 
               setPayload({ ...payload, save_path: filePath })

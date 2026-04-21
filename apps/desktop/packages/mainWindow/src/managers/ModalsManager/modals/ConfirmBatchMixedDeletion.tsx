@@ -17,9 +17,9 @@ const ConfirmBatchMixedDeletion = (props: ModalProps) => {
   const [isDeleting, setIsDeleting] = createSignal(false)
   const [deletedCount, setDeletedCount] = createSignal(0)
   const [totalCount, setTotalCount] = createSignal(0)
-  const [currentPhase, setCurrentPhase] = createSignal<
-    "instances" | "folders"
-  >("instances")
+  const [currentPhase, setCurrentPhase] = createSignal<"instances" | "folders">(
+    "instances"
+  )
 
   const instances = () => (props?.data?.instances || []) as ListInstance[]
   const folders = () => (props?.data?.folders || []) as ListGroup[]
@@ -151,10 +151,7 @@ const ConfirmBatchMixedDeletion = (props: ModalProps) => {
           <Show when={instances().length > 0}>
             <div class="flex flex-col gap-2">
               <span class="text-lightSlate-100 text-sm font-medium">
-                <Trans
-                  key="instances:_trn_instances"
-                />{" "}
-                ({instances().length})
+                <Trans key="instances:_trn_instances" /> ({instances().length})
               </span>
               <div class="bg-darkSlate-700 max-h-40 overflow-y-auto rounded-lg p-3">
                 <For each={instances()}>
@@ -173,10 +170,7 @@ const ConfirmBatchMixedDeletion = (props: ModalProps) => {
           <Show when={folders().length > 0}>
             <div class="flex flex-col gap-2">
               <span class="text-lightSlate-100 text-sm font-medium">
-                <Trans
-                  key="instances:_trn_folders"
-                />{" "}
-                ({folders().length})
+                <Trans key="instances:_trn_folders" /> ({folders().length})
               </span>
               <div class="bg-darkSlate-700 max-h-40 overflow-y-auto rounded-lg p-3">
                 <For each={folderInstanceCounts()}>

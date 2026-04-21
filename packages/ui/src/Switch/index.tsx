@@ -60,7 +60,8 @@ const toggleStyles = cva(
 )
 
 interface Props
-  extends JSX.InputHTMLAttributes<HTMLInputElement>,
+  extends
+    JSX.InputHTMLAttributes<HTMLInputElement>,
     VariantProps<typeof switchStyles> {
   isIndeterminate?: boolean
   isLoading?: boolean

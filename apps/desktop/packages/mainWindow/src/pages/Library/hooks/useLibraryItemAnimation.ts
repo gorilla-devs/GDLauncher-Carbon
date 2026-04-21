@@ -42,7 +42,9 @@ export interface UseLibraryItemAnimationOptions {
 /**
  * Hook for managing library item entrance and spring animations.
  */
-export function useLibraryItemAnimation(options: UseLibraryItemAnimationOptions): void {
+export function useLibraryItemAnimation(
+  options: UseLibraryItemAnimationOptions
+): void {
   const {
     itemKey,
     itemId,
@@ -71,15 +73,14 @@ export function useLibraryItemAnimation(options: UseLibraryItemAnimationOptions)
     tileRefs.set(tileRefId, el)
 
     const shouldAnimate =
-      !reducedMotion() &&
-      !animatedIds.has(itemKey) &&
-      !initialComplete.value
+      !reducedMotion() && !animatedIds.has(itemKey) && !initialComplete.value
 
     const isNewlyCreatedFolder = isFolder && newlyCreatedFolderId?.() === itemId
 
     if (shouldAnimate) {
       animatedIds.add(itemKey)
-      const delay = ANIMATION.STAGGER_BASE + itemIndex() * ANIMATION.STAGGER_PER_ITEM
+      const delay =
+        ANIMATION.STAGGER_BASE + itemIndex() * ANIMATION.STAGGER_PER_ITEM
       const anim = el.animate([{ opacity: 0 }, { opacity: 1 }], {
         duration: ANIMATION.ENTRANCE_DURATION,
         delay,
@@ -130,4 +131,3 @@ export function useLibraryItemAnimation(options: UseLibraryItemAnimationOptions)
     tileRefs.delete(tileRefId)
   })
 }
-

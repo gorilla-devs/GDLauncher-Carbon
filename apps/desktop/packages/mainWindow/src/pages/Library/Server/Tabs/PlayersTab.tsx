@@ -26,8 +26,8 @@ const OP_LEVEL_KEYS: Record<string, string> = {
 
 const PlayersTab = () => {
   const [t] = useTransContext()
-  const params = useParams()
-  const serverId = () => parseInt(params.id!, 10)
+  const params = useParams<{ id: string }>()
+  const serverId = () => parseInt(params.id, 10)
 
   const opLevelLabel = (level: string) =>
     OP_LEVEL_KEYS[level]

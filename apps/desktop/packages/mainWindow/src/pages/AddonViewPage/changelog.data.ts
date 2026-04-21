@@ -2,7 +2,7 @@ import { rspc } from "@/utils/rspcClient"
 import { useParams } from "@solidjs/router"
 
 const useChangelogData = () => {
-  const params = useParams()
+  const params = useParams<{ id: string; platform: string }>()
 
   const isCurseforge = params.platform === "curseforge"
   const isModrinth = params.platform === "Modrinth"

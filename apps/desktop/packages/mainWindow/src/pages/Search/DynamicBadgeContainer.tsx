@@ -82,7 +82,9 @@ export default function DynamicBadgeContainer(props: {
                   type={category.icon?.type}
                   value={category.icon?.value}
                 />
-                {category.platform === "modrinth" ? formatModrinthCategory(category.name) : category.name}
+                {category.platform === "modrinth"
+                  ? formatModrinthCategory(category.name)
+                  : category.name}
               </Badge>
             )
           }}
@@ -147,7 +149,11 @@ export default function DynamicBadgeContainer(props: {
                             type={category.icon?.type}
                             value={category.icon?.value}
                           />
-                          <span class="text-xs">{category.platform === "modrinth" ? formatModrinthCategory(category.name) : category.name}</span>
+                          <span class="text-xs">
+                            {category.platform === "modrinth"
+                              ? formatModrinthCategory(category.name)
+                              : category.name}
+                          </span>
                         </div>
                       </Badge>
                     )

@@ -89,7 +89,7 @@ interface Props {
 
 const EXPIRATION_OPTIONS = [
   { value: "1", label: "_trn_instance_share.expiration_1d" },
-  { value: "7", label: "_trn_instance_share.expiration_7d" },
+  { value: "7", label: "_trn_instance_share.expiration_7d" }
   // { value: "30", label: "_trn_instance_share.expiration_30d" },
   // { value: "90", label: "_trn_instance_share.expiration_90d" }
 ] as const
@@ -192,7 +192,7 @@ function ShareInstance(props: ModalProps) {
       }
       if (data.finished) {
         setFileKey(data.finished)
-        sseStream.close()
+        sseStream?.close()
       }
     }
 
@@ -207,7 +207,7 @@ function ShareInstance(props: ModalProps) {
         toast.error(t("instances:_trn_share_errors.upload_failed"))
       }
       setIsLoading(false)
-      sseStream.close()
+      sseStream?.close()
     })
   }
 
@@ -338,7 +338,7 @@ function ShareInstance(props: ModalProps) {
                 <Select
                   class="flex shrink-0"
                   value={copyMode()}
-                  onChange={(val) => val && setCopyMode(val as "code" | "link")}
+                  onChange={(val) => val && setCopyMode(val)}
                   options={["code", "link"]}
                   itemComponent={(itemProps) => (
                     <SelectItem item={itemProps.item}>

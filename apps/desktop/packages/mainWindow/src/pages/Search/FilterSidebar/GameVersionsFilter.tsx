@@ -18,20 +18,22 @@ export function GameVersionsFilter() {
       })) || []
   )
 
-  const selectedCount = () => searchResults?.searchQuery().gameVersions?.length ?? 0
+  const selectedCount = () =>
+    searchResults?.searchQuery().gameVersions?.length ?? 0
 
-  const handleToggle = (value: string, checked: boolean) => {
+  const handleToggle = (value: string | number, checked: boolean) => {
+    const stringValue = typeof value === "number" ? String(value) : value
     searchResults?.setSearchQuery((prev) => {
       const prevGameVersions = prev.gameVersions || []
       if (checked) {
-        if (!prevGameVersions.includes(value)) {
+        if (!prevGameVersions.includes(stringValue)) {
           return {
             ...prev,
-            gameVersions: [...prevGameVersions, value]
+            gameVersions: [...prevGameVersions, stringValue]
           }
         }
       } else {
-        const filtered = prevGameVersions.filter((v) => v !== value)
+        const filtered = prevGameVersions.filter((v) => v !== stringValue)
         return {
           ...prev,
           gameVersions: filtered.length === 0 ? null : filtered
@@ -43,7 +45,12 @@ export function GameVersionsFilter() {
 
   return (
     <Collapsable
-      title={<div class="flex items-center gap-2"><div class="i-hugeicons:gameboy h-4 w-4" /><Trans key="search:_trn_game_versions" /></div>}
+      title={
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:gameboy h-4 w-4" />
+          <Trans key="search:_trn_game_versions" />
+        </div>
+      }
       defaultOpened={false}
       noPadding
       count={selectedCount()}

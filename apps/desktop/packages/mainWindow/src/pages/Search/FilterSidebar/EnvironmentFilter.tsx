@@ -23,7 +23,12 @@ export function EnvironmentFilter() {
 
   return (
     <Collapsable
-      title={<div class="flex items-center gap-2"><div class="i-hugeicons:computer h-4 w-4" /><Trans key="search:_trn_environment" /></div>}
+      title={
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:computer h-4 w-4" />
+          <Trans key="search:_trn_environment" />
+        </div>
+      }
       defaultOpened
       noPadding
       count={searchResults?.searchQuery().environment ? 1 : 0}

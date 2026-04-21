@@ -156,7 +156,9 @@ const RowContainer = (props: Props & AdditionalProps) => {
                     name={props.modVersion.name}
                     fileId={fileId()}
                     size="small"
-                    splitPosition={props.modVersion.serverPackFileId ? "left" : undefined}
+                    splitPosition={
+                      props.modVersion.serverPackFileId ? "left" : undefined
+                    }
                   />
                   <Show when={props.modVersion.serverPackFileId}>
                     <div class="w-px self-stretch bg-primary-700 shrink-0" />

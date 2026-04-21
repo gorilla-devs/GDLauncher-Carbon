@@ -12,7 +12,9 @@ export interface NestedEntry {
   entries: Record<string, NestedEntry> | null
 }
 
-export function buildNestedObject(paths: string[][]): Record<string, NestedEntry> {
+export function buildNestedObject(
+  paths: string[][]
+): Record<string, NestedEntry> {
   const root: Record<string, NestedEntry> = {}
 
   paths.forEach((path) => {

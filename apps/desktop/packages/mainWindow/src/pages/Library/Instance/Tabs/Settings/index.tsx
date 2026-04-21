@@ -29,7 +29,7 @@ const Settings = () => {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const searchContext = useSearchContext()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const updateInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.updateInstance"],
     onMutate: async (variables) => {

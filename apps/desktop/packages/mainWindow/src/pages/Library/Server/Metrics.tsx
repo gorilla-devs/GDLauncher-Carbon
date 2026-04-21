@@ -1,11 +1,7 @@
 import { port } from "@/utils/rspcClient"
 import { Progress } from "@gd/ui"
-import {
-  createEffect,
-  createSignal,
-  onCleanup,
-  Show
-} from "solid-js"
+import { Trans } from "@gd/i18n"
+import { createEffect, createSignal, onCleanup, Show } from "solid-js"
 
 interface MetricsProps {
   serverId: number
@@ -66,13 +62,15 @@ const Metrics = (props: MetricsProps) => {
 
   return (
     <div class="flex flex-col gap-4 rounded-xl border border-darkSlate-600 bg-darkSlate-900 p-4">
-      <h3 class="m-0 text-sm font-medium text-lightSlate-400">Metrics</h3>
+      <h3 class="m-0 text-sm font-medium text-lightSlate-400">
+        <Trans key="instances:_trn_server_metrics_title" />
+      </h3>
 
       <Show
         when={props.isRunning}
         fallback={
           <div class="flex items-center justify-center py-8 text-sm text-lightSlate-700">
-            Start the server to see metrics
+            <Trans key="instances:_trn_server_metrics_start_hint" />
           </div>
         }
       >
@@ -101,9 +99,14 @@ const Metrics = (props: MetricsProps) => {
         {/* Memory */}
         <div class="flex flex-col gap-1.5">
           <div class="flex items-center justify-between text-xs">
-            <span class="text-lightSlate-500">Memory</span>
+            <span class="text-lightSlate-500">
+              <Trans key="instances:_trn_server_metrics_memory" />
+            </span>
             <span class="font-mono text-lightSlate-300">
-              {memoryMb()} MB / {props.xmx} MB
+              <Trans
+                key="instances:_trn_server_metrics_memory_value"
+                options={{ used: memoryMb(), total: props.xmx }}
+              />
             </span>
           </div>
           <Progress
@@ -122,7 +125,9 @@ const Metrics = (props: MetricsProps) => {
 
         {/* Uptime */}
         <div class="flex items-center justify-between text-xs">
-          <span class="text-lightSlate-500">Uptime</span>
+          <span class="text-lightSlate-500">
+            <Trans key="instances:_trn_server_metrics_uptime" />
+          </span>
           <span class="font-mono text-lightSlate-300">
             {formatUptime(uptime())}
           </span>

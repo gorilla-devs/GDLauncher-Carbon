@@ -1,4 +1,11 @@
-import { createEffect, createSignal, JSX, onCleanup, onMount, untrack } from "solid-js"
+import {
+  createEffect,
+  createSignal,
+  JSX,
+  onCleanup,
+  onMount,
+  untrack
+} from "solid-js"
 import { useLocation } from "@solidjs/router"
 import initThemes from "./utils/theme"
 import { rspc } from "@/utils/rspcClient"
@@ -100,9 +107,7 @@ const App = (props: Props) => {
   return (
     <div class="relative w-screen">
       <div class="z-10 flex h-auto w-screen">
-        <main class="max-w-screen relative grow">
-          {props.children}
-        </main>
+        <main class="max-w-screen relative grow">{props.children}</main>
       </div>
     </div>
   )

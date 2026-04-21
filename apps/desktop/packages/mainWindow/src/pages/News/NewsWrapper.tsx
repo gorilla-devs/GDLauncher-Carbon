@@ -5,9 +5,7 @@ import { JSX } from "solid-js"
 export function NewsWrapper(props: { children?: JSX.Element }) {
   return (
     <NewsProvider>
-      <ContentWrapper zeroPadding>
-        {props.children}
-      </ContentWrapper>
+      <ContentWrapper zeroPadding>{props.children}</ContentWrapper>
     </NewsProvider>
   )
 }

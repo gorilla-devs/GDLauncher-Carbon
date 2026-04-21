@@ -157,14 +157,14 @@ export function useDragSelect(options: UseDragSelectOptions) {
       // Near or above top edge — scroll up
       const distance = containerRect.top + AUTO_SCROLL_EDGE_PX - mouseY
       scrollAmount = -Math.min(
-        Math.ceil(distance / AUTO_SCROLL_EDGE_PX * AUTO_SCROLL_MAX_SPEED),
+        Math.ceil((distance / AUTO_SCROLL_EDGE_PX) * AUTO_SCROLL_MAX_SPEED),
         AUTO_SCROLL_MAX_SPEED
       )
     } else if (mouseY > containerRect.bottom - AUTO_SCROLL_EDGE_PX) {
       // Near or below bottom edge — scroll down
       const distance = mouseY - (containerRect.bottom - AUTO_SCROLL_EDGE_PX)
       scrollAmount = Math.min(
-        Math.ceil(distance / AUTO_SCROLL_EDGE_PX * AUTO_SCROLL_MAX_SPEED),
+        Math.ceil((distance / AUTO_SCROLL_EDGE_PX) * AUTO_SCROLL_MAX_SPEED),
         AUTO_SCROLL_MAX_SPEED
       )
     }
@@ -215,7 +215,7 @@ export function useDragSelect(options: UseDragSelectOptions) {
 
   const handleMouseMove = (e: MouseEvent) => {
     const state = dragState()
-    if (!state || !state.isDragging) return
+    if (!state?.isDragging) return
 
     lastMouseY = e.clientY
 

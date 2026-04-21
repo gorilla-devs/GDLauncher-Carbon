@@ -232,7 +232,13 @@ export const propertyGroups: PropertyGroup[] = [
           "minecraft\\:amplified",
           "minecraft\\:single_biome_surface"
         ],
-        enumLabels: ["Normal", "Superflat", "Large Biomes", "Amplified", "Single Biome"],
+        enumLabels: [
+          "Normal",
+          "Superflat",
+          "Large Biomes",
+          "Amplified",
+          "Single Biome"
+        ],
         info: "World generator preset. Normal generates standard terrain. Superflat creates a flat world. Large Biomes increases biome size by 16x. Amplified exaggerates terrain height. Single Biome generates the entire world as one biome."
       },
       {
@@ -285,7 +291,11 @@ export const propertyGroups: PropertyGroup[] = [
         type: "enum",
         defaultValue: "deflate",
         enumValues: ["deflate", "lz4", "none"],
-        enumLabels: ["Deflate (default, most compatible)", "LZ4 (faster, slightly larger)", "None (no compression)"],
+        enumLabels: [
+          "Deflate (default, most compatible)",
+          "LZ4 (faster, slightly larger)",
+          "None (no compression)"
+        ],
         info: "Algorithm used to compress region files. Deflate is the standard format with maximum compatibility. LZ4 is ~2-3x faster but produces slightly larger files. Changing this does not recompress existing chunks.",
         minVersion: "1.20.5"
       }

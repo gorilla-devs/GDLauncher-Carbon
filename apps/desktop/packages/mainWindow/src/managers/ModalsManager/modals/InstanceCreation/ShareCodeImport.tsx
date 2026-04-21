@@ -1,6 +1,14 @@
 import { Input } from "@gd/ui"
 import { useModal } from "../.."
-import { createEffect, createMemo, createSignal, Match, on, onCleanup, Switch } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  Match,
+  on,
+  onCleanup,
+  Switch
+} from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { parseShareInput } from "@/utils/searchQueryParser"
 import SharePreviewContent from "@/components/SharePreviewContent"
@@ -36,7 +44,10 @@ const ShareCodeImport = () => {
         {/* Input section */}
         <div class="relative mb-4 shrink-0 flex justify-center">
           <Input
-            placeholder={t("instances:_trn_share_preview.input_placeholder") || "Share code or gdl.gg link"}
+            placeholder={
+              t("instances:_trn_share_preview.input_placeholder") ||
+              "Share code or gdl.gg link"
+            }
             class={`w-full max-w-xs h-12 rounded-lg ${debouncedCode() ? "ring-2 ring-green-500" : shareInput() && !parsedShareCode() ? "ring-2 ring-red-500" : ""}`}
             inputClass="text-base text-center"
             inputColor="bg-darkSlate-800"

@@ -17,7 +17,10 @@ export { useFLIPAnimation, useEntranceAnimation } from "./useFLIPAnimation"
 export { useLibraryDragDrop } from "./useLibraryDragDrop"
 
 export { useDropIndicators } from "./useDropIndicators"
-export type { UseDropIndicatorsOptions, DropIndicatorState } from "./useDropIndicators"
+export type {
+  UseDropIndicatorsOptions,
+  DropIndicatorState
+} from "./useDropIndicators"
 
 export { useDropZoneRegistration } from "./useDropZoneRegistration"
 export type { UseDropZoneRegistrationOptions } from "./useDropZoneRegistration"

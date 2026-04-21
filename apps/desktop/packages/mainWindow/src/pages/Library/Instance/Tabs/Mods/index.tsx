@@ -23,7 +23,7 @@ import { useModal } from "@/managers/ModalsManager"
 
 const Mods = () => {
   const [t] = useTransContext()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
   const modalsContext = useModal()
 

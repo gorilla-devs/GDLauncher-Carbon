@@ -74,7 +74,10 @@ export function useDropZoneRegistration(
     if (!isFolder || !el) return
 
     const dtype = dragContext.dragType()
-    if (dragContext.isDragging() && (dtype === "instance" || dtype === "server")) {
+    if (
+      dragContext.isDragging() &&
+      (dtype === "instance" || dtype === "server")
+    ) {
       const rect = el.getBoundingClientRect()
       // Register drop zone on left edge
       const dropRect = new DOMRect(
@@ -102,7 +105,10 @@ export function useDropZoneRegistration(
     if (!isReorderable || !el) return
 
     const dtype = dragContext.dragType()
-    if (dragContext.isDragging() && (dtype === "instance" || dtype === "server")) {
+    if (
+      dragContext.isDragging() &&
+      (dtype === "instance" || dtype === "server")
+    ) {
       // Don't register drop zone for dragged instances
       if (dragContext.draggedIds().includes(itemId)) {
         dragContext.unregisterDropZone(`before-instance-${itemId}`)

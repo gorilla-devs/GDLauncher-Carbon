@@ -55,9 +55,9 @@ interface InstancePage {
 
 const Instance = (props: { children?: any }) => {
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const location = useLocation()
-  const instanceId = () => parseInt(params.id!, 10)
+  const instanceId = () => parseInt(params.id, 10)
   const [editableName, setEditableName] = createSignal(false)
   const [isFavorite, setIsFavorite] = createSignal(false)
   const routeData = useInstanceData()
@@ -80,13 +80,10 @@ const Instance = (props: { children?: any }) => {
     mutationKey: ["instance.setFavorite"],
     onMutate: async (
       obj
-    ): Promise<
-      | {
-          instancesUngrouped: ListInstance[]
-          instanceDetails: InstanceDetails
-        }
-      | undefined
-    > => {
+    ): Promise<{
+      instancesUngrouped: ListInstance[]
+      instanceDetails: InstanceDetails
+    }> => {
       await queryClient.cancelQueries({
         queryKey: ["instance.getInstanceDetails", instanceId()]
       })
@@ -94,11 +91,13 @@ const Instance = (props: { children?: any }) => {
         queryKey: ["instance.getAllInstances"]
       })
 
-      const instancesUngrouped: ListInstance[] | undefined =
-        queryClient.getQueryData(["instance.getAllInstances"])
+      const instancesUngrouped: ListInstance[] =
+        queryClient.getQueryData(["instance.getAllInstances"]) ?? []
 
-      const instanceDetails: InstanceDetails | undefined =
-        queryClient.getQueryData(["instance.getInstanceDetails", instanceId()])
+      const instanceDetails = queryClient.getQueryData<InstanceDetails>([
+        "instance.getInstanceDetails",
+        instanceId()
+      ])
 
       queryClient.setQueryData(
         ["instance.getInstanceDetails", instanceId()],
@@ -110,8 +109,10 @@ const Instance = (props: { children?: any }) => {
         }
       )
 
-      if (instancesUngrouped && instanceDetails)
-        return { instancesUngrouped, instanceDetails }
+      return {
+        instancesUngrouped,
+        instanceDetails: instanceDetails ?? ({} as InstanceDetails)
+      }
     },
     onSettled() {
       queryClient.invalidateQueries({
@@ -309,7 +310,7 @@ const Instance = (props: { children?: any }) => {
         name: "instanceCreation"
       },
       {
-        id: params.id!,
+        id: params.id,
         modloader: routeData.instanceDetails.data?.modloaders[0]?.type_,
         title: routeData.instanceDetails.data?.name,
         mcVersion: routeData.instanceDetails.data?.version,
@@ -317,7 +318,7 @@ const Instance = (props: { children?: any }) => {
           routeData.instanceDetails.data?.modloaders[0]?.version,
         img: routeData.instanceDetails.data?.iconRevision
           ? getInstanceImageUrl(
-              params.id!,
+              params.id,
               routeData.instanceDetails.data?.iconRevision
             )
           : null
@@ -402,7 +403,7 @@ const Instance = (props: { children?: any }) => {
   const iconUrl = () =>
     routeData.instanceDetails.data?.iconRevision
       ? getInstanceImageUrl(
-          params.id!,
+          params.id,
           routeData.instanceDetails.data?.iconRevision
         )
       : DefaultImg

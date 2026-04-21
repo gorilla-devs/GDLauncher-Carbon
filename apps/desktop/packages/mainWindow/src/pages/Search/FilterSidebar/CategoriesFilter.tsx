@@ -16,9 +16,7 @@ export function CategoriesFilter() {
 
   const curseforgeCategories = createMemo(() =>
     Object.values(categories.data?.curseforge ?? {})
-      .filter(
-        (v) => v.projectType === searchResults?.searchQuery().projectType
-      )
+      .filter((v) => v.projectType === searchResults?.searchQuery().projectType)
       .map((category) => ({
         label: category.name,
         value: category.id,
@@ -28,9 +26,7 @@ export function CategoriesFilter() {
 
   const modrinthCategories = createMemo(() =>
     Object.values(categories.data?.modrinth ?? {})
-      .filter(
-        (v) => v.projectType === searchResults?.searchQuery().projectType
-      )
+      .filter((v) => v.projectType === searchResults?.searchQuery().projectType)
       .map((category) => ({
         label: formatModrinthCategory(category.name),
         value: category.id,
@@ -47,13 +43,18 @@ export function CategoriesFilter() {
     return !selected || selected === api
   }
 
-  const selectedCount = () => searchResults?.searchQuery().categories?.length ?? 0
+  const selectedCount = () =>
+    searchResults?.searchQuery().categories?.length ?? 0
 
-  const toggleCategory = (categoryValue: string, checked: boolean) => {
+  const toggleCategory = (categoryValue: string | number, checked: boolean) => {
+    const id =
+      typeof categoryValue === "string"
+        ? parseInt(categoryValue, 10)
+        : categoryValue
     searchResults?.setSearchQuery((prev) => {
       const updated = checked
-        ? [...(prev.categories || []), categoryValue]
-        : (prev.categories || []).filter((v) => v !== categoryValue)
+        ? [...(prev.categories || []), id]
+        : (prev.categories || []).filter((v) => v !== id)
       return {
         ...prev,
         categories: updated.length === 0 ? null : updated
@@ -63,7 +64,12 @@ export function CategoriesFilter() {
 
   return (
     <Collapsable
-      title={<div class="flex items-center gap-2"><div class="i-hugeicons:folder-01 h-4 w-4" /><Trans key="search:_trn_categories" /></div>}
+      title={
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:folder-01 h-4 w-4" />
+          <Trans key="search:_trn_categories" />
+        </div>
+      }
       defaultOpened
       noPadding
       count={selectedCount()}
@@ -85,7 +91,9 @@ export function CategoriesFilter() {
             </div>
             <SearchableCheckboxList
               items={curseforgeCategories()}
-              selectedValues={() => searchResults?.searchQuery().categories || []}
+              selectedValues={() =>
+                searchResults?.searchQuery().categories || []
+              }
               onToggle={toggleCategory}
               showSearch={false}
               emptyMessage={<Trans key="search:_trn_no_categories_found" />}
@@ -107,7 +115,9 @@ export function CategoriesFilter() {
             </div>
             <SearchableCheckboxList
               items={modrinthCategories()}
-              selectedValues={() => searchResults?.searchQuery().categories || []}
+              selectedValues={() =>
+                searchResults?.searchQuery().categories || []
+              }
               onToggle={toggleCategory}
               showSearch={false}
               emptyMessage={<Trans key="search:_trn_no_categories_found" />}

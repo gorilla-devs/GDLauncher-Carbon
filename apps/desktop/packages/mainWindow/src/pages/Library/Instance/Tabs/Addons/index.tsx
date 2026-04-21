@@ -44,7 +44,7 @@ const ADDON_TYPES: AddonType[] = [
 const Addons = () => {
   const [t] = useTransContext()
   const routeData = useInstanceData()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const modalsContext = useModal()
   const navigator = useGDNavigate()
   let tableInstance: any = null
@@ -99,7 +99,7 @@ const Addons = () => {
     })
   }
 
-  const instanceId = () => parseInt(params.id!, 10)
+  const instanceId = () => parseInt(params.id, 10)
 
   const columns = createAddonColumns({
     selectedCount: () => getSelectedRows().length,

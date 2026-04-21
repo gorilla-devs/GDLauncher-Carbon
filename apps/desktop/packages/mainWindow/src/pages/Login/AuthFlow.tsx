@@ -82,7 +82,11 @@ interface AuthFlowInnerProps {
 
 function AuthFlowInner(props: AuthFlowInnerProps) {
   const globalStore = useGlobalStore()
-  const [searchParams] = useSearchParams()
+  const [searchParams] = useSearchParams<{
+    addMicrosoftAccount: string
+    addGdlAccount: string
+    returnTo: string
+  }>()
   const rspcContext = rspc.useContext()
 
   // Extract configuration from global store
@@ -1069,7 +1073,8 @@ function AuthFlowContent() {
             <Show
               when={
                 getStepAs("gdl-account")?.gdlAccount?.type === "none" &&
-                (flow.data.gdlAccountId !== "" || flow.data.isAddingGdlFromSettings)
+                (flow.data.gdlAccountId !== "" ||
+                  flow.data.isAddingGdlFromSettings)
               }
             >
               <Button

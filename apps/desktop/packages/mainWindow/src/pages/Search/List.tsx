@@ -17,7 +17,7 @@ import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 export function List() {
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ type: string }>()
 
   const allRows = () => searchContext?.allRows() || []
 
@@ -115,131 +115,145 @@ export function List() {
         <Show when={searchContext?.isShareMode() && searchContext?.shareCode()}>
           <div class="flex h-full justify-center overflow-auto px-6 pt-6">
             <div class="w-full max-w-2xl h-full pb-6">
-              <SharePreviewContent shareCode={searchContext!.shareCode()!} expandMods />
+              <SharePreviewContent
+                shareCode={searchContext!.shareCode()}
+                expandMods
+              />
             </div>
           </div>
         </Show>
         <Show when={!searchContext?.isShareMode()}>
-        <Switch>
-          <Match when={searchContext?.viewMode() === "grid"}>
-            <Grid />
-          </Match>
-          <Match when={searchContext?.viewMode() === "list"}>
-            <Show
-              when={!searchContext?.isInitialLoading() || allRows().some(r => r.type === 'value')}
-              fallback={<Skeleton.searchList />}
-            >
+          <Switch>
+            <Match when={searchContext?.viewMode() === "grid"}>
+              <Grid />
+            </Match>
+            <Match when={searchContext?.viewMode() === "list"}>
               <Show
-                when={allRows().length > 0}
-                fallback={
-                  <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
-                    <PlaceholderGorilla
-                      size={12}
-                      variant="Searching Gorilla - Magnifying Glass"
-                    />
-                    <h3 class="mb-2 mt-6 text-xl font-semibold text-gray-300">
-                      <Trans key="search:_trn_no_results_found" />
-                    </h3>
-                    <p class="max-w-md text-gray-500">
-                      <Trans
-                        key="search:_trn_no_results_description"
-                        options={{ type: type() }}
-                      />
-                    </p>
-                  </div>
+                when={
+                  !searchContext?.isInitialLoading() ||
+                  allRows().some((r) => r.type === "value")
                 }
+                fallback={<Skeleton.searchList />}
               >
-                <VList
-                  data={allRows()}
-                  class="flex h-full max-w-full flex-col gap-4 overflow-auto px-6 pb-6"
-                  ref={(v) => {
-                    if (v) {
-                      searchContext?.setRef(v)
-                      // Restore scroll position when VList mounts
-                      queueMicrotask(() => {
-                        v.scrollTo(searchContext?.lastScrollOffset() ?? 0)
-                      })
-                    }
-                  }}
-                  onScroll={searchContext?.virtualOnScrollHandler}
+                <Show
+                  when={allRows().length > 0}
+                  fallback={
+                    <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
+                      <PlaceholderGorilla
+                        size={12}
+                        variant="Searching Gorilla - Magnifying Glass"
+                      />
+                      <h3 class="mb-2 mt-6 text-xl font-semibold text-gray-300">
+                        <Trans key="search:_trn_no_results_found" />
+                      </h3>
+                      <p class="max-w-md text-gray-500">
+                        <Trans
+                          key="search:_trn_no_results_description"
+                          options={{ type: type() }}
+                        />
+                      </p>
+                    </div>
+                  }
                 >
-                  {(result) => {
-                    if (result.type === "loader") {
-                      return <Skeleton.searchListItem />
-                    }
+                  <VList
+                    data={allRows()}
+                    class="flex h-full max-w-full flex-col gap-4 overflow-auto px-6 pb-6"
+                    ref={(v) => {
+                      if (v) {
+                        searchContext?.setRef(v)
+                        // Restore scroll position when VList mounts
+                        queueMicrotask(() => {
+                          v.scrollTo(searchContext?.lastScrollOffset() ?? 0)
+                        })
+                      }
+                    }}
+                    onScroll={searchContext?.virtualOnScrollHandler}
+                  >
+                    {(result) => {
+                      if (result.type === "loader") {
+                        return <Skeleton.searchListItem />
+                      }
 
-                    if (result.type === "skeleton") {
-                      return (
-                        <div class="my-1 overflow-hidden rounded-md">
-                          <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent px-8 py-4">
-                            <div class="relative z-10 flex w-full items-center gap-4">
-                              <div class="bg-darkSlate-500 skeleton-shimmer relative flex h-16 w-16 items-center justify-center rounded-md">
-                                <Show when={result.platform}>
-                                  <img
-                                    src={result.platform === "curseforge" ? CurseforgeLogo : ModrinthLogo}
-                                    class="h-6 w-6 opacity-40"
-                                    alt={`${result.platform} logo`}
-                                  />
-                                </Show>
-                              </div>
-                              <div class="w-7/10 flex flex-col gap-2">
-                                <div class="truncate text-left text-xl font-medium">
-                                  <div class="bg-darkSlate-500 skeleton-shimmer h-7 w-3/4 rounded-md" />
+                      if (result.type === "skeleton") {
+                        return (
+                          <div class="my-1 overflow-hidden rounded-md">
+                            <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent px-8 py-4">
+                              <div class="relative z-10 flex w-full items-center gap-4">
+                                <div class="bg-darkSlate-500 skeleton-shimmer relative flex h-16 w-16 items-center justify-center rounded-md">
+                                  <Show when={result.platform}>
+                                    <img
+                                      src={
+                                        result.platform === "curseforge"
+                                          ? CurseforgeLogo
+                                          : ModrinthLogo
+                                      }
+                                      class="h-6 w-6 opacity-40"
+                                      alt={`${result.platform} logo`}
+                                    />
+                                  </Show>
                                 </div>
-                                <div class="text-lightSlate-700 truncate text-left text-sm">
-                                  <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-full rounded-md" />
+                                <div class="w-7/10 flex flex-col gap-2">
+                                  <div class="truncate text-left text-xl font-medium">
+                                    <div class="bg-darkSlate-500 skeleton-shimmer h-7 w-3/4 rounded-md" />
+                                  </div>
+                                  <div class="text-lightSlate-700 truncate text-left text-sm">
+                                    <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-full rounded-md" />
+                                  </div>
+                                  <div class="flex items-center gap-2 py-1">
+                                    <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-16 rounded-md" />
+                                    <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-20 rounded-md" />
+                                  </div>
                                 </div>
-                                <div class="flex items-center gap-2 py-1">
-                                  <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-16 rounded-md" />
-                                  <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-20 rounded-md" />
-                                </div>
-                              </div>
-                              <div class="ml-auto flex items-center">
-                                <div class="relative flex items-center">
-                                  <div class="flex items-center gap-2">
-                                    <div class="text-lightSlate-700 text-sm">
-                                      <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-14 rounded-md" />
+                                <div class="ml-auto flex items-center">
+                                  <div class="relative flex items-center">
+                                    <div class="flex items-center gap-2">
+                                      <div class="text-lightSlate-700 text-sm">
+                                        <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-14 rounded-md" />
+                                      </div>
+                                      <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-12 rounded" />
                                     </div>
-                                    <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-12 rounded" />
                                   </div>
                                 </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    }
+                        )
+                      }
 
-                    return (
-                      <ListItem
-                        instanceMods={instanceMods()?.data ?? undefined}
-                        serverAddons={serverAddons()?.data ?? undefined}
-                        instanceId={instanceId()}
-                        serverId={serverId()}
-                        result={result.value!}
-                        isInstalled={
-                          !isNaN(serverId()) && serverId() > 0
-                            ? isServerAddonInstalled(result.value!.id, result.value!.slug)
-                            : lookupTableInstalledMods().has(result.value!.id)
-                        }
-                        onItemClick={() => {
-                          const sid = serverId()
-                          const iid = instanceId()
-                          const idParam = !isNaN(sid) && sid > 0
-                            ? `serverId=${sid}`
-                            : `instanceId=${iid}`
-                          navigator.navigate(
-                            `/addon/${result.value!.id}/${result.value!.platform}?${idParam}`
-                          )
-                        }}
-                      />
-                    )
-                  }}
-                </VList>
+                      return (
+                        <ListItem
+                          instanceMods={instanceMods()?.data ?? undefined}
+                          serverAddons={serverAddons()?.data ?? undefined}
+                          instanceId={instanceId()}
+                          serverId={serverId()}
+                          result={result.value!}
+                          isInstalled={
+                            !isNaN(serverId()) && serverId() > 0
+                              ? isServerAddonInstalled(
+                                  result.value!.id,
+                                  result.value!.slug
+                                )
+                              : lookupTableInstalledMods().has(result.value!.id)
+                          }
+                          onItemClick={() => {
+                            const sid = serverId()
+                            const iid = instanceId()
+                            const idParam =
+                              !isNaN(sid) && sid > 0
+                                ? `serverId=${sid}`
+                                : `instanceId=${iid}`
+                            navigator.navigate(
+                              `/addon/${result.value!.id}/${result.value!.platform}?${idParam}`
+                            )
+                          }}
+                        />
+                      )
+                    }}
+                  </VList>
+                </Show>
               </Show>
-            </Show>
-          </Match>
-        </Switch>
+            </Match>
+          </Switch>
         </Show>
       </div>
     </div>

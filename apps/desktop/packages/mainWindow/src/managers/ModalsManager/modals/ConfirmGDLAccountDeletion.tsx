@@ -47,7 +47,8 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
                 throw new Error("No active gdl account")
               }
 
-              const result = await requestAccountDeletionMutation.mutateAsync(uuid)
+              const result =
+                await requestAccountDeletionMutation.mutateAsync(uuid)
               if (result === "success") {
                 toast.success("Deletion Request Sent", {
                   description: "Check your email"

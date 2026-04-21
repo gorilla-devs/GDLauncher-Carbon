@@ -51,31 +51,14 @@ export function LibraryHeader(props: LibraryHeaderProps) {
 
   const isServerMode = () => props.libraryMode() === "servers"
 
-  // Mode-aware settings accessors
-  const currentTileSize = () =>
-    isServerMode()
-      ? globalStore.settings.data?.serversTileSize
-      : globalStore.settings.data?.instancesTileSize
+  // Settings accessors — servers and instances share the instances* settings
+  const currentGroupBy = () => globalStore.settings.data?.instancesGroupBy
 
-  const currentGroupBy = () =>
-    isServerMode()
-      ? globalStore.settings.data?.serversGroupBy
-      : globalStore.settings.data?.instancesGroupBy
+  const currentGroupByAsc = () => globalStore.settings.data?.instancesGroupByAsc
 
-  const currentGroupByAsc = () =>
-    isServerMode()
-      ? globalStore.settings.data?.serversGroupByAsc
-      : globalStore.settings.data?.instancesGroupByAsc
+  const currentSortBy = () => globalStore.settings.data?.instancesSortBy
 
-  const currentSortBy = () =>
-    isServerMode()
-      ? globalStore.settings.data?.serversSortBy
-      : globalStore.settings.data?.instancesSortBy
-
-  const currentSortByAsc = () =>
-    isServerMode()
-      ? globalStore.settings.data?.serversSortByAsc
-      : globalStore.settings.data?.instancesSortByAsc
+  const currentSortByAsc = () => globalStore.settings.data?.instancesSortByAsc
 
   // Sort by options for accordion mode
   const instanceSortByOptions: { key: InstancesSortBy; label: string }[] = [
@@ -93,10 +76,14 @@ export function LibraryHeader(props: LibraryHeaderProps) {
     { key: "created", label: t("ui:_trn_created") }
   ]
 
-  const sortByOptions = () => isServerMode() ? serverSortByOptions : instanceSortByOptions
+  const sortByOptions = () =>
+    isServerMode() ? serverSortByOptions : instanceSortByOptions
 
   // Group by options
-  const instanceGroupByOptions: { key: InstancesGroupBy | null; label: string }[] = [
+  const instanceGroupByOptions: {
+    key: InstancesGroupBy | null
+    label: string
+  }[] = [
     { key: null, label: t("ui:_trn_folders") },
     { key: "gameVersion", label: t("ui:_trn_game_version") },
     { key: "modloader", label: t("ui:_trn_modloader") },
@@ -108,106 +95,66 @@ export function LibraryHeader(props: LibraryHeaderProps) {
     { key: "gameVersion", label: t("ui:_trn_game_version") }
   ]
 
-  const groupByOptions = () => isServerMode() ? serverGroupByOptions : instanceGroupByOptions
+  const groupByOptions = () =>
+    isServerMode() ? serverGroupByOptions : instanceGroupByOptions
 
   const isFoldersView = () => props.viewMode() === "folders"
 
-  // Mode-aware setting helpers
+  // Setting helpers — servers and instances share the instances* settings
   const setTileSizeSetting = (size: number) => {
-    if (isServerMode()) {
-      settingsMutation.mutate({ serversTileSize: { Set: size } })
-    } else {
-      settingsMutation.mutate({ instancesTileSize: { Set: size } })
-    }
+    settingsMutation.mutate({ instancesTileSize: { Set: size } })
   }
 
   const setSortBySetting = (key: string, asc: boolean) => {
-    if (isServerMode()) {
-      settingsMutation.mutate({
-        serversSortBy: { Set: key },
-        serversSortByAsc: { Set: asc }
-      })
-    } else {
-      settingsMutation.mutate({
-        instancesSortBy: { Set: key },
-        instancesSortByAsc: { Set: asc }
-      })
-    }
+    settingsMutation.mutate({
+      instancesSortBy: { Set: key as InstancesSortBy },
+      instancesSortByAsc: { Set: asc }
+    })
   }
 
   const setSortByAsc = (asc: boolean) => {
-    if (isServerMode()) {
-      settingsMutation.mutate({ serversSortByAsc: { Set: asc } })
-    } else {
-      settingsMutation.mutate({ instancesSortByAsc: { Set: asc } })
-    }
+    settingsMutation.mutate({ instancesSortByAsc: { Set: asc } })
   }
 
   const setGroupBySetting = (key: string | null) => {
-    if (isServerMode()) {
-      if (key === null) {
-        settingsMutation.mutate({
-          serversGroupBy: { Set: null },
-          serversSortBy: { Set: null },
-          serversGroupByAsc: { Set: true }
-        })
-      } else {
-        settingsMutation.mutate({
-          serversGroupBy: { Set: key },
-          serversSortBy: { Set: "name" },
-          serversGroupByAsc: { Set: true }
-        })
-      }
+    if (key === null) {
+      settingsMutation.mutate({
+        instancesGroupBy: { Set: null },
+        instancesSortBy: { Set: null },
+        instancesGroupByAsc: { Set: true }
+      })
     } else {
-      if (key === null) {
-        settingsMutation.mutate({
-          instancesGroupBy: { Set: null },
-          instancesSortBy: { Set: null },
-          instancesGroupByAsc: { Set: true }
-        })
-      } else {
-        settingsMutation.mutate({
-          instancesGroupBy: { Set: key },
-          instancesSortBy: { Set: "name" },
-          instancesGroupByAsc: { Set: true }
-        })
-      }
+      settingsMutation.mutate({
+        instancesGroupBy: { Set: key as InstancesGroupBy },
+        instancesSortBy: { Set: "name" },
+        instancesGroupByAsc: { Set: true }
+      })
     }
   }
 
   const setGroupByAsc = (asc: boolean) => {
-    if (isServerMode()) {
-      settingsMutation.mutate({ serversGroupByAsc: { Set: asc } })
-    } else {
-      settingsMutation.mutate({ instancesGroupByAsc: { Set: asc } })
-    }
+    settingsMutation.mutate({ instancesGroupByAsc: { Set: asc } })
   }
 
   const resetFilters = () => {
-    if (isServerMode()) {
-      settingsMutation.mutate({
-        serversTileSize: { Set: 2 },
-        serversSortBy: { Set: null },
-        serversSortByAsc: { Set: false },
-        serversGroupBy: { Set: null },
-        serversGroupByAsc: { Set: true }
-      })
-    } else {
-      settingsMutation.mutate({
-        instancesTileSize: { Set: 2 },
-        instancesSortBy: { Set: null },
-        instancesSortByAsc: { Set: false },
-        instancesGroupBy: { Set: null },
-        instancesGroupByAsc: { Set: true }
-      })
-    }
+    settingsMutation.mutate({
+      instancesTileSize: { Set: 2 },
+      instancesSortBy: { Set: null },
+      instancesSortByAsc: { Set: false },
+      instancesGroupBy: { Set: null },
+      instancesGroupByAsc: { Set: true }
+    })
     props.setTileSize(2)
   }
 
   return (
     <div class="bg-darkSlate-800 z-5 sticky top-0 flex items-center gap-4 py-4">
       {/* Library Mode Toggle */}
-      <Tabs value={props.libraryMode()} onChange={(v) => props.setLibraryMode(v as LibraryMode)} class="h-auto w-auto flex-shrink-0">
+      <Tabs
+        value={props.libraryMode()}
+        onChange={(v) => props.setLibraryMode(v as LibraryMode)}
+        class="h-auto w-auto flex-shrink-0"
+      >
         <TabsList class="p-0.5" size="small">
           <TabsIndicator />
           <TabsTrigger value="instances">
@@ -219,7 +166,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
           <TabsTrigger value="servers">
             <div class="relative flex items-center gap-1.5">
               <div class="i-hugeicons:server-stack-01 h-3.5 w-3.5" />
-              Servers
+              <Trans key="instances:_trn_library_mode_servers" />
               <div class="absolute -top-5 -right-4">
                 <FeatureStatusBadge type="beta" />
               </div>
@@ -230,7 +177,11 @@ export function LibraryHeader(props: LibraryHeaderProps) {
 
       <Input
         ref={inputRef}
-        placeholder={isServerMode() ? t("search:_trn_search_servers") : t("search:_trn_search_instances")}
+        placeholder={
+          isServerMode()
+            ? t("search:_trn_search_servers")
+            : t("search:_trn_search_instances")
+        }
         value={props.filter()}
         class="w-full rounded-full"
         onInput={(e) => props.setFilter(e.target.value)}

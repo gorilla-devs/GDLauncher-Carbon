@@ -7,6 +7,7 @@ import { capitalize } from "@/utils/helpers"
 import { ModloaderIcon } from "@/utils/sidebar"
 import { FilterWarning } from "./shared"
 import { SearchableCheckboxList } from "./SearchableCheckboxList"
+import type { FEUnifiedModLoaderType } from "@gd/core_module/bindings"
 
 export function ModloadersFilter() {
   const globalStore = useGlobalStore()
@@ -21,20 +22,22 @@ export function ModloadersFilter() {
       })) || []
   )
 
-  const selectedCount = () => searchResults?.searchQuery().modloaders?.length ?? 0
+  const selectedCount = () =>
+    searchResults?.searchQuery().modloaders?.length ?? 0
 
-  const handleToggle = (value: string, checked: boolean) => {
+  const handleToggle = (value: string | number, checked: boolean) => {
+    const ml = String(value) as FEUnifiedModLoaderType
     searchResults?.setSearchQuery((prev) => {
       const prevModloaders = prev.modloaders || []
       if (checked) {
-        if (!prevModloaders.includes(value)) {
+        if (!prevModloaders.includes(ml)) {
           return {
             ...prev,
-            modloaders: [...prevModloaders, value]
+            modloaders: [...prevModloaders, ml]
           }
         }
       } else {
-        const filtered = prevModloaders.filter((m) => m !== value)
+        const filtered = prevModloaders.filter((m) => m !== ml)
         return {
           ...prev,
           modloaders: filtered.length === 0 ? null : filtered
@@ -46,7 +49,12 @@ export function ModloadersFilter() {
 
   return (
     <Collapsable
-      title={<div class="flex items-center gap-2"><div class="i-hugeicons:puzzle h-4 w-4" /><Trans key="search:_trn_modloaders" /></div>}
+      title={
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:puzzle h-4 w-4" />
+          <Trans key="search:_trn_modloaders" />
+        </div>
+      }
       defaultOpened
       noPadding
       count={selectedCount()}

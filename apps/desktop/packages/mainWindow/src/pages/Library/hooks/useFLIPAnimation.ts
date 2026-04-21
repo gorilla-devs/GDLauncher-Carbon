@@ -24,12 +24,16 @@ interface UseFLIPAnimationOptions {
  * Hook for FLIP animations during library item reordering.
  * All state is component-scoped (no module-level mutable state).
  */
-export function useFLIPAnimation(options: UseFLIPAnimationOptions): FLIPAnimation {
+export function useFLIPAnimation(
+  options: UseFLIPAnimationOptions
+): FLIPAnimation {
   // Component-scoped refs map (cleaned up on unmount)
   const itemRefs = new Map<string, HTMLDivElement>()
 
   // Component-scoped state
-  const [positionSnapshot, setPositionSnapshot] = createSignal<Map<string, DOMRect>>(new Map())
+  const [positionSnapshot, setPositionSnapshot] = createSignal<
+    Map<string, DOMRect>
+  >(new Map())
   const [orderSnapshot, setOrderSnapshot] = createSignal<string[] | null>(null)
   const [isAnimating, setIsAnimating] = createSignal(false)
 
@@ -107,7 +111,7 @@ export function useFLIPAnimation(options: UseFLIPAnimationOptions): FLIPAnimatio
     // Single RAF with staleness validation
     requestAnimationFrame(() => {
       // Verify elements still valid before animating
-      const stillValid = Array.from(positionSnapshot().keys()).every(key => {
+      const stillValid = Array.from(positionSnapshot().keys()).every((key) => {
         const el = itemRefs.get(key)
         return el && el.isConnected && el.offsetParent !== null
       })
@@ -133,7 +137,7 @@ export function useFLIPAnimation(options: UseFLIPAnimationOptions): FLIPAnimatio
     // This ensures items that were recreated during DOM reconciliation still animate
     oldPositions.forEach((oldRect, key) => {
       const el = itemRefs.get(key)
-      if (!el || !el.isConnected) return
+      if (!el?.isConnected) return
 
       const newRect = el.getBoundingClientRect()
 
@@ -167,7 +171,7 @@ export function useFLIPAnimation(options: UseFLIPAnimationOptions): FLIPAnimatio
     })
 
     // Ensure all elements visible after animation completes
-    Promise.all(animations.map(a => a.finished)).finally(() => {
+    Promise.all(animations.map((a) => a.finished)).finally(() => {
       oldPositions.forEach((_, key) => {
         const el = itemRefs.get(key)
         if (el) el.style.opacity = "1"
@@ -234,7 +238,6 @@ const [_initialCompleteSignal, _setInitialCompleteSignal] = createSignal(false)
  * Uses module-scoped state so animations don't replay on navigation.
  */
 export function useEntranceAnimation(): EntranceAnimationReturn {
-
   /**
    * Check if an item should animate on mount.
    */

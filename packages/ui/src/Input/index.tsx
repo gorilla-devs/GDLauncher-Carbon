@@ -88,7 +88,8 @@ const container = cva(
 )
 
 interface Props
-  extends Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "disabled">,
+  extends
+    Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "disabled">,
     Omit<VariantProps<typeof input>, "errorMessage"> {
   class?: string
   inputClass?: string

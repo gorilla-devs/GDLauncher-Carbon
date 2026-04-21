@@ -145,7 +145,7 @@ const ServerTile = (props: Props) => {
   })
 
   createEffect(() => {
-    if (failedTask.data && failedTask.data.progress.type === "Failed") {
+    if (failedTask.data?.progress.type === "Failed") {
       const chain = failedTask.data.progress.value.cause
         .map((c: { display: string }) => c.display)
         .join("\n  → ")
@@ -159,8 +159,7 @@ const ServerTile = (props: Props) => {
       : undefined
   )
 
-  const shouldSetViewTransition = () =>
-    clickedServerId() === props.identifier
+  const shouldSetViewTransition = () => clickedServerId() === props.identifier
 
   const handleClick = () => {
     if (props.preventClick) return
@@ -325,9 +324,7 @@ const ServerTile = (props: Props) => {
           totalDownload={progress.totalDownload}
           isMultiSelected={props.isMultiSelected ?? false}
           showCheckbox={
-            !!props.onToggleSelection &&
-            !isDeleting() &&
-            !isInstalling()
+            !!props.onToggleSelection && !isDeleting() && !isInstalling()
           }
           onToggleSelection={props.onToggleSelection}
           onDragStart={props.onDragStart}
@@ -339,9 +336,7 @@ const ServerTile = (props: Props) => {
           viewTransitionPrefix="server-tile"
           onPlay={(e) => handlePlayStop(e)}
           isMenuOpen={isMenuOpen()}
-          waitingText={
-            <Trans key="instances:_trn_server_loading" />
-          }
+          waitingText={<Trans key="instances:_trn_server_loading" />}
           playButtonContent={
             <>
               <div
@@ -401,9 +396,7 @@ const ServerTile = (props: Props) => {
                   />
                 </Show>
                 <span>{props.server.gameVersion}</span>
-                <span class="text-white/40">
-                  :{props.server.port}
-                </span>
+                <span class="text-white/40">:{props.server.port}</span>
               </div>
             </>
           }

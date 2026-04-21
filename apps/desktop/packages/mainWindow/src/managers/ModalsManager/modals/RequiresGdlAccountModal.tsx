@@ -16,7 +16,9 @@ function RequiresGdlAccountModal(props: ModalProps) {
 
   const handleLinkAccount = () => {
     const returnTo = data()?.returnPath || "/"
-    navigator.navigate(`/?addGdlAccount=true&returnTo=${encodeURIComponent(returnTo)}`)
+    navigator.navigate(
+      `/?addGdlAccount=true&returnTo=${encodeURIComponent(returnTo)}`
+    )
     modalsContext?.closeModal()
   }
 
@@ -37,11 +39,7 @@ function RequiresGdlAccountModal(props: ModalProps) {
           >
             <Trans key="accounts:_trn_cancel" />
           </Button>
-          <Button
-            type="primary"
-            size="large"
-            onClick={handleLinkAccount}
-          >
+          <Button type="primary" size="large" onClick={handleLinkAccount}>
             <Trans key="accounts:_trn_link_account" />
           </Button>
         </div>

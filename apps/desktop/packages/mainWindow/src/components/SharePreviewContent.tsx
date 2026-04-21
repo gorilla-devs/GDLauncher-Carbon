@@ -10,7 +10,6 @@ import {
 } from "solid-js"
 import { VList } from "@/components/VirtuaWrapper"
 import { Trans, useTransContext } from "@gd/i18n"
-import { FESharePreview } from "@gd/core_module/bindings"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { useModal } from "@/managers/ModalsManager"
@@ -147,9 +146,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
     }
   })
 
-  const preview = createMemo(
-    () => previewQuery.data as FESharePreview | undefined
-  )
+  const preview = createMemo(() => previewQuery.data)
 
   const isExpired = createMemo(() => {
     const p = preview()
@@ -403,7 +400,10 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                     <span class="font-medium">
                       {preview()?.mods?.length || 0}
                     </span>
-                    <span class="text-lightSlate-400"> mods</span>
+                    <span class="text-lightSlate-400">
+                      {" "}
+                      <Trans key="instances:_trn_share_preview_mods" />
+                    </span>
                   </div>
 
                   <Show when={fileSize()}>
@@ -414,7 +414,9 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
 
                   <Show when={!isExpired() && preview()?.expiresAt}>
                     <div class="bg-darkSlate-800/80 border-darkSlate-600/40 rounded border px-2.5 py-1 text-xs backdrop-blur-sm">
-                      <span class="text-lightSlate-400">Expires </span>
+                      <span class="text-lightSlate-400">
+                        <Trans key="instances:_trn_share_preview_expires" />{" "}
+                      </span>
                       <span class="font-medium">
                         {new Date(preview()!.expiresAt).toLocaleDateString(
                           undefined,

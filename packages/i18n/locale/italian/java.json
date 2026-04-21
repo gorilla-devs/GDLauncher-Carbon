@@ -58,5 +58,10 @@
   "_trn_used_in_counted_profiles": "Usato in {{count}} profili",
   "_trn_profile_name": "Nome Profilo:",
   "_trn_assigned_java_path": "Percorso Java Assegnato:",
-  "_trn_add_custom_java_path": "Aggiungi Percorso Personalizzato"
+  "_trn_add_custom_java_path": "Aggiungi Percorso Personalizzato",
+  "_trn_ram_warning_high_allocation": "Allocare più dell'80% della RAM di sistema può causare crash di Minecraft o instabilità.",
+  "_trn_insufficient_memory_title": "Memoria Insufficiente",
+  "_trn_insufficient_memory_body": "Minecraft è configurato per usare {{requested}} MB di RAM, ma solo {{available}} MB sono disponibili. Java richiede anche ~1,5 GB aggiuntivi per le sue operazioni interne. Il gioco probabilmente andrà in crash.",
+  "_trn_launch_anyway": "Avvia Comunque",
+  "_trn_adjust_memory": "Regola Memoria"
 }

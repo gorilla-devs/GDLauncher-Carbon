@@ -120,7 +120,10 @@ const Tile = (props: Props) => {
       )
       return
     }
-    launchInstanceMutation.mutate({ id: props.instance.id, skipMemoryCheck: false })
+    launchInstanceMutation.mutate({
+      id: props.instance.id,
+      skipMemoryCheck: false
+    })
   }
 
   const handleDelete = () => {
@@ -365,7 +368,9 @@ const Tile = (props: Props) => {
           downloaded={props.downloaded}
           totalDownload={props.totalDownload}
           isMultiSelected={props.isMultiSelected ?? false}
-          showCheckbox={!!props.onToggleSelection && !isLoading() && !isInQueue()}
+          showCheckbox={
+            !!props.onToggleSelection && !isLoading() && !isInQueue()
+          }
           onToggleSelection={props.onToggleSelection}
           onDragStart={props.onDragStart}
           isDragging={!!props.isDragging}
@@ -447,9 +452,7 @@ const Tile = (props: Props) => {
                 >
                   <img
                     class="h-4 w-4"
-                    src={getModpackPlatformIcon(
-                      validInstance()?.modpack?.type
-                    )}
+                    src={getModpackPlatformIcon(validInstance()?.modpack?.type)}
                   />
                 </div>
               </Show>

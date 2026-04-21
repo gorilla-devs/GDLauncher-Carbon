@@ -31,7 +31,9 @@ export default function CategoriesDisplay() {
               type={categoryData?.icon?.type}
               value={categoryData?.icon?.value}
             />
-            {categoryData?.platform === "modrinth" ? formatModrinthCategory(categoryData?.name) : categoryData?.name}
+            {categoryData?.platform === "modrinth"
+              ? formatModrinthCategory(categoryData?.name)
+              : categoryData?.name}
           </FilterBadge>
         )
       }}

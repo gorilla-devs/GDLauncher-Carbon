@@ -10,7 +10,12 @@ import { createMemo, Show, Accessor } from "solid-js"
 import { useDragContext, DragType } from "../../DragContext"
 import ExpandedFolderContent from "@/components/Library/ExpandedFolderContent"
 import { LibraryGrid } from "./LibraryGrid"
-import { LibraryItem, LibraryMode, SelectionState, FLIPAnimation } from "../../types"
+import {
+  LibraryItem,
+  LibraryMode,
+  SelectionState,
+  FLIPAnimation
+} from "../../types"
 import { EntranceAnimationReturn } from "../../hooks/useFLIPAnimation"
 import { parseInstanceIds, parseServerIds } from "../../utils/selectionIds"
 

@@ -223,13 +223,13 @@ a {
    - will-change: transform keeps element on GPU layer to prevent hover re-rasterization shift */
 .press-effect {
   transition:
-    opacity 0.15s cubic-bezier(.4, 0, .2, 1),
-    filter 0.15s cubic-bezier(.4, 0, .2, 1),
-    color 0.15s cubic-bezier(.4, 0, .2, 1),
-    background-color 0.15s cubic-bezier(.4, 0, .2, 1),
-    border-color 0.15s cubic-bezier(.4, 0, .2, 1),
-    scale 0.15s cubic-bezier(.4, 0, .2, 1),
-    transform 0.15s cubic-bezier(.4, 0, .2, 1);
+    opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    scale 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   transform-origin: center center;
@@ -239,9 +239,10 @@ a {
 [class*="active:scale-"],
 [class*="hover:scale-"],
 [class*="group-hover:scale-"] {
-  transition-property: scale, transform, opacity, filter, color, background-color, border-color;
+  transition-property:
+    scale, transform, opacity, filter, color, background-color, border-color;
   transition-duration: 0.15s;
-  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   transform-origin: center center;

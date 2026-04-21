@@ -12,7 +12,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 
 const Overview = () => {
   const routeData = useInstanceData()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
   const [t] = useTransContext()
 

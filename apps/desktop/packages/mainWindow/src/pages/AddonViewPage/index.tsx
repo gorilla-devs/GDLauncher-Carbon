@@ -12,11 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "@gd/ui"
-import {
-  useLocation,
-  useParams,
-  useSearchParams
-} from "@solidjs/router"
+import { useLocation, useParams, useSearchParams } from "@solidjs/router"
 import {
   For,
   JSX,
@@ -41,7 +37,7 @@ import {
   FEUnifiedPlatform,
   FEUnifiedSearchResultWithDescription
 } from "@gd/core_module/bindings"
-import { CreateQueryResult } from "@tanstack/solid-query"
+import { UseQueryResult } from "@tanstack/solid-query"
 import { RSPCError } from "@/utils/rspcClient"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
@@ -64,7 +60,7 @@ const getTabValueFromPath = (path: string, id: string, platform: string) => {
 }
 
 const ModsInfiniteScrollQueryWrapper = (props: { children?: any }) => {
-  const params = useParams()
+  const params = useParams<{ id: string; platform: string }>()
   const platform = () => params.platform as FEUnifiedPlatform
 
   // Hoisted project query to pass addonType to InfiniteScrollVersionsQueryWrapper
@@ -98,7 +94,7 @@ const ModsInfiniteScrollQueryWrapper = (props: { children?: any }) => {
   )
 }
 
-export const AddonContext = createContext<CreateQueryResult<
+export const AddonContext = createContext<UseQueryResult<
   FEUnifiedSearchResultWithDescription,
   RSPCError
 > | null>(null)
@@ -106,7 +102,7 @@ export const AddonContext = createContext<CreateQueryResult<
 export const StickyHeaderHeightContext = createContext<() => number>(() => 0)
 
 const ModContextProvider = (props: {
-  mod: CreateQueryResult<FEUnifiedSearchResultWithDescription, RSPCError>
+  mod: UseQueryResult<FEUnifiedSearchResultWithDescription, RSPCError>
   children: JSX.Element
 }) => {
   return (
@@ -118,20 +114,25 @@ const ModContextProvider = (props: {
 
 const AddonExplore = (props: { children?: any }) => {
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ id: string; platform: string }>()
   const platform = () => params.platform as FEUnifiedPlatform
   const location = useLocation()
   const tabValue = () =>
     getTabValueFromPath(location.pathname, params.id, params.platform)
   const [t] = useTransContext()
-  const [searchParams] = useSearchParams()
+  const [searchParams] = useSearchParams<{
+    instanceId: string
+    serverId: string
+  }>()
 
   const selectedInstanceId = () => {
+    if (!searchParams.instanceId) return undefined
     const id = parseInt(searchParams.instanceId, 10)
     return isNaN(id) ? undefined : id
   }
 
   const selectedServerId = () => {
+    if (!searchParams.serverId) return undefined
     const id = parseInt(searchParams.serverId, 10)
     return isNaN(id) ? undefined : id
   }
@@ -408,11 +409,18 @@ const AddonExplore = (props: { children?: any }) => {
                         <div class="flex items-center">
                           <ModpackDownloadButton
                             addon={project.data}
-                            splitPosition={project.data?.serverPackFileId ? "left" : undefined}
+                            splitPosition={
+                              project.data?.serverPackFileId
+                                ? "left"
+                                : undefined
+                            }
                           />
                           <Show when={project.data?.serverPackFileId}>
                             <div class="w-px self-stretch bg-primary-700 shrink-0" />
-                            <ServerPackDownloadButton addon={project.data} splitPosition="right" />
+                            <ServerPackDownloadButton
+                              addon={project.data}
+                              splitPosition="right"
+                            />
                           </Show>
                         </div>
                       </Match>
@@ -506,7 +514,9 @@ const AddonExplore = (props: { children?: any }) => {
                           addon={project.data}
                           size="small"
                           iconOnly
-                          splitPosition={project.data?.serverPackFileId ? "left" : undefined}
+                          splitPosition={
+                            project.data?.serverPackFileId ? "left" : undefined
+                          }
                         />
                         <Show when={project.data?.serverPackFileId}>
                           <div class="w-px self-stretch bg-primary-700 shrink-0" />

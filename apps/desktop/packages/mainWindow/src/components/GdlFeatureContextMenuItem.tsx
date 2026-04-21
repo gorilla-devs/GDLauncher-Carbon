@@ -1,7 +1,12 @@
 import { JSX, Show } from "solid-js"
 import { useLocation } from "@solidjs/router"
 import { useTransContext } from "@gd/i18n"
-import { ContextMenuItem, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
+import {
+  ContextMenuItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import { useGlobalStore } from "./GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
 import { logoUrl } from "@/utils/logos"
@@ -30,12 +35,12 @@ const GdlFeatureContextMenuItem = (props: Props) => {
   const location = useLocation()
   const [t] = useTransContext()
 
-  const hasValidAccount = () =>
-    globalStore.gdlAccount.data?.status === "valid"
+  const hasValidAccount = () => globalStore.gdlAccount.data?.status === "valid"
 
   const handleClick = () => {
     if (!hasValidAccount()) {
-      const returnTo = props.returnPath || `${location.pathname}${location.search}`
+      const returnTo =
+        props.returnPath || `${location.pathname}${location.search}`
       modalsContext?.openModal(
         { name: "requiresGdlAccount" },
         { returnPath: returnTo }

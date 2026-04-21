@@ -24,7 +24,7 @@ const defaultEnabledTypes = (): Record<string, boolean> => {
 const filterCache = new Map<string, FilterCacheEntry>()
 
 export const useServerAddonData = () => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const paramId = params.id ?? ""
   const cached = filterCache.get(paramId)
 

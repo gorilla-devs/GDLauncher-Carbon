@@ -192,13 +192,15 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
   // Type-prefixed string ID for selection
   const instanceStringId = `instance-${props.instance.id}`
 
-  const totalDelay = props.groupStaggerBase + props.instanceIndex * ANIMATION.STAGGER_PER_ITEM
+  const totalDelay =
+    props.groupStaggerBase + props.instanceIndex * ANIMATION.STAGGER_PER_ITEM
 
-  const isBeingDragged = createMemo(() =>
-    dragContext.isDragging() &&
-    dragContext.dragDetached() &&
-    dragContext.dragType() === "instance" &&
-    dragContext.draggedIds().includes(props.instance.id)
+  const isBeingDragged = createMemo(
+    () =>
+      dragContext.isDragging() &&
+      dragContext.dragDetached() &&
+      dragContext.dragType() === "instance" &&
+      dragContext.draggedIds().includes(props.instance.id)
   )
 
   const showDropIndicator = createMemo(() => {
@@ -242,7 +244,7 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
         target: {
           type: "beforeInstance",
           instanceId: props.instance.id,
-          groupId: props.groupId as number
+          groupId: props.groupId
         }
       })
     } else {
@@ -257,17 +259,14 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
 
     if (ref && shouldAnimate) {
       props.animatedInstanceIds.add(props.instance.id)
-      const anim = ref.animate(
-        [{ opacity: 0 }, { opacity: 1 }],
-        {
-          duration: ANIMATION.ENTRANCE_DURATION,
-          delay: totalDelay,
-          easing: "linear",
-          fill: "both"
-        }
-      )
+      const anim = ref.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: ANIMATION.ENTRANCE_DURATION,
+        delay: totalDelay,
+        easing: "linear",
+        fill: "both"
+      })
       anim.onfinish = () => {
-        ref.style.opacity = "1"
+        if (ref) ref.style.opacity = "1"
       }
     }
 
@@ -311,20 +310,27 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
           }
         }}
         data-instance-tile
-        class="relative" style="opacity:0"
+        class="relative"
+        style="opacity:0"
       >
         <InstanceTile
           instance={props.instance}
           identifier={`${props.groupId?.toString() || props.groupIndex}-${props.instance.id}`}
           size={props.tileSize() as 1 | 2 | 3 | 4 | 5}
           isMultiSelected={props.selection.isSelected(instanceStringId)}
-          onToggleSelection={() => props.selection.toggleSelection(instanceStringId)}
+          onToggleSelection={() =>
+            props.selection.toggleSelection(instanceStringId)
+          }
           isDragging={isBeingDragged()}
           isDragActive={dragContext.isDragging()}
-          groupId={typeof props.groupId === "number" ? props.groupId : undefined}
+          groupId={
+            typeof props.groupId === "number" ? props.groupId : undefined
+          }
           onDragStart={(e) => {
             // Extract numeric instance IDs from selected string IDs for drag operation
-            const selectedInstanceIds = Array.from(props.selection.selectedIds())
+            const selectedInstanceIds = Array.from(
+              props.selection.selectedIds()
+            )
               .filter((id) => id.startsWith("instance-"))
               .map((id) => parseInt(id.replace("instance-", ""), 10))
             const ids = props.selection.isSelected(instanceStringId)

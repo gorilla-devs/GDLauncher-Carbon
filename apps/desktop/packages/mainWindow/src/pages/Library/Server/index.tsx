@@ -55,7 +55,7 @@ const ALL_TABS: ServerTab[] = [
 const Server = (props: { children?: any }) => {
   const [t] = useTransContext()
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const location = useLocation()
   const routeData = useServerData()
 
@@ -71,7 +71,7 @@ const Server = (props: { children?: any }) => {
     mutationKey: ["server.setFavorite"]
   }))
 
-  const serverId = () => parseInt(params.id!, 10)
+  const serverId = () => parseInt(params.id, 10)
   const details = () => routeData.serverDetails.data
 
   const iconUrl = createMemo(() => {

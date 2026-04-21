@@ -27,7 +27,7 @@ const Logs = () => {
   )
   const [autoFollowPreference, setAutoFollowPreference] = createSignal(true)
   const [autoFollow, setAutoFollow] = createSignal(true)
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const [newLogsCount, setNewLogsCount] = createSignal(0)
   const [query, setQuery] = createStore<LogQuery>({
     query: null,
@@ -202,8 +202,13 @@ const Logs = () => {
         setAutoFollowPreference={setAutoFollowPreference}
         scrollToIndex={virtualizerRef?.scrollToIndex ?? (() => {})}
         isIndexLoaded={(index: number) => {
-          const startIndex = (virtualizerRef?.findItemIndex(virtualizerRef.scrollOffset) ?? 0) - 10
-          const endIndex = (virtualizerRef?.findItemIndex(virtualizerRef.scrollOffset + virtualizerRef.viewportSize) ?? 0) + 10
+          const startIndex =
+            (virtualizerRef?.findItemIndex(virtualizerRef.scrollOffset) ?? 0) -
+            10
+          const endIndex =
+            (virtualizerRef?.findItemIndex(
+              virtualizerRef.scrollOffset + virtualizerRef.viewportSize
+            ) ?? 0) + 10
           return index >= startIndex && index <= endIndex
         }}
       />

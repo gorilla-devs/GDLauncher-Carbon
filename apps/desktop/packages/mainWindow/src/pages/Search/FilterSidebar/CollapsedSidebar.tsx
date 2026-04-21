@@ -17,7 +17,10 @@ function FilterIcon(props: {
       <div class={`${props.icon} h-5 w-5`} />
       <Show when={props.hasActive}>
         <div class="bg-primary-500 absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none text-white">
-          <Show when={props.activeCount !== undefined && props.activeCount > 0} fallback={<div class="h-1.5 w-1.5 rounded-full bg-white" />}>
+          <Show
+            when={props.activeCount !== undefined && props.activeCount > 0}
+            fallback={<div class="h-1.5 w-1.5 rounded-full bg-white" />}
+          >
             {props.activeCount}
           </Show>
         </div>
@@ -72,19 +75,19 @@ export function CollapsedSidebar(props: {
       />
       <FilterIcon
         icon="i-hugeicons:folder-01"
-        hasActive={!!(query()?.categories?.length)}
+        hasActive={!!query()?.categories?.length}
         activeCount={query()?.categories?.length ?? 0}
         onClick={() => props.onFilterIconClick?.("categories")}
       />
       <FilterIcon
         icon="i-hugeicons:puzzle"
-        hasActive={!!(query()?.modloaders?.length)}
+        hasActive={!!query()?.modloaders?.length}
         activeCount={query()?.modloaders?.length ?? 0}
         onClick={() => props.onFilterIconClick?.("modloaders")}
       />
       <FilterIcon
         icon="i-hugeicons:gameboy"
-        hasActive={!!(query()?.gameVersions?.length)}
+        hasActive={!!query()?.gameVersions?.length}
         activeCount={query()?.gameVersions?.length ?? 0}
         onClick={() => props.onFilterIconClick?.("gameVersions")}
       />

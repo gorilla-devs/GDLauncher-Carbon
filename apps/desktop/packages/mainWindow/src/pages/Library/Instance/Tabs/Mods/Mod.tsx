@@ -105,7 +105,7 @@ const Mod = (props: Props) => {
   )
 
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const location = useLocation()
   const instanceId = () => getInstanceIdFromPath(location.pathname)
 

@@ -15,6 +15,8 @@
   "_trn_clear_all_filters": "Clear All",
   "_trn_platform": "Platform",
   "_trn_categories": "Categories",
+  "_trn_context_instance": "Instance",
+  "_trn_context_server": "Server",
   "_trn_no_categories_found": "No categories found",
   "_trn_modloaders": "Modloaders",
   "_trn_no_modloaders_found": "No modloaders found",

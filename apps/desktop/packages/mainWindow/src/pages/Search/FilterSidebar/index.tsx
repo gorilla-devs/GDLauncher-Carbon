@@ -97,9 +97,9 @@ function ExpandedPanel(props: {
               <span class="text-lightSlate-500 text-xs">
                 <Show
                   when={searchContext?.selectedServerId()}
-                  fallback="Instance"
+                  fallback={<Trans key="search:_trn_context_instance" />}
                 >
-                  Server
+                  <Trans key="search:_trn_context_server" />
                 </Show>
               </span>
             </div>
@@ -155,17 +155,29 @@ function ExpandedPanel(props: {
       {/* Scrollable Filter Sections */}
       <div class="relative flex-1 overflow-hidden">
         <div class="h-full overflow-y-auto px-2 pb-4">
-          <div data-filter-section="platform"><PlatformFilter /></div>
+          <div data-filter-section="platform">
+            <PlatformFilter />
+          </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="categories"><CategoriesFilter /></div>
+          <div data-filter-section="categories">
+            <CategoriesFilter />
+          </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="modloaders"><ModloadersFilter /></div>
+          <div data-filter-section="modloaders">
+            <ModloadersFilter />
+          </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="gameVersions"><GameVersionsFilter /></div>
+          <div data-filter-section="gameVersions">
+            <GameVersionsFilter />
+          </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="environment"><EnvironmentFilter /></div>
+          <div data-filter-section="environment">
+            <EnvironmentFilter />
+          </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="sort"><SortFilter /></div>
+          <div data-filter-section="sort">
+            <SortFilter />
+          </div>
         </div>
         {/* Scroll fade at bottom */}
         <div class="from-darkSlate-800 pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t to-transparent" />
@@ -197,9 +209,14 @@ export function FilterSidebar() {
   const [isHovered, setIsHovered] = createSignal(false)
 
   // Reset hover when dock state changes
-  createEffect(on(() => isDocked(), () => {
-    setIsHovered(false)
-  }))
+  createEffect(
+    on(
+      () => isDocked(),
+      () => {
+        setIsHovered(false)
+      }
+    )
+  )
 
   // Flyout close delay
   let closeTimer: ReturnType<typeof setTimeout> | undefined
@@ -246,7 +263,9 @@ export function FilterSidebar() {
   const scrollToFilterSection = (sectionId: string) => {
     setIsHovered(true)
     requestAnimationFrame(() => {
-      const el = flyoutRef?.querySelector(`[data-filter-section="${sectionId}"]`)
+      const el = flyoutRef?.querySelector(
+        `[data-filter-section="${sectionId}"]`
+      )
       el?.scrollIntoView({
         behavior: reducedMotion() ? "auto" : "smooth",
         block: "start"
@@ -310,7 +329,9 @@ export function FilterSidebar() {
         }}
         style={{
           width: `${SIDEBAR_WIDTH}px`,
-          transform: showOverlay() ? "translateX(0)" : `translateX(-${SIDEBAR_WIDTH}px)`
+          transform: showOverlay()
+            ? "translateX(0)"
+            : `translateX(-${SIDEBAR_WIDTH}px)`
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}

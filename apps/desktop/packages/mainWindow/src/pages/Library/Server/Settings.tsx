@@ -36,10 +36,22 @@ const Settings = (props: SettingsProps) => {
     setAutoRestart(d.autoRestart)
   })
 
-  const save = (update: Record<string, unknown>) => {
+  const save = (
+    update: Partial<{
+      name: string | null
+      xmx: number | null
+      xms: number | null
+      extraJavaArgs: string | null
+      autoRestart: boolean | null
+    }>
+  ) => {
     updateServerMutation.mutate({
       id: props.serverDetails.id,
-      ...update
+      name: update.name ?? null,
+      xmx: update.xmx ?? null,
+      xms: update.xms ?? null,
+      extraJavaArgs: update.extraJavaArgs ?? null,
+      autoRestart: update.autoRestart ?? null
     })
   }
 
@@ -91,7 +103,8 @@ const Settings = (props: SettingsProps) => {
           <RightHandSide>
             <Switch
               checked={autoRestart()}
-              onChange={(val) => {
+              onChange={(e) => {
+                const val = e.currentTarget.checked
                 setAutoRestart(val)
                 save({ autoRestart: val })
               }}

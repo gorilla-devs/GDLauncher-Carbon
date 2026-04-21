@@ -23,10 +23,6 @@ const ServerRename = (props: ModalProps) => {
     updateServerMutation.mutate({
       id: props.data?.id,
       name: trimmed,
-      port: null,
-      motd: null,
-      maxPlayers: null,
-      onlineMode: null,
       xmx: null,
       xms: null,
       extraJavaArgs: null,

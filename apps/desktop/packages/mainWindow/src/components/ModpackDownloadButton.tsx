@@ -2,7 +2,14 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { FEUnifiedSearchResult, Modpack } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Button, toast, Spinner, Tooltip, TooltipTrigger, TooltipContent } from "@gd/ui"
+import {
+  Button,
+  toast,
+  Spinner,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent
+} from "@gd/ui"
 import { Show, createSignal, getOwner, runWithOwner } from "solid-js"
 
 interface ModDownloadButtonProps {
@@ -115,7 +122,13 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
             disabled={loading()}
             size={props.size || "medium"}
             onClick={handleDownload}
-            class={props.splitPosition === "left" ? "!rounded-r-none" : props.splitPosition === "right" ? "!rounded-l-none" : ""}
+            class={
+              props.splitPosition === "left"
+                ? "!rounded-r-none"
+                : props.splitPosition === "right"
+                  ? "!rounded-l-none"
+                  : ""
+            }
           >
             <Show when={loading()}>
               <Spinner />

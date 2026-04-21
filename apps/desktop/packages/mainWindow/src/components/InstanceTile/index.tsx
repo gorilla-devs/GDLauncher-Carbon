@@ -129,15 +129,11 @@ const InstanceTile = (props: {
   })
 
   createEffect(() => {
-    if (failedTask.data && failedTask.data.progress.type === "Failed") {
+    if (failedTask.data?.progress.type === "Failed") {
       if (taskId()) dismissTaskMutation.mutate(taskId()!)
       setFailError(failedTask.data.progress.value.cause[0].display)
     }
   })
-
-  const variant = () => (props.isSidebarOpened ? "sidebar" : "sidebar-small")
-  const type = () =>
-    props.isSidebarOpened === undefined ? undefined : variant()
 
   const instanceImageUrl = createMemo(() =>
     props.instance.icon_revision
@@ -152,7 +148,7 @@ const InstanceTile = (props: {
 
     // Instance must be in inactive state (not preparing, running, or deleting)
     const state = validInstance()?.state
-    if (!state || state.state !== "inactive") return false
+    if (state?.state !== "inactive") return false
 
     // Instance must not have a failed task (installation didn't error)
     if (inactiveState()) return false
@@ -186,7 +182,6 @@ const InstanceTile = (props: {
       isQueued={isQueuedState() !== undefined}
       isPreparing={isPreparingState() !== undefined}
       isDeleting={isDeleting()}
-      variant={type()}
       size={props.size}
       img={instanceImageUrl()}
       selected={props.selected}

@@ -17,29 +17,25 @@ const changelogs: Changelog = {
       title: "Instance Sharing",
       description:
         "Share your modpack instances with anyone via a simple link. Recipients can preview what they're importing before adding it to their library. Requires a GDL account with verified email.",
-      media:
-        "https://cdn.gdl.gg/launcher/changelog/2.1.0/instance-sharing.mp4"
+      media: "https://cdn.gdl.gg/launcher/changelog/2.1.0/instance-sharing.mp4"
     },
     {
       title: "Instance Folders & Drag and Drop",
       description:
         "Organize your library with folders. Drag and drop instances freely, use multi-select for batch operations, and pin your favorites for quick access.",
-      media:
-        "https://cdn.gdl.gg/launcher/changelog/2.1.0/instance-folders.mp4"
+      media: "https://cdn.gdl.gg/launcher/changelog/2.1.0/instance-folders.mp4"
     },
     {
       title: "Server Management",
       description:
         "Add and manage Minecraft servers directly from GDLauncher. View the live console, manage server properties, track connected players, and install addons.",
-      media:
-        "https://cdn.gdl.gg/launcher/changelog/2.1.0/server-management.mp4"
+      media: "https://cdn.gdl.gg/launcher/changelog/2.1.0/server-management.mp4"
     },
     {
       title: "Collapsible Search Filter Sidebar",
       description:
         "A new collapsible sidebar replaces the old filters dropdown, making it easier to filter by platform, game version, modloader, categories, and environment.",
-      media:
-        "https://cdn.gdl.gg/launcher/changelog/2.1.0/filter-sidebar.mp4"
+      media: "https://cdn.gdl.gg/launcher/changelog/2.1.0/filter-sidebar.mp4"
     }
   ],
   new: [

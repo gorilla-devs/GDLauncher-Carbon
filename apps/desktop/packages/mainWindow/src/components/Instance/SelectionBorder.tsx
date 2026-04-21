@@ -1,4 +1,10 @@
-import { Show, createMemo, createSignal, createEffect, onCleanup } from "solid-js"
+import {
+  Show,
+  createMemo,
+  createSignal,
+  createEffect,
+  onCleanup
+} from "solid-js"
 
 interface SelectionBorderProps {
   isSelected: boolean
@@ -77,7 +83,9 @@ const SelectionBorder = (props: SelectionBorderProps) => {
           fill="none"
           stroke="rgb(var(--primary-500))"
           stroke-width={strokeWidth}
-          class={isExiting() ? "selection-border-undraw" : "selection-border-draw"}
+          class={
+            isExiting() ? "selection-border-undraw" : "selection-border-draw"
+          }
           style={{ "--border-perimeter": `${perimeter()}px` }}
         />
       </svg>

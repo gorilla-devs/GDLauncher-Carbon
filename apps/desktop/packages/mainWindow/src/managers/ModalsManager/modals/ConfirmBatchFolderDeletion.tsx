@@ -16,7 +16,7 @@ const ConfirmBatchFolderDeletion = (props: ModalProps) => {
 
   const [isDeleting, setIsDeleting] = createSignal(false)
   const [deletedCount, setDeletedCount] = createSignal(0)
-  const [deleteMode, setDeleteMode] = createSignal<"unlink" | "deleteAll">(
+  const [_deleteMode, setDeleteMode] = createSignal<"unlink" | "deleteAll">(
     "unlink"
   )
 

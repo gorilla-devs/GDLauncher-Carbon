@@ -1,5 +1,6 @@
 {
   "_trn_search_instances": "Cerca Istanze",
+  "_trn_search_servers": "Cerca Server",
   "_trn_browser_table_headers.name": "Nome",
   "_trn_browser_table_headers.published": "Pubblicato",
   "_trn_browser_table_headers.downloads": "Download",
@@ -14,6 +15,8 @@
   "_trn_clear_all_filters": "Cancella Tutto",
   "_trn_platform": "Platform",
   "_trn_categories": "Categorie",
+  "_trn_context_instance": "Istanza",
+  "_trn_context_server": "Server",
   "_trn_no_categories_found": "Nessuna categoria trovata",
   "_trn_modloaders": "Modloader",
   "_trn_no_modloaders_found": "Nessun modloader trovato",
@@ -48,5 +51,7 @@
   "_trn_sort_order": "Ordine: {{order}}",
   "_trn_platform_filters": "Filtri {{platform}}",
   "_trn_search": "Cerca",
-  "_trn_group_by": "Raggruppa per"
+  "_trn_group_by": "Raggruppa per",
+  "_trn_direct": "Diretto",
+  "_trn_share": "Condividi"
 }

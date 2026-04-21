@@ -29,7 +29,12 @@ export function PlatformFilter() {
 
   return (
     <Collapsable
-      title={<div class="flex items-center gap-2"><div class="i-hugeicons:globe-02 h-4 w-4" /><Trans key="search:_trn_platform" /></div>}
+      title={
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:globe-02 h-4 w-4" />
+          <Trans key="search:_trn_platform" />
+        </div>
+      }
       defaultOpened
       noPadding
       count={searchResults?.searchQuery().searchApi ? 1 : 0}

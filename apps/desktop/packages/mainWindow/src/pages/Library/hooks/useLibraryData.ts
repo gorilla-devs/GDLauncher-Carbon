@@ -10,7 +10,7 @@ import { createStore, reconcile } from "solid-js/store"
 import { useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
-import { ListInstance, ValidListInstance } from "@gd/core_module/bindings"
+import { ListInstance } from "@gd/core_module/bindings"
 import {
   LibraryItem,
   VirtualGroup,
@@ -84,13 +84,14 @@ export function useLibraryData(filter: Accessor<string>): UseLibraryDataReturn {
   // Compute library items for folders mode
   createEffect(
     on(
-      () => [
-        globalStore.instances.data,
-        globalStore.instanceGroups.data,
-        filter(),
-        defaultGroupId(),
-        isFoldersView()
-      ] as const,
+      () =>
+        [
+          globalStore.instances.data,
+          globalStore.instanceGroups.data,
+          filter(),
+          defaultGroupId(),
+          isFoldersView()
+        ] as const,
       ([instances, groups, filterValue, defGroupId, foldersView]) => {
         const filterActive = !!filterValue?.trim()
         if (!foldersView || filterActive) {
@@ -117,13 +118,14 @@ export function useLibraryData(filter: Accessor<string>): UseLibraryDataReturn {
   // Compute virtual groups for accordion mode
   createEffect(
     on(
-      () => [
-        globalStore.instances.data,
-        globalStore.instanceGroups.data,
-        globalStore.settings.data,
-        filter(),
-        isFoldersView()
-      ] as const,
+      () =>
+        [
+          globalStore.instances.data,
+          globalStore.instanceGroups.data,
+          globalStore.settings.data,
+          filter(),
+          isFoldersView()
+        ] as const,
       ([instances, groups, settings, filterValue, foldersView]) => {
         const filterActive = !!filterValue?.trim()
         if (foldersView && !filterActive) {
@@ -145,8 +147,7 @@ export function useLibraryData(filter: Accessor<string>): UseLibraryDataReturn {
 
   const isLoading = createMemo(
     () =>
-      globalStore.instances.isLoading ||
-      (isFoldersView() && !defaultGroupId())
+      globalStore.instances.isLoading || (isFoldersView() && !defaultGroupId())
   )
 
   const isEmpty = createMemo(
@@ -160,9 +161,15 @@ export function useLibraryData(filter: Accessor<string>): UseLibraryDataReturn {
   // captures the proxy reference once — if reconcile replaces it, consumers
   // hold a stale proxy and never see updates.
   return {
-    get libraryItems() { return store.libraryItems },
-    get virtualGroups() { return store.virtualGroups },
-    get favoriteIds() { return store.favoriteIds },
+    get libraryItems() {
+      return store.libraryItems
+    },
+    get virtualGroups() {
+      return store.virtualGroups
+    },
+    get favoriteIds() {
+      return store.favoriteIds
+    },
     viewMode,
     isFoldersView,
     defaultGroupId,
@@ -256,7 +263,14 @@ function computeLibraryItems(
 function computeVirtualGroups(
   instances: ListInstance[],
   _groups: { id: number; name: string }[],
-  settings: { instancesGroupBy?: string | null; instancesSortBy?: string | null; instancesSortByAsc?: boolean; instancesGroupByAsc?: boolean } | undefined,
+  settings:
+    | {
+        instancesGroupBy?: string | null
+        instancesSortBy?: string | null
+        instancesSortByAsc?: boolean
+        instancesGroupByAsc?: boolean
+      }
+    | undefined,
   filterValue: string,
   t: ReturnType<typeof import("@gd/i18n").useTransContext>[0]
 ): VirtualGroup[] {
@@ -266,16 +280,22 @@ function computeVirtualGroups(
   const sortByAsc = settings?.instancesSortByAsc ?? true
   const groupByAsc = settings?.instancesGroupByAsc ?? true
 
-  const groupsMap: Map<string, VirtualGroup> = new Map()
+  const groupsMap = new Map<string, VirtualGroup>()
 
   if (groupBy === null || groupBy === undefined) {
     // Flat search results — no grouping, single group
-    const matching = instances.filter(
-      (inst) => inst.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
+    const matching = instances.filter((inst) =>
+      inst.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
     )
     matching.sort((a, b) => a.name.localeCompare(b.name))
     return matching.length > 0
-      ? [{ id: "search-results", name: t("library:_trn_search_results"), instances: matching }]
+      ? [
+          {
+            id: "search-results",
+            name: t("library:_trn_search_results"),
+            instances: matching
+          }
+        ]
       : []
   }
 
@@ -357,8 +377,8 @@ function sortInstances(
     return a.index - b.index
   }
 
-  const validA = a.status.status === "valid" ? (a.status.value as ValidListInstance) : undefined
-  const validB = b.status.status === "valid" ? (b.status.value as ValidListInstance) : undefined
+  const validA = a.status.status === "valid" ? a.status.value : undefined
+  const validB = b.status.status === "valid" ? b.status.value : undefined
 
   switch (sortBy) {
     case "name":

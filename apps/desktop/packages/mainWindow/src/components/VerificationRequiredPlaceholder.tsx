@@ -49,8 +49,7 @@ const VerificationRequiredPlaceholder = () => {
         cooldownInterval = undefined
       }
 
-      const result =
-        await requestNewVerificationTokenMutation.mutateAsync(uuid)
+      const result = await requestNewVerificationTokenMutation.mutateAsync(uuid)
 
       if (result.status === "success") {
         toast.success(t("accounts:_trn_verification_email_sent"))

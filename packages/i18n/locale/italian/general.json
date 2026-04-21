@@ -1,4 +1,5 @@
 {
+  "_trn_text": "Testo",
   "_trn_loading": "Caricamento...",
   "_trn_updating": "Aggiornamento...",
   "_trn_badge_new": "NUOVO",
@@ -34,5 +35,11 @@
   "_trn_profile_name": "Nome Profilo",
   "_trn_assigned_java_path": "Percorso Java Assegnato",
   "_trn_instance_unlock_confirmation": "Lo sblocco consente di installare contenuti aggiuntivi su questa istanza. Se non fatto correttamente, potrebbe portare all'istanza che non si avvia più. Questa azione non può essere annullata.",
-  "_trn_instance_unpair_confirmation": "L'annullamento del collegamento rimuove il link tra l'istanza e il modpack. Ciò significa che non sarai più in grado di cambiare la versione del modpack. Questa azione non può essere annullata."
+  "_trn_instance_unpair_confirmation": "L'annullamento del collegamento rimuove il link tra l'istanza e il modpack. Ciò significa che non sarai più in grado di cambiare la versione del modpack. Questa azione non può essere annullata.",
+  "_trn_select_image": "Seleziona Immagine",
+  "_trn_delete": "Elimina",
+  "_trn_edit": "Modifica",
+  "_trn_ok": "OK",
+  "_trn_field_required": "Questo campo è obbligatorio",
+  "_trn_dismiss": "Ignora"
 }

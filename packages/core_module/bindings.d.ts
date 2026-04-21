@@ -185,7 +185,7 @@ export type Procedures = {
         { key: "server.removeOp", input: RemovePlayerRequest, result: null } | 
         { key: "server.renameServerGroup", input: RenameServerGroup, result: null } | 
         { key: "server.sendConsoleCommand", input: SendCommand, result: null } | 
-        { key: "server.setFavorite", input: SetFavorite, result: null } | 
+        { key: "server.setFavorite", input: SetServerFavorite, result: null } | 
         { key: "server.setServerIcon", input: SetServerIcon, result: null } | 
         { key: "server.startServer", input: FEServerId, result: null } | 
         { key: "server.stopServer", input: FEServerId, result: null } | 
@@ -576,8 +576,6 @@ export type ModrinthMod = { project_id: string; version_id: string }
 
 export type Or<T> = T[]
 
-export type SetFavorite = { id: FEServerId; favorite: boolean }
-
 export type FEModFileChangelogResponse = { data: string; pagination: CFFEPagination | null }
 
 export type MRFESearchFacetOr = MRFESearchFacet[]
@@ -649,6 +647,8 @@ export type EnrollmentError = { errorType: EnrollmentErrorType; title: string; d
 export type FEWaitForInstanceShareResponse = { share_code: string; expires_at: string }
 
 export type FEInstanceModpackInfo = { name: string; version_name: string; url_slug: string; has_image: boolean }
+
+export type SetServerFavorite = { id: FEServerId; favorite: boolean }
 
 export type ListServer = { id: FEServerId; groupId: FEServerGroupId; index: number; libraryPosition: number | null; name: string; favorite: boolean; serverType: ServerType; gameVersion: string; port: number; dateCreated: string; lastStarted: string | null; state: FEServerState; iconRevision: number | null; modloaderType: string | null; modloaderVersion: string | null; modpackInfo: FEServerModpackInfo | null }
 

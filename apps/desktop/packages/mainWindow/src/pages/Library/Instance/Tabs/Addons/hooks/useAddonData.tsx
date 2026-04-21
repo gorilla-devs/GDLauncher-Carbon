@@ -25,13 +25,11 @@ const DEFAULT_ADDON_TYPES: Record<AddonType, boolean> = {
 const filterCache = new Map<string, FilterCacheEntry>()
 
 export const useAddonData = () => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const cached = filterCache.get(params.id)
 
   // Create fresh signals/store each mount
-  const [searchQuery, _setSearchQuery] = createSignal(
-    cached?.searchQuery ?? ""
-  )
+  const [searchQuery, _setSearchQuery] = createSignal(cached?.searchQuery ?? "")
   const [enabledAddonTypes, _setEnabledAddonTypes] = createStore<
     Record<AddonType, boolean>
   >({ ...DEFAULT_ADDON_TYPES })

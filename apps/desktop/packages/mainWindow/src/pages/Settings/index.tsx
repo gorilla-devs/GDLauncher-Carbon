@@ -103,9 +103,7 @@ function Settings(props: { children?: JSX.Element }) {
           </Tabs>
         </div>
         <div class="h-1 w-1 pt-4" />
-        <div class="px-6">
-          {props.children}
-        </div>
+        <div class="px-6">{props.children}</div>
         <div class="h-1 w-1 pb-4" />
       </ContentWrapper>
     </>

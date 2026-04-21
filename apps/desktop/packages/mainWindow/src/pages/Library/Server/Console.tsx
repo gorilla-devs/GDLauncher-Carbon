@@ -82,9 +82,8 @@ const LEVEL_BG: Record<string, string> = {
  * Or: [HH:MM:SS INFO]: message (some servers)
  */
 function parseLogLine(raw: string): ParsedLogLine {
-  const match1 = raw.match(
-    /^\[(\d{2}:\d{2}:\d{2})\]\s*\[([^/\]]+)\/(\w+)\]:\s*(.*)$/
-  )
+  const match1 =
+    /^\[(\d{2}:\d{2}:\d{2})\]\s*\[([^/\]]+)\/(\w+)\]:\s*(.*)$/.exec(raw)
   if (match1) {
     return {
       raw,
@@ -95,7 +94,7 @@ function parseLogLine(raw: string): ParsedLogLine {
     }
   }
 
-  const match2 = raw.match(/^\[(\d{2}:\d{2}:\d{2})\s+(\w+)\]:\s*(.*)$/)
+  const match2 = /^\[(\d{2}:\d{2}:\d{2})\s+(\w+)\]:\s*(.*)$/.exec(raw)
   if (match2) {
     return {
       raw,
@@ -218,9 +217,7 @@ function ConsoleSearch(props: {
                 >
                   <div
                     class={`i-codicon:case-sensitive transition-colors duration-200 ease-spring group-hover:bg-lightSlate-50 ${
-                      props.matchCase
-                        ? "bg-lightSlate-50"
-                        : "bg-lightSlate-800"
+                      props.matchCase ? "bg-lightSlate-50" : "bg-lightSlate-800"
                     }`}
                   />
                 </div>
@@ -230,9 +227,7 @@ function ConsoleSearch(props: {
                     "bg-darkSlate-500": props.matchWholeWord,
                     "hover:bg-darkSlate-800": !props.matchWholeWord
                   }}
-                  onClick={() =>
-                    props.setMatchWholeWord(!props.matchWholeWord)
-                  }
+                  onClick={() => props.setMatchWholeWord(!props.matchWholeWord)}
                 >
                   <div
                     class={`i-codicon:whole-word transition-colors duration-200 ease-spring group-hover:bg-lightSlate-50 ${
@@ -252,9 +247,7 @@ function ConsoleSearch(props: {
                 >
                   <div
                     class={`i-codicon:regex transition-colors duration-200 ease-spring group-hover:bg-lightSlate-50 ${
-                      props.useRegex
-                        ? "bg-lightSlate-50"
-                        : "bg-lightSlate-800"
+                      props.useRegex ? "bg-lightSlate-50" : "bg-lightSlate-800"
                     }`}
                   />
                 </div>
@@ -323,9 +316,7 @@ function ConsoleOptions(props: {
             <DropdownMenuSubContent>
               <DropdownMenuRadioGroup
                 value={props.logsDensity}
-                onChange={(value) =>
-                  props.setLogsDensity(value as LogDensity)
-                }
+                onChange={(value) => props.setLogsDensity(value as LogDensity)}
               >
                 <DropdownMenuRadioItem value="low">
                   <Trans key="logs:_trn_logs_density.low" />
@@ -496,9 +487,13 @@ const Console = (props: ConsoleProps) => {
 
   // Reset result navigation when search params change
   createEffect(
-    on([searchQuery, matchCase, matchWholeWord, useRegex], () => {
-      setCurrentResultIndex(null)
-    }, { defer: true })
+    on(
+      [searchQuery, matchCase, matchWholeWord, useRegex],
+      () => {
+        setCurrentResultIndex(null)
+      },
+      { defer: true }
+    )
   )
 
   const sendCommandMutation = rspc.createMutation(() => ({
@@ -772,20 +767,16 @@ const Console = (props: ConsoleProps) => {
                 }
               }}
               onWheel={handleWheel}
-              overscan={10}
+              bufferSize={10}
             >
               {(line, index) => {
                 const rowResults = () =>
                   searchOpen()
-                    ? searchResults().filter(
-                        (r) => r.lineIndex === index()
-                      )
+                    ? searchResults().filter((r) => r.lineIndex === index())
                     : undefined
 
                 const baseIndex = () =>
-                  searchResults().findIndex(
-                    (r) => r.lineIndex === index()
-                  )
+                  searchResults().findIndex((r) => r.lineIndex === index())
 
                 const relativeCurrentResultIndex = () => {
                   const currIdx = currentResultIndex()
@@ -878,10 +869,7 @@ const Console = (props: ConsoleProps) => {
                         "text-base": fontMultiplier() === 2
                       }}
                     >
-                      <Show
-                        when={rowResults()?.length}
-                        fallback={line.message}
-                      >
+                      <Show when={rowResults()?.length} fallback={line.message}>
                         <For each={rowResults()}>
                           {(result, i) => (
                             <>
@@ -909,11 +897,8 @@ const Console = (props: ConsoleProps) => {
                                   result.pos + result.len
                                 )}
                               </span>
-                              {i() ===
-                                (rowResults()?.length ?? 0) - 1 &&
-                                line.message.slice(
-                                  result.pos + result.len
-                                )}
+                              {i() === (rowResults()?.length ?? 0) - 1 &&
+                                line.message.slice(result.pos + result.len)}
                             </>
                           )}
                         </For>

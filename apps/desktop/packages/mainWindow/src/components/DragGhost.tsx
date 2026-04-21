@@ -9,7 +9,11 @@ import { getModloaderIcon } from "@/utils/sidebar"
 interface DragGhostProps {
   instances: ListInstance[]
   servers: ListServer[]
-  groups: { id: number; name: string; instances: ListInstance[] }[]
+  groups: {
+    id: number
+    name: string
+    instances: ListInstance[] | ListServer[]
+  }[]
   tileSize: 1 | 2 | 3 | 4 | 5
 }
 
@@ -34,7 +38,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 const SCATTER_CONFIG = [
   { xFrac: 0, yFrac: 0, rotation: 0, opacity: 1.0 },
   { xFrac: 0.08, yFrac: -0.06, rotation: 4, opacity: 0.9 },
-  { xFrac: -0.06, yFrac: -0.10, rotation: -3, opacity: 0.8 }
+  { xFrac: -0.06, yFrac: -0.1, rotation: -3, opacity: 0.8 }
 ]
 const MAX_SCATTER_TILES = 3
 
@@ -116,26 +120,26 @@ const DragGhost = (props: DragGhostProps) => {
 
   return (
     <Portal>
-      <Show when={dragContext.isDragging() && count() > 0 && (dragContext.dragDetached() || dragContext.dropAnimating() !== null)}>
+      <Show
+        when={
+          dragContext.isDragging() &&
+          count() > 0 &&
+          (dragContext.dragDetached() || dragContext.dropAnimating() !== null)
+        }
+      >
         <div
           class="fixed z-[10002] pointer-events-none motion-reduce:transition-none"
           style={{
             left: dropAnim()
               ? `${dropAnim()!.targetX}px`
               : ghostPosition().left,
-            top: dropAnim()
-              ? `${dropAnim()!.targetY}px`
-              : ghostPosition().top,
+            top: dropAnim() ? `${dropAnim()!.targetY}px` : ghostPosition().top,
             transform: dropAnim()
               ? dropAnim()!.type === "settle"
                 ? "translate(-50%, -50%) scale(1)"
                 : "translate(-50%, -50%) scale(0.05) scaleX(0.3)"
               : `translate(-50%, -50%) scale(${isOverFavorites() ? 0.25 : isOverGroup() ? 0.45 : 1})`,
-            opacity: dropAnim()
-              ? dropAnim()!.type === "settle"
-                ? 1
-                : 0
-              : 1,
+            opacity: dropAnim() ? (dropAnim()!.type === "settle" ? 1 : 0) : 1,
             transition: dropAnim()
               ? dropAnim()!.type === "settle"
                 ? "left 200ms cubic-bezier(0.25, 1, 0.5, 1), top 200ms cubic-bezier(0.25, 1, 0.5, 1), transform 200ms cubic-bezier(0.25, 1, 0.5, 1)"
@@ -143,7 +147,10 @@ const DragGhost = (props: DragGhostProps) => {
               : "left 0s, top 0s, transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1)"
           }}
         >
-          <div class="relative" style={{ opacity: dropAnim() ? 1 : 1 - 0.5 * blendFactor() }}>
+          <div
+            class="relative"
+            style={{ opacity: dropAnim() ? 1 : 1 - 0.5 * blendFactor() }}
+          >
             <Show when={dragContext.dragType() === "instance"}>
               <InstanceGhost
                 instances={draggedItems() as ListInstance[]}
@@ -158,7 +165,12 @@ const DragGhost = (props: DragGhostProps) => {
                 blendFactor={blendFactor}
               />
             </Show>
-            <Show when={dragContext.dragType() === "group" || dragContext.dragType() === "serverGroup"}>
+            <Show
+              when={
+                dragContext.dragType() === "group" ||
+                dragContext.dragType() === "serverGroup"
+              }
+            >
               <GroupGhost
                 groups={
                   draggedItems() as {
@@ -261,7 +273,9 @@ const InstanceGhost = (props: InstanceGhostProps) => {
                       <Show when={validFirstInstance()?.modloader}>
                         <img
                           class="h-3 w-3"
-                          src={getModloaderIcon(validFirstInstance()!.modloader!)}
+                          src={getModloaderIcon(
+                            validFirstInstance()!.modloader!
+                          )}
                         />
                       </Show>
                       <span>{validFirstInstance()?.mc_version}</span>

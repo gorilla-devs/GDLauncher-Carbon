@@ -8,10 +8,10 @@ import Metrics from "../Metrics"
 export const [isConsoleFullScreen, setIsConsoleFullScreen] = createSignal(false)
 
 const ConsoleTab = () => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const routeData = useServerData()
 
-  const serverId = () => parseInt(params.id!, 10)
+  const serverId = () => parseInt(params.id, 10)
   const details = () => routeData.serverDetails.data
   const isRunning = () => details()?.state?.status === "running"
 

@@ -1,4 +1,8 @@
-import { FEUnifiedSearchResult, Mod, ServerAddon } from "@gd/core_module/bindings"
+import {
+  FEUnifiedSearchResult,
+  Mod,
+  ServerAddon
+} from "@gd/core_module/bindings"
 import { createSignal, Match, Show, Switch } from "solid-js"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
@@ -155,11 +159,16 @@ export function GridItem(props: GridItemProps) {
               <div class="flex items-center">
                 <ModpackDownloadButton
                   addon={props.result}
-                  splitPosition={props.result.serverPackFileId ? "left" : undefined}
+                  splitPosition={
+                    props.result.serverPackFileId ? "left" : undefined
+                  }
                 />
                 <Show when={props.result.serverPackFileId}>
                   <div class="w-px self-stretch bg-primary-700 shrink-0" />
-                  <ServerPackDownloadButton addon={props.result} splitPosition="right" />
+                  <ServerPackDownloadButton
+                    addon={props.result}
+                    splitPosition="right"
+                  />
                 </Show>
               </div>
             </Match>

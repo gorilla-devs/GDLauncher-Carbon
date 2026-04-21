@@ -477,9 +477,7 @@ const Accounts = () => {
                 size="small"
               >
                 <Switch>
-                  <Match
-                    when={validGDLUser()?.scheduledDeletionEffectiveAt}
-                  >
+                  <Match when={validGDLUser()?.scheduledDeletionEffectiveAt}>
                     <div class="border-red-900/40 bg-red-950/30 flex flex-col gap-2 rounded-md border p-3">
                       <div class="flex items-center gap-2">
                         <div class="i-ri:alert-line text-red-400" />
@@ -505,7 +503,8 @@ const Accounts = () => {
                           onClick={async () => {
                             const uuid = globalStore.accounts.data?.find(
                               (a: AccountEntry) =>
-                                a.uuid === globalStore.settings.data?.gdlAccountId
+                                a.uuid ===
+                                globalStore.settings.data?.gdlAccountId
                             )?.uuid
                             if (!uuid) return
                             const result =
@@ -614,7 +613,10 @@ const Accounts = () => {
         {/* Not logged in state */}
         <Match
           when={
-            !validGDLUser() && !invalidGDLUser() && !gdlAccountUnavailable() && !globalStore.gdlAccount.isLoading
+            !validGDLUser() &&
+            !invalidGDLUser() &&
+            !gdlAccountUnavailable() &&
+            !globalStore.gdlAccount.isLoading
           }
         >
           <RowsContainer>

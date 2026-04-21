@@ -11,15 +11,15 @@ import {
 import { VList } from "@/components/VirtuaWrapper"
 
 interface CheckboxItem {
-  label: string
-  value: string
+  label: string | null | undefined
+  value: string | number
   icon?: JSX.Element
 }
 
 interface SearchableCheckboxListProps {
   items: CheckboxItem[]
-  selectedValues: () => string[]
-  onToggle: (value: string, checked: boolean) => void
+  selectedValues: () => (string | number)[]
+  onToggle: (value: string | number, checked: boolean) => void
   searchPlaceholder?: string
   showSearch?: boolean
   maxHeight?: number
@@ -45,7 +45,9 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
   const filteredItems = createMemo(() => {
     const query = debouncedQuery().toLowerCase().trim()
     if (!query) return props.items
-    return props.items.filter((item) => item.label.toLowerCase().includes(query))
+    return props.items.filter((item) =>
+      (item.label ?? "").toLowerCase().includes(query)
+    )
   })
 
   const maxHeight = () => props.maxHeight ?? 200
@@ -117,7 +119,9 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
               class="flex flex-col gap-0.5 overflow-y-auto"
               style={{ "max-height": `${maxHeight()}px` }}
             >
-              <Index each={filteredItems()}>{(item) => renderItem(item())}</Index>
+              <Index each={filteredItems()}>
+                {(item) => renderItem(item())}
+              </Index>
             </div>
           }
         >

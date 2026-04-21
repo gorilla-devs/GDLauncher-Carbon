@@ -1,10 +1,4 @@
-import {
-  createSignal,
-  Show,
-  createEffect,
-  onCleanup,
-  createMemo
-} from "solid-js"
+import { createSignal, Show, createEffect, createMemo } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
   ContextMenu,
@@ -43,10 +37,6 @@ const GroupHeader = (props: GroupHeaderProps) => {
 
   const deleteGroupMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteGroup"]
-  }))
-
-  const moveGroupMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.moveGroup"]
   }))
 
   // Check if this group is being dragged
@@ -210,7 +200,10 @@ const GroupHeader = (props: GroupHeaderProps) => {
           </Show>
 
           <Show when={props.isDefault}>
-            <ContextMenuItem class="flex items-center gap-2 opacity-50" disabled>
+            <ContextMenuItem
+              class="flex items-center gap-2 opacity-50"
+              disabled
+            >
               <div class="i-hugeicons:information-circle h-4 w-4" />
               <Trans key="instances:_trn_default_group_info" />
             </ContextMenuItem>

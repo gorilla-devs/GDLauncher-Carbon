@@ -12,7 +12,10 @@ import {
   useDropZoneRegistration,
   useLibraryItemAnimation
 } from "@/pages/Library/hooks"
-import { parseInstanceIds, parseServerIds } from "@/pages/Library/utils/selectionIds"
+import {
+  parseInstanceIds,
+  parseServerIds
+} from "@/pages/Library/utils/selectionIds"
 import { DropOverlayIndicator } from "@/pages/Library/components/DropOverlayIndicator"
 
 interface LibraryItemTileProps {
@@ -62,11 +65,13 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
       : null
 
   const serverData = () =>
-    isServer
-      ? (props.item as { type: "server"; data: ListServer }).data
-      : null
+    isServer ? (props.item as { type: "server"; data: ListServer }).data : null
 
-  const itemType = isFolder ? "folder" as const : isServer ? "server" as const : "instance" as const
+  const itemType = isFolder
+    ? ("folder" as const)
+    : isServer
+      ? ("server" as const)
+      : ("instance" as const)
 
   // Extracted hooks for drop indicators
   const dropIndicators = useDropIndicators({

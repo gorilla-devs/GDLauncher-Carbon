@@ -35,7 +35,8 @@ const ServerCreation = (props: ModalProps) => {
   const [mcVersion, setMcVersion] = createSignal("")
   const [error, setError] = createSignal("")
   const [portError, setPortError] = createSignal("")
-  const [modloaderType, setModloaderType] = createSignal<ModloaderOption>("vanilla")
+  const [modloaderType, setModloaderType] =
+    createSignal<ModloaderOption>("vanilla")
   const [modloaderVersion, setModloaderVersion] = createSignal("")
 
   const createServerMutation = rspc.createMutation(() => ({
@@ -77,9 +78,7 @@ const ServerCreation = (props: ModalProps) => {
   const releaseVersions = createMemo(() => {
     const versions = globalStore.minecraftVersions.data
     if (!versions) return []
-    return versions
-      .filter((v) => v.type === "release")
-      .map((v) => v.id)
+    return versions.filter((v) => v.type === "release").map((v) => v.id)
   })
 
   const selectedVersion = createMemo(() => {
@@ -119,7 +118,9 @@ const ServerCreation = (props: ModalProps) => {
     if (ml === "fabric" || ml === "quilt") {
       const supported = data.gameVersions.find((v: any) => v.id === gameVer)
       if (!supported) return []
-      const loaders = data.gameVersions.find((v: any) => v.id === DUMMY_META_VERSION)?.loaders
+      const loaders = data.gameVersions.find(
+        (v: any) => v.id === DUMMY_META_VERSION
+      )?.loaders
       return (loaders || []).map((l: any) => l.id).slice(0, 50)
     }
 
@@ -154,7 +155,8 @@ const ServerCreation = (props: ModalProps) => {
   }
 
   const isFormValid = createMemo(() => {
-    const basic = selectedVersion().length > 0 && portValue() >= 1 && portValue() <= 65535
+    const basic =
+      selectedVersion().length > 0 && portValue() >= 1 && portValue() <= 65535
     if (modloaderType() !== "vanilla") {
       return basic && modloaderVersion().length > 0
     }
@@ -176,8 +178,9 @@ const ServerCreation = (props: ModalProps) => {
         name,
         gameVersion: selectedVersion(),
         port: portValue(),
-        modloaderType: ml !== "vanilla" ? ml : undefined,
-        modloaderVersion: ml !== "vanilla" ? modloaderVersion() : undefined
+        group: null,
+        modloaderType: ml !== "vanilla" ? ml : null,
+        modloaderVersion: ml !== "vanilla" ? modloaderVersion() : null
       })
 
       modalsContext?.closeModal()
@@ -219,8 +222,10 @@ const ServerCreation = (props: ModalProps) => {
                 <button
                   class="flex flex-col items-center gap-1.5 rounded-xl border-2 border-solid px-3 py-3 text-xs transition-all"
                   classList={{
-                    "border-primary-500 bg-primary-500/10 text-primary-400": modloaderType() === option.id,
-                    "border-darkSlate-600 bg-darkSlate-800 text-lightSlate-500 hover:border-darkSlate-500 hover:text-lightSlate-300": modloaderType() !== option.id
+                    "border-primary-500 bg-primary-500/10 text-primary-400":
+                      modloaderType() === option.id,
+                    "border-darkSlate-600 bg-darkSlate-800 text-lightSlate-500 hover:border-darkSlate-500 hover:text-lightSlate-300":
+                      modloaderType() !== option.id
                   }}
                   onClick={() => setModloaderType(option.id)}
                 >
@@ -312,7 +317,9 @@ const ServerCreation = (props: ModalProps) => {
 
         {/* Port */}
         <div class="flex flex-col gap-2">
-          <label class="text-lightSlate-400 text-xs font-medium"><Trans key="instances:_trn_server_creation_port" /></label>
+          <label class="text-lightSlate-400 text-xs font-medium">
+            <Trans key="instances:_trn_server_creation_port" />
+          </label>
           <Input
             type="number"
             placeholder="25565"

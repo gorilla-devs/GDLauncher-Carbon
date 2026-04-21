@@ -5,7 +5,7 @@ import { createMemo } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 
 const useInstanceData = () => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
 
   const instanceDetails = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]

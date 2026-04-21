@@ -132,7 +132,6 @@ function Slider(props: Props) {
     document.addEventListener("mouseup", mouseup)
   }
 
-
   const mousemove = (e: MouseEvent) => {
     if (!dragging()) return
     setShowTooltip(true)

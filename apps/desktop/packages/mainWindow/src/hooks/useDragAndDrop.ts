@@ -1,5 +1,9 @@
-import { createSignal, onCleanup } from "solid-js"
-import { DragType, DropTarget, useDragContext } from "@/pages/Library/DragContext"
+import { onCleanup } from "solid-js"
+import {
+  DragType,
+  DropTarget,
+  useDragContext
+} from "@/pages/Library/DragContext"
 
 interface UseDragSourceOptions {
   type: DragType
@@ -15,7 +19,9 @@ interface UseDragSourceResult {
 /**
  * Hook for making an element a drag source
  */
-export function useDragSource(options: UseDragSourceOptions): UseDragSourceResult {
+export function useDragSource(
+  options: UseDragSourceOptions
+): UseDragSourceResult {
   const dragContext = useDragContext()
 
   const isDragging = () => {
@@ -63,30 +69,10 @@ interface UseDropTargetResult {
 /**
  * Hook for making an element a drop target
  */
-export function useDropTarget(options: UseDropTargetOptions): UseDropTargetResult {
+export function useDropTarget(
+  options: UseDropTargetOptions
+): UseDropTargetResult {
   const dragContext = useDragContext()
-
-  // Register/update drop zone when dependencies change
-  const updateDropZone = () => {
-    const target = options.getTarget()
-    const rect = options.getRect()
-
-    if (target && rect) {
-      dragContext.registerDropZone({
-        id: options.id,
-        rect,
-        target
-      })
-    } else {
-      dragContext.unregisterDropZone(options.id)
-    }
-  }
-
-  // Update drop zone on mount and when dragging starts
-  // We'll call this from the component using requestAnimationFrame
-  const scheduleUpdate = () => {
-    requestAnimationFrame(updateDropZone)
-  }
 
   onCleanup(() => {
     dragContext.unregisterDropZone(options.id)

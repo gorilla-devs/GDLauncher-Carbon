@@ -31,7 +31,9 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
   const globalStore = useGlobalStore()
 
   // Track newly created folder for spring animation
-  const [newlyCreatedFolderId, setNewlyCreatedFolderId] = createSignal<number | null>(null)
+  const [newlyCreatedFolderId, setNewlyCreatedFolderId] = createSignal<
+    number | null
+  >(null)
 
   // Create all mutations
   const moveInstanceMutation = rspc.createMutation(() => ({
@@ -76,7 +78,10 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
    * Handle instance drop events.
    * Mutations are batched to trigger a single reconciliation pass.
    */
-  const handleInstanceDrop = (target: DropTarget, draggedIds: number[]): void => {
+  const handleInstanceDrop = (
+    target: DropTarget,
+    draggedIds: number[]
+  ): void => {
     const _defaultGroupId = options.defaultGroupId()
 
     batch(() => {
@@ -280,7 +285,12 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
   /**
    * Main drop handler.
    */
-  const handleDrop = (target: DropTarget | null, draggedIds: number[], dragType: DragType, origin: string | null): void => {
+  const handleDrop = (
+    target: DropTarget | null,
+    draggedIds: number[],
+    dragType: DragType,
+    origin: string | null
+  ): void => {
     if (draggedIds.length === 0) return
 
     const isServerDrag = dragType === "server"
@@ -316,8 +326,8 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
     // For "favorites" target from grid: only ADD favorites, never remove
     if (target.type === "favorites") {
       if (isServerDrag) {
-        const draggedServers = (globalStore.servers.data || []).filter(
-          (s) => draggedIds.includes(s.id)
+        const draggedServers = (globalStore.servers.data || []).filter((s) =>
+          draggedIds.includes(s.id)
         )
         for (const srv of draggedServers) {
           if (!srv.favorite) {

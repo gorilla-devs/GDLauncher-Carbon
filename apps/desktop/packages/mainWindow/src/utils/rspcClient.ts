@@ -4,8 +4,8 @@ import {
   MutationCache,
   createQuery as solidCreateQuery,
   createMutation as solidCreateMutation,
-  type CreateQueryResult,
-  type CreateMutationResult,
+  type UseQueryResult,
+  type UseMutationResult,
   type SolidQueryOptions,
   type SolidMutationOptions
 } from "@tanstack/solid-query"
@@ -190,7 +190,7 @@ async function rspcFetch<T>(
 export const rspc = {
   createQuery<K extends QKey>(
     optsFn: () => RspcQueryOpts<K>
-  ): CreateQueryResult<QResult<K>, RSPCError> {
+  ): UseQueryResult<QResult<K>, RSPCError> {
     return solidCreateQuery((() => {
       const opts = optsFn()
       const key = opts.queryKey[0] as string
@@ -206,14 +206,19 @@ export const rspc = {
               signal: ctx.signal
             }))
       }
-    }) as () => SolidQueryOptions<QResult<K>, RSPCError, QResult<K>, QKeyArr<K>> & {
+    }) as () => SolidQueryOptions<
+      QResult<K>,
+      RSPCError,
+      QResult<K>,
+      QKeyArr<K>
+    > & {
       initialData?: undefined
-    }) as CreateQueryResult<QResult<K>, RSPCError>
+    })
   },
 
   createMutation<K extends MKey, TContext = unknown>(
     optsFn: () => RspcMutationOpts<K, TContext>
-  ): CreateMutationResult<MResult<K>, RSPCError, MInputVar<K>, TContext> {
+  ): UseMutationResult<MResult<K>, RSPCError, MInputVar<K>, TContext> {
     return solidCreateMutation((() => {
       const { mutationKey: rawKey, mutationFn: customFn, ...rest } = optsFn()
       const key: string = Array.isArray(rawKey) ? rawKey[0] : rawKey
@@ -239,7 +244,7 @@ export const rspc = {
       RSPCError,
       MInputVar<K>,
       TContext
-    >) as CreateMutationResult<MResult<K>, RSPCError, MInputVar<K>, TContext>
+    >)
   },
 
   useContext() {

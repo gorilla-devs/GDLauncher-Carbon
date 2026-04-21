@@ -68,20 +68,23 @@ const ConfirmBatchInstanceDeletion = (props: ModalProps) => {
       width="w-120"
     >
       <div class="flex flex-col gap-4">
-        <Show when={!isDeleting()} fallback={
-          <div class="flex flex-col items-center gap-4 py-8">
-            <Spinner />
-            <span class="text-lightSlate-50">
-              <Trans
-                key="instances:_trn_deleting_instances_progress"
-                options={{
-                  current: deletedCount(),
-                  total: instances().length
-                }}
-              />
-            </span>
-          </div>
-        }>
+        <Show
+          when={!isDeleting()}
+          fallback={
+            <div class="flex flex-col items-center gap-4 py-8">
+              <Spinner />
+              <span class="text-lightSlate-50">
+                <Trans
+                  key="instances:_trn_deleting_instances_progress"
+                  options={{
+                    current: deletedCount(),
+                    total: instances().length
+                  }}
+                />
+              </span>
+            </div>
+          }
+        >
           <div class="text-lightSlate-50">
             <Trans
               key="instances:_trn_batch_deletion_confirmation"
@@ -107,10 +110,7 @@ const ConfirmBatchInstanceDeletion = (props: ModalProps) => {
               <div class="i-hugeicons:cancel-01" />
               {t("instances:_trn_instance_confirm_deletion.cancel")}
             </Button>
-            <Button
-              type="secondary"
-              onClick={handleDelete}
-            >
+            <Button type="secondary" onClick={handleDelete}>
               <div class="i-hugeicons:delete-02" />
               <Trans
                 key="instances:_trn_delete_instances_button"

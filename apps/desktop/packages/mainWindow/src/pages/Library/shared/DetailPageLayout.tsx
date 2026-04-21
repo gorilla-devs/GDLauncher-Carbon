@@ -111,7 +111,8 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
                     style={
                       props.iconViewTransitionName
                         ? {
-                            "view-transition-name": props.iconViewTransitionName,
+                            "view-transition-name":
+                              props.iconViewTransitionName,
                             contain: "layout"
                           }
                         : {}

@@ -11,7 +11,7 @@ import { useServerAddonData, useServerAddonMutations } from "./hooks"
 
 const ServerAddons = () => {
   const [t] = useTransContext()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   let tableInstance: any = null
 
   const addonData = useServerAddonData()
@@ -58,7 +58,7 @@ const ServerAddons = () => {
     getAddonType: (row) => row.addonType,
     getImageUrl: (row) => {
       if (!row.hasImage) return null
-      return getServerModImageUrl(params.id!, row.id, "metadata")
+      return getServerModImageUrl(params.id, row.id, "metadata")
     },
     getPlatformInfo: (row) => ({
       hasCurseforge: !!row.curseforgeProjectId,

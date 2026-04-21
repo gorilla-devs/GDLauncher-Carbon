@@ -38,7 +38,11 @@ interface GroupProps {
 let nextId = 1
 
 const Radio = (props: Props) => {
-  const [local, otherProps] = splitProps(props, ["buttonStyle", "onChange", "allowDeselect"])
+  const [local, otherProps] = splitProps(props, [
+    "buttonStyle",
+    "onChange",
+    "allowDeselect"
+  ])
   const [isHovered, setIsHovered] = createSignal(false) // Track hover state
 
   const id = `radio-${nextId++}`

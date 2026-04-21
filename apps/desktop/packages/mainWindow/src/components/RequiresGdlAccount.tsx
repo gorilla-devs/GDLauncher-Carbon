@@ -38,8 +38,7 @@ const RequiresGdlAccount = (props: Props) => {
   const location = useLocation()
   const [t] = useTransContext()
 
-  const hasValidAccount = () =>
-    globalStore.gdlAccount.data?.status === "valid"
+  const hasValidAccount = () => globalStore.gdlAccount.data?.status === "valid"
 
   const showBadge = () => local.showIndicator !== false
 
@@ -52,7 +51,8 @@ const RequiresGdlAccount = (props: Props) => {
     if (local.onUnauthenticatedClick) {
       local.onUnauthenticatedClick()
     } else {
-      const returnTo = local.returnPath || `${location.pathname}${location.search}`
+      const returnTo =
+        local.returnPath || `${location.pathname}${location.search}`
       modalsContext?.openModal(
         { name: "requiresGdlAccount" },
         { returnPath: returnTo }
@@ -74,11 +74,7 @@ const RequiresGdlAccount = (props: Props) => {
             <div class="text-primary-500 flex items-center">
               {local.children}
               <Show when={showBadge()}>
-                <img
-                  src={logoUrl}
-                  alt=""
-                  class="ml-1 h-3.5 w-3.5"
-                />
+                <img src={logoUrl} alt="" class="ml-1 h-3.5 w-3.5" />
               </Show>
             </div>
           </TooltipTrigger>

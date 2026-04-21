@@ -4,8 +4,10 @@ import { cn } from "../util"
 
 type Size = "small" | "medium" | "large"
 
-interface CopyTextProps
-  extends Omit<JSX.HTMLAttributes<HTMLDivElement>, "onCopy"> {
+interface CopyTextProps extends Omit<
+  JSX.HTMLAttributes<HTMLDivElement>,
+  "onCopy"
+> {
   value: string
   size?: Size
   onCopy?: (value: string) => void
@@ -75,7 +77,12 @@ export const CopyText: Component<CopyTextProps> = (props) => {
       {...others}
     >
       {/* Text content */}
-      <span class={cn("text-lightSlate-400 select-all flex-1 min-w-0 truncate", styles().text)}>
+      <span
+        class={cn(
+          "text-lightSlate-400 select-all flex-1 min-w-0 truncate",
+          styles().text
+        )}
+      >
         {local.value}
       </span>
 

@@ -97,7 +97,12 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
         })()}
       </Show>
 
-      <Show when={gdlState().type === "none" && (flow.data.gdlAccountId !== "" || flow.data.isAddingGdlFromSettings)}>
+      <Show
+        when={
+          gdlState().type === "none" &&
+          (flow.data.gdlAccountId !== "" || flow.data.isAddingGdlFromSettings)
+        }
+      >
         <>
           <div class="bg-primary-500/10 flex h-20 w-20 items-center justify-center rounded-full">
             <div class="i-hugeicons:cloud-upload h-10 w-10 text-primary-400" />
@@ -170,7 +175,9 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
       <Show
         when={
           gdlState().type === "linked" ||
-          (gdlState().type === "none" && flow.data.gdlAccountId === "" && !flow.data.isAddingGdlFromSettings)
+          (gdlState().type === "none" &&
+            flow.data.gdlAccountId === "" &&
+            !flow.data.isAddingGdlFromSettings)
         }
       >
         <>

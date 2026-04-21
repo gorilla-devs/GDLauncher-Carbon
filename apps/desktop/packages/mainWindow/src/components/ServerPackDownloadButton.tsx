@@ -5,7 +5,14 @@ import {
   FEUnifiedSearchResult
 } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Button, toast, Spinner, Tooltip, TooltipTrigger, TooltipContent } from "@gd/ui"
+import {
+  Button,
+  toast,
+  Spinner,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent
+} from "@gd/ui"
 import { Show, createSignal, getOwner, runWithOwner } from "solid-js"
 
 interface ServerPackDownloadButtonProps {
@@ -90,7 +97,7 @@ const ServerPackDownloadButton = (props: ServerPackDownloadButtonProps) => {
         modpackSource = {
           modrinth: {
             project_id: props.addon.id,
-            version_id: versionId!
+            version_id: versionId
           }
         }
       }
@@ -113,11 +120,18 @@ const ServerPackDownloadButton = (props: ServerPackDownloadButtonProps) => {
             disabled={loading()}
             size={props.size || "medium"}
             onClick={handleDownload}
-            class={props.splitPosition === "left" ? "!rounded-r-none" : props.splitPosition === "right" ? "!rounded-l-none" : ""}
+            class={
+              props.splitPosition === "left"
+                ? "!rounded-r-none"
+                : props.splitPosition === "right"
+                  ? "!rounded-l-none"
+                  : ""
+            }
           >
-            <Show when={loading()} fallback={
-              <div class="i-hugeicons:server-stack-01 text-xl" />
-            }>
+            <Show
+              when={loading()}
+              fallback={<div class="i-hugeicons:server-stack-01 text-xl" />}
+            >
               <Spinner />
             </Show>
           </Button>

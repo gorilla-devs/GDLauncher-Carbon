@@ -389,7 +389,7 @@ function useLoading() {
       })
 
       const currentState = await ipcRenderer.invoke("getUpdateState")
-      if (currentState && currentState.state === "idle") {
+      if (currentState?.state === "idle") {
         checkForUpdates()
       } else if (currentState) {
         switch (currentState.state) {

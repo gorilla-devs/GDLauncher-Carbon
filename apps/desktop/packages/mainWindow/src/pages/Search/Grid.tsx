@@ -26,7 +26,7 @@ const GAP = 24 // Gap between items in pixels
 export function Grid() {
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ type: string }>()
 
   const allRows = () => searchContext?.allRows() || []
 
@@ -154,7 +154,9 @@ export function Grid() {
     if (!virtualizer || (searchContext?.allRows().length ?? 0) === 0) return
 
     // Get the row-based end index and convert to item index
-    const endRowIndex = virtualizer.findItemIndex(virtualizer.scrollOffset + virtualizer.viewportSize)
+    const endRowIndex = virtualizer.findItemIndex(
+      virtualizer.scrollOffset + virtualizer.viewportSize
+    )
     const endItemIndex = (endRowIndex + 1) * itemsPerRow()
     const totalItems = searchContext?.allRows().length || 0
 
@@ -173,13 +175,17 @@ export function Grid() {
   }
 
   // Grid item skeleton matching actual card design
-  const GridItemSkeleton = (props: { platform?: "curseforge" | "modrinth" }) => (
+  const GridItemSkeleton = (props: {
+    platform?: "curseforge" | "modrinth"
+  }) => (
     <div class="bg-darkSlate-800 relative aspect-square overflow-hidden rounded-2xl border border-white/5">
       {/* Image area skeleton with platform icon */}
       <div class="skeleton-shimmer bg-darkSlate-500 flex h-full w-full items-center justify-center">
         <Show when={props.platform}>
           <img
-            src={props.platform === "curseforge" ? CurseforgeLogo : ModrinthLogo}
+            src={
+              props.platform === "curseforge" ? CurseforgeLogo : ModrinthLogo
+            }
             class="h-8 w-8 opacity-40"
             alt={`${props.platform} logo`}
           />
@@ -213,7 +219,10 @@ export function Grid() {
     <div ref={containerRef} class="flex h-full flex-col overflow-hidden">
       <div class="flex-1 overflow-hidden">
         <Show
-          when={!searchContext?.isInitialLoading() || allRows().some(r => r.type === 'value')}
+          when={
+            !searchContext?.isInitialLoading() ||
+            allRows().some((r) => r.type === "value")
+          }
           fallback={<GridSkeleton />}
         >
           <Show
@@ -272,15 +281,19 @@ export function Grid() {
                           result={item.value!}
                           isInstalled={
                             !isNaN(serverId()) && serverId() > 0
-                              ? isServerAddonInstalled(item.value!.id, item.value!.slug)
+                              ? isServerAddonInstalled(
+                                  item.value!.id,
+                                  item.value!.slug
+                                )
                               : lookupTableInstalledMods().has(item.value!.id)
                           }
                           onItemClick={() => {
                             const sid = serverId()
                             const iid = instanceId()
-                            const idParam = !isNaN(sid) && sid > 0
-                              ? `serverId=${sid}`
-                              : `instanceId=${iid}`
+                            const idParam =
+                              !isNaN(sid) && sid > 0
+                                ? `serverId=${sid}`
+                                : `instanceId=${iid}`
                             navigator.navigate(
                               `/addon/${item.value!.id}/${item.value!.platform}?${idParam}`
                             )

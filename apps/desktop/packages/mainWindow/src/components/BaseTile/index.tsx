@@ -97,34 +97,34 @@ const BaseTile = (props: BaseTileProps) => {
 
   // Progress bar computation
   const computedProgressWidth = () => {
-    const sub = props.subTasks?.find(
-      (s) => s.progress !== "opaque"
-    )
+    const sub = props.subTasks?.find((s) => s.progress !== "opaque")
     if (!sub) return 0
-    if ("download" in sub.progress) {
-      const d = sub.progress.download
+    const progress = sub.progress
+    if (typeof progress === "string") return 0
+    if ("download" in progress) {
+      const d = progress.download
       return d.total > 0 ? (d.downloaded / d.total) * 100 : 0
     }
-    if ("item" in sub.progress) {
-      const i = sub.progress.item
+    if ("item" in progress) {
+      const i = progress.item
       return i.total > 0 ? (i.current / i.total) * 100 : 0
     }
     return 0
   }
 
   const computedProgressText = () => {
-    const sub = props.subTasks?.find(
-      (s) => s.progress !== "opaque"
-    )
+    const sub = props.subTasks?.find((s) => s.progress !== "opaque")
     if (!sub) return ""
-    if ("download" in sub.progress) {
-      const d = sub.progress.download
+    const progress = sub.progress
+    if (typeof progress === "string") return ""
+    if ("download" in progress) {
+      const d = progress.download
       const dlMB = (d.downloaded / 1_048_576).toFixed(1)
       const totMB = (d.total / 1_048_576).toFixed(1)
       return `${dlMB} / ${totMB} MB`
     }
-    if ("item" in sub.progress) {
-      const i = sub.progress.item
+    if ("item" in progress) {
+      const i = progress.item
       return `${i.current} / ${i.total}`
     }
     return ""
@@ -165,15 +165,9 @@ const BaseTile = (props: BaseTileProps) => {
       }}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <SelectionBorder
-        isSelected={props.isMultiSelected}
-        size={props.size}
-      />
+      <SelectionBorder isSelected={props.isMultiSelected} size={props.size} />
 
-      <Tooltip
-        open={props.failError ? undefined : false}
-        placement="top"
-      >
+      <Tooltip open={props.failError ? undefined : false} placement="top">
         <TooltipTrigger>
           <div
             class="relative box-border overflow-hidden rounded-2xl p-[2px]"
@@ -186,13 +180,9 @@ const BaseTile = (props: BaseTileProps) => {
               class="absolute left-0 top-0 h-full w-full transition-[opacity,background] duration-300 ease-spring"
               classList={{
                 "opacity-0 bg-transparent":
-                  !isLoadingOrWaiting() &&
-                  !props.isRunning &&
-                  !props.isBusy,
+                  !isLoadingOrWaiting() && !props.isRunning && !props.isBusy,
                 "opacity-100":
-                  isLoadingOrWaiting() ||
-                  props.isRunning ||
-                  props.isBusy,
+                  isLoadingOrWaiting() || props.isRunning || props.isBusy,
                 "bg-green-400": props.isRunning,
                 "bg-yellow-400": props.isBusy && !props.isRunning,
                 "instance-tile-spinning": isLoadingOrWaiting()
@@ -226,9 +216,7 @@ const BaseTile = (props: BaseTileProps) => {
                   "group-hover:scale-110 group-hover:blur-[2px]":
                     !isLoadingOrWaiting() && !props.isDragActive,
                   "scale-110 blur-[2px]":
-                    isMenuOpen() &&
-                    !isLoadingOrWaiting() &&
-                    !props.isDragActive
+                    isMenuOpen() && !isLoadingOrWaiting() && !props.isDragActive
                 }}
                 style={{
                   "background-image": props.img
@@ -250,8 +238,7 @@ const BaseTile = (props: BaseTileProps) => {
                 classList={{
                   "!bg-black/0": isLoadingOrWaiting(),
                   "group-hover:bg-black/30": !props.isDragActive,
-                  "bg-black/30":
-                    isMenuOpen() && !props.isDragActive
+                  "bg-black/30": isMenuOpen() && !props.isDragActive
                 }}
               />
 
@@ -287,10 +274,7 @@ const BaseTile = (props: BaseTileProps) => {
                     props.onToggleSelection?.()
                   }}
                 >
-                  <Checkbox
-                    checked={props.isMultiSelected}
-                    hover={false}
-                  />
+                  <Checkbox checked={props.isMultiSelected} hover={false} />
                 </div>
               </Show>
 
@@ -331,11 +315,7 @@ const BaseTile = (props: BaseTileProps) => {
               </Show>
 
               {/* Loading dark overlays (backdrop-blur + gradients) */}
-              <Show
-                when={
-                  isLoadingOrWaiting() || props.isDeleting
-                }
-              >
+              <Show when={isLoadingOrWaiting() || props.isDeleting}>
                 <div class="z-1 absolute bottom-0 left-0 right-0 top-0 rounded-2xl backdrop-blur-sm" />
                 <div class="from-darkSlate-900 z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-30% opacity-50" />
                 <div class="from-darkSlate-900 z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t opacity-50" />
@@ -369,16 +349,12 @@ const BaseTile = (props: BaseTileProps) => {
                           class="text-center"
                           classList={{
                             "text-xs":
-                              props.subTasks &&
-                              props.subTasks.length > 1,
-                            "text-md":
-                              props.subTasks?.length === 1
+                              props.subTasks && props.subTasks.length > 1,
+                            "text-md": props.subTasks?.length === 1
                           }}
                         >
                           {t(
-                            getTaskTranslationKey(
-                              subTask.name.translation
-                            ),
+                            getTaskTranslationKey(subTask.name.translation),
                             getTranslationArgs(subTask.name)
                           )}
                         </div>
@@ -433,13 +409,9 @@ const BaseTile = (props: BaseTileProps) => {
                     "flex bg-yellow-500 translate-x-0 opacity-100":
                       props.isBusy && !props.isRunning,
                     "group-hover:flex group-hover:translate-x-0 group-hover:opacity-100":
-                      !props.isRunning &&
-                      !props.isBusy &&
-                      !props.isDragActive,
+                      !props.isRunning && !props.isBusy && !props.isDragActive,
                     "!flex !translate-x-0 !opacity-100":
-                      isMenuOpen() &&
-                      !props.isRunning &&
-                      !props.isBusy
+                      isMenuOpen() && !props.isRunning && !props.isBusy
                   }}
                   style={
                     props.shouldSetViewTransition
@@ -462,8 +434,7 @@ const BaseTile = (props: BaseTileProps) => {
               <div
                 class="z-4 absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl transition-opacity duration-300"
                 classList={{
-                  "opacity-0":
-                    isLoadingOrWaiting() || props.isDeleting
+                  "opacity-0": isLoadingOrWaiting() || props.isDeleting
                 }}
               >
                 {props.infoContent}
@@ -474,9 +445,7 @@ const BaseTile = (props: BaseTileProps) => {
                 when={
                   props.isLoading &&
                   props.subTasks?.length &&
-                  props.subTasks.find(
-                    (s) => s.progress !== "opaque"
-                  )
+                  props.subTasks.find((s) => s.progress !== "opaque")
                 }
               >
                 <div class="z-5 animate-enterWithOpacityChange absolute bottom-0 left-0 right-0 flex items-center gap-2 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl overflow-hidden opacity-0">
@@ -542,4 +511,3 @@ const BaseTile = (props: BaseTileProps) => {
 
 // Export the menu open signal setter so consumers can sync context menu state
 export { BaseTile }
-export type { BaseTileProps }

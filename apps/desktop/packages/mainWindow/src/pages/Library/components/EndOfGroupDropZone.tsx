@@ -14,7 +14,7 @@ interface EndOfGroupDropZoneProps {
   instanceCount?: number
   zoneIdPrefix?: string
   tileSize: Accessor<number>
-  scope?: string  // Optional scope for filtering (e.g., "folder-123")
+  scope?: string // Optional scope for filtering (e.g., "folder-123")
 }
 
 export function EndOfGroupDropZone(props: EndOfGroupDropZoneProps) {
@@ -34,7 +34,8 @@ export function EndOfGroupDropZone(props: EndOfGroupDropZoneProps) {
     const zoneId = `${zoneIdPrefix()}-${props.groupId}`
     if (
       dragContext.isDragging() &&
-      (dragContext.dragType() === "instance" || dragContext.dragType() === "server") &&
+      (dragContext.dragType() === "instance" ||
+        dragContext.dragType() === "server") &&
       ref
     ) {
       const rect = ref.getBoundingClientRect()

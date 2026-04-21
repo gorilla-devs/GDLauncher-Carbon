@@ -5,9 +5,9 @@ import {
   EnrollmentStatus
 } from "@gd/core_module/bindings"
 import { RSPCError } from "@/utils/rspcClient"
-import { CreateQueryResult } from "@tanstack/solid-query"
+import { UseQueryResult } from "@tanstack/solid-query"
 
-type RouteData = CreateQueryResult<EnrollmentStatus | null, RSPCError>
+type RouteData = UseQueryResult<EnrollmentStatus | null, RSPCError>
 
 interface EventsCallbacks {
   onPolling?: (_info: DeviceCode) => void
@@ -23,7 +23,7 @@ interface EventsCallbacks {
 }
 
 export const handleStatus = (
-  routeData: RouteData | CreateQueryResult<any, RSPCError>,
+  routeData: RouteData | UseQueryResult<any, RSPCError>,
   callbacks: EventsCallbacks
 ) => {
   if (routeData.isSuccess) {

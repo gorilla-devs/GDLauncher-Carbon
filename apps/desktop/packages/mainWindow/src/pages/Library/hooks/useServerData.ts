@@ -42,9 +42,9 @@ export function useServerData(filter: Accessor<string>): UseServerDataReturn {
 
   const defaultGroupId = createMemo(() => defaultGroupQuery.data ?? null)
 
-  // Server view mode from settings
+  // Server view mode from settings (servers share the instances* settings)
   const viewMode = createMemo<LibraryViewMode>(() =>
-    getViewMode(globalStore.settings.data?.serversGroupBy)
+    getViewMode(globalStore.settings.data?.instancesGroupBy)
   )
 
   const isFoldersView = createMemo(() => viewMode() === "folders")
@@ -71,13 +71,14 @@ export function useServerData(filter: Accessor<string>): UseServerDataReturn {
   // Compute library items for folders mode
   createEffect(
     on(
-      () => [
-        globalStore.servers.data,
-        globalStore.serverGroups.data,
-        filter(),
-        defaultGroupId(),
-        isFoldersView()
-      ] as const,
+      () =>
+        [
+          globalStore.servers.data,
+          globalStore.serverGroups.data,
+          filter(),
+          defaultGroupId(),
+          isFoldersView()
+        ] as const,
       ([servers, groups, filterValue, defGroupId, foldersView]) => {
         const filterActive = !!filterValue?.trim()
         if (!foldersView || filterActive) {
@@ -101,13 +102,14 @@ export function useServerData(filter: Accessor<string>): UseServerDataReturn {
   // Compute virtual groups for accordion/search mode
   createEffect(
     on(
-      () => [
-        globalStore.servers.data,
-        globalStore.serverGroups.data,
-        globalStore.settings.data,
-        filter(),
-        isFoldersView()
-      ] as const,
+      () =>
+        [
+          globalStore.servers.data,
+          globalStore.serverGroups.data,
+          globalStore.settings.data,
+          filter(),
+          isFoldersView()
+        ] as const,
       ([servers, _groups, settings, filterValue, foldersView]) => {
         const filterActive = !!filterValue?.trim()
         if (foldersView && !filterActive) {
@@ -127,8 +129,7 @@ export function useServerData(filter: Accessor<string>): UseServerDataReturn {
 
   const isLoading = createMemo(
     () =>
-      globalStore.servers.isLoading ||
-      (isFoldersView() && !defaultGroupId())
+      globalStore.servers.isLoading || (isFoldersView() && !defaultGroupId())
   )
 
   const isEmpty = createMemo(
@@ -138,9 +139,15 @@ export function useServerData(filter: Accessor<string>): UseServerDataReturn {
   )
 
   return {
-    get libraryItems() { return store.libraryItems },
-    get virtualGroups() { return store.virtualGroups },
-    get favoriteIds() { return store.favoriteIds },
+    get libraryItems() {
+      return store.libraryItems
+    },
+    get virtualGroups() {
+      return store.virtualGroups
+    },
+    get favoriteIds() {
+      return store.favoriteIds
+    },
     viewMode,
     isFoldersView,
     defaultGroupId,
@@ -214,16 +221,22 @@ function computeServerLibraryItems(
 
 function computeServerVirtualGroups(
   servers: ListServer[],
-  settings: { serversGroupBy?: string | null; serversSortBy?: string | null; serversSortByAsc?: boolean; serversGroupByAsc?: boolean } | undefined,
+  settings:
+    | {
+        instancesGroupBy?: string | null
+        instancesSortBy?: string | null
+        instancesSortByAsc?: boolean
+        instancesGroupByAsc?: boolean
+      }
+    | undefined,
   filterValue: string
 ): VirtualGroup[] {
   const nameFilter = filterValue.replaceAll(" ", "").toLowerCase()
-  const groupBy = settings?.serversGroupBy
-  const sortByAsc = settings?.serversSortByAsc ?? true
-  const groupByAsc = settings?.serversGroupByAsc ?? true
+  const groupBy = settings?.instancesGroupBy
+  const groupByAsc = settings?.instancesGroupByAsc ?? true
 
-  const matching = servers.filter(
-    (s) => s.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
+  const matching = servers.filter((s) =>
+    s.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
   )
 
   if (groupBy === null || groupBy === undefined) {

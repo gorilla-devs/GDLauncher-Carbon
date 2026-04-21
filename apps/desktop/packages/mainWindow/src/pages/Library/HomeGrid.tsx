@@ -45,11 +45,18 @@ import {
   injectFolderTransitionCSS,
   removeFolderTransitionCSS
 } from "./utils/folderViewTransition"
-import { parseInstanceIds, parseFolderIds, parseServerIds } from "./utils/selectionIds"
+import {
+  parseInstanceIds,
+  parseFolderIds,
+  parseServerIds
+} from "./utils/selectionIds"
 import "@/components/Library/folderTransitions.css"
 import "./styles/modeTransitions.css"
 
-import { clickedInstanceId, setClickedInstanceId } from "@/components/InstanceTile"
+import {
+  clickedInstanceId,
+  setClickedInstanceId
+} from "@/components/InstanceTile"
 import { setClickedServerId } from "@/components/Server/Tile"
 import { DragProvider, useDragContext } from "./DragContext"
 import { FloatingFavoritesBar } from "./components/FloatingFavoritesBar"
@@ -84,8 +91,11 @@ const HomeGridInner = () => {
   const [filter, setFilter] = createSignal("")
   const [tileSize, setTileSize] = createSignal(2)
   const [openFolderId, setOpenFolderId] = createSignal<number | null>(null)
-  const libraryMode = (): LibraryMode => searchParams.mode === "servers" ? "servers" : "instances"
-  const [modeDirection, setModeDirection] = createSignal<"forward" | "backward" | null>(null)
+  const libraryMode = (): LibraryMode =>
+    searchParams.mode === "servers" ? "servers" : "instances"
+  const [modeDirection, setModeDirection] = createSignal<
+    "forward" | "backward" | null
+  >(null)
 
   // Refs for drag selection - keyed by type-prefixed string ID (e.g., "instance-5", "folder-3")
   const tileRefs = new Map<string, HTMLDivElement>()
@@ -123,16 +133,16 @@ const HomeGridInner = () => {
     defaultGroupId,
     selection,
     flipAnimation,
-    get libraryItems() { return data().libraryItems }
+    get libraryItems() {
+      return data().libraryItems
+    }
   })
 
-  // Sync tile size from settings based on mode
+  // Sync tile size from settings (shared across instances and servers)
   createEffect(() => {
-    const mode = libraryMode()
-    if (mode === "instances" && globalStore.settings.data?.instancesTileSize) {
+    libraryMode()
+    if (globalStore.settings.data?.instancesTileSize) {
       setTileSize(globalStore.settings.data.instancesTileSize)
-    } else if (mode === "servers" && globalStore.settings.data?.serversTileSize) {
-      setTileSize(globalStore.settings.data.serversTileSize)
     }
   })
 
@@ -271,10 +281,7 @@ const HomeGridInner = () => {
       const instanceCount =
         folder?.type === "folder" ? folder.data.instances.length : 0
       const maxVisible = Math.min(instanceCount, 4)
-      const visibleIndices = Array.from(
-        { length: maxVisible },
-        (_, i) => i
-      )
+      const visibleIndices = Array.from({ length: maxVisible }, (_, i) => i)
 
       setVisibleFolderIndices(visibleIndices)
       injectFolderTransitionCSS(visibleIndices, isClosing ? "close" : "open")
@@ -327,11 +334,13 @@ const HomeGridInner = () => {
         setSearchParams({ mode: modeParam }, { replace: true })
       })
 
-      transition.finished.then(() => {
-        setModeDirection(null)
-      }).catch(() => {
-        setModeDirection(null)
-      })
+      transition.finished
+        .then(() => {
+          setModeDirection(null)
+        })
+        .catch(() => {
+          setModeDirection(null)
+        })
     } else {
       setSearchParams({ mode: modeParam }, { replace: true })
     }
@@ -589,8 +598,8 @@ const HomeGridInner = () => {
       <DragGhost
         instances={globalStore.instances.data || []}
         servers={globalStore.servers.data || []}
-        groups={data().libraryItems
-          .filter(
+        groups={data()
+          .libraryItems.filter(
             (item): item is LibraryItem & { type: "folder" } =>
               item.type === "folder"
           )

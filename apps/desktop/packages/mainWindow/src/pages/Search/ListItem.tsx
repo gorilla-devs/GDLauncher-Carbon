@@ -1,4 +1,9 @@
-import { FEUnifiedSearchResult, Mod, ServerAddon } from "@gd/core_module/bindings"
+import {
+  FEUnifiedCategory,
+  FEUnifiedSearchResult,
+  Mod,
+  ServerAddon
+} from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
@@ -33,10 +38,14 @@ export function ListItem(props: SearchResultItemProps) {
     return props.result.categories
       .map((cat) =>
         props.result.platform === "curseforge"
-          ? cats?.[cat as number]
-          : cats?.[`${props.result.type}:${cat}`]
+          ? cats?.[cat as unknown as number]
+          : (cats as Record<string, FEUnifiedCategory> | undefined)?.[
+              `${props.result.type}:${cat}`
+            ]
       )
-      .filter((cat) => cat !== undefined)
+      .filter(
+        (cat): cat is FEUnifiedCategory => cat !== undefined && cat !== null
+      )
   })
 
   return (
@@ -133,11 +142,16 @@ export function ListItem(props: SearchResultItemProps) {
                     <div class="flex items-center">
                       <ModpackDownloadButton
                         addon={props.result}
-                        splitPosition={props.result.serverPackFileId ? "left" : undefined}
+                        splitPosition={
+                          props.result.serverPackFileId ? "left" : undefined
+                        }
                       />
                       <Show when={props.result.serverPackFileId}>
                         <div class="w-px self-stretch bg-primary-700 shrink-0" />
-                        <ServerPackDownloadButton addon={props.result} splitPosition="right" />
+                        <ServerPackDownloadButton
+                          addon={props.result}
+                          splitPosition="right"
+                        />
                       </Show>
                     </div>
                   </Match>

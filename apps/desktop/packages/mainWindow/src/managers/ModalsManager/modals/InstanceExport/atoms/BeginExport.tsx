@@ -49,7 +49,12 @@ const BeginExport = (props: Props) => {
     if (typeof payload.instance_id !== "number") return false
     if (typeof payload.save_path !== "string") return false
     const extension = _.last(payload.save_path.split("."))
-    if (extension !== "zip" && extension !== "mrpack" && extension !== "gdlpack") return false
+    if (
+      extension !== "zip" &&
+      extension !== "mrpack" &&
+      extension !== "gdlpack"
+    )
+      return false
     return true
   }
 

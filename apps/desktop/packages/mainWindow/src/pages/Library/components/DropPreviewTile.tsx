@@ -48,7 +48,12 @@ const DropPreviewTile = (props: DropPreviewTileProps) => {
         rect,
         element: previewRef,
         rectTransform: (r) =>
-          new DOMRect(r.left - ZONE_PADDING, r.top, r.width + ZONE_PADDING * 2, r.height),
+          new DOMRect(
+            r.left - ZONE_PADDING,
+            r.top,
+            r.width + ZONE_PADDING * 2,
+            r.height
+          ),
         target: props.dropTarget,
         scope: props.scope
       })

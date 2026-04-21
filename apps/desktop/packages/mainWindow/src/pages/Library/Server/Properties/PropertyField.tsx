@@ -1,4 +1,4 @@
-import { Show, For } from "solid-js"
+import { Show } from "solid-js"
 import {
   Input,
   Select,
@@ -19,9 +19,13 @@ const PropertyField = (props: PropertyFieldProps) => {
   return (
     <div class="flex flex-col gap-1">
       <div class="flex items-center justify-between">
-        <label class="text-xs text-lightSlate-500">{props.definition.label}</label>
+        <label class="text-xs text-lightSlate-500">
+          {props.definition.label}
+        </label>
         <Show when={props.definition.description}>
-          <span class="text-xs text-lightSlate-700">{props.definition.description}</span>
+          <span class="text-xs text-lightSlate-700">
+            {props.definition.description}
+          </span>
         </Show>
       </div>
 
@@ -32,7 +36,9 @@ const PropertyField = (props: PropertyFieldProps) => {
             "bg-green-900/30 text-green-400": props.value === "true",
             "bg-darkSlate-700 text-lightSlate-500": props.value !== "true"
           }}
-          onClick={() => props.onChange(props.value === "true" ? "false" : "true")}
+          onClick={() =>
+            props.onChange(props.value === "true" ? "false" : "true")
+          }
         >
           <div
             classList={{
@@ -58,14 +64,24 @@ const PropertyField = (props: PropertyFieldProps) => {
           value={props.value}
           onInput={(e) => {
             const val = e.currentTarget.value
-            if (props.definition.min !== undefined && Number(val) < props.definition.min) return
-            if (props.definition.max !== undefined && Number(val) > props.definition.max) return
+            if (
+              props.definition.min !== undefined &&
+              Number(val) < props.definition.min
+            )
+              return
+            if (
+              props.definition.max !== undefined &&
+              Number(val) > props.definition.max
+            )
+              return
             props.onChange(val)
           }}
         />
       </Show>
 
-      <Show when={props.definition.type === "enum" && props.definition.enumValues}>
+      <Show
+        when={props.definition.type === "enum" && props.definition.enumValues}
+      >
         <Select
           value={props.value}
           onChange={(value) => {

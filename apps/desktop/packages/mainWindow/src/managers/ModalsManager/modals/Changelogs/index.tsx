@@ -3,7 +3,7 @@ import ModalLayout from "../../ModalLayout"
 
 import { Trans } from "@gd/i18n"
 import { For, Show, createSignal, onMount } from "solid-js"
-import changelogs, { Changelog, ChangelogEntry } from "./changelogs"
+import changelogs, { ChangelogEntry } from "./changelogs"
 import { Button, Badge } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 
@@ -166,9 +166,7 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
           </div>
         }
       >
-        <div
-          class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6"
-        >
+        <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6">
           <Show
             when={!props.reverse}
             fallback={

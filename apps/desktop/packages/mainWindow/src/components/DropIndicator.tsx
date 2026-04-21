@@ -1,4 +1,4 @@
-import { Show, createMemo, createEffect } from "solid-js"
+import { Show, createMemo } from "solid-js"
 import { useDragContext, DropTarget } from "@/pages/Library/DragContext"
 
 interface DropIndicatorProps {
@@ -57,8 +57,12 @@ const DropIndicator = (props: DropIndicatorProps) => {
             ? {
                 left: `${props.position.x}px`,
                 top: `${props.position.y}px`,
-                width: props.position.width ? `${props.position.width}px` : undefined,
-                height: props.position.height ? `${props.position.height}px` : undefined
+                width: props.position.width
+                  ? `${props.position.width}px`
+                  : undefined,
+                height: props.position.height
+                  ? `${props.position.height}px`
+                  : undefined
               }
             : undefined
         }
@@ -100,7 +104,11 @@ interface InstanceDropIndicatorProps {
 export const InstanceDropIndicator = (props: InstanceDropIndicatorProps) => {
   const target: DropTarget =
     props.position === "before"
-      ? { type: "beforeInstance", instanceId: props.instanceId, groupId: props.groupId }
+      ? {
+          type: "beforeInstance",
+          instanceId: props.instanceId,
+          groupId: props.groupId
+        }
       : { type: "endOfGroup", groupId: props.groupId }
 
   return <DropIndicator target={target} orientation="horizontal" />

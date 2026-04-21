@@ -11,7 +11,11 @@ const SettingsTab = () => {
       {(d) => (
         <Settings
           serverDetails={d()}
-          totalRam={routeData.totalRam.data ?? undefined}
+          totalRam={
+            routeData.totalRam.data
+              ? parseInt(routeData.totalRam.data, 10)
+              : undefined
+          }
         />
       )}
     </Show>

@@ -177,9 +177,7 @@ export function SortFilter() {
         title={
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:sort-by-down-01 h-4 w-4" />
-            <span>
-              {t("search:_trn_sort_by")}
-            </span>
+            <span>{t("search:_trn_sort_by")}</span>
           </div>
         }
         defaultOpened

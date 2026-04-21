@@ -25,7 +25,7 @@ export function useDragLayoutAnimation(
   const dragContext = useDragContext()
   const globalStore = useGlobalStore()
   let savedPositions = new Map<Element, DOMRect>()
-  let activeAnimations = new Map<Element, Animation>()
+  const activeAnimations = new Map<Element, Animation>()
 
   const capturePositions = () => {
     const grid = gridRef()

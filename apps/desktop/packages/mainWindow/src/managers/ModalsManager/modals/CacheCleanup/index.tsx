@@ -11,7 +11,7 @@ import {
   Switch
 } from "solid-js"
 import { createStore } from "solid-js/store"
-import type { CacheBreakdown, CacheCleanupSelection } from "@gd/core_module/bindings"
+import type { CacheCleanupSelection } from "@gd/core_module/bindings"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { queryClient, rspc } from "@/utils/rspcClient"
@@ -22,11 +22,11 @@ type Phase = "select" | "running" | "done" | "failed"
 
 // Each row in the dialog. `key` corresponds 1:1 with a CacheBreakdown /
 // CacheCleanupSelection field. Sections render as headers between rows.
-type Item = {
+interface Item {
   key: keyof CacheCleanupSelection
   labelKey: string
 }
-type Section = {
+interface Section {
   titleKey: string
   items: Item[]
 }
@@ -35,50 +35,101 @@ const SECTIONS: Section[] = [
   {
     titleKey: "modals:_trn_cache_cleanup.section_network",
     items: [
-      { key: "httpCache", labelKey: "modals:_trn_cache_cleanup.item_http_cache" }
+      {
+        key: "httpCache",
+        labelKey: "modals:_trn_cache_cleanup.item_http_cache"
+      }
     ]
   },
   {
     titleKey: "modals:_trn_cache_cleanup.section_curseforge",
     items: [
-      { key: "curseforgeModMetadata", labelKey: "modals:_trn_cache_cleanup.item_cf_mod_metadata" },
-      { key: "curseforgeModIcons", labelKey: "modals:_trn_cache_cleanup.item_cf_mod_icons" },
-      { key: "curseforgeModpackMetadata", labelKey: "modals:_trn_cache_cleanup.item_cf_modpack_metadata" },
-      { key: "curseforgeModpackIcons", labelKey: "modals:_trn_cache_cleanup.item_cf_modpack_icons" }
+      {
+        key: "curseforgeModMetadata",
+        labelKey: "modals:_trn_cache_cleanup.item_cf_mod_metadata"
+      },
+      {
+        key: "curseforgeModIcons",
+        labelKey: "modals:_trn_cache_cleanup.item_cf_mod_icons"
+      },
+      {
+        key: "curseforgeModpackMetadata",
+        labelKey: "modals:_trn_cache_cleanup.item_cf_modpack_metadata"
+      },
+      {
+        key: "curseforgeModpackIcons",
+        labelKey: "modals:_trn_cache_cleanup.item_cf_modpack_icons"
+      }
     ]
   },
   {
     titleKey: "modals:_trn_cache_cleanup.section_modrinth",
     items: [
-      { key: "modrinthModMetadata", labelKey: "modals:_trn_cache_cleanup.item_mr_mod_metadata" },
-      { key: "modrinthModIcons", labelKey: "modals:_trn_cache_cleanup.item_mr_mod_icons" },
-      { key: "modrinthModpackMetadata", labelKey: "modals:_trn_cache_cleanup.item_mr_modpack_metadata" },
-      { key: "modrinthModpackIcons", labelKey: "modals:_trn_cache_cleanup.item_mr_modpack_icons" }
+      {
+        key: "modrinthModMetadata",
+        labelKey: "modals:_trn_cache_cleanup.item_mr_mod_metadata"
+      },
+      {
+        key: "modrinthModIcons",
+        labelKey: "modals:_trn_cache_cleanup.item_mr_mod_icons"
+      },
+      {
+        key: "modrinthModpackMetadata",
+        labelKey: "modals:_trn_cache_cleanup.item_mr_modpack_metadata"
+      },
+      {
+        key: "modrinthModpackIcons",
+        labelKey: "modals:_trn_cache_cleanup.item_mr_modpack_icons"
+      }
     ]
   },
   {
     titleKey: "modals:_trn_cache_cleanup.section_local",
     items: [
-      { key: "localModIcons", labelKey: "modals:_trn_cache_cleanup.item_local_mod_icons" }
+      {
+        key: "localModIcons",
+        labelKey: "modals:_trn_cache_cleanup.item_local_mod_icons"
+      }
     ]
   },
   {
     titleKey: "modals:_trn_cache_cleanup.section_mc_metadata",
     items: [
-      { key: "mcVersionManifests", labelKey: "modals:_trn_cache_cleanup.item_mc_version_manifests" },
-      { key: "modloaderVersions", labelKey: "modals:_trn_cache_cleanup.item_modloader_versions" },
-      { key: "lwjglConfigs", labelKey: "modals:_trn_cache_cleanup.item_lwjgl_configs" },
-      { key: "assetIndices", labelKey: "modals:_trn_cache_cleanup.item_asset_indices" }
+      {
+        key: "mcVersionManifests",
+        labelKey: "modals:_trn_cache_cleanup.item_mc_version_manifests"
+      },
+      {
+        key: "modloaderVersions",
+        labelKey: "modals:_trn_cache_cleanup.item_modloader_versions"
+      },
+      {
+        key: "lwjglConfigs",
+        labelKey: "modals:_trn_cache_cleanup.item_lwjgl_configs"
+      },
+      {
+        key: "assetIndices",
+        labelKey: "modals:_trn_cache_cleanup.item_asset_indices"
+      }
     ]
   },
   {
     titleKey: "modals:_trn_cache_cleanup.section_disk",
     items: [
-      { key: "tempFiles", labelKey: "modals:_trn_cache_cleanup.item_temp_files" },
+      {
+        key: "tempFiles",
+        labelKey: "modals:_trn_cache_cleanup.item_temp_files"
+      },
       { key: "oldLogs", labelKey: "modals:_trn_cache_cleanup.item_old_logs" },
       { key: "mcAssets", labelKey: "modals:_trn_cache_cleanup.item_mc_assets" },
-      { key: "mcLibraries", labelKey: "modals:_trn_cache_cleanup.item_mc_libraries" },
-      { key: "mcNatives", labelKey: "modals:_trn_cache_cleanup.item_mc_natives" }
+      {
+        key: "mcLibraries",
+        labelKey: "modals:_trn_cache_cleanup.item_mc_libraries"
+      },
+      {
+        key: "mcNatives",
+        labelKey: "modals:_trn_cache_cleanup.item_mc_natives"
+      }
     ]
   }
 ]
@@ -111,7 +162,9 @@ const CacheCleanup = (props: ModalProps) => {
   const [phase, setPhase] = createSignal<Phase>("select")
   const [taskId, setTaskId] = createSignal<number | null>(null)
   const [failedMessage, setFailedMessage] = createSignal<string>("")
-  const [selection, setSelection] = createStore<CacheCleanupSelection>({ ...EMPTY_SELECTION })
+  const [selection, setSelection] = createStore<CacheCleanupSelection>({
+    ...EMPTY_SELECTION
+  })
   // Captured at start so we can show "reclaimed X" after VACUUM completes.
   const [sizeBeforeStart, setSizeBeforeStart] = createSignal<number>(0)
 
@@ -135,8 +188,7 @@ const CacheCleanup = (props: ModalProps) => {
     }
   }))
 
-  const allKeys = () =>
-    SECTIONS.flatMap((s) => s.items.map((i) => i.key))
+  const allKeys = () => SECTIONS.flatMap((s) => s.items.map((i) => i.key))
 
   // Master-row total. Uses the same file-stat number the settings row
   // displays (DB file + disk dirs) rather than summing per-item
@@ -153,7 +205,7 @@ const CacheCleanup = (props: ModalProps) => {
     const data = breakdown.data
     if (!data) return 0
     return allKeys().reduce(
-      (acc, k) => acc + (selection[k] ? data[k] ?? 0 : 0),
+      (acc, k) => acc + (selection[k] ? (data[k] ?? 0) : 0),
       0
     )
   })
@@ -167,7 +219,10 @@ const CacheCleanup = (props: ModalProps) => {
 
   // Tri-state helpers. A section/master checkbox shows indeterminate when
   // some but not all children are selected.
-  type TriState = { checked: boolean; indeterminate: boolean }
+  interface TriState {
+    checked: boolean
+    indeterminate: boolean
+  }
   const sectionState = (section: Section): TriState => {
     const total = section.items.length
     const sel = section.items.filter((i) => selection[i.key]).length
@@ -216,7 +271,9 @@ const CacheCleanup = (props: ModalProps) => {
     }
 
     if (vtask.data?.progress.type === "Failed") {
-      setFailedMessage(vtask.data.progress.value.cause[1]?.display ?? "Unknown error")
+      setFailedMessage(
+        vtask.data.progress.value.cause[1]?.display ?? "Unknown error"
+      )
       setPhase("failed")
     }
   })
@@ -358,7 +415,9 @@ const CacheCleanup = (props: ModalProps) => {
                 <div class="i-hugeicons:delete-02 h-4 w-4" />
                 <Show
                   when={selectedTotalBytes() > 0}
-                  fallback={<Trans key="modals:_trn_cache_cleanup.start_empty" />}
+                  fallback={
+                    <Trans key="modals:_trn_cache_cleanup.start_empty" />
+                  }
                 >
                   <Trans
                     key="modals:_trn_cache_cleanup.start"
@@ -416,7 +475,12 @@ const CacheCleanup = (props: ModalProps) => {
               <div class="text-lg font-medium">
                 <Trans key="modals:_trn_cache_cleanup.done_title" />
               </div>
-              <Show when={breakdown.data && sizeBeforeStart() > (breakdown.data.totalSize ?? 0)}>
+              <Show
+                when={
+                  breakdown.data &&
+                  sizeBeforeStart() > (breakdown.data.totalSize ?? 0)
+                }
+              >
                 <div class="text-lightSlate-400 text-sm">
                   <Trans
                     key="modals:_trn_cache_cleanup.done_reclaimed"

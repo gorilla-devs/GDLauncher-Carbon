@@ -1,11 +1,19 @@
 import {
   FEUnifiedBatchRequest,
+  FEUnifiedModLoaderType,
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
   FEUnifiedSearchType
 } from "@gd/core_module/bindings"
 
-import { createEffect, createMemo, createSignal, mergeProps, on, onCleanup } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  mergeProps,
+  on,
+  onCleanup
+} from "solid-js"
 import { rspc } from "./rspcClient"
 import { createAsyncEffect } from "./asyncEffect"
 import { createInfiniteQuery } from "@tanstack/solid-query"
@@ -78,12 +86,18 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
   let prevDockedValue: boolean | undefined
 
-  createEffect(on(() => sidebarExpanded(), (docked) => {
-    if (prevDockedValue !== undefined && dockedHasSynced) {
-      sidebarDockedMutation.mutate(docked)
-    }
-    prevDockedValue = docked
-  }, { defer: true }))
+  createEffect(
+    on(
+      () => sidebarExpanded(),
+      (docked) => {
+        if (prevDockedValue !== undefined && dockedHasSynced) {
+          sidebarDockedMutation.mutate(docked)
+        }
+        prevDockedValue = docked
+      },
+      { defer: true }
+    )
+  )
 
   // sidebarReady: true once docked query has resolved
   createEffect(() => {
@@ -108,9 +122,14 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
   const [lastScrollOffset, setLastScrollOffset] = createSignal(0)
 
-  const [searchParams, _setSearchParams] = useSearchParams()
+  const [searchParams, _setSearchParams] = useSearchParams<{
+    instanceId: string
+    serverId: string
+    q: string
+  }>()
 
   const selectedInstanceId = () => {
+    if (!searchParams.instanceId) return undefined
     const id = parseInt(searchParams.instanceId, 10)
     return isNaN(id) ? undefined : id
   }
@@ -118,11 +137,12 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const setSelectedInstanceId = (instanceId: number | undefined) => {
     _setSearchParams({
       ...searchParams,
-      instanceId
+      instanceId: instanceId !== undefined ? String(instanceId) : undefined
     })
   }
 
   const selectedServerId = () => {
+    if (!searchParams.serverId) return undefined
     const id = parseInt(searchParams.serverId, 10)
     return isNaN(id) ? undefined : id
   }
@@ -130,12 +150,12 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const setSelectedServerId = (serverId: number | undefined) => {
     _setSearchParams({
       ...searchParams,
-      serverId
+      serverId: serverId !== undefined ? String(serverId) : undefined
     })
   }
 
   const selectedInstance = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceDetails", selectedInstanceId() ?? null],
+    queryKey: ["instance.getInstanceDetails", selectedInstanceId() ?? 0],
     enabled: !!selectedInstanceId()
   }))
 
@@ -145,7 +165,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   }))
 
   const selectedServer = rspc.createQuery(() => ({
-    queryKey: ["server.getServerDetails", selectedServerId() ?? null],
+    queryKey: ["server.getServerDetails", selectedServerId() ?? 0],
     enabled: !!selectedServerId()
   }))
 
@@ -187,7 +207,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     if (currentId && currentId !== prevServerId && serverData) {
       setSearchQuery((prev) => ({
         ...prev,
-        modloaders: serverData.modloaderType ? [serverData.modloaderType] : null,
+        modloaders: serverData.modloaderType
+          ? [serverData.modloaderType as FEUnifiedModLoaderType]
+          : null,
         gameVersions: serverData.gameVersion ? [serverData.gameVersion] : null,
         environment: "server"
       }))
@@ -301,9 +323,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
   const shareCode = createMemo(() => {
     const item = parsedQuery().items.find(
-      (i) =>
-        i.type === "gdlauncher_share" ||
-        i.type === "gdlauncher_share_link"
+      (i) => i.type === "gdlauncher_share" || i.type === "gdlauncher_share_link"
     )
     if (!item) return null
     return item.type === "gdlauncher_share" ||
@@ -342,7 +362,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     ],
     enabled:
       !isDirectMode() &&
-      (!debouncedSearchQuery().searchApi || debouncedSearchQuery().searchApi === "curseforge"),
+      (!debouncedSearchQuery().searchApi ||
+        debouncedSearchQuery().searchApi === "curseforge"),
     queryFn: (ctx) => {
       return rspcContext.client.query(
         [
@@ -351,7 +372,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
             searchQuery: debouncedSearchQuery().searchQuery,
             categories: debouncedSearchQuery().categories,
             gameVersions: debouncedSearchQuery().gameVersions,
-            modloaders: !shouldBypassModloaderFilter(debouncedSearchQuery().projectType)
+            modloaders: !shouldBypassModloaderFilter(
+              debouncedSearchQuery().projectType
+            )
               ? debouncedSearchQuery().modloaders
               : null,
             pageSize: actualPageSize(),
@@ -381,7 +404,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     ],
     enabled:
       !isDirectMode() &&
-      (!debouncedSearchQuery().searchApi || debouncedSearchQuery().searchApi === "modrinth"),
+      (!debouncedSearchQuery().searchApi ||
+        debouncedSearchQuery().searchApi === "modrinth"),
     queryFn: (ctx) => {
       return rspcContext.client.query(
         [
@@ -390,7 +414,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
             searchQuery: debouncedSearchQuery().searchQuery,
             categories: debouncedSearchQuery().categories,
             gameVersions: debouncedSearchQuery().gameVersions,
-            modloaders: !shouldBypassModloaderFilter(debouncedSearchQuery().projectType)
+            modloaders: !shouldBypassModloaderFilter(
+              debouncedSearchQuery().projectType
+            )
               ? debouncedSearchQuery().modloaders
               : null,
             pageSize: actualPageSize(),
@@ -451,8 +477,10 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       const mrFetching = mrInfiniteResults.isFetching
 
       // When a platform has no data but is still fetching, expect actualPageSize() items
-      const cfExpected = cfData.length > 0 ? cfData.length : (cfFetching ? actualPageSize() : 0)
-      const mrExpected = mrData.length > 0 ? mrData.length : (mrFetching ? actualPageSize() : 0)
+      const cfExpected =
+        cfData.length > 0 ? cfData.length : cfFetching ? actualPageSize() : 0
+      const mrExpected =
+        mrData.length > 0 ? mrData.length : mrFetching ? actualPageSize() : 0
       const maxLength = Math.max(cfExpected, mrExpected)
 
       const interleaved: SearchResultItem[] = []
@@ -500,7 +528,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     if (!virtualizer || allRows().length === 0) return
 
     // Check if we're near the bottom with an increased threshold
-    const endIndex = virtualizer.findItemIndex(virtualizer.scrollOffset + virtualizer.viewportSize)
+    const endIndex = virtualizer.findItemIndex(
+      virtualizer.scrollOffset + virtualizer.viewportSize
+    )
     const totalItems = allRows().length
 
     // Load more when user reaches 25% from the end of current items

@@ -91,10 +91,7 @@ const EditShare = (props: ModalProps) => {
         </div>
 
         <div class="flex justify-between">
-          <Button
-            type="secondary"
-            onClick={() => modalsContext?.closeModal()}
-          >
+          <Button type="secondary" onClick={() => modalsContext?.closeModal()}>
             <Trans key="instances:_trn_instance_share.cancel" />
           </Button>
           <Button

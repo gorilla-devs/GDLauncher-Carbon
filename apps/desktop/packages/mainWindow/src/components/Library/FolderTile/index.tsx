@@ -29,6 +29,7 @@ import {
   visibleFolderIndices
 } from "@/pages/Library/utils/folderViewTransition"
 import { DropOverlayIndicator } from "@/pages/Library/components/DropOverlayIndicator"
+import type { ListInstance, ListServer } from "@gd/core_module/bindings"
 
 interface FolderTileProps {
   groupId: number
@@ -52,8 +53,10 @@ const FolderTile = (props: FolderTileProps) => {
   const [isMenuOpen, setIsMenuOpen] = createSignal(false)
 
   // Detect whether this folder is a server group or instance group
-  const isServerGroup = createMemo(() =>
-    globalStore.serverGroups.data?.some((g) => g.id === props.groupId) ?? false
+  const isServerGroup = createMemo(
+    () =>
+      globalStore.serverGroups.data?.some((g) => g.id === props.groupId) ??
+      false
   )
 
   // Look up group from globalStore - creates reactive dependency
@@ -82,8 +85,6 @@ const FolderTile = (props: FolderTileProps) => {
 
   // Preview items - now reactive via groupInstances()
   const previewInstances = createMemo(() => groupInstances().slice(0, 4))
-
-  const instanceCount = createMemo(() => groupInstances().length)
 
   // Check if this folder should have view-transition-name for animation
   // Only set when this folder is clicked AND not open (to avoid duplicate with ExpandedFolderContent)
@@ -161,12 +162,14 @@ const FolderTile = (props: FolderTileProps) => {
   }
 
   return (
-    <ContextMenu onOpenChange={(open) => {
+    <ContextMenu
+      onOpenChange={(open) => {
         setIsMenuOpen(open)
         if (open && !props.isSelected && props.onSelectExclusive) {
           props.onSelectExclusive()
         }
-      }}>
+      }}
+    >
       <ContextMenuContent>
         <Show
           when={props.isSelected && (props.selectedCount ?? 0) > 1}
@@ -227,7 +230,9 @@ const FolderTile = (props: FolderTileProps) => {
               }}
               onPointerDown={(e) => {
                 if (e.button === 0 && isMenuOpen()) {
-                  document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+                  document.body.dispatchEvent(
+                    new PointerEvent("pointerdown", { bubbles: true })
+                  )
                 }
                 handleDragStart(e)
               }}
@@ -267,20 +272,27 @@ const FolderTile = (props: FolderTileProps) => {
                           }}
                         >
                           <Show when={instance()}>
-                            {(inst) => (
-                              <img
-                                src={
-                                  inst().icon_revision
-                                    ? getInstanceImageUrl(
-                                        inst().id,
-                                        inst().icon_revision!
-                                      )
-                                    : DefaultImg
-                                }
-                                alt=""
-                                class="h-full w-full object-cover"
-                              />
-                            )}
+                            {(inst) => {
+                              const iconRev = () =>
+                                "icon_revision" in inst()
+                                  ? (inst() as ListInstance).icon_revision
+                                  : (inst() as ListServer).iconRevision
+                              return (
+                                <img
+                                  src={
+                                    iconRev() !== null &&
+                                    iconRev() !== undefined
+                                      ? getInstanceImageUrl(
+                                          inst().id,
+                                          iconRev()!
+                                        )
+                                      : DefaultImg
+                                  }
+                                  alt=""
+                                  class="h-full w-full object-cover"
+                                />
+                              )
+                            }}
                           </Show>
                         </div>
                       )
@@ -325,7 +337,9 @@ const FolderTile = (props: FolderTileProps) => {
                   onPointerDown={(e) => {
                     e.stopPropagation()
                     if (isMenuOpen()) {
-                      document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+                      document.body.dispatchEvent(
+                        new PointerEvent("pointerdown", { bubbles: true })
+                      )
                     }
                   }}
                   onClick={(e) => {

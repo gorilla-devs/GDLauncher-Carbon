@@ -1,5 +1,4 @@
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -106,8 +105,10 @@ function MyShares(props: ModalProps) {
     const data = globalStore.gdlAccount.data
     return data?.status === "valid" && data.value.isEmailVerified
   }
-  const [regeneratingShareCode, setRegeneratingShareCode] = createSignal<string | null>(null)
-  const [updatingShare, setUpdatingShare] = createSignal<{
+  const [regeneratingShareCode, setRegeneratingShareCode] = createSignal<
+    string | null
+  >(null)
+  const [updatingShare, _setUpdatingShare] = createSignal<{
     shareCode: string
     fields: { title?: boolean; maxDownloads?: boolean }
   } | null>(null)
@@ -182,13 +183,16 @@ function MyShares(props: ModalProps) {
   }
 
   const openEditModal = (share: FEShareInfo) => {
-    modalsContext?.openModal({ name: "editShare" }, {
-      share,
-      onUpdated: () => {
-        sharesQuery.refetch()
-        quotaQuery.refetch()
+    modalsContext?.openModal(
+      { name: "editShare" },
+      {
+        share,
+        onUpdated: () => {
+          sharesQuery.refetch()
+          quotaQuery.refetch()
+        }
       }
-    })
+    )
   }
 
   const copyToClipboard = async (shareCode: string) => {
@@ -299,7 +303,10 @@ function MyShares(props: ModalProps) {
           <Match when={sharesQuery.isLoading}>
             <div class="flex flex-1 flex-col overflow-hidden">
               <TableHeader />
-              <div class="flex-1 overflow-y-auto" style={{ "scrollbar-gutter": "stable" }}>
+              <div
+                class="flex-1 overflow-y-auto"
+                style={{ "scrollbar-gutter": "stable" }}
+              >
                 <SkeletonRow />
                 <SkeletonRow />
                 <SkeletonRow />
@@ -362,7 +369,9 @@ function MyShares(props: ModalProps) {
                       <div class="flex min-w-0 items-center gap-1">
                         <Show
                           when={regeneratingShareCode() !== share.shareCode}
-                          fallback={<div class="bg-darkSlate-600 h-4 w-16 animate-pulse rounded" />}
+                          fallback={
+                            <div class="bg-darkSlate-600 h-4 w-16 animate-pulse rounded" />
+                          }
                         >
                           <span class="text-lightSlate-400 truncate font-mono text-xs">
                             {share.shareCode}
@@ -493,7 +502,9 @@ function MyShares(props: ModalProps) {
                         class="flex-1"
                         value={quota().usedKilobytes}
                         max={quota().totalKilobytes}
-                        barStyle={{ background: getQuotaBarColor(percentage()) }}
+                        barStyle={{
+                          background: getQuotaBarColor(percentage())
+                        }}
                       />
                       <span class="text-lightSlate-400 whitespace-nowrap text-sm">
                         {formatSize(quota().usedKilobytes)} /{" "}

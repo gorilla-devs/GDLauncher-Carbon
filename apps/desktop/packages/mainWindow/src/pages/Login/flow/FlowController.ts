@@ -1,8 +1,5 @@
 import { createSignal } from "solid-js"
-import type {
-  CreateMutationResult,
-  CreateQueryResult
-} from "@tanstack/solid-query"
+import type { UseMutationResult, UseQueryResult } from "@tanstack/solid-query"
 import type { RSPCError } from "@/utils/rspcClient"
 import type {
   FEGDLAccount,
@@ -74,36 +71,32 @@ export class FlowControllerImpl implements FlowController {
 
   // External dependencies (injected)
   private rspcContext: RSPCContext
-  private settingsMutation: CreateMutationResult<
-    null,
-    RSPCError,
-    FESettingsUpdate
-  >
-  private saveGdlAccountMutation: CreateMutationResult<
+  private settingsMutation: UseMutationResult<null, RSPCError, FESettingsUpdate>
+  private saveGdlAccountMutation: UseMutationResult<
     null,
     RSPCError,
     string | null
   >
-  private enrollBeginMutation: CreateMutationResult<null, RSPCError, undefined>
-  private enrollBeginBrowserMutation: CreateMutationResult<
+  private enrollBeginMutation: UseMutationResult<null, RSPCError, undefined>
+  private enrollBeginBrowserMutation: UseMutationResult<
     null,
     RSPCError,
     boolean
   >
-  private enrollCancelMutation: CreateMutationResult<null, RSPCError, undefined>
-  private usernameAvailabilityMutation: CreateMutationResult<
+  private enrollCancelMutation: UseMutationResult<null, RSPCError, undefined>
+  private usernameAvailabilityMutation: UseMutationResult<
     UsernameAvailability,
     RSPCError,
     FECheckUsernameAvailability
   >
-  private createProfileMutation: CreateMutationResult<
+  private createProfileMutation: UseMutationResult<
     null,
     RSPCError,
     FECreateProfile
   >
-  private enrollResumeMutation: CreateMutationResult<null, RSPCError, undefined>
-  private accountsQuery: CreateQueryResult<AccountEntry[], RSPCError>
-  private gdlAccountQuery: CreateQueryResult<FEGDLAccount | null, RSPCError>
+  private enrollResumeMutation: UseMutationResult<null, RSPCError, undefined>
+  private accountsQuery: UseQueryResult<AccountEntry[], RSPCError>
+  private gdlAccountQuery: UseQueryResult<FEGDLAccount | null, RSPCError>
 
   // Abort controller for cancelling pending operations
   private abortController: AbortController | null = null
@@ -113,28 +106,20 @@ export class FlowControllerImpl implements FlowController {
     config: AuthFlowConfig,
     deps: {
       rspcContext: RSPCContext
-      settingsMutation: CreateMutationResult<null, RSPCError, FESettingsUpdate>
-      saveGdlAccountMutation: CreateMutationResult<
-        null,
-        RSPCError,
-        string | null
-      >
-      enrollBeginMutation: CreateMutationResult<null, RSPCError, undefined>
-      enrollBeginBrowserMutation: CreateMutationResult<null, RSPCError, boolean>
-      enrollCancelMutation: CreateMutationResult<null, RSPCError, undefined>
-      usernameAvailabilityMutation: CreateMutationResult<
+      settingsMutation: UseMutationResult<null, RSPCError, FESettingsUpdate>
+      saveGdlAccountMutation: UseMutationResult<null, RSPCError, string | null>
+      enrollBeginMutation: UseMutationResult<null, RSPCError, undefined>
+      enrollBeginBrowserMutation: UseMutationResult<null, RSPCError, boolean>
+      enrollCancelMutation: UseMutationResult<null, RSPCError, undefined>
+      usernameAvailabilityMutation: UseMutationResult<
         UsernameAvailability,
         RSPCError,
         FECheckUsernameAvailability
       >
-      createProfileMutation: CreateMutationResult<
-        null,
-        RSPCError,
-        FECreateProfile
-      >
-      enrollResumeMutation: CreateMutationResult<null, RSPCError, undefined>
-      accountsQuery: CreateQueryResult<AccountEntry[], RSPCError>
-      gdlAccountQuery: CreateQueryResult<FEGDLAccount | null, RSPCError>
+      createProfileMutation: UseMutationResult<null, RSPCError, FECreateProfile>
+      enrollResumeMutation: UseMutationResult<null, RSPCError, undefined>
+      accountsQuery: UseQueryResult<AccountEntry[], RSPCError>
+      gdlAccountQuery: UseQueryResult<FEGDLAccount | null, RSPCError>
     }
   ) {
     // Initialize shared data from config
@@ -842,24 +827,20 @@ export function createFlowController(
   config: AuthFlowConfig,
   deps: {
     rspcContext: RSPCContext
-    settingsMutation: CreateMutationResult<null, RSPCError, FESettingsUpdate>
-    saveGdlAccountMutation: CreateMutationResult<null, RSPCError, string | null>
-    enrollBeginMutation: CreateMutationResult<null, RSPCError, undefined>
-    enrollBeginBrowserMutation: CreateMutationResult<null, RSPCError, boolean>
-    enrollCancelMutation: CreateMutationResult<null, RSPCError, undefined>
-    usernameAvailabilityMutation: CreateMutationResult<
+    settingsMutation: UseMutationResult<null, RSPCError, FESettingsUpdate>
+    saveGdlAccountMutation: UseMutationResult<null, RSPCError, string | null>
+    enrollBeginMutation: UseMutationResult<null, RSPCError, undefined>
+    enrollBeginBrowserMutation: UseMutationResult<null, RSPCError, boolean>
+    enrollCancelMutation: UseMutationResult<null, RSPCError, undefined>
+    usernameAvailabilityMutation: UseMutationResult<
       UsernameAvailability,
       RSPCError,
       FECheckUsernameAvailability
     >
-    createProfileMutation: CreateMutationResult<
-      null,
-      RSPCError,
-      FECreateProfile
-    >
-    enrollResumeMutation: CreateMutationResult<null, RSPCError, undefined>
-    accountsQuery: CreateQueryResult<AccountEntry[], RSPCError>
-    gdlAccountQuery: CreateQueryResult<FEGDLAccount | null, RSPCError>
+    createProfileMutation: UseMutationResult<null, RSPCError, FECreateProfile>
+    enrollResumeMutation: UseMutationResult<null, RSPCError, undefined>
+    accountsQuery: UseQueryResult<AccountEntry[], RSPCError>
+    gdlAccountQuery: UseQueryResult<FEGDLAccount | null, RSPCError>
   }
 ): FlowController {
   return new FlowControllerImpl(config, deps)

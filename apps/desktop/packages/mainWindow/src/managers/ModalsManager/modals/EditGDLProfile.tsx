@@ -375,7 +375,9 @@ const EditGDLProfile = () => {
             onSelect={handleAvatarSelect}
             onDelete={handleAvatarRemove}
             isLoading={avatarLoading}
-            deletable={Boolean(avatarPreview() && validGDLUser()?.hasCustomAvatar)}
+            deletable={Boolean(
+              avatarPreview() && validGDLUser()?.hasCustomAvatar
+            )}
             confirmDelete={false}
             sizeClass="h-20 w-20"
             dialogTitle={t("accounts:_trn_select_avatar_image")}

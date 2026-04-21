@@ -164,7 +164,7 @@ const EmptyChangelogState = () => {
 }
 
 const Changelog = () => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const rspcContext = rspc.useContext()
 
   const routeData = useChangelogData()

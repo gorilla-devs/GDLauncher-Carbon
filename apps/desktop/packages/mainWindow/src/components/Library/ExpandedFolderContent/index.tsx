@@ -167,7 +167,8 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
     }
     const rects = new Map<string, DOMRect>()
     folderTileRefs.forEach((el, id) => {
-      if (el && !nonSelectable.has(id)) rects.set(id, el.getBoundingClientRect())
+      if (el && !nonSelectable.has(id))
+        rects.set(id, el.getBoundingClientRect())
     })
     return rects
   }
@@ -186,13 +187,16 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   // Register drop zones for instance/server reordering within folder
   createEffect(() => {
     const dtype = dragContext.dragType()
-    if (dragContext.isDragging() && (dtype === "instance" || dtype === "server")) {
+    if (
+      dragContext.isDragging() &&
+      (dtype === "instance" || dtype === "server")
+    ) {
       const draggedIds = dragContext.draggedIds()
       // Use safeInstances which handles stale props gracefully
       const instances = safeInstances()
       const idPrefix = props.isServerMode ? "server" : "instance"
 
-      instances.forEach((instance, index) => {
+      instances.forEach((instance, _index) => {
         const zoneId = `before-folder-instance-${instance.id}`
         const instanceStringId = `${idPrefix}-${instance.id}`
         const el = folderTileRefs.get(instanceStringId)
@@ -319,11 +323,13 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
       await Promise.all(
         previewInstances.map((inst) => {
           // Determine icon revision and URL based on item type
-          const rev = "icon_revision" in inst ? inst.icon_revision : (inst as ListServer).iconRevision
+          const rev =
+            "icon_revision" in inst ? inst.icon_revision : inst.iconRevision
           if (!rev) return Promise.resolve()
-          const src = "icon_revision" in inst
-            ? getInstanceImageUrl(inst.id, rev)
-            : getServerImageUrl(inst.id, rev)
+          const src =
+            "icon_revision" in inst
+              ? getInstanceImageUrl(inst.id, rev)
+              : getServerImageUrl(inst.id, rev)
           return new Promise<void>((resolve) => {
             const img = new Image()
             img.onload = () => resolve()
@@ -444,7 +450,8 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                 target.closest("input") ||
                 target.closest("[data-kb-menu]") ||
                 target.closest("[role='menu']")
-              ) return
+              )
+                return
               e.stopPropagation()
               dragSelect.handlers.handleMouseDown(e)
             }}
@@ -493,13 +500,16 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                 >
                   <For each={safeInstances()}>
                     {(instance, index) => {
-                      const idPrefix = props.isServerMode ? "server" : "instance"
+                      const idPrefix = props.isServerMode
+                        ? "server"
+                        : "instance"
                       const instanceStringId = `${idPrefix}-${instance.id}`
                       const isBeingDragged = () =>
                         (dragContext.isDragging() ||
                           dragContext.justDropped()) &&
                         dragContext.dragDetached() &&
-                        (dragContext.dragType() === "instance" || dragContext.dragType() === "server") &&
+                        (dragContext.dragType() === "instance" ||
+                          dragContext.dragType() === "server") &&
                         dragContext.draggedIds().includes(instance.id)
 
                       const isSelected = () =>
@@ -550,7 +560,9 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                           {/* Remove dragged tile from DOM so the grid collapses the gap */}
                           <Show when={!isBeingDragged()}>
                             <div
-                              data-instance-tile={!props.isServerMode || undefined}
+                              data-instance-tile={
+                                !props.isServerMode || undefined
+                              }
                               data-server-tile={props.isServerMode || undefined}
                               class="relative"
                               style={getFolderPreviewStyle()}
@@ -582,10 +594,16 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                                         e
                                       )
                                     }
-                                    preventClick={() => dragContext.justDropped()}
+                                    preventClick={() =>
+                                      dragContext.justDropped()
+                                    }
                                     selectedCount={props.selectedCount}
                                     onBatchDelete={props.onBatchDelete}
-                                    onSelectExclusive={() => props.onSelectExclusive?.(`instance-${instance.id}`)}
+                                    onSelectExclusive={() =>
+                                      props.onSelectExclusive?.(
+                                        `instance-${instance.id}`
+                                      )
+                                    }
                                   />
                                 }
                               >
@@ -628,7 +646,8 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                   <Show
                     when={
                       (dragContext.isDragging() || dragContext.justDropped()) &&
-                      (dragContext.dragType() === "instance" || dragContext.dragType() === "server")
+                      (dragContext.dragType() === "instance" ||
+                        dragContext.dragType() === "server")
                     }
                   >
                     <EndOfGroupDropZone

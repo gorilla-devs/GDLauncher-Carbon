@@ -6,7 +6,7 @@
  * - Accordion Mode (instancesGroupBy != null): Read-only virtual grouping, optional sortBy within groups
  */
 
-import { ListInstance, ListGroup, ListServer, ListServerGroup } from "@gd/core_module/bindings"
+import { ListInstance, ListServer } from "@gd/core_module/bindings"
 import { Accessor } from "solid-js"
 import { DragType } from "./DragContext"
 
@@ -36,7 +36,7 @@ export interface FolderData {
   id: number
   name: string
   libraryPosition: number | null
-  instances: ListInstance[]
+  instances: ListInstance[] | ListServer[]
 }
 
 /**
@@ -121,7 +121,9 @@ export type AccordionSortBy =
  * Helper to determine view mode from settings.
  * instancesGroupBy = null means folders mode.
  */
-export function getViewMode(instancesGroupBy: string | null | undefined): LibraryViewMode {
+export function getViewMode(
+  instancesGroupBy: string | null | undefined
+): LibraryViewMode {
   return instancesGroupBy === null || instancesGroupBy === undefined
     ? "folders"
     : "accordion"

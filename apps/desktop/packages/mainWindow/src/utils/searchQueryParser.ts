@@ -1,6 +1,7 @@
 /**
  * Parser for addon browser search queries.
- * Supports direct ID/slug lookup with # prefix, URL auto-detection, and custom protocols.
+ * Supports direct ID/slug lookup with # prefix, shared-instance codes with $ prefix,
+ * URL auto-detection, and custom protocols.
  */
 
 // Parsed item types
@@ -203,6 +204,18 @@ export function parseSearchQuery(input: string): ParsedQuery {
       mode: "search",
       items: [],
       originalQuery: input
+    }
+  }
+
+  // Check for $ prefix (direct shared-instance code lookup)
+  if (trimmed.startsWith("$")) {
+    const rest = trimmed.substring(1).trim()
+    if (/^[a-zA-Z0-9]{7,10}$/.test(rest)) {
+      return {
+        mode: "direct",
+        items: [{ type: "gdlauncher_share", shareCode: rest }],
+        originalQuery: input
+      }
     }
   }
 

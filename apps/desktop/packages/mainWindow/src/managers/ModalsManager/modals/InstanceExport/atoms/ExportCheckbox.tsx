@@ -2,10 +2,7 @@ import { rspc } from "@/utils/rspcClient"
 import { Checkbox } from "@gd/ui"
 import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
-import {
-  checkedFiles,
-  setCheckedFiles
-} from "./ExportCheckboxParent"
+import { checkedFiles, setCheckedFiles } from "./ExportCheckboxParent"
 import _ from "lodash"
 import type { ExploreEntry } from "@gd/core_module/bindings"
 

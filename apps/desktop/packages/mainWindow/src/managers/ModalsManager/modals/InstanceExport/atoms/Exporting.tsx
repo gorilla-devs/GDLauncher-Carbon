@@ -30,7 +30,7 @@ export default function Exporting() {
         setExportStep(2)
       }
     }
-    const isFailed = vtask.data && vtask.data.progress.type === "Failed"
+    const isFailed = vtask.data?.progress.type === "Failed"
     const isDownloaded = vtask.data === null && progress() !== 0
     if (isDownloaded || isFailed) {
       setTaskId(undefined)

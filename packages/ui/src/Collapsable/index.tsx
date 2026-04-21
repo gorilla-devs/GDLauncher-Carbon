@@ -58,7 +58,11 @@ const Collapsable = (props: Props) => {
                 </span>
               </Show>
             </div>
-            <Show when={props.onClear && props.count !== undefined && props.count > 0}>
+            <Show
+              when={
+                props.onClear && props.count !== undefined && props.count > 0
+              }
+            >
               <div
                 class="i-hugeicons:cancel-01 h-3.5 w-3.5 text-lightSlate-700 hover:text-lightSlate-300 shrink-0 ml-1 transition-colors"
                 onClick={(e) => {
@@ -78,9 +82,7 @@ const Collapsable = (props: Props) => {
           "grid-template-rows": opened() ? "1fr" : "0fr"
         }}
       >
-        <div class="overflow-hidden pt-1">
-          {props.children}
-        </div>
+        <div class="overflow-hidden pt-1">{props.children}</div>
       </div>
     </div>
   )

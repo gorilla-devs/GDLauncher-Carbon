@@ -17,7 +17,8 @@ export function ViewModeToggle() {
         class="flex items-center justify-center rounded p-1 transition-colors border-none bg-transparent text-inherit"
         classList={{
           "bg-darkSlate-600 text-white": searchContext?.viewMode() === "list",
-          "hover:bg-darkSlate-700 text-lightSlate-700": searchContext?.viewMode() !== "list"
+          "hover:bg-darkSlate-700 text-lightSlate-700":
+            searchContext?.viewMode() !== "list"
         }}
         onClick={() => switchToMode("list")}
       >
@@ -27,7 +28,8 @@ export function ViewModeToggle() {
         class="flex items-center justify-center rounded p-1 transition-colors border-none bg-transparent text-inherit"
         classList={{
           "bg-darkSlate-600 text-white": searchContext?.viewMode() === "grid",
-          "hover:bg-darkSlate-700 text-lightSlate-700": searchContext?.viewMode() !== "grid"
+          "hover:bg-darkSlate-700 text-lightSlate-700":
+            searchContext?.viewMode() !== "grid"
         }}
         onClick={() => switchToMode("grid")}
       >

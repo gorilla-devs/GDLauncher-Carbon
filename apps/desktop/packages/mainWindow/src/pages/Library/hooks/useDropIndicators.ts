@@ -138,10 +138,7 @@ export function useDropIndicators(
     if (!isDragActive() || !dragContext.dragDetached()) return false
 
     if (isReorderable) {
-      return (
-        isReorderableDrag() &&
-        dragContext.draggedIds().includes(itemId)
-      )
+      return isReorderableDrag() && dragContext.draggedIds().includes(itemId)
     }
 
     if (isFolder) {

@@ -1,6 +1,10 @@
 import { rspc } from "@/utils/rspcClient"
 import { Switch, Match, createSignal, createEffect, createMemo } from "solid-js"
-import { FEUnifiedSearchResult, Mod, ServerAddon } from "@gd/core_module/bindings"
+import {
+  FEUnifiedSearchResult,
+  Mod,
+  ServerAddon
+} from "@gd/core_module/bindings"
 import { useModInstallation } from "./hooks/useModInstallation"
 import { useInstanceSearch } from "./hooks/useInstanceSearch"
 import { useTaskProgress } from "./hooks/useTaskProgress"
@@ -29,8 +33,6 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     instanceTaskIds,
     installLatestModMutation,
     installModMutation,
-    installLatestServerModMutation,
-    installServerModMutation,
     handleInstanceSelection,
     handleServerInstall,
     clearInstanceLoadingState,
@@ -112,7 +114,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       if (byId) return { id: byId.id } as any
 
       // Fallback: match by slug against display name
-      const slug = props.addon!.slug?.toLowerCase()
+      const slug = props.addon.slug?.toLowerCase()
       if (slug) {
         const bySlug = serverAddons.find((addon) => {
           const name = addon.displayName.toLowerCase()
@@ -129,7 +131,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     const found = mods.find((mod) => {
       if (props.addon!.platform === "curseforge") {
         return (
-          mod.curseforge?.project_id === parseInt(props.addon!.id.toString(), 10)
+          mod.curseforge?.project_id ===
+          parseInt(props.addon!.id.toString(), 10)
         )
       } else if (props.addon!.platform === "modrinth") {
         return mod.modrinth?.project_id === props.addon!.id.toString()

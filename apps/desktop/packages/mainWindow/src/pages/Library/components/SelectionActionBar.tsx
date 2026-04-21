@@ -30,7 +30,9 @@ export const SelectionActionBar = (props: Props) => {
             {/* Delete button */}
             <Button size="small" type="secondary" onClick={props.onDelete}>
               <div class="i-hugeicons:delete-02 h-4 w-4" />
-              <span><Trans key="general:_trn_delete" /></span>
+              <span>
+                <Trans key="general:_trn_delete" />
+              </span>
             </Button>
 
             {/* Close button */}

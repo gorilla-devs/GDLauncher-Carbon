@@ -213,7 +213,7 @@ struct UpdateServer {
 
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct SetFavorite {
+struct SetServerFavorite {
     id: FEServerId,
     favorite: bool,
 }
@@ -617,7 +617,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             }))
         }
 
-        mutation SET_FAVORITE[app, args: SetFavorite] {
+        mutation SET_FAVORITE[app, args: SetServerFavorite] {
             app.server_manager()
                 .set_favorite(args.id.into(), args.favorite)
                 .await
