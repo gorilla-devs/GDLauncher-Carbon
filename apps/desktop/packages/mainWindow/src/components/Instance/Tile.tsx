@@ -375,12 +375,7 @@ const Tile = (props: Props) => {
           onDragStart={props.onDragStart}
           isDragging={!!props.isDragging}
           isDragActive={!!props.isDragActive}
-          canDrag={
-            !isLoading() &&
-            !isInQueue() &&
-            !props.isDeleting &&
-            !props.instance.locked
-          }
+          canDrag={!isLoading() && !isInQueue() && !props.isDeleting}
           onClick={props.onClick}
           onHover={props.onHover}
           shouldSetViewTransition={props.shouldSetViewTransition}

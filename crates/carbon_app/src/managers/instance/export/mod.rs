@@ -27,11 +27,11 @@ use crate::{
         vtask::{Progress, VisualTaskId},
     },
     managers::{
+        ManagerRef,
         account::gdl_account::{
-            InstanceShareError, SharedMod, ShareMetadata, WaitForShareInstanceResponse,
+            InstanceShareError, ShareMetadata, SharedMod, WaitForShareInstanceResponse,
         },
         vtask::{Subtask, VisualTask},
-        ManagerRef,
     },
 };
 
@@ -117,10 +117,7 @@ async fn build_shared_mods_from_cache(
         .await;
 
     let Ok(cached_files) = cached_files else {
-        tracing::warn!(
-            "Failed to query ModFileCache for instance {}",
-            *instance_id
-        );
+        tracing::warn!("Failed to query ModFileCache for instance {}", *instance_id);
         return Vec::new();
     };
 
@@ -197,10 +194,8 @@ async fn enrich_share_metadata(
                         shared_mod.curseforge_slug = Some(cf_entry.urlslug.clone());
 
                         // Check for Modrinth cross-reference via metadata
-                        if let Some(Some(mr_data)) = cf_entry
-                            .metadata
-                            .as_ref()
-                            .and_then(|m| m.modrinth.as_ref())
+                        if let Some(Some(mr_data)) =
+                            cf_entry.metadata.as_ref().and_then(|m| m.modrinth.as_ref())
                         {
                             shared_mod.modrinth_project_id = Some(mr_data.project_id.clone());
                             shared_mod.modrinth_version_id = Some(mr_data.version_id.clone());
@@ -276,30 +271,26 @@ impl ManagerRef<'_, InstanceExportManager> {
         version: String,
     ) -> anyhow::Result<VisualTaskId> {
         match target {
-            ExportTarget::Curseforge => {
-                curseforge_archive::export_curseforge(
-                    self.app.clone(),
-                    instance_id,
-                    save_path,
-                    self_contained_addons_bundling,
-                    filter,
-                    Some(version),
-                )
-                .await
-                .map(|v| v.0)
-            }
-            ExportTarget::Modrinth => {
-                modrinth_archive::export_modrinth(
-                    self.app.clone(),
-                    instance_id,
-                    save_path,
-                    self_contained_addons_bundling,
-                    filter,
-                    Some(version),
-                )
-                .await
-                .map(|v| v.0)
-            }
+            ExportTarget::Curseforge => curseforge_archive::export_curseforge(
+                self.app.clone(),
+                instance_id,
+                save_path,
+                self_contained_addons_bundling,
+                filter,
+                Some(version),
+            )
+            .await
+            .map(|v| v.0),
+            ExportTarget::Modrinth => modrinth_archive::export_modrinth(
+                self.app.clone(),
+                instance_id,
+                save_path,
+                self_contained_addons_bundling,
+                filter,
+                Some(version),
+            )
+            .await
+            .map(|v| v.0),
             ExportTarget::Gdlauncher => {
                 gdlauncher_archive::export_gdlauncher(
                     self.app.clone(),
@@ -431,14 +422,15 @@ impl ManagerRef<'_, InstanceExportManager> {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
 
-
             // Update total progress after first phase
             total_progress += first_phase_weight;
             tx.send(ShareInstanceProgress::Progress(total_progress as i32))
                 .await?;
 
             if cancel_token.is_cancelled() {
-                tracing::info!("ShareInstance: cancelled between phase 1 (export) and phase 2 (checksum)");
+                tracing::info!(
+                    "ShareInstance: cancelled between phase 1 (export) and phase 2 (checksum)"
+                );
                 anyhow::bail!("Share cancelled");
             }
 
@@ -463,7 +455,7 @@ impl ManagerRef<'_, InstanceExportManager> {
 
             let content_length = tokio::fs::metadata(&initial_tmpfile).await?.len();
             let sha256_checksum = {
-                use base64::{engine::general_purpose, Engine as _};
+                use base64::{Engine as _, engine::general_purpose};
                 use sha2::{Digest, Sha256};
                 let mut file = tokio::fs::File::open(&initial_tmpfile).await?;
                 let mut hasher = Sha256::new();
@@ -496,7 +488,9 @@ impl ManagerRef<'_, InstanceExportManager> {
                 .await?;
 
             if cancel_token.is_cancelled() {
-                tracing::info!("ShareInstance: cancelled between phase 2 (checksum) and phase 3 (presigned URL)");
+                tracing::info!(
+                    "ShareInstance: cancelled between phase 2 (checksum) and phase 3 (presigned URL)"
+                );
                 anyhow::bail!("Share cancelled");
             }
 
@@ -533,7 +527,9 @@ impl ManagerRef<'_, InstanceExportManager> {
                 .await?;
 
             if cancel_token.is_cancelled() {
-                tracing::info!("ShareInstance: cancelled between phase 3 (presigned URL) and phase 4 (upload)");
+                tracing::info!(
+                    "ShareInstance: cancelled between phase 3 (presigned URL) and phase 4 (upload)"
+                );
                 anyhow::bail!("Share cancelled");
             }
 
@@ -611,18 +607,16 @@ impl ManagerRef<'_, InstanceExportManager> {
                 .upload_instance_background(&gdl_account_uuid, &response.share_code, instance_id)
                 .await
             {
-                let is_rejection = e
-                    .downcast_ref::<InstanceShareError>()
-                    .is_some_and(|se| {
-                        matches!(
-                            se,
-                            InstanceShareError::ImageRejectedByModeration
-                                | InstanceShareError::ModerationUnavailable
-                                | InstanceShareError::ModerationRateLimited
-                                | InstanceShareError::ImageTooLarge
-                                | InstanceShareError::InvalidImageFormat
-                        )
-                    });
+                let is_rejection = e.downcast_ref::<InstanceShareError>().is_some_and(|se| {
+                    matches!(
+                        se,
+                        InstanceShareError::ImageRejectedByModeration
+                            | InstanceShareError::ModerationUnavailable
+                            | InstanceShareError::ModerationRateLimited
+                            | InstanceShareError::ImageTooLarge
+                            | InstanceShareError::InvalidImageFormat
+                    )
+                });
 
                 if is_rejection {
                     if let Err(del_err) = self

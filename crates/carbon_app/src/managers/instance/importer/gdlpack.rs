@@ -4,17 +4,11 @@ use crate::{
         instance::info::{GameVersion, ModLoader, ModLoaderType, StandardVersion},
         vtask::VisualTaskId,
     },
-    managers::{instance::InstanceVersionSource, AppInner},
+    managers::{AppInner, instance::InstanceVersionSource},
 };
 use anyhow::anyhow;
 use carbon_platforms::gdlauncher::manifest::schema::v1::{Manifest, ModloaderType};
-use std::{
-    collections::HashSet,
-    fs,
-    io::Read,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{collections::HashSet, fs, io::Read, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 
 use super::{
@@ -217,9 +211,10 @@ impl InstanceImporter for GdlpackImporter {
         let instance_version_source = InstanceVersionSource::Version(version);
 
         // Set up icon from extracted data
-        let icon = instance.icon_data.as_ref().map(|(bytes, ext)| {
-            (format!("icon.{}", ext), bytes.clone())
-        });
+        let icon = instance
+            .icon_data
+            .as_ref()
+            .map(|(bytes, ext)| (format!("icon.{}", ext), bytes.clone()));
 
         let instance_path_for_copy = instance.path.clone();
 

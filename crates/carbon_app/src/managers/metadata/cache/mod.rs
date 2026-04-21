@@ -9,7 +9,9 @@ use anyhow::anyhow;
 use carbon_repos::db::read_filters::BytesFilter;
 use carbon_repos::db::read_filters::IntFilter;
 use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb, server_mod_file_cache as sfcdb};
+use carbon_repos::db::{
+    mod_file_cache as fcdb, mod_metadata as metadb, server_mod_file_cache as sfcdb,
+};
 use carbon_rt_path::InstancesPath;
 use curseforge::CurseforgeModCacher;
 use futures::Future;
@@ -274,9 +276,7 @@ impl CacheTargets {
             } => Some(CacheTargetInfo {
                 entity_id: *entity_id,
                 is_override: true,
-                is_priority: priority
-                    .as_ref()
-                    .is_some_and(|v| *entity_id == v.entity_id),
+                is_priority: priority.as_ref().is_some_and(|v| *entity_id == v.entity_id),
             }),
             Self {
                 backend_override: None,
@@ -702,7 +702,8 @@ fn cache_modplatform<C: ModplatformCacher>(
                 if let Some(bundle) = bundle {
                     debug!(
                         "Saving {} mod cache update bundle for {}",
-                        C::NAME, entity_id
+                        C::NAME,
+                        entity_id
                     );
                     C::save_batch(&app, entity_id, bundle).await;
 
@@ -721,16 +722,10 @@ fn cache_modplatform<C: ModplatformCacher>(
 
         let mut image_loop_watcher = LoopWatcher::new(image_rx).await;
         let image_loop = image_loop_watcher.loop_interrupt(|entity_id| async move {
-            info!(
-                "Starting {} mod icon caching for {}",
-                C::NAME, entity_id
-            );
+            info!("Starting {} mod icon caching for {}", C::NAME, entity_id);
 
             C::cache_icons(&app, entity_id, &update_notifier).await;
-            info!(
-                "Completed {} mod icon caching for {}",
-                C::NAME, entity_id
-            );
+            info!("Completed {} mod icon caching for {}", C::NAME, entity_id);
 
             |_: &mut Option<CacheEntityId>| false
         });
@@ -1197,7 +1192,9 @@ impl ManagerRef<'_, MetaCacheManager> {
                     result.murmur2 as i32,
                     Vec::from(result.sha512),
                     Vec::from(result.sha1),
-                    result.meta.as_ref()
+                    result
+                        .meta
+                        .as_ref()
                         .map(|meta| &meta.modloaders)
                         .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
                         .unwrap_or(String::new()),
@@ -1243,7 +1240,9 @@ impl ManagerRef<'_, MetaCacheManager> {
         enabled: bool,
         addon_type: String,
     ) -> anyhow::Result<String> {
-        let result = self.hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled).await?;
+        let result = self
+            .hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled)
+            .await?;
         let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
 
         self.app
@@ -1284,7 +1283,9 @@ impl ManagerRef<'_, MetaCacheManager> {
         enabled: bool,
         addon_type: String,
     ) -> anyhow::Result<String> {
-        let result = self.hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled).await?;
+        let result = self
+            .hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled)
+            .await?;
         let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
 
         self.app
@@ -1320,18 +1321,25 @@ impl ManagerRef<'_, MetaCacheManager> {
 
     /// Cache all mod files for a server. Scans filesystem, hashes new/changed files,
     /// and stores results in server_mod_file_cache.
-    pub async fn cache_server_local(self, server_id: i32, server_shortpath: &str) -> anyhow::Result<()> {
+    pub async fn cache_server_local(
+        self,
+        server_id: i32,
+        server_shortpath: &str,
+    ) -> anyhow::Result<()> {
         let runtime_path = &self.app.settings_manager().runtime_path;
         let server_path = runtime_path.get_servers().get_server_path(server_shortpath);
 
         // Get existing cache entries
-        let cached = self.app.prisma_client
+        let cached = self
+            .app
+            .prisma_client
             .server_mod_file_cache()
             .find_many(vec![sfcdb::server_id::equals(server_id)])
             .exec()
             .await?;
 
-        let cached_map: HashMap<String, (i32, bool)> = cached.iter()
+        let cached_map: HashMap<String, (i32, bool)> = cached
+            .iter()
             .map(|c| (c.filename.clone(), (c.filesize, c.enabled)))
             .collect();
 
@@ -1364,15 +1372,19 @@ impl ManagerRef<'_, MetaCacheManager> {
             }
         }
 
-        let disk_filenames: HashSet<String> = disk_files.iter().map(|(f, _, _)| f.clone()).collect();
+        let disk_filenames: HashSet<String> =
+            disk_files.iter().map(|(f, _, _)| f.clone()).collect();
 
         // Delete stale cache entries (files no longer on disk)
-        let stale: Vec<_> = cached.iter()
+        let stale: Vec<_> = cached
+            .iter()
             .filter(|c| !disk_filenames.contains(&c.filename))
             .collect();
 
         for entry in &stale {
-            let _ = self.app.prisma_client
+            let _ = self
+                .app
+                .prisma_client
                 .server_mod_file_cache()
                 .delete(sfcdb::UniqueWhereParam::IdEquals(entry.id.clone()))
                 .exec()
@@ -1384,13 +1396,18 @@ impl ManagerRef<'_, MetaCacheManager> {
             // Check if already cached with same size
             if let Some((cached_size, cached_enabled)) = cached_map.get(base_filename) {
                 // Get current file size
-                let dir = if addon_type == "mods" { &mods_path } else { &datapacks_path };
+                let dir = if addon_type == "mods" {
+                    &mods_path
+                } else {
+                    &datapacks_path
+                };
                 let actual_filename = if *enabled {
                     base_filename.clone()
                 } else {
                     format!("{}.disabled", base_filename)
                 };
-                let file_size = tokio::fs::metadata(dir.join(&actual_filename)).await
+                let file_size = tokio::fs::metadata(dir.join(&actual_filename))
+                    .await
                     .map(|m| m.len() as i32)
                     .unwrap_or(0);
 
@@ -1405,13 +1422,16 @@ impl ManagerRef<'_, MetaCacheManager> {
                 datapacks_path.clone()
             };
 
-            if let Err(e) = self.cache_server_mod_file_unchecked(
-                server_id,
-                &dir,
-                base_filename.clone(),
-                *enabled,
-                addon_type.clone(),
-            ).await {
+            if let Err(e) = self
+                .cache_server_mod_file_unchecked(
+                    server_id,
+                    &dir,
+                    base_filename.clone(),
+                    *enabled,
+                    addon_type.clone(),
+                )
+                .await
+            {
                 warn!("Failed to cache server addon '{}': {}", base_filename, e);
             }
         }
@@ -1484,7 +1504,6 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     .exec()
                     .await
             });
-
 
             let instance_manager = app.instance_manager();
             let instances = instance_manager.instances.read().await;

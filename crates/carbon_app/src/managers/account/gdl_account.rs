@@ -537,13 +537,13 @@ impl GDLAccountTask {
 
         match resp.status() {
             StatusCode::OK => {
-                let response: TokenExchangeResponse = resp
-                    .json()
-                    .await
-                    .map_err(|e| TokenExchangeError::RequestFailed {
-                        status: 200,
-                        body: e.to_string(),
-                    })?;
+                let response: TokenExchangeResponse =
+                    resp.json()
+                        .await
+                        .map_err(|e| TokenExchangeError::RequestFailed {
+                            status: 200,
+                            body: e.to_string(),
+                        })?;
                 Ok(response)
             }
             StatusCode::UNAUTHORIZED => Err(TokenExchangeError::InvalidToken),

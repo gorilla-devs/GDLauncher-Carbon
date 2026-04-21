@@ -103,10 +103,7 @@ type InstanceCallback = Box<
 impl ManagerRef<'_, InstanceManager> {
     /// Resolve the effective memory (xms, xmx) for an instance.
     /// Uses instance-level override if set, otherwise falls back to global settings.
-    pub async fn get_effective_memory(
-        self,
-        instance_id: InstanceId,
-    ) -> anyhow::Result<(u16, u16)> {
+    pub async fn get_effective_memory(self, instance_id: InstanceId) -> anyhow::Result<(u16, u16)> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -299,7 +296,10 @@ impl ManagerRef<'_, InstanceManager> {
         let now = Local::now();
 
         let (log_id, log) = if launch_account.is_some() {
-            let (id, sender) = app.instance_manager().create_log(instance_id, Some(now)).await;
+            let (id, sender) = app
+                .instance_manager()
+                .create_log(instance_id, Some(now))
+                .await;
             (Some(id), Some(sender))
         } else {
             (None, None)

@@ -419,7 +419,8 @@ impl ManagerRef<'_, InstanceManager> {
             })
         };
 
-        let in_memory_logs = read_logs_from_memory(self.clone(), instance_id, logs_path.clone()).await;
+        let in_memory_logs =
+            read_logs_from_memory(self.clone(), instance_id, logs_path.clone()).await;
 
         if in_memory_logs.len() == 0 {
             let instance_lock = self.instances.read().await;
@@ -464,7 +465,8 @@ impl ManagerRef<'_, InstanceManager> {
                         };
 
                         // Use from_local_datetime since the filename is in local time
-                        let Some(file_as_datetime) = Local.from_local_datetime(&naive).single() else {
+                        let Some(file_as_datetime) = Local.from_local_datetime(&naive).single()
+                        else {
                             continue;
                         };
 

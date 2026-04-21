@@ -111,12 +111,6 @@ const InstanceTile = (props: {
     }
   })
 
-  createEffect(() => {
-    if ((validInstance() || invalidInstance()) && taskId === undefined) {
-      dismissTaskMutation.mutate(taskId)
-    }
-  })
-
   const failedTask = rspc.createQuery(() => ({
     queryKey: ["vtask.getTask", inactiveState()!],
     enabled: false

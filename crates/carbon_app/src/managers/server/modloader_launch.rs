@@ -22,13 +22,10 @@ pub async fn get_launch_config(server_path: &ServerPath) -> Result<LaunchConfig>
 }
 
 /// Save a LaunchConfig to the server's modloader_config.json.
-pub async fn save_launch_config(
-    server_path: &ServerPath,
-    config: &LaunchConfig,
-) -> Result<()> {
+pub async fn save_launch_config(server_path: &ServerPath, config: &LaunchConfig) -> Result<()> {
     let config_path = server_path.get_modloader_config_path();
-    let content = serde_json::to_string_pretty(config)
-        .context("Failed to serialize LaunchConfig")?;
+    let content =
+        serde_json::to_string_pretty(config).context("Failed to serialize LaunchConfig")?;
 
     tokio::fs::write(&config_path, content)
         .await

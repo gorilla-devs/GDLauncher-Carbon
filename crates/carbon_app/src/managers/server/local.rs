@@ -7,7 +7,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{Notify, mpsc};
 use tracing::{error, info};
 
 pub struct LocalServerProvider;
@@ -54,10 +54,7 @@ impl ServerProvider for LocalServerProvider {
             cmd.arg(main_class);
         } else {
             // Vanilla or Fabric/Quilt: use -jar
-            let jar_name = launch_config
-                .jar_path
-                .as_deref()
-                .unwrap_or("server.jar");
+            let jar_name = launch_config.jar_path.as_deref().unwrap_or("server.jar");
             let jar_path = data_path.join(jar_name);
 
             if !jar_path.exists() {

@@ -1,9 +1,8 @@
 use super::keys::server::*;
 use super::router::router;
 use crate::domain::server::{
-    self as domain, ServerGroupId, ServerGroupMoveTarget, ServerId, ServerMoveTarget,
-    ServerSettingsUpdate, WhitelistEntry, OpsEntry, BannedPlayerEntry, BannedIpEntry,
-    ServerAddon,
+    self as domain, BannedIpEntry, BannedPlayerEntry, OpsEntry, ServerAddon, ServerGroupId,
+    ServerGroupMoveTarget, ServerId, ServerMoveTarget, ServerSettingsUpdate, WhitelistEntry,
 };
 use crate::error::{AxumError, FeError};
 use crate::managers::server::PlayerListFile;
@@ -411,9 +410,9 @@ fn convert_state(state: &domain::ServerState) -> FEServerState {
         domain::ServerState::Stopped { failed_task } => FEServerState::Stopped {
             failed_task: failed_task.map(|t| t.0),
         },
-        domain::ServerState::Installing(task_id) => FEServerState::Installing {
-            task_id: task_id.0,
-        },
+        domain::ServerState::Installing(task_id) => {
+            FEServerState::Installing { task_id: task_id.0 }
+        }
         domain::ServerState::Starting(_) => FEServerState::Starting,
         domain::ServerState::Running {
             start_time,
@@ -1145,11 +1144,7 @@ async fn server_metrics_ws_handler(
                 "uptimeSeconds": uptime,
             });
 
-            if socket
-                .send(Message::Text(msg.to_string()))
-                .await
-                .is_err()
-            {
+            if socket.send(Message::Text(msg.to_string())).await.is_err() {
                 break;
             }
         }

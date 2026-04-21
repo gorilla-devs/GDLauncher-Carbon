@@ -21,7 +21,6 @@ use specta::Type;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-
 mod common;
 mod curseforge;
 mod filters;

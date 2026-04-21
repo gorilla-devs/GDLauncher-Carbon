@@ -265,12 +265,8 @@ impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
         };
 
         let filters = value.environment.map(|env| match env {
-            FEUnifiedEnvironment::Client => {
-                r#"client_side != "unsupported""#.to_string()
-            }
-            FEUnifiedEnvironment::Server => {
-                r#"server_side != "unsupported""#.to_string()
-            }
+            FEUnifiedEnvironment::Client => r#"client_side != "unsupported""#.to_string(),
+            FEUnifiedEnvironment::Server => r#"server_side != "unsupported""#.to_string(),
         });
 
         ProjectSearchParameters {

@@ -6,7 +6,7 @@ use strum_macros::EnumIter;
 use tokio::{
     fs::File,
     io::AsyncWriteExt,
-    sync::{mpsc, watch, RwLock},
+    sync::{RwLock, mpsc, watch},
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, trace};
@@ -14,7 +14,7 @@ use tracing::{debug, info, trace};
 use crate::{
     api::{keys::instance::*, translation::Translation},
     domain::vtask::VisualTaskId,
-    managers::{modplatforms::curseforge::CurseForge, vtask::VisualTask, AppInner, ManagerRef},
+    managers::{AppInner, ManagerRef, modplatforms::curseforge::CurseForge, vtask::VisualTask},
 };
 
 use self::{

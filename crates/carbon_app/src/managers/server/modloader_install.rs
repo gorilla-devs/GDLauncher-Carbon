@@ -24,10 +24,48 @@ pub async fn install_modloader(
     progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
     match modloader_type {
-        "fabric" => install_fabric(reqwest_client, server_path, game_version, modloader_version, progress).await,
-        "quilt" => install_quilt(reqwest_client, server_path, game_version, modloader_version, progress).await,
-        "forge" => install_forge(reqwest_client, server_path, game_version, modloader_version, java_path, progress).await,
-        "neoforge" => install_neoforge(reqwest_client, server_path, game_version, modloader_version, java_path, progress).await,
+        "fabric" => {
+            install_fabric(
+                reqwest_client,
+                server_path,
+                game_version,
+                modloader_version,
+                progress,
+            )
+            .await
+        }
+        "quilt" => {
+            install_quilt(
+                reqwest_client,
+                server_path,
+                game_version,
+                modloader_version,
+                progress,
+            )
+            .await
+        }
+        "forge" => {
+            install_forge(
+                reqwest_client,
+                server_path,
+                game_version,
+                modloader_version,
+                java_path,
+                progress,
+            )
+            .await
+        }
+        "neoforge" => {
+            install_neoforge(
+                reqwest_client,
+                server_path,
+                game_version,
+                modloader_version,
+                java_path,
+                progress,
+            )
+            .await
+        }
         other => bail!("Unsupported modloader type: {}", other),
     }
 }
@@ -227,7 +265,10 @@ async fn install_forge(
     // Modern Forge (1.17+) uses a run script / @libraries approach.
     // The installer creates various files. We look for the forge server jar or run args.
     // Check for run.sh/run.bat or forge-*-server.jar
-    let args_file = data_path.join("libraries").join("net").join("minecraftforge");
+    let args_file = data_path
+        .join("libraries")
+        .join("net")
+        .join("minecraftforge");
 
     // For modern Forge, check if there are unix_args.txt or win_args.txt
     let unix_args_path = data_path.join("unix_args.txt");

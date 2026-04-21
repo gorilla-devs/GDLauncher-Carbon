@@ -518,7 +518,13 @@ impl Installer {
                         // ensure the task stays alive until the mod is cached
                         app_clone
                             .meta_cache_manager()
-                            .override_caching_and_wait(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), true, true)
+                            .override_caching_and_wait(
+                                crate::managers::metadata::cache::CacheEntityId::Instance(
+                                    instance_id,
+                                ),
+                                true,
+                                true,
+                            )
                             .await?;
 
                         app_clone.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));

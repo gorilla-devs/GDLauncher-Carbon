@@ -1,6 +1,6 @@
-use crate::managers::instance::modpack::packinfo::PackInfo;
 use crate::managers::App;
-use anyhow::{anyhow, Context};
+use crate::managers::instance::modpack::packinfo::PackInfo;
+use anyhow::{Context, anyhow};
 use carbon_net::Downloadable;
 use carbon_platforms::gdlauncher::manifest::schema::v1::{
     FileHashes, Manifest, ModloaderType, PackFile,
@@ -117,7 +117,9 @@ async fn batch_resolve_curseforge(
                             .file
                             .hashes
                             .iter()
-                            .find(|h| matches!(h.algo, carbon_platforms::curseforge::HashAlgo::Sha1))
+                            .find(|h| {
+                                matches!(h.algo, carbon_platforms::curseforge::HashAlgo::Sha1)
+                            })
                             .map(|h| h.value.clone())
                             .unwrap_or_default(),
                         size: exact_match.file.file_length as u64,
@@ -334,8 +336,7 @@ pub async fn prepare_modpack_from_gdlpack(
                             found = true;
                             trace!(
                                 "Found unresolved platform file in overrides: {} (SHA512: {})",
-                                entry_name,
-                                hashes.sha512
+                                entry_name, hashes.sha512
                             );
                             break;
                         }

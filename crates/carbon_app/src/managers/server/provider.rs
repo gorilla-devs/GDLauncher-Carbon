@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use carbon_rt_path::ServerPath;
 use std::path::Path;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{Notify, mpsc};
 
 #[derive(Debug)]
 pub struct ServerHandle {

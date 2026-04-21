@@ -4,12 +4,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 
 /// Generate a server.properties file content from server settings
-pub fn generate_properties(
-    port: i32,
-    motd: &str,
-    max_players: i32,
-    online_mode: bool,
-) -> String {
+pub fn generate_properties(port: i32, motd: &str, max_players: i32, online_mode: bool) -> String {
     let mut props = BTreeMap::new();
     props.insert("server-port", port.to_string());
     props.insert("motd", motd.to_string());
@@ -41,10 +36,7 @@ pub fn parse_properties(content: &str) -> BTreeMap<String, String> {
 }
 
 /// Update specific properties in an existing server.properties file
-pub fn update_properties(
-    existing_content: &str,
-    updates: &BTreeMap<String, String>,
-) -> String {
+pub fn update_properties(existing_content: &str, updates: &BTreeMap<String, String>) -> String {
     let mut lines: Vec<String> = Vec::new();
     let mut updated_keys = std::collections::HashSet::new();
 

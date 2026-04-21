@@ -171,11 +171,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     // Re-exchange GDL tokens on every startup to ensure they're valid
     // (handles backend target changes where JWT signing keys differ)
-    if let Err(e) = app
-        .account_manager()
-        .refresh_all_gdl_tokens()
-        .await
-    {
+    if let Err(e) = app.account_manager().refresh_all_gdl_tokens().await {
         tracing::warn!("Failed to refresh GDL tokens on startup: {}", e);
     }
 

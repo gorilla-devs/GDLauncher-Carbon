@@ -87,10 +87,7 @@ pub async fn download_vanilla_server_jar(
         .context("Failed to download server jar")?;
 
     if !response.status().is_success() {
-        bail!(
-            "Failed to download server jar: HTTP {}",
-            response.status()
-        );
+        bail!("Failed to download server jar: HTTP {}", response.status());
     }
 
     // Use manifest size (always available), fall back to Content-Length, then opaque
@@ -142,10 +139,7 @@ pub async fn download_vanilla_server_jar(
         }
     }
 
-    info!(
-        "Server jar downloaded successfully ({} bytes)",
-        downloaded
-    );
+    info!("Server jar downloaded successfully ({} bytes)", downloaded);
 
     Ok(())
 }

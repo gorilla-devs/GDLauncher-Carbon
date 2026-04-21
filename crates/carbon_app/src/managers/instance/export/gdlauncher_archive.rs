@@ -2,15 +2,15 @@ use crate::{
     api::translation::Translation,
     domain::{
         instance::{
-            info::{GameVersion, InstanceIcon, ModLoaderType, Modpack},
             ExportEntry, InstanceId,
+            info::{GameVersion, InstanceIcon, ModLoaderType, Modpack},
         },
         vtask::VisualTaskId,
     },
     managers::{
-        instance::{export::ZipMode, InstanceType, InvalidInstanceIdError},
-        vtask::{TaskState, VisualTask},
         AppInner,
+        instance::{InstanceType, InvalidInstanceIdError, export::ZipMode},
+        vtask::{TaskState, VisualTask},
     },
 };
 use anyhow::anyhow;
@@ -154,7 +154,13 @@ pub async fn export_gdlauncher(
 
                         // Ensure cache is up to date
                         app.meta_cache_manager()
-                            .override_caching_and_wait(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), true, false)
+                            .override_caching_and_wait(
+                                crate::managers::metadata::cache::CacheEntityId::Instance(
+                                    instance_id,
+                                ),
+                                true,
+                                false,
+                            )
                             .await?;
 
                         // Query ModFileCache for tracked files
@@ -182,8 +188,16 @@ pub async fn export_gdlauncher(
 
                             // Check if file has platform data in cache - if yes, it's resolvable
                             // This avoids making network calls for every file during export
-                            let has_curseforge = metadata.curseforge.as_ref().map(|o| o.is_some()).unwrap_or(false);
-                            let has_modrinth = metadata.modrinth.as_ref().map(|o| o.is_some()).unwrap_or(false);
+                            let has_curseforge = metadata
+                                .curseforge
+                                .as_ref()
+                                .map(|o| o.is_some())
+                                .unwrap_or(false);
+                            let has_modrinth = metadata
+                                .modrinth
+                                .as_ref()
+                                .map(|o| o.is_some())
+                                .unwrap_or(false);
                             let can_resolve = has_curseforge || has_modrinth;
 
                             // Build hashes from metadata
@@ -265,7 +279,9 @@ pub async fn export_gdlauncher(
             });
 
             // Prepare icon path
-            let icon_archive_path = icon_data.as_ref().map(|(_, ext)| format!(".gdl/icon.{}", ext));
+            let icon_archive_path = icon_data
+                .as_ref()
+                .map(|(_, ext)| format!(".gdl/icon.{}", ext));
 
             let manifest = Manifest {
                 format_version: 1,
@@ -354,7 +370,9 @@ pub async fn export_gdlauncher(
             if save_path.parent().map_or(true, |p| p.exists()) {
                 tmpfile.try_rename_or_move(save_path).await?;
             } else {
-                tracing::debug!("Export destination no longer exists, skipping move (share likely cancelled)");
+                tracing::debug!(
+                    "Export destination no longer exists, skipping move (share likely cancelled)"
+                );
             }
 
             t_create_bundle.complete_items();
@@ -386,7 +404,7 @@ mod test {
     use zip::ZipArchive;
 
     use crate::{
-        domain::instance::{info, ExportEntry, ExportTarget, InstanceId},
+        domain::instance::{ExportEntry, ExportTarget, InstanceId, info},
         managers::instance::InstanceVersionSource,
     };
 
@@ -516,7 +534,10 @@ mod test {
                 assert_eq!(manifest.name, "test-gdlpack");
                 assert_eq!(manifest.dependencies.minecraft, "1.16.5");
                 assert_eq!(manifest.dependencies.modloaders.len(), 1);
-                assert_eq!(manifest.dependencies.modloaders[0].version, "1.16.5-36.2.34");
+                assert_eq!(
+                    manifest.dependencies.modloaders[0].version,
+                    "1.16.5-36.2.34"
+                );
                 assert_eq!(manifest.overrides, "overrides");
                 Ok(())
             })

@@ -242,12 +242,10 @@ impl ManagerRef<'_, ServerManager> {
                         icon_revision: s.icon_revision.map(|v| v as u32),
                         modloader_type: s.modloader_type,
                         modloader_version: s.modloader_version,
-                        modpack_info: s.modpack_platform.map(|platform| {
-                            ServerModpackInfo {
-                                platform,
-                                project_id: s.modpack_project_id.unwrap_or_default(),
-                                file_id: s.modpack_file_id.unwrap_or_default(),
-                            }
+                        modpack_info: s.modpack_platform.map(|platform| ServerModpackInfo {
+                            platform,
+                            project_id: s.modpack_project_id.unwrap_or_default(),
+                            file_id: s.modpack_file_id.unwrap_or_default(),
                         }),
                     })
                     .collect(),
@@ -311,9 +309,11 @@ impl ManagerRef<'_, ServerManager> {
                     db::server::port::set(port),
                     db::server::modloader_type::set(modloader_type.clone()),
                     db::server::modloader_version::set(modloader_version.clone()),
-                    db::server::server_type::set(
-                        if modloader_type.is_some() { "modded".to_string() } else { "vanilla".to_string() }
-                    ),
+                    db::server::server_type::set(if modloader_type.is_some() {
+                        "modded".to_string()
+                    } else {
+                        "vanilla".to_string()
+                    }),
                 ],
             )
             .exec()
@@ -347,9 +347,7 @@ impl ManagerRef<'_, ServerManager> {
         let app = self.app.clone();
         tokio::spawn(async move {
             let runtime_path = &app.settings_manager().runtime_path;
-            let server_path = runtime_path
-                .get_servers()
-                .get_server_path(&shortpath);
+            let server_path = runtime_path.get_servers().get_server_path(&shortpath);
 
             // Create subtasks for progress reporting — only create ones that will run
             let t_download_jar = task.subtask(Translation::ServerTaskDownloadServerJar);
@@ -361,7 +359,8 @@ impl ManagerRef<'_, ServerManager> {
             } else {
                 None
             };
-            task.edit(|data| data.state = crate::managers::vtask::TaskState::KnownProgress).await;
+            task.edit(|data| data.state = crate::managers::vtask::TaskState::KnownProgress)
+                .await;
 
             let install_result: anyhow::Result<()> = async {
                 // Download server jar
@@ -411,7 +410,10 @@ impl ManagerRef<'_, ServerManager> {
                     .context(format!("Failed to install {} {}", ml_type, ml_version))?;
 
                     modloader_launch::save_launch_config(&server_path, &launch_config).await?;
-                    info!("Modloader installed successfully for server {}", server_id.0);
+                    info!(
+                        "Modloader installed successfully for server {}",
+                        server_id.0
+                    );
                 }
 
                 Ok(())
@@ -432,8 +434,7 @@ impl ManagerRef<'_, ServerManager> {
             };
 
             // Transition to Stopped
-            if let Some(server_data) =
-                app.server_manager.servers.write().await.get_mut(&server_id)
+            if let Some(server_data) = app.server_manager.servers.write().await.get_mut(&server_id)
             {
                 server_data.state = ServerState::Stopped { failed_task };
             }
@@ -586,9 +587,7 @@ impl ManagerRef<'_, ServerManager> {
         let shortpath_clone = shortpath.clone();
         tokio::spawn(async move {
             let runtime_path = &app.settings_manager().runtime_path;
-            let server_path = runtime_path
-                .get_servers()
-                .get_server_path(&shortpath_clone);
+            let server_path = runtime_path.get_servers().get_server_path(&shortpath_clone);
 
             // Create ALL subtasks upfront so the total weight is fixed from the start
             // and progress only moves forward. The process_* functions will create their
@@ -600,7 +599,8 @@ impl ManagerRef<'_, ServerManager> {
             let t_install_modloader = task.subtask(Translation::ServerTaskInstallModloader);
             t_install_modloader.set_weight(5.0);
 
-            task.edit(|data| data.state = crate::managers::vtask::TaskState::KnownProgress).await;
+            task.edit(|data| data.state = crate::managers::vtask::TaskState::KnownProgress)
+                .await;
 
             let result: anyhow::Result<()> = async {
                 let pack_result = match modpack_source {
@@ -757,8 +757,7 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         self.app.invalidate(GET_ALL_SERVERS, None);
-        self.app
-            .invalidate(GET_SERVER_DETAILS, None);
+        self.app.invalidate(GET_SERVER_DETAILS, None);
 
         // Delete from DB
         self.app
@@ -805,7 +804,10 @@ impl ManagerRef<'_, ServerManager> {
             let server = servers
                 .get(&id)
                 .ok_or_else(|| anyhow!("Server not found"))?;
-            if matches!(server.state, ServerState::Running { .. } | ServerState::Starting(_)) {
+            if matches!(
+                server.state,
+                ServerState::Running { .. } | ServerState::Starting(_)
+            ) {
                 bail!("Server is already running or starting");
             }
         }
@@ -841,11 +843,7 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Find Java
-        let java_path = self
-            .app
-            .java_manager()
-            .find_best_java_for_server()
-            .await?;
+        let java_path = self.app.java_manager().find_best_java_for_server().await?;
 
         // Set up log streaming — clean up previous session's log entry first
         let log_id = {
@@ -935,11 +933,13 @@ impl ManagerRef<'_, ServerManager> {
 
         // Pre-warm CPU metrics tracking so the first WebSocket poll gets non-zero values.
         // sysinfo needs two refresh calls to compute cpu_usage delta.
-        self.app.system_info_manager().get_process_metrics(process_id).await;
+        self.app
+            .system_info_manager()
+            .get_process_metrics(process_id)
+            .await;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
-        self.app
-            .invalidate(GET_SERVER_DETAILS, None);
+        self.app.invalidate(GET_SERVER_DETAILS, None);
 
         // Spawn a watcher for unexpected exits (crash/normal exit not triggered by stop/kill).
         // If auto_restart is enabled, restart the server automatically.
@@ -1117,8 +1117,7 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         self.app.invalidate(GET_ALL_SERVERS, None);
-        self.app
-            .invalidate(GET_SERVER_DETAILS, None);
+        self.app.invalidate(GET_SERVER_DETAILS, None);
 
         Ok(())
     }
@@ -1203,13 +1202,13 @@ impl ManagerRef<'_, ServerManager> {
             icon_revision: db_server.icon_revision.map(|v| v as u32),
             modloader_type: db_server.modloader_type,
             modloader_version: db_server.modloader_version,
-            modpack_info: db_server.modpack_platform.map(|platform| {
-                ServerModpackInfo {
+            modpack_info: db_server
+                .modpack_platform
+                .map(|platform| ServerModpackInfo {
                     platform,
                     project_id: db_server.modpack_project_id.unwrap_or_default(),
                     file_id: db_server.modpack_file_id.unwrap_or_default(),
-                }
-            }),
+                }),
         })
     }
 
@@ -1244,8 +1243,7 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         self.app.invalidate(GET_ALL_SERVERS, None);
-        self.app
-            .invalidate(GET_SERVER_DETAILS, None);
+        self.app.invalidate(GET_SERVER_DETAILS, None);
 
         Ok(())
     }
@@ -1403,7 +1401,10 @@ impl ManagerRef<'_, ServerManager> {
             name: String,
         }
 
-        let profile: MojangProfile = resp.json().await.context("Failed to parse Mojang response")?;
+        let profile: MojangProfile = resp
+            .json()
+            .await
+            .context("Failed to parse Mojang response")?;
 
         // Mojang returns UUID without dashes, convert to standard format
         let uuid = if profile.id.len() == 32 && !profile.id.contains('-') {
@@ -1439,15 +1440,10 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     /// List server addons from database cache. Triggers caching if needed.
-    pub async fn list_server_addons(
-        self,
-        id: ServerId,
-    ) -> anyhow::Result<Vec<ServerAddon>> {
+    pub async fn list_server_addons(self, id: ServerId) -> anyhow::Result<Vec<ServerAddon>> {
         use carbon_repos::db::{
+            curse_forge_mod_cache as cfdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
             server_mod_file_cache as sfcdb,
-            mod_metadata as metadb,
-            curse_forge_mod_cache as cfdb,
-            modrinth_mod_cache as mrdb,
         };
 
         let db_server = self
@@ -1481,19 +1477,25 @@ impl ManagerRef<'_, ServerManager> {
                 let metadata = match entry.metadata.as_ref() {
                     Some(m) => m,
                     None => {
-                        warn!("ServerModFileCache entry {} has no metadata, skipping", entry.id);
+                        warn!(
+                            "ServerModFileCache entry {} has no metadata, skipping",
+                            entry.id
+                        );
                         return None;
                     }
                 };
 
                 let display_name = metadata.name.clone().unwrap_or_else(|| {
-                    entry.filename
+                    entry
+                        .filename
                         .trim_end_matches(".jar")
                         .trim_end_matches(".zip")
                         .to_string()
                 });
 
-                let has_local_image = metadata.logo_image.as_ref()
+                let has_local_image = metadata
+                    .logo_image
+                    .as_ref()
                     .and_then(|opt| opt.as_ref())
                     .is_some();
 
@@ -1549,7 +1551,9 @@ impl ManagerRef<'_, ServerManager> {
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Look up the cache entry to get the filename
-        let cache_entry = self.app.prisma_client
+        let cache_entry = self
+            .app
+            .prisma_client
             .server_mod_file_cache()
             .find_unique(sfcdb::UniqueWhereParam::IdEquals(addon_id.clone()))
             .exec()
@@ -1569,7 +1573,10 @@ impl ManagerRef<'_, ServerManager> {
 
         // Find the actual file on disk (enabled or disabled variant)
         let disabled_name = format!("{}.disabled", base_filename);
-        let dirs = [server_path.get_mods_path(), server_path.get_datapacks_path()];
+        let dirs = [
+            server_path.get_mods_path(),
+            server_path.get_datapacks_path(),
+        ];
         let mut file_path = None;
         for dir in &dirs {
             let enabled_path = dir.join(base_filename);
@@ -1583,10 +1590,14 @@ impl ManagerRef<'_, ServerManager> {
                 break;
             }
         }
-        let file_path = file_path.ok_or_else(|| anyhow!("Addon file not found: {}", base_filename))?;
+        let file_path =
+            file_path.ok_or_else(|| anyhow!("Addon file not found: {}", base_filename))?;
 
         let new_path = if enabled {
-            let name = file_path.to_string_lossy().trim_end_matches(".disabled").to_string();
+            let name = file_path
+                .to_string_lossy()
+                .trim_end_matches(".disabled")
+                .to_string();
             std::path::PathBuf::from(name)
         } else {
             let mut name = file_path.to_string_lossy().to_string();
@@ -1601,7 +1612,9 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Update cache entry's enabled state directly (no re-hash needed)
-        let _ = self.app.prisma_client
+        let _ = self
+            .app
+            .prisma_client
             .server_mod_file_cache()
             .update(
                 sfcdb::UniqueWhereParam::IdEquals(addon_id),
@@ -1616,11 +1629,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     /// Delete a server addon file
-    pub async fn delete_server_addon(
-        self,
-        id: ServerId,
-        addon_id: String,
-    ) -> anyhow::Result<()> {
+    pub async fn delete_server_addon(self, id: ServerId, addon_id: String) -> anyhow::Result<()> {
         use carbon_repos::db::server_mod_file_cache as sfcdb;
 
         let db_server = self
@@ -1633,7 +1642,9 @@ impl ManagerRef<'_, ServerManager> {
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Look up the cache entry to get the filename
-        let cache_entry = self.app.prisma_client
+        let cache_entry = self
+            .app
+            .prisma_client
             .server_mod_file_cache()
             .find_unique(sfcdb::UniqueWhereParam::IdEquals(addon_id.clone()))
             .exec()
@@ -1653,7 +1664,10 @@ impl ManagerRef<'_, ServerManager> {
 
         // Find the actual file on disk
         let disabled_name = format!("{}.disabled", base_filename);
-        let dirs = [server_path.get_mods_path(), server_path.get_datapacks_path()];
+        let dirs = [
+            server_path.get_mods_path(),
+            server_path.get_datapacks_path(),
+        ];
         let mut file_path = None;
         for dir in &dirs {
             let enabled_path = dir.join(base_filename);
@@ -1667,12 +1681,15 @@ impl ManagerRef<'_, ServerManager> {
                 break;
             }
         }
-        let file_path = file_path.ok_or_else(|| anyhow!("Addon file not found: {}", base_filename))?;
+        let file_path =
+            file_path.ok_or_else(|| anyhow!("Addon file not found: {}", base_filename))?;
 
         tokio::fs::remove_file(&file_path).await?;
 
         // Remove cache entry
-        let _ = self.app.prisma_client
+        let _ = self
+            .app
+            .prisma_client
             .server_mod_file_cache()
             .delete(sfcdb::UniqueWhereParam::IdEquals(addon_id))
             .exec()
@@ -1693,10 +1710,10 @@ impl ManagerRef<'_, ServerManager> {
         project_id: u32,
         file_id: u32,
     ) -> anyhow::Result<VisualTaskId> {
-        use carbon_net::{Downloadable, DownloadOptions, Checksum};
-        use carbon_platforms::curseforge::filters::ModFileParameters;
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
+        use carbon_net::{Checksum, DownloadOptions, Downloadable};
+        use carbon_platforms::curseforge::filters::ModFileParameters;
 
         let db_server = self
             .app
@@ -1724,9 +1741,10 @@ impl ManagerRef<'_, ServerManager> {
             .await?
             .data;
 
-        let download_url = file.download_url.clone().ok_or_else(|| {
-            anyhow!("Mod cannot be downloaded without privileged API key")
-        })?;
+        let download_url = file
+            .download_url
+            .clone()
+            .ok_or_else(|| anyhow!("Mod cannot be downloaded without privileged API key"))?;
 
         let mods_path = server_path.get_mods_path();
         tokio::fs::create_dir_all(&mods_path).await?;
@@ -1767,7 +1785,10 @@ impl ManagerRef<'_, ServerManager> {
 
             // Queue caching for server addons after download
             app.meta_cache_manager()
-                .queue_caching(crate::managers::metadata::cache::CacheEntityId::Server(server_id_val), true)
+                .queue_caching(
+                    crate::managers::metadata::cache::CacheEntityId::Server(server_id_val),
+                    true,
+                )
                 .await;
 
             app.invalidate(GET_SERVER_ADDONS, None);
@@ -1795,14 +1816,13 @@ impl ManagerRef<'_, ServerManager> {
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         let game_version = db_server.game_version.clone();
-        let modloader_type = db_server.modloader_type.as_deref()
-            .and_then(|ml| match ml {
-                "forge" => Some(carbon_platforms::curseforge::ModLoaderType::Forge),
-                "fabric" => Some(carbon_platforms::curseforge::ModLoaderType::Fabric),
-                "quilt" => Some(carbon_platforms::curseforge::ModLoaderType::Quilt),
-                "neoforge" => Some(carbon_platforms::curseforge::ModLoaderType::NeoForge),
-                _ => None,
-            });
+        let modloader_type = db_server.modloader_type.as_deref().and_then(|ml| match ml {
+            "forge" => Some(carbon_platforms::curseforge::ModLoaderType::Forge),
+            "fabric" => Some(carbon_platforms::curseforge::ModLoaderType::Fabric),
+            "quilt" => Some(carbon_platforms::curseforge::ModLoaderType::Quilt),
+            "neoforge" => Some(carbon_platforms::curseforge::ModLoaderType::NeoForge),
+            _ => None,
+        });
 
         let files = self
             .app
@@ -1837,10 +1857,10 @@ impl ManagerRef<'_, ServerManager> {
         project_id: String,
         version_id: String,
     ) -> anyhow::Result<VisualTaskId> {
-        use carbon_net::{Downloadable, DownloadOptions, Checksum};
-        use carbon_platforms::modrinth::search::VersionID;
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
+        use carbon_net::{Checksum, DownloadOptions, Downloadable};
+        use carbon_platforms::modrinth::search::VersionID;
 
         let db_server = self
             .app
@@ -1902,7 +1922,10 @@ impl ManagerRef<'_, ServerManager> {
 
             // Queue caching for server addons after download
             app.meta_cache_manager()
-                .queue_caching(crate::managers::metadata::cache::CacheEntityId::Server(server_id_val), true)
+                .queue_caching(
+                    crate::managers::metadata::cache::CacheEntityId::Server(server_id_val),
+                    true,
+                )
                 .await;
 
             app.invalidate(GET_SERVER_ADDONS, None);
@@ -2008,13 +2031,11 @@ impl ManagerRef<'_, ServerManager> {
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         match &server.state {
-            ServerState::Running { process_id, .. } => {
-                Ok(self
-                    .app
-                    .system_info_manager()
-                    .get_process_metrics(*process_id)
-                    .await)
-            }
+            ServerState::Running { process_id, .. } => Ok(self
+                .app
+                .system_info_manager()
+                .get_process_metrics(*process_id)
+                .await),
             _ => Ok(None),
         }
     }
@@ -2073,11 +2094,7 @@ impl ManagerRef<'_, ServerManager> {
         Ok(())
     }
 
-    pub async fn set_server_icon(
-        self,
-        id: ServerId,
-        base64_data: String,
-    ) -> anyhow::Result<()> {
+    pub async fn set_server_icon(self, id: ServerId, base64_data: String) -> anyhow::Result<()> {
         use base64::Engine;
 
         const MAX_ICON_SIZE: usize = 8 * 1024 * 1024; // 8 MB
@@ -2144,10 +2161,7 @@ impl ManagerRef<'_, ServerManager> {
         Ok(())
     }
 
-    pub async fn server_icon(
-        self,
-        id: ServerId,
-    ) -> anyhow::Result<Option<(String, Vec<u8>)>> {
+    pub async fn server_icon(self, id: ServerId) -> anyhow::Result<Option<(String, Vec<u8>)>> {
         let shortpath = {
             let servers = self.servers.read().await;
             let server = servers
@@ -2191,7 +2205,11 @@ impl ManagerRef<'_, ServerManager> {
                 .await?
                 .ok_or_else(|| anyhow!("Server not found in database"))?;
 
-            (ServerGroupId(server.group_id), server.index, server.library_position)
+            (
+                ServerGroupId(server.group_id),
+                server.index,
+                server.library_position,
+            )
         };
 
         let (target_group, target_idx, target_library_pos) = match target {
@@ -2223,9 +2241,9 @@ impl ManagerRef<'_, ServerManager> {
                         .server()
                         .find_first(vec![
                             WhereParam::GroupId(IntFilter::Equals(group.0)),
-                            WhereParam::LibraryPosition(
-                                db::read_filters::IntNullableFilter::Not(None),
-                            ),
+                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(
+                                None,
+                            )),
                         ])
                         .order_by(db::server::OrderByParam::LibraryPosition(Direction::Desc))
                         .exec()
@@ -2264,15 +2282,17 @@ impl ManagerRef<'_, ServerManager> {
                     .await?
                     .ok_or_else(|| anyhow!("Server group not found in database"))?;
 
-                let lib_pos = target_folder.library_position.ok_or_else(|| {
-                    anyhow!("Target folder has no libraryPosition")
-                })?;
+                let lib_pos = target_folder
+                    .library_position
+                    .ok_or_else(|| anyhow!("Target folder has no libraryPosition"))?;
 
                 let target_idx = self
                     .app
                     .prisma_client
                     .server()
-                    .count(vec![WhereParam::GroupId(IntFilter::Equals(default_group_id.0))])
+                    .count(vec![WhereParam::GroupId(IntFilter::Equals(
+                        default_group_id.0,
+                    ))])
                     .exec()
                     .await? as i32;
 
@@ -2382,9 +2402,9 @@ impl ManagerRef<'_, ServerManager> {
                     .update_many(
                         vec![
                             WhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                            WhereParam::LibraryPosition(
-                                db::read_filters::IntNullableFilter::Gt(start_lib_pos),
-                            ),
+                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Gt(
+                                start_lib_pos,
+                            )),
                         ],
                         vec![SetParam::DecrementLibraryPosition(1)],
                     )
@@ -2409,10 +2429,10 @@ impl ManagerRef<'_, ServerManager> {
             .prisma_client
             ._batch((
                 index_shifts,
-                self.app.prisma_client.server().update(
-                    UniqueWhereParam::IdEquals(server_id.0),
-                    update_params,
-                ),
+                self.app
+                    .prisma_client
+                    .server()
+                    .update(UniqueWhereParam::IdEquals(server_id.0), update_params),
             ))
             .await?;
 
@@ -2448,9 +2468,7 @@ impl ManagerRef<'_, ServerManager> {
         group: ServerGroupId,
         target: ServerGroupMoveTarget,
     ) -> anyhow::Result<()> {
-        use db::server::{
-            SetParam as ServerSetParam, WhereParam as ServerWhereParam,
-        };
+        use db::server::{SetParam as ServerSetParam, WhereParam as ServerWhereParam};
         use db::server_group::{SetParam, UniqueWhereParam, WhereParam};
 
         let _index_lock = self.index_lock.lock().await;
@@ -2494,12 +2512,14 @@ impl ManagerRef<'_, ServerManager> {
                     .ok_or_else(|| anyhow!("Server not found in database"))?;
 
                 if server.group_id != default_group_id.0 {
-                    bail!("Can only position a group before ungrouped servers (servers in default group)");
+                    bail!(
+                        "Can only position a group before ungrouped servers (servers in default group)"
+                    );
                 }
 
-                server.library_position.ok_or_else(|| {
-                    anyhow!("Server has no libraryPosition")
-                })?
+                server
+                    .library_position
+                    .ok_or_else(|| anyhow!("Server has no libraryPosition"))?
             }
             ServerGroupMoveTarget::EndOfLibrary => {
                 let max_server_pos: Option<i32> = self
@@ -2569,9 +2589,9 @@ impl ManagerRef<'_, ServerManager> {
                 .update_many(
                     vec![
                         ServerWhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                        ServerWhereParam::LibraryPosition(
-                            db::read_filters::IntNullableFilter::Gt(start_pos),
-                        ),
+                        ServerWhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Gt(
+                            start_pos,
+                        )),
                         ServerWhereParam::LibraryPosition(
                             db::read_filters::IntNullableFilter::Lte(target_pos - 1),
                         ),
@@ -2618,9 +2638,9 @@ impl ManagerRef<'_, ServerManager> {
                         ServerWhereParam::LibraryPosition(
                             db::read_filters::IntNullableFilter::Gte(target_pos),
                         ),
-                        ServerWhereParam::LibraryPosition(
-                            db::read_filters::IntNullableFilter::Lt(start_pos),
-                        ),
+                        ServerWhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Lt(
+                            start_pos,
+                        )),
                     ],
                     vec![ServerSetParam::IncrementLibraryPosition(1)],
                 )
@@ -2727,9 +2747,9 @@ impl ManagerRef<'_, ServerManager> {
             .server()
             .find_first(vec![
                 db::server::WhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                db::server::WhereParam::LibraryPosition(
-                    db::read_filters::IntNullableFilter::Not(None),
-                ),
+                db::server::WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(
+                    None,
+                )),
             ])
             .order_by(db::server::OrderByParam::LibraryPosition(Direction::Desc))
             .exec()
@@ -2900,10 +2920,8 @@ impl ManagerRef<'_, ServerManager> {
             .exec()
             .await?;
 
-        let mut sortable_servers: Vec<(i32, String)> = servers
-            .iter()
-            .map(|s| (s.id, s.name.clone()))
-            .collect();
+        let mut sortable_servers: Vec<(i32, String)> =
+            servers.iter().map(|s| (s.id, s.name.clone())).collect();
 
         sortable_servers.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
 

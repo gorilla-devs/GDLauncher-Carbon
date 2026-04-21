@@ -406,10 +406,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await
             .map_err(RequestGDLAccountDeletionError::RequestFailed)?;
 
-        let deletion = self
-            .gdl_account_task
-            .request_deletion(auth_token)
-            .await;
+        let deletion = self.gdl_account_task.request_deletion(auth_token).await;
 
         self.app
             .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
@@ -430,9 +427,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .map_err(CancelGDLAccountDeletionError::RequestFailed)?
             .into_iter()
             .find(|account| account.uuid == uuid)
-            .ok_or(CancelGDLAccountDeletionError::RequestFailed(anyhow::anyhow!(
-                "attempted to cancel a gdl account deletion for an account that does not exist"
-            )))?;
+            .ok_or(CancelGDLAccountDeletionError::RequestFailed(
+                anyhow::anyhow!(
+                    "attempted to cancel a gdl account deletion for an account that does not exist"
+                ),
+            ))?;
 
         let auth_token = self
             .ensure_gdl_auth_token(&account)
@@ -624,7 +623,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let _auth_token = self.ensure_gdl_auth_token(&account).await?;
 
         self.gdl_account_task
-            .upload_share_instance(presigned_url, file, file_size, sha256_checksum, progress_tx, cancel_token)
+            .upload_share_instance(
+                presigned_url,
+                file,
+                file_size,
+                sha256_checksum,
+                progress_tx,
+                cancel_token,
+            )
             .await
     }
 

@@ -36,7 +36,9 @@ pub trait FeErrorCode {
 pub type AxumError = (axum::http::StatusCode, String);
 
 /// Try to extract an error code and data from an entry in the anyhow error chain.
-fn extract_fe_error(entry: &(dyn std::error::Error + 'static)) -> (Option<String>, Option<serde_json::Value>) {
+fn extract_fe_error(
+    entry: &(dyn std::error::Error + 'static),
+) -> (Option<String>, Option<serde_json::Value>) {
     use crate::managers::account::gdl_account::{AvatarUploadError, InstanceShareError};
     use crate::managers::instance::run::InsufficientMemoryError;
     use crate::managers::server::EulaNotAcceptedError;

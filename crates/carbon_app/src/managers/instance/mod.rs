@@ -244,7 +244,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             self.app
                 .meta_cache_manager()
-                .queue_caching(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), false)
+                .queue_caching(
+                    crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+                    false,
+                )
                 .await;
 
             let app = self.app.clone();
@@ -537,12 +540,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .ok_or_else(|| anyhow!("InstanceId is not in database"))?;
 
                 if instance.group_id != *default_group_id {
-                    bail!("Can only position a group before ungrouped instances (instances in default group)");
+                    bail!(
+                        "Can only position a group before ungrouped instances (instances in default group)"
+                    );
                 }
 
-                instance.library_position.ok_or_else(|| {
-                    anyhow!("Instance has no libraryPosition")
-                })?
+                instance
+                    .library_position
+                    .ok_or_else(|| anyhow!("Instance has no libraryPosition"))?
             }
             GroupMoveTarget::EndOfLibrary => {
                 // Find the maximum libraryPosition across ungrouped instances and groups
@@ -577,7 +582,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .await?
                     .and_then(|g| g.library_position);
 
-                let max_pos = max_instance_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0));
+                let max_pos = max_instance_pos
+                    .unwrap_or(0)
+                    .max(max_group_pos.unwrap_or(0));
                 max_pos + 1
             }
         };
@@ -750,7 +757,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     anyhow!("InstanceId is not in database, this should never happen")
                 })?;
 
-            (GroupId(instance.group_id), instance.index, instance.library_position)
+            (
+                GroupId(instance.group_id),
+                instance.index,
+                instance.library_position,
+            )
         };
 
         let (target_group, target_idx, target_library_pos) = match target {
@@ -777,7 +788,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         .instance()
                         .find_first(vec![
                             WhereParam::GroupId(IntFilter::Equals(*group)),
-                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(None)),
+                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(
+                                None,
+                            )),
                         ])
                         .order_by(db::instance::OrderByParam::LibraryPosition(
                             carbon_repos::pcr::Direction::Asc,
@@ -810,7 +823,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         .instance()
                         .find_first(vec![
                             WhereParam::GroupId(IntFilter::Equals(*group)),
-                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(None)),
+                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(
+                                None,
+                            )),
                         ])
                         .order_by(db::instance::OrderByParam::LibraryPosition(
                             carbon_repos::pcr::Direction::Desc,
@@ -834,7 +849,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         .await?
                         .and_then(|g| g.library_position);
 
-                    let max_pos = max_instance_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0));
+                    let max_pos = max_instance_pos
+                        .unwrap_or(0)
+                        .max(max_group_pos.unwrap_or(0));
                     Some(max_pos + 1)
                 } else {
                     None
@@ -854,16 +871,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .await?
                     .ok_or_else(|| anyhow!("GroupId is not in database"))?;
 
-                let lib_pos = target_folder.library_position.ok_or_else(|| {
-                    anyhow!("Target folder has no libraryPosition")
-                })?;
+                let lib_pos = target_folder
+                    .library_position
+                    .ok_or_else(|| anyhow!("Target folder has no libraryPosition"))?;
 
                 // The instance will be moved to the default group with target libraryPosition
                 let target_idx = self
                     .app
                     .prisma_client
                     .instance()
-                    .count(vec![WhereParam::GroupId(IntFilter::Equals(*default_group_id))])
+                    .count(vec![WhereParam::GroupId(IntFilter::Equals(
+                        *default_group_id,
+                    ))])
                     .exec()
                     .await? as i32;
 
@@ -984,9 +1003,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .update_many(
                         vec![
                             WhereParam::GroupId(IntFilter::Equals(*default_group_id)),
-                            WhereParam::LibraryPosition(
-                                db::read_filters::IntNullableFilter::Gt(start_lib_pos),
-                            ),
+                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Gt(
+                                start_lib_pos,
+                            )),
                         ],
                         vec![SetParam::DecrementLibraryPosition(1)],
                     )
@@ -1012,10 +1031,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .prisma_client
             ._batch((
                 index_shifts,
-                self.app.prisma_client.instance().update(
-                    UniqueWhereParam::IdEquals(*instance),
-                    update_params,
-                ),
+                self.app
+                    .prisma_client
+                    .instance()
+                    .update(UniqueWhereParam::IdEquals(*instance), update_params),
             ))
             .await?;
 
@@ -1174,7 +1193,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?
             .and_then(|g| g.library_position);
 
-        let next_library_pos = max_instance_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0)) + 1;
+        let next_library_pos = max_instance_pos
+            .unwrap_or(0)
+            .max(max_group_pos.unwrap_or(0))
+            + 1;
 
         let group = self
             .app
@@ -1370,7 +1392,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     /// Used in folders mode only (instancesGroupBy = null).
     pub async fn arrange_library(self, sort_by: LibrarySortCriteria) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam, WhereParam};
-        use db::instance_group::{SetParam as GroupSetParam, UniqueWhereParam as GroupUniqueWhereParam};
+        use db::instance_group::{
+            SetParam as GroupSetParam, UniqueWhereParam as GroupUniqueWhereParam,
+        };
 
         let default_group_id = self.get_default_group().await?;
 
@@ -1382,7 +1406,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .app
             .prisma_client
             .instance()
-            .find_many(vec![WhereParam::GroupId(IntFilter::Equals(*default_group_id))])
+            .find_many(vec![WhereParam::GroupId(IntFilter::Equals(
+                *default_group_id,
+            ))])
             .exec()
             .await?;
 
@@ -1396,7 +1422,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let instance_data = active_instances.get(&InstanceId(inst.id));
                 let (last_played, seconds_played) = match instance_data {
                     Some(data) => match &data.type_ {
-                        InstanceType::Valid(valid) => (valid.config.last_played, valid.config.seconds_played),
+                        InstanceType::Valid(valid) => {
+                            (valid.config.last_played, valid.config.seconds_played)
+                        }
                         InstanceType::Invalid(_) => (None, 0),
                     },
                     None => (None, 0),
@@ -1413,18 +1441,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 sortable_instances.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
             }
             LibrarySortCriteria::LastPlayed => {
-                sortable_instances.sort_by(|a, b| {
-                    match (&b.2, &a.2) {
-                        (Some(b_date), Some(a_date)) => b_date.cmp(a_date),
-                        (Some(_), None) => std::cmp::Ordering::Less,
-                        (None, Some(_)) => std::cmp::Ordering::Greater,
-                        (None, None) => a.1.to_lowercase().cmp(&b.1.to_lowercase()),
-                    }
+                sortable_instances.sort_by(|a, b| match (&b.2, &a.2) {
+                    (Some(b_date), Some(a_date)) => b_date.cmp(a_date),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.1.to_lowercase().cmp(&b.1.to_lowercase()),
                 });
             }
             LibrarySortCriteria::MostPlayed => {
                 sortable_instances.sort_by(|a, b| {
-                    b.3.cmp(&a.3).then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase()))
+                    b.3.cmp(&a.3)
+                        .then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase()))
                 });
             }
             LibrarySortCriteria::DateCreated => {
@@ -1495,7 +1522,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     /// Arrange all instances within a specific folder by the given criteria.
     /// This is a one-off arrange operation that reassigns indices within the folder.
     /// Used in folders mode only (instancesGroupBy = null).
-    pub async fn arrange_group(self, group_id: GroupId, sort_by: LibrarySortCriteria) -> anyhow::Result<()> {
+    pub async fn arrange_group(
+        self,
+        group_id: GroupId,
+        sort_by: LibrarySortCriteria,
+    ) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam, WhereParam};
 
         // Lock indexes while we're changing them
@@ -1520,7 +1551,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let instance_data = active_instances.get(&InstanceId(inst.id));
                 let (last_played, seconds_played) = match instance_data {
                     Some(data) => match &data.type_ {
-                        InstanceType::Valid(valid) => (valid.config.last_played, valid.config.seconds_played),
+                        InstanceType::Valid(valid) => {
+                            (valid.config.last_played, valid.config.seconds_played)
+                        }
                         InstanceType::Invalid(_) => (None, 0),
                     },
                     None => (None, 0),
@@ -1537,18 +1570,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 sortable_instances.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
             }
             LibrarySortCriteria::LastPlayed => {
-                sortable_instances.sort_by(|a, b| {
-                    match (&b.2, &a.2) {
-                        (Some(b_date), Some(a_date)) => b_date.cmp(a_date),
-                        (Some(_), None) => std::cmp::Ordering::Less,
-                        (None, Some(_)) => std::cmp::Ordering::Greater,
-                        (None, None) => a.1.to_lowercase().cmp(&b.1.to_lowercase()),
-                    }
+                sortable_instances.sort_by(|a, b| match (&b.2, &a.2) {
+                    (Some(b_date), Some(a_date)) => b_date.cmp(a_date),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.1.to_lowercase().cmp(&b.1.to_lowercase()),
                 });
             }
             LibrarySortCriteria::MostPlayed => {
                 sortable_instances.sort_by(|a, b| {
-                    b.3.cmp(&a.3).then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase()))
+                    b.3.cmp(&a.3)
+                        .then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase()))
                 });
             }
             LibrarySortCriteria::DateCreated => {
@@ -1621,7 +1653,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .await?
                 .and_then(|g| g.library_position);
 
-            Some(max_instance_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0)) + 1)
+            Some(
+                max_instance_pos
+                    .unwrap_or(0)
+                    .max(max_group_pos.unwrap_or(0))
+                    + 1,
+            )
         } else {
             None
         };
@@ -2360,9 +2397,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .app
                     .prisma_client
                     .instance()
-                    .count(vec![db::instance::WhereParam::GroupId(
-                        IntFilter::Equals(*group_id),
-                    )])
+                    .count(vec![db::instance::WhereParam::GroupId(IntFilter::Equals(
+                        *group_id,
+                    ))])
                     .exec()
                     .await?;
 
@@ -2473,7 +2510,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
-        self.app.meta_cache_manager().queue_caching(crate::managers::metadata::cache::CacheEntityId::Instance(id), false).await;
+        self.app
+            .meta_cache_manager()
+            .queue_caching(
+                crate::managers::metadata::cache::CacheEntityId::Instance(id),
+                false,
+            )
+            .await;
 
         Ok(id)
     }
@@ -2610,7 +2653,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let instance_id = InstanceId(instance.id);
             let app_clone = app.clone();
             tokio::spawn(async move {
-                if let Err(e) = app_clone.instance_manager()._delete_instance(instance_id).await {
+                if let Err(e) = app_clone
+                    .instance_manager()
+                    ._delete_instance(instance_id)
+                    .await
+                {
                     tracing::error!("Failed to delete instance {:?}: {:?}", instance_id, e);
                 }
             });
@@ -2945,12 +2992,12 @@ pub enum InstanceMoveTarget {
     Before(InstanceId),
     BeginningOfGroup(GroupId),
     EndOfGroup(GroupId),
-    BeforeGroup(GroupId),  // Position instance before a folder (at library root level)
+    BeforeGroup(GroupId), // Position instance before a folder (at library root level)
 }
 
 pub enum GroupMoveTarget {
     BeforeGroup(GroupId),
-    BeforeInstance(InstanceId),  // Instance must be in default group (ungrouped)
+    BeforeInstance(InstanceId), // Instance must be in default group (ungrouped)
     EndOfLibrary,
 }
 

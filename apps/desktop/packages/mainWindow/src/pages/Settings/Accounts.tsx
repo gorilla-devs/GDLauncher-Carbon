@@ -250,11 +250,56 @@ const Accounts = () => {
     getCoreRowModel: getCoreRowModel()
   })
 
+  const cancelScheduledDeletion = async () => {
+    const uuid = globalStore.accounts.data?.find(
+      (a: AccountEntry) => a.uuid === globalStore.settings.data?.gdlAccountId
+    )?.uuid
+    if (!uuid) return
+    const result = await cancelAccountDeletionMutation.mutateAsync(uuid)
+    if (result === "success") {
+      toast.success(t("accounts:_trn_cancel_deletion_success"))
+    } else if (result === "noScheduledDeletion") {
+      toast.info(t("accounts:_trn_cancel_deletion_already_completed"))
+    } else {
+      toast.error(result.failed ?? t("accounts:_trn_cancel_deletion_failed"))
+    }
+  }
+
   return (
     <>
       <PageTitle>
         <Trans key="accounts:_trn_accounts" />
       </PageTitle>
+
+      {/* Scheduled-deletion banner — rendered at the top so it's unmissable. */}
+      <Show when={validGDLUser()?.scheduledDeletionEffectiveAt}>
+        <div class="mb-4 flex items-start gap-3 rounded-lg border border-solid border-red-500/50 bg-red-950/40 p-4">
+          <div class="i-hugeicons:alert-01 mt-0.5 shrink-0 text-2xl text-red-400" />
+          <div class="flex flex-1 flex-col gap-1">
+            <span class="text-base font-semibold text-red-300">
+              <Trans key="accounts:_trn_account_scheduled_for_deletion_title" />
+            </span>
+            <p class="text-lightSlate-300 m-0 text-sm">
+              <Trans
+                key="accounts:_trn_account_scheduled_for_deletion_description"
+                options={{
+                  time: convertSecondsToHumanTime(scheduledDeletionRemaining())
+                }}
+              />
+            </p>
+          </div>
+          <Button
+            type="primary"
+            size="small"
+            class="self-center"
+            disabled={cancelAccountDeletionMutation.isPending}
+            onClick={cancelScheduledDeletion}
+          >
+            <Trans key="accounts:_trn_cancel_account_deletion" />
+          </Button>
+        </div>
+      </Show>
+
       {/* GDL Account Section */}
       <Switch>
         {/* Logged in state - Discord-like profile card */}
@@ -478,60 +523,19 @@ const Accounts = () => {
               >
                 <Switch>
                   <Match when={validGDLUser()?.scheduledDeletionEffectiveAt}>
-                    <div class="border-red-900/40 bg-red-950/30 flex flex-col gap-2 rounded-md border p-3">
-                      <div class="flex items-center gap-2">
-                        <div class="i-ri:alert-line text-red-400" />
-                        <span class="text-sm font-medium text-red-300">
-                          <Trans key="accounts:_trn_account_scheduled_for_deletion_title" />
-                        </span>
-                      </div>
-                      <p class="text-lightSlate-500 text-xs">
-                        <Trans
-                          key="accounts:_trn_account_scheduled_for_deletion_description"
-                          options={{
-                            time: convertSecondsToHumanTime(
-                              scheduledDeletionRemaining()
-                            )
-                          }}
-                        />
+                    {/* Scheduled-deletion state is shown as a top-level banner above. */}
+                    <div class="flex items-center justify-between py-2">
+                      <p class="text-lightSlate-500 text-sm">
+                        <Trans key="accounts:_trn_delete_account_description" />
                       </p>
-                      <div class="flex justify-end">
-                        <Button
-                          type="secondary"
-                          size="small"
-                          disabled={cancelAccountDeletionMutation.isPending}
-                          onClick={async () => {
-                            const uuid = globalStore.accounts.data?.find(
-                              (a: AccountEntry) =>
-                                a.uuid ===
-                                globalStore.settings.data?.gdlAccountId
-                            )?.uuid
-                            if (!uuid) return
-                            const result =
-                              await cancelAccountDeletionMutation.mutateAsync(
-                                uuid
-                              )
-                            if (result === "success") {
-                              toast.success(
-                                t("accounts:_trn_cancel_deletion_success")
-                              )
-                            } else if (result === "noScheduledDeletion") {
-                              toast.info(
-                                t(
-                                  "accounts:_trn_cancel_deletion_already_completed"
-                                )
-                              )
-                            } else {
-                              toast.error(
-                                result.failed ??
-                                  t("accounts:_trn_cancel_deletion_failed")
-                              )
-                            }
-                          }}
-                        >
-                          <Trans key="accounts:_trn_cancel_account_deletion" />
-                        </Button>
-                      </div>
+                      <Button
+                        type="secondary"
+                        size="small"
+                        disabled={cancelAccountDeletionMutation.isPending}
+                        onClick={cancelScheduledDeletion}
+                      >
+                        <Trans key="accounts:_trn_cancel_account_deletion" />
+                      </Button>
                     </div>
                   </Match>
                   <Match when={deletionCooldownRemaining() > 0}>

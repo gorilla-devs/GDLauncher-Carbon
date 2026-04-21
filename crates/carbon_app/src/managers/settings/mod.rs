@@ -454,20 +454,62 @@ impl ManagerRef<'_, SettingsManager> {
             lwjgl_configs,
             asset_indices,
         ) = tokio::join!(
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(url) + length(data) + IFNULL(length(etag), 0) + IFNULL(length(lastModified), 0)), 0) AS bytes FROM HTTPCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(metadataId) + length(name) + length(version) + length(urlslug) + length(summary) + length(authors) + length(updatePaths)), 0) AS bytes FROM CurseForgeModCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(metadataId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM CurseForgeModImageCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(modpackName) + length(versionName) + length(urlSlug)), 0) AS bytes FROM CurseForgeModpackCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM CurseForgeModpackImageCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(metadataId) + length(sha512) + length(projectId) + length(versionId) + length(title) + length(version) + length(urlslug) + length(description) + length(authors) + length(updatePaths) + length(filename) + length(fileUrl)), 0) AS bytes FROM ModrinthModCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(metadataId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM ModrinthModImageCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(projectId) + length(versionId) + length(modpackName) + length(versionName) + length(urlSlug)), 0) AS bytes FROM ModrinthModpackCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(projectId) + length(versionId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM ModrinthModpackImageCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(metadataId) + length(data)), 0) AS bytes FROM LocalModImageCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(id) + length(versionInfo)), 0) AS bytes FROM VersionInfoCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(id) + length(partialVersionInfo)), 0) AS bytes FROM PartialVersionInfoCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(id) + length(lwjgl)), 0) AS bytes FROM LwjglMetaCache"),
-            table_bytes(prisma, "SELECT IFNULL(SUM(length(id) + length(assetsIndex)), 0) AS bytes FROM AssetsMetaCache"),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(url) + length(data) + IFNULL(length(etag), 0) + IFNULL(length(lastModified), 0)), 0) AS bytes FROM HTTPCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(metadataId) + length(name) + length(version) + length(urlslug) + length(summary) + length(authors) + length(updatePaths)), 0) AS bytes FROM CurseForgeModCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(metadataId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM CurseForgeModImageCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(modpackName) + length(versionName) + length(urlSlug)), 0) AS bytes FROM CurseForgeModpackCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM CurseForgeModpackImageCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(metadataId) + length(sha512) + length(projectId) + length(versionId) + length(title) + length(version) + length(urlslug) + length(description) + length(authors) + length(updatePaths) + length(filename) + length(fileUrl)), 0) AS bytes FROM ModrinthModCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(metadataId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM ModrinthModImageCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(projectId) + length(versionId) + length(modpackName) + length(versionName) + length(urlSlug)), 0) AS bytes FROM ModrinthModpackCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(projectId) + length(versionId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM ModrinthModpackImageCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(metadataId) + length(data)), 0) AS bytes FROM LocalModImageCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(id) + length(versionInfo)), 0) AS bytes FROM VersionInfoCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(id) + length(partialVersionInfo)), 0) AS bytes FROM PartialVersionInfoCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(id) + length(lwjgl)), 0) AS bytes FROM LwjglMetaCache"
+            ),
+            table_bytes(
+                prisma,
+                "SELECT IFNULL(SUM(length(id) + length(assetsIndex)), 0) AS bytes FROM AssetsMetaCache"
+            ),
         );
 
         let runtime_path = self.runtime_path.clone();
@@ -710,12 +752,7 @@ impl ManagerRef<'_, SettingsManager> {
             if any_db_cleared {
                 let vacuum_subtask = task.subtask(Translation::CacheCleanupVacuuming);
                 vacuum_subtask.start_opaque();
-                if let Err(e) = app
-                    .prisma_client
-                    ._execute_raw(raw!("VACUUM"))
-                    .exec()
-                    .await
-                {
+                if let Err(e) = app.prisma_client._execute_raw(raw!("VACUUM")).exec().await {
                     error!("VACUUM failed: {e}");
                     task.fail(anyhow!("Failed to reclaim cache space: {e}"))
                         .await;
@@ -764,12 +801,8 @@ async fn dir_size(path: PathBuf) -> f64 {
 async fn db_total_bytes(runtime_path: &carbon_rt_path::RuntimePath) -> f64 {
     let db_path = runtime_path.join("gdl_conf.db");
     let wal_path = runtime_path.join("gdl_conf.db-wal");
-    let size_of = |p: PathBuf| async move {
-        tokio::fs::metadata(&p)
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0)
-    };
+    let size_of =
+        |p: PathBuf| async move { tokio::fs::metadata(&p).await.map(|m| m.len()).unwrap_or(0) };
     (size_of(db_path).await + size_of(wal_path).await) as f64
 }
 

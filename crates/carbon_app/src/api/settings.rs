@@ -6,8 +6,8 @@ use crate::{
             settings::{
                 CLEANUP_CACHES, COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY,
                 GET_CACHE_BREAKDOWN, GET_DB_SIZE, GET_PRIVACY_STATEMENT_BODY,
-                GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY,
-                GET_TOTAL_CACHE_SIZE, IS_FIRST_LAUNCH, GET_SEARCH_SIDEBAR_DOCKED,
+                GET_SEARCH_SIDEBAR_DOCKED, GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS,
+                GET_TERMS_OF_SERVICE_BODY, GET_TOTAL_CACHE_SIZE, IS_FIRST_LAUNCH,
                 MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER,
                 RESET_ONBOARDING_TIPS, SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS,
                 SHOULD_SHOW_BETA_PROMPT, SHOULD_SHOW_CHANGELOG,
@@ -692,16 +692,10 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             download_dependencies: data.download_dependencies,
             show_featured: data.show_featured,
             // instances_sort_by: None = manual ordering, Some(x) = accordion mode sorting
-            instances_sort_by: data
-                .instances_sort_by
-                .map(|s| s.try_into())
-                .transpose()?,
+            instances_sort_by: data.instances_sort_by.map(|s| s.try_into()).transpose()?,
             instances_sort_by_asc: data.instances_sort_by_asc,
             // instances_group_by: None = folders mode, Some(x) = accordion mode
-            instances_group_by: data
-                .instances_group_by
-                .map(|s| s.try_into())
-                .transpose()?,
+            instances_group_by: data.instances_group_by.map(|s| s.try_into()).transpose()?,
             instances_group_by_asc: data.instances_group_by_asc,
             instances_duplicate_favorites: data.instances_duplicate_favorites,
             instances_tile_size: data.instances_tile_size,

@@ -87,10 +87,7 @@ pub async fn process_curseforge_server_pack(
         .context("Failed to download server pack")?;
 
     if !response.status().is_success() {
-        bail!(
-            "Failed to download server pack: HTTP {}",
-            response.status()
-        );
+        bail!("Failed to download server pack: HTTP {}", response.status());
     }
 
     // Stream download with progress tracking (throttled to avoid flooding WS invalidation)
@@ -129,7 +126,10 @@ pub async fn process_curseforge_server_pack(
         None => t_download.complete_opaque(),
     }
 
-    info!("Server pack downloaded ({} bytes), extracting...", downloaded);
+    info!(
+        "Server pack downloaded ({} bytes), extracting...",
+        downloaded
+    );
 
     // --- Extract server pack (subtask already created upfront) ---
     t_extract.start_opaque();
@@ -328,8 +328,7 @@ pub async fn process_modrinth_server_pack(
         .await?
         .concurrent_downloads;
 
-    let (progress_tx, mut progress_rx) =
-        tokio::sync::watch::channel(carbon_net::Progress::new());
+    let (progress_tx, mut progress_rx) = tokio::sync::watch::channel(carbon_net::Progress::new());
 
     t_download_files.start_opaque();
 
@@ -416,18 +415,17 @@ pub async fn process_modrinth_server_pack(
             .unwrap_or_else(|| "unknown".to_string())
     });
 
-    let (modloader_type, modloader_version) =
-        if let Some(ref v) = index.dependencies.forge {
-            (Some("forge".to_string()), Some(v.clone()))
-        } else if let Some(ref v) = index.dependencies.neoforge {
-            (Some("neoforge".to_string()), Some(v.clone()))
-        } else if let Some(ref v) = index.dependencies.fabric_loader {
-            (Some("fabric".to_string()), Some(v.clone()))
-        } else if let Some(ref v) = index.dependencies.quilt_loader {
-            (Some("quilt".to_string()), Some(v.clone()))
-        } else {
-            (None, None)
-        };
+    let (modloader_type, modloader_version) = if let Some(ref v) = index.dependencies.forge {
+        (Some("forge".to_string()), Some(v.clone()))
+    } else if let Some(ref v) = index.dependencies.neoforge {
+        (Some("neoforge".to_string()), Some(v.clone()))
+    } else if let Some(ref v) = index.dependencies.fabric_loader {
+        (Some("fabric".to_string()), Some(v.clone()))
+    } else if let Some(ref v) = index.dependencies.quilt_loader {
+        (Some("quilt".to_string()), Some(v.clone()))
+    } else {
+        (None, None)
+    };
 
     info!(
         "Modrinth server pack processed: game_version={}, modloader={:?}",
@@ -510,10 +508,7 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
 }
 
 /// Detect game version from CurseForge file metadata.
-async fn detect_game_version_from_files(
-    _data_path: &Path,
-    cf_game_versions: &[String],
-) -> String {
+async fn detect_game_version_from_files(_data_path: &Path, cf_game_versions: &[String]) -> String {
     for version in cf_game_versions {
         if version.contains('.')
             && !version.contains('-')

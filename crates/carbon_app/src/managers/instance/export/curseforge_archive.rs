@@ -209,15 +209,15 @@ pub async fn export_curseforge(
 
                             const SIZE_WEIGHT: f64 = 0.6;
                             const COUNT_WEIGHT: f64 = 0.4;
-                            
+
                             let estimated_total_files = file_count;
                             let estimated_total_size = size_count;
-                            
+
                             let count_progress = (counter as f64 / estimated_total_files as f64).min(1.0);
                             let size_progress = (size as f64 / estimated_total_size as f64).min(1.0);
-                            
+
                             let weighted_progress = (count_progress * COUNT_WEIGHT + size_progress * SIZE_WEIGHT) * 100.0;
-                            
+
                             let computed_curr = weighted_progress as u32;
 
                             t_create_bundle.update_items(computed_curr, 100);

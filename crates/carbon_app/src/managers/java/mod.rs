@@ -618,8 +618,9 @@ impl ManagerRef<'_, JavaManager> {
             }
         }
 
-        best.map(|(_, path)| path)
-            .ok_or_else(|| anyhow::anyhow!("No Java installation found. Please install Java first."))
+        best.map(|(_, path)| path).ok_or_else(|| {
+            anyhow::anyhow!("No Java installation found. Please install Java first.")
+        })
     }
 }
 

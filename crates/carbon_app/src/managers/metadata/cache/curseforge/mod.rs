@@ -310,11 +310,11 @@ impl ModplatformCacher for CurseforgeModCacher {
                     .server_mod_file_cache()
                     .find_many(vec![
                         sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
-                        sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIs(vec![
-                            cfdb::WhereParam::LogoImageIs(vec![cfimgdb::WhereParam::UpToDate(
-                                IntFilter::Equals(0),
-                            )]),
-                        ])]),
+                        sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIs(
+                            vec![cfdb::WhereParam::LogoImageIs(vec![
+                                cfimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
+                            ])],
+                        )]),
                     ])
                     .with(
                         sfcdb::metadata::fetch()

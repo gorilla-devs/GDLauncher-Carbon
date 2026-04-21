@@ -10,8 +10,7 @@ use crate::{
         vtask::VisualTaskId,
     },
     managers::{
-        AppInner,
-        instance::InstanceVersionSource,
+        AppInner, instance::InstanceVersionSource,
         modplatforms::curseforge::convert_cf_version_to_standard_version,
     },
 };

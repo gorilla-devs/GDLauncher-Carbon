@@ -8,21 +8,21 @@ use crate::api::keys;
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::error::{AxumError, FeError, FeErrorCode};
 use crate::managers::account::gdl_account::{
-    PaginatedShares, QuotaInfo, RegenerateShareCodeResponse, SharedMod, ShareInfo, SharePreview,
+    PaginatedShares, QuotaInfo, RegenerateShareCodeResponse, ShareInfo, SharePreview, SharedMod,
     UpdateShareBody, WaitForShareInstanceResponse,
 };
 use crate::managers::instance as manager;
+use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::instance::export::ShareInstanceProgress;
 use crate::managers::instance::importer::ImportShareCodeProgress;
-use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
 use crate::managers::{App, AppInner, instance::importer};
 use anyhow::anyhow;
+use axum::Json;
 use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
-use axum::Json;
 use carbon_platforms as mpdomain;
 use chrono::{DateTime, Utc};
 use rspc::RouterBuilder;
@@ -757,7 +757,13 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         let (mut rx, handle) = app
             .instance_manager()
             .export_manager()
-            .share_instance(query.instance_id.into(), query.title, query.expiration_days, query.max_downloads, cancel_token.clone())
+            .share_instance(
+                query.instance_id.into(),
+                query.title,
+                query.expiration_days,
+                query.max_downloads,
+                cancel_token.clone(),
+            )
             .await
             .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
@@ -1307,7 +1313,7 @@ struct StandardVersion {
 #[derive(Type, Debug, Deserialize)]
 enum MoveGroupTarget {
     BeforeGroup(FEGroupId),
-    BeforeInstance(FEInstanceId),  // Instance must be in default group (ungrouped)
+    BeforeInstance(FEInstanceId), // Instance must be in default group (ungrouped)
     EndOfLibrary,
 }
 
@@ -1369,7 +1375,7 @@ enum MoveInstanceTarget {
     BeforeInstance(FEInstanceId),
     BeginningOfGroup(FEGroupId),
     EndOfGroup(FEGroupId),
-    BeforeGroup(FEGroupId),  // Position instance before a folder (at library root level)
+    BeforeGroup(FEGroupId), // Position instance before a folder (at library root level)
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]

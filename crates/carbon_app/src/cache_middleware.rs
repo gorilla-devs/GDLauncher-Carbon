@@ -104,9 +104,13 @@ impl Middleware for CacheMiddleware {
         if let Some(expires) = cached.as_ref().and_then(|c| c.expires_at) {
             if expires > Utc::now() {
                 let cached = cached.take().expect("cached was just asserted to be Some");
-                if let Ok(response) =
-                    build_cached(cached.status_code, cached.data, &empty_headers, &req_url, true)
-                {
+                if let Ok(response) = build_cached(
+                    cached.status_code,
+                    cached.data,
+                    &empty_headers,
+                    &req_url,
+                    true,
+                ) {
                     return Ok(response);
                 }
             }
