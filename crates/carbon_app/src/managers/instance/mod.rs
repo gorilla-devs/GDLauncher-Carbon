@@ -498,8 +498,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // lock indexes while we're changing them
         let _index_lock = self.index_lock.lock().await;
 
-        let default_group_id = self.get_default_group().await?;
-
         // Get the group we're moving
         let moving_group = self
             .app
@@ -529,7 +527,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 })?
             }
             GroupMoveTarget::BeforeInstance(instance_id) => {
-                // Instance must be in the default group (ungrouped)
+                // Instance must be in the default group (ungrouped) — detected via
+                // library_position being set (only default-group instances have one).
                 let instance = self
                     .app
                     .prisma_client
@@ -539,28 +538,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .await?
                     .ok_or_else(|| anyhow!("InstanceId is not in database"))?;
 
-                if instance.group_id != *default_group_id {
-                    bail!(
+                instance.library_position.ok_or_else(|| {
+                    anyhow!(
                         "Can only position a group before ungrouped instances (instances in default group)"
-                    );
-                }
-
-                instance
-                    .library_position
-                    .ok_or_else(|| anyhow!("Instance has no libraryPosition"))?
+                    )
+                })?
             }
             GroupMoveTarget::EndOfLibrary => {
-                // Find the maximum libraryPosition across ungrouped instances and groups
+                // Find the maximum libraryPosition across ungrouped instances and groups.
+                // library_position is only set on default-group instances, so the
+                // filter alone is sufficient (no need to join against the default group).
                 let max_instance_pos: Option<i32> = self
                     .app
                     .prisma_client
                     .instance()
-                    .find_first(vec![
-                        InstanceWhereParam::GroupId(IntFilter::Equals(*default_group_id)),
-                        InstanceWhereParam::LibraryPosition(
-                            db::read_filters::IntNullableFilter::Not(None),
-                        ),
-                    ])
+                    .find_first(vec![InstanceWhereParam::LibraryPosition(
+                        db::read_filters::IntNullableFilter::Not(None),
+                    )])
                     .order_by(db::instance::OrderByParam::LibraryPosition(
                         carbon_repos::pcr::Direction::Desc,
                     ))
@@ -619,13 +613,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .exec()
                 .await?;
 
-            // For ungrouped instances:
+            // For ungrouped instances (library_position is only set on them):
             self.app
                 .prisma_client
                 .instance()
                 .update_many(
                     vec![
-                        InstanceWhereParam::GroupId(IntFilter::Equals(*default_group_id)),
                         InstanceWhereParam::LibraryPosition(
                             db::read_filters::IntNullableFilter::Gt(start_pos),
                         ),
@@ -667,13 +660,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .exec()
                 .await?;
 
-            // For ungrouped instances:
+            // For ungrouped instances (library_position is only set on them):
             self.app
                 .prisma_client
                 .instance()
                 .update_many(
                     vec![
-                        InstanceWhereParam::GroupId(IntFilter::Equals(*default_group_id)),
                         InstanceWhereParam::LibraryPosition(
                             db::read_filters::IntNullableFilter::Gte(target_pos),
                         ),
@@ -740,10 +732,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     ) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam, WhereParam};
 
+        // Materialize the default group before taking index_lock (see create_group).
+        let default_group_id = self.get_default_group().await?;
+
         // lock indexes while we're changing them
         let _index_lock = self.index_lock.lock().await;
-
-        let default_group_id = self.get_default_group().await?;
 
         let (start_group, start_idx, start_library_pos) = {
             let instance = self
@@ -1145,6 +1138,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     pub async fn create_group(self, name: String) -> anyhow::Result<GroupId> {
         use db::instance_group::WhereParam;
+
         let index = self.next_group_index().await?;
 
         let group = self
@@ -1159,19 +1153,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             return Ok(GroupId(group.id));
         }
 
-        // Calculate the next libraryPosition for the new group
-        let default_group_id = self.get_default_group().await?;
-
+        // Instances in the default group (and only those) have library_position set,
+        // so filtering by LibraryPosition IS NOT NULL avoids needing default_group_id
+        // here — which would otherwise deadlock via get_default_group re-acquiring
+        // index_lock on a fresh database.
         let max_instance_pos: Option<i32> = self
             .app
             .prisma_client
             .instance()
-            .find_first(vec![
-                db::instance::WhereParam::GroupId(IntFilter::Equals(*default_group_id)),
-                db::instance::WhereParam::LibraryPosition(
-                    db::read_filters::IntNullableFilter::Not(None),
-                ),
-            ])
+            .find_first(vec![db::instance::WhereParam::LibraryPosition(
+                db::read_filters::IntNullableFilter::Not(None),
+            )])
             .order_by(db::instance::OrderByParam::LibraryPosition(
                 carbon_repos::pcr::Direction::Desc,
             ))
@@ -1225,21 +1217,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         target_position: i32,
     ) -> anyhow::Result<GroupId> {
         use db::instance_group::WhereParam;
+
         let index = self.next_group_index().await?;
 
-        let default_group_id = self.get_default_group().await?;
-
         // Shift all items (groups and ungrouped instances) with library_position >= target_position up by 1
+        // (library_position is only set on default-group instances, so no need to filter by group_id
+        // — which would require materializing the default group and re-acquiring index_lock.)
         self.app
             .prisma_client
             .instance()
             .update_many(
-                vec![
-                    db::instance::WhereParam::GroupId(IntFilter::Equals(*default_group_id)),
-                    db::instance::WhereParam::LibraryPosition(
-                        db::read_filters::IntNullableFilter::Gte(target_position),
-                    ),
-                ],
+                vec![db::instance::WhereParam::LibraryPosition(
+                    db::read_filters::IntNullableFilter::Gte(target_position),
+                )],
                 vec![db::instance::SetParam::IncrementLibraryPosition(1)],
             )
             .exec()
@@ -1618,10 +1608,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     ) -> anyhow::Result<InstanceId> {
         use db::instance::{SetParam, WhereParam};
         use db::instance_group::UniqueWhereParam;
-        let index = self.next_instance_index(group).await?;
 
-        // Calculate libraryPosition if adding to default group
+        // Materialize the default group before taking index_lock via
+        // next_instance_index (see create_group).
         let default_group_id = self.get_default_group().await?;
+
+        let index = self.next_instance_index(group).await?;
         let library_position = if group == default_group_id {
             // Find the next library position
             let max_instance_pos: Option<i32> = self
