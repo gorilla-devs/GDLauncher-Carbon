@@ -34,10 +34,24 @@
   animation: none;
 }
 
-/* Don't interpolate the group's size between old/new states */
+/* Don't interpolate the group's size between old/new states.
+   We also paint the group's background with the scroll container's color
+   so the scrollbar-gutter band on the right stays filled even when we
+   clip the sliding content out of it (see ::view-transition-image-pair
+   below). */
 ::view-transition-group(library-content) {
   overflow: hidden;
   animation: none;
+  background-color: rgb(var(--darkSlate-800));
+}
+
+/* Clip the image-pair (static — doesn't participate in the slide) so the
+   right 13px band of the group corresponds to the scrollbar gutter and
+   never shows sliding tile content. The group's background (above) fills
+   that band with the solid container color. Keep 13px in sync with the
+   global ::-webkit-scrollbar width in @gd/ui/style.css. */
+::view-transition-image-pair(library-content) {
+  clip-path: inset(0 13px 0 0);
 }
 
 /* Disable default crossfade */
@@ -64,4 +78,32 @@
 
 ::view-transition-new(library-content.backward) {
   animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both library-slide-in-left;
+}
+
+/* Hold the sticky LibraryHeader in place while the library content slides.
+   handleModeSwitch temporarily sets view-transition-name: library-header on
+   the sticky header so it becomes its own pseudo group — the rules below
+   stop that group from sliding/crossfading. */
+::view-transition-group(library-header),
+::view-transition-old(library-header),
+::view-transition-new(library-header) {
+  animation: none;
+}
+
+/* Make the scroll container's scrollbar visually invisible (but keep its
+   dimensions) for the duration of the mode-switch transition. Otherwise
+   the scrollbar is captured in the library-content snapshot and slides
+   with it.
+   We only override the ::-webkit-scrollbar-thumb/track backgrounds — not
+   `scrollbar-color` or `scrollbar-width` — because the global style in
+   @gd/ui defines a 13px custom scrollbar via ::-webkit-scrollbar, and
+   switching to the native "thin" scrollbar via `scrollbar-color` changes
+   the reserved gutter width, shifting content. Keeping the custom
+   scrollbar but painting its parts transparent preserves the exact
+   layout. */
+.library-mode-switching::-webkit-scrollbar-thumb,
+.library-mode-switching::-webkit-scrollbar-track,
+.library-mode-switching::-webkit-scrollbar-corner {
+  background: transparent !important;
+  border-color: transparent !important;
 }

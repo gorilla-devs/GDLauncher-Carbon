@@ -148,7 +148,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
   }
 
   return (
-    <div class="bg-darkSlate-800 z-5 sticky top-0 flex items-center gap-4 py-4">
+    <div class="bg-darkSlate-800 z-5 sticky top-0 -mx-6 flex items-center gap-4 px-6 py-4">
       {/* Library Mode Toggle */}
       <Tabs
         value={props.libraryMode()}

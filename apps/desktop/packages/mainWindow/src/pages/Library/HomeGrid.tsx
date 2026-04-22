@@ -330,17 +330,58 @@ const HomeGridInner = () => {
       const direction = newMode === "servers" ? "forward" : "backward"
       setModeDirection(direction)
 
+      // Put the view-transition-name + class on the scroll container
+      // instead of contentRef. contentRef's border box spans the full tile
+      // list (scrolling happens on the ancestor), so its snapshot paints
+      // tiles that were scrolled out of view on top of the surrounding
+      // layout during the slide. The scroll container, by contrast, is
+      // already viewport-sized, so its snapshot naturally matches what the
+      // user was seeing — no clip-path gymnastics needed.
+      //
+      // The sticky LibraryHeader sits inside the scroll container, so we
+      // also give it its own view-transition-name. That lifts it out of
+      // the library-content snapshot into its own pseudo group, and the
+      // `animation: none` rule in modeTransitions.css keeps it visually
+      // fixed while the content slides behind it.
+      const scrollEl = document.getElementById("gdl-content-wrapper")
+      let headerEl: HTMLElement | null = null
+      if (contentRef) {
+        let sib = contentRef.previousElementSibling as HTMLElement | null
+        while (sib) {
+          if (getComputedStyle(sib).position === "sticky") {
+            headerEl = sib
+            break
+          }
+          sib = sib.previousElementSibling as HTMLElement | null
+        }
+      }
+      if (scrollEl) {
+        scrollEl.style.viewTransitionName = "library-content"
+        scrollEl.style.setProperty("view-transition-class", direction)
+        // Hide the scrollbar while the snapshot is captured so it isn't
+        // baked into the library-content pseudo and carried along by the
+        // slide. scrollbar-gutter: stable on the container (see
+        // ContentWrapper) reserves the space so there's no layout shift.
+        scrollEl.classList.add("library-mode-switching")
+      }
+      if (headerEl) {
+        headerEl.style.viewTransitionName = "library-header"
+      }
+
       const transition = document.startViewTransition(() => {
         setSearchParams({ mode: modeParam }, { replace: true })
       })
 
-      transition.finished
-        .then(() => {
-          setModeDirection(null)
-        })
-        .catch(() => {
-          setModeDirection(null)
-        })
+      const finish = () => {
+        setModeDirection(null)
+        if (scrollEl) {
+          scrollEl.style.viewTransitionName = ""
+          scrollEl.style.removeProperty("view-transition-class")
+          scrollEl.classList.remove("library-mode-switching")
+        }
+        if (headerEl) headerEl.style.viewTransitionName = ""
+      }
+      transition.finished.then(finish).catch(finish)
     } else {
       setSearchParams({ mode: modeParam }, { replace: true })
     }
@@ -433,15 +474,7 @@ const HomeGridInner = () => {
         libraryMode={libraryMode}
         setLibraryMode={handleModeSwitch}
       />
-      <div
-        ref={contentRef}
-        class="flex flex-1 flex-col"
-        style={{
-          "view-transition-name": modeDirection() ? "library-content" : "none",
-          // @ts-expect-error - view-transition-class not in TS types yet
-          "view-transition-class": modeDirection() || undefined
-        }}
-      >
+      <div ref={contentRef} class="flex flex-1 flex-col">
         <Show when={isLoading()}>
           <Skeleton.instances />
         </Show>
