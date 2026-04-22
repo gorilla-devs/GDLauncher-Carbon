@@ -133,30 +133,35 @@ export function useFLIPAnimation(
     const oldPositions = positionSnapshot()
     const animations: Animation[] = []
 
-    // Iterate over captured positions, not refs
-    // This ensures items that were recreated during DOM reconciliation still animate
+    // Phase 1: batch READS. Interleaving getBoundingClientRect with
+    // el.animate(...) causes one forced reflow per item.
+    interface Pending {
+      el: HTMLDivElement
+      key: string
+      newRect: DOMRect
+      dx: number
+      dy: number
+    }
+    const pending: Pending[] = []
     oldPositions.forEach((oldRect, key) => {
       const el = itemRefs.get(key)
       if (!el?.isConnected) return
-
       const newRect = el.getBoundingClientRect()
-
-      // Skip zero-size elements (layout thrash)
-      if (newRect.width === 0 || newRect.height === 0) {
-        el.style.opacity = "1"
-        return
-      }
-
       const dx = oldRect.left - newRect.left
       const dy = oldRect.top - newRect.top
+      pending.push({ el, key, newRect, dx, dy })
+    })
 
-      // Skip if no movement
+    // Phase 2: batch WRITES.
+    for (const { el, newRect, dx, dy } of pending) {
+      if (newRect.width === 0 || newRect.height === 0) {
+        el.style.opacity = "1"
+        continue
+      }
       if (dx === 0 && dy === 0) {
         el.style.opacity = "1"
-        return
+        continue
       }
-
-      // Apply FLIP animation
       const anim = el.animate(
         [
           { transform: `translate(${dx}px, ${dy}px)` },
@@ -168,7 +173,7 @@ export function useFLIPAnimation(
         }
       )
       animations.push(anim)
-    })
+    }
 
     // Ensure all elements visible after animation completes
     Promise.all(animations.map((a) => a.finished)).finally(() => {

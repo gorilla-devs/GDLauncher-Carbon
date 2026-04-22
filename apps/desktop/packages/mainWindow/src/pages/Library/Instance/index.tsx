@@ -5,7 +5,10 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem
+  DropdownMenuItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
 } from "@gd/ui"
 import { useLocation, useParams } from "@solidjs/router"
 import {
@@ -345,6 +348,23 @@ const Instance = (props: { children?: any }) => {
     )
   }
 
+  const hasValidGdlAccount = () =>
+    globalStore.gdlAccount.data?.status === "valid"
+
+  const handleShare = () => {
+    if (!hasValidGdlAccount()) {
+      modalsContext?.openModal(
+        { name: "requiresGdlAccount" },
+        { returnPath: `${location.pathname}${location.search}` }
+      )
+      return
+    }
+    modalsContext?.openModal(
+      { name: "shareInstance" },
+      { instanceId: instanceId() }
+    )
+  }
+
   const menuItems = () => [
     {
       icon: "i-hugeicons:pencil-edit-01",
@@ -563,17 +583,24 @@ const Instance = (props: { children?: any }) => {
       headerTopRight={
         <>
           <DropdownMenu placement="bottom-end">
-            <DropdownMenuTrigger class="b-0 bg-transparent p-0">
-              <Button
-                as="div"
-                rounded
-                class="h-full w-full"
-                size="small"
-                type="transparent"
-              >
-                <div class="i-hugeicons:more-horizontal text-xl" />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tooltip placement="bottom">
+              <TooltipTrigger as="div">
+                <DropdownMenuTrigger class="b-0 bg-transparent p-0">
+                  <Button
+                    as="div"
+                    rounded
+                    class="h-full w-full"
+                    size="small"
+                    type="transparent"
+                  >
+                    <div class="i-hugeicons:more-horizontal text-xl" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="instances:_trn_more_actions" />
+              </TooltipContent>
+            </Tooltip>
             <DropdownMenuContent>
               <For each={menuItems()}>
                 {(item) => (
@@ -587,24 +614,57 @@ const Instance = (props: { children?: any }) => {
               </For>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            onClick={() =>
-              setFavoriteMutation.mutate({
-                instance: instanceId(),
-                favorite: !routeData.instanceDetails.data?.favorite
-              })
-            }
-            rounded
-            size="small"
-            type="transparent"
-          >
-            <div
-              class="i-hugeicons:star text-xl"
-              classList={{
-                "text-yellow-500": isFavorite()
-              }}
-            />
-          </Button>
+          <Tooltip placement="bottom">
+            <TooltipTrigger as="div">
+              <Button
+                onClick={handleShare}
+                rounded
+                size="small"
+                type="transparent"
+              >
+                <div
+                  class="i-ri:share-line text-xl"
+                  classList={{
+                    "text-primary-500": !hasValidGdlAccount()
+                  }}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans key="instances:_trn_instance_share.title" />
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger as="div">
+              <Button
+                onClick={() =>
+                  setFavoriteMutation.mutate({
+                    instance: instanceId(),
+                    favorite: !routeData.instanceDetails.data?.favorite
+                  })
+                }
+                rounded
+                size="small"
+                type="transparent"
+              >
+                <div
+                  class="i-hugeicons:star text-xl"
+                  classList={{
+                    "text-yellow-500": isFavorite()
+                  }}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans
+                key={
+                  isFavorite()
+                    ? "instances:_trn_remove_favorite"
+                    : "instances:_trn_add_favorite"
+                }
+              />
+            </TooltipContent>
+          </Tooltip>
         </>
       }
       tabs={tabs()}
@@ -612,21 +672,30 @@ const Instance = (props: { children?: any }) => {
       onTabClick={(tab) => navigator.navigate(tab.id)}
       onBackClick={() => navigator.navigate("/library")}
       stickyRightButton={
-        <Button
-          size="small"
-          variant={isRunning() && "red"}
-          loading={isPreparing() !== undefined}
-          onClick={handlePlay}
-        >
-          <Switch>
-            <Match when={!isRunning()}>
-              <div class="i-hugeicons:play text-xl" />
-            </Match>
-            <Match when={isRunning()}>
-              <div class="i-hugeicons:stop text-xl" />
-            </Match>
-          </Switch>
-        </Button>
+        <Tooltip placement="bottom">
+          <TooltipTrigger as="div">
+            <Button
+              size="small"
+              variant={isRunning() && "red"}
+              loading={isPreparing() !== undefined}
+              onClick={handlePlay}
+            >
+              <Switch>
+                <Match when={!isRunning()}>
+                  <div class="i-hugeicons:play text-xl" />
+                </Match>
+                <Match when={isRunning()}>
+                  <div class="i-hugeicons:stop text-xl" />
+                </Match>
+              </Switch>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <Trans
+              key={isRunning() ? "instances:_trn_stop" : "instances:_trn_play"}
+            />
+          </TooltipContent>
+        </Tooltip>
       }
       noPaddingPaths={["/addons", "/logs"]}
       isFullScreen={isFullScreen}

@@ -128,5 +128,21 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
 }
 
 export const useGDNavigate = (): NavigationContext => {
-  return useContext(NavigationContext)!
+  const ctx = useContext(NavigationContext)
+  if (ctx) return ctx
+
+  // Fallback so call sites never crash on `navigator.navigate(...)` if the
+  // provider is briefly missing (HMR, stale tree during a route transition,
+  // etc.). Router context is still present — it wraps the provider — so
+  // plain solid-router navigate works. The transition polish and
+  // last-path tracking are skipped in this path.
+  console.warn(
+    "useGDNavigate called without NavigationManager provider; using fallback"
+  )
+  const navigate = useNavigate()
+  return {
+    navigate: (path, options) => navigate(path, { replace: options?.replace }),
+    prev: () => navigate(-1),
+    lastPathVisited: () => ({ path: "", searchParams: "" })
+  }
 }

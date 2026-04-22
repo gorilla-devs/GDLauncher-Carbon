@@ -72,6 +72,7 @@ import {
 import FoldersView from "./views/FoldersView"
 import AccordionView from "./views/AccordionView"
 import { LibraryItem, LibraryMode } from "./types"
+import { TILE_SIZES, TileSize } from "./constants"
 
 const HomeGrid = () => (
   <DragProvider>
@@ -93,9 +94,11 @@ const HomeGridInner = () => {
   const [openFolderId, setOpenFolderId] = createSignal<number | null>(null)
   const libraryMode = (): LibraryMode =>
     searchParams.mode === "servers" ? "servers" : "instances"
-  const [modeDirection, setModeDirection] = createSignal<
-    "forward" | "backward" | null
-  >(null)
+  // Skeleton crossfade: when loading ends, keep the skeleton overlay alive
+  // briefly and fade it out on top of the real content so tiles appear to
+  // swap in place rather than flicker through an empty state.
+  const [skeletonVisible, setSkeletonVisible] = createSignal(false)
+  const [skeletonFading, setSkeletonFading] = createSignal(false)
 
   // Refs for drag selection - keyed by type-prefixed string ID (e.g., "instance-5", "folder-3")
   const tileRefs = new Map<string, HTMLDivElement>()
@@ -161,6 +164,23 @@ const HomeGridInner = () => {
   createEffect(() => {
     if (filter().trim()) {
       setOpenFolderId(null)
+    }
+  })
+
+  // Drive skeleton crossfade in response to isLoading flipping.
+  createEffect(() => {
+    if (isLoading()) {
+      setSkeletonVisible(true)
+      setSkeletonFading(false)
+    } else if (skeletonVisible()) {
+      // Real content just mounted — fade skeleton out on top of it,
+      // then unmount once the transition finishes.
+      setSkeletonFading(true)
+      const id = setTimeout(() => {
+        setSkeletonVisible(false)
+        setSkeletonFading(false)
+      }, 220)
+      onCleanup(() => clearTimeout(id))
     }
   })
 
@@ -235,7 +255,13 @@ const HomeGridInner = () => {
       document.getElementById("gdl-content-wrapper") ?? undefined,
     getItemRects,
     onSelectionChange: (ids) => selection.selectAll(ids),
-    getExistingSelection: () => selection.selectedIds()
+    getExistingSelection: () => selection.selectedIds(),
+    getTopBoundary: () => {
+      const header = document.querySelector<HTMLElement>(
+        "[data-library-header]"
+      )
+      return header?.getBoundingClientRect().bottom
+    }
   })
 
   const shouldIgnoreClick = (e: MouseEvent): boolean => {
@@ -328,7 +354,6 @@ const HomeGridInner = () => {
 
     if (!reducedMotion && document.startViewTransition) {
       const direction = newMode === "servers" ? "forward" : "backward"
-      setModeDirection(direction)
 
       // Put the view-transition-name + class on the scroll container
       // instead of contentRef. contentRef's border box spans the full tile
@@ -373,7 +398,6 @@ const HomeGridInner = () => {
       })
 
       const finish = () => {
-        setModeDirection(null)
         if (scrollEl) {
           scrollEl.style.viewTransitionName = ""
           scrollEl.style.removeProperty("view-transition-class")
@@ -474,9 +498,23 @@ const HomeGridInner = () => {
         libraryMode={libraryMode}
         setLibraryMode={handleModeSwitch}
       />
-      <div ref={contentRef} class="flex flex-1 flex-col">
-        <Show when={isLoading()}>
-          <Skeleton.instances />
+      <div ref={contentRef} class="relative flex flex-1 flex-col">
+        <Show when={skeletonVisible()}>
+          <div
+            class="pointer-events-none transition-opacity duration-200 ease-out motion-reduce:transition-none"
+            classList={{
+              "absolute inset-0 z-10 opacity-0": skeletonFading(),
+              "opacity-100": !skeletonFading()
+            }}
+          >
+            <Skeleton.instances
+              tileWidthPx={TILE_SIZES[tileSize() as TileSize]?.widthPx ?? 184}
+              rowGapPx={
+                { 1: 16, 2: 24, 3: 32, 4: 40, 5: 48 }[tileSize() as TileSize] ??
+                24
+              }
+            />
+          </div>
         </Show>
         <Show when={!isLoading()}>
           <ContextMenu>

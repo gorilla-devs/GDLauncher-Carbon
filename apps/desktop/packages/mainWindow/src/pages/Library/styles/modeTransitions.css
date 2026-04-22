@@ -107,3 +107,11 @@
   background: transparent !important;
   border-color: transparent !important;
 }
+
+/* Prevent horizontal scrollbar from flickering during drag — the fixed-
+   position ghost and in-flight FLIP transforms can briefly extend
+   scrollWidth past the viewport. We only suppress the X axis; vertical
+   scrolling must remain available so edge autoscroll works. */
+.gdl-dragging-no-x {
+  overflow-x: hidden !important;
+}

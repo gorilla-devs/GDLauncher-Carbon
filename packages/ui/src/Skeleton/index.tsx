@@ -58,17 +58,36 @@ const Instance = () => {
 
 Skeleton.instance = Instance
 
-Skeleton.instances = () => {
+Skeleton.instances = (props: {
+  tileWidthPx?: number
+  rowGapPx?: number
+  count?: number
+}) => {
+  const width = () => props.tileWidthPx ?? 184
+  const rowGap = () => props.rowGapPx ?? 24
+  const count = () => props.count ?? 18
   return (
-    <div class="flex flex-col gap-4">
-      {/* Header: search input + filter button */}
-      <div class="flex items-center gap-4 py-4">
-        <div class="bg-darkSlate-500 skeleton-shimmer h-10 w-full rounded-full" />
-        <div class="bg-darkSlate-500 skeleton-shimmer h-8 w-8 min-w-8 rounded-md" />
-      </div>
-      <div class="flex flex-wrap gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
+    <div
+      style={{
+        display: "grid",
+        "align-content": "start",
+        "grid-template-columns": `repeat(auto-fill, ${width()}px)`,
+        "justify-content": "space-evenly",
+        "column-gap": "16px",
+        "row-gap": `${rowGap()}px`
+      }}
+    >
+      <For each={new Array(count())}>
+        {() => (
+          <div
+            class="bg-darkSlate-500 skeleton-shimmer rounded-2xl"
+            style={{
+              width: `${width()}px`,
+              height: `${width()}px`
+            }}
+          />
+        )}
+      </For>
     </div>
   )
 }

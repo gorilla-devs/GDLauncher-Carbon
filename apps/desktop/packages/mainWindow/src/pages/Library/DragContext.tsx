@@ -167,6 +167,99 @@ export function DragProvider(props: { children: JSX.Element }) {
     dropTimers = []
   }
 
+  // Edge autoscroll: while dragging near the top/bottom of the scroll
+  // container under the pointer, scroll that container. Proximity to the
+  // edge scales speed — closer = faster. Runs as a rAF loop so speed is
+  // frame-rate independent and scroll updates compose with the drop-
+  // target recompute.
+  //
+  // The scroll target is resolved per-frame from the element under the
+  // pointer — this lets autoscroll work both in the main library
+  // (#gdl-content-wrapper) and inside an expanded folder (its own
+  // scroll container), switching automatically as the pointer crosses.
+  const AUTOSCROLL_ZONE = 90
+  const AUTOSCROLL_MIN_SPEED = 2
+  const AUTOSCROLL_MAX_SPEED = 22
+  let autoscrollRaf: number | null = null
+  let autoscrollPointerX = 0
+  let autoscrollPointerY = 0
+
+  const stopAutoscroll = () => {
+    if (autoscrollRaf !== null) {
+      cancelAnimationFrame(autoscrollRaf)
+      autoscrollRaf = null
+    }
+  }
+
+  const isVerticallyScrollable = (el: HTMLElement): boolean => {
+    if (el.scrollHeight <= el.clientHeight) return false
+    const overflowY = getComputedStyle(el).overflowY
+    return (
+      overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay"
+    )
+  }
+
+  const findScrollContainer = (x: number, y: number): HTMLElement | null => {
+    // Nearest vertically-scrollable ancestor of the element under the
+    // pointer. Falls back to the main library scroll container if the
+    // pointer isn't over anything interesting (e.g. outside the viewport).
+    const hit = document.elementFromPoint(x, y) as HTMLElement | null
+    let node: HTMLElement | null = hit
+    while (node && node !== document.body) {
+      if (isVerticallyScrollable(node)) return node
+      node = node.parentElement
+    }
+    return document.getElementById("gdl-content-wrapper")
+  }
+
+  const runAutoscrollFrame = () => {
+    autoscrollRaf = null
+    if (!isDragging()) return
+
+    const container = findScrollContainer(
+      autoscrollPointerX,
+      autoscrollPointerY
+    )
+    if (!container) return
+
+    const rect = container.getBoundingClientRect()
+    const y = autoscrollPointerY
+    let speed = 0
+    if (y < rect.top + AUTOSCROLL_ZONE) {
+      const prox = Math.max(
+        0,
+        (rect.top + AUTOSCROLL_ZONE - y) / AUTOSCROLL_ZONE
+      )
+      speed = -(
+        AUTOSCROLL_MIN_SPEED +
+        (AUTOSCROLL_MAX_SPEED - AUTOSCROLL_MIN_SPEED) * prox
+      )
+    } else if (y > rect.bottom - AUTOSCROLL_ZONE) {
+      const prox = Math.max(
+        0,
+        (y - (rect.bottom - AUTOSCROLL_ZONE)) / AUTOSCROLL_ZONE
+      )
+      speed =
+        AUTOSCROLL_MIN_SPEED +
+        (AUTOSCROLL_MAX_SPEED - AUTOSCROLL_MIN_SPEED) * prox
+    }
+
+    if (speed !== 0) {
+      container.scrollTop += speed
+      // Keep the loop alive while inside an edge zone.
+      autoscrollRaf = requestAnimationFrame(runAutoscrollFrame)
+    }
+  }
+
+  const updateAutoscroll = (clientX: number, clientY: number) => {
+    if (!isDragging()) return
+    autoscrollPointerX = clientX
+    autoscrollPointerY = clientY
+    if (autoscrollRaf === null) {
+      autoscrollRaf = requestAnimationFrame(runAutoscrollFrame)
+    }
+  }
+
   const DETACH_THRESHOLD_SQ = 35 * 35
 
   // Drop zones registry
@@ -331,6 +424,11 @@ export function DragProvider(props: { children: JSX.Element }) {
     document.addEventListener("pointerup", handlePointerUp)
     document.addEventListener("keydown", handleKeyDown)
 
+    // Suppress horizontal scrollbar flicker during drag: the fixed-position
+    // ghost and in-flight FLIP transforms can momentarily extend scrollWidth.
+    const scrollContainer = document.getElementById("gdl-content-wrapper")
+    scrollContainer?.classList.add("gdl-dragging-no-x")
+
     const handleScroll = () => {
       if (hasDragStarted() && dragDetached()) {
         const pos = ghostPosition()
@@ -390,6 +488,8 @@ export function DragProvider(props: { children: JSX.Element }) {
         }
         setDropTarget(resolved)
       }
+
+      updateAutoscroll(e.clientX, e.clientY)
     }
   }
 
@@ -530,6 +630,10 @@ export function DragProvider(props: { children: JSX.Element }) {
       scrollCleanup()
       scrollCleanup = null
     }
+    stopAutoscroll()
+    document
+      .getElementById("gdl-content-wrapper")
+      ?.classList.remove("gdl-dragging-no-x")
   }
 
   const updateDrag = (e: PointerEvent) => {

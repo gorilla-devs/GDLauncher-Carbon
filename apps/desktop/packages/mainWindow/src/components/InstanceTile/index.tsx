@@ -60,11 +60,6 @@ const InstanceTile = (props: {
       ? props.instance.status.value
       : undefined
 
-  const invalidInstance = () =>
-    props.instance.status.status === "invalid"
-      ? props.instance.status.value
-      : undefined
-
   const inactiveState = () => getInactiveState(validInstance()?.state)
   const isQueuedState = () => getQueuedState(validInstance()?.state)
   const isPreparingState = () => getPreparingState(validInstance()?.state)

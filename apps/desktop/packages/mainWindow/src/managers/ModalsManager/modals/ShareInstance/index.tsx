@@ -122,6 +122,13 @@ function ShareInstance(props: ModalProps) {
   })
 
   const [copyMode, setCopyMode] = createSignal<"code" | "link">("code")
+  const copyDisplay = createMemo(() => {
+    const obj = shareObject()
+    if (!obj) return ""
+    return copyMode() === "link"
+      ? `https://.../${obj.share_code}`
+      : obj.share_code
+  })
   const copyValue = createMemo(() => {
     const obj = shareObject()
     if (!obj) return ""
@@ -329,7 +336,8 @@ function ShareInstance(props: ModalProps) {
               <div class="flex items-stretch gap-2">
                 <CopyText
                   size="large"
-                  value={copyValue()}
+                  value={copyDisplay()}
+                  copyValue={copyValue()}
                   onCopy={() =>
                     toast.success(t("general:_trn_general_copied_to_clipboard"))
                   }

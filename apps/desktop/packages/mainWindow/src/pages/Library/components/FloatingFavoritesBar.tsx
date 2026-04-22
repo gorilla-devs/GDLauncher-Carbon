@@ -21,6 +21,7 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
+  Spinner,
   Tooltip,
   TooltipContent,
   TooltipTrigger
@@ -801,7 +802,7 @@ function DockAvatar(props: DockAvatarProps) {
                 <div
                   class="group relative h-12 w-12 shrink-0 cursor-pointer rounded-full transition-all duration-200 hover:scale-110"
                   classList={{
-                    "opacity-50": isBusy() || isDeleting(),
+                    "opacity-50": isDeleting(),
                     "ring-2 ring-green-500": isRunning(),
                     "scale-110": isMenuOpen(),
                     "opacity-0 pointer-events-none": isBeingDragged()
@@ -834,6 +835,13 @@ function DockAvatar(props: DockAvatarProps) {
                   <Show when={isRunning()}>
                     <div class="absolute -top-0.5 -right-0.5">
                       <div class="h-3 w-3 rounded-full bg-green-500 animate-pulse shadow-lg shadow-green-500/50" />
+                    </div>
+                  </Show>
+
+                  {/* Launching / busy spinner overlay */}
+                  <Show when={isBusy() && !isDeleting()}>
+                    <div class="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 z-10">
+                      <Spinner class="h-6 w-6" />
                     </div>
                   </Show>
 

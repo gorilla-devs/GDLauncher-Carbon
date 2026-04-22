@@ -68,23 +68,27 @@ export function useDragLayoutAnimation(
         const grid = gridRef()
         if (!grid) return
 
-        // DOM has been updated by SolidJS.
-        // getBoundingClientRect forces reflow → new layout positions.
+        // Phase 1: batch READS. Reading getBoundingClientRect between writes
+        // thrashes layout (O(n) reflows); reading all first keeps it to one.
+        const pending: { el: HTMLElement; dx: number; dy: number }[] = []
         for (const child of grid.children) {
           if (!(child instanceof HTMLElement)) continue
-          // Skip DropPreviewTile and hidden (dragged) tiles
           if (child.dataset.dropPreview !== undefined) continue
           if (child.classList.contains("hidden")) continue
 
           const oldRect = savedPositions.get(child)
-          if (!oldRect) continue // New element, skip
+          if (!oldRect) continue
 
           const newRect = child.getBoundingClientRect()
           const dx = oldRect.left - newRect.left
           const dy = oldRect.top - newRect.top
           if (Math.abs(dx) < 2 && Math.abs(dy) < 2) continue
+          pending.push({ el: child, dx, dy })
+        }
 
-          const anim = child.animate(
+        // Phase 2: batch WRITES.
+        for (const { el, dx, dy } of pending) {
+          const anim = el.animate(
             [
               { transform: `translate(${dx}px, ${dy}px)` },
               { transform: "translate(0, 0)" }
@@ -94,9 +98,9 @@ export function useDragLayoutAnimation(
               easing: ANIMATION.DRAG_LAYOUT_EASING
             }
           )
-          activeAnimations.set(child, anim)
-          anim.onfinish = () => activeAnimations.delete(child)
-          anim.oncancel = () => activeAnimations.delete(child)
+          activeAnimations.set(el, anim)
+          anim.onfinish = () => activeAnimations.delete(el)
+          anim.oncancel = () => activeAnimations.delete(el)
         }
 
         savedPositions = new Map()

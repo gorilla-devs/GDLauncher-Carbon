@@ -1381,11 +1381,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     /// This is a one-off arrange operation that reassigns library positions.
     /// Used in folders mode only (instancesGroupBy = null).
     pub async fn arrange_library(self, sort_by: LibrarySortCriteria) -> anyhow::Result<()> {
-        use db::instance::{SetParam, UniqueWhereParam, WhereParam};
-        use db::instance_group::{
-            SetParam as GroupSetParam, UniqueWhereParam as GroupUniqueWhereParam,
-        };
-
         let default_group_id = self.get_default_group().await?;
 
         // Lock indexes while we're changing them
@@ -1396,16 +1391,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .app
             .prisma_client
             .instance()
-            .find_many(vec![WhereParam::GroupId(IntFilter::Equals(
-                *default_group_id,
-            ))])
+            .find_many(vec![db::instance::group_id::equals(*default_group_id)])
             .exec()
             .await?;
 
         // Get instance data for sorting
         let active_instances = self.instances.read().await;
 
-        // Build a sortable list of (instance_id, sort_key)
+        // Build a sortable list of (instance_id, name, last_played, seconds_played)
         let mut sortable_instances: Vec<(i32, String, Option<DateTime<Utc>>, u32)> = instances
             .iter()
             .map(|inst| {
@@ -1450,20 +1443,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
         }
 
-        // Update indices for all instances
-        let mut updates = Vec::new();
-        for (new_index, (instance_id, _, _, _)) in sortable_instances.iter().enumerate() {
-            updates.push(self.app.prisma_client.instance().update(
-                UniqueWhereParam::IdEquals(*instance_id),
-                vec![SetParam::SetIndex(new_index as i32)],
-            ));
-        }
-
-        if !updates.is_empty() {
-            self.app.prisma_client._batch(updates).await?;
-        }
-
-        // Now sort the groups (folders) by the same criteria
+        // Fetch and sort non-default groups (folders) by name. They appear
+        // after ungrouped instances in the library listing.
         let groups = self
             .app
             .prisma_client
@@ -1472,35 +1453,58 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .exec()
             .await?;
 
-        // Filter out the default group and sort the rest
         let mut sortable_groups: Vec<(i32, String)> = groups
             .iter()
             .filter(|g| g.id != *default_group_id)
             .map(|g| (g.id, g.name.clone()))
             .collect();
-
-        // Sort groups by name (primary sort for folders)
         sortable_groups.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
 
-        // Update group indices (default group stays at index 0)
+        // Folders always come first in the library, followed by ungrouped
+        // instances. The frontend enforces the folders-first rule at sort
+        // time; we mirror it here so the DB positions agree with what the
+        // user sees.
+        //
+        // The frontend sorts top-level items by `library_position ?? index`
+        // (or `libraryPosition ?? 10000` for folders). Writing `index`
+        // alone is invisible whenever `library_position` is set, so we
+        // stamp both: positions `0..M-1` for folders, `M..M+N-1` for
+        // ungrouped instances.
         let mut group_updates = Vec::new();
-
-        // Update default group to index 0
+        // Default group has no library_position (it's not rendered as a
+        // top-level folder); keep group_index at 0 as before.
         group_updates.push(self.app.prisma_client.instance_group().update(
-            GroupUniqueWhereParam::IdEquals(*default_group_id),
-            vec![GroupSetParam::SetGroupIndex(0)],
+            db::instance_group::UniqueWhereParam::IdEquals(*default_group_id),
+            vec![db::instance_group::group_index::set(0)],
         ));
-
-        // Update other groups starting at index 1
-        for (new_index, (group_id, _)) in sortable_groups.iter().enumerate() {
+        for (i, (group_id, _)) in sortable_groups.iter().enumerate() {
+            let p = i as i32;
             group_updates.push(self.app.prisma_client.instance_group().update(
-                GroupUniqueWhereParam::IdEquals(*group_id),
-                vec![GroupSetParam::SetGroupIndex((new_index + 1) as i32)],
+                db::instance_group::UniqueWhereParam::IdEquals(*group_id),
+                vec![
+                    db::instance_group::group_index::set((i + 1) as i32),
+                    db::instance_group::library_position::set(Some(p)),
+                ],
             ));
         }
-
         if !group_updates.is_empty() {
             self.app.prisma_client._batch(group_updates).await?;
+        }
+
+        let instance_base = sortable_groups.len() as i32;
+        let mut updates = Vec::new();
+        for (i, (instance_id, _, _, _)) in sortable_instances.iter().enumerate() {
+            let p = instance_base + i as i32;
+            updates.push(self.app.prisma_client.instance().update(
+                db::instance::UniqueWhereParam::IdEquals(*instance_id),
+                vec![
+                    db::instance::index::set(p),
+                    db::instance::library_position::set(Some(p)),
+                ],
+            ));
+        }
+        if !updates.is_empty() {
+            self.app.prisma_client._batch(updates).await?;
         }
 
         self.app.invalidate(GET_GROUPS, None);
@@ -1606,7 +1610,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         shortpath: String,
         group: GroupId,
     ) -> anyhow::Result<InstanceId> {
-        use db::instance::{SetParam, WhereParam};
         use db::instance_group::UniqueWhereParam;
 
         // Materialize the default group before taking index_lock via
@@ -1615,48 +1618,50 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let index = self.next_instance_index(group).await?;
         let library_position = if group == default_group_id {
-            // Find the next library position
-            let max_instance_pos: Option<i32> = self
+            // New instances/folders appear at the top of the library.
+            // Pick a value strictly smaller than every existing
+            // library_position across both ungrouped instances and groups.
+            let min_instance_pos: Option<i32> = self
                 .app
                 .prisma_client
                 .instance()
                 .find_first(vec![
-                    WhereParam::GroupId(IntFilter::Equals(*default_group_id)),
-                    WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(None)),
+                    db::instance::group_id::equals(*default_group_id),
+                    db::instance::library_position::not(None),
                 ])
                 .order_by(db::instance::OrderByParam::LibraryPosition(
-                    carbon_repos::pcr::Direction::Desc,
+                    carbon_repos::pcr::Direction::Asc,
                 ))
                 .exec()
                 .await?
                 .and_then(|i| i.library_position);
 
-            let max_group_pos: Option<i32> = self
+            let min_group_pos: Option<i32> = self
                 .app
                 .prisma_client
                 .instance_group()
-                .find_first(vec![db::instance_group::WhereParam::LibraryPosition(
-                    db::read_filters::IntNullableFilter::Not(None),
-                )])
+                .find_first(vec![db::instance_group::library_position::not(None)])
                 .order_by(db::instance_group::OrderByParam::LibraryPosition(
-                    carbon_repos::pcr::Direction::Desc,
+                    carbon_repos::pcr::Direction::Asc,
                 ))
                 .exec()
                 .await?
                 .and_then(|g| g.library_position);
 
-            Some(
-                max_instance_pos
-                    .unwrap_or(0)
-                    .max(max_group_pos.unwrap_or(0))
-                    + 1,
-            )
+            let current_min = match (min_instance_pos, min_group_pos) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+
+            Some(current_min.map(|n| n - 1).unwrap_or(0))
         } else {
             None
         };
 
         let create_params = match library_position {
-            Some(pos) => vec![SetParam::SetLibraryPosition(Some(pos))],
+            Some(pos) => vec![db::instance::library_position::set(Some(pos))],
             None => vec![],
         };
 
@@ -1668,9 +1673,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 self.app
                     .prisma_client
                     .instance()
-                    .delete_many(vec![WhereParam::Shortpath(StringFilter::Equals(
-                        shortpath.clone(),
-                    ))]),
+                    .delete_many(vec![db::instance::shortpath::equals(shortpath.clone())]),
                 self.app.prisma_client.instance().create(
                     name,
                     shortpath,
@@ -2880,20 +2883,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     async fn next_instance_index(self, group: GroupId) -> anyhow::Result<IdLock<'s, i32>> {
-        use db::instance::WhereParam;
-
         let guard = self.manager.index_lock.lock().await;
 
-        let count = self
+        // Newly created instances appear at the TOP of their group, so we
+        // pick an index strictly smaller than the current minimum. Sort is
+        // ascending on `index`, so a smaller value sorts first.
+        let min_index: Option<i32> = self
             .app
             .prisma_client
             .instance()
-            .count(vec![WhereParam::GroupId(IntFilter::Equals(*group))])
+            .find_first(vec![db::instance::group_id::equals(*group)])
+            .order_by(db::instance::OrderByParam::Index(
+                carbon_repos::pcr::Direction::Asc,
+            ))
             .exec()
-            .await?;
+            .await?
+            .map(|i| i.index);
 
         Ok(IdLock {
-            value: count as i32,
+            value: min_index.map(|n| n - 1).unwrap_or(0),
             guard,
         })
     }

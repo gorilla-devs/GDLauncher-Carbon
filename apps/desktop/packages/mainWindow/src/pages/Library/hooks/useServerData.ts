@@ -202,8 +202,13 @@ function computeServerLibraryItems(
     }
   }
 
-  // Sort by libraryPosition
+  // Folders always come before ungrouped servers, regardless of
+  // libraryPosition. Within each bucket, sort ascending by libraryPosition
+  // (falling back to index for servers).
   items.sort((a, b) => {
+    const aFolder = a.type === "folder"
+    const bFolder = b.type === "folder"
+    if (aFolder !== bFolder) return aFolder ? -1 : 1
     const getKey = (item: LibraryItem) => {
       if (item.type === "server") {
         return item.data.libraryPosition ?? item.data.index

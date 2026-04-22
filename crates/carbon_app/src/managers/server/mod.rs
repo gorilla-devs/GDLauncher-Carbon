@@ -282,19 +282,79 @@ impl ManagerRef<'_, ServerManager> {
             .await
             .context("Failed to create server directory")?;
 
-        // Hold index_lock to make count+create atomic
+        // Hold index_lock to make lookup+create atomic
         let _index_guard = self.index_lock.lock().await;
 
-        // Get next index
-        let count = self
+        // Newly created servers appear at the TOP of their group — pick an
+        // index strictly smaller than the current minimum so ascending
+        // sort on `index` puts the new row first.
+        let min_index: Option<i32> = self
             .app
             .prisma_client
             .server()
-            .count(vec![db::server::group_id::equals(group_id.0)])
+            .find_first(vec![db::server::group_id::equals(group_id.0)])
+            .order_by(db::server::OrderByParam::Index(Direction::Asc))
             .exec()
-            .await? as i32;
+            .await?
+            .map(|s| s.index);
+        let next_index = min_index.map(|n| n - 1).unwrap_or(0);
+
+        // If the new server is in the default group, also give it a
+        // library_position that sorts above every existing server or
+        // folder at the library's top level.
+        let default_group_id = self.clone().get_default_group().await?;
+        let library_position = if group_id == default_group_id {
+            let min_server_pos: Option<i32> = self
+                .app
+                .prisma_client
+                .server()
+                .find_first(vec![
+                    db::server::group_id::equals(default_group_id.0),
+                    db::server::library_position::not(None),
+                ])
+                .order_by(db::server::OrderByParam::LibraryPosition(Direction::Asc))
+                .exec()
+                .await?
+                .and_then(|s| s.library_position);
+
+            let min_group_pos: Option<i32> = self
+                .app
+                .prisma_client
+                .server_group()
+                .find_first(vec![db::server_group::library_position::not(None)])
+                .order_by(db::server_group::OrderByParam::LibraryPosition(
+                    Direction::Asc,
+                ))
+                .exec()
+                .await?
+                .and_then(|g| g.library_position);
+
+            let current_min = match (min_server_pos, min_group_pos) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+            Some(current_min.map(|n| n - 1).unwrap_or(0))
+        } else {
+            None
+        };
 
         // Create DB record
+        let mut extra_params = vec![
+            db::server::port::set(port),
+            db::server::modloader_type::set(modloader_type.clone()),
+            db::server::modloader_version::set(modloader_version.clone()),
+            db::server::server_type::set(if modloader_type.is_some() {
+                "modded".to_string()
+            } else {
+                "vanilla".to_string()
+            }),
+        ];
+        if let Some(pos) = library_position {
+            extra_params.push(db::server::library_position::set(Some(pos)));
+        }
+
         let db_server = self
             .app
             .prisma_client
@@ -302,19 +362,10 @@ impl ManagerRef<'_, ServerManager> {
             .create(
                 name.clone(),
                 shortpath.clone(),
-                count,
+                next_index,
                 db::server_group::id::equals(group_id.0),
                 game_version.clone(),
-                vec![
-                    db::server::port::set(port),
-                    db::server::modloader_type::set(modloader_type.clone()),
-                    db::server::modloader_version::set(modloader_version.clone()),
-                    db::server::server_type::set(if modloader_type.is_some() {
-                        "modded".to_string()
-                    } else {
-                        "vanilla".to_string()
-                    }),
-                ],
+                extra_params,
             )
             .exec()
             .await?;
@@ -494,17 +545,71 @@ impl ManagerRef<'_, ServerManager> {
             ),
         };
 
-        // Hold index_lock to make count+create atomic
+        // Hold index_lock to make lookup+create atomic
         let _index_guard = self.index_lock.lock().await;
 
-        // Get next index
-        let count = self
+        // Top-of-group insertion: pick an index smaller than the current min
+        let min_index: Option<i32> = self
             .app
             .prisma_client
             .server()
-            .count(vec![db::server::group_id::equals(group_id.0)])
+            .find_first(vec![db::server::group_id::equals(group_id.0)])
+            .order_by(db::server::OrderByParam::Index(Direction::Asc))
             .exec()
-            .await? as i32;
+            .await?
+            .map(|s| s.index);
+        let next_index = min_index.map(|n| n - 1).unwrap_or(0);
+
+        // If placing in the default group, also bump library_position to
+        // sort above all existing top-level items.
+        let default_group_id = self.clone().get_default_group().await?;
+        let library_position = if group_id == default_group_id {
+            let min_server_pos: Option<i32> = self
+                .app
+                .prisma_client
+                .server()
+                .find_first(vec![
+                    db::server::group_id::equals(default_group_id.0),
+                    db::server::library_position::not(None),
+                ])
+                .order_by(db::server::OrderByParam::LibraryPosition(Direction::Asc))
+                .exec()
+                .await?
+                .and_then(|s| s.library_position);
+
+            let min_group_pos: Option<i32> = self
+                .app
+                .prisma_client
+                .server_group()
+                .find_first(vec![db::server_group::library_position::not(None)])
+                .order_by(db::server_group::OrderByParam::LibraryPosition(
+                    Direction::Asc,
+                ))
+                .exec()
+                .await?
+                .and_then(|g| g.library_position);
+
+            let current_min = match (min_server_pos, min_group_pos) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+            Some(current_min.map(|n| n - 1).unwrap_or(0))
+        } else {
+            None
+        };
+
+        let mut extra_params = vec![
+            db::server::port::set(port),
+            db::server::server_type::set("modded".to_string()),
+            db::server::modpack_platform::set(Some(modpack_platform)),
+            db::server::modpack_project_id::set(Some(modpack_project_id)),
+            db::server::modpack_file_id::set(Some(modpack_file_id)),
+        ];
+        if let Some(pos) = library_position {
+            extra_params.push(db::server::library_position::set(Some(pos)));
+        }
 
         // Create DB record with a placeholder game_version — will be updated after processing
         let db_server = self
@@ -514,16 +619,10 @@ impl ManagerRef<'_, ServerManager> {
             .create(
                 name.clone(),
                 shortpath.clone(),
-                count,
+                next_index,
                 db::server_group::id::equals(group_id.0),
                 "unknown".to_string(),
-                vec![
-                    db::server::port::set(port),
-                    db::server::server_type::set("modded".to_string()),
-                    db::server::modpack_platform::set(Some(modpack_platform)),
-                    db::server::modpack_project_id::set(Some(modpack_project_id)),
-                    db::server::modpack_file_id::set(Some(modpack_file_id)),
-                ],
+                extra_params,
             )
             .exec()
             .await?;
@@ -2900,11 +2999,6 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn arrange_server_library(self) -> anyhow::Result<()> {
-        use db::server::{SetParam, UniqueWhereParam, WhereParam};
-        use db::server_group::{
-            SetParam as GroupSetParam, UniqueWhereParam as GroupUniqueWhereParam,
-        };
-
         let default_group_id = self.get_default_group().await?;
 
         let _index_lock = self.index_lock.lock().await;
@@ -2914,30 +3008,16 @@ impl ManagerRef<'_, ServerManager> {
             .app
             .prisma_client
             .server()
-            .find_many(vec![WhereParam::GroupId(IntFilter::Equals(
-                default_group_id.0,
-            ))])
+            .find_many(vec![db::server::group_id::equals(default_group_id.0)])
             .exec()
             .await?;
 
         let mut sortable_servers: Vec<(i32, String)> =
             servers.iter().map(|s| (s.id, s.name.clone())).collect();
-
         sortable_servers.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
 
-        let mut updates = Vec::new();
-        for (new_index, (server_id, _)) in sortable_servers.iter().enumerate() {
-            updates.push(self.app.prisma_client.server().update(
-                UniqueWhereParam::IdEquals(*server_id),
-                vec![SetParam::SetIndex(new_index as i32)],
-            ));
-        }
-
-        if !updates.is_empty() {
-            self.app.prisma_client._batch(updates).await?;
-        }
-
-        // Sort groups by name
+        // Non-default server groups, sorted by name — rendered after
+        // ungrouped servers in the library.
         let groups = self
             .app
             .prisma_client
@@ -2951,25 +3031,46 @@ impl ManagerRef<'_, ServerManager> {
             .filter(|g| g.id != default_group_id.0)
             .map(|g| (g.id, g.name.clone()))
             .collect();
-
         sortable_groups.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
 
+        // Folders always come first, followed by ungrouped servers.
+        // Frontend sorts top-level items by `libraryPosition ?? index`
+        // (or `libraryPosition ?? 10000` for folders). Writing only
+        // `index` leaves drag-reordered rows frozen. Stamp both fields so
+        // the new order is visible whether library_position is set or not.
         let mut group_updates = Vec::new();
-
         group_updates.push(self.app.prisma_client.server_group().update(
-            GroupUniqueWhereParam::IdEquals(default_group_id.0),
-            vec![GroupSetParam::SetGroupIndex(0)],
+            db::server_group::UniqueWhereParam::IdEquals(default_group_id.0),
+            vec![db::server_group::group_index::set(0)],
         ));
-
-        for (new_index, (group_id, _)) in sortable_groups.iter().enumerate() {
+        for (i, (group_id, _)) in sortable_groups.iter().enumerate() {
+            let p = i as i32;
             group_updates.push(self.app.prisma_client.server_group().update(
-                GroupUniqueWhereParam::IdEquals(*group_id),
-                vec![GroupSetParam::SetGroupIndex((new_index + 1) as i32)],
+                db::server_group::UniqueWhereParam::IdEquals(*group_id),
+                vec![
+                    db::server_group::group_index::set((i + 1) as i32),
+                    db::server_group::library_position::set(Some(p)),
+                ],
             ));
         }
-
         if !group_updates.is_empty() {
             self.app.prisma_client._batch(group_updates).await?;
+        }
+
+        let server_base = sortable_groups.len() as i32;
+        let mut updates = Vec::new();
+        for (i, (server_id, _)) in sortable_servers.iter().enumerate() {
+            let p = server_base + i as i32;
+            updates.push(self.app.prisma_client.server().update(
+                db::server::UniqueWhereParam::IdEquals(*server_id),
+                vec![
+                    db::server::index::set(p),
+                    db::server::library_position::set(Some(p)),
+                ],
+            ));
+        }
+        if !updates.is_empty() {
+            self.app.prisma_client._batch(updates).await?;
         }
 
         self.app.invalidate(GET_GROUPS, None);

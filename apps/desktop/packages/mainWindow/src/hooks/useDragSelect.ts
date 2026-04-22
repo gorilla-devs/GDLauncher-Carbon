@@ -21,6 +21,10 @@ interface UseDragSelectOptions {
   getItemRects: () => Map<string, DOMRect>
   getExistingSelection?: () => Set<string>
   minDragDistance?: number
+  /** Optional top clip in viewport coordinates. If provided, the selection
+   *  rect (and autoscroll target zone) are clamped so they never extend
+   *  above this Y. Used to keep the rubber-band below a sticky header. */
+  getTopBoundary?: () => number | undefined
 }
 
 const AUTO_SCROLL_EDGE_PX = 40
@@ -79,8 +83,9 @@ export function useDragSelect(options: UseDragSelectOptions) {
     // Clip to container bounds so the rect and hit-testing stay inside
     if (container) {
       const bounds = container.getBoundingClientRect()
+      const topBoundary = options.getTopBoundary?.() ?? bounds.top
       const left = Math.max(raw.left, bounds.left)
-      const top = Math.max(raw.top, bounds.top)
+      const top = Math.max(raw.top, Math.max(bounds.top, topBoundary))
       const right = Math.min(raw.left + raw.width, bounds.right)
       const bottom = Math.min(raw.top + raw.height, bounds.bottom)
 
@@ -150,12 +155,16 @@ export function useDragSelect(options: UseDragSelectOptions) {
 
     const containerRect = container.getBoundingClientRect()
     const mouseY = lastMouseY
+    const topEdge = Math.max(
+      containerRect.top,
+      options.getTopBoundary?.() ?? containerRect.top
+    )
 
     let scrollAmount = 0
 
-    if (mouseY < containerRect.top + AUTO_SCROLL_EDGE_PX) {
+    if (mouseY < topEdge + AUTO_SCROLL_EDGE_PX) {
       // Near or above top edge — scroll up
-      const distance = containerRect.top + AUTO_SCROLL_EDGE_PX - mouseY
+      const distance = topEdge + AUTO_SCROLL_EDGE_PX - mouseY
       scrollAmount = -Math.min(
         Math.ceil((distance / AUTO_SCROLL_EDGE_PX) * AUTO_SCROLL_MAX_SPEED),
         AUTO_SCROLL_MAX_SPEED

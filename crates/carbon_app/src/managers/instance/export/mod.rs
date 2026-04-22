@@ -597,28 +597,28 @@ impl ManagerRef<'_, InstanceExportManager> {
             .wait_for_share_instance(gdl_account_uuid.clone(), file_key)
             .await?;
 
-        // Upload instance background if available. Transient failures (network,
-        // unknown) are best-effort — the share stays. A content-moderation or
-        // format rejection of the background fails the whole share and we roll
-        // back the just-created share so the user can try again with a
-        // different background.
+        // Upload instance background if available. The icon is reused as the
+        // share background, but the user didn't necessarily choose it with
+        // sharing in mind — so format/size issues are downgraded to a warning
+        // and the share stays. Only content-moderation signals roll back the
+        // share, since those indicate the uploaded image itself is not
+        // acceptable and the user should reshare with a different icon.
         if let Some(instance_id) = instance_id {
             if let Err(e) = self
                 .upload_instance_background(&gdl_account_uuid, &response.share_code, instance_id)
                 .await
             {
-                let is_rejection = e.downcast_ref::<InstanceShareError>().is_some_and(|se| {
-                    matches!(
-                        se,
-                        InstanceShareError::ImageRejectedByModeration
-                            | InstanceShareError::ModerationUnavailable
-                            | InstanceShareError::ModerationRateLimited
-                            | InstanceShareError::ImageTooLarge
-                            | InstanceShareError::InvalidImageFormat
-                    )
-                });
+                let is_moderation_rejection =
+                    e.downcast_ref::<InstanceShareError>().is_some_and(|se| {
+                        matches!(
+                            se,
+                            InstanceShareError::ImageRejectedByModeration
+                                | InstanceShareError::ModerationUnavailable
+                                | InstanceShareError::ModerationRateLimited
+                        )
+                    });
 
-                if is_rejection {
+                if is_moderation_rejection {
                     if let Err(del_err) = self
                         .app
                         .account_manager()

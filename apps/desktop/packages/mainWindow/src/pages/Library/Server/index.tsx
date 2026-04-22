@@ -1,4 +1,4 @@
-import { Button } from "@gd/ui"
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { useLocation, useParams } from "@solidjs/router"
 import { Match, Show, Switch, createEffect, createMemo } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -220,22 +220,35 @@ const Server = (props: { children?: any }) => {
       headerActions={
         <>
           <Show when={details()}>
-            <Button
-              rounded
-              size="small"
-              type="transparent"
-              onClick={() =>
-                setFavoriteMutation.mutate({
-                  id: serverId(),
-                  favorite: !details()!.favorite
-                })
-              }
-            >
-              <div
-                class="i-hugeicons:star text-xl"
-                classList={{ "text-yellow-500": details()!.favorite }}
-              />
-            </Button>
+            <Tooltip placement="bottom">
+              <TooltipTrigger as="div">
+                <Button
+                  rounded
+                  size="small"
+                  type="transparent"
+                  onClick={() =>
+                    setFavoriteMutation.mutate({
+                      id: serverId(),
+                      favorite: !details()!.favorite
+                    })
+                  }
+                >
+                  <div
+                    class="i-hugeicons:star text-xl"
+                    classList={{ "text-yellow-500": details()!.favorite }}
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans
+                  key={
+                    details()!.favorite
+                      ? "instances:_trn_remove_favorite"
+                      : "instances:_trn_add_favorite"
+                  }
+                />
+              </TooltipContent>
+            </Tooltip>
           </Show>
           <Button
             uppercase
@@ -275,21 +288,34 @@ const Server = (props: { children?: any }) => {
       }}
       onBackClick={() => navigator.navigate("/library?mode=servers")}
       stickyRightButton={
-        <Button
-          size="small"
-          variant={isRunning() ? "red" : undefined}
-          loading={isBusy()}
-          onClick={handleStartStop}
-        >
-          <Switch>
-            <Match when={isRunning()}>
-              <div class="i-hugeicons:stop text-xl" />
-            </Match>
-            <Match when={true}>
-              <div class="i-hugeicons:play text-xl" />
-            </Match>
-          </Switch>
-        </Button>
+        <Tooltip placement="bottom">
+          <TooltipTrigger as="div">
+            <Button
+              size="small"
+              variant={isRunning() ? "red" : undefined}
+              loading={isBusy()}
+              onClick={handleStartStop}
+            >
+              <Switch>
+                <Match when={isRunning()}>
+                  <div class="i-hugeicons:stop text-xl" />
+                </Match>
+                <Match when={true}>
+                  <div class="i-hugeicons:play text-xl" />
+                </Match>
+              </Switch>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <Trans
+              key={
+                isRunning()
+                  ? "instances:_trn_server_action_stop"
+                  : "instances:_trn_server_action_start"
+              }
+            />
+          </TooltipContent>
+        </Tooltip>
       }
       noPaddingPaths={["/addons"]}
       isFullScreen={isConsoleFullScreen}

@@ -48,6 +48,21 @@ export function LibraryHeader(props: LibraryHeaderProps) {
   const arrangeLibraryMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.arrangeLibrary"]
   }))
+  const arrangeServerLibraryMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.arrangeServerLibrary"]
+  }))
+
+  // Server arrange currently only supports sort-by-name, so instance-only
+  // criteria (lastPlayed, mostPlayed) aren't offered in server mode.
+  const arrange = (
+    criteria: "name" | "lastPlayed" | "mostPlayed" | "dateCreated"
+  ) => {
+    if (isServerMode()) {
+      arrangeServerLibraryMutation.mutate(undefined)
+    } else {
+      arrangeLibraryMutation.mutate(criteria)
+    }
+  }
 
   const isServerMode = () => props.libraryMode() === "servers"
 
@@ -148,7 +163,10 @@ export function LibraryHeader(props: LibraryHeaderProps) {
   }
 
   return (
-    <div class="bg-darkSlate-800 z-5 sticky top-0 -mx-6 flex items-center gap-4 px-6 py-4">
+    <div
+      data-library-header
+      class="bg-darkSlate-800 z-5 sticky top-0 -mx-6 flex items-center gap-4 px-6 py-4"
+    >
       {/* Library Mode Toggle */}
       <Tabs
         value={props.libraryMode()}
@@ -408,35 +426,27 @@ export function LibraryHeader(props: LibraryHeaderProps) {
               <Trans key="instances:_trn_rearrange" />
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => arrangeLibraryMutation.mutate("name")}
-            >
+            <DropdownMenuItem onClick={() => arrange("name")}>
               <div class="flex items-center gap-2">
                 <div class="i-hugeicons:text h-4 w-4" />
                 <Trans key="ui:_trn_by_name" />
               </div>
             </DropdownMenuItem>
             <Show when={!isServerMode()}>
-              <DropdownMenuItem
-                onClick={() => arrangeLibraryMutation.mutate("lastPlayed")}
-              >
+              <DropdownMenuItem onClick={() => arrange("lastPlayed")}>
                 <div class="flex items-center gap-2">
                   <div class="i-hugeicons:clock-01 h-4 w-4" />
                   <Trans key="ui:_trn_by_last_played" />
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => arrangeLibraryMutation.mutate("mostPlayed")}
-              >
+              <DropdownMenuItem onClick={() => arrange("mostPlayed")}>
                 <div class="flex items-center gap-2">
                   <div class="i-hugeicons:time-02 h-4 w-4" />
                   <Trans key="ui:_trn_by_most_played" />
                 </div>
               </DropdownMenuItem>
             </Show>
-            <DropdownMenuItem
-              onClick={() => arrangeLibraryMutation.mutate("dateCreated")}
-            >
+            <DropdownMenuItem onClick={() => arrange("dateCreated")}>
               <div class="flex items-center gap-2">
                 <div class="i-hugeicons:calendar-add-01 h-4 w-4" />
                 <Trans key="ui:_trn_by_date_created" />
