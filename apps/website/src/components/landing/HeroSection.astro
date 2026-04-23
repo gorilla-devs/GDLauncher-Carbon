@@ -77,19 +77,18 @@ import HeroDownload from "./HeroDownload"
 <script>
   import vanilla from "vanilla-tilt"
 
-  document.addEventListener(
-    "astro:page-load",
-    () => {
-      const parallaxEl = document.querySelector(".parallax") as HTMLElement
-      if (parallaxEl) {
-        vanilla.init(parallaxEl, {
-          max: 5,
-          speed: 400,
-          glare: true,
-          "max-glare": 0.08
-        })
-      }
-    },
-    { once: true }
-  )
+  document.addEventListener("astro:page-load", () => {
+    const parallaxEl = document.querySelector(".parallax") as HTMLElement & {
+      vanillaTilt?: { destroy: () => void }
+    } | null
+    if (parallaxEl) {
+      parallaxEl.vanillaTilt?.destroy()
+      vanilla.init(parallaxEl, {
+        max: 5,
+        speed: 400,
+        glare: true,
+        "max-glare": 0.08
+      })
+    }
+  })
 </script>

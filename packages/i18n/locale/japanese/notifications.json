@@ -6,5 +6,7 @@
   "_trn_server_from_modpack_success": "Modパックからサーバーを作成しました。",
   "_trn_server_from_modpack_error": "Modパックからのサーバー作成に失敗しました。",
   "_trn_cannot_delete_instance": "インスタンスを削除できません",
-  "_trn_custom_java_added": "カスタムJavaパスを追加しました"
+  "_trn_custom_java_added": "カスタムJavaパスを追加しました",
+  "_trn_addon_downloading_to_server": "{{title}} をサーバーにダウンロード中",
+  "_trn_addon_fallback_name": "アドオン"
 }

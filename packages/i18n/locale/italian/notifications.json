@@ -6,5 +6,7 @@
   "_trn_server_from_modpack_success": "Server creato dal modpack.",
   "_trn_server_from_modpack_error": "Errore nella creazione del server dal modpack.",
   "_trn_cannot_delete_instance": "Impossibile eliminare l'istanza",
-  "_trn_custom_java_added": "Percorso Java personalizzato aggiunto"
+  "_trn_custom_java_added": "Percorso Java personalizzato aggiunto",
+  "_trn_addon_downloading_to_server": "{{title}} in download sul server",
+  "_trn_addon_fallback_name": "Addon"
 }

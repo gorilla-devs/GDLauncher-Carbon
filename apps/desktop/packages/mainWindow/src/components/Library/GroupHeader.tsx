@@ -13,6 +13,7 @@ import {
 import { useDragContext } from "@/pages/Library/DragContext"
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
 
 interface GroupHeaderProps {
   groupId: number
@@ -26,6 +27,13 @@ const GroupHeader = (props: GroupHeaderProps) => {
   const [t] = useTransContext()
   const dragContext = useDragContext()
   const modals = useModal()
+  const globalStore = useGlobalStore()
+
+  const isServerGroup = createMemo(
+    () =>
+      globalStore.serverGroups.data?.some((g) => g.id === props.groupId) ??
+      false
+  )
 
   const [isEditing, setIsEditing] = createSignal(false)
   const [editValue, setEditValue] = createSignal("")
@@ -40,13 +48,15 @@ const GroupHeader = (props: GroupHeaderProps) => {
   }))
 
   // Check if this group is being dragged
-  const isBeingDragged = createMemo(
-    () =>
+  const isBeingDragged = createMemo(() => {
+    const dtype = dragContext.dragType()
+    return (
       dragContext.isDragging() &&
       dragContext.dragDetached() &&
-      dragContext.dragType() === "group" &&
+      (dtype === "group" || dtype === "serverGroup") &&
       dragContext.draggedIds().includes(props.groupId)
-  )
+    )
+  })
 
   // Start editing on double click
   const handleDoubleClick = (e: MouseEvent) => {
@@ -116,7 +126,11 @@ const GroupHeader = (props: GroupHeaderProps) => {
     if (props.isDefault) return // Can't drag default group
     e.stopPropagation()
     e.preventDefault()
-    dragContext.startDrag("group", [props.groupId], e)
+    dragContext.startDrag(
+      isServerGroup() ? "serverGroup" : "group",
+      [props.groupId],
+      e
+    )
   }
 
   return (

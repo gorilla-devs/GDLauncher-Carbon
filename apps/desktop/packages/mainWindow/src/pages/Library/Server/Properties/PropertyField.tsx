@@ -62,19 +62,17 @@ const PropertyField = (props: PropertyFieldProps) => {
         <Input
           type="number"
           value={props.value}
-          onInput={(e) => {
+          onInput={(e) => props.onChange(e.currentTarget.value)}
+          onBlur={(e) => {
             const val = e.currentTarget.value
-            if (
-              props.definition.min !== undefined &&
-              Number(val) < props.definition.min
-            )
-              return
-            if (
-              props.definition.max !== undefined &&
-              Number(val) > props.definition.max
-            )
-              return
-            props.onChange(val)
+            if (val === "") return
+            const num = Number(val)
+            if (Number.isNaN(num)) return
+            const { min, max } = props.definition
+            let clamped = num
+            if (min !== undefined && clamped < min) clamped = min
+            if (max !== undefined && clamped > max) clamped = max
+            if (clamped !== num) props.onChange(String(clamped))
           }}
         />
       </Show>

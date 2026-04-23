@@ -62,8 +62,8 @@ mod modpack;
 #[error("Minecraft needs {requested_mb} MB but only {available_mb} MB is available")]
 pub struct InsufficientMemoryError {
     pub instance_id: i32,
-    pub requested_mb: u16,
-    pub available_mb: u16,
+    pub requested_mb: u64,
+    pub available_mb: u64,
 }
 
 impl crate::error::FeErrorCode for InsufficientMemoryError {

@@ -300,7 +300,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 let available_bytes = app.system_info_manager()
                     .get_available_ram()
                     .await;
-                let available_mb = (available_bytes / 1024 / 1024) as u16;
+                let available_mb: u64 = available_bytes / 1024 / 1024;
 
                 // If we couldn't determine available RAM, skip the check
                 // and let the user launch normally.
@@ -308,12 +308,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     // JVM needs native memory beyond the heap for JIT compiler, thread
                     // stacks, metaspace, GC structures, direct buffers, etc.
                     // A 1500 MB buffer accounts for this overhead.
-                    let total_estimated_mb = xmx.saturating_add(1500);
+                    let total_estimated_mb: u64 = u64::from(xmx).saturating_add(1500);
 
                     if total_estimated_mb > available_mb {
                         return Err(crate::managers::instance::run::InsufficientMemoryError {
                             instance_id: args.id.0,
-                            requested_mb: xmx,
+                            requested_mb: u64::from(xmx),
                             available_mb,
                         }.into());
                     }

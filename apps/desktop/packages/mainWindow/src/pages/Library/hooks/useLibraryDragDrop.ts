@@ -283,6 +283,43 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
   }
 
   /**
+   * Handle server-group drop events.
+   */
+  const handleServerGroupDrop = (
+    target: DropTarget,
+    groupId: number
+  ): void => {
+    switch (target.type) {
+      case "beforeGroup": {
+        if (groupId !== target.groupId) {
+          moveServerGroupMutation.mutate({
+            group: groupId,
+            target: { beforeGroup: target.groupId }
+          })
+        }
+        break
+      }
+
+      case "beforeGroupAtInstance": {
+        moveServerGroupMutation.mutate({
+          group: groupId,
+          target: { beforeServer: target.beforeInstanceId }
+        })
+        break
+      }
+
+      case "endOfGroups":
+      case "endOfLibrary": {
+        moveServerGroupMutation.mutate({
+          group: groupId,
+          target: "endOfLibrary"
+        })
+        break
+      }
+    }
+  }
+
+  /**
    * Main drop handler.
    */
   const handleDrop = (
@@ -360,6 +397,8 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
       handleServerDrop(target, draggedIds)
     } else if (dragType === "group") {
       handleGroupDrop(target, draggedIds[0])
+    } else if (dragType === "serverGroup") {
+      handleServerGroupDrop(target, draggedIds[0])
     }
 
     options.onAfterDrop?.()

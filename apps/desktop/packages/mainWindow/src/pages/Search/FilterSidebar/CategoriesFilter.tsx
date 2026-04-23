@@ -47,14 +47,10 @@ export function CategoriesFilter() {
     searchResults?.searchQuery().categories?.length ?? 0
 
   const toggleCategory = (categoryValue: string | number, checked: boolean) => {
-    const id =
-      typeof categoryValue === "string"
-        ? parseInt(categoryValue, 10)
-        : categoryValue
     searchResults?.setSearchQuery((prev) => {
       const updated = checked
-        ? [...(prev.categories || []), id]
-        : (prev.categories || []).filter((v) => v !== id)
+        ? [...(prev.categories || []), categoryValue]
+        : (prev.categories || []).filter((v) => v !== categoryValue)
       return {
         ...prev,
         categories: updated.length === 0 ? null : updated

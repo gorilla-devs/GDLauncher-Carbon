@@ -8,5 +8,7 @@
   "_trn_cannot_delete_instance": "Cannot delete instance",
   "_trn_cannot_delete_server": "Cannot delete server",
   "_trn_eula_accept_failed": "Failed to accept EULA",
-  "_trn_custom_java_added": "Custom Java Path added successfully"
+  "_trn_custom_java_added": "Custom Java Path added successfully",
+  "_trn_addon_downloading_to_server": "{{title}} downloading to server",
+  "_trn_addon_fallback_name": "Addon"
 }

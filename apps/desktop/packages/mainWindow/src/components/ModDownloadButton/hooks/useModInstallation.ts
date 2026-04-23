@@ -128,24 +128,16 @@ export const useModInstallation = (props: UseModInstallationProps) => {
   const handleServerInstall = async (serverId: number) => {
     if (!props.addon) return
 
-    try {
-      let taskId: number
-
-      if (!props.fileId) {
-        taskId = await installLatestServerModMutation.mutateAsync({
-          serverId,
-          modSource: latestModInstallObj()
-        })
-      } else {
-        taskId = await installServerModMutation.mutateAsync({
-          serverId,
-          modSource: modInstallObj()
-        })
-      }
-
-      return taskId
-    } catch (_error) {
-      // Error handled by caller
+    if (!props.fileId) {
+      return await installLatestServerModMutation.mutateAsync({
+        serverId,
+        modSource: latestModInstallObj()
+      })
+    } else {
+      return await installServerModMutation.mutateAsync({
+        serverId,
+        modSource: modInstallObj()
+      })
     }
   }
 

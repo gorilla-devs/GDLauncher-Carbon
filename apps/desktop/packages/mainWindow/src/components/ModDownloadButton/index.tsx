@@ -11,6 +11,7 @@ import { useTaskProgress } from "./hooks/useTaskProgress"
 import { InstanceDropdown } from "./components/InstanceDropdown"
 import { InstallButton } from "./components/InstallButton"
 import { toast } from "@gd/ui"
+import { useTransContext } from "@gd/i18n"
 
 interface ModDownloadButtonProps {
   fileId?: number | string
@@ -26,6 +27,7 @@ interface ModDownloadButtonProps {
 }
 
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
+  const [t] = useTransContext()
   const [taskId, setTaskId] = createSignal<number | null>(null)
 
   const {
@@ -176,11 +178,14 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       try {
         await handleServerInstall(serverId)
         toast.success(
-          `${props.addon?.title || "Addon"} downloading to server`,
+          t("notifications:_trn_addon_downloading_to_server", {
+            title:
+              props.addon?.title || t("notifications:_trn_addon_fallback_name")
+          }),
           { duration: 2000 }
         )
       } catch {
-        // mutation error handled internally
+        // Error surfaced via global MutationCache.onError
       } finally {
         setLoading(false)
         setProgress(null)

@@ -98,20 +98,26 @@ const FolderTile = (props: FolderTileProps) => {
   })
 
   // Check if this folder is being dragged
-  const isBeingDragged = createMemo(
-    () =>
+  const isBeingDragged = createMemo(() => {
+    const dtype = dragContext.dragType()
+    return (
       dragContext.isDragging() &&
       dragContext.dragDetached() &&
-      dragContext.dragType() === "group" &&
+      (dtype === "group" || dtype === "serverGroup") &&
       dragContext.draggedIds().includes(props.groupId)
-  )
+    )
+  })
 
   // Handle drag start for folder reordering
   const handleDragStart = (e: PointerEvent) => {
     e.stopPropagation()
     // Don't call preventDefault - let clicks work normally
     // DragContext's 5px threshold handles click vs drag distinction
-    dragContext.startDrag("group", [props.groupId], e)
+    dragContext.startDrag(
+      isServerGroup() ? "serverGroup" : "group",
+      [props.groupId],
+      e
+    )
   }
 
   // Register as drop target when dragging instances or servers
