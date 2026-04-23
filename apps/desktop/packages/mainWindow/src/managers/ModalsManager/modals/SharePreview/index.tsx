@@ -3,6 +3,7 @@ import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { Trans } from "@gd/i18n"
 import SharePreviewContent from "@/components/SharePreviewContent"
+import { useGDNavigate } from "@/managers/NavigationManager"
 
 interface Props {
   shareCode: string
@@ -11,13 +12,17 @@ interface Props {
 function SharePreview(props: ModalProps) {
   const data: () => Props = () => props.data
   const modalsContext = useModal()
+  const navigator = useGDNavigate()
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="w-140 flex flex-col gap-4">
         <SharePreviewContent
           shareCode={data()?.shareCode || ""}
-          onImportSuccess={() => modalsContext?.closeModal()}
+          onImportSuccess={() => {
+            modalsContext?.closeModal()
+            navigator.navigate("/library")
+          }}
         />
 
         {/* Cancel button */}

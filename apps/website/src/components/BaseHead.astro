@@ -15,10 +15,12 @@ const siteUrl = Astro.site?.toString() || "https://gdlauncher.com";
 const currentUrl = canonicalUrl || new URL(Astro.url.pathname, siteUrl).toString();
 ---
 
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
 <!-- Primary Meta Tags -->
 <title>{title}</title>
 <meta name="description" content={description} />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
 {keywords && <meta name="keywords" content={keywords} />}
 <link rel="canonical" href={currentUrl} />
 

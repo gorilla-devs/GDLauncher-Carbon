@@ -20,7 +20,6 @@ import {
   onMount
 } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
-import { rspc } from "@/utils/rspcClient"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -416,20 +415,27 @@ const HomeGridInner = () => {
     selection.toggleSelection(id)
   }
 
-  const deleteServerMutation = rspc.createMutation(() => ({
-    mutationKey: ["server.deleteServer"]
-  }))
-
   const handleBatchDelete = () => {
     const selectedStringIds = selection.selectedIds()
 
-    // Server mode: delete servers directly (batch modal not implemented for servers yet)
     if (libraryMode() === "servers") {
       const selectedServerIds = parseServerIds(selectedStringIds)
-      for (const id of selectedServerIds) {
-        deleteServerMutation.mutate(id)
+      const selectedServersList = (globalStore.servers.data || []).filter(
+        (server) => selectedServerIds.includes(server.id)
+      )
+
+      if (selectedServersList.length === 0) {
+        selection.clearSelection()
+        return
       }
-      selection.clearSelection()
+
+      modals?.openModal(
+        { name: "confirmBatchServerDeletion" },
+        {
+          servers: selectedServersList,
+          onComplete: selection.clearSelection
+        }
+      )
       return
     }
 

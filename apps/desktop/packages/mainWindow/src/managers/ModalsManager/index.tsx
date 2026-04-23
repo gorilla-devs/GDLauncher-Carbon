@@ -14,6 +14,7 @@ import { useTransContext, TypedTFunction } from "@gd/i18n"
 import { useGDNavigate } from "../NavigationManager"
 import adSize from "@/utils/adhelper"
 import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
+import { listenServerEula } from "@/utils/serverEulaBridge"
 import { cleanupRunning } from "./modals/CacheCleanup/state"
 
 export interface ModalProps {
@@ -91,6 +92,14 @@ const getDefaultModals = (t: TypedTFunction) => ({
   confirmBatchInstanceDeletion: {
     component: lazy(() => import("./modals/ConfirmBatchInstanceDeletion")),
     title: t("modals:_trn_confirm_batch_instance_deletion")
+  },
+  confirmBatchServerDeletion: {
+    component: lazy(() => import("./modals/ConfirmBatchServerDeletion")),
+    title: t("modals:_trn_confirm_batch_server_deletion")
+  },
+  serverEulaAcceptance: {
+    component: lazy(() => import("./modals/ServerEulaAcceptance")),
+    title: t("modals:_trn_server_eula_acceptance")
   },
   confirmBatchFolderDeletion: {
     component: lazy(() => import("./modals/ConfirmBatchFolderDeletion")),
@@ -298,10 +307,16 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   }
 
   onMount(() => {
-    const cleanup = listenMemoryWarning((data) => {
+    const cleanupMemory = listenMemoryWarning((data) => {
       manager.openModal({ name: "insufficientMemory" }, data)
     })
-    onCleanup(cleanup)
+    const cleanupEula = listenServerEula((data) => {
+      manager.openModal({ name: "serverEulaAcceptance" }, data)
+    })
+    onCleanup(() => {
+      cleanupMemory()
+      cleanupEula()
+    })
   })
 
   const manager = {

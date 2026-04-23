@@ -15,6 +15,8 @@
   "_trn_notification": "Notification",
   "_trn_confirm_instance_deletion": "Confirm Instance Deletion",
   "_trn_confirm_batch_instance_deletion": "Delete Instances",
+  "_trn_confirm_batch_server_deletion": "Delete Servers",
+  "_trn_server_eula_acceptance": "Accept Minecraft EULA",
   "_trn_confirm_change_runtime_path": "Confirm Change RuntimePath",
   "_trn_why_are_ads_needed": "Why are ads needed?",
   "_trn_mods_updater": "Mods Updater",

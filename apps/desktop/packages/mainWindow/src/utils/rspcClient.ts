@@ -16,6 +16,10 @@ import {
   dispatchMemoryWarningEvent,
   type InsufficientMemoryData
 } from "./memoryWarningBridge"
+import {
+  dispatchServerEulaEvent,
+  type ServerEulaData
+} from "./serverEulaBridge"
 
 // ---------------------------------------------------------------------------
 // Procedure type utilities
@@ -104,6 +108,11 @@ function handleGlobalError(error: Error) {
 
     if (errorCode === "INSUFFICIENT_MEMORY" && errorCause?.data) {
       dispatchMemoryWarningEvent(errorCause.data as InsufficientMemoryData)
+      return
+    }
+
+    if (errorCode === "EULA_NOT_ACCEPTED" && errorCause?.data) {
+      dispatchServerEulaEvent(errorCause.data as ServerEulaData)
       return
     }
 

@@ -797,7 +797,24 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 } else {
                     None
                 };
-                (group, 0, lib_pos)
+
+                // Indices are prepend-allocated (see `next_instance_index`), so
+                // the "beginning" is strictly less than the current minimum, not
+                // a fixed 0.
+                let min_idx: Option<i32> = self
+                    .app
+                    .prisma_client
+                    .instance()
+                    .find_first(vec![WhereParam::GroupId(IntFilter::Equals(*group))])
+                    .order_by(db::instance::OrderByParam::Index(
+                        carbon_repos::pcr::Direction::Asc,
+                    ))
+                    .exec()
+                    .await?
+                    .map(|i| i.index);
+
+                let target_idx = min_idx.map(|n| n - 1).unwrap_or(0);
+                (group, target_idx, lib_pos)
             }
             InstanceMoveTarget::EndOfGroup(group) => {
                 let target_idx = self
@@ -3272,11 +3289,15 @@ mod test {
             mk_instance("g0i1", group0.clone()).await?,
             mk_instance("g0i2", group0.clone()).await?,
         ];
+        // New instances prepend within their group, so DB-ascending order
+        // is the reverse of creation order.
+        group0_instances.reverse();
 
-        let group1_instances = [
+        let mut group1_instances = [
             mk_instance("g1i0", group1.clone()).await?,
             mk_instance("g1i1", group1.clone()).await?,
         ];
+        group1_instances.reverse();
 
         // move 1 to 1 (do nothing)
         app.instance_manager()

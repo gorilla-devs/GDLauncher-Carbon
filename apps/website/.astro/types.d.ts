@@ -180,20 +180,6 @@ declare module 'astro:content' {
 } & { render(): Render[".md"] };
 };
 "blog": {
-"best-modpacks-2025.md": {
-	id: "best-modpacks-2025.md";
-  slug: "best-modpacks-2025";
-  body: string;
-  collection: "blog";
-  data: InferEntrySchema<"blog">
-} & { render(): Render[".md"] };
-"best-shaders-2025.md": {
-	id: "best-shaders-2025.md";
-  slug: "best-shaders-2025";
-  body: string;
-  collection: "blog";
-  data: InferEntrySchema<"blog">
-} & { render(): Render[".md"] };
 "curseforge-partnership-announcement.md": {
 	id: "curseforge-partnership-announcement.md";
   slug: "curseforge-partnership-announcement";

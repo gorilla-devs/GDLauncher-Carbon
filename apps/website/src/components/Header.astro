@@ -72,7 +72,7 @@ const { pathname } = Astro.url;
     </div>
 
     <!-- Mobile Menu Button -->
-    <button class="md:hidden p-2 rounded-lg hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-95" onclick="openNav()">
+    <button class="md:hidden p-2 rounded-lg hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-95" onclick="openNav()" aria-label="Open navigation menu">
       <div class="i-hugeicons:menu-02 w-6 h-6 text-lightSlate-100"></div>
     </button>
   </div>
@@ -84,7 +84,7 @@ const { pathname } = Astro.url;
     <a href="/" class="px-3 py-2">
       <Image src={Logo} alt="gdlauncher logo" width="150" height="35" loading="eager" />
     </a>
-    <button class="p-2 rounded-lg hover:bg-darkSlate-700 transition-colors" onclick="closeNav()">
+    <button class="p-2 rounded-lg hover:bg-darkSlate-700 transition-colors" onclick="closeNav()" aria-label="Close navigation menu">
       <div class="i-hugeicons:cancel-01 w-6 h-6 text-lightSlate-100"></div>
     </button>
   </div>

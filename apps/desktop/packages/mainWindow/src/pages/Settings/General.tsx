@@ -477,6 +477,7 @@ const General = () => {
                 type="secondary"
                 size="small"
                 rounded={false}
+                class="min-w-44"
                 onClick={() => {
                   modalsContext?.openModal({ name: "cacheCleanup" })
                 }}

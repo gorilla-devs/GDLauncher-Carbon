@@ -19,7 +19,7 @@ const features = [
       "Dependencies handled automatically",
       "Downloads in parallel for speed"
     ],
-    image: "https://cdn.gdl.gg/assets/features/one-click-install.jpg"
+    video: "https://cdn.gdl.gg/assets/one_click_install.h264.mp4"
   },
   {
     id: "instance-sharing",
@@ -30,29 +30,7 @@ const features = [
       "One code, one click",
       "No manual file sharing"
     ],
-    image: "https://cdn.gdl.gg/assets/features/instance-sharing.jpg"
-  },
-  {
-    id: "auto-java",
-    title: "Java Just Works",
-    description: "Different Minecraft versions need different Java versions. GDLauncher figures out which one and downloads it. You never have to think about Java again.",
-    bullets: [
-      "Right version for each instance",
-      "Downloaded and configured automatically",
-      "No system Java conflicts"
-    ],
-    image: "https://cdn.gdl.gg/assets/features/auto-java.jpg"
-  },
-  {
-    id: "mod-management",
-    title: "Mod Updates Without the Hassle",
-    description: "GDLauncher tracks which mods have updates available. Update them one by one or all at once. Dependencies update too.",
-    bullets: [
-      "See what's outdated at a glance",
-      "Update with one click",
-      "Roll back if something breaks"
-    ],
-    image: "https://cdn.gdl.gg/assets/features/mod-management.jpg"
+    video: "https://cdn.gdl.gg/assets/instance_sharing.h264.mp4"
   },
   {
     id: "multi-instance",
@@ -63,7 +41,7 @@ const features = [
       "Duplicate to experiment",
       "Import from other launchers"
     ],
-    image: "https://cdn.gdl.gg/assets/features/multi-instance.jpg"
+    video: "https://cdn.gdl.gg/assets/drag_drop.h264.mp4"
   },
   {
     id: "server-management",
@@ -74,7 +52,7 @@ const features = [
       "Whitelist, ops, and bans built in",
       "Install server mods from CurseForge and Modrinth"
     ],
-    image: "https://cdn.gdl.gg/assets/features/server-management.jpg"
+    video: "https://cdn.gdl.gg/assets/servers.h264.mp4"
   }
 ]
 ---
@@ -109,11 +87,14 @@ const features = [
             data-scroll={index % 2 === 0 ? "slide-left" : "slide-right"}
           >
             <div class="relative aspect-video rounded-xl overflow-hidden bg-darkSlate-700/50 border border-darkSlate-600 shadow-xl shadow-black/20">
-              <img
-                src={feature.image}
-                alt={feature.title}
+              <video
+                data-lazy-src={feature.video}
                 class="w-full h-full object-cover"
-                loading="lazy"
+                muted
+                loop
+                playsinline
+                preload="none"
+                aria-label={feature.title}
               />
             </div>
           </div>
@@ -150,3 +131,42 @@ const features = [
     </div>
   </div>
 </section>
+
+<script>
+  const videos = document.querySelectorAll<HTMLVideoElement>(
+    "video[data-lazy-src]"
+  )
+
+  const loadVideo = (video: HTMLVideoElement) => {
+    const src = video.dataset.lazySrc
+    if (!src || video.src) return
+    video.src = src
+    video.load()
+  }
+
+  if (videos.length > 0 && "IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const video = entry.target as HTMLVideoElement
+          if (entry.isIntersecting) {
+            loadVideo(video)
+            video.play().catch(() => {
+              // autoplay can be blocked (e.g., power saver); safe to ignore
+            })
+          } else if (!video.paused) {
+            video.pause()
+          }
+        }
+      },
+      { rootMargin: "200px 0px" }
+    )
+    videos.forEach((v) => observer.observe(v))
+  } else {
+    // No IntersectionObserver: load all eagerly as a fallback
+    videos.forEach((v) => {
+      loadVideo(v)
+      v.play().catch(() => {})
+    })
+  }
+</script>

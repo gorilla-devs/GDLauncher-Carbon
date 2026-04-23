@@ -118,6 +118,7 @@ export function List() {
               <SharePreviewContent
                 shareCode={searchContext!.shareCode()}
                 expandMods
+                onImportSuccess={() => navigator.navigate("/library")}
               />
             </div>
           </div>
