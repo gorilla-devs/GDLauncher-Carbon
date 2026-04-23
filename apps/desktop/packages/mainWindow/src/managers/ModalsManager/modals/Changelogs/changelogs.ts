@@ -17,7 +17,8 @@ const changelogs: Changelog = {
       title: "Instance Sharing",
       description:
         "Share your modpack instances with anyone via a simple link. Recipients can preview what they're importing before adding it to their library. Requires a GDL account with verified email.",
-      media: "https://cdn.gdl.gg/launcher/changelog/2.0.31/instance_sharing.h264.mp4"
+      media:
+        "https://cdn.gdl.gg/launcher/changelog/2.0.31/instance_sharing.h264.mp4"
     },
     {
       title: "Instance Folders & Drag and Drop",
