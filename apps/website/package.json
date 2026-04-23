@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro check && astro build",
+    "build": "pnpm --filter @gd/config build && astro check && astro build",
     "preview": "astro preview",
     "astro": "astro",
     "update-addons": "node --env-file=.env scripts/update-addons.mjs"
