@@ -1,5 +1,5 @@
 ---
-import { composeCDNArticleThumbnailAssetLink } from "../utils/composeCDNAssetLink";
+
 
 const { post } = Astro.props;
 const formatDate = (date: Date) => {
@@ -18,7 +18,7 @@ const formatDate = (date: Date) => {
 };
 ---
 
-<a href={`/blog/${post.slug}`}>
+<a href={`/blog/${post.slug}`} class="block transition-transform duration-100 ease-spring active:scale-98">
   <article
     class="max-w-lg rounded-xl bg-slate-900 hover:-translate-y-4 ease-in-out duration-200"
   >
@@ -28,7 +28,7 @@ const formatDate = (date: Date) => {
         backgroundSize: "cover",
         backgroundImage: `url(${post.data.heroImage})`,
       }}
-      class="min-h-[18rem] bg-green-400 rounded-t-xl"
+      class="min-h-[18rem] bg-primary-500/30 rounded-t-xl"
     >
       <!-- {
         post.image && (

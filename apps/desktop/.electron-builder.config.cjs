@@ -4,7 +4,8 @@ const dotenv = require("dotenv")
 const { notarize } = require("@electron/notarize")
 
 dotenv.config({
-  path: "../../.env"
+  path: "../../.env",
+  quiet: true
 })
 
 let arch = process.argv[4].replace(/-/g, "")
@@ -73,7 +74,8 @@ module.exports = {
     {
       from: "binaries/${arch}",
       to: `binaries`
-    }
+    },
+    "legal"
   ],
   npmRebuild: false,
   protocols: [

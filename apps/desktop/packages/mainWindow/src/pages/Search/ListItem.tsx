@@ -1,12 +1,18 @@
-import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings"
+import {
+  FEUnifiedCategory,
+  FEUnifiedSearchResult,
+  Mod,
+  ServerAddon
+} from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DynamicBadgeContainer from "./DynamicBadgeContainer"
-import { createSignal, Match, Switch } from "solid-js"
+import { createMemo, createSignal, Match, Show, Switch } from "solid-js"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
+import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 
 interface SearchResultItemProps {
@@ -15,20 +21,32 @@ interface SearchResultItemProps {
   isInstalled: boolean
   instanceId?: number
   instanceMods?: Mod[]
+  serverAddons?: ServerAddon[]
+  serverId?: number
 }
 
 export function ListItem(props: SearchResultItemProps) {
   const [isHoverActive, setIsHoverActive] = createSignal(false)
   const globalStore = useGlobalStore()
 
-  const cats =
-    props.result.platform === "curseforge"
-      ? globalStore.categories.data?.curseforge
-      : globalStore.categories.data?.modrinth
+  const filteredCategories = createMemo(() => {
+    const cats =
+      props.result.platform === "curseforge"
+        ? globalStore.categories.data?.curseforge
+        : globalStore.categories.data?.modrinth
 
-  const filteredCategories = props.result.categories
-    .map((cat) => cats?.[cat as number])
-    .filter((cat) => cat !== undefined)
+    return props.result.categories
+      .map((cat) =>
+        props.result.platform === "curseforge"
+          ? cats?.[cat as unknown as number]
+          : (cats as Record<string, FEUnifiedCategory> | undefined)?.[
+              `${props.result.type}:${cat}`
+            ]
+      )
+      .filter(
+        (cat): cat is FEUnifiedCategory => cat !== undefined && cat !== null
+      )
+  })
 
   return (
     <div class="my-1 overflow-hidden rounded-md">
@@ -71,7 +89,8 @@ export function ListItem(props: SearchResultItemProps) {
             </div>
             <DynamicBadgeContainer
               typeBadgeContent={props.result.type}
-              categories={filteredCategories}
+              categories={filteredCategories()}
+              categoriesLoading={globalStore.categories.isLoading}
             />
           </div>
 
@@ -120,12 +139,28 @@ export function ListItem(props: SearchResultItemProps) {
                     </div>
                   </Match>
                   <Match when={props.result.type === "modpack"}>
-                    <ModpackDownloadButton addon={props.result} />
+                    <div class="flex items-center">
+                      <ModpackDownloadButton
+                        addon={props.result}
+                        splitPosition={
+                          props.result.serverPackFileId ? "left" : undefined
+                        }
+                      />
+                      <Show when={props.result.serverPackFileId}>
+                        <div class="w-px self-stretch bg-primary-700 shrink-0" />
+                        <ServerPackDownloadButton
+                          addon={props.result}
+                          splitPosition="right"
+                        />
+                      </Show>
+                    </div>
                   </Match>
                   <Match when={props.result.type !== "modpack"}>
                     <ModDownloadButton
                       selectedInstanceId={props.instanceId}
                       selectedInstanceMods={props.instanceMods}
+                      selectedServerAddons={props.serverAddons}
+                      selectedServerId={props.serverId}
                       addon={props.result}
                       onDropdownOpenChange={(isOpen) => {
                         if (isOpen) {

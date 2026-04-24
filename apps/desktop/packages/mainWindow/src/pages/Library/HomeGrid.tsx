@@ -1,6 +1,26 @@
+/**
+ * HomeGrid - Library View Orchestrator
+ *
+ * Slim orchestrator component (~250 lines) that coordinates:
+ * - Data hooks (useLibraryData, useLibrarySelection, useLibraryDragDrop)
+ * - View switching (FoldersView vs AccordionView)
+ * - Animation hooks (useFLIPAnimation, useEntranceAnimation)
+ * - Global UI (header, context menu, selection bar, drag ghost)
+ */
+
 import {
-  Button,
-  Collapsable,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createMemo,
+  createSignal,
+  on,
+  onCleanup,
+  onMount
+} from "solid-js"
+import { useSearchParams } from "@solidjs/router"
+import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuGroup,
@@ -8,737 +28,665 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuPortal,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-  Input,
   Skeleton
 } from "@gd/ui"
-import {
-  For,
-  Match,
-  Show,
-  Switch,
-  createEffect,
-  createMemo,
-  createSignal,
-  onMount
-} from "solid-js"
-import { Trans, useTransContext } from "@gd/i18n"
-import InstanceTile from "@/components/InstanceTile"
-import UnstableCard from "@/components/UnstableCard"
-import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
-import {
-  InstancesGroupBy,
-  InstancesSortBy,
-  ListInstance,
-  ValidListInstance
-} from "@gd/core_module/bindings"
-import { rspc } from "@/utils/rspcClient"
-import { createStore, reconcile } from "solid-js/store"
+import { Trans } from "@gd/i18n"
+import { useDragSelect } from "@/hooks/useDragSelect"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
+import { useGDNavigate } from "@/managers/NavigationManager"
+import UnstableCard from "@/components/UnstableCard"
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
+import DragGhost from "@/components/DragGhost"
+import {
+  setClickedFolderId,
+  setVisibleFolderIndices,
+  injectFolderTransitionCSS,
+  removeFolderTransitionCSS
+} from "./utils/folderViewTransition"
+import {
+  parseInstanceIds,
+  parseFolderIds,
+  parseServerIds
+} from "./utils/selectionIds"
+import "@/components/Library/folderTransitions.css"
+import "./styles/modeTransitions.css"
 
-let initAnimationRan = false
+import {
+  clickedInstanceId,
+  setClickedInstanceId
+} from "@/components/InstanceTile"
+import { setClickedServerId } from "@/components/Server/Tile"
+import { DragProvider, useDragContext } from "./DragContext"
+import { FloatingFavoritesBar } from "./components/FloatingFavoritesBar"
+import { LibraryHeader } from "./components/LibraryHeader"
+import {
+  useLibraryData,
+  useServerData,
+  useLibrarySelection,
+  useFLIPAnimation,
+  useEntranceAnimation,
+  useLibraryDragDrop
+} from "./hooks"
+import FoldersView from "./views/FoldersView"
+import AccordionView from "./views/AccordionView"
+import { LibraryItem, LibraryMode } from "./types"
+import { TILE_SIZES, TileSize } from "./constants"
 
-const HomeGrid = () => {
-  const [t] = useTransContext()
+const HomeGrid = () => (
+  <DragProvider>
+    <HomeGridInner />
+  </DragProvider>
+)
 
-  const [filter, setFilter] = createSignal("")
-
+const HomeGridInner = () => {
   const globalStore = useGlobalStore()
-
   const modals = useModal()
+  const dragContext = useDragContext()
+  const navigator = useGDNavigate()
 
-  const [instancesTileSize, setInstancesTileSize] = createSignal(2)
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const [instances, setInstances] = createStore<
-    {
-      id: string | number | null
-      name: string
-      instances: ListInstance[]
-    }[]
-  >([])
+  // UI State
+  const [filter, setFilter] = createSignal("")
+  const [tileSize, setTileSize] = createSignal(2)
+  const [openFolderId, setOpenFolderId] = createSignal<number | null>(null)
+  const libraryMode = (): LibraryMode =>
+    searchParams.mode === "servers" ? "servers" : "instances"
+  // Skeleton crossfade: when loading ends, keep the skeleton overlay alive
+  // briefly and fade it out on top of the real content so tiles appear to
+  // swap in place rather than flicker through an empty state.
+  const [skeletonVisible, setSkeletonVisible] = createSignal(false)
+  const [skeletonFading, setSkeletonFading] = createSignal(false)
 
+  // Refs for drag selection - keyed by type-prefixed string ID (e.g., "instance-5", "folder-3")
+  const tileRefs = new Map<string, HTMLDivElement>()
+  let contentRef: HTMLDivElement | undefined
+
+  // Hooks
+  // Don't destructure libraryItems/virtualGroups/favoriteIds — they are store
+  // properties returned via getters. Destructuring reads the proxy once; if
+  // reconcile replaces it the captured reference goes stale. Access them
+  // through `data.*` so every read hits the getter in a reactive context.
+  const instanceData = useLibraryData(filter)
+  const serverData = useServerData(filter)
+
+  // Active data based on library mode
+  const data = createMemo(() =>
+    libraryMode() === "instances" ? instanceData : serverData
+  )
+  const viewMode = createMemo(() => data().viewMode())
+  const isFoldersView = createMemo(() => data().isFoldersView())
+  const defaultGroupId = createMemo(() => data().defaultGroupId())
+  const isLoading = createMemo(() => data().isLoading())
+  const isEmpty = createMemo(() => data().isEmpty())
+
+  const showFoldersView = createMemo(() => isFoldersView() && !filter().trim())
+
+  const selection = useLibrarySelection()
+
+  const entranceAnimation = useEntranceAnimation()
+
+  const flipAnimation = useFLIPAnimation({
+    reducedMotion: () => globalStore.settings.data?.reducedMotion ?? false
+  })
+
+  const dragDrop = useLibraryDragDrop({
+    defaultGroupId,
+    selection,
+    flipAnimation,
+    get libraryItems() {
+      return data().libraryItems
+    }
+  })
+
+  // Sync tile size from settings (shared across instances and servers)
   createEffect(() => {
-    setInstancesTileSize(globalStore.settings.data?.instancesTileSize!)
+    libraryMode()
+    if (globalStore.settings.data?.instancesTileSize) {
+      setTileSize(globalStore.settings.data.instancesTileSize)
+    }
   })
 
-  const settingsMutation = rspc.createMutation(() => ({
-    mutationKey: ["settings.setSettings"]
-  }))
+  // Reset animation state when switching view modes
+  createEffect(
+    on(
+      isFoldersView,
+      () => {
+        entranceAnimation.reset()
+      },
+      { defer: true }
+    )
+  )
 
-  let inputRef: HTMLInputElement | undefined
-
-  type Groups = Record<
-    string | number,
-    {
-      id: string | number | null
-      name: string
-      instances: ListInstance[]
+  // Close open folder when search activates
+  createEffect(() => {
+    if (filter().trim()) {
+      setOpenFolderId(null)
     }
-  >
+  })
 
-  const filteredGroups = createMemo(() => {
-    const _groups: Groups = {}
-
-    const nameFilter = filter().replaceAll(" ", "").toLowerCase()
-
-    if (globalStore.settings.data?.instancesGroupBy === "group") {
-      _groups.favorites = {
-        id: -1,
-        name: t("instances:_trn_favorites"),
-        instances: []
-      }
+  // Drive skeleton crossfade in response to isLoading flipping.
+  createEffect(() => {
+    if (isLoading()) {
+      setSkeletonVisible(true)
+      setSkeletonFading(false)
+    } else if (skeletonVisible()) {
+      // Real content just mounted — fade skeleton out on top of it,
+      // then unmount once the transition finishes.
+      setSkeletonFading(true)
+      const id = setTimeout(() => {
+        setSkeletonVisible(false)
+        setSkeletonFading(false)
+      }, 220)
+      onCleanup(() => clearTimeout(id))
     }
+  })
 
-    for (const instance of globalStore.instances.data || []) {
-      let groupId = null
-      let groupName = null
+  // FLIP animation effect - runs after libraryItems changes
+  createEffect(() => {
+    const items = data().libraryItems
+    if (items.length > 0 && flipAnimation.isAnimating()) {
+      flipAnimation.animateIfOrderChanged(items.map((item) => item.id))
+    }
+  })
 
-      const validInstance =
-        instance.status.status === "valid" ? instance.status.value : undefined
+  // Register drop handler and clear stale view-transition state
+  onMount(() => {
+    dragContext.setOnDrop(dragDrop.handleDrop)
 
-      if (globalStore.settings.data?.instancesGroupBy === "group") {
-        const _groupName = globalStore.instanceGroups.data?.find(
-          (group) => group.id === instance.group_id
-        )?.name
-
-        groupName =
-          _groupName === "localize➽default"
-            ? t("general:_trn_default")
-            : _groupName
-        groupId = instance.group_id
-      } else if (
-        globalStore.settings.data?.instancesGroupBy === "gameVersion"
-      ) {
-        if (instance.status.status === "valid") {
-          groupName = validInstance?.mc_version
+    // If returning directly from an instance page that was inside a folder,
+    // re-open that folder so the tile exists in the DOM for the view-transition.
+    // Only applies when the previous page was an instance page (/library/:id),
+    // not when arriving from an unrelated page (e.g. /settings).
+    const clicked = clickedInstanceId()
+    const prevPath = navigator.lastPathVisited().path
+    const isFromInstancePage = /^\/library\/\d+/.test(prevPath)
+    if (clicked?.startsWith("folder-") && isFromInstancePage) {
+      const groupId = parseInt(clicked.split("-")[1], 10)
+      if (!isNaN(groupId)) {
+        setOpenFolderId(groupId)
+        const overlay = document.getElementById("overlay")
+        if (overlay) {
+          overlay.style.display = "flex"
+          overlay.style.opacity = "1"
+          overlay.style.transition = ""
         }
-      } else if (globalStore.settings.data?.instancesGroupBy === "modloader") {
-        if (instance.status.status === "valid") {
-          groupName = validInstance?.modloader || "vanilla"
-        }
-      } else if (
-        globalStore.settings.data?.instancesGroupBy === "modplatform"
-      ) {
-        if (instance.status.status === "valid") {
-          groupName = validInstance?.modpack?.type
-        }
-      }
-
-      if (!groupName) {
-        continue
-      }
-
-      if (!_groups[groupName]) {
-        _groups[groupName] = {
-          id: groupId,
-          name: groupName,
-          instances: []
-        }
-      }
-
-      if (
-        instance.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
-      ) {
-        if (
-          globalStore.settings.data?.instancesGroupBy === "group" &&
-          instance.favorite
-        ) {
-          _groups.favorites.instances.push(instance)
-        }
-        _groups[groupName].instances.push(instance)
       }
     }
 
-    // sort groups
-    for (const key in _groups) {
-      _groups[key].instances.sort((a, b) => {
-        let comparisonResult = 0 // Default comparison result
+    // Defer clearing so the view-transition snapshot captures the
+    // tile with its view-transition-name before it's removed.
+    requestAnimationFrame(() => {
+      setClickedInstanceId(undefined)
+      setClickedServerId(undefined)
+    })
+  })
 
-        if (globalStore.settings.data?.instancesSortBy === "name") {
-          comparisonResult = a.name.localeCompare(b.name)
-        } else if (
-          globalStore.settings.data?.instancesSortBy === "mostPlayed"
-        ) {
-          comparisonResult = (a.seconds_played || 0) - (b.seconds_played || 0)
-        } else if (
-          globalStore.settings.data?.instancesSortBy === "lastPlayed"
-        ) {
-          const aLastPlayed = a.last_played ? Date.parse(a.last_played) : 0
-          const bLastPlayed = b.last_played ? Date.parse(b.last_played) : 0
-          comparisonResult = aLastPlayed - bLastPlayed
-        } else if (
-          globalStore.settings.data?.instancesSortBy === "lastUpdated"
-        ) {
-          const aLastUpdated = a.date_updated ? Date.parse(a.date_updated) : 0
-          const bLastUpdated = b.date_updated ? Date.parse(b.date_updated) : 0
-          comparisonResult = aLastUpdated - bLastUpdated
-        } else if (
-          globalStore.settings.data?.instancesSortBy === "gameVersion"
-        ) {
-          comparisonResult = (
-            (a.status.value as ValidListInstance).mc_version || ""
-          ).localeCompare(
-            (b.status.value as ValidListInstance).mc_version || "",
-            undefined,
-            { numeric: true, sensitivity: "base" }
-          )
-        } else if (globalStore.settings.data?.instancesSortBy === "created") {
-          const aCreated = a.date_created ? Date.parse(a.date_created) : 0
-          const bCreated = b.date_created ? Date.parse(b.date_created) : 0
-          comparisonResult = aCreated - bCreated
+  onCleanup(() => {
+    dragContext.setOnDrop(null)
+  })
+
+  // Drag selection - returns rects keyed by type-prefixed string IDs
+  // Excludes instances that are queued or downloading (preparing) since they
+  // shouldn't be selectable.
+  const getItemRects = (): Map<string, DOMRect> => {
+    const nonSelectable = new Set<string>()
+    for (const item of data().libraryItems) {
+      if (item.type === "instance" && item.data.status.status === "valid") {
+        const s = item.data.status.value.state.state
+        if (s === "queued" || s === "preparing") {
+          nonSelectable.add(item.id)
         }
+      }
+    }
+    const rects = new Map<string, DOMRect>()
+    tileRefs.forEach((el, id) => {
+      if (!nonSelectable.has(id)) {
+        rects.set(id, el.getBoundingClientRect())
+      }
+    })
+    return rects
+  }
 
-        // If descending order is selected, invert the comparison result
-        if (!globalStore.settings.data?.instancesSortByAsc) {
-          comparisonResult = -comparisonResult
-        }
+  const dragSelect = useDragSelect({
+    containerRef: () =>
+      document.getElementById("gdl-content-wrapper") ?? undefined,
+    getItemRects,
+    onSelectionChange: (ids) => selection.selectAll(ids),
+    getExistingSelection: () => selection.selectedIds(),
+    getTopBoundary: () => {
+      const header = document.querySelector<HTMLElement>(
+        "[data-library-header]"
+      )
+      return header?.getBoundingClientRect().bottom
+    }
+  })
 
-        // Use name as a secondary sort criteria to ensure consistent order where primary criteria are equal
-        return comparisonResult || a.name.localeCompare(b.name)
+  const shouldIgnoreClick = (e: MouseEvent): boolean => {
+    const target = e.target as HTMLElement
+    return (
+      !dragContext.dragSelectEnabled() ||
+      openFolderId() !== null ||
+      target.closest("[data-instance-tile]") !== null ||
+      target.closest("[data-server-tile]") !== null ||
+      target.closest("[data-folder-tile]") !== null ||
+      target.closest("input") !== null ||
+      target.closest("button") !== null ||
+      target.closest("[data-kb-menu]") !== null ||
+      target.closest("[role='menu']") !== null
+    )
+  }
+
+  // Escape key handler
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      if (dragContext.isDragging()) {
+        dragContext.cancelDrag()
+      } else if (selection.selectedIds().size > 0) {
+        selection.clearSelection()
+      }
+    }
+  }
+
+  onMount(() => document.addEventListener("keydown", handleKeyDown))
+  onCleanup(() => document.removeEventListener("keydown", handleKeyDown))
+
+  // Folder toggle with view transition
+  const toggleFolder = async (folderId: number) => {
+    const overlay = document.getElementById("overlay")
+    const shouldTransition =
+      !globalStore.settings.data?.reducedMotion && document.startViewTransition
+
+    if (shouldTransition) {
+      const isClosing = openFolderId() === folderId
+      const folder = data().libraryItems.find(
+        (i) => i.type === "folder" && i.data.id === folderId
+      )
+      const instanceCount =
+        folder?.type === "folder" ? folder.data.instances.length : 0
+      const maxVisible = Math.min(instanceCount, 4)
+      const visibleIndices = Array.from({ length: maxVisible }, (_, i) => i)
+
+      setVisibleFolderIndices(visibleIndices)
+      injectFolderTransitionCSS(visibleIndices, isClosing ? "close" : "open")
+      setClickedFolderId(folderId)
+
+      // Show overlay BEFORE view transition captures states
+      // Reset opacity in case it was left at "0" by ModalsManager.closeModal()
+      if (overlay) {
+        overlay.style.display = "flex"
+        overlay.style.opacity = "1"
+        overlay.style.transition = ""
+      }
+
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+
+      const transition = document.startViewTransition(() => {
+        setOpenFolderId((prev) => (prev === folderId ? null : folderId))
       })
-    }
-
-    return _groups
-  })
-
-  const iterableFilteredGroups = createMemo(() => {
-    const iterable = Object.values(filteredGroups())
-
-    if (globalStore.settings.data?.instancesGroupBy === "gameVersion") {
-      iterable.sort((a, b) => {
-        if (globalStore.settings.data?.instancesGroupByAsc) {
-          return a.name.localeCompare(b.name, undefined, {
-            numeric: true,
-            sensitivity: "base"
-          })
-        } else {
-          return b.name.localeCompare(a.name, undefined, {
-            numeric: true,
-            sensitivity: "base"
-          })
+      transition.finished.then(() => {
+        setClickedFolderId(null)
+        setVisibleFolderIndices([])
+        removeFolderTransitionCSS()
+        // Hide overlay if folder was closed
+        if (openFolderId() === null && overlay) {
+          overlay.style.display = "none"
         }
       })
     } else {
-      iterable.sort((a, b) => {
-        if (a.name === t("instances:_trn_favorites")) {
-          return -1
-        }
+      if (overlay) {
+        overlay.style.display = folderId ? "flex" : "none"
+        overlay.style.opacity = folderId ? "1" : ""
+        overlay.style.transition = ""
+      }
+      setOpenFolderId((prev) => (prev === folderId ? null : folderId))
+    }
+  }
 
-        if (b.name === t("instances:_trn_favorites")) {
-          return 1
-        }
+  // Library mode switch with slide transition
+  const handleModeSwitch = async (newMode: LibraryMode) => {
+    if (libraryMode() === newMode) return
 
-        if (globalStore.settings.data?.instancesGroupByAsc) {
-          return a.name.localeCompare(b.name)
-        } else {
-          return b.name.localeCompare(a.name)
+    const reducedMotion = globalStore.settings.data?.reducedMotion
+    const modeParam = newMode === "servers" ? "servers" : undefined
+
+    if (!reducedMotion && document.startViewTransition) {
+      const direction = newMode === "servers" ? "forward" : "backward"
+
+      // Put the view-transition-name + class on the scroll container
+      // instead of contentRef. contentRef's border box spans the full tile
+      // list (scrolling happens on the ancestor), so its snapshot paints
+      // tiles that were scrolled out of view on top of the surrounding
+      // layout during the slide. The scroll container, by contrast, is
+      // already viewport-sized, so its snapshot naturally matches what the
+      // user was seeing — no clip-path gymnastics needed.
+      //
+      // The sticky LibraryHeader sits inside the scroll container, so we
+      // also give it its own view-transition-name. That lifts it out of
+      // the library-content snapshot into its own pseudo group, and the
+      // `animation: none` rule in modeTransitions.css keeps it visually
+      // fixed while the content slides behind it.
+      const scrollEl = document.getElementById("gdl-content-wrapper")
+      let headerEl: HTMLElement | null = null
+      if (contentRef) {
+        let sib = contentRef.previousElementSibling as HTMLElement | null
+        while (sib) {
+          if (getComputedStyle(sib).position === "sticky") {
+            headerEl = sib
+            break
+          }
+          sib = sib.previousElementSibling as HTMLElement | null
         }
+      }
+      if (scrollEl) {
+        scrollEl.style.viewTransitionName = "library-content"
+        scrollEl.style.setProperty("view-transition-class", direction)
+        // Hide the scrollbar while the snapshot is captured so it isn't
+        // baked into the library-content pseudo and carried along by the
+        // slide. scrollbar-gutter: stable on the container (see
+        // ContentWrapper) reserves the space so there's no layout shift.
+        scrollEl.classList.add("library-mode-switching")
+      }
+      if (headerEl) {
+        headerEl.style.viewTransitionName = "library-header"
+      }
+
+      const transition = document.startViewTransition(() => {
+        setSearchParams({ mode: modeParam }, { replace: true })
       })
+
+      const finish = () => {
+        if (scrollEl) {
+          scrollEl.style.viewTransitionName = ""
+          scrollEl.style.removeProperty("view-transition-class")
+          scrollEl.classList.remove("library-mode-switching")
+        }
+        if (headerEl) headerEl.style.viewTransitionName = ""
+      }
+      transition.finished.then(finish).catch(finish)
+    } else {
+      setSearchParams({ mode: modeParam }, { replace: true })
+    }
+  }
+
+  const handleSelectExclusive = (id: string) => {
+    selection.clearSelection()
+    selection.toggleSelection(id)
+  }
+
+  const handleBatchDelete = () => {
+    const selectedStringIds = selection.selectedIds()
+
+    if (libraryMode() === "servers") {
+      const selectedServerIds = parseServerIds(selectedStringIds)
+      const selectedServersList = (globalStore.servers.data || []).filter(
+        (server) => selectedServerIds.includes(server.id)
+      )
+
+      if (selectedServersList.length === 0) {
+        selection.clearSelection()
+        return
+      }
+
+      modals?.openModal(
+        { name: "confirmBatchServerDeletion" },
+        {
+          servers: selectedServersList,
+          onComplete: selection.clearSelection
+        }
+      )
+      return
     }
 
-    return iterable
-  })
+    // Parse string IDs to separate instances from folders
+    const selectedInstanceIds = parseInstanceIds(selectedStringIds)
+    const selectedFolderIds = parseFolderIds(selectedStringIds)
 
-  createEffect(() => {
-    setInstances(reconcile(iterableFilteredGroups()))
-  })
+    // Get full data for instances
+    const selectedInstancesList = (globalStore.instances.data || []).filter(
+      (instance) => selectedInstanceIds.includes(instance.id)
+    )
 
-  const sortByOptions: {
-    key: InstancesSortBy
-    label: string
-  }[] = [
-    {
-      key: "name",
-      label: t("ui:_trn_name")
-    },
-    {
-      key: "mostPlayed",
-      label: t("ui:_trn_most_played")
-    },
-    {
-      key: "lastPlayed",
-      label: t("ui:_trn_last_played")
-    },
-    {
-      key: "lastUpdated",
-      label: t("ui:_trn_last_updated")
-    },
-    {
-      key: "gameVersion",
-      label: t("ui:_trn_game_version")
-    },
-    {
-      key: "created",
-      label: t("ui:_trn_created")
+    // Get full data for folders
+    const selectedFoldersList = (globalStore.instanceGroups.data || []).filter(
+      (group) => selectedFolderIds.includes(group.id)
+    )
+
+    // Open appropriate modal based on what's selected
+    if (selectedInstancesList.length > 0 && selectedFoldersList.length === 0) {
+      // Only instances selected
+      modals?.openModal(
+        { name: "confirmBatchInstanceDeletion" },
+        {
+          instances: selectedInstancesList,
+          onComplete: selection.clearSelection
+        }
+      )
+    } else if (
+      selectedFoldersList.length > 0 &&
+      selectedInstancesList.length === 0
+    ) {
+      // Only folders selected
+      modals?.openModal(
+        { name: "confirmBatchFolderDeletion" },
+        { folders: selectedFoldersList, onComplete: selection.clearSelection }
+      )
+    } else {
+      // Mixed selection - open mixed deletion modal
+      modals?.openModal(
+        { name: "confirmBatchMixedDeletion" },
+        {
+          instances: selectedInstancesList,
+          folders: selectedFoldersList,
+          onComplete: selection.clearSelection
+        }
+      )
     }
-  ]
-
-  const groupByOptions: {
-    key: InstancesGroupBy
-    label: string
-  }[] = [
-    {
-      key: "group",
-      label: t("ui:_trn_group")
-    },
-    {
-      key: "gameVersion",
-      label: t("ui:_trn_game_version")
-    },
-    {
-      key: "modloader",
-      label: t("ui:_trn_modloader")
-    },
-    {
-      key: "modplatform",
-      label: t("content:_trn_modplatform")
-    }
-  ]
+  }
 
   return (
-    <div class="p-6">
+    <div
+      class="box-border flex flex-1 flex-col p-6"
+      onMouseDown={(e) => {
+        if (!shouldIgnoreClick(e)) {
+          dragSelect.handlers.handleMouseDown(e)
+        }
+      }}
+    >
       <UnstableCard />
-      <Switch>
-        <Match when={globalStore.instances.isLoading}>
-          <div>
-            <Skeleton.instances />
-          </div>
-        </Match>
-        <Match
-          when={
-            globalStore.instances?.data?.length === 0 &&
-            !globalStore.instances.isLoading
-          }
-        >
-          <div class="mt-12 flex h-full w-full flex-col items-center justify-center gap-6">
-            <PlaceholderGorilla
-              size={14}
-              variant="Welcoming Gorilla - Open Arms"
+      <LibraryHeader
+        filter={filter}
+        setFilter={setFilter}
+        tileSize={tileSize}
+        setTileSize={setTileSize}
+        viewMode={viewMode}
+        libraryMode={libraryMode}
+        setLibraryMode={handleModeSwitch}
+      />
+      <div ref={contentRef} class="relative flex flex-1 flex-col">
+        <Show when={skeletonVisible()}>
+          <div
+            class="pointer-events-none transition-opacity duration-200 ease-out motion-reduce:transition-none"
+            classList={{
+              "absolute inset-0 z-10 opacity-0": skeletonFading(),
+              "opacity-100": !skeletonFading()
+            }}
+          >
+            <Skeleton.instances
+              tileWidthPx={TILE_SIZES[tileSize() as TileSize]?.widthPx ?? 184}
+              rowGapPx={
+                { 1: 16, 2: 24, 3: 32, 4: 40, 5: 48 }[tileSize() as TileSize] ??
+                24
+              }
             />
-            <p class="text-lightSlate-700 max-w-100 text-center">
-              <Trans key="instances:_trn_no_instances_text" />
-            </p>
           </div>
-        </Match>
-        <Match
-          when={
-            (globalStore.instances?.data?.length || 0) > 0 &&
-            !globalStore.instances.isLoading
-          }
-        >
-          <div>
-            <div class="bg-darkSlate-800 z-5 sticky top-0 flex items-center gap-4 py-4">
-              <Input
-                ref={inputRef}
-                placeholder={t("search:_trn_search_instances")}
-                value={filter()}
-                class="w-full rounded-full"
-                onInput={(e) => setFilter(e.target.value)}
-                disabled={iterableFilteredGroups().length === 0}
-                icon={
+        </Show>
+        <Show when={!isLoading()}>
+          <ContextMenu>
+            <ContextMenuTrigger class="flex flex-1 flex-col">
+              <Show
+                when={!isEmpty()}
+                fallback={
+                  <div class="mt-12 flex h-full w-full flex-col items-center justify-center gap-6">
+                    <PlaceholderGorilla
+                      size={14}
+                      variant="Welcoming Gorilla - Open Arms"
+                    />
+                    <p class="text-lightSlate-700 max-w-100 text-center">
+                      <Trans key="instances:_trn_no_instances_text" />
+                    </p>
+                  </div>
+                }
+              >
+                <div
+                  class="mt-4"
+                  onClick={() => {
+                    if (
+                      !dragContext.isDragging() &&
+                      !dragContext.justDropped()
+                    ) {
+                      setOpenFolderId(null)
+                    }
+                  }}
+                >
                   <Switch>
-                    <Match when={filter()}>
-                      <div
-                        class="hover:bg-white i-hugeicons:cancel-01"
-                        onClick={() => {
-                          setFilter("")
-                        }}
+                    <Match when={showFoldersView()}>
+                      <FoldersView
+                        libraryItems={data().libraryItems}
+                        defaultGroupId={defaultGroupId()}
+                        tileSize={tileSize}
+                        selection={selection}
+                        openFolderId={openFolderId}
+                        setOpenFolderId={setOpenFolderId}
+                        onToggleFolder={toggleFolder}
+                        onDragStart={(type, ids, e) =>
+                          dragContext.startDrag(type, ids, e)
+                        }
+                        justDropped={dragContext.justDropped}
+                        flipAnimation={flipAnimation}
+                        entranceAnimation={entranceAnimation}
+                        tileRefs={tileRefs}
+                        newlyCreatedFolderId={dragDrop.newlyCreatedFolderId}
+                        clearNewlyCreatedFolderId={
+                          dragDrop.clearNewlyCreatedFolderId
+                        }
+                        selectedCount={selection.selectedIds().size}
+                        onBatchDelete={handleBatchDelete}
+                        onSelectExclusive={handleSelectExclusive}
+                        libraryMode={libraryMode()}
                       />
                     </Match>
-                    <Match when={!filter()}>
-                      <div class="i-hugeicons:search-01" />
+                    <Match when={!showFoldersView()}>
+                      <AccordionView
+                        virtualGroups={data().virtualGroups}
+                        tileSize={tileSize}
+                        selection={selection}
+                        onDragStart={(type, ids, e) =>
+                          dragContext.startDrag(type, ids, e)
+                        }
+                        justDropped={dragContext.justDropped}
+                        animatedInstanceIds={entranceAnimation.animatedIds}
+                        initialAnimationComplete={entranceAnimation}
+                        tileRefs={tileRefs}
+                        selectedCount={selection.selectedIds().size}
+                        onBatchDelete={handleBatchDelete}
+                        onSelectExclusive={handleSelectExclusive}
+                      />
                     </Match>
                   </Switch>
-                }
-              />
-              <DropdownMenu>
-                <DropdownMenuTrigger>
-                  <Button type="secondary" size="small">
-                    <div class="i-hugeicons:filter h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent class="w-64">
-                  <DropdownMenuLabel>
-                    <div class="flex items-center justify-between gap-2">
-                      <div>
-                        <Trans key="content:_trn_platform" />
-                      </div>
-                      <div
-                        class="text-lightSlate-900 hover:text-lightSlate-50 text-xs transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
-                        onClick={() => {
-                          // Reset all filter settings to defaults
-                          settingsMutation.mutate({
-                            instancesTileSize: { Set: 2 },
-                            instancesSortBy: { Set: "created" },
-                            instancesSortByAsc: { Set: false },
-                            instancesGroupBy: { Set: "group" },
-                            instancesGroupByAsc: { Set: true }
-                          })
-                          setInstancesTileSize(2)
-                        }}
-                      >
-                        <Trans key="instances:_trn_reset_filters" />
-                      </div>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-
-                  <div class="flex w-full flex-col">
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger class="w-full">
-                        <div class="flex w-full items-center justify-between">
-                          <Trans key="instances:_trn_instance_tile_size" />
-                          <div class="flex items-center gap-2">
-                            <span>{instancesTileSize()}</span>
-                          </div>
-                        </div>
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          <DropdownMenuLabel>
-                            <Trans key="ui:_trn_tile_size" />
-                          </DropdownMenuLabel>
-                          <DropdownMenuRadioGroup
-                            value={instancesTileSize().toString()}
-                          >
-                            <For each={[1, 2, 3, 4, 5]}>
-                              {(size) => (
-                                <DropdownMenuRadioItem
-                                  value={size.toString()}
-                                  onSelect={() => {
-                                    setInstancesTileSize(size)
-                                    settingsMutation.mutate({
-                                      instancesTileSize: {
-                                        Set: size
-                                      }
-                                    })
-                                  }}
-                                >
-                                  {size}
-                                </DropdownMenuRadioItem>
-                              )}
-                            </For>
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger class="w-full">
-                        <div class="flex w-full items-center justify-between">
-                          <Trans key="search:_trn_sort_by" />
-                          <div class="flex items-center gap-2">
-                            <span>
-                              {sortByOptions.find(
-                                (opt) =>
-                                  opt.key ===
-                                  globalStore.settings.data?.instancesSortBy
-                              )?.label || "Name"}
-                            </span>
-                            {globalStore.settings.data?.instancesSortBy && (
-                              <div
-                                class={`ml-2 h-4 w-4 ${globalStore.settings.data?.instancesSortByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          <DropdownMenuLabel>
-                            <Trans key="ui:_trn_sort_options" />
-                          </DropdownMenuLabel>
-                          <DropdownMenuRadioGroup
-                            value={
-                              globalStore.settings.data?.instancesSortBy || ""
-                            }
-                          >
-                            <For each={sortByOptions}>
-                              {(option) => (
-                                <DropdownMenuRadioItem
-                                  value={option.key}
-                                  onSelect={() => {
-                                    const currentOption =
-                                      globalStore.settings.data?.instancesSortBy
-                                    const currentDirection =
-                                      globalStore.settings.data
-                                        ?.instancesSortByAsc
-
-                                    // If clicking the same option
-                                    if (currentOption === option.key) {
-                                      // Toggle direction
-                                      settingsMutation.mutate({
-                                        instancesSortByAsc: {
-                                          Set: !currentDirection
-                                        }
-                                      })
-                                    } else {
-                                      // New option, set to ascending by default
-                                      settingsMutation.mutate({
-                                        instancesSortBy: {
-                                          Set: option.key
-                                        },
-                                        instancesSortByAsc: {
-                                          Set: true
-                                        }
-                                      })
-                                    }
-                                  }}
-                                >
-                                  <div class="flex w-full items-center justify-between">
-                                    <span>{option.label}</span>
-                                    {globalStore.settings.data
-                                      ?.instancesSortBy === option.key && (
-                                      <div
-                                        class={`ml-4 h-4 w-4 ${globalStore.settings.data?.instancesSortByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
-                                      />
-                                    )}
-                                  </div>
-                                </DropdownMenuRadioItem>
-                              )}
-                            </For>
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger class="w-full">
-                        <div class="flex w-full items-center justify-between">
-                          <Trans key="search:_trn_group_by" />
-                          <div class="flex items-center gap-2">
-                            <span>
-                              {groupByOptions.find(
-                                (opt) =>
-                                  opt.key ===
-                                  globalStore.settings.data?.instancesGroupBy
-                              )?.label || "Group"}
-                            </span>
-                            {globalStore.settings.data?.instancesGroupBy && (
-                              <div
-                                class={`ml-2 h-4 w-4 ${globalStore.settings.data?.instancesGroupByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          <DropdownMenuLabel>
-                            <Trans key="ui:_trn_group_options" />
-                          </DropdownMenuLabel>
-                          <DropdownMenuRadioGroup
-                            value={
-                              globalStore.settings.data?.instancesGroupBy || ""
-                            }
-                          >
-                            <For each={groupByOptions}>
-                              {(option) => (
-                                <DropdownMenuRadioItem
-                                  value={option.key}
-                                  onSelect={() => {
-                                    const currentOption =
-                                      globalStore.settings.data
-                                        ?.instancesGroupBy
-                                    const currentDirection =
-                                      globalStore.settings.data
-                                        ?.instancesGroupByAsc
-
-                                    // If clicking the same option
-                                    if (currentOption === option.key) {
-                                      // Toggle direction
-                                      settingsMutation.mutate({
-                                        instancesGroupByAsc: {
-                                          Set: !currentDirection
-                                        }
-                                      })
-                                    } else {
-                                      // New option, set to ascending by default
-                                      settingsMutation.mutate({
-                                        instancesGroupBy: {
-                                          Set: option.key
-                                        },
-                                        instancesGroupByAsc: {
-                                          Set: true
-                                        }
-                                      })
-                                    }
-                                  }}
-                                >
-                                  <div class="flex w-full items-center justify-between">
-                                    <span>{option.label}</span>
-                                    {globalStore.settings.data
-                                      ?.instancesGroupBy === option.key && (
-                                      <div
-                                        class={`ml-4 h-4 w-4 ${globalStore.settings.data?.instancesGroupByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
-                                      />
-                                    )}
-                                  </div>
-                                </DropdownMenuRadioItem>
-                              )}
-                            </For>
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <ContextMenu>
-              <ContextMenuTrigger>
-                <div class="mt-4">
-                  <For each={instances || []}>
-                    {(group, i) => {
-                      return (
-                        <Show when={group.instances.length > 0}>
-                          <Collapsable
-                            noPadding
-                            title={
-                              <>
-                                <span>{group.name}</span>
-                              </>
-                            }
-                            size="standard"
-                          >
-                            <div
-                              class="mt-4 flex flex-wrap gap-x-4"
-                              classList={{
-                                "gap-y-4": instancesTileSize() === 1,
-                                "gap-y-6": instancesTileSize() === 2,
-                                "gap-y-8": instancesTileSize() === 3,
-                                "gap-y-10": instancesTileSize() === 4,
-                                "gap-y-12": instancesTileSize() === 5
-                              }}
-                            >
-                              <For each={group.instances}>
-                                {(instance, j) => {
-                                  let ref: HTMLDivElement | undefined
-
-                                  const instancesCountInPreviousGroups =
-                                    instances
-                                      .slice(0, i())
-                                      .reduce(
-                                        (acc, group) =>
-                                          acc + group.instances.length,
-                                        0
-                                      )
-
-                                  const baseDelay = 300
-
-                                  const groupDelay =
-                                    i() * 60 +
-                                    60 * instancesCountInPreviousGroups
-
-                                  const instanceDelay = j() * 60
-
-                                  const totalDelay =
-                                    baseDelay + groupDelay + instanceDelay
-
-                                  onMount(() => {
-                                    if (ref && !initAnimationRan) {
-                                      ref.animate(
-                                        [
-                                          {
-                                            opacity: 0
-                                          },
-                                          {
-                                            opacity: 1
-                                          }
-                                        ],
-                                        {
-                                          duration: 250,
-                                          delay: totalDelay,
-                                          easing: "linear",
-                                          fill: "forwards"
-                                        }
-                                      )
-                                    }
-
-                                    if (
-                                      i() === instances.length - 1 &&
-                                      j() === group.instances.length - 1
-                                    ) {
-                                      requestAnimationFrame(() => {
-                                        initAnimationRan = true
-                                      })
-                                    }
-                                  })
-
-                                  return (
-                                    <div
-                                      ref={ref}
-                                      classList={{
-                                        "opacity-0": !initAnimationRan
-                                      }}
-                                    >
-                                      <InstanceTile
-                                        instance={instance}
-                                        identifier={`${group.id?.toString() || group.name} - ${instance.id}`}
-                                        size={instancesTileSize() as any}
-                                      />
-                                    </div>
-                                  )
-                                }}
-                              </For>
-                            </div>
-                          </Collapsable>
-                        </Show>
-                      )
-                    }}
-                  </For>
                 </div>
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuGroup>
-                  <ContextMenuGroupLabel>
-                    <Trans key="library:_trn_add_new_instance" />
-                  </ContextMenuGroupLabel>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    class="flex items-center gap-2"
-                    onClick={() => {
-                      modals?.openModal({
-                        name: "instanceCreation"
-                      })
-                    }}
-                  >
-                    <div class="i-hugeicons:file-add h-4 w-4" />
-                    <Trans key="library:_trn_create_new_instance" />
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    class="flex items-center gap-2"
-                    onClick={() => {
-                      modals?.openModal(
-                        {
-                          name: "instanceCreation"
-                        },
-                        {
-                          import: true
-                        }
-                      )
-                    }}
-                  >
-                    <div class="i-hugeicons:download-02 h-4 w-4" />
-                    <Trans key="library:_trn_import_instance" />
-                  </ContextMenuItem>
-                </ContextMenuGroup>
-              </ContextMenuContent>
-            </ContextMenu>
-          </div>
-        </Match>
-      </Switch>
+              </Show>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <Switch>
+                <Match when={libraryMode() === "instances"}>
+                  <ContextMenuGroup>
+                    <ContextMenuGroupLabel>
+                      <Trans key="library:_trn_add_new_instance" />
+                    </ContextMenuGroupLabel>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={() =>
+                        modals?.openModal({ name: "instanceCreation" })
+                      }
+                    >
+                      <div class="i-hugeicons:file-add h-4 w-4" />
+                      <Trans key="library:_trn_create_new_instance" />
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={() =>
+                        modals?.openModal(
+                          { name: "instanceCreation" },
+                          { import: true }
+                        )
+                      }
+                    >
+                      <div class="i-hugeicons:download-02 h-4 w-4" />
+                      <Trans key="library:_trn_import_instance" />
+                    </ContextMenuItem>
+                  </ContextMenuGroup>
+                </Match>
+                <Match when={libraryMode() === "servers"}>
+                  <ContextMenuGroup>
+                    <ContextMenuGroupLabel>
+                      <Trans key="instances:_trn_server_create_title" />
+                    </ContextMenuGroupLabel>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={() =>
+                        modals?.openModal({ name: "serverCreation" })
+                      }
+                    >
+                      <div class="i-hugeicons:server h-4 w-4" />
+                      <Trans key="instances:_trn_server_create" />
+                    </ContextMenuItem>
+                  </ContextMenuGroup>
+                </Match>
+              </Switch>
+            </ContextMenuContent>
+          </ContextMenu>
+        </Show>
+      </div>
+
+      <FloatingFavoritesBar
+        favoriteIds={data().favoriteIds}
+        isSelectionActive={selection.selectedIds().size > 0}
+        libraryMode={libraryMode()}
+      />
+
+      <Show when={dragSelect.selectionRect()}>
+        {(rect) => (
+          <div
+            class="border-primary-500 bg-primary-500/20 pointer-events-none fixed z-50 border-2"
+            style={{
+              left: `${rect().left}px`,
+              top: `${rect().top}px`,
+              width: `${rect().width}px`,
+              height: `${rect().height}px`
+            }}
+          />
+        )}
+      </Show>
+
+      <DragGhost
+        instances={globalStore.instances.data || []}
+        servers={globalStore.servers.data || []}
+        groups={data()
+          .libraryItems.filter(
+            (item): item is LibraryItem & { type: "folder" } =>
+              item.type === "folder"
+          )
+          .map((item) => ({
+            id: item.data.id,
+            name: item.data.name,
+            instances: item.data.instances
+          }))}
+        tileSize={tileSize() as 1 | 2 | 3 | 4 | 5}
+      />
     </div>
   )
 }

@@ -18,7 +18,7 @@ use crate::managers::java::managed::Step;
 use crate::managers::minecraft::assets::get_assets_dir;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
-use crate::managers::minecraft::{UpdateValue, curseforge};
+use crate::managers::minecraft::{UpdateValue, curseforge, gdlpack};
 use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
 use crate::managers::modplatforms::modrinth::convert_mr_version_to_standard_version;
 use crate::managers::vtask::Subtask;
@@ -183,6 +183,7 @@ pub async fn process_modpack(
 
         let cffile_path = setup_path.join("curseforge");
         let mrfile_path = setup_path.join("modrinth");
+        let gdlpack_path = setup_path.join("gdlpack");
 
         // Is this required? Can we not extract them twice? Extraction should be idempotent.
         // TODO: look into this
@@ -199,27 +200,37 @@ pub async fn process_modpack(
         enum Modplatform {
             Curseforge,
             Modrinth,
+            GDLPack,
         }
 
         t_request.start_opaque();
 
-        // If a cf or mr file is provided, we don't need to do anything.
+        // If a cf, mr, or gdlpack file is provided, we don't need to do anything.
         // In case a modpack (from a change-pack-version.json file) is provided,
         // we need to download the modpack zip file.
-        let file = match (cffile_path.is_file(), mrfile_path.is_file(), &modpack) {
-            (false, false, None) => {
+        let file = match (
+            cffile_path.is_file(),
+            mrfile_path.is_file(),
+            gdlpack_path.is_file(),
+            &modpack,
+        ) {
+            (false, false, false, None) => {
                 t_request.complete_opaque();
                 None
             }
-            (true, _, _) => {
+            (true, _, _, _) => {
                 t_request.complete_opaque();
                 Some(Modplatform::Curseforge)
             }
-            (_, true, _) => {
+            (_, true, _, _) => {
                 t_request.complete_opaque();
                 Some(Modplatform::Modrinth)
             }
-            (false, false, Some(Modpack::Curseforge(modpack))) => {
+            (_, _, true, _) => {
+                t_request.complete_opaque();
+                Some(Modplatform::GDLPack)
+            }
+            (false, false, false, Some(Modpack::Curseforge(modpack))) => {
                 let file = app
                     .modplatforms_manager()
                     .curseforge
@@ -260,7 +271,7 @@ pub async fn process_modpack(
 
                 Some(Modplatform::Curseforge)
             }
-            (false, false, Some(Modpack::Modrinth(modpack))) => {
+            (false, false, false, Some(Modpack::Modrinth(modpack))) => {
                 let file = app
                     .modplatforms_manager()
                     .modrinth
@@ -441,6 +452,55 @@ pub async fn process_modpack(
 
                 Some(gdl_version)
             }
+            Some(Modplatform::GDLPack) => {
+                let (modpack_progress_tx, mut modpack_progress_rx) =
+                    tokio::sync::watch::channel(gdlpack::ProgressState::Idle);
+
+                let completion = tokio::spawn(async move {
+                    while modpack_progress_rx.changed().await.is_ok() {
+                        {
+                            let progress = *modpack_progress_rx.borrow();
+                            match progress {
+                                gdlpack::ProgressState::Idle => {}
+                                gdlpack::ProgressState::ResolvingFiles(count, total) => {
+                                    t_addon_metadata.update_items(count as u32, total as u32)
+                                }
+                                gdlpack::ProgressState::ExtractingOverrides(count, total) => {
+                                    t_extract_files.update_items(count as u32, total as u32)
+                                }
+                            }
+                        }
+
+                        tokio::time::sleep(Duration::from_millis(200)).await;
+                    }
+
+                    t_addon_metadata.complete_opaque();
+                    t_extract_files.complete_opaque();
+                });
+
+                let modpack_info = gdlpack::prepare_modpack_from_gdlpack(
+                    &app,
+                    &gdlpack_path,
+                    &instance_prep_path,
+                    skip_overrides,
+                    packinfo.as_ref(),
+                    modpack_progress_tx,
+                )
+                .await?;
+
+                completion.await?;
+
+                tokio::fs::create_dir_all(skip_overrides_path).await?;
+
+                for (downloadable, skip) in modpack_info.downloadables {
+                    match skip {
+                        Some(skippath) => skipped_mods.push(skippath),
+                        None => modpack_downloads.push(downloadable),
+                    }
+                }
+
+                Some(modpack_info.version)
+            }
             None => None,
         };
 
@@ -570,7 +630,10 @@ pub async fn process_modpack(
         t_fill_cache.start_opaque();
 
         app.meta_cache_manager()
-            .queue_caching(instance_id, true)
+            .queue_caching(
+                crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+                true,
+            )
             .await;
 
         t_fill_cache.complete_opaque();
@@ -827,7 +890,9 @@ pub async fn process_modpack_staging(
 
         // Trigger caching now that modpack installation is complete
         app.meta_cache_manager()
-            .watch_and_prioritize(Some(instance_id))
+            .watch_and_prioritize(Some(
+                crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+            ))
             .await;
     }
 

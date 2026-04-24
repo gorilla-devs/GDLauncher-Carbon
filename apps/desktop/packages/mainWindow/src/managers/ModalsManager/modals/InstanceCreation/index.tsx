@@ -4,6 +4,7 @@ import ModalLayout from "../../ModalLayout"
 import { Trans, useTransContext } from "@gd/i18n"
 import Custom from "./Custom"
 import Import from "./Import"
+import ShareCodeImport from "./ShareCodeImport"
 import { Match, Switch } from "solid-js"
 
 interface Props {
@@ -29,7 +30,7 @@ const InstanceCreation = (props: ModalProps) => {
           </Match>
           <Match when={data()?.id === undefined || data()?.id === null}>
             <Tabs defaultValue={data()?.import ? "import" : "custom"}>
-              <TabsList class="w-full">
+              <TabsList class="mx-4 mt-4 w-auto">
                 <TabsIndicator />
                 <TabsTrigger value="custom" class="flex-1">
                   <div class="flex items-center gap-2">
@@ -43,12 +44,21 @@ const InstanceCreation = (props: ModalProps) => {
                     <Trans key="instances:_trn_instance_import_tab" />
                   </div>
                 </TabsTrigger>
+                <TabsTrigger value="share" class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <div class="i-hugeicons:share-08" />
+                    <Trans key="instances:_trn_instance_share_code_tab" />
+                  </div>
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="custom">
                 <Custom data={data()} />
               </TabsContent>
               <TabsContent value="import">
                 <Import />
+              </TabsContent>
+              <TabsContent value="share">
+                <ShareCodeImport />
               </TabsContent>
             </Tabs>
           </Match>

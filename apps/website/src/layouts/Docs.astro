@@ -1,10 +1,7 @@
 ---
 import type { CollectionEntry } from "astro:content";
-import BaseHead from "../components/BaseHead.astro";
-import Header from "../components/Header.astro";
-import Footer from "../components/Footer.astro";
-import FormattedDate from "../components/FormattedDate.astro";
-import "@fontsource/ubuntu";
+import PageShell from "../components/PageShell.astro";
+import Breadcrumb from "../components/Breadcrumb.astro";
 import DocsSideNav from "../components/DocsSideNav.astro";
 import "../styles/DocsStyle.css";
 
@@ -13,105 +10,301 @@ type Props = CollectionEntry<"docs">["data"];
 const { title, category } = Astro.props;
 ---
 
-<html lang="en">
-  <head>
-    <BaseHead title={title} description={category} />
-    <style>
-      body {
-        font-family: "Ubuntu", sans-serif;
-        /* background-color: rgba(29, 32, 40, 1); */
-        background-image: linear-gradient(
-            rgba(23, 29, 39, 0.3),
-            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
-          ),
-          url("../assets/patern.svg");
-        background-size: cover;
-        /* background-position: center; */
-        background-repeat: no-repeat;
-        background-color: rgba(29, 32, 40, 1);
-      }
-      main {
-        width: calc(100% - 2em);
-        max-width: 100%;
-        margin: 0;
-      }
-      .hero-image {
-        width: 100%;
-      }
-      .hero-image img {
-        display: block;
-        margin: 0 auto;
-        border-radius: 12px;
-        box-shadow: var(--box-shadow);
-      }
-      .prose {
-        width: 720px;
-        max-width: calc(100% - 2em);
-        margin: auto;
-        padding: 1em;
-        color: rgb(var(--gray-dark));
-      }
-      .title {
-        margin-bottom: 1em;
-        padding: 1em 0;
-        text-align: center;
-        line-height: 1;
-      }
-      .title h1 {
-        margin: 0 0 0.5em 0;
-      }
-      .date {
-        margin-bottom: 0.5em;
-        color: rgb(var(--gray));
-      }
-      .last-updated-on {
-        font-style: italic;
-      }
-      #container {
-        padding: 1em;
-      }
-    </style>
-  </head>
+<PageShell
+  title={title}
+  description={category}
+  particles
+>
+    <!-- Mobile overlay -->
+    <div id="docs-overlay" class="docs-overlay lg:hidden"></div>
 
-  <body>
-    <Header />
-    <div
-      id="container"
-      class="grid min-h-screen max-w-6xl mx-auto transition-colors"
-    >
-      <aside
-        aria-label="Sidebar navigation"
-        id="sidenav-open"
-        class="z-50 grid px-2 lg:px-6 lg:block grid-cols-[max-content_1fr] invisible target:visible lg:visible lg:translate-x-0 sticky top-0 max-h-screen -translate-x-full target:translate-x-0 transition-transform"
-      >
-        <DocsSideNav />
-      </aside>
-      <main
-        aria-label="Main panel"
-        class="max-w-[95vw] py-6 px-2 lg:px-6 mx-auto w-full"
-      >
-        <slot />
+    <div class="docs-container max-w-6xl mx-auto px-4 py-8">
+      <Breadcrumb
+        items={[
+          { label: "Docs", href: "/docs" },
+          { label: title }
+        ]}
+        maxWidth="max-w-6xl"
+      />
+      <div class="flex gap-8">
+        <!-- Sidebar -->
+        <aside
+          id="docs-sidebar"
+          class="docs-sidebar w-64 flex-shrink-0 lg:block"
+        >
+          <div class="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto bg-darkSlate-800 rounded-xl p-4">
+            <DocsSideNav />
+          </div>
+        </aside>
 
-        <!-- <Footer /> -->
-      </main>
+        <!-- Main content -->
+        <main class="flex-1 min-w-0">
+          <article class="docs-content prose prose-invert max-w-none bg-darkSlate-800 rounded-xl p-8">
+            <slot />
+          </article>
+        </main>
+      </div>
     </div>
 
-    <Footer />
+    <!-- Mobile FAB toggle -->
+    <button
+      id="docs-menu-toggle"
+      class="lg:hidden fixed bottom-6 right-6 z-50 p-4 rounded-full bg-primary-500 hover:bg-primary-400 text-lightSlate-50 shadow-lg shadow-primary-500/25 transition-all duration-200 hover:scale-105"
+      aria-label="Toggle documentation menu"
+    >
+      <div class="i-hugeicons:menu-02 w-6 h-6 menu-icon"></div>
+      <div class="i-hugeicons:cancel-01 w-6 h-6 close-icon hidden"></div>
+    </button>
+</PageShell>
 
-    <style is:global>
-      /** Side Navigation */
-      #container {
-        grid: [stack] 1fr / 1fr [stack] 4fr;
-      }
+<style is:global>
+  /* Sidebar - Desktop */
+  .docs-sidebar {
+    display: none;
+  }
 
-      @media (max-width: 1024px) {
-        #container {
-          grid: [stack] 1fr / min-content [stack] 1fr;
-        }
-        #container > * {
-          grid-area: stack;
-        }
+  @media (min-width: 1024px) {
+    .docs-sidebar {
+      display: block;
+    }
+  }
+
+  /* Sidebar - Mobile */
+  @media (max-width: 1023px) {
+    .docs-sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100vh;
+      width: 280px;
+      background-color: rgb(var(--darkSlate-800));
+      border-right: 1px solid rgb(var(--darkSlate-700));
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      z-index: 100;
+      padding-top: 5rem;
+      overflow-y: auto;
+    }
+
+    .docs-sidebar.open {
+      transform: translateX(0);
+    }
+
+    .docs-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+      z-index: 90;
+    }
+
+    .docs-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #docs-menu-toggle.open .menu-icon {
+      display: none;
+    }
+
+    #docs-menu-toggle.open .close-icon {
+      display: block;
+    }
+  }
+
+  /* Docs content styling */
+  .docs-content {
+    color: rgb(var(--lightSlate-100));
+  }
+
+  .docs-content h1 {
+    color: rgb(var(--lightSlate-50));
+    font-size: 2.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    line-height: 1.2;
+  }
+
+  .docs-content h2 {
+    color: rgb(var(--lightSlate-50));
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgb(var(--darkSlate-600));
+  }
+
+  .docs-content h3 {
+    color: rgb(var(--lightSlate-50));
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .docs-content p {
+    margin-bottom: 1rem;
+    line-height: 1.75;
+  }
+
+  .docs-content ul,
+  .docs-content ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .docs-content ul {
+    list-style-type: disc;
+  }
+
+  .docs-content ol {
+    list-style-type: decimal;
+  }
+
+  .docs-content li {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+  }
+
+  .docs-content code {
+    background-color: rgb(var(--darkSlate-700));
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: ui-monospace, monospace;
+  }
+
+  .docs-content pre {
+    background-color: rgb(var(--darkSlate-800));
+    border: 1px solid rgb(var(--darkSlate-600));
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+  }
+
+  .docs-content pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.875rem;
+  }
+
+  .docs-content a {
+    color: rgb(var(--primary-400));
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .docs-content a:hover {
+    color: rgb(var(--primary-300));
+  }
+
+  .docs-content strong {
+    color: rgb(var(--lightSlate-50));
+    font-weight: 600;
+  }
+
+  .docs-content blockquote {
+    border-left: 4px solid rgb(var(--primary-500));
+    padding-left: 1rem;
+    margin: 1.5rem 0;
+    color: rgb(var(--darkSlate-100));
+    font-style: italic;
+  }
+
+  .docs-content img {
+    border-radius: 0.5rem;
+    margin: 1.5rem 0;
+  }
+
+  .docs-content hr {
+    border: none;
+    border-top: 1px solid rgb(var(--darkSlate-600));
+    margin: 2rem 0;
+  }
+
+  .docs-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+  }
+
+  .docs-content th,
+  .docs-content td {
+    border: 1px solid rgb(var(--darkSlate-600));
+    padding: 0.75rem;
+    text-align: left;
+  }
+
+  .docs-content th {
+    background-color: rgb(var(--darkSlate-700));
+    color: rgb(var(--lightSlate-50));
+    font-weight: 600;
+  }
+</style>
+
+<script>
+  function initDocsLayout() {
+    const sidebar = document.getElementById('docs-sidebar');
+    const overlay = document.getElementById('docs-overlay');
+    const toggleBtn = document.getElementById('docs-menu-toggle');
+
+    if (!sidebar || !overlay || !toggleBtn) return;
+
+    // Capture non-null references for use in closures
+    const sidebarEl = sidebar;
+    const overlayEl = overlay;
+    const toggleBtnEl = toggleBtn;
+
+    function openSidebar() {
+      sidebarEl.classList.add('open');
+      overlayEl.classList.add('open');
+      toggleBtnEl.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+      sidebarEl.classList.remove('open');
+      overlayEl.classList.remove('open');
+      toggleBtnEl.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    toggleBtn.addEventListener('click', () => {
+      if (sidebar.classList.contains('open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
       }
-    </style>
-  </body>
-</html>
+    });
+
+    overlay.addEventListener('click', closeSidebar);
+
+    // Close sidebar when clicking a link (for mobile)
+    sidebar.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 1024) {
+          closeSidebar();
+        }
+      });
+    });
+
+    // Close sidebar on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+        closeSidebar();
+      }
+    });
+  }
+
+  // Run on initial load
+  initDocsLayout();
+
+  // Re-run on Astro page transitions
+  document.addEventListener('astro:page-load', initDocsLayout);
+</script>

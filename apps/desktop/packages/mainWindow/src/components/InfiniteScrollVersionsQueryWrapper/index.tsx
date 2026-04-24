@@ -1,6 +1,6 @@
 import {
   createInfiniteQuery,
-  CreateInfiniteQueryResult
+  UseInfiniteQueryResult
 } from "@tanstack/solid-query"
 import { createContext, useContext, createSignal, createEffect } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
@@ -35,12 +35,13 @@ export interface VersionRowTypeData {
   hash: string
   status: string
   mainThumbnail?: string
+  serverPackFileId?: string | null
 }
 
 export const [versionsQuery, setVersionsQuery] = useVersionsQuery()
 
 interface InfiniteQueryType {
-  infiniteQuery: CreateInfiniteQueryResult<any, unknown>
+  infiniteQuery: UseInfiniteQueryResult<any, unknown>
   query: typeof versionsQuery
   isLoading: boolean
   setQuery: (_newValue: Partial<typeof versionsQuery>) => void
@@ -65,7 +66,9 @@ export const useInfiniteVersionsQuery = () => {
 
 const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext()
-  const [searchParams, _setSearchParams] = useSearchParams()
+  const [searchParams, _setSearchParams] = useSearchParams<{
+    instanceId: string
+  }>()
   const searchContext = useSearchContext()
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(null)
 
@@ -117,7 +120,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             size: v.fileLength,
             hash: v.fileFingerprint,
             status: v.fileStatus,
-            mainThumbnail: project.data.logo?.url
+            mainThumbnail: project.data.logo?.url,
+            serverPackFileId: v.serverPackFileId?.toString() ?? null
           })),
           index: response.pagination?.index || 0,
           total: response.pagination?.totalCount || 0
@@ -156,7 +160,12 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             size: v.files[0].size,
             hash: v.files[0].hashes.sha512,
             status: v.status || "",
-            mainThumbnail: project.icon_url || undefined
+            mainThumbnail: project.icon_url || undefined,
+            serverPackFileId:
+              project.project_type === "modpack" &&
+              project.server_side !== "unsupported"
+                ? "mrpack-server"
+                : null
           })),
           index: 0,
           total: response.length
@@ -191,7 +200,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   }
 
   createEffect(() => {
-    const _instanceId = parseInt(searchParams.instanceId, 10)
+    const _instanceId = parseInt(searchParams.instanceId ?? "", 10)
     const instanceId = isNaN(_instanceId) ? undefined : _instanceId
     const addonType = props.addonType
 

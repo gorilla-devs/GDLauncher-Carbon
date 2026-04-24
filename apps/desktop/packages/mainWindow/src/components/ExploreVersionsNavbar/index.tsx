@@ -43,8 +43,11 @@ interface Props {
 }
 
 const ExploreVersionsNavbar = (props: Props) => {
-  const [searchParams, _setSearchParams] = useSearchParams()
+  const [searchParams, _setSearchParams] = useSearchParams<{
+    instanceId: string
+  }>()
   const instanceId = (): number | null => {
+    if (!searchParams.instanceId) return null
     const id = parseInt(searchParams.instanceId, 10)
     return isNaN(id) ? null : id
   }

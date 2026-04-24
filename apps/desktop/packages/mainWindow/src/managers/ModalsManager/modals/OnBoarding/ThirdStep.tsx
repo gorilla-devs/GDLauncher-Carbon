@@ -2,14 +2,25 @@ import { useModal } from "../.."
 import { Button, Spinner } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import { For, Match, Show, Switch, createSignal } from "solid-js"
-import { ImportEntityStatus } from "@gd/core_module/bindings"
+import { ImportEntity, ImportEntityStatus } from "@gd/core_module/bindings"
 import EntityCard from "@/components/Card/EntityCard"
-import SingleEntity, { setInstances, setStep } from "./SingleEntity"
+import SingleEntity, { setInstances } from "./SingleEntity"
 
 import { Trans } from "@gd/i18n"
-import { isDownloaded } from "./SingleImport"
-import { taskIds } from "@/utils/import"
 import { ENTITIES } from "@/utils/constants"
+
+const LAUNCHER_ENTITIES: ImportEntity[] = [
+  "LegacyGDLauncher",
+  "ATLauncher",
+  "CurseForge",
+  "FTB",
+  "MultiMC",
+  "Technic",
+  "PrismLauncher",
+  "Modrinth"
+]
+
+const FILE_ENTITIES: ImportEntity[] = ["CurseForgeZip", "MRPack", "GDLPack"]
 
 interface Props {
   prevStep: () => void
@@ -31,12 +42,8 @@ const ThirdStep = (props: Props) => {
 
   const handleClickEntity = (ent: ImportEntityStatus) => {
     if (ent.supported) {
-      if (currentEntity() && !(currentEntity()?.entity === ent.entity)) {
-        setStep("selectionStep")
-        setInstances([])
-      }
-      if (taskIds().every((x) => x === undefined)) {
-        setStep("selectionStep")
+      // Reset instances when switching to a different entity
+      if (currentEntity() && currentEntity()?.entity !== ent.entity) {
         setInstances([])
       }
       setEntity(ent)
@@ -63,27 +70,55 @@ const ThirdStep = (props: Props) => {
         </Match>
         <Match when={!entity()}>
           <div
-            class={`flex w-full flex-1 flex-col gap-4 ${
+            class={`flex w-full flex-1 flex-col overflow-y-auto ${
               props.isImportInstance ? "px-4 pt-4" : ""
             }`}
           >
-            <Show when={props.isImportInstance}>
-              <div class="flex w-full items-center">
-                <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
-                <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
-                  <div class="i-hugeicons:rocket-02 text-primary-500 text-sm" />
-                  <Trans key="instances:_trn_import_instance" />
-                </span>
-                <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
-              </div>
-            </Show>
-            <ul class="grid grid-cols-3 gap-1.5 p-0">
+            <div class="flex w-full items-center">
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+              <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
+                <div class="i-hugeicons:rocket-02 text-primary-500 text-sm" />
+                <Trans key="instances:_trn_import_from_launcher" />
+              </span>
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            </div>
+            <ul class="mt-3 mb-8 grid grid-cols-4 gap-1.5 p-0">
               <For
-                each={entities.data?.sort(
-                  (a, b) =>
-                    (b.supported === true ? 1 : 0) -
-                    (a.supported === true ? 1 : 0)
+                each={entities.data
+                  ?.filter((e) => LAUNCHER_ENTITIES.includes(e.entity))
+                  .sort(
+                    (a, b) =>
+                      (b.supported === true ? 1 : 0) -
+                      (a.supported === true ? 1 : 0)
+                  )}
+              >
+                {(entity) => (
+                  <EntityCard
+                    entity={entity}
+                    icon={ENTITIES[entity.entity].icon}
+                    translation={ENTITIES[entity.entity].translation}
+                    onClick={[handleClickEntity, entity]}
+                  />
                 )}
+              </For>
+            </ul>
+            <div class="flex w-full items-center">
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+              <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
+                <div class="i-hugeicons:file-zip text-primary-500 text-sm" />
+                <Trans key="instances:_trn_import_from_file" />
+              </span>
+              <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            </div>
+            <ul class="mt-3 grid grid-cols-4 gap-1.5 p-0">
+              <For
+                each={entities.data
+                  ?.filter((e) => FILE_ENTITIES.includes(e.entity))
+                  .sort(
+                    (a, b) =>
+                      (b.supported === true ? 1 : 0) -
+                      (a.supported === true ? 1 : 0)
+                  )}
               >
                 {(entity) => (
                   <EntityCard
@@ -114,11 +149,7 @@ const ThirdStep = (props: Props) => {
                 size="large"
                 type="primary"
               >
-                {isDownloaded() ? (
-                  <Trans key="onboarding:_trn_done" />
-                ) : (
-                  <Trans key="onboarding:_trn_skip" />
-                )}
+                <Trans key="onboarding:_trn_skip" />
               </Button>
             </div>
           </Show>

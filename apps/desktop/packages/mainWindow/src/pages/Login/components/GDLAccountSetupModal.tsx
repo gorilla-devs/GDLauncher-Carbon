@@ -161,10 +161,10 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
           </Show>
 
           <Show when={currentStep() === ModalStep.Completion}>
-            {/* Step 2: Email and nickname */}
+            {/* Step 2: Email and display name */}
             <div class="flex flex-col gap-4">
               <p class="text-lightSlate-600 text-sm">
-                <Trans key="auth:_trn_login.enter_recovery_email_nickname" />
+                <Trans key="auth:_trn_login.enter_recovery_email_display_name" />
               </p>
               {/* TODO: Integrate GDLAccountCompletion component here */}
               <div class="text-lightSlate-500 text-center text-sm">

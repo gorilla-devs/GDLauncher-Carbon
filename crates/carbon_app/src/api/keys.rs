@@ -57,13 +57,14 @@ keys! {
         REMOVE_GDL_ACCOUNT                          = "removeGdlAccount";
         SAVE_GDL_ACCOUNT                            = "saveGdlAccount";
         REQUEST_GDL_ACCOUNT_DELETION                = "requestGdlAccountDeletion";
-        CHANGE_GDL_ACCOUNT_NICKNAME                 = "changeGdlAccountNickname";
+        CANCEL_GDL_ACCOUNT_DELETION                 = "cancelGdlAccountDeletion";
+        CHANGE_GDL_ACCOUNT_DISPLAY_NAME             = "changeGdlAccountDisplayName";
         UPLOAD_PROFILE_ICON                         = "uploadProfileIcon";
         DELETE_PROFILE_ICON                         = "deleteProfileIcon";
         CHECK_USERNAME_AVAILABLE                    = "checkUsernameAvailable";
         CREATE_PROFILE                              = "createProfile";
-        GET_NICKNAME_HISTORY                        = "getNicknameHistory";
-        CLEAR_NICKNAME_HISTORY                      = "clearNicknameHistory";
+        GET_DISPLAY_NAME_HISTORY                    = "getDisplayNameHistory";
+        CLEAR_DISPLAY_NAME_HISTORY                  = "clearDisplayNameHistory";
     }
 
     java {
@@ -96,14 +97,18 @@ keys! {
         DEFAULT_GROUP                               = "getDefaultGroup";
         GET_GROUPS                                  = "getGroups";
         GET_ALL_INSTANCES                           = "getAllInstances";
-        CREATE_GROUP                                = "createGroup";
         CREATE_INSTANCE                             = "createInstance";
         CHANGE_MODPACK                              = "changeModpack";
         LOAD_ICON_URL                               = "loadIconUrl";
         DELETE_GROUP                                = "deleteGroup";
+        DELETE_GROUP_WITH_INSTANCES                 = "deleteGroupWithInstances";
+        RENAME_GROUP                                = "renameGroup";
         DELETE_INSTANCE                             = "deleteInstance";
         MOVE_GROUP                                  = "moveGroup";
         MOVE_INSTANCE                               = "moveInstance";
+        CREATE_FOLDER_FROM_INSTANCES                = "createFolderFromInstances";
+        ARRANGE_LIBRARY                             = "arrangeLibrary";
+        ARRANGE_GROUP                               = "arrangeGroup";
         DUPLICATE_INSTANCE                          = "duplicateInstance";
         UPDATE_INSTANCE                             = "updateInstance";
         SET_FAVORITE                                = "setFavorite";
@@ -116,6 +121,7 @@ keys! {
         GET_LOGS                                    = "getLogs";
         SEARCH_LOGS                                 = "searchLogs";
         DELETE_LOG                                  = "deleteLog";
+        OPEN_LOG_IN_FOLDER                          = "openLogInFolder";
         OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
         ENABLE_MOD                                  = "enableMod";
         DISABLE_MOD                                 = "disableMod";
@@ -125,6 +131,9 @@ keys! {
         UPDATE_MOD                                  = "updateMod";
         FIND_MOD_UPDATE                             = "findModUpdate";
         GET_MOD_SOURCES                             = "getModSources";
+        IMPORT_INSTANCE_SHARE_CODE                  = "importInstanceShareCode";
+        VALIDATE_SHARE_CODE                         = "validateShareCode";
+        GET_SHARE_PREVIEW                           = "getSharePreview";
         GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
         GET_IMPORT_ENTITY_DEFAULT_PATH              = "getImportEntityDefaultPath";
         SET_IMPORT_SCAN_TARGET                      = "setImportScanTarget";
@@ -133,6 +142,13 @@ keys! {
         IMPORT_INSTANCE                             = "importInstance";
         EXPLORE                                     = "explore";
         EXPORT                                      = "export";
+        WAIT_FOR_SHARE_INSTANCE                     = "waitForShareInstance";
+        GET_USER_SHARES                             = "getUserShares";
+        GET_USER_QUOTA                              = "getUserQuota";
+        DELETE_SHARE                                = "deleteShare";
+        UPDATE_SHARE                                = "updateShare";
+        REPORT_SHARE                                = "reportShare";
+        REGENERATE_SHARE_CODE                       = "regenerateShareCode";
         GET_MODPACK_INFO                            = "getModpackInfo";
     }
 
@@ -161,6 +177,14 @@ keys! {
         GET_SEEN_ONBOARDING_TIPS                    = "getSeenOnboardingTips";
         MARK_ONBOARDING_TIP_SEEN                    = "markOnboardingTipSeen";
         RESET_ONBOARDING_TIPS                       = "resetOnboardingTips";
+        // Search sidebar
+        GET_SEARCH_SIDEBAR_DOCKED                   = "getSearchSidebarDocked";
+        SET_SEARCH_SIDEBAR_DOCKED                   = "setSearchSidebarDocked";
+        // Cache cleanup
+        GET_TOTAL_CACHE_SIZE                        = "getTotalCacheSize";
+        GET_DB_SIZE                                 = "getDbSize";
+        GET_CACHE_BREAKDOWN                         = "getCacheBreakdown";
+        CLEANUP_CACHES                              = "cleanupCaches";
     }
 
     metrics {
@@ -171,6 +195,53 @@ keys! {
     systeminfo {
         GET_TOTAL_RAM                               = "getTotalRAM";
         GET_USED_RAM                                = "getUsedRAM";
+        GET_AVAILABLE_RAM                           = "getAvailableRAM";
+    }
+
+    server {
+        GET_DEFAULT_GROUP                           = "getDefaultGroup";
+        GET_GROUPS                                  = "getGroups";
+        GET_ALL_SERVERS                             = "getAllServers";
+        CREATE_SERVER                               = "createServer";
+        CREATE_SERVER_FROM_MODPACK                  = "createServerFromModpack";
+        DELETE_SERVER                               = "deleteServer";
+        ACCEPT_EULA                                 = "acceptEula";
+        START_SERVER                                = "startServer";
+        STOP_SERVER                                 = "stopServer";
+        KILL_SERVER                                 = "killServer";
+        SEND_CONSOLE_COMMAND                        = "sendConsoleCommand";
+        GET_SERVER_DETAILS                          = "getServerDetails";
+        GET_SERVER_METRICS                          = "getServerMetrics";
+        SET_FAVORITE                                = "setFavorite";
+        UPDATE_SERVER                               = "updateServer";
+        SET_SERVER_ICON                             = "setServerIcon";
+        MOVE_SERVER                                 = "moveServer";
+        MOVE_SERVER_GROUP                           = "moveServerGroup";
+        CREATE_FOLDER_FROM_SERVERS                  = "createFolderFromServers";
+        ARRANGE_SERVER_LIBRARY                      = "arrangeServerLibrary";
+        RENAME_SERVER_GROUP                         = "renameServerGroup";
+        DELETE_SERVER_GROUP                         = "deleteServerGroup";
+        GET_SERVER_PROPERTIES                       = "getServerProperties";
+        UPDATE_SERVER_PROPERTIES                    = "updateServerProperties";
+        GET_WHITELIST                               = "getWhitelist";
+        ADD_TO_WHITELIST                            = "addToWhitelist";
+        REMOVE_FROM_WHITELIST                       = "removeFromWhitelist";
+        GET_OPS                                     = "getOps";
+        ADD_OP                                      = "addOp";
+        REMOVE_OP                                   = "removeOp";
+        GET_BANNED_PLAYERS                          = "getBannedPlayers";
+        BAN_PLAYER                                  = "banPlayer";
+        UNBAN_PLAYER                                = "unbanPlayer";
+        GET_BANNED_IPS                              = "getBannedIps";
+        BAN_IP                                      = "banIp";
+        UNBAN_IP                                    = "unbanIp";
+        GET_SERVER_ADDONS                           = "getServerAddons";
+        ENABLE_SERVER_ADDON                         = "enableServerAddon";
+        DELETE_SERVER_ADDON                         = "deleteServerAddon";
+        INSTALL_SERVER_MOD                          = "installServerMod";
+        INSTALL_LATEST_SERVER_MOD                   = "installLatestServerMod";
+        OPEN_SERVER_FOLDER                          = "openServerFolder";
+        PRIORITIZE_SERVER_CACHE                     = "prioritizeServerCache";
     }
 
     modplatforms {

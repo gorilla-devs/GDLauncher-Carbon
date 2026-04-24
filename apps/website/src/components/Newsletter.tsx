@@ -1,11 +1,11 @@
-import { Show, createEffect, createSignal } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import Button from "./button/Button";
 import { ADD_USER_ENDPOINT } from "../consts";
 
 const NewsLetter = () => {
   const [email, setEmail] = createSignal("");
   const [error, setError] = createSignal<null | string>(null);
-  const [loading, setLoading] = createSignal(false);
+  const [_loading, setLoading] = createSignal(false);
   const [success, setSuccess] = createSignal<null | string>(null);
   const addUser = async (body: any) => {
     return await fetch(ADD_USER_ENDPOINT, {
@@ -17,7 +17,7 @@ const NewsLetter = () => {
       body: JSON.stringify(body),
     });
   };
-  const handleSubmit = async (event: Event) => {
+  const handleSubmit = async (_event: Event) => {
     // event.preventDefault();
     const obj: any = {};
     setError(null);

@@ -8,10 +8,12 @@ import {
   FEUnifiedModLoaders,
   ListGroup,
   ListInstance,
+  ListServer,
+  ListServerGroup,
   ManifestVersion
 } from "@gd/core_module/bindings"
-import { RSPCError } from "@rspc/client"
-import { CreateQueryResult } from "@tanstack/solid-query"
+import { RSPCError } from "@/utils/rspcClient"
+import { UseQueryResult } from "@tanstack/solid-query"
 import {
   JSX,
   createContext,
@@ -21,17 +23,19 @@ import {
 } from "solid-js"
 
 interface Context {
-  instances: CreateQueryResult<ListInstance[], RSPCError>
-  instanceGroups: CreateQueryResult<ListGroup[], RSPCError>
-  settings: CreateQueryResult<FESettings, RSPCError>
-  accounts: CreateQueryResult<AccountEntry[], RSPCError>
+  instances: UseQueryResult<ListInstance[], RSPCError>
+  instanceGroups: UseQueryResult<ListGroup[], RSPCError>
+  servers: UseQueryResult<ListServer[], RSPCError>
+  serverGroups: UseQueryResult<ListServerGroup[], RSPCError>
+  settings: UseQueryResult<FESettings, RSPCError>
+  accounts: UseQueryResult<AccountEntry[], RSPCError>
   currentlySelectedAccount: () => AccountEntry | null
-  currentlySelectedAccountUuid: CreateQueryResult<string | null, RSPCError>
-  gdlAccount: CreateQueryResult<FEGDLAccountStatus | null, RSPCError>
-  announcements: CreateQueryResult<Announcement[], RSPCError>
-  categories: CreateQueryResult<FEUnifiedCategories, RSPCError>
-  modloaders: CreateQueryResult<FEUnifiedModLoaders, RSPCError>
-  minecraftVersions: CreateQueryResult<ManifestVersion[], RSPCError>
+  currentlySelectedAccountUuid: UseQueryResult<string | null, RSPCError>
+  gdlAccount: UseQueryResult<FEGDLAccountStatus | null, RSPCError>
+  announcements: UseQueryResult<Announcement[], RSPCError>
+  categories: UseQueryResult<FEUnifiedCategories, RSPCError>
+  modloaders: UseQueryResult<FEUnifiedModLoaders, RSPCError>
+  minecraftVersions: UseQueryResult<ManifestVersion[], RSPCError>
   isNewInstance: (id: number) => boolean
   markInstanceAsSeen: (id: number) => void
 }
@@ -83,7 +87,7 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
           }
           return target[prop as keyof typeof target]
         }
-      }) as CreateQueryResult<string | null, RSPCError>)
+      }) as UseQueryResult<string | null, RSPCError>)
     : currentlySelectedAccountUuidRaw
 
   // In showcase mode, create reactive proxy objects that anonymize data
@@ -109,7 +113,7 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
           }
           return target[prop as keyof typeof target]
         }
-      }) as CreateQueryResult<AccountEntry[], RSPCError>)
+      }) as UseQueryResult<AccountEntry[], RSPCError>)
     : accountsRaw
 
   const gdlAccount = __SHOWCASE_MODE__
@@ -123,7 +127,7 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
                 ...data,
                 value: {
                   ...data.value,
-                  nickname: "DemoUser",
+                  displayName: "DemoUser",
                   email: "demo@example.com",
                   friendCode: "DEMO#0000",
                   microsoftOid: "00000000-0000-0000-0000-000000000000",
@@ -135,7 +139,7 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
           }
           return target[prop as keyof typeof target]
         }
-      }) as CreateQueryResult<FEGDLAccountStatus | null, RSPCError>)
+      }) as UseQueryResult<FEGDLAccountStatus | null, RSPCError>)
     : gdlAccountRaw
 
   const currentlySelectedAccount = () => {
@@ -159,6 +163,14 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
 
   const minecraftVersions = rspc.createQuery(() => ({
     queryKey: ["mc.getMinecraftVersions"]
+  }))
+
+  const servers = rspc.createQuery(() => ({
+    queryKey: ["server.getAllServers"]
+  }))
+
+  const serverGroups = rspc.createQuery(() => ({
+    queryKey: ["server.getGroups"]
   }))
 
   // Track which instances existed at app load (for NEW badge feature)
@@ -192,6 +204,8 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
   const store: Context = {
     instances,
     instanceGroups: groups,
+    servers,
+    serverGroups,
     settings,
     accounts,
     currentlySelectedAccountUuid,

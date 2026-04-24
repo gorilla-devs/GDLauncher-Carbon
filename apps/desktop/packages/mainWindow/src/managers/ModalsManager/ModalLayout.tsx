@@ -49,10 +49,10 @@ const ModalLayout = (props: Props) => {
       >
         <Show when={props.background}>{props.background}</Show>
         <Show when={!props.noHeader}>
-          <div class="bg-darkSlate-800 box-border flex h-12 items-center justify-between rounded-t-2xl px-5">
-            <h3>{props.title}</h3>
+          <div class="box-border flex items-center justify-between px-5 pt-3 pb-4">
+            <h2 class="text-lg font-bold text-lightSlate-50">{props.title}</h2>
             <div
-              class="text-darkSlate-300 i-hugeicons:cancel-01 hover:text-lightSlate-100 h-5 w-5 duration-100 ease-spring"
+              class="text-darkSlate-300 i-hugeicons:cancel-01 hover:text-lightSlate-100 h-5 w-5 press-effect active:scale-90 cursor-pointer"
               onClick={() => {
                 if (!props.preventClose) {
                   navigator.navigate(location.pathname)
@@ -65,9 +65,9 @@ const ModalLayout = (props: Props) => {
         <div
           class={`box-border ${
             props.scrollable ? props.scrollable : "overflow-hidden"
-          } z-10 h-full`}
+          } z-10 h-full pt-5`}
           classList={{
-            "p-5": !props.noPadding
+            "px-5 pb-6": !props.noPadding
           }}
         >
           {c()}

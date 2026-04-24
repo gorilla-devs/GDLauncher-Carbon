@@ -1,14 +1,14 @@
-import { Outlet } from "@solidjs/router"
 import { isFullScreen } from "."
+import { JSX } from "solid-js"
 
-const LogsRouteWrapper = () => {
+const LogsRouteWrapper = (props: { children?: JSX.Element }) => {
   return (
     <div
       style={{
         height: isFullScreen() ? "calc(100vh - 155px)" : "calc(100vh - 396px)"
       }}
     >
-      <Outlet />
+      {props.children}
     </div>
   )
 }

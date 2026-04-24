@@ -105,7 +105,7 @@ const Mod = (props: Props) => {
   )
 
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const location = useLocation()
   const instanceId = () => getInstanceIdFromPath(location.pathname)
 
@@ -587,7 +587,7 @@ const Mod = (props: Props) => {
                       </div>
                       <div class="my-4 flex w-full gap-4">
                         <Button
-                          type="outline"
+                          type="secondary"
                           rounded={false}
                           size="small"
                           onClick={() => {
@@ -602,7 +602,7 @@ const Mod = (props: Props) => {
                           <div class="i-hugeicons:arrow-right-01 ml-1" />
                         </Button>
                         <Button
-                          type="outline"
+                          type="secondary"
                           rounded={false}
                           size="small"
                           onClick={() => {
@@ -638,7 +638,7 @@ const Mod = (props: Props) => {
                       </div>
                       <div class="my-4 flex w-full gap-4">
                         <Button
-                          type="outline"
+                          type="secondary"
                           rounded={false}
                           size="small"
                           onClick={() => {
@@ -653,7 +653,7 @@ const Mod = (props: Props) => {
                           <div class="i-hugeicons:arrow-right-01 ml-1" />
                         </Button>
                         <Button
-                          type="outline"
+                          type="secondary"
                           rounded={false}
                           size="small"
                           onClick={() => {

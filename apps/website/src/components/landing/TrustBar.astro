@@ -1,0 +1,93 @@
+---
+/**
+ * TrustBar - Shows platform logos and modloader support
+ */
+
+const modPlatforms = [
+  {
+    name: "CurseForge",
+    icon: "/assets/icons/curseforge_logo.svg",
+    url: "https://curseforge.com",
+    description: "Browse thousands of mods and modpacks"
+  },
+  {
+    name: "Modrinth",
+    icon: "/assets/icons/modrinth_logo.svg",
+    url: "https://modrinth.com",
+    description: "Discover community-driven content"
+  }
+]
+
+const modLoaders = [
+  { name: "Forge", icon: "/assets/icons/forge.png" },
+  { name: "Fabric", icon: "/assets/icons/fabric.png" },
+  { name: "NeoForge", icon: "/assets/icons/forge.png" },
+  { name: "Quilt", icon: "/assets/icons/quilt.svg" }
+]
+---
+
+<section class="py-24 bg-darkSlate-900">
+  <div class="max-w-6xl mx-auto px-4">
+    <!-- Section header -->
+    <div class="text-center mb-16" data-scroll="fade-up">
+      <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
+        Supports Your
+        <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
+          Favorite Platforms
+        </span>
+      </h2>
+      <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+        Install mods and modpacks from the biggest platforms with one click.
+      </p>
+    </div>
+
+    <!-- Mod Platforms -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 max-w-2xl mx-auto">
+      {modPlatforms.map((platform, index) => (
+        <a
+          href={platform.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex items-center gap-4 p-6 rounded-xl bg-darkSlate-800 border border-darkSlate-700 hover:border-primary-500/30 transition-colors transition-transform duration-100 ease-spring active:scale-98"
+          data-scroll="scale"
+          data-scroll-delay={index * 100}
+        >
+          <img
+            src={platform.icon}
+            alt={platform.name}
+            class="w-12 h-12"
+            loading="lazy"
+          />
+          <div>
+            <h3 class="text-lightSlate-50 font-semibold text-lg">{platform.name}</h3>
+            <p class="text-darkSlate-100 text-sm">{platform.description}</p>
+          </div>
+        </a>
+      ))}
+    </div>
+
+    <!-- Modloaders -->
+    <div class="text-center" data-scroll="fade-up" data-scroll-delay="200">
+      <p class="text-darkSlate-200 text-sm uppercase tracking-wider mb-6">
+        All major modloaders supported
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-8">
+        {modLoaders.map((loader, index) => (
+          <div
+            class="flex items-center gap-3"
+            data-scroll="fade-up"
+            data-scroll-delay={250 + index * 75}
+          >
+            <img
+              src={loader.icon}
+              alt={loader.name}
+              class="w-10 h-10 object-contain"
+              loading="lazy"
+            />
+            <span class="text-lightSlate-100 font-medium text-lg">{loader.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

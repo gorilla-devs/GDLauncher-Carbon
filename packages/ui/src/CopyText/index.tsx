@@ -4,9 +4,15 @@ import { cn } from "../util"
 
 type Size = "small" | "medium" | "large"
 
-interface CopyTextProps
-  extends Omit<JSX.HTMLAttributes<HTMLDivElement>, "onCopy"> {
+interface CopyTextProps extends Omit<
+  JSX.HTMLAttributes<HTMLDivElement>,
+  "onCopy"
+> {
   value: string
+  // Written to the clipboard instead of `value` when provided. Use this when
+  // the visible text is a shortened/placeholder form (e.g. "https://.../abc")
+  // and the full string should be copied.
+  copyValue?: string
   size?: Size
   onCopy?: (value: string) => void
 }
@@ -37,6 +43,7 @@ type CopyState = "idle" | "showing" | "leaving"
 export const CopyText: Component<CopyTextProps> = (props) => {
   const [local, others] = splitProps(props, [
     "value",
+    "copyValue",
     "size",
     "class",
     "onCopy"
@@ -49,9 +56,10 @@ export const CopyText: Component<CopyTextProps> = (props) => {
   const handleCopy = async () => {
     if (copyState() !== "idle") return
 
+    const toCopy = local.copyValue ?? local.value
     try {
-      await navigator.clipboard.writeText(local.value)
-      local.onCopy?.(local.value)
+      await navigator.clipboard.writeText(toCopy)
+      local.onCopy?.(toCopy)
       setCopyState("showing")
 
       // After 2s, start exit animation
@@ -75,7 +83,12 @@ export const CopyText: Component<CopyTextProps> = (props) => {
       {...others}
     >
       {/* Text content */}
-      <span class={cn("text-lightSlate-400 select-all flex-1", styles().text)}>
+      <span
+        class={cn(
+          "text-lightSlate-400 select-all flex-1 min-w-0 truncate",
+          styles().text
+        )}
+      >
         {local.value}
       </span>
 

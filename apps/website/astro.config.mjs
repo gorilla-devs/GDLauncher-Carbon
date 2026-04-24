@@ -1,6 +1,6 @@
 import { defineConfig } from "astro/config"
 import mdx from "@astrojs/mdx"
-import tailwind from "@astrojs/tailwind"
+import UnoCSS from "@unocss/astro"
 import sitemap from "@astrojs/sitemap"
 import cloudflare from "@astrojs/cloudflare"
 import solidJs from "@astrojs/solid-js"
@@ -30,9 +30,10 @@ const excludedPages = [
 export default defineConfig({
   output: "hybrid",
   site: "https://gdlauncher.com",
+  trailingSlash: "never",
   adapter: cloudflare(),
   integrations: [
-    tailwind(),
+    UnoCSS({ injectReset: true }),
     mdx(),
     sitemap({
       filter: (page) =>

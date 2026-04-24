@@ -1,6 +1,7 @@
 import { createEffect, createSignal, createMemo } from "solid-js"
 import Tile from "../Instance/Tile"
 import {
+  getQueuedState,
   getPreparingState,
   getRunningState,
   getInactiveState,
@@ -31,6 +32,16 @@ const InstanceTile = (props: {
   identifier: string
   selected?: boolean
   size: 1 | 2 | 3 | 4 | 5
+  isMultiSelected?: boolean
+  onToggleSelection?: () => void
+  onDragStart?: (e: PointerEvent) => void
+  isDragging?: boolean
+  isDragActive?: boolean
+  groupId?: number
+  preventClick?: () => boolean
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: () => void
 }) => {
   const [isLoading, setIsLoading] = createSignal(false)
   const [failError, setFailError] = createSignal("")
@@ -49,18 +60,15 @@ const InstanceTile = (props: {
       ? props.instance.status.value
       : undefined
 
-  const invalidInstance = () =>
-    props.instance.status.status === "invalid"
-      ? props.instance.status.value
-      : undefined
-
   const inactiveState = () => getInactiveState(validInstance()?.state)
+  const isQueuedState = () => getQueuedState(validInstance()?.state)
   const isPreparingState = () => getPreparingState(validInstance()?.state)
   const isDeleting = () => isInstanceDeleting(validInstance()?.state)
 
   const modloader = () => validInstance()?.modloader
 
-  const taskId = () => isPreparingState()
+  // Task ID can be from either queued or preparing state
+  const taskId = () => isQueuedState() || isPreparingState()
 
   const isRunning = () => getRunningState(validInstance()?.state)
   const dismissTaskMutation = rspc.createMutation(() => ({
@@ -98,12 +106,6 @@ const InstanceTile = (props: {
     }
   })
 
-  createEffect(() => {
-    if ((validInstance() || invalidInstance()) && taskId === undefined) {
-      dismissTaskMutation.mutate(taskId)
-    }
-  })
-
   const failedTask = rspc.createQuery(() => ({
     queryKey: ["vtask.getTask", inactiveState()!],
     enabled: false
@@ -116,15 +118,11 @@ const InstanceTile = (props: {
   })
 
   createEffect(() => {
-    if (failedTask.data && failedTask.data.progress.type === "Failed") {
+    if (failedTask.data?.progress.type === "Failed") {
       if (taskId()) dismissTaskMutation.mutate(taskId()!)
       setFailError(failedTask.data.progress.value.cause[0].display)
     }
   })
-
-  const variant = () => (props.isSidebarOpened ? "sidebar" : "sidebar-small")
-  const type = () =>
-    props.isSidebarOpened === undefined ? undefined : variant()
 
   const instanceImageUrl = createMemo(() =>
     props.instance.icon_revision
@@ -139,7 +137,7 @@ const InstanceTile = (props: {
 
     // Instance must be in inactive state (not preparing, running, or deleting)
     const state = validInstance()?.state
-    if (!state || state.state !== "inactive") return false
+    if (state?.state !== "inactive") return false
 
     // Instance must not have a failed task (installation didn't error)
     if (inactiveState()) return false
@@ -150,6 +148,9 @@ const InstanceTile = (props: {
   return (
     <Tile
       onClick={() => {
+        // Prevent click if we just finished a drag operation
+        if (props.preventClick?.()) return
+
         globalStore.markInstanceAsSeen(props.instance.id)
         setClickedInstanceId(props.identifier)
 
@@ -167,9 +168,9 @@ const InstanceTile = (props: {
       isInvalid={props.instance.status.status === "invalid"}
       failError={failError()}
       isRunning={!!isRunning()}
+      isQueued={isQueuedState() !== undefined}
       isPreparing={isPreparingState() !== undefined}
       isDeleting={isDeleting()}
-      variant={type()}
       size={props.size}
       img={instanceImageUrl()}
       selected={props.selected}
@@ -178,6 +179,21 @@ const InstanceTile = (props: {
       totalDownload={bytesToMB(progress.totalDownload)}
       downloaded={bytesToMB(progress.downloaded)}
       subTasks={progress.subTasks}
+      isMultiSelected={props.isMultiSelected}
+      onToggleSelection={props.onToggleSelection}
+      onDragStart={props.onDragStart}
+      isDragging={props.isDragging}
+      isDragActive={props.isDragActive}
+      selectedCount={props.selectedCount}
+      onBatchDelete={props.onBatchDelete}
+      onSelectExclusive={props.onSelectExclusive}
+      onDismissError={() => {
+        const taskIdVal = inactiveState()
+        if (taskIdVal) {
+          dismissTaskMutation.mutate(taskIdVal)
+        }
+        setFailError("")
+      }}
     />
   )
 }

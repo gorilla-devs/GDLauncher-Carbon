@@ -1,0 +1,54 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Install Minecraft Shaders"
+  description="Transform your Minecraft graphics with beautiful shader packs. Complete guide to installing shaders with GDLauncher."
+  keywords="install shaders minecraft, minecraft shaders, how to install shaders, shader pack, iris shaders, optifine shaders, gdlauncher shaders"
+  lastUpdated="April 2026"
+>
+  <h2>What shaders do</h2>
+  <p>
+    Shaders completely change how Minecraft looks. Dynamic shadows that follow the sun, water with actual reflections, light rays through trees, better clouds and fog. It's the difference between "blocky game" and "wait, that's actually pretty."
+  </p>
+  <p>
+    The catch is that shaders need GPU power. A mid-range dedicated GPU handles most shaders fine. Heavier packs like SEUS PTGI need something beefier. If your computer struggles with vanilla Minecraft, shaders probably aren't for you.
+  </p>
+
+  <h2>Iris (the recommended approach)</h2>
+  <p>
+    Iris is a modern shader mod for Fabric that works with Sodium, so you get both nice graphics and good performance. It's what most people use these days.
+  </p>
+  <p>
+    Create an instance with Fabric as the mod loader. Open the instance, go to the <strong>Addons</strong> tab, and click <strong>Add Addons</strong>. Search for Iris Shaders and download it (Sodium usually comes bundled). Then select <strong>Shaders</strong> from the dropdown on the left of the search bar, find a shader pack you like, and click <strong>Download</strong>.
+  </p>
+  <p>
+    In-game, go to Options → Video Settings → Shader Packs, select your shader, and apply. Done.
+  </p>
+
+  <h2>OptiFine (the classic way)</h2>
+  <p>
+    OptiFine is the older method, mainly for Forge users. Download OptiFine from <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a> for your Minecraft version, drop the .jar into your instance's mods folder, and launch the game. Shaders go in Video Settings → Shaders.
+  </p>
+  <p>
+    Note that OptiFine conflicts with a lot of mods. If you're playing a modpack, check if it already has shader support or recommends a specific approach.
+  </p>
+
+  <h2>Shader recommendations</h2>
+  <p>
+    Complementary Reimagined hits a nice balance between looking good and running well. BSL and Sildur's Vibrant are solid classics with lots of settings to tweak. For older hardware, try Complementary's Potato preset or Sildur's Enhanced Default.
+  </p>
+  <p>
+    High-end GPU? SEUS PTGI has path-traced global illumination (it's gorgeous and demanding). Continuum goes for photorealism. These need serious hardware.
+  </p>
+
+  <h2>Performance tips</h2>
+  <p>
+    Most shaders have quality presets. Start with Medium or Low and work up. Render distance matters a lot with shaders, so try 8-12 chunks instead of 32. Volumetric lighting (god rays) and shadows are the heaviest features to disable if you're struggling.
+  </p>
+  <p>
+    If a shader pack won't load at all, make sure it's compatible with your shader mod. Some work with Iris only, some with OptiFine only, some with both. Update your shader mod to the latest version.
+  </p>
+
+</GuideLayout>

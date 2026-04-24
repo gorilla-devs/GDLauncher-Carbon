@@ -73,7 +73,7 @@ function NotificationDemo() {
           <Button type="secondary" onClick={showWarningNotification}>
             Show Warning
           </Button>
-          <Button type="outline" onClick={showErrorNotification}>
+          <Button type="secondary" onClick={showErrorNotification}>
             Show Error
           </Button>
         </div>

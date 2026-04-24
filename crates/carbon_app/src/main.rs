@@ -169,6 +169,12 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     let app = AppInner::new(invalidation_sender, runtime_path, base_api_override).await;
 
+    // Re-exchange GDL tokens on every startup to ensure they're valid
+    // (handles backend target changes where JWT signing keys differ)
+    if let Err(e) = app.account_manager().refresh_all_gdl_tokens().await {
+        tracing::warn!("Failed to refresh GDL tokens on startup: {}", e);
+    }
+
     let auto_manage_java_system_profiles = app
         .settings_manager()
         .get_settings()
@@ -205,17 +211,18 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     tokio::spawn(async move {
         let mut counter = 0;
         let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(200));
-        let reqwest_client = reqwest::Client::new();
+        let reqwest_client = reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .expect("Failed to build health check HTTP client");
         loop {
             counter += 1;
             // If we've waited for 40 seconds, give up
             if counter > 200 {
-                tracing::error!(
-                    "Server failed to start within 40 seconds. This may indicate a system issue or insufficient resources."
-                );
-                panic!(
-                    "Server failed to start within 40 seconds. Please check system logs for errors and ensure sufficient system resources are available."
-                );
+                let error = "Server failed to start within 40 seconds. This may indicate a system issue preventing local connections to localhost (maybe a proxy?).";
+
+                tracing::error!(error);
+                panic!("{}", error);
             }
 
             interval.tick().await;
@@ -349,7 +356,7 @@ mod test {
         });
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
         let resp = client
             .get(format!("http://127.0.0.1:{port}",))
             .send()

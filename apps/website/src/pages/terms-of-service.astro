@@ -2,14 +2,6 @@
 import Layout from "../layouts/Layout.astro";
 import { marked } from "marked";
 
-// fetch(
-//   "https://github.com/gorilla-devs/ToS-Privacy/blob/master/privacy-statement.md"
-// )
-//   .then((response) => response.text()) // or response.json() if it's a JSON file
-//   .then((data) => {
-//     console.log(data); // This is the content of the file
-//   })
-//   .catch((error) => console.error("Error fetching data: ", error));
 const response = await fetch(
   "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy/master/terms-of-service.md"
 );
@@ -22,20 +14,7 @@ const md = marked(data);
   description="gdlauncher terms of service"
   pubDate={new Date("August 08 2021")}
 >
-  <div set:html={md} />
+  <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
+    <div set:html={md} />
+  </div>
 </Layout>
-<!-- <script>
-  import { marked } from "marked";
-  const root = document.getElementById("root");
-  
-  const response = await fetch(
-    "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy/master/terms-of-service.md"
-  );
-  const data = await response.text();
-root?.attachShadow({ mode: "open" });
-const shadow = root?.shadowRoot;
-  shadow!.innerHTML = marked(data);
-</script>
-<style>
-  
-</style> -->

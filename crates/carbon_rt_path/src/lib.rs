@@ -84,6 +84,91 @@ impl LoggingConfigsPath {
     }
 }
 
+pub struct ServersPath(PathBuf);
+
+impl ServersPath {
+    pub fn subpath() -> ServersPath {
+        Self(PathBuf::from("servers"))
+    }
+
+    pub fn to_path(&self) -> PathBuf {
+        self.0.clone()
+    }
+
+    pub fn get_server_path(&self, server_shortpath: &str) -> ServerPath {
+        ServerPath(self.0.join(server_shortpath))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ServerPath(PathBuf);
+
+impl ServerPath {
+    pub fn new(path: PathBuf) -> Self {
+        Self(path)
+    }
+
+    pub fn get_root(&self) -> PathBuf {
+        self.0.clone()
+    }
+
+    pub fn get_data_path(&self) -> PathBuf {
+        self.0.join("server")
+    }
+
+    pub fn get_logs_path(&self) -> PathBuf {
+        self.get_data_path().join("logs")
+    }
+
+    pub fn get_world_path(&self) -> PathBuf {
+        self.get_data_path().join("world")
+    }
+
+    pub fn get_plugins_path(&self) -> PathBuf {
+        self.get_data_path().join("plugins")
+    }
+
+    pub fn get_server_properties_path(&self) -> PathBuf {
+        self.get_data_path().join("server.properties")
+    }
+
+    pub fn get_server_jar_path(&self) -> PathBuf {
+        self.get_data_path().join("server.jar")
+    }
+
+    pub fn get_eula_path(&self) -> PathBuf {
+        self.get_data_path().join("eula.txt")
+    }
+
+    pub fn get_mods_path(&self) -> PathBuf {
+        self.get_data_path().join("mods")
+    }
+
+    pub fn get_datapacks_path(&self) -> PathBuf {
+        self.get_data_path().join("world").join("datapacks")
+    }
+
+    pub fn get_whitelist_path(&self) -> PathBuf {
+        self.get_data_path().join("whitelist.json")
+    }
+
+    pub fn get_ops_path(&self) -> PathBuf {
+        self.get_data_path().join("ops.json")
+    }
+
+    pub fn get_banned_players_path(&self) -> PathBuf {
+        self.get_data_path().join("banned-players.json")
+    }
+
+    pub fn get_banned_ips_path(&self) -> PathBuf {
+        self.get_data_path().join("banned-ips.json")
+    }
+
+    pub fn get_modloader_config_path(&self) -> PathBuf {
+        self.0.join("modloader_config.json")
+    }
+}
+
 // TODO: WIP
 pub struct InstancesPath(PathBuf);
 
@@ -385,6 +470,10 @@ impl RuntimePath {
 
     pub fn get_instances(&self) -> InstancesPath {
         InstancesPath(self.0.join("instances"))
+    }
+
+    pub fn get_servers(&self) -> ServersPath {
+        ServersPath(self.0.join("servers"))
     }
 
     pub fn get_logging_configs(&self) -> LoggingConfigsPath {

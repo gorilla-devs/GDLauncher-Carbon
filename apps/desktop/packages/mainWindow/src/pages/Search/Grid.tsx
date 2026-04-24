@@ -17,6 +17,8 @@ import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { SearchResultItem } from "@/utils/platformSearch"
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
+import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 
 const ITEM_WIDTH = 320 // Approximate width of each grid item in pixels (larger for better visuals)
 const GAP = 24 // Gap between items in pixels
@@ -24,13 +26,17 @@ const GAP = 24 // Gap between items in pixels
 export function Grid() {
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ type: string }>()
+
+  const allRows = () => searchContext?.allRows() || []
 
   const [containerWidth, setContainerWidth] = createSignal(800)
   let containerRef: HTMLDivElement | undefined
 
   const instanceId = () => searchContext?.selectedInstanceId() || NaN
   const instanceMods = () => searchContext?.selectedInstanceMods
+  const serverId = () => searchContext?.selectedServerId() || NaN
+  const serverAddons = () => searchContext?.selectedServerAddons
 
   const instance = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceDetails", instanceId()],
@@ -80,6 +86,26 @@ export function Grid() {
     enabled: !isNaN(instanceId()) && instanceId() > 0
   }))
 
+  const isServerAddonInstalled = (resultId: string, slug?: string) => {
+    const addons = serverAddons()?.data
+    if (!addons) return false
+
+    for (const addon of addons) {
+      if (addon.curseforgeProjectId?.toString() === resultId) return true
+      if (addon.modrinthProjectId === resultId) return true
+    }
+
+    if (slug) {
+      const slugLower = slug.toLowerCase()
+      for (const addon of addons) {
+        const name = addon.displayName.toLowerCase()
+        if (name === slugLower || name.startsWith(slugLower + "-")) return true
+      }
+    }
+
+    return false
+  }
+
   const lookupTableInstalledMods = createMemo(() => {
     const curseforgeMods =
       installedMods.data?.reduce((acc: string[], mod) => {
@@ -97,9 +123,7 @@ export function Grid() {
         return acc
       }, []) || []
 
-    const map = new Set([...curseforgeMods, ...modrinthMods])
-
-    return map
+    return new Set([...curseforgeMods, ...modrinthMods])
   })
 
   // Calculate items per row based on container width
@@ -111,7 +135,7 @@ export function Grid() {
 
   // Group items into rows for virtualization
   const rows = createMemo(() => {
-    const items = searchContext?.allRows() || []
+    const items = allRows()
     const perRow = itemsPerRow()
     const result: SearchResultItem[][] = []
 
@@ -127,10 +151,12 @@ export function Grid() {
   const gridScrollHandler = (_index: number) => {
     const virtualizer = searchContext?.ref()
 
-    if (!virtualizer || searchContext?.isLoading()) return
+    if (!virtualizer || (searchContext?.allRows().length ?? 0) === 0) return
 
     // Get the row-based end index and convert to item index
-    const endRowIndex = virtualizer.findEndIndex()
+    const endRowIndex = virtualizer.findItemIndex(
+      virtualizer.scrollOffset + virtualizer.viewportSize
+    )
     const endItemIndex = (endRowIndex + 1) * itemsPerRow()
     const totalItems = searchContext?.allRows().length || 0
 
@@ -149,10 +175,22 @@ export function Grid() {
   }
 
   // Grid item skeleton matching actual card design
-  const GridItemSkeleton = () => (
+  const GridItemSkeleton = (props: {
+    platform?: "curseforge" | "modrinth"
+  }) => (
     <div class="bg-darkSlate-800 relative aspect-square overflow-hidden rounded-2xl border border-white/5">
-      {/* Image area skeleton */}
-      <Skeleton class="h-full w-full rounded-none" />
+      {/* Image area skeleton with platform icon */}
+      <div class="skeleton-shimmer bg-darkSlate-500 flex h-full w-full items-center justify-center">
+        <Show when={props.platform}>
+          <img
+            src={
+              props.platform === "curseforge" ? CurseforgeLogo : ModrinthLogo
+            }
+            class="h-8 w-8 opacity-40"
+            alt={`${props.platform} logo`}
+          />
+        </Show>
+      </div>
 
       {/* Bottom overlay matching card design */}
       <div class="absolute inset-x-0 bottom-0 h-1/5 border-t border-white/10 bg-black/60 p-3">
@@ -181,11 +219,14 @@ export function Grid() {
     <div ref={containerRef} class="flex h-full flex-col overflow-hidden">
       <div class="flex-1 overflow-hidden">
         <Show
-          when={!searchContext?.isInitialLoading()}
+          when={
+            !searchContext?.isInitialLoading() ||
+            allRows().some((r) => r.type === "value")
+          }
           fallback={<GridSkeleton />}
         >
           <Show
-            when={(searchContext?.allRows() || []).length > 0}
+            when={allRows().length > 0}
             fallback={
               <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
                 <PlaceholderGorilla
@@ -227,21 +268,34 @@ export function Grid() {
                 >
                   <For each={row}>
                     {(item) => {
-                      if (item.type === "loader") {
-                        return <GridItemSkeleton />
+                      if (item.type === "loader" || item.type === "skeleton") {
+                        return <GridItemSkeleton platform={item.platform} />
                       }
 
                       return (
                         <GridItem
                           instanceMods={instanceMods()?.data ?? undefined}
+                          serverAddons={serverAddons()?.data ?? undefined}
                           instanceId={instanceId()}
+                          serverId={serverId()}
                           result={item.value!}
-                          isInstalled={lookupTableInstalledMods().has(
-                            item.value!.id
-                          )}
+                          isInstalled={
+                            !isNaN(serverId()) && serverId() > 0
+                              ? isServerAddonInstalled(
+                                  item.value!.id,
+                                  item.value!.slug
+                                )
+                              : lookupTableInstalledMods().has(item.value!.id)
+                          }
                           onItemClick={() => {
+                            const sid = serverId()
+                            const iid = instanceId()
+                            const idParam =
+                              !isNaN(sid) && sid > 0
+                                ? `serverId=${sid}`
+                                : `instanceId=${iid}`
                             navigator.navigate(
-                              `/addon/${item.value!.id}/${item.value!.platform}?instanceId=${instanceId()}`
+                              `/addon/${item.value!.id}/${item.value!.platform}?${idParam}`
                             )
                           }}
                         />

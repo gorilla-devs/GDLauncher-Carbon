@@ -1,0 +1,53 @@
+---
+---
+
+<div id="page-loading-bar"></div>
+
+<style is:global>
+  #page-loading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, rgb(var(--primary-400)), rgb(var(--primary-500)));
+    z-index: 9999;
+    transform: scaleX(0);
+    transform-origin: left;
+    pointer-events: none;
+    opacity: 0;
+  }
+</style>
+
+<script is:inline>
+  (function() {
+    if (window.__loadingBarInitialized) return;
+    window.__loadingBarInitialized = true;
+
+    document.addEventListener('astro:before-preparation', function() {
+      var bar = document.getElementById('page-loading-bar');
+      if (!bar) return;
+      bar.style.transition = 'none';
+      bar.style.transform = 'scaleX(0)';
+      bar.style.opacity = '1';
+      bar.offsetWidth;
+      bar.style.transition = 'transform 8s cubic-bezier(0.1, 0.5, 0.1, 1)';
+      bar.style.transform = 'scaleX(0.7)';
+    });
+
+    document.addEventListener('astro:after-swap', function() {
+      // After swap, the old bar is gone. The new page has a fresh bar at scaleX(0).
+      // Snap it to full width instantly, then fade out.
+      var bar = document.getElementById('page-loading-bar');
+      if (!bar) return;
+      bar.style.transition = 'none';
+      bar.style.transform = 'scaleX(1)';
+      bar.style.opacity = '1';
+      bar.offsetWidth;
+      setTimeout(function() {
+        bar.style.transition = 'opacity 0.3s ease';
+        bar.style.opacity = '0';
+      }, 50);
+    });
+  })();
+</script>

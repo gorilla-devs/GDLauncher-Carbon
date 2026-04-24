@@ -14,6 +14,8 @@ serde_json = { workspace = true }
 serde_qs = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true }
+tokio-util = "0.7.13"
+base64 = "0.22.1"
 futures = { workspace = true }
 tower-http = { workspace = true }
 rspc = { workspace = true }

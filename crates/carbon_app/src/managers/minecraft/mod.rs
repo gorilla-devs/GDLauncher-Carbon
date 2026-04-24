@@ -38,6 +38,7 @@ pub mod assets;
 pub mod curseforge;
 pub mod fabric;
 pub mod forge;
+pub mod gdlpack;
 pub mod minecraft;
 pub mod modrinth;
 pub mod neoforge;

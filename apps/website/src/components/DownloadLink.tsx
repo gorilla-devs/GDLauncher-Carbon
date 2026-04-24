@@ -1,44 +1,30 @@
-import { Show, createResource } from "solid-js";
-import Apple from "../assets/Apple";
-import Linux from "../assets/Linux";
-import Windows from "../assets/Windows";
+import { onMount, createSignal } from "solid-js";
+import { detectOS } from "../utils/detectOS";
+import type { OS } from "../utils/detectOS";
 
-const getOs = () => {
-  if (window.navigator.userAgent.toLowerCase().includes("windows")) {
-    return "Windows";
-  } else if (window.navigator.userAgent.toLowerCase().includes("mac")) {
-    return "MacOS";
-  } else if (window.navigator.userAgent.toLowerCase().includes("linux")) {
-    return "Linux";
-  } else {
-    return "Unknown";
-  }
-};
+const OS_ICONS: Record<OS, string> = {
+  Windows: "i-simple-icons:windows11",
+  MacOS: "i-simple-icons:apple",
+  Linux: "i-simple-icons:linux",
+}
 
-export const DownloadLink = ({ urls }: { urls: Array<string> }) => {
-  const getCurrentUrl = () => {
-    if (getOs() === "Windows") {
-      return urls[0];
-    } else if (getOs() === "MacOS") {
-      return urls[1];
-    } else {
-      return urls[2];
-    }
-  };
-  const url = getCurrentUrl();
+const OS_URL: Record<OS, string> = {
+  Windows: "/download/windows",
+  MacOS: "/download/mac",
+  Linux: "/download/linux",
+}
+
+export const DownloadLink = () => {
+  const [os, setOS] = createSignal<OS>("Windows");
+
+  onMount(() => {
+    setOS(detectOS());
+  });
+
   return (
-    <a href={url} class="flex items-center gap-2">
+    <a href={OS_URL[os()]} class="flex items-center gap-2" data-astro-prefetch="false">
       <span>DOWNLOAD FOR</span>
-
-      <Show when={getOs() === "Windows"}>
-        <Windows />
-      </Show>
-      <Show when={getOs() === "MacOS"}>
-        <Apple />
-      </Show>
-      <Show when={getOs() === "Linux"}>
-        <Linux />
-      </Show>
+      <div class={`${OS_ICONS[os()]} w-4 h-4`} aria-hidden="true"></div>
     </a>
   );
 };

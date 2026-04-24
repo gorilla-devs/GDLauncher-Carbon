@@ -19,10 +19,17 @@
   background-color: rgb(var(--lightGray-900));
 }
 
+:root {
+  /* Enables smoother size/transform transitions - key fix for scale animation blur */
+  interpolate-size: allow-keywords;
+}
+
 html,
 body {
   background: rgb(var(--darkSlate-800));
   color: white;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .potato-pc *,
@@ -207,3 +214,47 @@ a {
 
 /* Respect potato PC mode (performance mode) - disabled by .potato-pc class on body */
 /* Note: .potato-pc already sets transition: none !important on all elements */
+
+/* Scale transitions with rendering optimizations:
+   - interpolate-size: allow-keywords on :root enables smoother transforms
+   - 150ms Material Design standard easing cubic-bezier(.4, 0, .2, 1)
+   - backface-visibility: hidden forces 3D compositing layer
+   - transform-origin: center ensures consistent scaling point
+   - will-change: transform keeps element on GPU layer to prevent hover re-rasterization shift */
+.press-effect {
+  transition:
+    opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    scale 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+[class*="active:scale-"],
+[class*="hover:scale-"],
+[class*="group-hover:scale-"] {
+  transition-property:
+    scale, transform, opacity, filter, color, background-color, border-color;
+  transition-duration: 0.15s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-origin: center center;
+}
+
+/* Disabled input stripes pattern */
+.disabled-stripes {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.15) 3px,
+    rgba(0, 0, 0, 0.15) 6px
+  );
+}

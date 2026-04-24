@@ -44,14 +44,14 @@ export const PopoverContent = <T extends ValidComponent = "div">(
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
         class={cn(
-          "z-100000 w-72 rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-4 text-lightSlate-200 shadow-md outline-none data-[expanded]:animate-popoverEnter data-[closed]:animate-popoverLeave",
+          "z-100000 w-72 rounded-md border border-solid border-darkSlate-500 bg-darkSlate-700 p-4 text-lightSlate-200 shadow-lg shadow-darkSlate-900/50 outline-none data-[expanded]:animate-popoverEnter data-[closed]:animate-popoverLeave",
           local.class
         )}
         {...rest}
       >
         {local.children}
         {!local.hideCloseButton && (
-          <PopoverPrimitive.CloseButton class="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-[1.5px] focus:ring-darkSlate-600 focus:ring-offset-2 disabled:pointer-events-none">
+          <PopoverPrimitive.CloseButton class="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-md text-lightSlate-400 transition-all hover:bg-darkSlate-600 hover:text-lightSlate-200 active:scale-95 focus:outline-none focus:ring-[1.5px] focus:ring-darkSlate-500 disabled:pointer-events-none">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"

@@ -1,0 +1,40 @@
+---
+/**
+ * Breadcrumb - Reusable breadcrumb navigation component
+ * Shows on all pages except homepage
+ */
+
+interface BreadcrumbItem {
+  label: string
+  href?: string
+}
+
+interface Props {
+  items: BreadcrumbItem[]
+  maxWidth?: string
+}
+
+const { items, maxWidth = "max-w-4xl" } = Astro.props
+---
+
+<nav class={`${maxWidth} mx-auto px-4 py-4 text-sm`}>
+  <ol class="flex items-center gap-2 text-darkSlate-100">
+    <li>
+      <a href="/" class="hover:text-lightSlate-50 transition-colors">Home</a>
+    </li>
+    {items.map((item) => (
+      <>
+        <li class="text-darkSlate-300">/</li>
+        {item.href ? (
+          <li>
+            <a href={item.href} class="hover:text-lightSlate-50 transition-colors">
+              {item.label}
+            </a>
+          </li>
+        ) : (
+          <li class="text-lightSlate-50 truncate max-w-48">{item.label}</li>
+        )}
+      </>
+    ))}
+  </ol>
+</nav>

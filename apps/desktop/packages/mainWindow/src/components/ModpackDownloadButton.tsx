@@ -2,7 +2,14 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { FEUnifiedSearchResult, Modpack } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Button, toast, Spinner } from "@gd/ui"
+import {
+  Button,
+  toast,
+  Spinner,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent
+} from "@gd/ui"
 import { Show, createSignal, getOwner, runWithOwner } from "solid-js"
 
 interface ModDownloadButtonProps {
@@ -11,6 +18,7 @@ interface ModDownloadButtonProps {
   addon: FEUnifiedSearchResult | undefined
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
+  splitPosition?: "left" | "right"
 }
 
 const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
@@ -33,10 +41,6 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
       setLoading(false)
       toast.error(t("notifications:_trn_instance_created_error"))
     }
-  }))
-
-  const loadIconMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.loadIconUrl"]
   }))
 
   const createInstanceMutation = rspc.createMutation(() => ({
@@ -87,9 +91,6 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     runWithOwner(owner, async () => {
       setLoading(true)
 
-      const imgUrl = props.addon?.imageUrl
-      if (imgUrl) loadIconMutation.mutate(imgUrl)
-
       let fileVersion = props.fileId
       if (!fileVersion && props.addon?.platform === "modrinth") {
         const mrVersions = await rspcContext.client.query([
@@ -102,7 +103,8 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
       }
 
       createInstanceMutation.mutate({
-        use_loaded_icon: true,
+        use_loaded_icon: false,
+        icon_url: props.addon?.imageUrl ?? null,
         notes: "",
         name: props.name || props.addon?.title!,
         version: {
@@ -113,6 +115,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
   }
 
   return (
+<<<<<<< develop
     <div class="relative">
       <Button
         disabled={loading()}
@@ -131,13 +134,46 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
                 <div class="i-hugeicons:download-02" />
                 <Trans key="instances:_trn_download" />
               </div>
+=======
+    <Tooltip>
+      <TooltipTrigger>
+        <div class="relative">
+          <Button
+            disabled={loading()}
+            size={props.size || "medium"}
+            onClick={handleDownload}
+            class={
+              props.splitPosition === "left"
+                ? "!rounded-r-none"
+                : props.splitPosition === "right"
+                  ? "!rounded-l-none"
+                  : ""
+>>>>>>> develop
             }
           >
-            <div class="i-hugeicons:download-02 text-xl" />
-          </Show>
-        </Show>
-      </Button>
-    </div>
+            <Show when={loading()}>
+              <Spinner />
+            </Show>
+            <Show when={!loading()}>
+              <Show
+                when={props.iconOnly}
+                fallback={
+                  <div class="flex items-center gap-1.5">
+                    <div class="i-hugeicons:download-02" />
+                    <Trans key="instances:_trn_download" />
+                  </div>
+                }
+              >
+                <div class="i-hugeicons:download-02 text-xl" />
+              </Show>
+            </Show>
+          </Button>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <Trans key="instances:_trn_download_instance" />
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

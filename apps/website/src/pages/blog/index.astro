@@ -1,11 +1,8 @@
 ---
-import BaseHead from "../../components/BaseHead.astro";
-import "@fontsource/ubuntu";
-import Header from "../../components/Header.astro";
-import Footer from "../../components/Footer.astro";
+import PageShell from "../../components/PageShell.astro";
+import Breadcrumb from "../../components/Breadcrumb.astro";
 import { SITE_TITLE, SITE_DESCRIPTION } from "../../consts";
 import { getCollection } from "astro:content";
-import FormattedDate from "../../components/FormattedDate.astro";
 import ArticleCard from "../../components/ArticleCard.astro";
 
 const posts = (await getCollection("blog")).sort(
@@ -13,28 +10,15 @@ const posts = (await getCollection("blog")).sort(
 );
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+<PageShell title={SITE_TITLE} description={SITE_DESCRIPTION}>
+  <Fragment slot="head">
     <style>
-      body {
-        font-family: "Ubuntu", sans-serif;
-        background-image: linear-gradient(
-            rgba(23, 29, 39, 0.3),
-            rgba(23, 29, 39, 0.3)
-          ),
-          url("../../assets/patern.svg");
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-color: rgba(29, 32, 40, 1);
-      }
-      main {
-        /* max-width: 960px; */
+      .blog-content {
         display: flex;
         justify-content: center;
         margin: 0 auto;
-        padding: 20px;
+        padding: 0 20px;
+        max-width: 1200px;
       }
       ul {
         display: flex;
@@ -84,16 +68,16 @@ const posts = (await getCollection("blog")).sort(
         }
       }
     </style>
-  </head>
-  <body>
-    <Header />
-    <main>
-      <section>
-        <ul>
-          {posts.map((post) => <ArticleCard post={post} />)}
-        </ul>
-      </section>
+  </Fragment>
+
+    <main class="py-8">
+      <Breadcrumb items={[{ label: "Blog" }]} maxWidth="max-w-6xl" />
+      <div class="blog-content">
+        <section class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
+          <ul>
+            {posts.map((post) => <ArticleCard post={post} />)}
+          </ul>
+        </section>
+      </div>
     </main>
-    <Footer />
-  </body>
-</html>
+</PageShell>

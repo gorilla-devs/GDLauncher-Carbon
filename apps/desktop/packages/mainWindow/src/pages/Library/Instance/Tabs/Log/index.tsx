@@ -27,7 +27,7 @@ const Logs = () => {
   )
   const [autoFollowPreference, setAutoFollowPreference] = createSignal(true)
   const [autoFollow, setAutoFollow] = createSignal(true)
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const [newLogsCount, setNewLogsCount] = createSignal(0)
   const [query, setQuery] = createStore<LogQuery>({
     query: null,
@@ -180,6 +180,7 @@ const Logs = () => {
     <div class="border-darkSlate-600 border-t-solid flex h-full w-full overflow-hidden border">
       <LogsSidebar
         availableLogEntries={availableLogEntries.data || []}
+        instanceId={parseInt(params.id, 10)}
         setSelectedLog={setSelectedLog}
         selectedLog={selectedLog()}
         isLoading={availableLogEntries.isLoading}
@@ -201,8 +202,13 @@ const Logs = () => {
         setAutoFollowPreference={setAutoFollowPreference}
         scrollToIndex={virtualizerRef?.scrollToIndex ?? (() => {})}
         isIndexLoaded={(index: number) => {
-          const startIndex = (virtualizerRef?.findStartIndex() ?? 0) - 10
-          const endIndex = (virtualizerRef?.findEndIndex() ?? 0) + 10
+          const startIndex =
+            (virtualizerRef?.findItemIndex(virtualizerRef.scrollOffset) ?? 0) -
+            10
+          const endIndex =
+            (virtualizerRef?.findItemIndex(
+              virtualizerRef.scrollOffset + virtualizerRef.viewportSize
+            ) ?? 0) + 10
           return index >= startIndex && index <= endIndex
         }}
       />

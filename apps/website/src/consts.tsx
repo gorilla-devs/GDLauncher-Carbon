@@ -6,14 +6,14 @@ import Linux from "./assets/Linux";
 import Windows from "./assets/Windows";
 
 export const APP_URLS = {
-  cdn: "https://cdn.gdlauncher.com",
+  cdn: "https://cdn.gdl.gg",
   socials: {
     discord: "https://discord.gdlauncher.com",
     github: "https://github.com/gorilla-devs/GDLauncher-Carbon",
     instagram: "https://www.instagram.com/gdlauncher",
     twitter: "https://twitter.com/gdlauncher",
   },
-  newsletter: "https://api.gdl.gg/v1",
+  newsletter: import.meta.env.ENDERIUM_API_BASE,
   olddownload: {
     win: "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",
     macOs:

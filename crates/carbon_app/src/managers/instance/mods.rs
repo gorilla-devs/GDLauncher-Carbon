@@ -439,11 +439,19 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::remove_file(disabled_path).await?;
         }
 
+        // Delete cache entry directly instead of re-scanning
         self.app
-            .meta_cache_manager()
-            .queue_caching(instance_id, true)
-            .await;
+            .prisma_client
+            .mod_file_cache()
+            .delete(fcdb::UniqueWhereParam::IdEquals(m.id))
+            .exec()
+            .await?;
 
+        // GC orphaned metadata
+        self.app.meta_cache_manager().gc_mod_metadata().await;
+
+        self.app
+            .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
         Ok(())
     }
 
@@ -1060,7 +1068,9 @@ mod test {
             .await?;
 
         app.meta_cache_manager()
-            .cache_with_priority(instance_id)
+            .cache_with_priority(crate::managers::metadata::cache::CacheEntityId::Instance(
+                instance_id,
+            ))
             .await;
 
         app.instance_manager()

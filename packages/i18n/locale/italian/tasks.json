@@ -33,5 +33,17 @@
   "_trn_instance_task_launch_waiting": "In attesa di altri avvii di istanze",
   "_trn_instance_task_prepare": "Preparazione {{name}}",
   "_trn_instance_task_launch_apply_staged_patches": "Applicazione patch in fase",
-  "_trn_finalizing_import": "Finalizzazione importazione"
+  "_trn_finalizing_import": "Finalizzazione importazione",
+  "_trn_server_task_install": "Installazione server {{server_name}}",
+  "_trn_server_task_install_from_modpack": "Installazione server da modpack {{server_name}}",
+  "_trn_server_task_download_server_pack": "Download del server pack",
+  "_trn_server_task_extract_server_pack": "Estrazione del server pack",
+  "_trn_server_task_download_modpack_files": "Download file modpack",
+  "_trn_server_task_extract_modpack_overrides": "Estrazione override",
+  "_trn_server_task_download_server_jar": "Download del server jar",
+  "_trn_server_task_install_modloader": "Installazione modloader",
+  "_trn_cache_cleanup": "Pulizia delle cache",
+  "_trn_cache_cleanup_clearing_table": "Cancellazione dei dati memorizzati nella cache",
+  "_trn_cache_cleanup_clearing_disk": "Cancellazione dei file memorizzati nella cache",
+  "_trn_cache_cleanup_vacuuming": "Recupero dello spazio"
 }

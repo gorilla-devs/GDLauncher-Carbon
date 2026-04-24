@@ -1,6 +1,7 @@
 pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
     use reqwest::{Request, Response};
     use reqwest_middleware::{Middleware, Next};
+    use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 
     use crate::managers::modplatforms::modrinth::MODRINTH_API_BASE;
 
@@ -82,5 +83,13 @@ pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
         ))
         .build()
         .expect("Failed to build HTTP client");
-    reqwest_middleware::ClientBuilder::new(client).with(AddHeaderMiddleware { gdl_api_base_host })
+
+    // Default strategy retries 408/429/5xx with exponential backoff and
+    // honors Retry-After — which requires the cache middleware to stop
+    // stripping response headers, fixed alongside this.
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+
+    reqwest_middleware::ClientBuilder::new(client)
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .with(AddHeaderMiddleware { gdl_api_base_host })
 }

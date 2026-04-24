@@ -1,5 +1,6 @@
 {
   "_trn_search_instances": "Search Instances",
+  "_trn_search_servers": "Search Servers",
   "_trn_browser_table_headers.name": "Name",
   "_trn_browser_table_headers.published": "Published",
   "_trn_browser_table_headers.downloads": "Downloads",
@@ -14,6 +15,8 @@
   "_trn_clear_all_filters": "Clear All",
   "_trn_platform": "Platform",
   "_trn_categories": "Categories",
+  "_trn_context_instance": "Instance",
+  "_trn_context_server": "Server",
   "_trn_no_categories_found": "No categories found",
   "_trn_modloaders": "Modloaders",
   "_trn_no_modloaders_found": "No modloaders found",
@@ -50,5 +53,6 @@
   "_trn_search": "Search",
   "_trn_sort_by": "Sort by",
   "_trn_group_by": "Group by",
-  "_trn_direct": "Direct"
+  "_trn_direct": "Direct",
+  "_trn_share": "Share"
 }

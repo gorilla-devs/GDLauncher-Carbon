@@ -1,6 +1,6 @@
 import { rspc } from "@/utils/rspcClient"
 
-const SettingsJavaData = () => {
+const useSettingsJavaData = () => {
   const availableJavas = rspc.createQuery(() => ({
     queryKey: ["java.getAvailableJavas"]
   }))
@@ -13,4 +13,4 @@ const SettingsJavaData = () => {
   return { availableJavas, javaProfiles, totalRam }
 }
 
-export default SettingsJavaData
+export default useSettingsJavaData

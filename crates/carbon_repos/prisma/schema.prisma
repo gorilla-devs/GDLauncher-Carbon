@@ -21,10 +21,11 @@ model AppConfiguration {
   concurrentDownloads             Int      @default(10)
   downloadDependencies            Boolean  @default(true)
   instancesTileSize               Int      @default(2) // 1-5
-  instancesGroupBy                String   @default("group")
+  instancesGroupBy                String?  // null = folders mode (manual drag-drop)
   instancesGroupByAsc             Boolean  @default(true)
-  instancesSortBy                 String   @default("created")
+  instancesSortBy                 String?  // null = manual order (uses libraryPosition)
   instancesSortByAsc              Boolean  @default(false)
+  instancesDuplicateFavorites     Boolean  @default(true) // Show favorites in both favorites section AND their folder/group
   showFeatured                    Boolean  @default(true)
   // Other settings
   deletionThroughRecycleBin       Boolean  @default(true)
@@ -48,6 +49,14 @@ model AppConfiguration {
   gdlAccountStatus                Bytes?
   // Stable installation ID for cohort-based features
   installationId                  String?
+  // Server settings
+  serversTileSize             Int      @default(2)
+  serversGroupBy              String?
+  serversGroupByAsc           Boolean  @default(true)
+  serversSortBy               String?
+  serversSortByAsc            Boolean  @default(false)
+  serversDuplicateFavorites   Boolean  @default(true)
+  defaultServerGroup          Int?
 }
 
 // Generic KV store for frontend preferences (onboarding, "don't show again" dialogs, etc.)
@@ -85,6 +94,7 @@ model Account {
   tokenExpires                  DateTime?
   msRefreshToken                String?
   idToken                       String?
+  gdlToken                      String?            // GDL custom JWT for API calls
   lastUsed                      DateTime
   skinId                        String?
   AppConfigurationActiveAccount AppConfiguration[] @relation("activeAccount")
@@ -110,15 +120,16 @@ model ActiveDownloads {
 }
 
 model Instance {
-  id            Int            @id @default(autoincrement())
-  name          String
-  shortpath     String         @unique
-  favorite      Boolean        @default(false)
-  hasPackUpdate Boolean        @default(false)
-  index         Int
-  group         InstanceGroup  @relation(fields: [groupId], references: [id])
-  groupId       Int
-  mods          ModFileCache[]
+  id              Int            @id @default(autoincrement())
+  name            String
+  shortpath       String         @unique
+  favorite        Boolean        @default(false)
+  hasPackUpdate   Boolean        @default(false)
+  index           Int
+  libraryPosition Int?           // Ordering at library root (null if inside folder)
+  group           InstanceGroup  @relation(fields: [groupId], references: [id])
+  groupId         Int
+  mods            ModFileCache[]
 }
 
 model VersionInfoCache {
@@ -146,10 +157,51 @@ model AssetsMetaCache {
 }
 
 model InstanceGroup {
-  id         Int        @id @default(autoincrement())
-  name       String
-  groupIndex Int
-  instances  Instance[]
+  id              Int        @id @default(autoincrement())
+  name            String
+  groupIndex      Int        // Legacy field - to be removed after migration
+  libraryPosition Int?       // Ordering at library root (null for default group)
+  instances       Instance[]
+}
+
+model Server {
+  id               Int                  @id @default(autoincrement())
+  name             String
+  shortpath        String               @unique
+  favorite         Boolean              @default(false)
+  index            Int
+  libraryPosition  Int?
+  group            ServerGroup          @relation(fields: [groupId], references: [id])
+  groupId          Int
+  serverType       String               @default("vanilla")
+  gameVersion      String
+  port             Int                  @default(25565)
+  motd             String               @default("A Minecraft Server")
+  maxPlayers       Int                  @default(20)
+  onlineMode       Boolean              @default(true)
+  xmx              Int                  @default(2048)
+  xms              Int                  @default(1024)
+  extraJavaArgs    String               @default("")
+  autoRestart      Boolean              @default(false)
+  dateCreated      DateTime             @default(now())
+  lastStarted      DateTime?
+  providerType     String               @default("local")
+  hostedServerId   String?
+  iconRevision     Int?
+  modloaderType    String?
+  modloaderVersion String?
+  modpackPlatform  String?
+  modpackProjectId String?
+  modpackFileId    String?
+  mods             ServerModFileCache[]
+}
+
+model ServerGroup {
+  id              Int        @id @default(autoincrement())
+  name            String
+  groupIndex      Int
+  libraryPosition Int?
+  servers         Server[]
 }
 
 model ModFileCache {
@@ -167,22 +219,38 @@ model ModFileCache {
   @@unique([instanceId, filename])
 }
 
+model ServerModFileCache {
+  id            String      @id @default(uuid())
+  lastUpdatedAt DateTime    @default(now()) @updatedAt
+  serverId      Int
+  server        Server      @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  filename      String
+  filesize      Int
+  enabled       Boolean     @default(true)
+  addonType     String      @default("mods") // "mods", "datapacks"
+  metadataId    String
+  metadata      ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Restrict)
+
+  @@unique([serverId, filename])
+}
+
 model ModMetadata {
-  id            String              @id
-  lastUpdatedAt DateTime            @default(now()) @updatedAt
-  murmur2       Int
-  sha512        Bytes
-  sha1          Bytes
-  name          String?
-  modid         String?
-  version       String?
-  description   String?
-  authors       String?
-  modloaders    String
-  logoImage     LocalModImageCache?
-  curseforge    CurseForgeModCache?
-  modrinth      ModrinthModCache?
-  cachedFiles   ModFileCache[]
+  id               String              @id
+  lastUpdatedAt    DateTime            @default(now()) @updatedAt
+  murmur2          Int
+  sha512           Bytes
+  sha1             Bytes
+  name             String?
+  modid            String?
+  version          String?
+  description      String?
+  authors          String?
+  modloaders       String
+  logoImage        LocalModImageCache?
+  curseforge       CurseForgeModCache?
+  modrinth         ModrinthModCache?
+  cachedFiles      ModFileCache[]
+  serverCachedFiles ServerModFileCache[]
 }
 
 model CurseForgeModCache {

@@ -413,7 +413,10 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         await storeIconForBackend()
 
         const instanceId = await createInstanceMutation.mutateAsync({
-          group: defaultGroup.data || 1,
+          group:
+            (props.data as { groupId?: number } | undefined)?.groupId ??
+            defaultGroup.data ??
+            1,
           use_loaded_icon: true,
           notes: "",
           name: title()!,
@@ -637,7 +640,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   quiltVersionsQuery.isFetching ||
                   neoForgeVersionsQuery.isFetching) &&
                   loader()) ||
-                  mappedMcVersions().length === 0
+                mappedMcVersions().length === 0
               )}
               disallowEmptySelection={true}
               itemComponent={(itemProps) => {
@@ -842,8 +845,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         <Button
           disabled={Boolean(
             (loaderVersions().length === 0 && loader()) ||
-              mappedMcVersions().length === 0 ||
-              !isUpdatingWithDiffs()
+            mappedMcVersions().length === 0 ||
+            !isUpdatingWithDiffs()
           )}
           type="primary"
           style={{ width: "100%", "max-width": "200px" }}

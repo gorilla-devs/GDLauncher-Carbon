@@ -135,7 +135,51 @@ declare module 'astro:content' {
 	>;
 
 	type ContentEntryMap = {
-		"blog": {
+		"addon-instructions": {
+"datapacks.md": {
+	id: "datapacks.md";
+  slug: "datapacks";
+  body: string;
+  collection: "addon-instructions";
+  data: any
+} & { render(): Render[".md"] };
+"modpacks.md": {
+	id: "modpacks.md";
+  slug: "modpacks";
+  body: string;
+  collection: "addon-instructions";
+  data: any
+} & { render(): Render[".md"] };
+"mods.md": {
+	id: "mods.md";
+  slug: "mods";
+  body: string;
+  collection: "addon-instructions";
+  data: any
+} & { render(): Render[".md"] };
+"resourcepacks.md": {
+	id: "resourcepacks.md";
+  slug: "resourcepacks";
+  body: string;
+  collection: "addon-instructions";
+  data: any
+} & { render(): Render[".md"] };
+"shaders.md": {
+	id: "shaders.md";
+  slug: "shaders";
+  body: string;
+  collection: "addon-instructions";
+  data: any
+} & { render(): Render[".md"] };
+"worlds.md": {
+	id: "worlds.md";
+  slug: "worlds";
+  body: string;
+  collection: "addon-instructions";
+  data: any
+} & { render(): Render[".md"] };
+};
+"blog": {
 "curseforge-partnership-announcement.md": {
 	id: "curseforge-partnership-announcement.md";
   slug: "curseforge-partnership-announcement";
@@ -152,6 +196,13 @@ declare module 'astro:content' {
 } & { render(): Render[".md"] };
 };
 "docs": {
+"authentication-errors.md": {
+	id: "authentication-errors.md";
+  slug: "authentication-errors";
+  body: string;
+  collection: "docs";
+  data: any
+} & { render(): Render[".md"] };
 "gdlauncher-vs-gdlauncher-carbon.md": {
 	id: "gdlauncher-vs-gdlauncher-carbon.md";
   slug: "gdlauncher-vs-gdlauncher-carbon";

@@ -1,8 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { createSignal, Show } from "solid-js";
-import { ButtonDropdown, type ButtonDropdownProps } from "./ButtonDropdown";
+import { ButtonDropdown } from "./ButtonDropdown";
 import { type JSX } from "solid-js";
-import Separator from "./Separator.astro";
 import Apple from "../../assets/Apple";
 import Windows from "../../assets/Windows";
 import Linux from "../../assets/Linux";
@@ -29,8 +28,10 @@ const button = cva("button", {
         "gap-2",
         "justify-center",
         "relative",
+        "active:scale-95",
+        "ease-spring",
       ],
-      secondary: ["bg-bluegd-600", "text-white", "rounded-xsgd"],
+      secondary: ["bg-bluegd-600", "text-white", "rounded-xsgd", "active:scale-95", "ease-spring", "transition-transform", "duration-100"],
       transparent: [
         "bg-transparent",
         "text-bluegd-500",
@@ -38,6 +39,10 @@ const button = cva("button", {
         "border-[1px]",
         "border-bluegd-500",
         "rounded-smgd",
+        "active:scale-95",
+        "ease-spring",
+        "transition-transform",
+        "duration-100",
       ],
     },
     size: {
@@ -56,9 +61,8 @@ export interface ButtonProps
   extends JSX.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof button> {}
 
-const [items, showItems] = createSignal(false);
-export { showItems };
 const Button = (props: ButtonProps & Props) => {
+  const [showDropdown, setShowDropdown] = createSignal(false);
   const intent = props.intent;
   const size = props.size;
   const className = props.class;
@@ -67,7 +71,7 @@ const Button = (props: ButtonProps & Props) => {
     <button
       onClick={() => {
         if (props.isDropdown) {
-          showItems(!items());
+          setShowDropdown(!showDropdown());
         }
         if (props.onClick) props.onClick();
       }}
@@ -75,8 +79,9 @@ const Button = (props: ButtonProps & Props) => {
     >
       {props.children}
 
-      <Show when={props.isDropdown && items()}>
+      <Show when={props.isDropdown && showDropdown()}>
         <ButtonDropdown
+          onClose={() => setShowDropdown(false)}
           items={[
             {
               item: (

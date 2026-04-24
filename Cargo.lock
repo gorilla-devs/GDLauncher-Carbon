@@ -514,6 +514,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "axum",
+ "base64 0.22.1",
  "carbon_compression",
  "carbon_macro",
  "carbon_net",
@@ -582,6 +583,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-util",
  "toml 0.7.8",
  "tower-http 0.5.2",
  "tracing",
@@ -3529,6 +3531,7 @@ dependencies = [
  "bstr",
  "dbus",
  "normpath",
+ "url",
  "windows-sys 0.59.0",
 ]
 

@@ -5,3 +5,4 @@ playwright-report
 binaries
 test-results
 release
+*.hbs

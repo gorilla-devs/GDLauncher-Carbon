@@ -1,0 +1,279 @@
+---
+/**
+ * AddonInstallLayout - Layout for addon installation pages
+ * SEO-optimized with dynamic addon name and platform branding
+ */
+import PageShell from "./PageShell.astro"
+import Breadcrumb from "./Breadcrumb.astro"
+
+import type { AddonType, Platform } from "../lib/api/types"
+import { ADDON_TYPE_LABELS, ADDON_TYPE_PLURAL } from "../lib/api/types"
+
+interface Props {
+  addonName: string
+  addonSlug: string
+  addonType: AddonType
+  platform: Platform
+  imageUrl: string | null
+  websiteUrl: string
+  description?: string | null
+  authors?: string[] | null
+  author?: string | null
+  categories?: string[] | null
+  dateModified?: string | null
+}
+
+const {
+  addonName, addonSlug, addonType, platform, imageUrl, websiteUrl,
+  description, authors, author, categories, dateModified
+} = Astro.props
+
+const authorDisplay = authors?.length ? authors.join(", ") : author || null
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+  } catch { return dateStr }
+}
+
+const platformLabel = platform === "curseforge" ? "CurseForge" : "Modrinth"
+const typeLabel = ADDON_TYPE_LABELS[addonType]
+const typePlural = ADDON_TYPE_PLURAL[addonType]
+
+const seoTitle = `Install ${addonName} ${typeLabel} with GDLauncher`
+const seoDescription = description
+  ? `${description} Install ${addonName} for Minecraft with GDLauncher.`
+  : `Download and install ${addonName} for Minecraft using GDLauncher. One-click installation from ${platformLabel}.`
+const seoKeywords = `${addonName}, minecraft ${addonType}, install ${addonName}, ${platformLabel} ${addonType}, gdlauncher`
+const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlug}`
+---
+
+<PageShell
+  title={seoTitle}
+  description={seoDescription}
+  keywords={seoKeywords}
+  image={imageUrl || undefined}
+  canonicalUrl={canonicalUrl}
+>
+  <Fragment slot="head">
+    <!-- Structured data for SEO -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": addonName,
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "Windows, macOS, Linux",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    })} />
+  </Fragment>
+
+    <main class="py-8">
+      <Breadcrumb items={[
+        { label: typePlural, href: `/${addonType}` },
+        { label: addonName }
+      ]} />
+
+      <div class="max-w-4xl mx-auto px-4">
+        <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
+        <!-- Hero section with addon image -->
+        <header class="mb-10">
+          <div class="flex flex-col md:flex-row gap-6 items-start">
+            {imageUrl ? (
+              <div class="flex-shrink-0">
+                <img
+                  src={imageUrl}
+                  alt={`${addonName} logo`}
+                  width="128"
+                  height="128"
+                  class="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 object-cover"
+                  loading="eager"
+                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                />
+                <div class="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 items-center justify-center hidden">
+                  <span class="text-4xl text-darkSlate-400">?</span>
+                </div>
+              </div>
+            ) : (
+              <div class="flex-shrink-0 w-24 h-24 md:w-32 md:h-32 rounded-xl bg-darkSlate-700 flex items-center justify-center">
+                <span class="text-4xl text-darkSlate-400">?</span>
+              </div>
+            )}
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <img
+                  src={`/assets/icons/${platform === "curseforge" ? "curseforge_logo" : "modrinth_logo"}.svg`}
+                  alt={platformLabel}
+                  class="w-5 h-5"
+                />
+                <span class="text-sm text-darkSlate-100">{platformLabel}</span>
+              </div>
+              <h1 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-3">
+                How to install "{addonName}"
+              </h1>
+              {description ? (
+                <p class="text-lg text-darkSlate-100">{description}</p>
+              ) : (
+                <p class="text-lg text-darkSlate-100">
+                  Install this {typeLabel.toLowerCase()} in Minecraft using GDLauncher
+                </p>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <!-- Addon metadata -->
+        {(authorDisplay || dateModified) && (
+          <div class="mb-8 grid grid-cols-2 md:grid-cols-3 gap-4">
+            {authorDisplay && (
+              <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg">
+                <p class="text-xs text-darkSlate-300 mb-1">Author</p>
+                <p class="text-lightSlate-50 font-semibold truncate">{authorDisplay}</p>
+              </div>
+            )}
+            {dateModified && (
+              <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg">
+                <p class="text-xs text-darkSlate-300 mb-1">Last Updated</p>
+                <p class="text-lightSlate-50 font-semibold">{formatDate(dateModified)}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {categories && categories.length > 0 && (
+          <div class="mb-8 flex flex-wrap gap-2">
+            {categories.map((cat) => (
+              <span class="px-3 py-1 bg-darkSlate-700/50 rounded-full text-xs text-darkSlate-100 border border-darkSlate-600">
+                {cat}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <!-- Quick Install ID -->
+        <div class="mb-8 px-4 py-3 bg-darkSlate-700/50 rounded-lg border border-darkSlate-600">
+          <p class="text-xs text-darkSlate-300 mb-2">Quick Install ID</p>
+          <div class="flex items-center justify-between gap-4">
+            <code class="text-primary-400 text-lg font-mono">#{addonSlug}</code>
+            <button
+              id="copy-slug-btn"
+              class="px-3 py-1.5 bg-darkSlate-600 hover:bg-darkSlate-500 rounded text-sm font-medium transition-colors flex items-center gap-2"
+              data-slug={`#${addonSlug}`}
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Installation content -->
+        <article class="prose prose-invert prose-lg max-w-none">
+          <slot />
+        </article>
+
+        <!-- CTA buttons -->
+        <div class="mt-12 flex flex-col sm:flex-row gap-4">
+        <a
+          href={websiteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-darkSlate-600 hover:bg-darkSlate-500 text-lightSlate-50 font-semibold transition-colors"
+        >
+          <img
+            src={`/assets/icons/${platform === "curseforge" ? "curseforge_logo" : "modrinth_logo"}.svg`}
+            alt=""
+            class="w-5 h-5"
+          />
+          View on {platformLabel}
+        </a>
+        <a
+          href="/download/windows"
+          data-astro-prefetch="false"
+          class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors"
+        >
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/>
+          </svg>
+          Download GDLauncher
+        </a>
+        </div>
+        </div>
+      </div>
+    </main>
+</PageShell>
+
+<style is:global>
+  /* Reuse prose styles from GuideLayout */
+  .prose {
+    color: rgb(var(--lightSlate-100));
+  }
+
+  .prose h2 {
+    color: rgb(var(--lightSlate-50));
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .prose h3 {
+    color: rgb(var(--lightSlate-50));
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .prose p {
+    margin-bottom: 1rem;
+    line-height: 1.75;
+  }
+
+  .prose ul, .prose ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .prose li {
+    margin-bottom: 0.5rem;
+  }
+
+  .prose a {
+    color: rgb(var(--primary-400));
+    text-decoration: underline;
+  }
+
+  .prose a:hover {
+    color: rgb(var(--primary-300));
+  }
+
+  .prose strong {
+    color: rgb(var(--lightSlate-50));
+    font-weight: 600;
+  }
+</style>
+
+<script>
+  const copyBtn = document.getElementById('copy-slug-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const slug = copyBtn.dataset.slug;
+      if (slug) {
+        await navigator.clipboard.writeText(slug);
+        const span = copyBtn.querySelector('span');
+        if (span) {
+          const originalText = span.textContent;
+          span.textContent = 'Copied!';
+          setTimeout(() => {
+            span.textContent = originalText;
+          }, 2000);
+        }
+      }
+    });
+  }
+</script>

@@ -50,6 +50,9 @@ export const AccountsDropdown = (props: Props) => {
       ? globalStore.gdlAccount.data?.value
       : undefined
 
+  const gdlAccountUnavailable = () =>
+    globalStore.gdlAccount.isError && !!globalStore.settings.data?.gdlAccountId
+
   let gdlAccountRef: HTMLDivElement | undefined
   let mcAccountsRef: HTMLDivElement | undefined
   let settingsButtonRef: HTMLDivElement | undefined
@@ -187,7 +190,15 @@ export const AccountsDropdown = (props: Props) => {
                     class="h-6 w-6 rounded-md"
                   />
                   <div class="max-w-50 truncate">
-                    {validGDLUser()?.nickname}
+                    {validGDLUser()?.displayName}
+                  </div>
+                </div>
+              </Match>
+              <Match when={gdlAccountUnavailable()}>
+                <div class="flex items-center gap-4 rounded-lg px-4 py-2">
+                  <div class="i-hugeicons:alert-01 text-yellow-500 h-6 w-6" />
+                  <div class="text-yellow-400">
+                    <Trans key="accounts:_trn_gdl_account_unavailable" />
                   </div>
                 </div>
               </Match>
@@ -257,7 +268,7 @@ export const AccountsDropdown = (props: Props) => {
             ref={settingsButtonRef}
           >
             <Button
-              type="outline"
+              type="secondary"
               class="flex items-center justify-center gap-4"
               fullWidth
               onClick={() => {

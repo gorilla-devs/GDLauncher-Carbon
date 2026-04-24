@@ -1,0 +1,39 @@
+---
+import type { GetStaticPaths } from "astro"
+import AddonInstallLayout from "../../../components/AddonInstallLayout.astro"
+import type { AddonInfo } from "../../../lib/api/types"
+import { marked } from "marked"
+import addonsData from "../../../lib/addonsData"
+
+import modpackInstructions from "../../../content/addon-instructions/modpacks.md?raw"
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  return addonsData.curseforge.modpacks.map((addon) => ({
+    params: { slug: addon.slug },
+    props: { addon: { ...addon, platform: "curseforge" as const, type: "modpacks" as const } },
+  }))
+}
+
+interface Props {
+  addon: AddonInfo
+}
+
+const { addon } = Astro.props
+const instructionsHtml = marked(modpackInstructions)
+---
+
+<AddonInstallLayout
+  addonName={addon.name}
+  addonSlug={addon.slug}
+  addonType="modpacks"
+  platform="curseforge"
+  imageUrl={addon.imageUrl}
+  websiteUrl={addon.websiteUrl}
+  description={addon.description}
+  authors={addon.authors}
+  author={addon.author}
+  categories={addon.categories}
+  dateModified={addon.dateModified}
+>
+  <Fragment set:html={instructionsHtml} />
+</AddonInstallLayout>

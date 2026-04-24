@@ -7,6 +7,7 @@ import {
   onMount,
   JSX,
   Show,
+  createEffect,
   mergeProps
 } from "solid-js"
 
@@ -22,6 +23,7 @@ interface Props {
   onChange?: (_val: number) => void
   OnRelease?: (_val: number) => void
   vertical?: boolean
+  tooltipFormat?: (_val: number) => string | JSX.Element
 }
 
 function Slider(props: Props) {
@@ -38,6 +40,13 @@ function Slider(props: Props) {
   const [handleRef, setHandleRef] = createSignal<HTMLDivElement | undefined>(
     undefined
   )
+
+  createEffect(() => {
+    const v = props.value
+    if (v !== undefined) {
+      setCurrentValue(v)
+    }
+  })
 
   const mergedProps = mergeProps({ noLabels: false, noTooltip: false }, props)
 
@@ -115,17 +124,12 @@ function Slider(props: Props) {
     setStartValue(value)
 
     if (currentValue() !== value) {
-      onChange(value)
+      setCurrentValue(value)
     }
 
     // Add document listeners when dragging starts
     document.addEventListener("mousemove", mousemove)
     document.addEventListener("mouseup", mouseup)
-  }
-
-  const onChange = (val: number) => {
-    setCurrentValue(val)
-    props?.onChange?.(val)
   }
 
   const mousemove = (e: MouseEvent) => {
@@ -141,12 +145,13 @@ function Slider(props: Props) {
     const value = trimAlignValue(startValue() + diffValue)
     const oldValue = currentValue()
     if (value === oldValue) return
-    onChange(value)
+    setCurrentValue(value)
   }
 
   const mouseup = () => {
     setShowTooltip(false)
     setDragging(false)
+    props?.onChange?.(currentValue())
     props?.OnRelease?.(currentValue())
 
     // Remove document listeners when dragging ends
@@ -154,18 +159,14 @@ function Slider(props: Props) {
     document.removeEventListener("mouseup", mouseup)
   }
 
-  const trackClick = (e: MouseEvent) => {
-    e.preventDefault()
-
+  const trackMousedown = (e: MouseEvent) => {
     // Don't react if the click came from the handle itself.
     if (e.target === handleRef()) {
       return
     }
 
-    const position = props.vertical ? e.clientY : e.clientX // Use clientY for vertical slider, clientX for horizontal
-    const value = calcValueByPos(position)
-    onChange(value)
-    mouseup()
+    // Delegate to the same mousedown handler so dragging starts from the track
+    mousedown(e)
   }
 
   onMount(() => {
@@ -174,7 +175,7 @@ function Slider(props: Props) {
       handle.addEventListener("mousedown", mousedown)
     }
     if (sliderRef) {
-      sliderRef.addEventListener("click", trackClick)
+      sliderRef.addEventListener("mousedown", trackMousedown)
     }
   })
 
@@ -184,7 +185,7 @@ function Slider(props: Props) {
       handle.removeEventListener("mousedown", mousedown)
     }
     if (sliderRef) {
-      sliderRef.removeEventListener("click", trackClick)
+      sliderRef.removeEventListener("mousedown", trackMousedown)
     }
     // Clean up document listeners if still attached (e.g., component unmounts while dragging)
     if (dragging()) {
@@ -201,7 +202,7 @@ function Slider(props: Props) {
   return (
     <>
       <div
-        class="relative flex items-center box-border"
+        class="group relative flex items-center box-border"
         classList={{
           "h-10 w-full max-w-full": !props.vertical,
           "h-full w-10": props.vertical
@@ -216,7 +217,11 @@ function Slider(props: Props) {
               transform: "translate(-50%, -40px)"
             }}
           >
-            <div class="z-10 relative">{currentValue()}</div>
+            <div class="z-10 relative whitespace-nowrap">
+              {props.tooltipFormat
+                ? props.tooltipFormat(currentValue())
+                : currentValue()}
+            </div>
             <div class="z-1 absolute left-1/2 -translate-x-1/2 -bottom-1 w-3 h-3 rotate-45 bg-darkSlate-900" />
           </div>
         </Show>
@@ -232,32 +237,23 @@ function Slider(props: Props) {
               {([value, label], i) => (
                 <>
                   <div
-                    class="w-2 h-2 rounded-full border-4 border-solid"
+                    class="absolute z-10 bg-lightSlate-50/25"
                     style={{
-                      position: "absolute",
-
                       ...(props.vertical
                         ? {
+                            left: "50%",
                             top: `${calcOffset(parseInt(value, 10))}%`,
-                            "margin-top": -(16 / 2) + "px"
+                            width: "1px",
+                            height: "8px",
+                            transform: "translate(-50%, -50%)"
                           }
                         : {
+                            top: "50%",
                             left: `${calcOffset(parseInt(value, 10))}%`,
-                            "margin-left": -(16 / 2) + "px"
+                            width: "1px",
+                            height: "8px",
+                            transform: "translate(-50%, -50%)"
                           })
-                    }}
-                    classList={{
-                      "bg-darkSlate-800 border-darkSlate-600":
-                        calcOffset(parseInt(value, 10)) >=
-                        calcOffset(currentValue()),
-                      "bg-primary-500 border-primary-500":
-                        calcOffset(parseInt(value, 10)) <=
-                          calcOffset(currentValue()) && !showTooptip(),
-                      "bg-accent border-accent":
-                        calcOffset(parseInt(value, 10)) <=
-                          calcOffset(currentValue()) && showTooptip(),
-                      "-top-1": !props.vertical,
-                      "-right-1": props.vertical
                     }}
                   />
                   <p
@@ -310,24 +306,23 @@ function Slider(props: Props) {
           </Show>
           <div
             ref={setHandleRef}
-            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 cursor-pointer z-20 transition-transform duration-100 active:scale-90"
+            class="rounded-full border-0 bg-lightSlate-50/15 shadow-md cursor-grab z-20 transition-[color,box-shadow,transform,opacity,background-color] ease-out group-hover:bg-lightSlate-50/80"
             style={{
               position: "absolute",
               ...(props.vertical
-                ? {
-                    top: `${calcOffset(currentValue())}%`,
-                    transform: "translateY(-50%)"
-                  }
-                : {
-                    left: `${calcOffset(currentValue())}%`,
-                    transform: "translateX(-50%)"
-                  })
+                ? { top: `${calcOffset(currentValue())}%` }
+                : { left: `${calcOffset(currentValue())}%` })
             }}
             classList={{
-              "after:content-[] after:rounded-full after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 hover:after:shadow-[0_0_0_6px_rgb(var(--accent))] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-spring after:duration-100 after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 after:shadow-[0_0_0_6px_rgb(var(--accent))] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-spring after:duration-100 after:z-0 z-10":
-                showTooptip(),
-              "-top-2": !props.vertical,
-              "-left-2": props.vertical
+              "w-1.5 h-5 -translate-x-1/2": !props.vertical,
+              "h-1.5 w-5 -translate-y-1/2": props.vertical,
+              "bg-lightSlate-50/80 scale-110": showTooptip() && !dragging(),
+              "bg-lightSlate-50 scale-90 shadow-lg shadow-primary-500/40 cursor-grabbing":
+                dragging(),
+              "duration-200": !dragging(),
+              "duration-75": dragging(),
+              "-top-0.5": !props.vertical,
+              "-left-0.5": props.vertical
             }}
             onMouseOver={() => {
               setShowTooltip(true)
@@ -342,38 +337,32 @@ function Slider(props: Props) {
             }}
             class="absolute z-10 cursor-pointer"
             classList={{
-              "top-1/2 left-0 right-0 -translate-y-1/2 w-full h-2":
+              "top-1/2 left-0 right-0 -translate-y-1/2 w-full h-4":
                 !props.vertical,
-              "top-0 bottom-0 left-1/2 -translate-x-1/2 h-full w-2":
+              "top-0 bottom-0 left-1/2 -translate-x-1/2 h-full w-4":
                 props.vertical
             }}
           />
           <div
-            class="rounded-full"
+            class="bg-darkSlate-600 rounded-full relative overflow-hidden"
             classList={{
-              "bg-accent": showTooptip(),
-              "bg-primary-500": !showTooptip(),
-              "h-2": !props.vertical,
-              "w-2": props.vertical
+              "w-full h-4": !props.vertical,
+              "h-full w-4": props.vertical
             }}
-            style={{
-              position: "absolute",
-              ...(props.vertical
-                ? {
-                    height: `${calcOffset(currentValue())}%`
-                  }
-                : {
-                    width: `${calcOffset(currentValue())}%`
-                  })
-            }}
-          />
-          <div
-            class="bg-darkSlate-600 rounded-full"
-            classList={{
-              "w-full h-2": !props.vertical,
-              "h-full w-2": props.vertical
-            }}
-          />
+          >
+            <div
+              class="absolute inset-0 bg-primary-500"
+              style={{
+                ...(props.vertical
+                  ? {
+                      height: `${calcOffset(currentValue())}%`
+                    }
+                  : {
+                      width: `${calcOffset(currentValue())}%`
+                    })
+              }}
+            />
+          </div>
         </div>
       </div>
     </>

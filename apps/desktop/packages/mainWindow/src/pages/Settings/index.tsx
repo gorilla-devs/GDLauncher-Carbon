@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from "@solidjs/router"
+import { useLocation } from "@solidjs/router"
 import ContentWrapper from "@/components/ContentWrapper"
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
 import { For, JSX, Show } from "solid-js"
@@ -13,7 +13,7 @@ export interface settingsItem {
   path: string
 }
 
-function Settings() {
+function Settings(props: { children?: JSX.Element }) {
   const location = useLocation()
   const navigator = useGDNavigate()
   const [t] = useTransContext()
@@ -103,9 +103,7 @@ function Settings() {
           </Tabs>
         </div>
         <div class="h-1 w-1 pt-4" />
-        <div class="px-6">
-          <Outlet />
-        </div>
+        <div class="px-6">{props.children}</div>
         <div class="h-1 w-1 pb-4" />
       </ContentWrapper>
     </>

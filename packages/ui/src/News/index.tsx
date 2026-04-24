@@ -48,7 +48,7 @@ const News = (props: CarouselProps) => {
     props
   )
 
-  let slidesRef: HTMLDivElement
+  let slidesRef!: HTMLDivElement
 
   const moveSlide = () => {
     slidesRef.style.transform = `translateX(-${currentImageIndex() * 100}%)`

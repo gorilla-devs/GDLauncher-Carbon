@@ -4,6 +4,7 @@ use super::api::{
     DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount, McAuth,
     McEntitlementMissingError, MsAuth, XboxAuth, XboxError, get_profile,
 };
+use super::gdl_account::GDLAccountTask;
 use super::oauth_server::{OAuthCallbackHandle, OAuthCallbackServer};
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -13,7 +14,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 use url::Url;
 
 /// Active process of adding an account
@@ -115,6 +116,7 @@ impl EnrollmentTask {
                 update_status(EnrollmentStatus::Complete(FullAccount {
                     ms: ms_auth,
                     mc: account,
+                    gdl_token: None, // Will be exchanged after enrollment
                 }))
                 .await;
 
@@ -298,6 +300,7 @@ impl EnrollmentTask {
                 update_status(EnrollmentStatus::Complete(FullAccount {
                     ms: ms_auth,
                     mc: account,
+                    gdl_token: None, // Will be exchanged after enrollment
                 }))
                 .await;
 
@@ -328,6 +331,7 @@ impl EnrollmentTask {
         client: reqwest_middleware::ClientWithMiddleware,
         refresh_token: String,
         invalidate: impl InvalidateCtx + Send + Sync + 'static,
+        gdl_account_task: GDLAccountTask,
     ) -> (
         Self,
         tokio::task::JoinHandle<Result<(), futures::future::Aborted>>,
@@ -350,6 +354,19 @@ impl EnrollmentTask {
                 update_core_module_status(CoreModuleStatus::RefreshMSAuth);
 
                 trace!("Successfully refreshed MsAuth with refresh token");
+
+                // Spawn GDL token exchange in parallel with Xbox/MC auth
+                let gdl_id_token = ms_auth.id_token.clone();
+                let gdl_handle = tokio::spawn(async move {
+                    update_core_module_status(CoreModuleStatus::ExchangingGdlToken);
+                    match gdl_account_task.exchange_token(&gdl_id_token).await {
+                        Ok(response) => Some(response.access_token),
+                        Err(e) => {
+                            warn!("Failed to exchange GDL token: {}", e);
+                            None
+                        }
+                    }
+                });
 
                 update_status(EnrollmentStatus::XboxAuth).await;
                 trace!("Authenticating with XBox");
@@ -404,9 +421,13 @@ impl EnrollmentTask {
                     auth: mc_auth,
                 };
 
+                // Await GDL token exchange result before completing
+                let gdl_token = gdl_handle.await.ok().flatten();
+
                 update_status(EnrollmentStatus::Complete(FullAccount {
                     ms: ms_auth,
                     mc: account,
+                    gdl_token,
                 }))
                 .await;
 

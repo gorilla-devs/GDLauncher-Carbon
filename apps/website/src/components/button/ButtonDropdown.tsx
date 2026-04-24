@@ -1,18 +1,18 @@
 import { For, onCleanup, onMount } from "solid-js";
-import { showItems } from "./Button";
 
 export interface ButtonDropdownProps {
   items: Array<{
     item: Element | string;
     onClick?: () => void;
   }>;
+  onClose: () => void;
 }
 
 export const ButtonDropdown = (props: ButtonDropdownProps) => {
   let ref: HTMLDivElement = null as any;
   const handleClick = (event: MouseEvent) => {
     if (!ref.contains(event.target as Node)) {
-      showItems(false);
+      props.onClose();
     }
   };
 

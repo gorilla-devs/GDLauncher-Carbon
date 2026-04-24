@@ -15,6 +15,7 @@ interface Props {
   checked: boolean
   onChange?: OnChange
   buttonStyle?: ButtonStyle
+  allowDeselect?: boolean
   children?: JSX.Element
 }
 
@@ -37,13 +38,17 @@ interface GroupProps {
 let nextId = 1
 
 const Radio = (props: Props) => {
-  const [local, otherProps] = splitProps(props, ["buttonStyle", "onChange"])
+  const [local, otherProps] = splitProps(props, [
+    "buttonStyle",
+    "onChange",
+    "allowDeselect"
+  ])
   const [isHovered, setIsHovered] = createSignal(false) // Track hover state
 
   const id = `radio-${nextId++}`
 
   // Determine base and conditional classes based on buttonStyle
-  const baseClasses = `relative flex gap-4 items-center w-full rounded-lg px-4 py-3 ${PRESS_CLASSES_LIGHT}`
+  const baseClasses = `relative flex gap-2 items-center w-full rounded-md px-1.5 py-1 ${PRESS_CLASSES_LIGHT}`
   const indicatorBaseClasses = "w-5 h-5 min-w-5 min-h-5 rounded-full shrink-0"
 
   return (
@@ -65,7 +70,7 @@ const Radio = (props: Props) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => {
-          if (!props.checked) {
+          if (props.allowDeselect || !props.checked) {
             local?.onChange?.(props.value)
           }
         }}
@@ -80,8 +85,8 @@ const Radio = (props: Props) => {
             class={`flex justify-center items-center box-border transition-colors ${indicatorBaseClasses} ${
               props.checked
                 ? "bg-primary-500"
-                : "bg-darkSlate-500 border border-darkSlate-300"
-            } ${isHovered() && !props.checked ? "border-darkSlate-200" : ""}`}
+                : "bg-darkSlate-800 ring-1 ring-inset ring-darkSlate-500"
+            } ${isHovered() && !props.checked ? "ring-darkSlate-300" : ""}`}
           >
             <div
               class={`w-2 h-2 rounded-full bg-lightSlate-100 transition-transform ${

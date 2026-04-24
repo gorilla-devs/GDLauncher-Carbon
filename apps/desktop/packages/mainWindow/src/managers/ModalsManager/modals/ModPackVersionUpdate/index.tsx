@@ -208,7 +208,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
 
           <div class="flex justify-between">
             <Button
-              type="outline"
+              type="secondary"
               onClick={() => {
                 modalContext?.closeModal()
               }}

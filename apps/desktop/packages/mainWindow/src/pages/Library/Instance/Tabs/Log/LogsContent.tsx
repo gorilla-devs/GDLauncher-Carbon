@@ -374,7 +374,7 @@ const LogsContent = (props: Props) => {
                 }
               }}
               onWheel={props.onScroll}
-              overscan={10}
+              bufferSize={10}
             >
               {(log, index) => {
                 const rowSearchResult = open()

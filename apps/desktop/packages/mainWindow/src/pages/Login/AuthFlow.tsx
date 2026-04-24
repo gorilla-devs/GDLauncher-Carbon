@@ -82,7 +82,11 @@ interface AuthFlowInnerProps {
 
 function AuthFlowInner(props: AuthFlowInnerProps) {
   const globalStore = useGlobalStore()
-  const [searchParams] = useSearchParams()
+  const [searchParams] = useSearchParams<{
+    addMicrosoftAccount: string
+    addGdlAccount: string
+    returnTo: string
+  }>()
   const rspcContext = rspc.useContext()
 
   // Extract configuration from global store
@@ -184,9 +188,9 @@ function AuthFlowContent() {
 
   // GDL account form state
   const [gdlEmail, setGdlEmail] = createSignal("")
-  const [gdlNickname, setGdlNickname] = createSignal("")
+  const [gdlDisplayName, setGdlDisplayName] = createSignal("")
   const [gdlEmailError, setGdlEmailError] = createSignal<string | undefined>()
-  const [gdlNicknameError, setGdlNicknameError] = createSignal<
+  const [gdlDisplayNameError, setGdlDisplayNameError] = createSignal<
     string | undefined
   >()
   const [gdlFormInitialized, setGdlFormInitialized] = createSignal(false)
@@ -265,9 +269,9 @@ function AuthFlowContent() {
       },
       (step) => {
         if (step && !gdlFormInitialized()) {
-          // Set default nickname from step (Microsoft username)
-          if (step.nickname) {
-            setGdlNickname(step.nickname)
+          // Set default display name from step (Microsoft username)
+          if (step.displayName) {
+            setGdlDisplayName(step.displayName)
           }
           // Set email if provided
           if (step.email) {
@@ -385,13 +389,13 @@ function AuthFlowContent() {
     return emailRegex.test(email)
   })
 
-  const isGdlNicknameValid = createMemo(() => {
-    const nickname = gdlNickname().trim()
-    return nickname.length >= 3
+  const isGdlDisplayNameValid = createMemo(() => {
+    const displayName = gdlDisplayName().trim()
+    return displayName.length >= 3
   })
 
   const canSubmitGdlForm = createMemo(
-    () => isGdlEmailValid() && isGdlNicknameValid()
+    () => isGdlEmailValid() && isGdlDisplayNameValid()
   )
 
   const handleRegisterGdlAccount = async () => {
@@ -402,17 +406,17 @@ function AuthFlowContent() {
       } else if (!isGdlEmailValid()) {
         setGdlEmailError("Please enter a valid email address")
       }
-      if (!gdlNickname().trim()) {
-        setGdlNicknameError("Nickname is required")
-      } else if (!isGdlNicknameValid()) {
-        setGdlNicknameError("Nickname must be at least 3 characters")
+      if (!gdlDisplayName().trim()) {
+        setGdlDisplayNameError("Display name is required")
+      } else if (!isGdlDisplayNameValid()) {
+        setGdlDisplayNameError("Display name must be at least 3 characters")
       }
       return
     }
 
     setButtonLoading(true)
     setGdlEmailError(undefined)
-    setGdlNicknameError(undefined)
+    setGdlDisplayNameError(undefined)
 
     try {
       const activeUuid = flow.data.activeUuid
@@ -423,7 +427,7 @@ function AuthFlowContent() {
       // Register the account
       await registerGdlAccountMutation.mutateAsync({
         email: gdlEmail().trim(),
-        nickname: gdlNickname().trim(),
+        displayName: gdlDisplayName().trim(),
         uuid: activeUuid
       })
 
@@ -477,16 +481,16 @@ function AuthFlowContent() {
   }
 
   const handleSetupGDLAccount = async () => {
-    // Get default nickname from current account
+    // Get default display name from current account
     const account = flow.data.accounts.find(
       (acc) => acc.uuid === flow.data.activeUuid
     )
-    const defaultNickname = account?.username || ""
+    const defaultDisplayName = account?.username || ""
 
     await flow.goToStep({
       type: "gdl-account-form",
       email: "",
-      nickname: defaultNickname
+      displayName: defaultDisplayName
     })
   }
 
@@ -502,7 +506,7 @@ function AuthFlowContent() {
   const handleRetryGdlCheck = async () => {
     setButtonLoading(true)
     try {
-      const gdlState = await flow.checkGDLAccount(true)
+      const gdlState = await flow.checkGDLAccount(false)
       await flow.goToStep({ type: "gdl-account", gdlAccount: gdlState })
     } catch (error) {
       console.error("[AuthFlow] Failed to retry GDL check:", error)
@@ -823,11 +827,11 @@ function AuthFlowContent() {
                     <GdlAccountFormStep
                       step={step()}
                       email={gdlEmail()}
-                      nickname={gdlNickname()}
+                      displayName={gdlDisplayName()}
                       onEmailChange={setGdlEmail}
-                      onNicknameChange={setGdlNickname}
+                      onDisplayNameChange={setGdlDisplayName}
                       emailError={gdlEmailError()}
-                      nicknameError={gdlNicknameError()}
+                      displayNameError={gdlDisplayNameError()}
                     />
                   )}
                 </Match>
@@ -1069,7 +1073,8 @@ function AuthFlowContent() {
             <Show
               when={
                 getStepAs("gdl-account")?.gdlAccount?.type === "none" &&
-                flow.data.gdlAccountId !== ""
+                (flow.data.gdlAccountId !== "" ||
+                  flow.data.isAddingGdlFromSettings)
               }
             >
               <Button
@@ -1090,7 +1095,8 @@ function AuthFlowContent() {
               when={
                 getStepAs("gdl-account")?.gdlAccount?.type === "linked" ||
                 (getStepAs("gdl-account")?.gdlAccount?.type === "none" &&
-                  flow.data.gdlAccountId === "")
+                  flow.data.gdlAccountId === "" &&
+                  !flow.data.isAddingGdlFromSettings)
               }
             >
               <Button

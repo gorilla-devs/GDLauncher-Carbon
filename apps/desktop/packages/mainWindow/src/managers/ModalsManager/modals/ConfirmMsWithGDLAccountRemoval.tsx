@@ -28,11 +28,11 @@ const ConfirmMsWithGDLAccountRemoval = (props: ModalProps) => {
     <ModalLayout
       noHeader={props.noHeader}
       title={props?.title}
-      height="h-60"
+      height="h-auto"
       width="w-100"
     >
-      <div class="flex h-full flex-col justify-between">
-        <div class="h-h-full">
+      <div class="flex flex-col gap-6">
+        <div>
           <Trans key="accounts:_trn_remove_ms_account_with_gdl_account_removal_description" />
         </div>
         <div class="flex w-full justify-between">

@@ -1,8 +1,9 @@
 ---
-import type { MDXInstance } from "astro";
-import { getCollection, type CollectionEntry } from "astro:content";
-
-const { pathname } = Astro.url;
+// Normalize pathname by removing trailing slash
+const rawPathname = Astro.url.pathname;
+const pathname = rawPathname.endsWith('/') && rawPathname !== '/'
+  ? rawPathname.slice(0, -1)
+  : rawPathname;
 
 const sidebar = [
   {
@@ -48,59 +49,92 @@ const sidebar = [
 ];
 ---
 
-<style>
-  .active {
-    color: #2865a4;
-    font-weight: bold;
+<nav class="docs-nav py-6">
+  {
+    sidebar.map(({ category, pages }) => {
+      const hasActivePage = pages.some(({ slug }) => {
+        const pageUrl = slug ? `/docs/${slug}` : '/docs';
+        return pathname === pageUrl;
+      });
+
+      return (
+        <div class="category mb-6" data-expanded={hasActivePage ? "true" : "true"}>
+          <button
+            type="button"
+            class="category-header w-full flex items-center justify-between px-3 py-2 text-sm font-semibold uppercase tracking-wider text-darkSlate-100 hover:text-lightSlate-50 transition-colors rounded-lg hover:bg-darkSlate-700/50"
+          >
+            <span>{category}</span>
+            <div class="i-hugeicons:arrow-down-01 w-4 h-4 chevron-icon transition-transform duration-200"></div>
+          </button>
+          <ul class="category-items mt-1 ml-1 space-y-1 overflow-hidden">
+            {pages.map(({ title, slug }) => {
+              const pageUrl = slug ? `/docs/${slug}` : '/docs';
+              const isActive = pathname === pageUrl;
+
+              return (
+                <li>
+                  <a
+                    href={pageUrl}
+                    class:list={[
+                      "nav-link block py-1.5 px-3 text-sm transition-colors duration-150",
+                      {
+                        "text-primary-400 font-medium": isActive,
+                        "text-darkSlate-100 hover:text-lightSlate-50": !isActive,
+                      },
+                    ]}
+                  >
+                    {title}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      );
+    })
+  }
+</nav>
+
+<style is:global>
+  .category-items li {
+    margin-bottom: 0;
+  }
+
+  .category[data-expanded="false"] .category-items {
+    max-height: 0;
+    opacity: 0;
+  }
+
+  .category[data-expanded="true"] .category-items {
+    max-height: 500px;
+    opacity: 1;
+  }
+
+  .category[data-expanded="false"] .chevron-icon {
+    transform: rotate(-90deg);
+  }
+
+  .category-items {
+    transition: max-height 0.3s ease, opacity 0.2s ease;
   }
 </style>
-<div
-  class="px-12 md:px-24 lg:px-0 py-32 shadow-inner lg:shadow-none transition-colors"
->
-  {
-    sidebar.map(({ category, pages }) => (
-      <>
-        <h3 class="mt-4 mb-2 text-2xl font-semibold capitalize first:mt-0 lg:text-lg text-white">
-          {category}
-        </h3>
-        <ul
-          aria-label={`Pages in ${category}`}
-          class="border-l text-lg lg:text-base"
-        >
-          {pages.map(({ title, slug }) => {
-            const matchesPath =
-              pathname === `/docs/${slug}/` || pathname === `/docs/${slug}`;
 
-            return (
-              <li
-                aria-label={title}
-                class:list={[
-                  "-ml-px border-l py-1 pl-4 text-graygd transition-all  hover:text-[#2865a4]",
-                  {
-                    "border-bluegd-500 border-l-2 border-solid active":
-                      matchesPath,
-                  },
-                  {
-                    "border-transparent dark:border-slate-600": !matchesPath,
-                  },
-                  {
-                    "hover:border-bluegd-500": !matchesPath,
-                  },
-                ]}
-              >
-                <a href={`/docs/${slug}`}>{title}</a>
-              </li>
-            );
-          })}
-        </ul>
-      </>
-    ))
+<script>
+  function initDocsSideNav() {
+    document.querySelectorAll('.category-header').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const category = btn.closest('.category');
+        if (category) {
+          const isExpanded = category.getAttribute('data-expanded') === 'true';
+          category.setAttribute('data-expanded', isExpanded ? 'false' : 'true');
+        }
+      });
+    });
   }
-</div>
-<a
-  class="bg-black/20 backdrop-blur-sm select-none touch-manipulation lg:hidden"
-  href="#"
-  id="sidenav-close"
-  title="Close Menu"
-  aria-label="Close Menu"
-  onchange="history.go(-1)"></a>
+
+  // Run on initial load
+  initDocsSideNav();
+
+  // Re-run on Astro page transitions
+  document.addEventListener('astro:page-load', initDocsSideNav);
+</script>

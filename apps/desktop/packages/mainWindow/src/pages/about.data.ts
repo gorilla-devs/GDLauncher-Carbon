@@ -1,4 +1,3 @@
-import type { RouteDataFunc } from "@solidjs/router"
 import { createResource } from "solid-js"
 
 function wait<T>(ms: number, data: T): Promise<T> {
@@ -13,10 +12,10 @@ function fetchName(): Promise<string> {
   return wait(random(500, 1000), "Solid")
 }
 
-const AboutData: RouteDataFunc = () => {
+const useAboutData = () => {
   const [data] = createResource(fetchName)
 
   return data
 }
 
-export default AboutData
+export default useAboutData

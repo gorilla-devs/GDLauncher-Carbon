@@ -1,19 +1,15 @@
 import { lazy } from "solid-js"
-import { RouteDefinition } from "@solidjs/router"
-import SettingsJavaData from "@/pages/Settings/settings.java.data"
-import SettingsGeneralData from "@/pages/Settings/settings.general.data"
-import AddonVersionsData from "@/pages/AddonViewPage/changelog.data"
-import InstanceData from "@/pages/Library/Instance/instance.data"
 import Login from "@/pages/Login"
 import withAdsLayout from "@/pages/withAds"
 import Library from "@/pages/Library"
 import Home from "@/pages/Library/Home"
 import Instance from "@/pages/Library/Instance"
+import Server from "@/pages/Library/Server"
 import AddonViewPage from "@/pages/AddonViewPage"
 import Search from "@/pages/Search"
 /* Defining the routes for the application. */
 
-export const routes: RouteDefinition[] = [
+export const routes = [
   {
     path: "/",
     component: Login
@@ -31,9 +27,44 @@ export const routes: RouteDefinition[] = [
             component: Home
           },
           {
+            path: "/server/:id",
+            component: Server,
+            children: [
+              {
+                path: "/",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/ConsoleTab")
+                )
+              },
+              {
+                path: "/settings",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/SettingsTab")
+                )
+              },
+              {
+                path: "/properties",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/PropertiesTab")
+                )
+              },
+              {
+                path: "/players",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/PlayersTab")
+                )
+              },
+              {
+                path: "/addons",
+                component: lazy(
+                  () => import("@/pages/Library/Server/Tabs/AddonsTab")
+                )
+              }
+            ]
+          },
+          {
             path: "/:id",
             component: Instance,
-            data: InstanceData,
             children: [
               {
                 path: "/",
@@ -124,13 +155,11 @@ export const routes: RouteDefinition[] = [
           },
           {
             path: "/versions",
-            component: lazy(() => import("@/pages/AddonViewPage/Versions")),
-            data: AddonVersionsData
+            component: lazy(() => import("@/pages/AddonViewPage/Versions"))
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/AddonViewPage/Changelog")),
-            data: AddonVersionsData
+            component: lazy(() => import("@/pages/AddonViewPage/Changelog"))
           },
           {
             path: "/screenshots",
@@ -142,7 +171,6 @@ export const routes: RouteDefinition[] = [
       {
         path: "/settings",
         component: lazy(() => import("@/pages/Settings")),
-        data: SettingsGeneralData,
         children: [
           {
             path: "/",
@@ -162,8 +190,7 @@ export const routes: RouteDefinition[] = [
           },
           {
             path: "/java",
-            component: lazy(() => import("@/pages/Settings/Java")),
-            data: SettingsJavaData
+            component: lazy(() => import("@/pages/Settings/Java"))
           },
           {
             path: "/custom-commands",

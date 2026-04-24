@@ -1,0 +1,58 @@
+---
+import BaseHead from "./BaseHead.astro"
+import Header from "./Header.astro"
+import Footer from "./Footer.astro"
+import BackgroundLayers from "./BackgroundLayers.astro"
+import ParticleBackground from "./ParticleBackground.astro"
+import "@fontsource/ubuntu"
+import "@fontsource/ubuntu/500.css"
+import "@fontsource/ubuntu/700.css"
+
+interface Props {
+  title: string
+  description: string
+  image?: string
+  keywords?: string
+  canonicalUrl?: string
+  particles?: boolean
+  bodyClass?: string
+  backgroundClass?: string
+  noFooter?: boolean
+}
+
+const {
+  title,
+  description,
+  image,
+  keywords,
+  canonicalUrl,
+  particles = false,
+  bodyClass,
+  backgroundClass,
+  noFooter = false,
+} = Astro.props
+---
+
+<!doctype html>
+<html lang="en" transition:animate="none">
+  <head>
+    <BaseHead
+      title={title}
+      description={description}
+      image={image}
+      keywords={keywords}
+      canonicalUrl={canonicalUrl}
+    />
+    <slot name="head" />
+  </head>
+
+  <body class:list={["bg-darkSlate-900 text-lightSlate-50 min-h-screen", bodyClass]}>
+    <BackgroundLayers class={backgroundClass} />
+    {particles && <ParticleBackground />}
+    <Header />
+
+    <slot />
+
+    {!noFooter && <Footer />}
+  </body>
+</html>

@@ -18,5 +18,11 @@
   "_trn_columns.source_kind": "Source Kind",
   "_trn_columns.thread_name": "Thread Name",
   "_trn_columns.level": "Log Level",
-  "_trn_font_size": "Font Size"
+  "_trn_font_size": "Font Size",
+  "_trn_open_in_folder": "Open in Folder",
+  "_trn_server_not_running": "Server is not running",
+  "_trn_waiting_for_output": "Waiting for output...",
+  "_trn_type_command": "Type a command...",
+  "_trn_start_server_to_send": "Start the server to send commands",
+  "_trn_send": "Send"
 }

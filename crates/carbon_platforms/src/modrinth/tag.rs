@@ -109,4 +109,6 @@ pub enum GameVersionType {
     Release,
     Beta,
     Alpha,
+    #[serde(other)]
+    Unknown,
 }

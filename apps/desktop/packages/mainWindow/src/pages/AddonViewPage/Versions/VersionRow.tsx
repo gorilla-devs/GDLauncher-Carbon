@@ -22,7 +22,7 @@ const VersionRow = (props: Props) => {
     <RowContainer
       {...props}
       loading={loading()}
-      disabled={!props.instanceId}
+      disabled={!props.instanceId && !props.serverId}
       isInstalled={isInstalled()}
     />
   )

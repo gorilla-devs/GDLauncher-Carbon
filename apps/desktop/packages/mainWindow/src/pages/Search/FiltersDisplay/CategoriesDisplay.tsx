@@ -3,6 +3,7 @@ import { CategoryIcon } from "@/utils/instances"
 import { For } from "solid-js"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { FilterBadge } from "./FilterBadge"
+import { formatModrinthCategory } from "@/utils/modrinthCategories"
 
 export default function CategoriesDisplay() {
   const searchContext = useSearchContext()
@@ -11,10 +12,10 @@ export default function CategoriesDisplay() {
   return (
     <For each={searchContext?.searchQuery().categories}>
       {(category) => {
-        // Not the best... but at this point we have no way of knowing which platform the category belongs to
+        const projectType = searchContext?.searchQuery().projectType
         const categoryData =
           globalStore.categories.data?.curseforge[category as number] ??
-          globalStore.categories.data?.modrinth[category as string]
+          globalStore.categories.data?.modrinth[`${projectType}:${category}`]
 
         return (
           <FilterBadge
@@ -30,7 +31,9 @@ export default function CategoriesDisplay() {
               type={categoryData?.icon?.type}
               value={categoryData?.icon?.value}
             />
-            {categoryData?.name}
+            {categoryData?.platform === "modrinth"
+              ? formatModrinthCategory(categoryData?.name)
+              : categoryData?.name}
           </FilterBadge>
         )
       }}

@@ -1,5 +1,5 @@
 import presetIcons from "@unocss/preset-icons"
-import presetWind from "@unocss/preset-wind"
+import presetWind3 from "@unocss/preset-wind3"
 import { theme } from "./unocss.theme.js"
 import { supportedLanguages } from "@gd/i18n"
 
@@ -15,7 +15,7 @@ const unocssConfig = {
       ]
     }
   },
-  presets: [presetWind(), presetIcons()],
+  presets: [presetWind3(), presetIcons()],
   rules: [],
   safelist: [
     ...safelist,

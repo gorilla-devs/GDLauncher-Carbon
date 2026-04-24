@@ -1,10 +1,12 @@
 import { rspc } from "@/utils/rspcClient"
 import { Mod } from "@gd/core_module/bindings"
+import { useParams } from "@solidjs/router"
 import { createMemo } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 
-//@ts-ignore
-const fetchData = ({ params }) => {
+const useInstanceData = () => {
+  const params = useParams<{ id: string }>()
+
   const instanceDetails = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
   }))
@@ -43,4 +45,4 @@ const fetchData = ({ params }) => {
   }
 }
 
-export default fetchData
+export default useInstanceData

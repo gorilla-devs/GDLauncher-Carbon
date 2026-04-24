@@ -1,4 +1,5 @@
-use crate::api::keys::instance::INSTANCE_MODS;
+use crate::api::keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS};
+use crate::api::keys::server::GET_SERVER_ADDONS;
 use crate::api::translation::Translation;
 use crate::domain::instance::InstanceId;
 use crate::managers::App;
@@ -8,7 +9,9 @@ use anyhow::anyhow;
 use carbon_repos::db::read_filters::BytesFilter;
 use carbon_repos::db::read_filters::IntFilter;
 use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use carbon_repos::db::{
+    mod_file_cache as fcdb, mod_metadata as metadb, server_mod_file_cache as sfcdb,
+};
 use carbon_rt_path::InstancesPath;
 use curseforge::CurseforgeModCacher;
 use futures::Future;
@@ -50,13 +53,39 @@ use uuid::Uuid;
 pub mod curseforge;
 pub mod modrinth;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CacheEntityId {
+    Instance(InstanceId),
+    Server(i32),
+}
+
+impl std::fmt::Display for CacheEntityId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Instance(id) => write!(f, "instance {}", *id),
+            Self::Server(id) => write!(f, "server {}", id),
+        }
+    }
+}
+
+/// Intermediate result from hashing and parsing a mod file.
+/// Entity-independent — used by both instance and server caching.
+struct ModFileParseResult {
+    sha512: [u8; 64],
+    sha1: [u8; 20],
+    murmur2: u32,
+    content_len: usize,
+    meta: Option<super::mods::ModFileMetadata>,
+    image_data: Option<Vec<u8>>,
+}
+
 pub struct MetaCacheManager {
     //waiting_instances: RwLock<HashSet<InstanceId>>,
     //scanned_instances: Mutex<HashSet<InstanceId>>,
     ignored_remote_cf_hashes: RwLock<HashSet<u32>>,
     ignored_remote_mr_hashes: RwLock<HashSet<String>>,
-    failed_cf_instances: RwLock<HashMap<InstanceId, (std::time::Instant, u32)>>,
-    failed_mr_instances: RwLock<HashMap<InstanceId, (std::time::Instant, u32)>>,
+    failed_cf_instances: RwLock<HashMap<CacheEntityId, (std::time::Instant, u32)>>,
+    failed_mr_instances: RwLock<HashMap<CacheEntityId, (std::time::Instant, u32)>>,
     failed_cf_thumbs: RwLock<HashMap<i32, (std::time::Instant, u32)>>,
     failed_mr_thumbs: RwLock<HashMap<String, (std::time::Instant, u32)>>,
     local_targets: LockNotify<CacheTargets>,
@@ -64,7 +93,7 @@ pub struct MetaCacheManager {
     modrinth_targets: LockNotify<CacheTargets>,
     image_scale_semaphore: Semaphore,
     image_download_semaphore: Semaphore,
-    watched_instance: watch::Sender<Option<InstanceId>>,
+    watched_entity: watch::Sender<Option<CacheEntityId>>,
     pause_caching: watch::Sender<bool>,
 }
 
@@ -84,9 +113,32 @@ impl MetaCacheManager {
             modrinth_targets: LockNotify::new(CacheTargets::new()),
             image_scale_semaphore: Semaphore::new(1),
             image_download_semaphore: Semaphore::new(10),
-            watched_instance: watch::channel(None).0,
+            watched_entity: watch::channel(None).0,
             pause_caching: watch::channel(false).0,
         }
+    }
+
+    /// Get the entity IDs that are currently being cached
+    pub async fn get_currently_caching_entities(&self) -> Vec<CacheEntityId> {
+        let mut result = Vec::new();
+
+        let local = self.local_targets.borrow().await.target();
+        let cf = self.curseforge_targets.borrow().await.target();
+        let mr = self.modrinth_targets.borrow().await.target();
+
+        if let Some(target) = local {
+            result.push(target.entity_id);
+        }
+
+        if let Some(target) = cf {
+            result.push(target.entity_id);
+        }
+
+        if let Some(target) = mr {
+            result.push(target.entity_id);
+        }
+
+        result
     }
 }
 
@@ -97,10 +149,10 @@ struct UpdateNotifier {
 }
 
 impl UpdateNotifier {
-    fn send(&self, instance_id: InstanceId) {
+    fn send(&self, _entity_id: CacheEntityId) {
         // let target = self.target.load(atomic::Ordering::SeqCst);
 
-        // if target == *instance_id {
+        // if target == entity_id {
         let _ = self.sender.send(());
         // }
     }
@@ -192,16 +244,16 @@ impl<F: FnOnce(anyhow::Result<()>) + Send + Sync> CompletionSender for F {
 struct CacheTargets {
     backend_override: Option<CacheTarget>,
     priority: Option<CacheTarget>,
-    waiting: VecDeque<InstanceId>,
+    waiting: VecDeque<CacheEntityId>,
 }
 
 struct CacheTarget {
-    instance_id: InstanceId,
+    entity_id: CacheEntityId,
     callback: Option<Box<dyn CompletionSender>>,
 }
 
 struct CacheTargetInfo {
-    instance_id: InstanceId,
+    entity_id: CacheEntityId,
     is_override: bool,
     is_priority: bool,
 }
@@ -218,22 +270,20 @@ impl CacheTargets {
     fn target(&self) -> Option<CacheTargetInfo> {
         match self {
             Self {
-                backend_override: Some(CacheTarget { instance_id, .. }),
+                backend_override: Some(CacheTarget { entity_id, .. }),
                 priority,
                 waiting: _,
             } => Some(CacheTargetInfo {
-                instance_id: *instance_id,
+                entity_id: *entity_id,
                 is_override: true,
-                is_priority: priority
-                    .as_ref()
-                    .is_some_and(|v| *instance_id == v.instance_id),
+                is_priority: priority.as_ref().is_some_and(|v| *entity_id == v.entity_id),
             }),
             Self {
                 backend_override: None,
-                priority: Some(CacheTarget { instance_id, .. }),
+                priority: Some(CacheTarget { entity_id, .. }),
                 waiting: _,
             } => Some(CacheTargetInfo {
-                instance_id: *instance_id,
+                entity_id: *entity_id,
                 is_override: false,
                 is_priority: true,
             }),
@@ -241,24 +291,24 @@ impl CacheTargets {
                 backend_override: None,
                 priority: None,
                 waiting,
-            } => waiting.front().map(|instance_id| CacheTargetInfo {
-                instance_id: *instance_id,
+            } => waiting.front().map(|entity_id| CacheTargetInfo {
+                entity_id: *entity_id,
                 is_override: false,
                 is_priority: false,
             }),
         }
     }
 
-    fn release_target(&mut self, instance_id: InstanceId, r: anyhow::Result<()>) -> bool {
+    fn release_target(&mut self, entity_id: CacheEntityId, r: anyhow::Result<()>) -> bool {
         let mut changed = false;
 
         let check_target_callback = |target: &mut CacheTarget| {
-            if target.instance_id == instance_id {
+            if target.entity_id == entity_id {
                 if let Some(callback) = target.callback.take() {
                     callback.complete(
                         r.as_ref()
                             .map(|_| ())
-                            .map_err(|_| anyhow!("error caching mods for instance")),
+                            .map_err(|_| anyhow!("error caching mods for entity")),
                     );
                 }
 
@@ -285,7 +335,7 @@ impl CacheTargets {
 
         let mut i = 0;
         while i < self.waiting.len() {
-            if self.waiting[i] == instance_id {
+            if self.waiting[i] == entity_id {
                 self.waiting.remove(i);
                 changed = true;
             } else {
@@ -297,12 +347,12 @@ impl CacheTargets {
     }
 
     // TODO: ensure this immediately cancels the target if running
-    fn revoke_target(&mut self, instance_id: InstanceId) -> bool {
+    fn revoke_target(&mut self, entity_id: CacheEntityId) -> bool {
         let mut changed = false;
 
         let mut revoke_option = |target_option: &mut Option<CacheTarget>| {
             if let Some(target) = target_option {
-                if target.instance_id == instance_id {
+                if target.entity_id == entity_id {
                     if let Some(callback) = target.callback.take() {
                         callback.complete(Err(anyhow!("This cache target was revoked")));
                     }
@@ -318,7 +368,7 @@ impl CacheTargets {
 
         let mut i = 0;
         while i < self.waiting.len() {
-            if self.waiting[i] == instance_id {
+            if self.waiting[i] == entity_id {
                 self.waiting.remove(i);
                 changed = true;
             } else {
@@ -355,8 +405,8 @@ impl CacheTargets {
         self.backend_override = Some(target);
     }
 
-    fn get_queue_position(&self, instance_id: InstanceId) -> Option<usize> {
-        self.waiting.iter().position(|&id| id == instance_id)
+    fn get_queue_position(&self, entity_id: CacheEntityId) -> Option<usize> {
+        self.waiting.iter().position(|&id| id == entity_id)
     }
 
     fn get_queue_length(&self) -> usize {
@@ -380,24 +430,24 @@ trait LoopValue: Send + Sync {
 }
 
 impl LoopValue for CacheTargets {
-    type Token = Option<InstanceId>;
+    type Token = Option<CacheEntityId>;
     type Value = CacheTargetInfo;
 
     fn token(&self) -> Self::Token {
-        self.target().map(|target| target.instance_id)
+        self.target().map(|target| target.entity_id)
     }
 
     fn loop_cmp(&self, token: Self::Token) -> Option<(Self::Value, bool)> {
         self.target().map(|target| {
-            let instance_id = target.instance_id;
-            (target, token == Some(instance_id))
+            let entity_id = target.entity_id;
+            (target, token == Some(entity_id))
         })
     }
 }
 
-impl LoopValue for Option<InstanceId> {
+impl LoopValue for Option<CacheEntityId> {
     type Token = Self;
-    type Value = InstanceId;
+    type Value = CacheEntityId;
 
     fn token(&self) -> Self::Token {
         *self
@@ -476,20 +526,20 @@ trait ModplatformCacher {
 
     async fn query_platform(
         app: &App,
-        instance_id: InstanceId,
+        entity_id: CacheEntityId,
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()>;
 
-    async fn save_batch(app: &App, instance_id: InstanceId, batch: Self::SaveBundle);
+    async fn save_batch(app: &App, entity_id: CacheEntityId, batch: Self::SaveBundle);
 
-    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier);
+    async fn cache_icons(app: &App, entity_id: CacheEntityId, update_notifier: &UpdateNotifier);
 }
 
-type ModplatformCacheBundle<T> = (InstanceId, bool, Option<T>, Option<oneshot::Sender<()>>);
+type ModplatformCacheBundle<T> = (CacheEntityId, bool, Option<T>, Option<oneshot::Sender<()>>);
 
 struct BundleSender<'a, T> {
     should_wait: bool,
-    instance_id: InstanceId,
+    entity_id: CacheEntityId,
     update_images: bool,
     active_wait: Option<oneshot::Receiver<()>>,
     sender: &'a mpsc::UnboundedSender<ModplatformCacheBundle<T>>,
@@ -497,13 +547,13 @@ struct BundleSender<'a, T> {
 
 impl<'a, T> BundleSender<'a, T> {
     fn new(
-        instance_id: InstanceId,
+        entity_id: CacheEntityId,
         wait: bool,
         update_images: bool,
         sender: &'a mpsc::UnboundedSender<ModplatformCacheBundle<T>>,
     ) -> Self {
         Self {
-            instance_id,
+            entity_id,
             should_wait: wait,
             update_images,
             active_wait: None,
@@ -523,7 +573,7 @@ impl<'a, T> BundleSender<'a, T> {
         self.active_wait = rx;
         let _ = self
             .sender
-            .send((self.instance_id, self.update_images, Some(bundle), tx));
+            .send((self.entity_id, self.update_images, Some(bundle), tx));
     }
 
     async fn wait(self) {
@@ -535,7 +585,7 @@ impl<'a, T> BundleSender<'a, T> {
                 if self.update_images {
                     let _ = self
                         .sender
-                        .send((self.instance_id, self.update_images, None, None));
+                        .send((self.entity_id, self.update_images, None, None));
                 }
             }
         }
@@ -553,14 +603,14 @@ fn cache_modplatform<C: ModplatformCacher>(
 
         let (batch_tx, mut batch_rx) =
             mpsc::unbounded_channel::<ModplatformCacheBundle<C::SaveBundle>>();
-        let image_rx = LockNotify::<Option<InstanceId>>::new(None);
+        let image_rx = LockNotify::<Option<CacheEntityId>>::new(None);
         let image_tx = image_rx.clone();
 
         let batch_tx = &batch_tx;
         let mut query_loop_watcher = LoopWatcher::new(rx).await;
         let query_loop = query_loop_watcher.loop_interrupt(
             |CacheTargetInfo {
-                instance_id,
+                entity_id,
                 is_priority,
                 is_override,
             }| async move {
@@ -579,22 +629,25 @@ fn cache_modplatform<C: ModplatformCacher>(
                     };
 
                     let do_caching = async {
-                        let instance_name = {
-                            let instance_manager = app.instance_manager();
-                            let instances = instance_manager.instances.read().await;
-                            instances.get(&instance_id)
-                                .map(|instance| instance.shortpath.clone())
-                                .unwrap_or_else(|| format!("Instance {}", instance_id.0))
+                        let entity_name = match entity_id {
+                            CacheEntityId::Instance(instance_id) => {
+                                let instance_manager = app.instance_manager();
+                                let instances = instance_manager.instances.read().await;
+                                instances.get(&instance_id)
+                                    .map(|instance| instance.shortpath.clone())
+                                    .unwrap_or_else(|| format!("Instance {}", instance_id.0))
+                            }
+                            CacheEntityId::Server(server_id) => format!("Server {}", server_id),
                         };
 
                         let task = VisualTask::new(match C::NAME {
-                            "curseforge" => Translation::CacheTaskCurseForge { instance_name: instance_name.clone() },
-                            "modrinth" => Translation::CacheTaskModrinth { instance_name: instance_name.clone() },
-                            _ => Translation::CacheTaskLocal { instance_name: instance_name.clone() }, // fallback
+                            "curseforge" => Translation::CacheTaskCurseForge { instance_name: entity_name.clone() },
+                            "modrinth" => Translation::CacheTaskModrinth { instance_name: entity_name.clone() },
+                            _ => Translation::CacheTaskLocal { instance_name: entity_name.clone() }, // fallback
                         });
                         let _task_id = app.task_manager().spawn_task(&task).await;
 
-                        info!({ is_priority, is_override }, "Starting {} mod caching for instance {}", C::NAME, instance_id);
+                        info!({ is_priority, is_override }, "Starting {} mod caching for {}", C::NAME, entity_id);
 
                         let platform_subtask = task.subtask(Translation::CacheSubtaskQueryingPlatform {
                             platform: C::NAME.to_string(),
@@ -602,17 +655,17 @@ fn cache_modplatform<C: ModplatformCacher>(
                         platform_subtask.start_opaque();
 
                         // true could be optimized to "if there is a callback" if this is a bottleneck
-                        let mut sender = BundleSender::new(instance_id, true, is_priority, batch_tx);
-                        let r = C::query_platform(&app, instance_id, &mut sender).await;
+                        let mut sender = BundleSender::new(entity_id, true, is_priority, batch_tx);
+                        let r = C::query_platform(&app, entity_id, &mut sender).await;
 
                         if r.is_ok() {
                             platform_subtask.complete_opaque();
                         }
 
                         if let Err(e) = &r {
-                            tracing::error!({ error = ?e }, "Could not query {} mod metadata for instance {}", C::NAME, instance_id);
+                            tracing::error!({ error = ?e }, "Could not query {} mod metadata for {}", C::NAME, entity_id);
                         } else {
-                            info!("Completed {} mod caching for instance {}", C::NAME, instance_id);
+                            info!("Completed {} mod caching for {}", C::NAME, entity_id);
                         }
 
                         sender.wait().await;
@@ -622,12 +675,12 @@ fn cache_modplatform<C: ModplatformCacher>(
 
                     tokio::select! {
                         _ = wait_for_pause => {
-                            info!("Remote {} mod caching paused for instance {instance_id} - waiting for unpause", C::NAME);
+                            info!("Remote {} mod caching paused for {entity_id} - waiting for unpause", C::NAME);
 
                             // wait for unpause
                             loop {
                                 if !*pause.borrow() {
-                                    info!("Remote {} mod caching unpaused for instance {instance_id} - resuming", C::NAME);
+                                    info!("Remote {} mod caching unpaused for {entity_id} - resuming", C::NAME);
                                     break;
                                 }
 
@@ -640,46 +693,41 @@ fn cache_modplatform<C: ModplatformCacher>(
                     };
                 };
 
-                move |targets: &mut CacheTargets| targets.release_target(instance_id, r)
+                move |targets: &mut CacheTargets| targets.release_target(entity_id, r)
             },
         );
 
         let save_loop = async {
-            while let Some((instance_id, update_images, bundle, notify)) = batch_rx.recv().await {
+            while let Some((entity_id, update_images, bundle, notify)) = batch_rx.recv().await {
                 if let Some(bundle) = bundle {
                     debug!(
-                        "Saving {} mod cache update bundle for instance {instance_id}",
-                        C::NAME
+                        "Saving {} mod cache update bundle for {}",
+                        C::NAME,
+                        entity_id
                     );
-                    C::save_batch(&app, instance_id, bundle).await;
+                    C::save_batch(&app, entity_id, bundle).await;
 
                     if let Some(notify) = notify {
                         let _ = notify.send(());
                     }
 
-                    let _ = update_notifier.send(instance_id);
+                    let _ = update_notifier.send(entity_id);
                 }
 
                 if update_images {
-                    image_tx.send(Some(instance_id)).await;
+                    image_tx.send(Some(entity_id)).await;
                 }
             }
         };
 
         let mut image_loop_watcher = LoopWatcher::new(image_rx).await;
-        let image_loop = image_loop_watcher.loop_interrupt(|instance_id| async move {
-            info!(
-                "Starting {} mod icon caching for instance {instance_id}",
-                C::NAME
-            );
+        let image_loop = image_loop_watcher.loop_interrupt(|entity_id| async move {
+            info!("Starting {} mod icon caching for {}", C::NAME, entity_id);
 
-            C::cache_icons(&app, instance_id, &update_notifier).await;
-            info!(
-                "Completed {} mod icon caching for instance {instance_id}",
-                C::NAME
-            );
+            C::cache_icons(&app, entity_id, &update_notifier).await;
+            info!("Completed {} mod icon caching for {}", C::NAME, entity_id);
 
-            |_: &mut Option<InstanceId>| false
+            |_: &mut Option<CacheEntityId>| false
         });
 
         // None of the futures should ever exit.
@@ -690,13 +738,14 @@ fn cache_modplatform<C: ModplatformCacher>(
 
 impl ManagerRef<'_, MetaCacheManager> {
     pub async fn instance_removed(self, instance_id: InstanceId) {
+        let entity_id = CacheEntityId::Instance(instance_id);
         join!(
             self.local_targets
-                .send_modify(|targets| targets.revoke_target(instance_id)),
+                .send_modify(|targets| targets.revoke_target(entity_id)),
             self.curseforge_targets
-                .send_modify(|targets| targets.revoke_target(instance_id)),
+                .send_modify(|targets| targets.revoke_target(entity_id)),
             self.modrinth_targets
-                .send_modify(|targets| targets.revoke_target(instance_id)),
+                .send_modify(|targets| targets.revoke_target(entity_id)),
         );
 
         let _ = self
@@ -717,20 +766,23 @@ impl ManagerRef<'_, MetaCacheManager> {
             .app
             .prisma_client
             .mod_metadata()
-            .delete_many(vec![metadb::WhereParam::CachedFilesNone(Vec::new())])
+            .delete_many(vec![
+                metadb::WhereParam::CachedFilesNone(Vec::new()),
+                metadb::WhereParam::ServerCachedFilesNone(Vec::new()),
+            ])
             .exec()
             .await;
     }
 
     // this will need further refactoring. left for later.
-    pub async fn cache_with_priority(self, instance_id: InstanceId) {
+    pub async fn cache_with_priority(self, entity_id: CacheEntityId) {
         let app = self.app.clone();
 
         // todo: trace scanned instances, but not here as we also need to account for waiting instances.
         self.local_targets
             .send_modify_always(move |targets| {
                 targets.set_priority(CacheTarget {
-                    instance_id,
+                    entity_id,
                     callback: Some(Box::new(move |r: anyhow::Result<()>| {
                         if r.is_ok() {
                             tokio::spawn(async move {
@@ -739,13 +791,13 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 join!(
                                     mcm.curseforge_targets.send_modify_always(move |targets| {
                                         targets.set_priority(CacheTarget {
-                                            instance_id,
+                                            entity_id,
                                             callback: None,
                                         })
                                     }),
                                     mcm.modrinth_targets.send_modify_always(move |targets| {
                                         targets.set_priority(CacheTarget {
-                                            instance_id,
+                                            entity_id,
                                             callback: None,
                                         })
                                     })
@@ -760,10 +812,12 @@ impl ManagerRef<'_, MetaCacheManager> {
 
     pub async fn override_caching_and_wait(
         self,
-        instance_id: InstanceId,
+        entity_id: CacheEntityId,
         curseforge: bool,
         modrinth: bool,
     ) -> anyhow::Result<()> {
+        tracing::info!("Overriding caching and waiting for {entity_id}");
+
         let app = self.app.clone();
 
         let split = |c| match c {
@@ -778,7 +832,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         self.local_targets
             .send_modify_always(move |targets| {
                 targets.set_override(CacheTarget {
-                    instance_id,
+                    entity_id,
                     callback: Some(Box::new(move |r: anyhow::Result<()>| match r {
                         Ok(()) => {
                             let _ = local_tx.send(Ok(()));
@@ -789,7 +843,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 let cf = cf_tx.map(|tx| {
                                     mcm.curseforge_targets.send_modify_always(move |targets| {
                                         targets.set_override(CacheTarget {
-                                            instance_id,
+                                            entity_id,
                                             callback: Some(Box::new(
                                                 move |r: anyhow::Result<()>| {
                                                     let _ = tx.send(r);
@@ -802,7 +856,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 let mr = mr_tx.map(|tx| {
                                     mcm.modrinth_targets.send_modify_always(move |targets| {
                                         targets.set_override(CacheTarget {
-                                            instance_id,
+                                            entity_id,
                                             callback: Some(Box::new(
                                                 move |r: anyhow::Result<()>| {
                                                     let _ = tx.send(r);
@@ -844,30 +898,32 @@ impl ManagerRef<'_, MetaCacheManager> {
             rx.await??;
         }
 
+        tracing::info!("Overriding caching and waiting for {entity_id} done");
+
         Ok(())
     }
 
-    pub async fn watch_and_prioritize(self, instance_id: Option<InstanceId>) {
-        match instance_id {
+    pub async fn watch_and_prioritize(self, entity_id: Option<CacheEntityId>) {
+        match entity_id {
             Some(id) => {
-                info!("Switching cache priority to instance {id}");
-                let _ = self.watched_instance.send(instance_id);
+                info!("Switching cache priority to {id}");
+                let _ = self.watched_entity.send(entity_id);
                 self.cache_with_priority(id).await;
             }
             None => {
-                info!("Clearing cache priority - no instance being watched");
-                let _ = self.watched_instance.send(instance_id);
+                info!("Clearing cache priority - no entity being watched");
+                let _ = self.watched_entity.send(entity_id);
             }
         }
     }
 
-    pub async fn queue_caching(self, instance_id: InstanceId, _force: bool) {
+    pub async fn queue_caching(self, entity_id: CacheEntityId, _force: bool) {
         // TODO: make track scanned instances for _force
-        info!("Queuing mod caching for instance {}", instance_id);
+        info!("Queuing mod caching for {}", entity_id);
 
         self.local_targets
             .send_modify_always(|targets| {
-                targets.waiting.push_back(instance_id);
+                targets.waiting.push_back(entity_id);
             })
             .await;
     }
@@ -909,7 +965,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         };
 
         let app_debounce = self.app.clone();
-        let mut debounce_watch_rx = self.watched_instance.subscribe();
+        let mut debounce_watch_rx = self.watched_entity.subscribe();
         tokio::spawn(async move {
             // wait until watched is some, then wait until we get a list debounce that matches.
             // Then wait 2 seconds, interrupted if the watch changes.
@@ -919,7 +975,8 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                 debounce_target.store(
                     match watched {
-                        Some(id) => *id,
+                        Some(CacheEntityId::Instance(id)) => *id,
+                        Some(CacheEntityId::Server(id)) => id,
                         None => -1,
                     },
                     atomic::Ordering::SeqCst,
@@ -935,7 +992,11 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                 tokio::select! {
                     _ = list_debounce_rx.changed() => {
-                        app_debounce.invalidate(INSTANCE_MODS, Some(watched.0.into()));
+                        match watched {
+                            CacheEntityId::Instance(id) => app_debounce.invalidate(INSTANCE_MODS, Some(id.0.into())),
+                            CacheEntityId::Server(id) => app_debounce.invalidate(GET_SERVER_ADDONS, Some(id.into())),
+                        }
+
                         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                     },
                     r = debounce_watch_rx.changed() => {
@@ -965,15 +1026,14 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     /// Cache a mod file without first checking the validity of the instance
-    async fn cache_mod_file_unchecked(
-        self,
-        instance_id: InstanceId,
+    /// Hash a mod file and parse its JAR metadata. Entity-independent.
+    async fn hash_and_parse_mod_file(
+        &self,
         mods_dir_path: &PathBuf,
-        mod_filename: String,
+        mod_filename: &str,
         enabled: bool,
-        addon_type: String,
-    ) -> anyhow::Result<String> {
-        let mut path = mods_dir_path.join(&mod_filename);
+    ) -> anyhow::Result<ModFileParseResult> {
+        let mut path = mods_dir_path.join(mod_filename);
 
         let prev_ext = path
             .extension()
@@ -1016,7 +1076,6 @@ impl ManagerRef<'_, MetaCacheManager> {
                 .map(|m| m.as_ref().map(|m| m.logo_file.as_ref()))
             {
                 Ok(Some(Some(logo_file))) => {
-                    // TODO: use the same zip in parse_metadata
                     let mut zip = zip::ZipArchive::new(&mut file).unwrap();
                     let r = match zip.by_name(&logo_file) {
                         Ok(mut file) => {
@@ -1061,14 +1120,29 @@ impl ManagerRef<'_, MetaCacheManager> {
             }
         };
 
+        Ok(ModFileParseResult {
+            sha512,
+            sha1,
+            murmur2,
+            content_len,
+            meta,
+            image_data,
+        })
+    }
+
+    /// Find or create a ModMetadata row for the given parse result. Entity-independent.
+    async fn ensure_mod_metadata(
+        &self,
+        result: &ModFileParseResult,
+        mod_filename: &str,
+    ) -> anyhow::Result<String> {
         let dbmeta = self
             .app
             .prisma_client
             .mod_metadata()
-            // just check both hashes for now
             .find_first(vec![
-                metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(sha512))),
-                metadb::WhereParam::Murmur2(IntFilter::Equals(murmur2 as i32)),
+                metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(result.sha512))),
+                metadb::WhereParam::Murmur2(IntFilter::Equals(result.murmur2 as i32)),
             ])
             .exec()
             .await?;
@@ -1078,7 +1152,7 @@ impl ManagerRef<'_, MetaCacheManager> {
             None => {
                 let meta_id = Uuid::new_v4().to_string();
 
-                let logo_insert = match image_data {
+                let logo_insert = match &result.image_data {
                     Some(image_data) => {
                         let permit = self
                             .image_scale_semaphore
@@ -1086,7 +1160,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                             .await
                             .expect("the image scale semaphore is never closed");
 
-                        let logo = carbon_scheduler::cpu_block(|| {
+                        let image_data = image_data.clone();
+                        let logo = carbon_scheduler::cpu_block(move || {
                             let scaled = scale_mod_image(&image_data[..])?;
                             Ok::<_, anyhow::Error>(Some(scaled))
                         })
@@ -1114,24 +1189,23 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                 let meta_insert = self.app.prisma_client.mod_metadata().create(
                     meta_id.clone(),
-                    murmur2 as i32,
-                    Vec::from(sha512),
-                    Vec::from(sha1),
-                    meta.as_ref()
+                    result.murmur2 as i32,
+                    Vec::from(result.sha512),
+                    Vec::from(result.sha1),
+                    result
+                        .meta
+                        .as_ref()
                         .map(|meta| &meta.modloaders)
                         .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
                         .unwrap_or(String::new()),
-                    match meta {
+                    match &result.meta {
                         Some(meta) => vec![
-                            metadb::SetParam::SetName(meta.name),
-                            metadb::SetParam::SetModid(meta.modid),
-                            metadb::SetParam::SetVersion(meta.version),
-                            metadb::SetParam::SetDescription(meta.description),
-                            metadb::SetParam::SetAuthors(meta.authors),
+                            metadb::SetParam::SetName(meta.name.clone()),
+                            metadb::SetParam::SetModid(meta.modid.clone()),
+                            metadb::SetParam::SetVersion(meta.version.clone()),
+                            metadb::SetParam::SetDescription(meta.description.clone()),
+                            metadb::SetParam::SetAuthors(meta.authors.clone()),
                         ],
-
-                        // Prisma sucks and is generating invalid sql.
-                        // As a workaround, all the defaults are manually set to None.
                         None => vec![
                             metadb::SetParam::SetName(None),
                             metadb::SetParam::SetModid(None),
@@ -1154,6 +1228,23 @@ impl ManagerRef<'_, MetaCacheManager> {
             logo_insert.exec().await?;
         }
 
+        Ok(meta_id)
+    }
+
+    /// Cache a mod file for an instance. Hashes, parses metadata, and upserts into mod_file_cache.
+    async fn cache_mod_file_unchecked(
+        self,
+        instance_id: InstanceId,
+        mods_dir_path: &PathBuf,
+        mod_filename: String,
+        enabled: bool,
+        addon_type: String,
+    ) -> anyhow::Result<String> {
+        let result = self
+            .hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled)
+            .await?;
+        let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
+
         self.app
             .prisma_client
             .mod_file_cache()
@@ -1165,13 +1256,13 @@ impl ManagerRef<'_, MetaCacheManager> {
                 fcdb::create(
                     carbon_repos::db::instance::UniqueWhereParam::IdEquals(*instance_id),
                     mod_filename.to_string(),
-                    content_len as i32,
+                    result.content_len as i32,
                     enabled,
                     metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
                     vec![fcdb::SetParam::SetAddonType(addon_type.clone())],
                 ),
                 vec![
-                    fcdb::SetParam::SetFilesize(content_len as i32),
+                    fcdb::SetParam::SetFilesize(result.content_len as i32),
                     fcdb::SetParam::SetEnabled(enabled),
                     fcdb::SetParam::SetMetadataId(meta_id.clone()),
                     fcdb::SetParam::SetAddonType(addon_type),
@@ -1181,6 +1272,178 @@ impl ManagerRef<'_, MetaCacheManager> {
             .await?;
 
         Ok(meta_id)
+    }
+
+    /// Cache a mod file for a server. Hashes, parses metadata, and upserts into server_mod_file_cache.
+    async fn cache_server_mod_file_unchecked(
+        self,
+        server_id: i32,
+        mods_dir_path: &PathBuf,
+        mod_filename: String,
+        enabled: bool,
+        addon_type: String,
+    ) -> anyhow::Result<String> {
+        let result = self
+            .hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled)
+            .await?;
+        let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
+
+        self.app
+            .prisma_client
+            .server_mod_file_cache()
+            .upsert(
+                sfcdb::UniqueWhereParam::ServerIdFilenameEquals(
+                    server_id,
+                    mod_filename.to_string(),
+                ),
+                sfcdb::create(
+                    carbon_repos::db::server::UniqueWhereParam::IdEquals(server_id),
+                    mod_filename.to_string(),
+                    result.content_len as i32,
+                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
+                    vec![
+                        sfcdb::SetParam::SetEnabled(enabled),
+                        sfcdb::SetParam::SetAddonType(addon_type.clone()),
+                    ],
+                ),
+                vec![
+                    sfcdb::SetParam::SetFilesize(result.content_len as i32),
+                    sfcdb::SetParam::SetEnabled(enabled),
+                    sfcdb::SetParam::SetMetadataId(meta_id.clone()),
+                    sfcdb::SetParam::SetAddonType(addon_type),
+                ],
+            )
+            .exec()
+            .await?;
+
+        Ok(meta_id)
+    }
+
+    /// Cache all mod files for a server. Scans filesystem, hashes new/changed files,
+    /// and stores results in server_mod_file_cache.
+    pub async fn cache_server_local(
+        self,
+        server_id: i32,
+        server_shortpath: &str,
+    ) -> anyhow::Result<()> {
+        let runtime_path = &self.app.settings_manager().runtime_path;
+        let server_path = runtime_path.get_servers().get_server_path(server_shortpath);
+
+        // Get existing cache entries
+        let cached = self
+            .app
+            .prisma_client
+            .server_mod_file_cache()
+            .find_many(vec![sfcdb::server_id::equals(server_id)])
+            .exec()
+            .await?;
+
+        let cached_map: HashMap<String, (i32, bool)> = cached
+            .iter()
+            .map(|c| (c.filename.clone(), (c.filesize, c.enabled)))
+            .collect();
+
+        // Scan filesystem
+        let mut disk_files: Vec<(String, String, bool)> = Vec::new(); // (base_filename, addon_type, enabled)
+
+        let mods_path = server_path.get_mods_path();
+        if mods_path.exists() {
+            let mut entries = tokio::fs::read_dir(&mods_path).await?;
+            while let Some(entry) = entries.next_entry().await? {
+                let filename = entry.file_name().to_string_lossy().to_string();
+                if filename.ends_with(".jar") || filename.ends_with(".jar.disabled") {
+                    let enabled = !filename.ends_with(".disabled");
+                    let base_filename = filename.trim_end_matches(".disabled").to_string();
+                    disk_files.push((base_filename, "mods".to_string(), enabled));
+                }
+            }
+        }
+
+        let datapacks_path = server_path.get_datapacks_path();
+        if datapacks_path.exists() {
+            let mut entries = tokio::fs::read_dir(&datapacks_path).await?;
+            while let Some(entry) = entries.next_entry().await? {
+                let filename = entry.file_name().to_string_lossy().to_string();
+                if filename.ends_with(".zip") || filename.ends_with(".zip.disabled") {
+                    let enabled = !filename.ends_with(".disabled");
+                    let base_filename = filename.trim_end_matches(".disabled").to_string();
+                    disk_files.push((base_filename, "datapacks".to_string(), enabled));
+                }
+            }
+        }
+
+        let disk_filenames: HashSet<String> =
+            disk_files.iter().map(|(f, _, _)| f.clone()).collect();
+
+        // Delete stale cache entries (files no longer on disk)
+        let stale: Vec<_> = cached
+            .iter()
+            .filter(|c| !disk_filenames.contains(&c.filename))
+            .collect();
+
+        for entry in &stale {
+            let _ = self
+                .app
+                .prisma_client
+                .server_mod_file_cache()
+                .delete(sfcdb::UniqueWhereParam::IdEquals(entry.id.clone()))
+                .exec()
+                .await;
+        }
+
+        // Cache new/changed files
+        for (base_filename, addon_type, enabled) in &disk_files {
+            // Check if already cached with same size
+            if let Some((cached_size, cached_enabled)) = cached_map.get(base_filename) {
+                // Get current file size
+                let dir = if addon_type == "mods" {
+                    &mods_path
+                } else {
+                    &datapacks_path
+                };
+                let actual_filename = if *enabled {
+                    base_filename.clone()
+                } else {
+                    format!("{}.disabled", base_filename)
+                };
+                let file_size = tokio::fs::metadata(dir.join(&actual_filename))
+                    .await
+                    .map(|m| m.len() as i32)
+                    .unwrap_or(0);
+
+                if *cached_size == file_size && *cached_enabled == *enabled {
+                    continue; // Skip unchanged file
+                }
+            }
+
+            let dir = if addon_type == "mods" {
+                mods_path.clone()
+            } else {
+                datapacks_path.clone()
+            };
+
+            if let Err(e) = self
+                .cache_server_mod_file_unchecked(
+                    server_id,
+                    &dir,
+                    base_filename.clone(),
+                    *enabled,
+                    addon_type.clone(),
+                )
+                .await
+            {
+                warn!("Failed to cache server addon '{}': {}", base_filename, e);
+            }
+        }
+
+        info!("Completed local caching for server {}", server_id);
+        Ok(())
+    }
+
+    /// Check if a specific entity is currently being cached
+    pub async fn is_entity_being_cached(&self, entity_id: CacheEntityId) -> bool {
+        let currently_caching = self.get_currently_caching_entities().await;
+        currently_caching.contains(&entity_id)
     }
 }
 
@@ -1376,6 +1639,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 instance_id, total_files_scanned
             );
 
+            trace!({ modpaths = ?modpaths }, "modpaths found for instance {instance_id}");
+
             scanning_subtask.complete_items();
 
             let mut has_outdated_entries = false;
@@ -1468,7 +1733,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
                             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-                            update_notifier.send(instance_id);
+                            update_notifier.send(CacheEntityId::Instance(instance_id));
 
                             Ok(())
                         }
@@ -1492,7 +1757,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             };
 
             if has_outdated_entries {
-                let _ = update_notifier.send(instance_id);
+                let _ = update_notifier.send(CacheEntityId::Instance(instance_id));
             }
 
             info!(
@@ -1507,7 +1772,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
         LoopWatcher::new(rx).await.loop_interrupt(
             |CacheTargetInfo {
-                instance_id,
+                entity_id,
                 is_override,
                 is_priority,
             }| async move {
@@ -1526,22 +1791,38 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     };
 
                     let do_caching = async {
-                        info!("Beginning local mod caching for instance {instance_id}");
+                        info!("Beginning local mod caching for {entity_id}");
 
-                        let r = cache_instance(instance_id).await;
+                        let r = match entity_id {
+                            CacheEntityId::Instance(instance_id) => {
+                                cache_instance(instance_id).await
+                            }
+                            CacheEntityId::Server(server_id) => {
+                                let db_server = app.prisma_client
+                                    .server()
+                                    .find_unique(carbon_repos::db::server::UniqueWhereParam::IdEquals(server_id))
+                                    .exec()
+                                    .await
+                                    .map_err(anyhow::Error::from)?
+                                    .ok_or_else(|| anyhow!("Server {} not found", server_id))?;
+                                app.meta_cache_manager()
+                                    .cache_server_local(server_id, &db_server.shortpath)
+                                    .await
+                            }
+                        };
 
                         if let Err(e) = &r {
-                            tracing::error!({ error = ?e }, "Could not query local mod metadata for instance {instance_id}");
+                            tracing::error!({ error = ?e }, "Could not query local mod metadata for {entity_id}");
                         }
 
                         // waiting list targets cascade into curseforge and modrinth caching.
                         if !is_override && !is_priority {
-                            info!("Cascading to platform caching for instance {}", instance_id);
+                            info!("Cascading to platform caching for {}", entity_id);
                             let mcm = app.meta_cache_manager();
 
                             join!(
-                                mcm.curseforge_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
-                                mcm.modrinth_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
+                                mcm.curseforge_targets.send_modify_always(|targets| targets.waiting.push_back(entity_id)),
+                                mcm.modrinth_targets.send_modify_always(|targets| targets.waiting.push_back(entity_id)),
                             );
                         }
 
@@ -1550,12 +1831,12 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
                     tokio::select! {
                         _ = wait_for_pause => {
-                            info!("Local mod caching paused for instance {instance_id} - waiting for unpause");
+                            info!("Local mod caching paused for {entity_id} - waiting for unpause");
 
                             // wait for unpause
                             loop {
                                 if !*pause.borrow() {
-                                    info!("Local mod caching unpaused for instance {instance_id} - resuming");
+                                    info!("Local mod caching unpaused for {entity_id} - resuming");
                                     break;
                                 }
 
@@ -1568,7 +1849,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     };
                 };
 
-                move |targets: &mut CacheTargets| targets.release_target(instance_id, r)
+                move |targets: &mut CacheTargets| targets.release_target(entity_id, r)
             }
         ).await;
     });

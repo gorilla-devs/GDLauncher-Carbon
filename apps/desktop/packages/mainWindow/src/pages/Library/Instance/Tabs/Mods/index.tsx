@@ -12,18 +12,18 @@ import {
 import { For, Show, createMemo, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import Mod from "./Mod"
-import { useParams, useRouteData } from "@solidjs/router"
+import { useParams } from "@solidjs/router"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { rspc } from "@/utils/rspcClient"
 import { createStore, produce, reconcile } from "solid-js/store"
-import fetchData from "../../instance.data"
+import useInstanceData from "../../instance.data"
 import { Mod as Modtype } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
 
 const Mods = () => {
   const [t] = useTransContext()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
   const modalsContext = useModal()
 
@@ -33,7 +33,7 @@ const Mods = () => {
   >({})
   const [isModStatusToggleLoading, setIsModStatusToggleLoading] =
     createSignal(false)
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
 
   const isInstanceLocked = () => routeData.instanceDetails.data?.modpack?.locked
 
@@ -121,7 +121,7 @@ const Mods = () => {
             <Trans key="content:_trn_no_mods_text" />
           </p>
           <Button
-            type="outline"
+            type="secondary"
             size="medium"
             onClick={() => {
               gotoSearchPage()
@@ -358,7 +358,7 @@ const Mods = () => {
             <Show when={isInstanceLocked()}>
               <Tooltip placement="top">
                 <TooltipTrigger>
-                  <Button disabled type="outline" size="medium">
+                  <Button disabled type="secondary" size="medium">
                     <Trans key="content:_trn_add_mod" />
                   </Button>
                 </TooltipTrigger>
@@ -370,7 +370,7 @@ const Mods = () => {
             <Show when={!isInstanceLocked()}>
               <Button
                 disabled={isInstanceLocked()}
-                type="outline"
+                type="secondary"
                 size="medium"
                 onClick={() => {
                   gotoSearchPage()

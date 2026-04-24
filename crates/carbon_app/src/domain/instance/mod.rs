@@ -30,6 +30,7 @@ pub struct GameLogEntry {
     pub instance_id: InstanceId,
     pub active: bool,
     pub datetime: DateTime<Local>,
+    pub file_size: Option<u64>,
 }
 
 pub struct InstanceDetails {
@@ -37,6 +38,7 @@ pub struct InstanceDetails {
     pub favorite: bool,
     pub name: String,
     pub version: Option<String>,
+    // pub is_being_cached: bool,
     pub modpack: Option<info::ModpackInfo>,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
@@ -89,6 +91,7 @@ pub enum LaunchState {
     Inactive {
         failed_task: Option<VisualTaskId>,
     },
+    Queued(VisualTaskId),
     Preparing(VisualTaskId),
     Running {
         start_time: DateTime<Utc>,

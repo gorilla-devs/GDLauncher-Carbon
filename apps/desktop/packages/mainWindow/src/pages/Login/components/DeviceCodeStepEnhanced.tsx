@@ -28,7 +28,7 @@ import { DeviceCode as DeviceCodeType } from "@gd/core_module/bindings"
 import { handleStatus } from "@/utils/login"
 import { EnrollmentError } from "@gd/core_module/bindings"
 import QRCode from "qrcode"
-import type { CreateQueryResult } from "@tanstack/solid-query"
+import type { UseQueryResult } from "@tanstack/solid-query"
 
 interface Props {
   deviceCodeObject: DeviceCodeType | null
@@ -36,7 +36,7 @@ interface Props {
   nextStep: () => void
   prevStep: () => void
   onSwitchToBrowser?: () => void
-  enrollmentStatus: CreateQueryResult<any, any> | null
+  enrollmentStatus: UseQueryResult<any, any> | null
 }
 
 export function DeviceCodeStepEnhanced(props: Props) {

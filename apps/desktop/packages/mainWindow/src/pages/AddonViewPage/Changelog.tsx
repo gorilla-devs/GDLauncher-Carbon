@@ -1,5 +1,5 @@
 /* eslint-disable solid/no-innerhtml */
-import { useParams, useRouteData } from "@solidjs/router"
+import { useParams } from "@solidjs/router"
 import { Trans } from "@gd/i18n"
 import {
   Match,
@@ -20,7 +20,7 @@ import {
   SelectValue
 } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
-import fetchData from "./changelog.data"
+import useChangelogData from "./changelog.data"
 import { CFFEFile } from "@gd/core_module/bindings"
 import { format, formatDistanceToNowStrict } from "date-fns"
 
@@ -164,10 +164,10 @@ const EmptyChangelogState = () => {
 }
 
 const Changelog = () => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const rspcContext = rspc.useContext()
 
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useChangelogData()
   const lastFile = () =>
     routeData.isCurseforge &&
     routeData.modpackDetails?.data?.data.latestFiles[

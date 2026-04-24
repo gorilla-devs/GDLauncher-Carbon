@@ -1,9 +1,6 @@
 import { createContext, useContext, type JSX } from "solid-js"
-import type {
-  CreateMutationResult,
-  CreateQueryResult
-} from "@tanstack/solid-query"
-import type { RSPCError } from "@rspc/client"
+import type { UseMutationResult, UseQueryResult } from "@tanstack/solid-query"
+import type { RSPCError } from "@/utils/rspcClient"
 import type {
   FEGDLAccount,
   FESettingsUpdate,
@@ -27,20 +24,20 @@ export interface FlowProviderProps {
   children: JSX.Element
   config: AuthFlowConfig
   rspcContext: RSPCContext
-  settingsMutation: CreateMutationResult<null, RSPCError, FESettingsUpdate>
-  saveGdlAccountMutation: CreateMutationResult<null, RSPCError, string | null>
-  enrollBeginMutation: CreateMutationResult<null, RSPCError, undefined>
-  enrollBeginBrowserMutation: CreateMutationResult<null, RSPCError, boolean>
-  enrollCancelMutation: CreateMutationResult<null, RSPCError, undefined>
-  usernameAvailabilityMutation: CreateMutationResult<
+  settingsMutation: UseMutationResult<null, RSPCError, FESettingsUpdate>
+  saveGdlAccountMutation: UseMutationResult<null, RSPCError, string | null>
+  enrollBeginMutation: UseMutationResult<null, RSPCError, undefined>
+  enrollBeginBrowserMutation: UseMutationResult<null, RSPCError, boolean>
+  enrollCancelMutation: UseMutationResult<null, RSPCError, undefined>
+  usernameAvailabilityMutation: UseMutationResult<
     UsernameAvailability,
     RSPCError,
     FECheckUsernameAvailability
   >
-  createProfileMutation: CreateMutationResult<null, RSPCError, FECreateProfile>
-  enrollResumeMutation: CreateMutationResult<null, RSPCError, undefined>
-  accountsQuery: CreateQueryResult<AccountEntry[], RSPCError>
-  gdlAccountQuery: CreateQueryResult<FEGDLAccount | null, RSPCError>
+  createProfileMutation: UseMutationResult<null, RSPCError, FECreateProfile>
+  enrollResumeMutation: UseMutationResult<null, RSPCError, undefined>
+  accountsQuery: UseQueryResult<AccountEntry[], RSPCError>
+  gdlAccountQuery: UseQueryResult<FEGDLAccount | null, RSPCError>
 }
 
 /**
