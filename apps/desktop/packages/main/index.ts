@@ -592,6 +592,14 @@ const isSupportedProtocol = (url: string) =>
   url.startsWith("curseforge://") ||
   url.startsWith("modrinth://")
 
+// On Windows/Linux cold-start, the protocol URL arrives in process.argv.
+// macOS uses `open-url` instead; `second-instance` covers already-running launches.
+const initialProtocolUrl = process.argv.find(isSupportedProtocol)
+if (initialProtocolUrl) {
+  console.log("Protocol URL received via process.argv:", initialProtocolUrl)
+  pendingProtocolUrl = initialProtocolUrl
+}
+
 async function createWindow(): Promise<BrowserWindow> {
   console.log("Creating window...")
   if (isSpawningWindow) {

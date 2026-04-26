@@ -277,6 +277,32 @@ const Settings = () => {
       </Show>
       <Row>
         <Title>
+          <Trans key="instances:_trn_instance_settings.reinstall" />
+        </Title>
+        <RightHandSide>
+          <Button
+            type="secondary"
+            disabled={!routeData?.instanceDetails?.data?.modpack}
+            onClick={() => {
+              modalsContext?.openModal(
+                {
+                  name: "confirmReinstall"
+                },
+                {
+                  id: parseInt(params.id, 10),
+                  name: routeData.instanceDetails.data?.name,
+                  isServer: false
+                }
+              )
+            }}
+          >
+            <i class="i-hugeicons:refresh h-5 w-5" />
+            <Trans key="instances:_trn_instance_settings.reinstall" />
+          </Button>
+        </RightHandSide>
+      </Row>
+      <Row>
+        <Title>
           <Trans key="java:_trn_instance_settings.java_path_profile" />
         </Title>
         <RightHandSide>

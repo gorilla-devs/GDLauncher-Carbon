@@ -119,6 +119,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .map(FETaskId::from)
         }
 
+        mutation REINSTALL_MODPACK[app, id: FEInstanceId] {
+            app.instance_manager()
+                .reinstall_modpack(id.into())
+                .await
+                .map(FETaskId::from)
+        }
+
         mutation LOAD_ICON_URL[app, url: String] {
             let icon = app.instance_manager()
                 .download_icon(url)

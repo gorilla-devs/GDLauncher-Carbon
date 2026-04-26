@@ -500,55 +500,92 @@ const Console = (props: ConsoleProps) => {
     mutationKey: ["server.sendConsoleCommand"]
   }))
 
-  // WebSocket connection
-  createEffect(() => {
-    if (!props.isRunning) {
-      setLogs([])
-      setLastSeenLogCount(0)
-      return
-    }
+  // WebSocket connection.
+  //
+  // We deliberately depend only on serverId, not isRunning: the backend now
+  // hands us the buffered log of the most recent session even after the
+  // server stops/crashes, so we want the connection to keep streaming the
+  // final crash output instead of being torn down and the local logs wiped.
+  //
+  // When the user starts a new session, the backend recycles the previous
+  // log buffer and our open WebSocket gets closed; `onclose` then schedules
+  // a reconnect, and the new session's initial message (always sent now,
+  // even when empty) replaces our local state.
+  createEffect(
+    on(
+      () => props.serverId,
+      (serverId) => {
+        let wsConnection: WebSocket | null = null
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+        let cancelled = false
 
-    const wsConnection = new WebSocket(
-      `ws://127.0.0.1:${port}/server/log?id=${props.serverId}`
-    )
+        const connect = () => {
+          if (cancelled) return
 
-    wsConnection.onmessage = (event) => {
-      const data = JSON.parse(event.data)
+          wsConnection = new WebSocket(
+            `ws://127.0.0.1:${port}/server/log?id=${serverId}`
+          )
 
-      if (data.error) {
-        setLogs(
-          produce((prev) => {
-            prev.push(parseLogLine(`[Error] ${data.error}`))
-          })
-        )
-        return
-      }
+          wsConnection.onmessage = (event) => {
+            const data = JSON.parse(event.data)
 
-      if (Array.isArray(data)) {
-        setLogs(data.map(parseLogLine))
-      } else if (typeof data === "string") {
-        setLogs(
-          produce((prev) => {
-            prev.push(parseLogLine(data))
-          })
-        )
-      }
-    }
+            if (data.error) {
+              // Don't clobber the buffered crash log with a transient error
+              // banner — just append.
+              setLogs(
+                produce((prev) => {
+                  prev.push(parseLogLine(`[Error] ${data.error}`))
+                })
+              )
+              return
+            }
 
-    wsConnection.onerror = () => {
-      setLogs(
-        produce((prev) => {
-          prev.push(parseLogLine("[Connection error]"))
+            if (Array.isArray(data)) {
+              // Initial snapshot from backend: replace local state. This is
+              // also what clears stale logs when a fresh session begins.
+              setLogs(data.map(parseLogLine))
+              setLastSeenLogCount(0)
+            } else if (typeof data === "string") {
+              setLogs(
+                produce((prev) => {
+                  prev.push(parseLogLine(data))
+                })
+              )
+            }
+          }
+
+          wsConnection.onerror = () => {
+            setLogs(
+              produce((prev) => {
+                prev.push(parseLogLine("[Connection error]"))
+              })
+            )
+          }
+
+          wsConnection.onclose = () => {
+            // Backend closes the socket when it recycles the log buffer for
+            // a new session, or when the server is genuinely gone. Try to
+            // reconnect — the next connection either reattaches to the
+            // current session's buffer (post-crash) or to the new session.
+            if (cancelled) return
+            reconnectTimer = setTimeout(connect, 1000)
+          }
+        }
+
+        connect()
+
+        onCleanup(() => {
+          cancelled = true
+          if (reconnectTimer !== null) {
+            clearTimeout(reconnectTimer)
+          }
+          if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
+            wsConnection.close()
+          }
         })
-      )
-    }
-
-    onCleanup(() => {
-      if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
-        wsConnection.close()
       }
-    })
-  })
+    )
+  )
 
   // Auto-follow on new logs
   createEffect(() => {

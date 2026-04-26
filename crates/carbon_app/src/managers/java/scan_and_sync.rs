@@ -126,7 +126,14 @@ where
     T: Discovery,
     G: JavaChecker,
 {
+    let t_discover = std::time::Instant::now();
     let local_javas = discovery.find_java_paths().await;
+    tracing::info!(
+        "[startup-timing] discovery.find_java_paths found {} candidate(s) in {:.2}s",
+        local_javas.len(),
+        t_discover.elapsed().as_secs_f64()
+    );
+
     let java_profiles = db
         .java_profile()
         .find_many(vec![])
@@ -136,6 +143,7 @@ where
 
     for local_java in &local_javas {
         trace!("Analyzing local java: {:?}", local_java);
+        let t_probe = std::time::Instant::now();
 
         let resolved_java_path = match dunce::canonicalize(local_java) {
             Ok(canonical_path) => canonical_path,
@@ -149,6 +157,11 @@ where
         let java_bin_info = java_checker
             .get_bin_info(&resolved_java_path, JavaComponentType::Local)
             .await;
+        tracing::info!(
+            "[startup-timing] probed java {} in {:.2}s",
+            resolved_java_path.display(),
+            t_probe.elapsed().as_secs_f64()
+        );
 
         let db_entry =
             get_java_component_from_db(db, resolved_java_path.to_string_lossy().to_string())

@@ -155,6 +155,7 @@ async fn get_available_port() -> TcpListener {
 
 async fn start_router(runtime_path: PathBuf, base_api_override: String, listener: TcpListener) {
     info!("Starting router");
+    let startup_total = std::time::Instant::now();
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router(base_api_override.clone())
@@ -167,21 +168,37 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .allow_headers(Any)
         .allow_origin(Any);
 
+    let t = std::time::Instant::now();
     let app = AppInner::new(invalidation_sender, runtime_path, base_api_override).await;
+    info!(
+        "[startup-timing] AppInner::new completed in {:.2}s",
+        t.elapsed().as_secs_f64()
+    );
 
     // Re-exchange GDL tokens on every startup to ensure they're valid
     // (handles backend target changes where JWT signing keys differ)
+    let t = std::time::Instant::now();
     if let Err(e) = app.account_manager().refresh_all_gdl_tokens().await {
         tracing::warn!("Failed to refresh GDL tokens on startup: {}", e);
     }
+    info!(
+        "[startup-timing] refresh_all_gdl_tokens completed in {:.2}s",
+        t.elapsed().as_secs_f64()
+    );
 
+    let t = std::time::Instant::now();
     let auto_manage_java_system_profiles = app
         .settings_manager()
         .get_settings()
         .await
         .unwrap()
         .auto_manage_java_system_profiles;
+    info!(
+        "[startup-timing] settings.get_settings completed in {:.2}s",
+        t.elapsed().as_secs_f64()
+    );
 
+    let t = std::time::Instant::now();
     crate::managers::java::JavaManager::scan_and_sync(
         auto_manage_java_system_profiles,
         &app.prisma_client,
@@ -190,6 +207,10 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     )
     .await
     .expect("Failed to scan and sync java system profiles");
+    info!(
+        "[startup-timing] JavaManager::scan_and_sync completed in {:.2}s",
+        t.elapsed().as_secs_f64()
+    );
 
     let app1 = app.clone();
     let app2 = app.clone();
@@ -207,6 +228,11 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .expect("Failed to get local address from TCP listener")
         .port();
 
+    info!(
+        "[startup-timing] reached axum::serve in {:.2}s total",
+        startup_total.elapsed().as_secs_f64()
+    );
+
     // As soon as the server is ready, notify via stdout
     tokio::spawn(async move {
         let mut counter = 0;
@@ -215,6 +241,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
             .no_proxy()
             .build()
             .expect("Failed to build health check HTTP client");
+        let health_check_start = std::time::Instant::now();
         loop {
             counter += 1;
             // If we've waited for 40 seconds, give up
@@ -232,6 +259,15 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
                 .await;
 
             if res.is_ok() {
+                info!(
+                    "[startup-timing] health check responded after {:.2}s ({} polls)",
+                    health_check_start.elapsed().as_secs_f64(),
+                    counter
+                );
+                info!(
+                    "[startup-timing] READY emitted at {:.2}s after start_router",
+                    startup_total.elapsed().as_secs_f64()
+                );
                 info!("_STATUS_:READY|{port}");
                 println!("_STATUS_:READY|{port}");
                 break;

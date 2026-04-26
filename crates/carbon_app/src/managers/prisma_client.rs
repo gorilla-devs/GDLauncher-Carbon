@@ -128,24 +128,171 @@ pub(super) async fn load_and_migrate(
         .await
         .unwrap();
 
-    // Sweep expired HTTPCache rows on every launch. Previously the cache layer
-    // only read `expiresAt` to decide whether to serve a row, never to delete
-    // one, so stale entries accumulated indefinitely. Best-effort: never fail
-    // startup on this.
-    match db_client
-        ._execute_raw(raw!(
-            "DELETE FROM HTTPCache WHERE expiresAt IS NOT NULL AND expiresAt < datetime('now')"
-        ))
-        .exec()
-        .await
-    {
-        Ok(deleted) => debug!("Swept {deleted} expired HTTPCache rows at startup"),
-        Err(e) => tracing::warn!("Failed to sweep expired HTTPCache rows: {e}"),
-    }
+    // Maybe sweep expired HTTPCache rows + ensure expiresAt index. Both
+    // operations hold the SQLite writer lock for their duration, so we gate
+    // them on a cheap file-size estimate (PRAGMA page_count * page_size, no
+    // table scan) to avoid hanging startup for users with huge DBs.
+    maybe_sweep_http_cache_and_index(&db_client).await;
 
     seed_init_db(&db_client, latest_consent_sha).await?;
 
     Ok(db_client)
+}
+
+/// Skip auto-sweep entirely above this size — the in-app DB-bloat banner
+/// (`pages/withAds.tsx`) takes over and the user cleans manually via the
+/// CacheCleanup modal. Must stay in sync with `DB_BLOAT_THRESHOLD_BYTES` on
+/// the frontend.
+const DB_SKIP_SWEEP_BYTES: i64 = 2 * 1024 * 1024 * 1024;
+
+/// Below this, the DB is essentially empty (fresh install, post-VACUUM, etc.)
+/// and there's nothing to sweep — we still try to ensure the index since
+/// it's free on an empty table.
+const DB_SKIP_SWEEP_MIN_BYTES: i64 = 1 * 1024 * 1024;
+
+/// Live-data threshold for ensuring the `HTTPCache(expiresAt)` index. The
+/// CREATE INDEX itself holds the writer lock for an O(table) build, so we
+/// only run it when the table is small enough that the build is brief
+/// (sub-second on SSD, a few seconds on HDD).
+const INDEX_BUILD_LIVE_BYTES: i64 = 200 * 1024 * 1024;
+
+async fn read_pragma_i64(db_client: &db::PrismaClient, sql: &str) -> Option<i64> {
+    #[derive(Deserialize)]
+    struct PragmaRow {
+        // SQLite returns the value as the column name of the pragma; deserializing
+        // an arbitrary single-column row is annoying, so we use a flat map.
+        #[serde(flatten)]
+        fields: std::collections::HashMap<String, serde_json::Value>,
+    }
+
+    match db_client
+        ._query_raw::<PragmaRow>(carbon_repos::pcr::raw::Raw::new(sql, vec![]))
+        .exec()
+        .await
+    {
+        Ok(rows) => rows
+            .into_iter()
+            .next()
+            .and_then(|row| row.fields.into_iter().next())
+            .and_then(|(_, v)| v.as_i64()),
+        Err(e) => {
+            tracing::warn!("[startup-timing] failed to read pragma `{sql}`: {e}");
+            None
+        }
+    }
+}
+
+async fn read_db_sizes(db_client: &db::PrismaClient) -> Option<(i64, i64)> {
+    let page_count = read_pragma_i64(db_client, "PRAGMA page_count;").await?;
+    let page_size = read_pragma_i64(db_client, "PRAGMA page_size;").await?;
+    let freelist = read_pragma_i64(db_client, "PRAGMA freelist_count;")
+        .await
+        .unwrap_or(0);
+    let file_bytes = page_count.saturating_mul(page_size);
+    let live_bytes = (page_count.saturating_sub(freelist)).saturating_mul(page_size);
+    Some((file_bytes, live_bytes))
+}
+
+/// Try to ensure the `HTTPCache(expiresAt)` index, gated on live data being
+/// small enough that the build is brief. Returns true if the index now
+/// exists (whether we just created it or it already did).
+async fn try_ensure_expires_at_index(db_client: &db::PrismaClient, live_bytes: i64) -> bool {
+    if live_bytes >= INDEX_BUILD_LIVE_BYTES {
+        tracing::info!(
+            "[startup-timing] live data is {} MB (>={} MB), skipping index build",
+            live_bytes / (1024 * 1024),
+            INDEX_BUILD_LIVE_BYTES / (1024 * 1024)
+        );
+        return false;
+    }
+    let t = std::time::Instant::now();
+    match db_client
+        ._execute_raw(raw!(
+            "CREATE INDEX IF NOT EXISTS HTTPCache_expiresAt_idx ON HTTPCache(expiresAt)"
+        ))
+        .exec()
+        .await
+    {
+        Ok(_) => {
+            tracing::info!(
+                "[startup-timing] HTTPCache(expiresAt) index ensured in {:.2}s (live={} MB)",
+                t.elapsed().as_secs_f64(),
+                live_bytes / (1024 * 1024)
+            );
+            true
+        }
+        Err(e) => {
+            tracing::warn!(
+                "[startup-timing] failed to ensure HTTPCache(expiresAt) index in {:.2}s: {e}",
+                t.elapsed().as_secs_f64()
+            );
+            false
+        }
+    }
+}
+
+async fn maybe_sweep_http_cache_and_index(db_client: &db::PrismaClient) {
+    let Some((file_bytes, live_bytes)) = read_db_sizes(db_client).await else {
+        // If we can't size the DB cheaply, do nothing — this is a best-effort
+        // maintenance pass and shouldn't fail startup.
+        return;
+    };
+
+    tracing::info!(
+        "[startup-timing] db size estimate: file={} MB live={} MB",
+        file_bytes / (1024 * 1024),
+        live_bytes / (1024 * 1024)
+    );
+
+    if file_bytes > DB_SKIP_SWEEP_BYTES {
+        tracing::info!(
+            "[startup-timing] db file is {} MB (>{} MB), skipping HTTPCache sweep + index — banner will prompt user to clean manually",
+            file_bytes / (1024 * 1024),
+            DB_SKIP_SWEEP_BYTES / (1024 * 1024)
+        );
+        return;
+    }
+
+    // Build the index BEFORE the sweep when live data is small enough. This
+    // turns the sweep's `WHERE expiresAt < ...` lookup from a full table scan
+    // into an index seek — important for HDD users on the first launch after
+    // this code ships, when no index exists yet.
+    let pre_sweep_indexed = try_ensure_expires_at_index(db_client, live_bytes).await;
+
+    if file_bytes >= DB_SKIP_SWEEP_MIN_BYTES {
+        let t = std::time::Instant::now();
+        match db_client
+            ._execute_raw(raw!(
+                "DELETE FROM HTTPCache WHERE expiresAt IS NOT NULL AND expiresAt < datetime('now')"
+            ))
+            .exec()
+            .await
+        {
+            Ok(deleted) => tracing::info!(
+                "[startup-timing] HTTPCache sweep deleted {deleted} row(s) in {:.2}s",
+                t.elapsed().as_secs_f64()
+            ),
+            Err(e) => tracing::warn!(
+                "[startup-timing] HTTPCache sweep failed in {:.2}s: {e}",
+                t.elapsed().as_secs_f64()
+            ),
+        }
+    } else {
+        tracing::info!(
+            "[startup-timing] db file is only {} MB, skipping sweep (nothing to clean)",
+            file_bytes / (1024 * 1024)
+        );
+    }
+
+    // If the index wasn't built pre-sweep (live was over the threshold), the
+    // sweep may have moved enough rows to the freelist that live data has now
+    // dropped below it — retry once so the next startup's sweep is fast.
+    if !pre_sweep_indexed {
+        let Some((_, live_after)) = read_db_sizes(db_client).await else {
+            return;
+        };
+        try_ensure_expires_at_index(db_client, live_after).await;
+    }
 }
 
 async fn find_appropriate_default_xmx() -> i32 {

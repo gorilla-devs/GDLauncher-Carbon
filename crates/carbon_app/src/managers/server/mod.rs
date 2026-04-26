@@ -682,11 +682,36 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_GROUPS, None);
 
         // Process the modpack in background
-        let app = self.app.clone();
-        let shortpath_clone = shortpath.clone();
+        Self::spawn_modpack_install(
+            self.app.clone(),
+            server_id,
+            shortpath.clone(),
+            port,
+            modpack_source,
+            task,
+            task_id,
+        );
+
+        Ok(server_id)
+    }
+
+    /// Spawn the actual modpack install pipeline (download server pack, extract,
+    /// download vanilla jar, install modloader, write properties, update DB).
+    /// Shared between fresh-create and reinstall flows.
+    fn spawn_modpack_install(
+        app: Arc<crate::managers::AppInner>,
+        server_id: ServerId,
+        shortpath: String,
+        port: i32,
+        modpack_source: modpack::ServerModpackSource,
+        task: crate::managers::vtask::VisualTask,
+        task_id: VisualTaskId,
+    ) {
+        use crate::api::translation::Translation;
+
         tokio::spawn(async move {
             let runtime_path = &app.settings_manager().runtime_path;
-            let server_path = runtime_path.get_servers().get_server_path(&shortpath_clone);
+            let server_path = runtime_path.get_servers().get_server_path(&shortpath);
 
             // Create ALL subtasks upfront so the total weight is fixed from the start
             // and progress only moves forward. The process_* functions will create their
@@ -805,12 +830,12 @@ impl ManagerRef<'_, ServerManager> {
 
             let failed_task = match result {
                 Ok(()) => {
-                    info!("Server from modpack created successfully: {}", server_id.0);
+                    info!("Server modpack install completed: {}", server_id.0);
                     drop(task);
                     None
                 }
                 Err(e) => {
-                    error!("Failed to create server from modpack: {}", e);
+                    error!("Failed server modpack install: {}", e);
                     task.fail(e).await;
                     Some(task_id)
                 }
@@ -826,8 +851,146 @@ impl ManagerRef<'_, ServerManager> {
             app.invalidate(GET_GROUPS, None);
             app.invalidate(GET_SERVER_DETAILS, None);
         });
+    }
 
-        Ok(server_id)
+    /// Reinstall a server from its original modpack. Wipes modpack-installed
+    /// files (mods, libraries, server jars, modloader launch config) and
+    /// re-runs the install pipeline. World saves, server.properties, eula.txt,
+    /// whitelist/ops/banned-* files, and the configs/ directory are preserved.
+    ///
+    /// Refuses to run if the server is not in the Stopped state — wiping mods
+    /// while a server is installing or running would corrupt the active task
+    /// or the live process.
+    pub async fn reinstall_server_from_modpack(self, id: ServerId) -> anyhow::Result<VisualTaskId> {
+        use crate::api::translation::Translation;
+        use crate::managers::vtask::VisualTask;
+
+        let lock = self.get_op_lock(id);
+        let _guard = lock.lock().await;
+
+        // State gate: only reinstall a server that's idle.
+        {
+            let servers = self.servers.read().await;
+            let server = servers
+                .get(&id)
+                .ok_or_else(|| anyhow!("Server not found"))?;
+            if !matches!(server.state, ServerState::Stopped { .. }) {
+                bail!("Cannot reinstall while the server is running, installing, or being deleted");
+            }
+        }
+
+        // Pull the modpack info we stored at create time.
+        let db_server = self
+            .app
+            .prisma_client
+            .server()
+            .find_unique(db::server::id::equals(id.0))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("Server not found in database"))?;
+
+        let modpack_source = match (
+            db_server.modpack_platform.as_deref(),
+            db_server.modpack_project_id.as_deref(),
+            db_server.modpack_file_id.as_deref(),
+        ) {
+            (Some("curseforge"), Some(project_id), Some(file_id)) => {
+                modpack::ServerModpackSource::Curseforge {
+                    project_id: project_id
+                        .parse()
+                        .context("invalid stored CurseForge project_id")?,
+                    // file_id isn't used by the install pipeline (only
+                    // server_pack_file_id is) so a placeholder is fine.
+                    file_id: 0,
+                    server_pack_file_id: file_id
+                        .parse()
+                        .context("invalid stored CurseForge server pack file_id")?,
+                }
+            }
+            (Some("modrinth"), Some(project_id), Some(version_id)) => {
+                modpack::ServerModpackSource::Modrinth {
+                    project_id: project_id.to_string(),
+                    version_id: version_id.to_string(),
+                }
+            }
+            _ => bail!("Server does not have an associated modpack to reinstall"),
+        };
+
+        let runtime_path = &self.app.settings_manager().runtime_path;
+        let server_path = runtime_path
+            .get_servers()
+            .get_server_path(&db_server.shortpath);
+        let data_path = server_path.get_data_path();
+
+        // Wipe modpack-installed content. Anything not in this list (worlds,
+        // server.properties, eula.txt, whitelist/ops/banned-*, logs) is left
+        // alone so the operator's state survives a reinstall.
+        let dirs_to_wipe = ["mods", "libraries", "defaultconfigs"];
+        for name in dirs_to_wipe {
+            let p = data_path.join(name);
+            if p.exists() {
+                tokio::fs::remove_dir_all(&p)
+                    .await
+                    .with_context(|| format!("Failed to wipe {}", p.display()))?;
+            }
+        }
+        let files_to_wipe = ["launch_config.json"];
+        for name in files_to_wipe {
+            let p = data_path.join(name);
+            if p.exists() {
+                tokio::fs::remove_file(&p)
+                    .await
+                    .with_context(|| format!("Failed to wipe {}", p.display()))?;
+            }
+        }
+        // Remove any .jar at the data root (server.jar, modloader installers,
+        // forge/neoforge server jars). Keep recursing only at depth 0 — we
+        // don't want to delete jars users dropped into mods/ etc, but mods/
+        // was already wiped above.
+        let mut entries = tokio::fs::read_dir(&data_path)
+            .await
+            .context("Failed to read server data dir")?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.is_file()
+                && path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| e.eq_ignore_ascii_case("jar"))
+                    .unwrap_or(false)
+            {
+                let _ = tokio::fs::remove_file(&path).await;
+            }
+        }
+
+        // Spin up the install task and flip state to Installing.
+        let task = VisualTask::new(Translation::ServerTaskInstallFromModpack {
+            server_name: db_server.name.clone(),
+        });
+        let task_id = self.app.task_manager().spawn_task(&task).await;
+
+        {
+            let mut servers = self.servers.write().await;
+            if let Some(s) = servers.get_mut(&id) {
+                s.state = ServerState::Installing(task_id);
+            }
+        }
+
+        self.app.invalidate(GET_ALL_SERVERS, None);
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_SERVER_DETAILS, None);
+
+        Self::spawn_modpack_install(
+            self.app.clone(),
+            id,
+            db_server.shortpath.clone(),
+            db_server.port,
+            modpack_source,
+            task,
+            task_id,
+        );
+
+        Ok(task_id)
     }
 
     pub async fn delete_server(self, id: ServerId) -> anyhow::Result<()> {
@@ -2148,12 +2311,23 @@ impl ManagerRef<'_, ServerManager> {
             .get(&id)
             .ok_or_else(|| anyhow!("Server not found"))?;
 
-        match &server.state {
-            ServerState::Running { log_id, .. } => {
+        // Prefer the live log_id while running, but fall back to the most
+        // recent session's log_id when the server is stopped/crashed so the
+        // UI keeps the post-mortem logs (and so a reconnecting WebSocket
+        // doesn't get "Server not running" back-to-back with the crash).
+        // The buffer is dropped on next start_server when last_log_id is
+        // recycled, so this only persists logs from the latest run.
+        let log_id = match &server.state {
+            ServerState::Running { log_id, .. } => Some(*log_id),
+            _ => server.last_log_id,
+        };
+
+        match log_id {
+            Some(log_id) => {
                 let logs = self.server_logs.read().await;
-                Ok(logs.get(log_id).map(|tx| tx.subscribe()))
+                Ok(logs.get(&log_id).map(|tx| tx.subscribe()))
             }
-            _ => Ok(None),
+            None => Ok(None),
         }
     }
 

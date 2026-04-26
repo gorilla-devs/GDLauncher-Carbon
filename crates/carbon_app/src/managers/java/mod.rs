@@ -106,12 +106,34 @@ impl JavaManager {
         T: Discovery,
         G: JavaChecker,
     {
+        let t = std::time::Instant::now();
         scan_and_sync::scan_and_sync_local(db, discovery, java_checker).await?;
+        tracing::info!(
+            "[startup-timing] scan_and_sync_local completed in {:.2}s",
+            t.elapsed().as_secs_f64()
+        );
+
+        let t = std::time::Instant::now();
         scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
+        tracing::info!(
+            "[startup-timing] scan_and_sync_custom completed in {:.2}s",
+            t.elapsed().as_secs_f64()
+        );
+
+        let t = std::time::Instant::now();
         scan_and_sync::scan_and_sync_managed(db, discovery, java_checker).await?;
+        tracing::info!(
+            "[startup-timing] scan_and_sync_managed completed in {:.2}s",
+            t.elapsed().as_secs_f64()
+        );
 
         if auto_manage_java_system_profiles {
+            let t = std::time::Instant::now();
             scan_and_sync::sync_system_java_profiles(db).await?;
+            tracing::info!(
+                "[startup-timing] sync_system_java_profiles completed in {:.2}s",
+                t.elapsed().as_secs_f64()
+            );
         }
 
         Ok(())

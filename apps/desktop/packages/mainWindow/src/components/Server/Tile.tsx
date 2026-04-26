@@ -293,6 +293,25 @@ const ServerTile = (props: Props) => {
             <div class="i-hugeicons:folder-open h-4 w-4" />
             {t("instances:_trn_action_open_folder")}
           </ContextMenuItem>
+          <ContextMenuItem
+            class="flex items-center gap-2"
+            onClick={() => {
+              modalsContext?.openModal(
+                { name: "confirmReinstall" },
+                {
+                  id: props.server.id,
+                  name: props.server.name,
+                  isServer: true
+                }
+              )
+            }}
+            disabled={
+              !props.server.modpackInfo || isDeleting() || isInstalling()
+            }
+          >
+            <div class="i-hugeicons:refresh h-4 w-4" />
+            {t("instances:_trn_instance_settings.reinstall")}
+          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem
             class="flex items-center gap-2 text-red-400"

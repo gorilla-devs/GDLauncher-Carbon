@@ -171,6 +171,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn scan_instances(self) -> anyhow::Result<()> {
+        let scan_start = std::time::Instant::now();
         let instance_cache = self
             .app
             .prisma_client
@@ -178,6 +179,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .find_many(vec![])
             .exec()
             .await?;
+        tracing::info!(
+            "[startup-timing] scan_instances: loaded {} cached instance row(s) from DB in {:.2}s",
+            instance_cache.len(),
+            scan_start.elapsed().as_secs_f64()
+        );
 
         let instance_path = self
             .app
@@ -189,6 +195,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let mut stream = tokio::fs::read_dir(instance_path).await?;
 
         let updates_semaphore = Arc::new(tokio::sync::Semaphore::new(20));
+        let mut scanned_count: u32 = 0;
 
         while let Some(dir) = stream.next_entry().await? {
             let path = dir.path();
@@ -250,6 +257,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 )
                 .await;
 
+            scanned_count += 1;
+
             let app = self.app.clone();
             let updates_semaphore = Arc::clone(&updates_semaphore);
             tokio::task::spawn(async move {
@@ -268,6 +277,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             });
         }
+
+        tracing::info!(
+            "[startup-timing] scan_instances scanned {} instance dir(s), total {:.2}s",
+            scanned_count,
+            scan_start.elapsed().as_secs_f64()
+        );
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);

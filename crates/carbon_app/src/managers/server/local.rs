@@ -119,7 +119,7 @@ impl ServerProvider for LocalServerProvider {
 
         // Set up stderr reading
         let stderr = child.stderr.take().expect("Failed to take stderr");
-        let log_tx_stderr = log_tx;
+        let log_tx_stderr = log_tx.clone();
         tokio::spawn(async move {
             let reader = BufReader::new(stderr);
             let mut lines = reader.lines();
@@ -134,6 +134,7 @@ impl ServerProvider for LocalServerProvider {
         let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
         let exit_notify = Arc::new(Notify::new());
         let exit_notify_clone = exit_notify.clone();
+        let log_tx_exit = log_tx;
         tokio::spawn(async move {
             tokio::select! {
                 _ = kill_rx.recv() => {
@@ -144,8 +145,18 @@ impl ServerProvider for LocalServerProvider {
                 }
                 status = child.wait() => {
                     match status {
-                        Ok(s) => info!("Server process exited with status: {}", s),
-                        Err(e) => error!("Error waiting for server process: {}", e),
+                        Ok(s) => {
+                            info!("Server process exited with status: {}", s);
+                            // Surface to in-app console so users (and bug reports)
+                            // see the actual exit status, not just "exited unexpectedly".
+                            let _ = log_tx_exit
+                                .send(format!("[GDLauncher] Server process exited: {}", s));
+                        }
+                        Err(e) => {
+                            error!("Error waiting for server process: {}", e);
+                            let _ = log_tx_exit
+                                .send(format!("[GDLauncher] Error waiting for server process: {}", e));
+                        }
                     }
                 }
             }

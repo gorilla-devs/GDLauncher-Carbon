@@ -1,8 +1,6 @@
-import { useLocation } from "@solidjs/router"
 import { Show, children } from "solid-js"
 import { JSX } from "solid-js/jsx-runtime"
 import { ModalProps, useModal } from "."
-import { useGDNavigate } from "../NavigationManager"
 import adSize from "@/utils/adhelper"
 
 interface Props extends ModalProps {
@@ -19,8 +17,6 @@ interface Props extends ModalProps {
 
 const ModalLayout = (props: Props) => {
   const c = children(() => props.children)
-  const navigator = useGDNavigate()
-  const location = useLocation()
   const modalsContext = useModal()
 
   return (
@@ -55,7 +51,6 @@ const ModalLayout = (props: Props) => {
               class="text-darkSlate-300 i-hugeicons:cancel-01 hover:text-lightSlate-100 h-5 w-5 press-effect active:scale-90 cursor-pointer"
               onClick={() => {
                 if (!props.preventClose) {
-                  navigator.navigate(location.pathname)
                   modalsContext?.closeModal()
                 }
               }}

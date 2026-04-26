@@ -1,5 +1,5 @@
 import { rspc } from "@/utils/rspcClient"
-import { Input, Slider, Switch } from "@gd/ui"
+import { Button, Input, Slider, Switch } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { createEffect, createSignal, Show } from "solid-js"
 import { FEServerDetails } from "@gd/core_module/bindings"
@@ -8,6 +8,7 @@ import Title from "@/pages/Settings/components/Title"
 import Row from "@/pages/Settings/components/Row"
 import RowsContainer from "@/pages/Settings/components/RowsContainer"
 import RightHandSide from "@/pages/Settings/components/RightHandSide"
+import { useModal } from "@/managers/ModalsManager"
 
 interface SettingsProps {
   serverDetails: FEServerDetails
@@ -16,6 +17,7 @@ interface SettingsProps {
 
 const Settings = (props: SettingsProps) => {
   const [t] = useTransContext()
+  const modalsContext = useModal()
   const [name, setName] = createSignal("")
   const [xmx, setXmx] = createSignal(2048)
   const [xms, setXms] = createSignal(1024)
@@ -62,6 +64,38 @@ const Settings = (props: SettingsProps) => {
 
   return (
     <div>
+      <h3 class="text-lightSlate-100 mb-0 mt-4 flex items-center gap-2 text-xl font-medium">
+        <div class="i-hugeicons:package h-5 w-5" />
+        <Trans key="instances:_trn_instance_settings.modpack_info" />
+      </h3>
+      <RowsContainer>
+        <Row>
+          <Title>
+            <Trans key="instances:_trn_instance_settings.reinstall" />
+          </Title>
+          <RightHandSide>
+            <Button
+              type="secondary"
+              disabled={!props.serverDetails.modpackInfo}
+              onClick={() => {
+                modalsContext?.openModal(
+                  {
+                    name: "confirmReinstall"
+                  },
+                  {
+                    id: props.serverDetails.id,
+                    name: props.serverDetails.name,
+                    isServer: true
+                  }
+                )
+              }}
+            >
+              <i class="i-hugeicons:refresh h-5 w-5" />
+              <Trans key="instances:_trn_instance_settings.reinstall" />
+            </Button>
+          </RightHandSide>
+        </Row>
+      </RowsContainer>
       <h3 class="text-lightSlate-100 mb-0 mt-4 flex items-center gap-2 text-xl font-medium">
         <div class="i-hugeicons:settings-02 h-5 w-5" />
         <Trans key="instances:_trn_server_settings_general" />

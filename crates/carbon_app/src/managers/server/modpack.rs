@@ -6,7 +6,62 @@ use carbon_platforms::curseforge::filters::ModFileParameters;
 use carbon_platforms::modrinth::version::ModrinthEnvironmentSupport;
 use carbon_rt_path::ServerPath;
 use std::path::Path;
-use tracing::info;
+use tracing::{info, warn};
+
+/// True if a relative path inside the server data dir points at world/save
+/// data. These paths are NEVER written to during install or reinstall — we
+/// will not destroy a user's world even if a malformed modpack tries to ship
+/// one.
+fn is_save_path(rel: &str) -> bool {
+    // Accept both / and \ from zip entry names.
+    let normalized = rel.replace('\\', "/");
+    let first = normalized.split('/').next().unwrap_or("");
+    let lower = first.to_ascii_lowercase();
+
+    // Standard vanilla + Forge custom dimensions live at the data root:
+    //   world, world_nether, world_the_end, world_<custom>
+    //   DIM-1, DIM1, DIM<id> (legacy Forge)
+    //   saves/ (rare on server, included for instance-style server packs)
+    //   playerdata, stats, advancements (sometimes hoisted to root by plugins)
+    if lower == "saves"
+        || lower == "world"
+        || lower.starts_with("world_")
+        || lower == "playerdata"
+        || lower == "stats"
+        || lower == "advancements"
+    {
+        return true;
+    }
+
+    // Legacy Forge dimension folder: DIM<id> or DIM-<id>, where <id> is an
+    // integer. Match strictly so we don't sweep in unrelated dirs like
+    // "dimension-config" or "dimskin".
+    if let Some(rest) = lower.strip_prefix("dim") {
+        let rest = rest.strip_prefix('-').unwrap_or(rest);
+        if !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// True if a relative path inside the server data dir is a top-level user
+/// config/state file we should preserve on reinstall. Caller should still
+/// allow the write when the destination doesn't exist (fresh install).
+fn is_preserved_config_file(rel: &str) -> bool {
+    matches!(
+        rel,
+        "server.properties"
+            | "eula.txt"
+            | "whitelist.json"
+            | "ops.json"
+            | "banned-players.json"
+            | "banned-ips.json"
+            | "usercache.json"
+            | "icon.png"
+    )
+}
 
 #[derive(Debug)]
 pub enum ServerModpackSource {
@@ -286,11 +341,21 @@ pub async fn process_modrinth_server_pack(
         .await?
         .context("Failed to read modrinth.index.json")?;
 
-    // Filter files for server compatibility
+    // Filter files for server compatibility, and refuse anything aimed at a
+    // world/save path. A well-formed mrpack should never list save data, but
+    // we don't trust the input — the cost of being wrong here is a destroyed
+    // user world.
     let server_files: Vec<_> = index
         .files
         .iter()
         .filter(|file| {
+            if is_save_path(&file.path) {
+                warn!(
+                    "Skipping save-path entry from mrpack index: {} (would overwrite user data)",
+                    file.path
+                );
+                return false;
+            }
             file.env.as_ref().map_or(true, |env| {
                 !matches!(env.server, ModrinthEnvironmentSupport::Unsupported)
             })
@@ -387,7 +452,25 @@ pub async fn process_modrinth_server_pack(
                     continue;
                 }
 
+                // Same hard refusal as the CF extractor: never write into
+                // world/save paths from a modpack override.
+                if is_save_path(relative) {
+                    tracing::warn!(
+                        "Skipping save-path entry from mrpack overrides: {} (would overwrite user data)",
+                        relative
+                    );
+                    continue;
+                }
+
                 let out_path = data_path_clone.join(relative);
+
+                if !entry.is_dir()
+                    && is_preserved_config_file(relative)
+                    && out_path.exists()
+                {
+                    continue;
+                }
+
                 if entry.is_dir() {
                     std::fs::create_dir_all(&out_path)?;
                 } else {
@@ -491,7 +574,24 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
             continue;
         }
 
+        // Hard refuse to write into world/save paths under any circumstances.
+        // Even a fresh install loses nothing — modpack-bundled worlds are
+        // niche and the risk to user data on reinstall isn't worth it.
+        if is_save_path(&relative) {
+            warn!(
+                "Skipping save-path entry from server pack: {} (would overwrite user data)",
+                relative
+            );
+            continue;
+        }
+
         let out_path = target_dir.join(&relative);
+
+        // Don't clobber user-customized config files if they already exist
+        // (server.properties, eula.txt, op/whitelist/banned lists, icon).
+        if !entry.is_dir() && is_preserved_config_file(&relative) && out_path.exists() {
+            continue;
+        }
 
         if entry.is_dir() {
             std::fs::create_dir_all(&out_path)?;
@@ -564,4 +664,72 @@ async fn detect_modloader_from_files(data_path: &Path) -> (Option<String>, Optio
     }
 
     (None, None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn save_path_protection_covers_world_dirs() {
+        // Vanilla worlds and Forge custom dimensions
+        assert!(is_save_path("world"));
+        assert!(is_save_path("world/level.dat"));
+        assert!(is_save_path("world_nether"));
+        assert!(is_save_path("world_nether/region/r.0.0.mca"));
+        assert!(is_save_path("world_the_end"));
+        assert!(is_save_path("world_aether/level.dat"));
+        assert!(is_save_path("world_twilightforest/level.dat"));
+        assert!(is_save_path("world_my_custom_dim_42/level.dat"));
+
+        // Legacy Forge dimension folders at the data root
+        assert!(is_save_path("DIM-1"));
+        assert!(is_save_path("DIM1/region/r.0.0.mca"));
+        assert!(is_save_path("dim-1/region/r.0.0.mca"));
+
+        // Instance-style save folder (rare on server but cheap to cover)
+        assert!(is_save_path("saves"));
+        assert!(is_save_path("saves/myworld/level.dat"));
+
+        // Plugin-hoisted player data
+        assert!(is_save_path("playerdata/uuid.dat"));
+        assert!(is_save_path("stats/uuid.json"));
+        assert!(is_save_path("advancements/uuid.json"));
+
+        // Backslash separators (zip entries on Windows-authored packs)
+        assert!(is_save_path("world\\level.dat"));
+    }
+
+    #[test]
+    fn save_path_protection_does_not_overmatch() {
+        // These look superficially close but must NOT be classified as saves
+        assert!(!is_save_path("mods/somemod.jar"));
+        assert!(!is_save_path("libraries/foo.jar"));
+        assert!(!is_save_path("config/somemod.toml"));
+        assert!(!is_save_path("defaultconfigs/foo.toml"));
+        assert!(!is_save_path("server.jar"));
+        assert!(!is_save_path("server.properties"));
+        assert!(!is_save_path("eula.txt"));
+        assert!(!is_save_path("whitelist.json"));
+        // "dim" alone is not a dimension folder
+        assert!(!is_save_path("dim"));
+        // Non-DIM names that happen to start with d/i/m are not saves
+        assert!(!is_save_path("dimension-config"));
+    }
+
+    #[test]
+    fn preserved_configs_are_listed() {
+        assert!(is_preserved_config_file("server.properties"));
+        assert!(is_preserved_config_file("eula.txt"));
+        assert!(is_preserved_config_file("whitelist.json"));
+        assert!(is_preserved_config_file("ops.json"));
+        assert!(is_preserved_config_file("banned-players.json"));
+        assert!(is_preserved_config_file("banned-ips.json"));
+        assert!(is_preserved_config_file("usercache.json"));
+        assert!(is_preserved_config_file("icon.png"));
+
+        // Nested files are not matched — caller passes top-level relative paths
+        assert!(!is_preserved_config_file("config/server.properties"));
+        assert!(!is_preserved_config_file("mods/foo.jar"));
+    }
 }

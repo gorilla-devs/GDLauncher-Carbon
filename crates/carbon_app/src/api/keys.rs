@@ -99,6 +99,7 @@ keys! {
         GET_ALL_INSTANCES                           = "getAllInstances";
         CREATE_INSTANCE                             = "createInstance";
         CHANGE_MODPACK                              = "changeModpack";
+        REINSTALL_MODPACK                           = "reinstallModpack";
         LOAD_ICON_URL                               = "loadIconUrl";
         DELETE_GROUP                                = "deleteGroup";
         DELETE_GROUP_WITH_INSTANCES                 = "deleteGroupWithInstances";
@@ -205,6 +206,7 @@ keys! {
         CREATE_SERVER                               = "createServer";
         CREATE_SERVER_FROM_MODPACK                  = "createServerFromModpack";
         DELETE_SERVER                               = "deleteServer";
+        REINSTALL_SERVER                            = "reinstallServer";
         ACCEPT_EULA                                 = "acceptEula";
         START_SERVER                                = "startServer";
         STOP_SERVER                                 = "stopServer";
