@@ -285,10 +285,7 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
   /**
    * Handle server-group drop events.
    */
-  const handleServerGroupDrop = (
-    target: DropTarget,
-    groupId: number
-  ): void => {
+  const handleServerGroupDrop = (target: DropTarget, groupId: number): void => {
     switch (target.type) {
       case "beforeGroup": {
         if (groupId !== target.groupId) {

@@ -184,16 +184,39 @@ mod app {
 
             let _app = app.clone();
             tokio::spawn(async move {
+                let bg_total = std::time::Instant::now();
+
+                let t = std::time::Instant::now();
                 _app.clone()
                     .instance_manager()
                     .launch_background_tasks()
                     .await;
+                info!(
+                    "[startup-timing] instance_manager.launch_background_tasks (scan_instances) completed in {:.2}s",
+                    t.elapsed().as_secs_f64()
+                );
+
+                let t = std::time::Instant::now();
                 _app.clone()
                     .server_manager()
                     .launch_background_tasks()
                     .await;
-                _app.meta_cache_manager().launch_background_tasks().await;
+                info!(
+                    "[startup-timing] server_manager.launch_background_tasks completed in {:.2}s",
+                    t.elapsed().as_secs_f64()
+                );
 
+                let t = std::time::Instant::now();
+                _app.meta_cache_manager().launch_background_tasks().await;
+                info!(
+                    "[startup-timing] meta_cache_manager.launch_background_tasks completed in {:.2}s",
+                    t.elapsed().as_secs_f64()
+                );
+
+                info!(
+                    "[startup-timing] all background tasks ready, emitting LaunchBackgroundTasks status (took {:.2}s)",
+                    bg_total.elapsed().as_secs_f64()
+                );
                 update_core_module_status(CoreModuleStatus::LaunchBackgroundTasks);
             });
 

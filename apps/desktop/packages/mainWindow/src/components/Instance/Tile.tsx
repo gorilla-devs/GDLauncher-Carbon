@@ -318,6 +318,28 @@ const Tile = (props: Props) => {
                         {t("instances:_trn_action_duplicate")}
                       </ContextMenuItem>
                     )}
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={() => {
+                        modalsContext?.openModal(
+                          { name: "confirmReinstall" },
+                          {
+                            id: props.instance.id,
+                            name: props.instance.name,
+                            isServer: false
+                          }
+                        )
+                      }}
+                      disabled={
+                        !validInstance()?.modpack ||
+                        isLoading() ||
+                        isInQueue() ||
+                        props.isDeleting
+                      }
+                    >
+                      <div class="i-hugeicons:refresh h-4 w-4" />
+                      {t("instances:_trn_instance_settings.reinstall")}
+                    </ContextMenuItem>
                   </ContextMenuSubContent>
                 </ContextMenuPortal>
               </ContextMenuSub>

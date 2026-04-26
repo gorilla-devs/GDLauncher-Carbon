@@ -556,6 +556,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        mutation REINSTALL_SERVER[app, id: FEServerId] {
+            app.server_manager()
+                .reinstall_server_from_modpack(id.into())
+                .await
+                .map(super::vtask::FETaskId::from)
+        }
+
         mutation ACCEPT_EULA[app, id: FEServerId] {
             app.server_manager()
                 .accept_eula(id.into())
@@ -1085,14 +1092,15 @@ async fn server_log_ws_handler(
 
         let mut log_rx = log_rx;
 
-        // Send existing log history immediately on connect
+        // Send existing log history immediately on connect — even when
+        // empty. The frontend uses this initial array to replace its local
+        // log state, so a new (empty) session correctly clears stale logs
+        // from a previous crash that the user was still viewing.
         {
             let logs = log_rx.borrow_and_update().clone();
-            if !logs.is_empty() {
-                let msg = serde_json::to_string(&logs).unwrap_or_default();
-                if socket.send(Message::Text(msg)).await.is_err() {
-                    return;
-                }
+            let msg = serde_json::to_string(&logs).unwrap_or_default();
+            if socket.send(Message::Text(msg)).await.is_err() {
+                return;
             }
         }
 

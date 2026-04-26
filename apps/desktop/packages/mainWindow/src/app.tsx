@@ -10,6 +10,8 @@ import { useLocation } from "@solidjs/router"
 import initThemes from "./utils/theme"
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "./managers/ModalsManager"
+import { useGDNavigate } from "./managers/NavigationManager"
+import { parseSearchQuery } from "./utils/searchQueryParser"
 import { useKeyDownEvent } from "@solid-primitives/keyboard"
 import { checkForUpdates } from "./utils/updater"
 import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning"
@@ -23,6 +25,7 @@ interface Props {
 const App = (props: Props) => {
   const [runItOnce, setRunItOnce] = createSignal(true)
   const modalsContext = useModal()
+  const navigate = useGDNavigate()
   const currentRoute = useLocation()
 
   props.createInvalidateQuery()
@@ -48,6 +51,27 @@ const App = (props: Props) => {
     onCleanup(() =>
       window.removeEventListener(ACCOUNT_BANNED_EVENT, handleBanned)
     )
+  })
+
+  // Handle protocol URLs (gdlauncher://, curseforge://, modrinth://).
+  // Must live inside ModalProvider so gdlauncher://share/* can open the
+  // sharePreview modal — NavigationManager is above the modal provider and
+  // useModal() returns undefined there.
+  onMount(() => {
+    window.onProtocolUrl?.((url) => {
+      const parsed = parseSearchQuery(url)
+      if (parsed.mode !== "direct" || parsed.items.length === 0) return
+
+      const firstItem = parsed.items[0]
+      if (firstItem.type === "gdlauncher_share") {
+        modalsContext?.openModal(
+          { name: "sharePreview" },
+          { shareCode: firstItem.shareCode }
+        )
+      } else {
+        navigate.navigate(`/search?q=${encodeURIComponent(url)}`)
+      }
+    })
   })
 
   // First launch detection using semantic query

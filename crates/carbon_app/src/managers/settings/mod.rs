@@ -759,6 +759,12 @@ impl ManagerRef<'_, SettingsManager> {
                     return;
                 }
                 vacuum_subtask.complete_opaque();
+
+                // Index creation is intentionally NOT done here. It happens
+                // exclusively on the next startup, gated on `db_file_bytes <=
+                // 2 GB`. That keeps index-build cost (which holds the writer
+                // lock) off the user-visible cleanup task and ensures it only
+                // runs on a DB small enough to make the build fast.
             }
 
             info!("Cache cleanup complete");

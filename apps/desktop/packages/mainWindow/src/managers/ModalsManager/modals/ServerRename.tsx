@@ -31,13 +31,8 @@ const ServerRename = (props: ModalProps) => {
   }
 
   return (
-    <ModalLayout
-      noHeader={props.noHeader}
-      title={props?.title}
-      height="h-50"
-      width="w-100"
-    >
-      <div class="flex h-full flex-col justify-between gap-4">
+    <ModalLayout noHeader={props.noHeader} title={props?.title} width="w-100">
+      <div class="flex flex-col gap-6">
         <div class="flex flex-col gap-2">
           <label class="text-sm text-lightSlate-400">
             {t("instances:_trn_server_rename_label")}

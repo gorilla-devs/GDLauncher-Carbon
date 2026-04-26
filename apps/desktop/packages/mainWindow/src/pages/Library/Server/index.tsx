@@ -2,6 +2,7 @@ import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { useLocation, useParams } from "@solidjs/router"
 import { Match, Show, Switch, createEffect, createMemo } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { useModal } from "@/managers/ModalsManager"
 import { rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext, type NamespacedTranslationKey } from "@gd/i18n"
 import useServerData from "./server.data"
@@ -55,6 +56,7 @@ const ALL_TABS: ServerTab[] = [
 const Server = (props: { children?: any }) => {
   const [t] = useTransContext()
   const navigator = useGDNavigate()
+  const modalsContext = useModal()
   const params = useParams<{ id: string }>()
   const location = useLocation()
   const routeData = useServerData()
@@ -247,6 +249,31 @@ const Server = (props: { children?: any }) => {
                       : "instances:_trn_add_favorite"
                   }
                 />
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip placement="bottom">
+              <TooltipTrigger as="div">
+                <Button
+                  rounded
+                  size="small"
+                  type="transparent"
+                  disabled={!details()!.modpackInfo}
+                  onClick={() =>
+                    modalsContext?.openModal(
+                      { name: "confirmReinstall" },
+                      {
+                        id: serverId(),
+                        name: details()!.name,
+                        isServer: true
+                      }
+                    )
+                  }
+                >
+                  <div class="i-hugeicons:refresh text-xl" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="instances:_trn_instance_settings.reinstall" />
               </TooltipContent>
             </Tooltip>
           </Show>

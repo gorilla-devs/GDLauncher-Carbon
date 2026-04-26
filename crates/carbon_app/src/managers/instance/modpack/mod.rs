@@ -181,6 +181,73 @@ impl ManagerRef<'_, InstanceManager> {
             .await
             .map(|r| r.1)
     }
+
+    /// Reinstall the instance's current modpack. Equivalent to wiping the
+    /// `.setup` folder by hand and relaunching, but without leaving the user
+    /// to figure that out. Re-runs the modpack download/extract pipeline,
+    /// which is what fixes a poisoned half-installed `.setup` state.
+    ///
+    /// Refuses to run if the instance is currently launching or running —
+    /// wiping `.setup` mid-install would corrupt the in-flight task.
+    pub async fn reinstall_modpack(self, instance_id: InstanceId) -> anyhow::Result<VisualTaskId> {
+        use super::run::LaunchState;
+
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let data = instance.data()?;
+        let modpack = data
+            .config
+            .modpack
+            .as_ref()
+            .map(|m| m.modpack.clone())
+            .ok_or_else(|| {
+                anyhow::anyhow!("Instance does not have an associated modpack to reinstall")
+            })?;
+
+        match data.state {
+            LaunchState::Inactive { .. } => {}
+            _ => {
+                anyhow::bail!(
+                    "Cannot reinstall while the instance is launching, queued, running, or being deleted"
+                );
+            }
+        }
+
+        let runtime_path = self.app.settings_manager().runtime_path.clone();
+        let instance_path = runtime_path
+            .get_instances()
+            .get_instance_path(&instance.shortpath);
+
+        drop(instances);
+
+        let setup_path = instance_path.get_root().join(".setup");
+
+        // Drop any leftover state from the previous (failed) install attempt
+        // so the launch path treats this as a fresh modpack install rather
+        // than trying to resume.
+        if setup_path.exists() {
+            tokio::fs::remove_dir_all(&setup_path).await?;
+        }
+
+        tokio::fs::create_dir_all(&setup_path).await?;
+
+        let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
+        let update_file_path = setup_path.join("change-pack-version.json");
+
+        runtime_path
+            .get_temp()
+            .write_file_atomic(update_file_path, pack_version_text)
+            .await?;
+
+        self.app
+            .instance_manager()
+            .prepare_game(instance_id, None, None, true)
+            .await
+            .map(|r| r.1)
+    }
 }
 
 #[derive(Serialize, Deserialize)]

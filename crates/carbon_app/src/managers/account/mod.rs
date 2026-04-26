@@ -247,14 +247,28 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn refresh_all_gdl_tokens(self) -> anyhow::Result<()> {
         let accounts = self.get_account_entries().await?;
 
+        let eligible = accounts.iter().filter(|a| a.id_token.is_some()).count();
+        info!(
+            "[startup-timing] refresh_all_gdl_tokens: {} eligible account(s) of {} total",
+            eligible,
+            accounts.len()
+        );
+
         for account in accounts {
             if account.id_token.is_some() {
+                let t = std::time::Instant::now();
                 info!("Refreshing GDL token for account {}", account.uuid);
-                if let Err(e) = self.exchange_gdl_token(&account.uuid).await {
-                    warn!(
-                        "Failed to refresh GDL token for account {}: {}",
-                        account.uuid, e
-                    );
+                let result = self.exchange_gdl_token(&account.uuid).await;
+                let elapsed = t.elapsed().as_secs_f64();
+                match result {
+                    Ok(_) => info!(
+                        "[startup-timing] exchange_gdl_token({}) ok in {:.2}s",
+                        account.uuid, elapsed
+                    ),
+                    Err(e) => warn!(
+                        "[startup-timing] exchange_gdl_token({}) failed in {:.2}s: {}",
+                        account.uuid, elapsed, e
+                    ),
                 }
             }
         }

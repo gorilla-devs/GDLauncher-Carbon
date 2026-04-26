@@ -365,7 +365,18 @@ const Instance = (props: { children?: any }) => {
     )
   }
 
-  const menuItems = () => [
+  const hasModpack = () => {
+    const status = routeData.instanceDetails.data
+    if (!status) return false
+    return !!status.modpack
+  }
+
+  const menuItems = (): {
+    icon: string
+    label: string | JSX.Element
+    action: () => void
+    disabled?: boolean
+  }[] => [
     {
       icon: "i-hugeicons:pencil-edit-01",
       label: t("instances:_trn_action_edit"),
@@ -398,6 +409,21 @@ const Instance = (props: { children?: any }) => {
           },
           {
             instanceId: parseInt(exportInstanceId!, 10)
+          }
+        )
+      }
+    },
+    {
+      icon: "i-hugeicons:refresh",
+      label: t("instances:_trn_instance_settings.reinstall"),
+      disabled: !hasModpack(),
+      action: () => {
+        modalsContext?.openModal(
+          { name: "confirmReinstall" },
+          {
+            id: instanceId(),
+            name: routeData.instanceDetails.data?.name,
+            isServer: false
           }
         )
       }
@@ -604,7 +630,10 @@ const Instance = (props: { children?: any }) => {
             <DropdownMenuContent>
               <For each={menuItems()}>
                 {(item) => (
-                  <DropdownMenuItem onSelect={item.action}>
+                  <DropdownMenuItem
+                    onSelect={item.action}
+                    disabled={item.disabled}
+                  >
                     <div class="flex items-center gap-2">
                       <div class={item.icon} />
                       <span>{item.label}</span>
