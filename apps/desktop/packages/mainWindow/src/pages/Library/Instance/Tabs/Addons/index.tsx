@@ -108,9 +108,11 @@ const Addons = () => {
   // search page falls through to whatever projectType the search context
   // last held (often "modpack"), which is the bug we're fixing.
   const defaultSearchType = (): AddonType => {
-    const enabled = (Object.keys(addonData.enabledAddonTypes) as AddonType[])
-      .filter((t) => addonData.enabledAddonTypes[t])
-    return enabled.length === 1 ? enabled[0]! : "mods"
+    const enabled = (
+      Object.keys(addonData.enabledAddonTypes) as AddonType[]
+    ).filter((t) => addonData.enabledAddonTypes[t])
+    if (enabled.length === 1) return enabled[0]
+    return hasModloaders() ? "mods" : "shaders"
   }
 
   const columns = createAddonColumns({

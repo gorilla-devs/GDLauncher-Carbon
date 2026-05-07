@@ -206,9 +206,7 @@ const Java = () => {
         </Row>
         <Row>
           <Title
-            description={
-              <Trans key="java:_trn_show_memory_warning_text" />
-            }
+            description={<Trans key="java:_trn_show_memory_warning_text" />}
           >
             <Trans key="java:_trn_show_memory_warning_title" />
           </Title>
@@ -216,9 +214,7 @@ const Java = () => {
             <GDSwitch
               checked={!memoryWarningDismissed.data}
               onChange={(e) => {
-                memoryWarningDismissedMutation.mutate(
-                  !e.currentTarget.checked
-                )
+                memoryWarningDismissedMutation.mutate(!e.currentTarget.checked)
               }}
             />
           </RightHandSide>

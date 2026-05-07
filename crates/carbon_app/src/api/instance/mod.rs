@@ -224,6 +224,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.instance_manager()
                 .update_instance(details.try_into()?)
                 .await
+                .map(|task_id| task_id.map(super::vtask::FETaskId::from))
         }
 
         mutation SET_FAVORITE[app, favorite: SetFavorite] {
@@ -462,6 +463,19 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .get_instance_mod_sources(instance_id.into())
                 .await
                 .map(crate::api::settings::ModSources::from)
+        }
+
+        query CHECK_SHADER_REQUIREMENTS[app, instance_id: FEInstanceId] {
+            app.instance_manager()
+                .check_shader_requirements(instance_id.into())
+                .await
+        }
+
+        mutation INSTALL_FABRIC_LOADER_DEFAULT[app, instance_id: FEInstanceId] {
+            let task_id = app.instance_manager()
+                .install_fabric_loader_default(instance_id.into())
+                .await?;
+            Ok(super::vtask::FETaskId::from(task_id))
         }
 
         mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {

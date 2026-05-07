@@ -61,6 +61,11 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/Java/JavaSetup")),
     title: t("modals:_trn_java_setup")
   },
+  shaderLoaderSetup: {
+    component: lazy(() => import("./modals/ShaderLoaderSetup")),
+    title: t("modals:_trn_shader_loader_setup"),
+    preventClose: false
+  },
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),
     title: t("modals:_trn_new_instance")

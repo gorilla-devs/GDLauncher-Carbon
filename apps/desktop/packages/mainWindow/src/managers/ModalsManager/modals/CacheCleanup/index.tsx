@@ -15,7 +15,10 @@ import { queryClient, rspc } from "@/utils/rspcClient"
 import { formatBytes } from "@/utils/formatBytes"
 import { setCleanupRunning } from "./state"
 
-const ClickableRow = (props: { onToggle: () => void; children: JSX.Element }) => {
+const ClickableRow = (props: {
+  onToggle: () => void
+  children: JSX.Element
+}) => {
   return (
     <div
       class={`hover:bg-darkSlate-700/50 flex cursor-pointer items-start gap-3 px-4 py-3 ${PRESS_CLASSES}`}
@@ -179,7 +182,10 @@ const CacheCleanup = (props: ModalProps) => {
             </div>
 
             <div class="flex items-center justify-between gap-3 pt-2">
-              <Button type="secondary" onClick={() => modalsContext?.closeModal()}>
+              <Button
+                type="secondary"
+                onClick={() => modalsContext?.closeModal()}
+              >
                 <Trans key="modals:_trn_cache_cleanup.cancel" />
               </Button>
               <Button
@@ -235,7 +241,10 @@ const CacheCleanup = (props: ModalProps) => {
                   />
                 </div>
               </Show>
-              <Button type="primary" onClick={() => modalsContext?.closeModal()}>
+              <Button
+                type="primary"
+                onClick={() => modalsContext?.closeModal()}
+              >
                 <Trans key="modals:_trn_cache_cleanup.close" />
               </Button>
             </div>
@@ -250,7 +259,10 @@ const CacheCleanup = (props: ModalProps) => {
               <div class="text-lightSlate-400 max-w-96 break-words text-center text-sm">
                 {failedMessage()}
               </div>
-              <Button type="secondary" onClick={() => modalsContext?.closeModal()}>
+              <Button
+                type="secondary"
+                onClick={() => modalsContext?.closeModal()}
+              >
                 <Trans key="modals:_trn_cache_cleanup.close" />
               </Button>
             </div>

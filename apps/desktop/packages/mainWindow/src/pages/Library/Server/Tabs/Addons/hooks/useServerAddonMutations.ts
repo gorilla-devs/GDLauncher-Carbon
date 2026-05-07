@@ -1,7 +1,7 @@
 import { useParams } from "@solidjs/router"
 import { rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { ServerAddon } from "@gd/core_module/bindings"
+import { FEServerId, ServerAddon } from "@gd/core_module/bindings"
 import { RowSelectionState } from "@tanstack/solid-table"
 
 export const useServerAddonMutations = (
@@ -20,6 +20,11 @@ export const useServerAddonMutations = (
   const navigator = useGDNavigate()
 
   const serverId = () => parseInt(params.id ?? "0", 10)
+
+  const serverDetails = rspc.createQuery(() => ({
+    queryKey: ["server.getServerDetails", serverId() as unknown as FEServerId],
+    enabled: serverId() > 0
+  }))
 
   // Mutations
   const enableAddonMutation = rspc.createMutation(() => ({
@@ -107,7 +112,9 @@ export const useServerAddonMutations = (
   }
 
   const gotoSearchPage = () => {
-    navigator.navigate(`/search/mod?serverId=${params.id}`)
+    const hasModloader = !!serverDetails.data?.modloaderType
+    const target = hasModloader ? "mod" : "shader"
+    navigator.navigate(`/search/${target}?serverId=${params.id}`)
   }
 
   return {

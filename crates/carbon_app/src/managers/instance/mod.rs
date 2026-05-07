@@ -58,6 +58,7 @@ pub mod modpack;
 mod mods;
 pub mod run;
 mod schema;
+pub mod shader_loader;
 
 #[derive(Debug)]
 pub struct InstanceManager {
@@ -2046,7 +2047,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn update_instance(
         self,
         update: domain::InstanceSettingsUpdate,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Option<VisualTaskId>> {
         use db::instance::{SetParam, UniqueWhereParam};
 
         // Acquire per-instance operation lock to prevent concurrent updates to same instance
@@ -2281,21 +2282,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             tokio::fs::create_dir_all(&setup)
                 .await
                 .context("writing incomplete instance marker")?;
-            // tokio::fs::create_dir_all(setup.join("modpack-complete"))
-            //     .await
-            //     .context("writing modpack complete")?;
 
-            let app = self.app.clone();
-            tokio::spawn(async move {
-                app.instance_manager()
-                    .prepare_game(InstanceId(*update.instance_id), None, None, true)
-                    .await?;
-
-                Ok(()) as anyhow::Result<()>
-            });
+            let (_handle, task_id) = self
+                .prepare_game(InstanceId(*update.instance_id), None, None, true)
+                .await?;
+            return Ok(Some(task_id));
         }
 
-        Ok(())
+        Ok(None)
     }
 
     pub async fn update_playtime(

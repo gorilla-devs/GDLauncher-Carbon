@@ -201,14 +201,14 @@ const BaseTile = (props: BaseTileProps) => {
                 "h-46 w-46": props.size === 2,
                 "h-24 w-24": props.size === 1
               }}
-              style={
-                props.shouldSetViewTransition
+              style={{
+                contain: "layout paint",
+                ...(props.shouldSetViewTransition
                   ? {
-                      "view-transition-name": `${props.viewTransitionPrefix}-image-container`,
-                      contain: "layout"
+                      "view-transition-name": `${props.viewTransitionPrefix}-image-container`
                     }
-                  : {}
-              }
+                  : {})
+              }}
             >
               {/* Background image */}
               <div
@@ -236,7 +236,7 @@ const BaseTile = (props: BaseTileProps) => {
 
               {/* Hover dark overlay */}
               <div
-                class="z-1 absolute inset-0 rounded-2xl bg-black/0 transition-all duration-300 ease-spring"
+                class="z-1 absolute inset-0 bg-black/0 transition-all duration-300 ease-spring [transform:translateZ(0)]"
                 classList={{
                   "!bg-black/0": isLoadingOrWaiting(),
                   "group-hover:bg-black/30": !props.isDragActive,
@@ -434,7 +434,7 @@ const BaseTile = (props: BaseTileProps) => {
 
               {/* Info overlay */}
               <div
-                class="z-4 absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl transition-opacity duration-300"
+                class="z-4 absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300"
                 classList={{
                   "opacity-0": isLoadingOrWaiting() || props.isDeleting
                 }}
@@ -450,7 +450,7 @@ const BaseTile = (props: BaseTileProps) => {
                   props.subTasks.find((s) => s.progress !== "opaque")
                 }
               >
-                <div class="z-5 animate-enterWithOpacityChange absolute bottom-0 left-0 right-0 flex items-center gap-2 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-2xl overflow-hidden opacity-0">
+                <div class="z-5 animate-enterWithOpacityChange absolute bottom-0 left-0 right-0 flex items-center gap-2 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent overflow-hidden opacity-0">
                   <div class="relative min-w-0 flex-1 overflow-hidden rounded-full h-2">
                     <div class="bg-darkSlate-500/50 absolute inset-0 rounded-full" />
                     <div

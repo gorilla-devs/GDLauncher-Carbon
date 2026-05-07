@@ -129,6 +129,8 @@ keys! {
         DELETE_MOD                                  = "deleteMod";
         INSTALL_MOD                                 = "installMod";
         INSTALL_LATEST_MOD                          = "installLatestMod";
+        CHECK_SHADER_REQUIREMENTS                   = "checkShaderRequirements";
+        INSTALL_FABRIC_LOADER_DEFAULT               = "installFabricLoaderDefault";
         UPDATE_MOD                                  = "updateMod";
         FIND_MOD_UPDATE                             = "findModUpdate";
         GET_MOD_SOURCES                             = "getModSources";

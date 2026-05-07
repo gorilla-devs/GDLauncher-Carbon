@@ -53,8 +53,7 @@ export function List() {
     // came here to add an addon to this instance, not to resume browsing
     // modpacks they were looking at earlier.
     if (instanceId() || serverId()) return defaultFallbackType()
-    return (searchContext?.searchQuery().projectType ||
-      defaultFallbackType()) as FEUnifiedSearchType
+    return searchContext?.searchQuery().projectType || defaultFallbackType()
   }
 
   // Sync the resolved type into searchContext so the active tab pill

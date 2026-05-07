@@ -382,9 +382,8 @@ impl ManagerRef<'_, SettingsManager> {
     pub async fn get_db_size(self) -> f64 {
         let db_path = self.runtime_path.join("gdl_conf.db");
         let wal_path = self.runtime_path.join("gdl_conf.db-wal");
-        let size_of = |p: PathBuf| async move {
-            tokio::fs::metadata(&p).await.map(|m| m.len()).unwrap_or(0)
-        };
+        let size_of =
+            |p: PathBuf| async move { tokio::fs::metadata(&p).await.map(|m| m.len()).unwrap_or(0) };
         (size_of(db_path).await + size_of(wal_path).await) as f64
     }
 
@@ -561,7 +560,8 @@ impl ManagerRef<'_, SettingsManager> {
             let mut db_total: u64 = 0;
             if selection.quick {
                 for table in TABLES {
-                    db_total = db_total.saturating_add(count_table(&app.prisma_client, table).await);
+                    db_total =
+                        db_total.saturating_add(count_table(&app.prisma_client, table).await);
                 }
             }
             let total_units = disk_total + db_total;
@@ -612,11 +612,9 @@ impl ManagerRef<'_, SettingsManager> {
                         {
                             Ok(0) => break,
                             Ok(n) => {
-                                let new = progress.fetch_add(n as u64, Ordering::Relaxed) + n as u64;
-                                work.update_items(
-                                    new.try_into().unwrap_or(u32::MAX),
-                                    total_u32,
-                                );
+                                let new =
+                                    progress.fetch_add(n as u64, Ordering::Relaxed) + n as u64;
+                                work.update_items(new.try_into().unwrap_or(u32::MAX), total_u32);
                             }
                             Err(e) => {
                                 warn!("Failed to clear {table}: {e}");
@@ -756,12 +754,7 @@ async fn clear_dir_with_progress(
         // CPU on assets/ trees with tens of thousands of tiny files.
         const PROGRESS_BATCH: u64 = 25;
 
-        fn walk_delete(
-            p: &Path,
-            progress: &AtomicU64,
-            subtask: &Subtask,
-            total: u32,
-        ) {
+        fn walk_delete(p: &Path, progress: &AtomicU64, subtask: &Subtask, total: u32) {
             let Ok(entries) = std::fs::read_dir(p) else {
                 return;
             };

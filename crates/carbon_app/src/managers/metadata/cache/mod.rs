@@ -37,12 +37,14 @@ use std::sync::atomic::AtomicI32;
 use std::thread::available_parallelism;
 use std::usize;
 use tokio::io::AsyncSeekExt;
+use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio::sync::RwLockReadGuard;
 use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::watch;
+use tokio::time::Instant as TokioInstant;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
@@ -52,6 +54,61 @@ use uuid::Uuid;
 
 pub mod curseforge;
 pub mod modrinth;
+
+/// Throttle Modrinth requests originating from the metadata-cache loop.
+/// Modrinth's public limit is 300 req/min (sliding window, reset via
+/// `X-RateLimit-Reset`). We cap ourselves at 210/min — 70% of the budget —
+/// so user-driven requests (which bypass this throttle) always have headroom
+/// even if the cache is running flat-out.
+///
+/// Scoped to the metadata cache only — direct user actions (search, install,
+/// browser) hit `app.modplatforms_manager().modrinth` without going through
+/// this throttle.
+pub(crate) struct ModrinthCacheThrottle {
+    history: Mutex<std::collections::VecDeque<TokioInstant>>,
+    max_per_window: usize,
+    window: std::time::Duration,
+}
+
+impl ModrinthCacheThrottle {
+    fn new(max_per_window: usize, window: std::time::Duration) -> Self {
+        Self {
+            history: Mutex::new(std::collections::VecDeque::with_capacity(max_per_window)),
+            max_per_window,
+            window,
+        }
+    }
+
+    /// Block until firing another request would stay within the configured
+    /// window, then record the request and return. Bursts up to
+    /// `max_per_window` are allowed.
+    pub async fn acquire(&self) {
+        loop {
+            let wait_until = {
+                let mut history = self.history.lock().await;
+                let now = TokioInstant::now();
+
+                while let Some(&front) = history.front() {
+                    if now.duration_since(front) >= self.window {
+                        history.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+
+                if history.len() < self.max_per_window {
+                    history.push_back(now);
+                    return;
+                }
+
+                // Wait for the oldest entry to age out of the window.
+                *history.front().expect("history is full so front exists") + self.window
+            };
+
+            tokio::time::sleep_until(wait_until).await;
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CacheEntityId {
@@ -95,6 +152,7 @@ pub struct MetaCacheManager {
     image_download_semaphore: Semaphore,
     watched_entity: watch::Sender<Option<CacheEntityId>>,
     pause_caching: watch::Sender<bool>,
+    pub(crate) modrinth_throttle: ModrinthCacheThrottle,
 }
 
 impl MetaCacheManager {
@@ -115,6 +173,7 @@ impl MetaCacheManager {
             image_download_semaphore: Semaphore::new(10),
             watched_entity: watch::channel(None).0,
             pause_caching: watch::channel(false).0,
+            modrinth_throttle: ModrinthCacheThrottle::new(210, std::time::Duration::from_secs(60)),
         }
     }
 
