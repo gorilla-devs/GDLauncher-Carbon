@@ -52,6 +52,7 @@
   "_trn_applying_new_runtime_path": "Applying new runtime path...",
   "_trn_do_not_close_app": "Do not close the app. It will restart automatically once it's done.",
   "_trn_migration_errored": "Runtime path migration failed. State might be corrupted. Click <0>here</0> for more info on how to proceed.",
+  "_trn_scanning_files": "Scanning files...",
   "_trn_copying_file": "Copying {{file}}",
   "_trn_removing_file": "Removing {{file}}",
   "_trn_used_in_the_following_profiles": "Used in the following profiles",

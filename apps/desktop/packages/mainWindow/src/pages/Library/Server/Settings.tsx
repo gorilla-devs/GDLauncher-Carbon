@@ -76,7 +76,13 @@ const Settings = (props: SettingsProps) => {
           <RightHandSide>
             <Button
               type="secondary"
-              disabled={!props.serverDetails.modpackInfo}
+              // Backend's reinstall_server_from_modpack only accepts a
+              // server in the Stopped state — disable here too so it's not
+              // a click-and-error round trip.
+              disabled={
+                !props.serverDetails.modpackInfo ||
+                props.serverDetails.state.status !== "stopped"
+              }
               onClick={() => {
                 modalsContext?.openModal(
                   {

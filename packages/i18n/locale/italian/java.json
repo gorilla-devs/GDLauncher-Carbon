@@ -52,6 +52,7 @@
   "_trn_applying_new_runtime_path": "Applicazione del nuovo percorso runtime...",
   "_trn_do_not_close_app": "Non chiudere l'app. Si riavvierà automaticamente una volta finito.",
   "_trn_migration_errored": "La migrazione del percorso runtime non è riuscita. Lo stato potrebbe essere corrotto. Fai clic <0>qui</0> per ulteriori informazioni su come procedere.",
+  "_trn_scanning_files": "Scansione dei file...",
   "_trn_copying_file": "Copia di {{file}}",
   "_trn_removing_file": "Rimozione di {{file}}",
   "_trn_used_in_the_following_profiles": "Usato nei seguenti profili",

@@ -36,10 +36,29 @@ pub enum ShaderRecommendation {
         recommended: ShaderLoaderKind,
         modloader_type: ApiModLoaderType,
         mc_version: String,
+        /// Modrinth project id of the loader the wizard will install. Carried
+        /// in the recommendation so the frontend doesn't need a parallel
+        /// copy of these constants.
+        loader_modrinth_id: String,
     },
     RequiresModloader {
         mc_version: String,
+        /// Modrinth project id of the shader loader to install once the
+        /// modloader is in place. Always Iris for this branch (we install
+        /// Fabric, and Iris is the Fabric-native option).
+        loader_modrinth_id: String,
     },
+}
+
+/// Modrinth project id for the shader loader, when one exists. OptiFine
+/// returns `None` because it ships outside Modrinth and the wizard never
+/// installs it automatically.
+fn shader_loader_modrinth_id(kind: ShaderLoaderKind) -> Option<&'static str> {
+    match kind {
+        ShaderLoaderKind::Iris => Some(IRIS_MODRINTH_ID),
+        ShaderLoaderKind::Oculus => Some(OCULUS_MODRINTH_ID),
+        ShaderLoaderKind::OptiFine => None,
+    }
 }
 
 #[derive(Type, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -164,15 +183,25 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         let Some(modloader_type) = modloader_type else {
-            return Ok(ShaderRecommendation::RequiresModloader { mc_version });
+            return Ok(ShaderRecommendation::RequiresModloader {
+                mc_version,
+                loader_modrinth_id: IRIS_MODRINTH_ID.to_string(),
+            });
         };
 
         let recommended = recommend_loader(modloader_type);
+        // `recommend_loader` only ever returns Iris or Oculus, both of
+        // which have Modrinth IDs — the OptiFine branch of
+        // `shader_loader_modrinth_id` is unreachable here.
+        let loader_modrinth_id = shader_loader_modrinth_id(recommended)
+            .expect("recommend_loader returned a non-Modrinth loader")
+            .to_string();
 
         Ok(ShaderRecommendation::RecommendLoader {
             recommended,
             modloader_type: modloader_type.into(),
             mc_version,
+            loader_modrinth_id,
         })
     }
 

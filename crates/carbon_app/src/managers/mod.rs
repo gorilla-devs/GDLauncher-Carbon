@@ -49,7 +49,7 @@ pub enum AppError {
 mod app {
     use metrics::MetricsManager;
     use sentry::capture_error;
-    use tracing::{error, info};
+    use tracing::{debug, error, info};
 
     use crate::{
         api::{CoreModuleStatus, update_core_module_status},
@@ -191,7 +191,7 @@ mod app {
                     .instance_manager()
                     .launch_background_tasks()
                     .await;
-                info!(
+                debug!(
                     "[startup-timing] instance_manager.launch_background_tasks (scan_instances) completed in {:.2}s",
                     t.elapsed().as_secs_f64()
                 );
@@ -201,19 +201,19 @@ mod app {
                     .server_manager()
                     .launch_background_tasks()
                     .await;
-                info!(
+                debug!(
                     "[startup-timing] server_manager.launch_background_tasks completed in {:.2}s",
                     t.elapsed().as_secs_f64()
                 );
 
                 let t = std::time::Instant::now();
                 _app.meta_cache_manager().launch_background_tasks().await;
-                info!(
+                debug!(
                     "[startup-timing] meta_cache_manager.launch_background_tasks completed in {:.2}s",
                     t.elapsed().as_secs_f64()
                 );
 
-                info!(
+                debug!(
                     "[startup-timing] all background tasks ready, emitting LaunchBackgroundTasks status (took {:.2}s)",
                     bg_total.elapsed().as_secs_f64()
                 );

@@ -54,9 +54,14 @@ function InsufficientMemory(props: ModalProps) {
           <Button
             type="secondary"
             size="large"
-            onClick={() => {
+            onClick={async () => {
+              // Persist the dismissal first if requested. The next launch
+              // (not this one — this one passes skipMemoryCheck) reads
+              // `is_memory_warning_dismissed` from the DB; awaiting here
+              // closes the race where a fast relaunch could land before
+              // the upsert is durable.
               if (dontShowAgain()) {
-                dismissWarningMutation.mutate(true)
+                await dismissWarningMutation.mutateAsync(true)
               }
               launchInstanceMutation.mutate({
                 id: instanceId(),

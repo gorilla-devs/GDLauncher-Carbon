@@ -128,7 +128,7 @@ where
 {
     let t_discover = std::time::Instant::now();
     let local_javas = discovery.find_java_paths().await;
-    tracing::info!(
+    tracing::debug!(
         "[startup-timing] discovery.find_java_paths found {} candidate(s) in {:.2}s",
         local_javas.len(),
         t_discover.elapsed().as_secs_f64()
@@ -157,7 +157,7 @@ where
         let java_bin_info = java_checker
             .get_bin_info(&resolved_java_path, JavaComponentType::Local)
             .await;
-        tracing::info!(
+        tracing::debug!(
             "[startup-timing] probed java {} in {:.2}s",
             resolved_java_path.display(),
             t_probe.elapsed().as_secs_f64()

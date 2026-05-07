@@ -305,9 +305,9 @@ const ServerTile = (props: Props) => {
                 }
               )
             }}
-            disabled={
-              !props.server.modpackInfo || isDeleting() || isInstalling()
-            }
+            // Backend rejects reinstall on anything but a stopped server.
+            // Match that here instead of enumerating busy states piecemeal.
+            disabled={!props.server.modpackInfo || statusKey() !== "stopped"}
           >
             <div class="i-hugeicons:refresh h-4 w-4" />
             {t("instances:_trn_instance_settings.reinstall")}

@@ -87,6 +87,7 @@ const Server = (props: { children?: any }) => {
   const isRunning = () => details()?.state?.status === "running"
   const isStarting = () => details()?.state?.status === "starting"
   const isStopping = () => details()?.state?.status === "stopping"
+  const isStopped = () => details()?.state?.status === "stopped"
   const isBusy = () => isStarting() || isStopping()
 
   const handleStartStop = () => {
@@ -257,7 +258,11 @@ const Server = (props: { children?: any }) => {
                   rounded
                   size="small"
                   type="transparent"
-                  disabled={!details()!.modpackInfo}
+                  // Backend rejects reinstall unless the server is stopped
+                  // (see ServerManager::reinstall_server_from_modpack). Mirror
+                  // that here so the button visibly disables instead of
+                  // letting the user click into an error toast.
+                  disabled={!details()!.modpackInfo || !isStopped()}
                   onClick={() =>
                     modalsContext?.openModal(
                       { name: "confirmReinstall" },

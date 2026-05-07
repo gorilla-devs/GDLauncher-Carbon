@@ -143,11 +143,16 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                   "opacity-0": RTprogress() === undefined
                 }}
               >
-                <div>
-                  {RTprogress()?.current} / {RTprogress()?.total}
-                </div>
+                <Show when={RTprogress()?.action !== "scan"}>
+                  <div>
+                    {RTprogress()?.current} / {RTprogress()?.total}
+                  </div>
+                </Show>
                 <div>
                   <Switch>
+                    <Match when={RTprogress()?.action === "scan"}>
+                      <Trans key="java:_trn_scanning_files" />
+                    </Match>
                     <Match when={RTprogress()?.action === "copy"}>
                       <Trans
                         key="java:_trn_copying_file"
@@ -163,16 +168,18 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                   </Switch>
                 </div>
 
-                <div class="w-full">
-                  <Progress
-                    color="bg-primary-400"
-                    value={
-                      RTprogress()
-                        ? (RTprogress()!.current * 100) / RTprogress()!.total
-                        : 0
-                    }
-                  />
-                </div>
+                <Show when={RTprogress()?.action !== "scan"}>
+                  <div class="w-full">
+                    <Progress
+                      color="bg-primary-400"
+                      value={
+                        RTprogress()
+                          ? (RTprogress()!.current * 100) / RTprogress()!.total
+                          : 0
+                      }
+                    />
+                  </div>
+                </Show>
               </div>
             </div>
           </div>

@@ -879,13 +879,16 @@ ipcMain.handle("getRuntimePath", async () => {
 
 ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
   interface Progress {
-    action: "copy" | "remove"
+    action: "scan" | "copy" | "remove"
     currentName: string
     current: number
     total: number
   }
 
+  console.log(`[RTP] Migration request: ${CURRENT_RUNTIME_PATH} -> ${newPath}`)
+
   if (newPath === CURRENT_RUNTIME_PATH) {
+    console.log(`[RTP] No-op: same path`)
     return
   }
 
@@ -894,23 +897,46 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
     RUNTIME_PATH_OVERRIDE_NAME
   )
 
-  await fs.mkdir(newPath, { recursive: true })
+  try {
+    await fs.mkdir(newPath, { recursive: true })
+    console.log(`[RTP] Destination ready`)
+  } catch (e) {
+    console.error(`[RTP] Failed to create destination:`, e)
+    throw e
+  }
 
   try {
     const cm = await coreModule
     if (cm.type === "success") {
+      console.log(`[RTP] Killing core module`)
       cm.result.kill()
+      // Give the OS a moment to release file handles (SQLite WAL, logs)
+      await new Promise((r) => setTimeout(r, 1500))
     }
   } catch {
     // No op
   }
 
+  // Surface activity to the renderer immediately so the user doesn't
+  // see only the spinner during the (potentially slow) glob scan.
+  win?.webContents.send("changeRuntimePathProgress", {
+    action: "scan",
+    currentName: "",
+    current: 0,
+    total: 0
+  } satisfies Progress)
+
+  console.log(`[RTP] Scanning source files...`)
+  const t0 = Date.now()
   const files = await fg("**/*", {
     cwd: CURRENT_RUNTIME_PATH!,
     onlyFiles: true,
     dot: true,
+    followSymbolicLinks: false,
+    suppressErrors: true,
     ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
   })
+  console.log(`[RTP] Scan: ${files.length} files in ${Date.now() - t0}ms`)
 
   const total = files.length
 
@@ -924,19 +950,26 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
       total: total * 2
     } satisfies Progress)
 
-    await fse.copy(
-      path.join(CURRENT_RUNTIME_PATH!, file),
-      path.join(newPath, file),
-      {
-        overwrite: true,
-        errorOnExist: false,
-        recursive: true
-      }
-    )
+    try {
+      await fse.copy(
+        path.join(CURRENT_RUNTIME_PATH!, file),
+        path.join(newPath, file),
+        {
+          overwrite: true,
+          errorOnExist: false,
+          recursive: true
+        }
+      )
+    } catch (e) {
+      console.error(`[RTP] Failed to copy ${file}:`, e)
+      throw new Error(`Failed to copy ${file}: ${(e as Error).message}`)
+    }
   }
+  console.log(`[RTP] Copy complete, writing override`)
 
   await fse.writeFile(runtimeOverridePath, newPath)
 
+  console.log(`[RTP] Removing source files`)
   for (let i = 0; i < total; i++) {
     const file = files[i]
 
@@ -947,9 +980,16 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
       total: total * 2
     } satisfies Progress)
 
-    await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file))
+    // Don't fail the migration if a single remove fails — data is already
+    // safely in the new path and the override file points at it.
+    try {
+      await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file))
+    } catch (e) {
+      console.error(`[RTP] Failed to remove ${file}:`, e)
+    }
   }
 
+  console.log(`[RTP] Migration complete, relaunching`)
   app.relaunch()
   app.exit()
 })

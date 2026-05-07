@@ -35,6 +35,26 @@ const changelogs: Changelog = {
   ],
   new: [
     {
+      title: "Modpack Reinstall",
+      description:
+        "Reinstall instances and servers from their original modpack with one click. Mods, libraries, and the modloader are wiped and redownloaded, while worlds, save data, and key config files (server.properties, ops, whitelist, etc.) are preserved."
+    },
+    {
+      title: "Shader Installation Wizard",
+      description:
+        "Installing a shader pack now walks you through any setup the instance needs — the wizard auto-installs Fabric plus Iris (or Oculus on Forge) when missing, then adds the shader."
+    },
+    {
+      title: "Dismiss Memory Warning",
+      description:
+        "The 'Insufficient Memory' prompt before launch can now be permanently dismissed; the toggle lives in Java settings."
+    },
+    {
+      title: "Post-Mortem Server Logs",
+      description:
+        "View the last server session's logs after the server crashes or is stopped, instead of the console going blank as soon as the process exits."
+    },
+    {
       title: "Collapsible Search Filter Sidebar",
       description:
         "A new collapsible sidebar replaces the old filters dropdown, making it easier to filter by platform, game version, modloader, categories, and environment."
@@ -72,6 +92,21 @@ const changelogs: Changelog = {
   ],
   fixed: [
     {
+      title:
+        "Fixed deep-link URLs (gdlauncher://, curseforge://, modrinth://) not opening on cold start",
+      description:
+        "Links arriving while the launcher wasn't already running used to be dropped on Windows and Linux."
+    },
+    {
+      title:
+        "Fixed the search tab not tracking the active project type when arriving from an instance or server",
+      description:
+        "Clicking 'Add addons' would sometimes leave the tab unselected or stuck on the previous session's modpack tab."
+    },
+    {
+      title: "Fixed an i18n runtime warning about html-parse-string"
+    },
+    {
       title: "Fixed GDL account creation from Settings"
     },
     {
@@ -88,6 +123,26 @@ const changelogs: Changelog = {
     }
   ],
   improved: [
+    {
+      title: "Simpler cache cleanup",
+      description:
+        "The cleanup dialog is now organized into two clear options — GDLauncher cache and Minecraft cache — with smoother progress reporting while it runs."
+    },
+    {
+      title: "Smarter addon search defaults",
+      description:
+        "When you click 'Add addons', the search now defaults to mods or shaders based on whether your instance has a modloader."
+    },
+    {
+      title: "Sortable addon columns",
+      description:
+        "Platform and update-available columns in the addon table are now sortable."
+    },
+    {
+      title: "Safer server reinstalls",
+      description:
+        "Server worlds, dimension folders, and key config files (eula, ops, whitelist, banned-player lists) are now protected end-to-end during install and reinstall, even from malformed modpacks that try to ship them."
+    },
     {
       title: "Smoother search experience",
       description:

@@ -3,9 +3,7 @@ import { Trans } from "@gd/i18n"
 import { createSignal, onMount, onCleanup, Match, Switch } from "solid-js"
 import type { StepProps } from "."
 import { rspc } from "@/utils/rspcClient"
-
-const IRIS_MODRINTH_ID = "YL57xq9U"
-const OCULUS_MODRINTH_ID = "GchcoXML"
+import { setShaderInstallRunning } from "./state"
 
 type StepName = "modloader" | "loader" | "shader"
 
@@ -16,7 +14,15 @@ const Installing = (props: StepProps) => {
   const [error, setError] = createSignal<string | null>(null)
   const [destroyed, setDestroyed] = createSignal(false)
 
-  onCleanup(() => setDestroyed(true))
+  // Lock the backdrop close before any await fires. The ModalsManager reads
+  // this via the registry's function-form `preventClose`, so without it a
+  // backdrop click during install could dismiss the modal mid-pipeline.
+  setShaderInstallRunning(true)
+
+  onCleanup(() => {
+    setDestroyed(true)
+    setShaderInstallRunning(false)
+  })
 
   const ctx = rspc.useContext()
 
@@ -95,16 +101,19 @@ const Installing = (props: StepProps) => {
         steps.push({
           name: "loader",
           run: () =>
-            installShaderLoader(props.data.instanceId, IRIS_MODRINTH_ID)
+            installShaderLoader(
+              props.data.instanceId,
+              recommendation.loader_modrinth_id
+            )
         })
       } else if (recommendation.kind === "RecommendLoader") {
-        const projectId =
-          recommendation.recommended === "Iris"
-            ? IRIS_MODRINTH_ID
-            : OCULUS_MODRINTH_ID
         steps.push({
           name: "loader",
-          run: () => installShaderLoader(props.data.instanceId, projectId)
+          run: () =>
+            installShaderLoader(
+              props.data.instanceId,
+              recommendation.loader_modrinth_id
+            )
         })
       }
     }

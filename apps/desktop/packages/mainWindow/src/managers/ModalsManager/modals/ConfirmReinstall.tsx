@@ -14,20 +14,17 @@ const ConfirmReinstall = (props: ModalProps) => {
 
   const isServer = () => !!props.data?.isServer
 
-  // If the user triggered reinstall from inside the instance/server detail
-  // page, kick them back to the library — the page they're on is about to
-  // wipe its `.setup` and re-run the install pipeline, so it'd just show a
-  // broken / loading state until the task finishes.
+  // If the user triggered reinstall from inside the detail page of the
+  // instance/server being reinstalled, kick them back to the library —
+  // the page is about to wipe its `.setup` and re-run the install pipeline,
+  // so it'd just show a broken / loading state until the task finishes.
   const navigateAwayIfInsideDetail = () => {
     const pathname = location.pathname
-    if (isServer()) {
-      if (pathname.startsWith("/library/server/")) {
-        navigate.navigate("/library?mode=servers")
-      }
-    } else {
-      if (/^\/library\/(\d+)(?:\/|$)/.exec(pathname)) {
-        navigate.navigate("/library")
-      }
+    const id = props.data?.id
+    if (id == null) return
+    const prefix = isServer() ? `/library/server/${id}` : `/library/${id}`
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+      navigate.navigate(isServer() ? "/library?mode=servers" : "/library")
     }
   }
 

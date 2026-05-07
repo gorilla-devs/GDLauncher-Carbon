@@ -527,6 +527,12 @@ const Console = (props: ConsoleProps) => {
           )
 
           wsConnection.onmessage = (event) => {
+            // Effect re-run / unmount can flip `cancelled` between us
+            // dispatching `close()` and the socket actually closing. A late
+            // message in that window would otherwise replace the new
+            // session's logs with the previous session's snapshot.
+            if (cancelled) return
+
             const data = JSON.parse(event.data)
 
             if (data.error) {
@@ -555,6 +561,7 @@ const Console = (props: ConsoleProps) => {
           }
 
           wsConnection.onerror = () => {
+            if (cancelled) return
             setLogs(
               produce((prev) => {
                 prev.push(parseLogLine("[Connection error]"))

@@ -248,7 +248,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let accounts = self.get_account_entries().await?;
 
         let eligible = accounts.iter().filter(|a| a.id_token.is_some()).count();
-        info!(
+        debug!(
             "[startup-timing] refresh_all_gdl_tokens: {} eligible account(s) of {} total",
             eligible,
             accounts.len()
@@ -261,7 +261,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 let result = self.exchange_gdl_token(&account.uuid).await;
                 let elapsed = t.elapsed().as_secs_f64();
                 match result {
-                    Ok(_) => info!(
+                    Ok(_) => debug!(
                         "[startup-timing] exchange_gdl_token({}) ok in {:.2}s",
                         account.uuid, elapsed
                     ),

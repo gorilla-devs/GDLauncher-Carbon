@@ -16,6 +16,7 @@ import adSize from "@/utils/adhelper"
 import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
 import { listenServerEula } from "@/utils/serverEulaBridge"
 import { cleanupRunning } from "./modals/CacheCleanup/state"
+import { shaderInstallRunning } from "./modals/ShaderLoaderSetup/state"
 
 export interface ModalProps {
   title: string
@@ -64,7 +65,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
   shaderLoaderSetup: {
     component: lazy(() => import("./modals/ShaderLoaderSetup")),
     title: t("modals:_trn_shader_loader_setup"),
-    preventClose: false
+    // Block backdrop close while the wizard is mid-install. Closing then
+    // would tear down the polling loop driving sequential steps and leave
+    // a half-installed loader/shader pair.
+    preventClose: () => shaderInstallRunning()
   },
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),

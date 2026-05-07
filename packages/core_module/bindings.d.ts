@@ -225,7 +225,7 @@ export type MRFEDependencyType = "required" | "optional" | "incompatible" | "emb
 
 export type DeleteServerAddonRequest = { serverId: FEServerId; addonId: string }
 
-export type ShaderRecommendation = { kind: "LoaderPresent"; loader: ShaderLoaderKind } | { kind: "RecommendLoader"; recommended: ShaderLoaderKind; modloader_type: ApiModLoaderType; mc_version: string } | { kind: "RequiresModloader"; mc_version: string }
+export type ShaderRecommendation = { kind: "LoaderPresent"; loader: ShaderLoaderKind } | { kind: "RecommendLoader"; recommended: ShaderLoaderKind; modloader_type: ApiModLoaderType; mc_version: string; loader_modrinth_id: string } | { kind: "RequiresModloader"; mc_version: string; loader_modrinth_id: string }
 
 export type CFFEModAuthor = { id: number; name: string; url: string; avatarUrl: string | null }
 

@@ -13,7 +13,7 @@ use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::info;
+use tracing::{debug, info};
 
 pub mod api;
 mod app_version;
@@ -170,7 +170,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     let t = std::time::Instant::now();
     let app = AppInner::new(invalidation_sender, runtime_path, base_api_override).await;
-    info!(
+    debug!(
         "[startup-timing] AppInner::new completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
@@ -181,7 +181,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     if let Err(e) = app.account_manager().refresh_all_gdl_tokens().await {
         tracing::warn!("Failed to refresh GDL tokens on startup: {}", e);
     }
-    info!(
+    debug!(
         "[startup-timing] refresh_all_gdl_tokens completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
@@ -193,7 +193,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .await
         .unwrap()
         .auto_manage_java_system_profiles;
-    info!(
+    debug!(
         "[startup-timing] settings.get_settings completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
@@ -207,7 +207,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     )
     .await
     .expect("Failed to scan and sync java system profiles");
-    info!(
+    debug!(
         "[startup-timing] JavaManager::scan_and_sync completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
@@ -228,7 +228,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .expect("Failed to get local address from TCP listener")
         .port();
 
-    info!(
+    debug!(
         "[startup-timing] reached axum::serve in {:.2}s total",
         startup_total.elapsed().as_secs_f64()
     );
@@ -259,12 +259,12 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
                 .await;
 
             if res.is_ok() {
-                info!(
+                debug!(
                     "[startup-timing] health check responded after {:.2}s ({} polls)",
                     health_check_start.elapsed().as_secs_f64(),
                     counter
                 );
-                info!(
+                debug!(
                     "[startup-timing] READY emitted at {:.2}s after start_router",
                     startup_total.elapsed().as_secs_f64()
                 );

@@ -2,7 +2,7 @@ import { ListItem } from "./ListItem"
 import { VList } from "@/components/VirtuaWrapper"
 import useSearchContext from "@/components/SearchInputContext"
 import { Skeleton } from "@gd/ui"
-import { Show, createMemo, Match, Switch } from "solid-js"
+import { Show, createEffect, createMemo, Match, Switch } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useParams } from "@solidjs/router"
@@ -60,13 +60,20 @@ export function List() {
   // tracks it (the tab strip reads searchQuery().projectType, not the
   // URL). Without this the tab can render unselected ("blank") when the
   // URL omits :type and we fell back to defaultFallbackType().
-  const resolvedType = type()
-  if (resolvedType !== searchContext?.searchQuery().projectType) {
-    searchContext?.setSearchQuery((prev) => ({
-      ...prev,
-      projectType: resolvedType
-    }))
-  }
+  //
+  // Wrapped in createEffect because `type()` reads `instance.data.modloaders`
+  // which loads asynchronously after mount — a one-shot evaluation in the
+  // component body would lock in the pre-load fallback ("shader") and never
+  // re-sync once the modloader info arrives.
+  createEffect(() => {
+    const resolvedType = type()
+    if (resolvedType !== searchContext?.searchQuery().projectType) {
+      searchContext?.setSearchQuery((prev) => ({
+        ...prev,
+        projectType: resolvedType
+      }))
+    }
+  })
 
   // Note: Scroll restoration is handled in VList's ref callback
   // to ensure it works when switching between view modes

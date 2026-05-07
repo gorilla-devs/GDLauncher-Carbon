@@ -180,7 +180,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .find_many(vec![])
             .exec()
             .await?;
-        tracing::info!(
+        tracing::debug!(
             "[startup-timing] scan_instances: loaded {} cached instance row(s) from DB in {:.2}s",
             instance_cache.len(),
             scan_start.elapsed().as_secs_f64()
@@ -279,7 +279,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             });
         }
 
-        tracing::info!(
+        tracing::debug!(
             "[startup-timing] scan_instances scanned {} instance dir(s), total {:.2}s",
             scanned_count,
             scan_start.elapsed().as_secs_f64()

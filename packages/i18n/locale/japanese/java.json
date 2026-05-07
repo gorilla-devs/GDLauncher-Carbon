@@ -52,6 +52,7 @@
   "_trn_applying_new_runtime_path": "新しいランタイムパスを適用中...",
   "_trn_do_not_close_app": "アプリを閉じないでください。完了後に自動で再起動します。",
   "_trn_migration_errored": "ランタイムパスの移行に失敗しました。状態が破損している可能性があります。対処方法は<0>こちら</0>。",
+  "_trn_scanning_files": "ファイルをスキャン中...",
   "_trn_copying_file": "{{file}} をコピー中",
   "_trn_removing_file": "{{file}} を削除中",
   "_trn_used_in_the_following_profiles": "以下のプロファイルで使用中",
