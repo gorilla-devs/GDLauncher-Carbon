@@ -171,9 +171,9 @@ export function LibraryHeader(props: LibraryHeaderProps) {
       <Tabs
         value={props.libraryMode()}
         onChange={(v) => props.setLibraryMode(v as LibraryMode)}
-        class="h-auto w-auto flex-shrink-0"
+        class="h-fit w-auto flex-shrink-0"
       >
-        <TabsList class="p-0.5" size="small">
+        <TabsList size="small">
           <TabsIndicator />
           <TabsTrigger value="instances">
             <div class="flex items-center gap-1.5">

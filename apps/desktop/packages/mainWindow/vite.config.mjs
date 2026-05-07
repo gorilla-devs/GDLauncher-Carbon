@@ -48,7 +48,13 @@ export default defineConfig({
   },
   base: "./",
   optimizeDeps: {
-    exclude: ["@tanstack/solid-query"]
+    exclude: ["@tanstack/solid-query"],
+    // `@mbarzda/solid-i18next` does `await import("html-parse-string")` inside
+    // its bundle to enable JSX-nested <Trans> children. Vite's dep scanner
+    // doesn't see dynamic imports nested in transitive deps, so without
+    // forcing the pre-bundle the runtime falls through to the
+    // "install html-parse-string" warning even though it IS installed.
+    include: ["html-parse-string"]
   },
   test: {
     globals: true,

@@ -44,8 +44,10 @@ fn generate_logs_filters() -> String {
     filters.to_vec().join(",")
 }
 
-/// Cleanup old log files, keeping only the most recent `keep_count` files
-fn cleanup_old_logs(logs_path: &Path, keep_count: usize) {
+/// Cleanup old log files, keeping only the most recent `keep_count` files.
+/// Reused by the cache-cleanup dialog so the launcher's "don't blanket-
+/// wipe logs" policy is enforced from a single place.
+pub fn cleanup_old_logs(logs_path: &Path, keep_count: usize) {
     let Ok(read_dir) = std::fs::read_dir(logs_path) else {
         return;
     };
@@ -79,8 +81,10 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
         tokio::fs::create_dir_all(&logs_path).await.unwrap();
     }
 
-    // Keep only the last 5 log files to prevent disk space issues
-    cleanup_old_logs(&logs_path, 5);
+    // Keep only the last 10 log files. Same retention as the cache-cleanup
+    // dialog enforces — recent logs are useful for debugging crashes that
+    // happened a few launches ago, so we don't blanket-wipe them.
+    cleanup_old_logs(&logs_path, 10);
 
     let filter = EnvFilter::builder();
 

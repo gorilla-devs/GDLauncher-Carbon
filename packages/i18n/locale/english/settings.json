@@ -80,5 +80,6 @@
   "_trn_cache_storage_title": "Cache size",
   "_trn_cache_storage_text": "GDLauncher caches responses from mod platforms and Minecraft metadata to speed up browsing and launches. If the cache grows unexpectedly large, cleaning it up will reclaim disk space; cached content is rebuilt automatically as needed.",
   "_trn_cache_storage_clean_up": "Clean up",
-  "_trn_cache_storage_bloat_banner": "Your caches have grown unusually large ({{size}}). Cleaning them up will reclaim disk space."
+  "_trn_cache_storage_bloat_banner_title": "Your launcher database is using {{size}}",
+  "_trn_cache_storage_bloat_banner_desc": "That's well above normal. Cleaning up will free disk space without affecting your installed instances."
 }

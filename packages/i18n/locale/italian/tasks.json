@@ -42,8 +42,5 @@
   "_trn_server_task_extract_modpack_overrides": "Estrazione override",
   "_trn_server_task_download_server_jar": "Download del server jar",
   "_trn_server_task_install_modloader": "Installazione modloader",
-  "_trn_cache_cleanup": "Pulizia delle cache",
-  "_trn_cache_cleanup_clearing_table": "Cancellazione dei dati memorizzati nella cache",
-  "_trn_cache_cleanup_clearing_disk": "Cancellazione dei file memorizzati nella cache",
-  "_trn_cache_cleanup_vacuuming": "Recupero dello spazio"
+  "_trn_cache_cleanup": "Pulizia della cache"
 }

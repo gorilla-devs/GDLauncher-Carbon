@@ -116,7 +116,4 @@ pub enum Translation {
         total: u32,
     },
     CacheCleanup,
-    CacheCleanupClearingTable,
-    CacheCleanupClearingDisk,
-    CacheCleanupVacuuming,
 }

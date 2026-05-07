@@ -181,10 +181,12 @@ keys! {
         // Search sidebar
         GET_SEARCH_SIDEBAR_DOCKED                   = "getSearchSidebarDocked";
         SET_SEARCH_SIDEBAR_DOCKED                   = "setSearchSidebarDocked";
+        // Memory warning dismissal
+        GET_MEMORY_WARNING_DISMISSED                = "getMemoryWarningDismissed";
+        SET_MEMORY_WARNING_DISMISSED                = "setMemoryWarningDismissed";
         // Cache cleanup
-        GET_TOTAL_CACHE_SIZE                        = "getTotalCacheSize";
         GET_DB_SIZE                                 = "getDbSize";
-        GET_CACHE_BREAKDOWN                         = "getCacheBreakdown";
+        GET_CACHE_SIZES                             = "getCacheSizes";
         CLEANUP_CACHES                              = "cleanupCaches";
     }
 

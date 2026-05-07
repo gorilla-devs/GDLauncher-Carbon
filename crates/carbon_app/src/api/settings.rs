@@ -5,11 +5,12 @@ use crate::{
             self,
             settings::{
                 CLEANUP_CACHES, COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY,
-                GET_CACHE_BREAKDOWN, GET_DB_SIZE, GET_PRIVACY_STATEMENT_BODY,
-                GET_SEARCH_SIDEBAR_DOCKED, GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS,
-                GET_TERMS_OF_SERVICE_BODY, GET_TOTAL_CACHE_SIZE, IS_FIRST_LAUNCH,
-                MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER,
-                RESET_ONBOARDING_TIPS, SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS,
+                GET_CACHE_SIZES, GET_DB_SIZE, GET_MEMORY_WARNING_DISMISSED,
+                GET_PRIVACY_STATEMENT_BODY, GET_SEARCH_SIDEBAR_DOCKED,
+                GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY,
+                IS_FIRST_LAUNCH, MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN,
+                REMIND_BETA_PROMPT_LATER, RESET_ONBOARDING_TIPS,
+                SET_MEMORY_WARNING_DISMISSED, SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS,
                 SHOULD_SHOW_BETA_PROMPT, SHOULD_SHOW_CHANGELOG,
             },
         },
@@ -34,6 +35,23 @@ mod preference_keys {
     pub const BETA_PROMPT_LAST_SHOWN: &str = "beta_prompt_last_shown";
     pub const ONBOARDING_TIPS_SEEN: &str = "onboarding_tips_seen";
     pub const SEARCH_SIDEBAR_DOCKED: &str = "search_sidebar_docked";
+    pub const MEMORY_WARNING_DISMISSED: &str = "memory_warning_dismissed";
+}
+
+/// Returns true if the user has permanently dismissed the insufficient
+/// memory warning shown when launching an instance.
+pub async fn is_memory_warning_dismissed(
+    db: &carbon_repos::db::PrismaClient,
+) -> anyhow::Result<bool> {
+    let pref = db
+        .frontend_preference()
+        .find_unique(frontend_preference::key::equals(
+            preference_keys::MEMORY_WARNING_DISMISSED.to_string(),
+        ))
+        .exec()
+        .await?;
+
+    Ok(pref.map(|p| p.value == "true").unwrap_or(false))
 }
 
 /// Input state for beta prompt decision logic
@@ -364,16 +382,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         // Cache maintenance
-        query GET_TOTAL_CACHE_SIZE[app, _args: ()] {
-            Ok::<f64, anyhow::Error>(app.settings_manager().get_total_cache_size().await)
-        }
-
         query GET_DB_SIZE[app, _args: ()] {
             Ok::<f64, anyhow::Error>(app.settings_manager().get_db_size().await)
         }
 
-        query GET_CACHE_BREAKDOWN[app, _args: ()] {
-            Ok::<CacheBreakdown, anyhow::Error>(app.settings_manager().get_cache_breakdown().await)
+        query GET_CACHE_SIZES[app, _args: ()] {
+            Ok::<CacheSizes, anyhow::Error>(app.settings_manager().get_cache_sizes().await)
         }
 
         mutation CLEANUP_CACHES[app, selection: CacheCleanupSelection] {
@@ -423,68 +437,58 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(())
         }
 
+        // Insufficient memory warning dismissal
+        query GET_MEMORY_WARNING_DISMISSED[app, _args: ()] {
+            is_memory_warning_dismissed(&app.prisma_client).await
+        }
+
+        mutation SET_MEMORY_WARNING_DISMISSED[app, dismissed: bool] {
+            let db = &app.prisma_client;
+            let value = if dismissed { "true" } else { "false" }.to_string();
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(
+                        preference_keys::MEMORY_WARNING_DISMISSED.to_string()
+                    ),
+                    frontend_preference::create(
+                        preference_keys::MEMORY_WARNING_DISMISSED.to_string(),
+                        value.clone(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(value)],
+                )
+                .exec()
+                .await?;
+
+            app.invalidate(GET_MEMORY_WARNING_DISMISSED, None);
+            Ok(())
+        }
     }
 }
 
-/// Approximate sizes (bytes) of every clearable cache. Each field maps to a
-/// checkbox in the Cache Cleanup dialog. Sent as f64 because rspc doesn't
-/// support u64 in its TS bindings; f64 is lossless for integers up to 2^53.
-#[derive(Type, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CacheBreakdown {
-    // Database tables
-    pub http_cache: f64,
-    pub curseforge_mod_metadata: f64,
-    pub curseforge_mod_icons: f64,
-    pub curseforge_modpack_metadata: f64,
-    pub curseforge_modpack_icons: f64,
-    pub modrinth_mod_metadata: f64,
-    pub modrinth_mod_icons: f64,
-    pub modrinth_modpack_metadata: f64,
-    pub modrinth_modpack_icons: f64,
-    pub local_mod_icons: f64,
-    pub mc_version_manifests: f64,
-    pub modloader_versions: f64,
-    pub lwjgl_configs: f64,
-    pub asset_indices: f64,
-    // Disk
-    pub temp_files: f64,
-    pub old_logs: f64,
-    pub mc_assets: f64,
-    pub mc_libraries: f64,
-    pub mc_natives: f64,
-    // Sum of every per-item cache size above. Equals the sum the user gets
-    // when they tick all the checkboxes, and matches what the settings
-    // row's `getTotalCacheSize` returns. Intentionally excludes DB
-    // overhead (indexes, non-cache tables like ModMetadata, freelist, WAL)
-    // — those aren't cache content and the user can't selectively clear
-    // them, though VACUUM does reclaim them when a cache table is emptied.
-    pub total_size: f64,
-}
-
-/// Selection of caches the user has ticked in the cleanup dialog.
-#[derive(Type, Deserialize, Debug, Clone)]
+/// Two-tier cleanup selection. `quick` wipes the cache tables, temp dir,
+/// and log dir — fast, low-impact, the next browse/launch refills only what
+/// the user actually touches. `deep` additionally clears `assets`,
+/// `libraries`, and `natives` — those are also re-downloadable but cost
+/// the user a multi-GB re-download on next launch, so it's opt-in.
+#[derive(Type, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct CacheCleanupSelection {
-    pub http_cache: bool,
-    pub curseforge_mod_metadata: bool,
-    pub curseforge_mod_icons: bool,
-    pub curseforge_modpack_metadata: bool,
-    pub curseforge_modpack_icons: bool,
-    pub modrinth_mod_metadata: bool,
-    pub modrinth_mod_icons: bool,
-    pub modrinth_modpack_metadata: bool,
-    pub modrinth_modpack_icons: bool,
-    pub local_mod_icons: bool,
-    pub mc_version_manifests: bool,
-    pub modloader_versions: bool,
-    pub lwjgl_configs: bool,
-    pub asset_indices: bool,
-    pub temp_files: bool,
-    pub old_logs: bool,
-    pub mc_assets: bool,
-    pub mc_libraries: bool,
-    pub mc_natives: bool,
+    pub quick: bool,
+    pub deep: bool,
+}
+
+/// Per-scope cache footprint reported by `getCacheSizes`. `gdlauncher`
+/// covers what the "quick" cleanup wipes (DB files, temp, logs); `minecraft`
+/// covers what "deep" wipes (assets, libraries, natives). Sum is the total
+/// the Settings row displays — splitting per-scope lets the cleanup modal
+/// label each option with its real reclaim estimate.
+#[derive(Type, Serialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheSizes {
+    pub gdlauncher: f64,
+    pub minecraft: f64,
 }
 
 #[derive(Type, Serialize, Deserialize, Debug)]

@@ -63,5 +63,8 @@
   "_trn_insufficient_memory_title": "メモリ不足",
   "_trn_insufficient_memory_body": "Minecraftに {{requested}} MB のRAMが割り当てられていますが、現在利用可能なのは {{available}} MB のみです。Javaは内部処理にさらに約1.5 GBのメモリを必要とします。ゲームがクラッシュする可能性が高いです。",
   "_trn_launch_anyway": "起動",
-  "_trn_adjust_memory": "メモリを調整"
+  "_trn_adjust_memory": "メモリを調整",
+  "_trn_insufficient_memory_dont_show_again": "今後この警告を表示しない",
+  "_trn_show_memory_warning_title": "メモリ不足警告を表示",
+  "_trn_show_memory_warning_text": "設定されたRAMが利用可能なメモリを超えるとき、起動前に警告を表示します。"
 }

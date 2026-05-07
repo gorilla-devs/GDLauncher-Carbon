@@ -165,8 +165,6 @@ const BaseTile = (props: BaseTileProps) => {
       }}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <SelectionBorder isSelected={props.isMultiSelected} size={props.size} />
-
       <Tooltip open={props.failError ? undefined : false} placement="top">
         <TooltipTrigger>
           <div
@@ -175,6 +173,10 @@ const BaseTile = (props: BaseTileProps) => {
               [props.glowExtraClass || ""]: !!props.glowExtraClass
             }}
           >
+            <SelectionBorder
+              isSelected={props.isMultiSelected}
+              size={props.size}
+            />
             {/* Running / loading / busy border glow */}
             <div
               class="absolute left-0 top-0 h-full w-full transition-[opacity,background] duration-300 ease-spring"

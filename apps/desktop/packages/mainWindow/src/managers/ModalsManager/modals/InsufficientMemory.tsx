@@ -1,16 +1,22 @@
 import { Trans } from "@gd/i18n"
-import { Button } from "@gd/ui"
+import { Button, Checkbox } from "@gd/ui"
 import ModalLayout from "../ModalLayout"
 import { ModalProps, useModal } from ".."
 import { rspc } from "@/utils/rspcClient"
 import { useNavigate } from "@solidjs/router"
+import { createSignal } from "solid-js"
 
 function InsufficientMemory(props: ModalProps) {
   const navigate = useNavigate()
   const modalsContext = useModal()
+  const [dontShowAgain, setDontShowAgain] = createSignal(false)
 
   const launchInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.launchInstance"]
+  }))
+
+  const dismissWarningMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setMemoryWarningDismissed"]
   }))
 
   const instanceId = () => props.data?.instance_id as number
@@ -34,6 +40,14 @@ function InsufficientMemory(props: ModalProps) {
               }}
             />
           </div>
+          <Checkbox
+            checked={dontShowAgain()}
+            onChange={(checked) => setDontShowAgain(checked)}
+          >
+            <span class="text-lightSlate-300 text-sm">
+              <Trans key="java:_trn_insufficient_memory_dont_show_again" />
+            </span>
+          </Checkbox>
         </div>
 
         <div class="flex w-full justify-between">
@@ -41,6 +55,9 @@ function InsufficientMemory(props: ModalProps) {
             type="secondary"
             size="large"
             onClick={() => {
+              if (dontShowAgain()) {
+                dismissWarningMutation.mutate(true)
+              }
               launchInstanceMutation.mutate({
                 id: instanceId(),
                 skipMemoryCheck: true

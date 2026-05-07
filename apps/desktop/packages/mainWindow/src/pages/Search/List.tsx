@@ -32,27 +32,40 @@ export function List() {
   }))
 
   const defaultFallbackType: () => FEUnifiedSearchType = () => {
-    if (!instanceId()) {
+    // Standalone search (no add-to-instance/server context): the natural
+    // landing tab is modpacks.
+    if (!instanceId() && !serverId()) {
       return "modpack"
     }
-
-    if (instance?.data?.modloaders?.length ?? 0 > 0) {
+    // Note the parens: `length ?? 0 > 0` would parse as
+    // `length ?? (0 > 0)` and silently rely on `0` being falsy.
+    if ((instance?.data?.modloaders?.length ?? 0) > 0) {
       return "mod"
     }
-
     return "shader"
   }
 
-  const type = () =>
-    (params.type ||
-      searchContext?.searchQuery().projectType ||
+  const type = () => {
+    // Explicit URL segment always wins.
+    if (params.type) return params.type as FEUnifiedSearchType
+    // When entering with an instance/server context (i.e. via "Add
+    // addons"), ignore the previous session's projectType — the user
+    // came here to add an addon to this instance, not to resume browsing
+    // modpacks they were looking at earlier.
+    if (instanceId() || serverId()) return defaultFallbackType()
+    return (searchContext?.searchQuery().projectType ||
       defaultFallbackType()) as FEUnifiedSearchType
+  }
 
-  // Only override projectType when the URL has an explicit :type param
-  if (params.type && params.type !== searchContext?.searchQuery().projectType) {
+  // Sync the resolved type into searchContext so the active tab pill
+  // tracks it (the tab strip reads searchQuery().projectType, not the
+  // URL). Without this the tab can render unselected ("blank") when the
+  // URL omits :type and we fell back to defaultFallbackType().
+  const resolvedType = type()
+  if (resolvedType !== searchContext?.searchQuery().projectType) {
     searchContext?.setSearchQuery((prev) => ({
       ...prev,
-      projectType: params.type as FEUnifiedSearchType
+      projectType: resolvedType
     }))
   }
 

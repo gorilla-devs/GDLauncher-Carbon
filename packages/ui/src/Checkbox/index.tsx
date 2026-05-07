@@ -54,12 +54,23 @@ function Checkbox(props: Props) {
         "cursor-pointer": !props.disabled,
         "cursor-not-allowed": props.disabled
       }}
-      onClick={() => {
-        if (!props.disabled) {
-          const check = !checked()
-          setChecked(check)
-          props.onChange?.(check)
-        }
+      onPointerDown={(e) => {
+        if (props.disabled) return
+        // Capture so pointerup lands here even if active:scale-95 shrinks
+        // the bounding box out from under a cursor that started near the edge.
+        e.currentTarget.setPointerCapture(e.pointerId)
+      }}
+      onPointerUp={(e) => {
+        if (props.disabled) return
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+        // Don't bounds-check the pointerup position: getBoundingClientRect
+        // returns the active:scale-95 *transformed* rect, which excludes
+        // exactly the edge pixels we're trying to fix. Pointer capture
+        // already guarantees pointerup landed on the captured element.
+        e.currentTarget.releasePointerCapture(e.pointerId)
+        const check = !checked()
+        setChecked(check)
+        props.onChange?.(check)
       }}
     >
       <div

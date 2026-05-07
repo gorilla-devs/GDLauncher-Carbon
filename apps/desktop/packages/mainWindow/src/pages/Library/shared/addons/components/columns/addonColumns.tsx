@@ -140,13 +140,24 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     }),
 
     // 6. Platform
-    columnHelper.display({
-      id: "platform",
-      header: () => (
-        <span class="hidden md:inline">{t("content:_trn_table.platform")}</span>
-      ),
-      size: 78,
-      cell: (props: any) => {
+    columnHelper.accessor(
+      (row: any) => {
+        const info = config.getPlatformInfo?.(row)
+        if (!info) return "z_local"
+        if (info.hasCurseforge && info.hasModrinth) return "b_both"
+        if (info.hasCurseforge) return "a_curseforge"
+        if (info.hasModrinth) return "c_modrinth"
+        return "z_local"
+      },
+      {
+        id: "platform",
+        header: () => (
+          <span class="hidden md:inline">
+            {t("content:_trn_table.platform")}
+          </span>
+        ),
+        size: 98,
+        cell: (props: any) => {
         const row = props.row.original
         const info = config.getPlatformInfo?.(row)
 
@@ -224,11 +235,14 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     }),
 
     // 7. Update available
-    columnHelper.display({
-      id: "update",
-      header: () => t("content:_trn_table.update"),
-      size: 80,
-      cell: (props: any) => {
+    columnHelper.accessor(
+      (row: any) => (config.hasUpdate?.(row) ? 0 : 1),
+      {
+        id: "update",
+        header: () => t("content:_trn_table.update"),
+        size: 100,
+        sortingFn: "basic",
+        cell: (props: any) => {
         const row = props.row.original
         const hasUpd = config.hasUpdate?.(row) ?? false
         const isUpdating = () => config.isModUpdating?.(row.id) ?? false
@@ -279,8 +293,7 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
             </Tooltip>
           </Show>
         )
-      },
-      enableSorting: false
+      }
     }),
 
     // 8. Enabled toggle

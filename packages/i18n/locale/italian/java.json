@@ -63,5 +63,8 @@
   "_trn_insufficient_memory_title": "Memoria Insufficiente",
   "_trn_insufficient_memory_body": "Minecraft è configurato per usare {{requested}} MB di RAM, ma solo {{available}} MB sono disponibili. Java richiede anche ~1,5 GB aggiuntivi per le sue operazioni interne. Il gioco probabilmente andrà in crash.",
   "_trn_launch_anyway": "Avvia Comunque",
-  "_trn_adjust_memory": "Regola Memoria"
+  "_trn_adjust_memory": "Regola Memoria",
+  "_trn_insufficient_memory_dont_show_again": "Non mostrare più questo avviso",
+  "_trn_show_memory_warning_title": "Mostra Avviso Memoria Insufficiente",
+  "_trn_show_memory_warning_text": "Mostra un avviso prima dell'avvio quando la RAM configurata supera la memoria disponibile."
 }

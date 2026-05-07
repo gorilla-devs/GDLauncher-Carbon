@@ -1,176 +1,62 @@
-import { Button, Checkbox, Progress, Skeleton } from "@gd/ui"
+import { Button, Checkbox, PRESS_CLASSES, Progress } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import {
   createEffect,
-  createMemo,
   createSignal,
-  For,
+  JSX,
   Match,
   onCleanup,
   Show,
   Switch
 } from "solid-js"
-import { createStore } from "solid-js/store"
-import type { CacheCleanupSelection } from "@gd/core_module/bindings"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import { formatBytes } from "@/utils/formatBytes"
 import { setCleanupRunning } from "./state"
 
+const ClickableRow = (props: { onToggle: () => void; children: JSX.Element }) => {
+  return (
+    <div
+      class={`hover:bg-darkSlate-700/50 flex cursor-pointer items-start gap-3 px-4 py-3 ${PRESS_CLASSES}`}
+      onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+      onPointerUp={(e) => {
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+        e.currentTarget.releasePointerCapture(e.pointerId)
+        props.onToggle()
+      }}
+    >
+      {props.children}
+    </div>
+  )
+}
+
 type Phase = "select" | "running" | "done" | "failed"
-
-// Each row in the dialog. `key` corresponds 1:1 with a CacheBreakdown /
-// CacheCleanupSelection field. Sections render as headers between rows.
-interface Item {
-  key: keyof CacheCleanupSelection
-  labelKey: string
-}
-interface Section {
-  titleKey: string
-  items: Item[]
-}
-
-const SECTIONS: Section[] = [
-  {
-    titleKey: "modals:_trn_cache_cleanup.section_network",
-    items: [
-      {
-        key: "httpCache",
-        labelKey: "modals:_trn_cache_cleanup.item_http_cache"
-      }
-    ]
-  },
-  {
-    titleKey: "modals:_trn_cache_cleanup.section_curseforge",
-    items: [
-      {
-        key: "curseforgeModMetadata",
-        labelKey: "modals:_trn_cache_cleanup.item_cf_mod_metadata"
-      },
-      {
-        key: "curseforgeModIcons",
-        labelKey: "modals:_trn_cache_cleanup.item_cf_mod_icons"
-      },
-      {
-        key: "curseforgeModpackMetadata",
-        labelKey: "modals:_trn_cache_cleanup.item_cf_modpack_metadata"
-      },
-      {
-        key: "curseforgeModpackIcons",
-        labelKey: "modals:_trn_cache_cleanup.item_cf_modpack_icons"
-      }
-    ]
-  },
-  {
-    titleKey: "modals:_trn_cache_cleanup.section_modrinth",
-    items: [
-      {
-        key: "modrinthModMetadata",
-        labelKey: "modals:_trn_cache_cleanup.item_mr_mod_metadata"
-      },
-      {
-        key: "modrinthModIcons",
-        labelKey: "modals:_trn_cache_cleanup.item_mr_mod_icons"
-      },
-      {
-        key: "modrinthModpackMetadata",
-        labelKey: "modals:_trn_cache_cleanup.item_mr_modpack_metadata"
-      },
-      {
-        key: "modrinthModpackIcons",
-        labelKey: "modals:_trn_cache_cleanup.item_mr_modpack_icons"
-      }
-    ]
-  },
-  {
-    titleKey: "modals:_trn_cache_cleanup.section_local",
-    items: [
-      {
-        key: "localModIcons",
-        labelKey: "modals:_trn_cache_cleanup.item_local_mod_icons"
-      }
-    ]
-  },
-  {
-    titleKey: "modals:_trn_cache_cleanup.section_mc_metadata",
-    items: [
-      {
-        key: "mcVersionManifests",
-        labelKey: "modals:_trn_cache_cleanup.item_mc_version_manifests"
-      },
-      {
-        key: "modloaderVersions",
-        labelKey: "modals:_trn_cache_cleanup.item_modloader_versions"
-      },
-      {
-        key: "lwjglConfigs",
-        labelKey: "modals:_trn_cache_cleanup.item_lwjgl_configs"
-      },
-      {
-        key: "assetIndices",
-        labelKey: "modals:_trn_cache_cleanup.item_asset_indices"
-      }
-    ]
-  },
-  {
-    titleKey: "modals:_trn_cache_cleanup.section_disk",
-    items: [
-      {
-        key: "tempFiles",
-        labelKey: "modals:_trn_cache_cleanup.item_temp_files"
-      },
-      { key: "oldLogs", labelKey: "modals:_trn_cache_cleanup.item_old_logs" },
-      { key: "mcAssets", labelKey: "modals:_trn_cache_cleanup.item_mc_assets" },
-      {
-        key: "mcLibraries",
-        labelKey: "modals:_trn_cache_cleanup.item_mc_libraries"
-      },
-      {
-        key: "mcNatives",
-        labelKey: "modals:_trn_cache_cleanup.item_mc_natives"
-      }
-    ]
-  }
-]
-
-const EMPTY_SELECTION: CacheCleanupSelection = {
-  httpCache: false,
-  curseforgeModMetadata: false,
-  curseforgeModIcons: false,
-  curseforgeModpackMetadata: false,
-  curseforgeModpackIcons: false,
-  modrinthModMetadata: false,
-  modrinthModIcons: false,
-  modrinthModpackMetadata: false,
-  modrinthModpackIcons: false,
-  localModIcons: false,
-  mcVersionManifests: false,
-  modloaderVersions: false,
-  lwjglConfigs: false,
-  assetIndices: false,
-  tempFiles: false,
-  oldLogs: false,
-  mcAssets: false,
-  mcLibraries: false,
-  mcNatives: false
-}
 
 const CacheCleanup = (props: ModalProps) => {
   const modalsContext = useModal()
 
   const [phase, setPhase] = createSignal<Phase>("select")
   const [taskId, setTaskId] = createSignal<number | null>(null)
-  const [failedMessage, setFailedMessage] = createSignal<string>("")
-  const [selection, setSelection] = createStore<CacheCleanupSelection>({
-    ...EMPTY_SELECTION
-  })
-  // Captured at start so we can show "reclaimed X" after VACUUM completes.
-  const [sizeBeforeStart, setSizeBeforeStart] = createSignal<number>(0)
+  const [failedMessage, setFailedMessage] = createSignal("")
+  // The two-tier selection. Quick is on by default — it's the safe wipe
+  // and the reason most people open this dialog. Deep is opt-in because
+  // it forces a multi-GB Minecraft re-download on next launch.
+  const [quick, setQuick] = createSignal(true)
+  const [deep, setDeep] = createSignal(false)
 
-  const breakdown = rspc.createQuery(() => ({
-    queryKey: ["settings.getCacheBreakdown"]
+  // Captured at click time so we can show "reclaimed X" once the post-
+  // cleanup invalidation has resolved.
+  const [sizeBefore, setSizeBefore] = createSignal(0)
+
+  const cacheSizes = rspc.createQuery(() => ({
+    queryKey: ["settings.getCacheSizes"]
   }))
+
+  const totalSize = () =>
+    cacheSizes.data
+      ? cacheSizes.data.gdlauncher + cacheSizes.data.minecraft
+      : undefined
 
   const vtask = rspc.createQuery(() => ({
     queryKey: ["vtask.getTask", taskId()]
@@ -188,83 +74,17 @@ const CacheCleanup = (props: ModalProps) => {
     }
   }))
 
-  const allKeys = () => SECTIONS.flatMap((s) => s.items.map((i) => i.key))
+  const canSubmit = () => quick() || deep()
 
-  // Master-row total. Uses the same file-stat number the settings row
-  // displays (DB file + disk dirs) rather than summing per-item
-  // approximations — those are `SUM(length(col))` over cache tables, which
-  // doesn't count DB overhead (indexes, non-cache tables, freelist pages)
-  // that VACUUM also reclaims. The two numbers agreeing avoids confusing
-  // the user with a "there's more than the items add up to" discrepancy.
-  const totalAvailableBytes = createMemo(() => breakdown.data?.totalSize ?? 0)
-
-  // Sum of all selected items' sizes — shown in the action button.
-  // Naturally equals the master total when everything is selected, because
-  // `totalSize` is now the sum of the same per-item rows summed here.
-  const selectedTotalBytes = createMemo(() => {
-    const data = breakdown.data
-    if (!data) return 0
-    return allKeys().reduce(
-      (acc, k) => acc + (selection[k] ? (data[k] ?? 0) : 0),
-      0
-    )
-  })
-
-  // Per-section size totals, used in the section header row.
-  const sectionBytes = (section: Section) => {
-    const data = breakdown.data
-    if (!data) return 0
-    return section.items.reduce((acc, i) => acc + (data[i.key] ?? 0), 0)
-  }
-
-  // Tri-state helpers. A section/master checkbox shows indeterminate when
-  // some but not all children are selected.
-  interface TriState {
-    checked: boolean
-    indeterminate: boolean
-  }
-  const sectionState = (section: Section): TriState => {
-    const total = section.items.length
-    const sel = section.items.filter((i) => selection[i.key]).length
-    return {
-      checked: sel === total,
-      indeterminate: sel > 0 && sel < total
-    }
-  }
-  const masterState = (): TriState => {
-    const keys = allKeys()
-    const sel = keys.filter((k) => selection[k]).length
-    return {
-      checked: sel === keys.length,
-      indeterminate: sel > 0 && sel < keys.length
-    }
-  }
-
-  const anySelected = () => masterState().checked || masterState().indeterminate
-
-  const toggleAll = () => {
-    const turnOn = !masterState().checked
-    const patch: Partial<CacheCleanupSelection> = {}
-    for (const k of allKeys()) patch[k] = turnOn
-    setSelection(patch)
-  }
-  const toggleSection = (section: Section) => {
-    const turnOn = !sectionState(section).checked
-    const patch: Partial<CacheCleanupSelection> = {}
-    for (const item of section.items) patch[item.key] = turnOn
-    setSelection(patch)
-  }
-
-  // Detect task completion. The backend drops the task when done; vtask.data
-  // becomes null. We use that as the "done" signal.
+  // Detect task completion. Backend drops the task from the manager when
+  // it finishes; vtask.data flips to null at that point.
   createEffect(() => {
     if (phase() !== "running") return
 
     if (vtask.data === null && taskId() !== null) {
-      // Clearing caches invalidates many derived views (instance mods, mod
-      // details, version lists, search results, etc.). Rather than enumerate
-      // every affected key, nuke the whole TanStack cache — the backend's
-      // cache pipeline will refill things as the user navigates.
+      // Many derived views (instance mods, mod search, version lists)
+      // depend on what we just wiped. Rather than enumerate every key,
+      // nuke the TanStack cache — the next access refills as needed.
       queryClient.invalidateQueries()
       setPhase("done")
       return
@@ -278,189 +98,121 @@ const CacheCleanup = (props: ModalProps) => {
     }
   })
 
-  // Mirror the "running" phase into the module-level signal the
-  // ModalsManager reads when deciding whether to honor backdrop clicks.
+  // Mirror the running phase into the module-level signal the
+  // ModalsManager reads when deciding whether backdrop clicks close.
   createEffect(() => {
     setCleanupRunning(phase() === "running")
   })
-  // Safety net: if the modal is somehow unmounted mid-run (shouldn't happen
-  // while preventClose is active, but defensive), clear the flag so a
-  // subsequent modal isn't accidentally locked.
   onCleanup(() => setCleanupRunning(false))
+
+  const reclaimed = () => {
+    const after = totalSize() ?? sizeBefore()
+    const delta = sizeBefore() - after
+    return delta > 0 ? delta : 0
+  }
+
+  // Backend marks the task `KnownProgress` once it's pre-counted both
+  // disk + DB work, then weighted-averages the disk/DB delete subtask
+  // (90%) with the VACUUM subtask (10%) into a single 0..1 number.
+  // Before that point the bar stays indeterminate.
+  const progressPercent = () => {
+    const p = vtask.data?.progress
+    return p?.type === "Known" ? p.value * 100 : undefined
+  }
 
   return (
     <ModalLayout
       noHeader={props.noHeader}
       title={props?.title}
-      width="w-160"
+      width="w-128"
       preventClose={phase() === "running"}
     >
-      <div class="flex max-h-[70vh] flex-col gap-4 p-4">
+      <div class="flex flex-col gap-4 p-4">
         <Switch>
           <Match when={phase() === "select"}>
             <div class="text-lightSlate-300 text-sm">
               <Trans key="modals:_trn_cache_cleanup.intro" />
             </div>
 
-            <div class="bg-darkSlate-800 divide-darkSlate-700 overflow-y-auto divide-y rounded">
-              {/* Master row: select-all with total. Sticky + distinct bg so
-                  it reads as the elevated primary control while the user
-                  scrolls through the section list. Explicit bg is required —
-                  position: sticky elements show content behind them unless
-                  opaque. */}
-              <div
-                class="bg-darkSlate-700 hover:bg-darkSlate-600 sticky top-0 z-10 grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-2"
-                onClick={toggleAll}
-              >
-                {/* Wrapper stops propagation so clicking the checkbox itself
-                    doesn't double-toggle (checkbox onChange + row onClick). */}
-                <span onClick={(e) => e.stopPropagation()}>
-                  <Checkbox
-                    checked={masterState().checked}
-                    indeterminate={masterState().indeterminate}
-                    onChange={toggleAll}
-                  />
-                </span>
-                <span class="text-sm font-semibold">
-                  <Trans key="modals:_trn_cache_cleanup.select_all" />
-                </span>
-                <Show
-                  when={breakdown.data}
-                  fallback={<Skeleton class="h-3 w-16" />}
-                >
-                  <span class="text-lightSlate-400 text-xs tabular-nums">
-                    {formatBytes(totalAvailableBytes())}
+            <div class="bg-darkSlate-800 divide-darkSlate-700 flex flex-col divide-y rounded">
+              <ClickableRow onToggle={() => setQuick((v) => !v)}>
+                <div class="pointer-events-none">
+                  <Checkbox checked={quick()} />
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <span class="text-lightSlate-50 text-sm font-medium">
+                      <Trans key="modals:_trn_cache_cleanup.quick_title" />
+                    </span>
+                    <Show when={cacheSizes.data}>
+                      <span class="text-lightSlate-400 shrink-0 text-xs tabular-nums">
+                        {formatBytes(cacheSizes.data!.gdlauncher)}
+                      </span>
+                    </Show>
+                  </div>
+                  <span class="text-lightSlate-500 text-xs">
+                    <Trans key="modals:_trn_cache_cleanup.quick_desc" />
                   </span>
-                </Show>
-              </div>
+                </div>
+              </ClickableRow>
 
-              <For each={SECTIONS}>
-                {(section) => (
-                  <>
-                    {/* Section header row: select-all-in-section */}
-                    <div
-                      class="bg-darkSlate-900 hover:bg-darkSlate-700 grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-1.5"
-                      onClick={() => toggleSection(section)}
-                    >
-                      <span onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={sectionState(section).checked}
-                          indeterminate={sectionState(section).indeterminate}
-                          onChange={() => toggleSection(section)}
-                        />
+              <ClickableRow onToggle={() => setDeep((v) => !v)}>
+                <div class="pointer-events-none">
+                  <Checkbox checked={deep()} />
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <span class="text-lightSlate-50 text-sm font-medium">
+                      <Trans key="modals:_trn_cache_cleanup.deep_title" />
+                    </span>
+                    <Show when={cacheSizes.data}>
+                      <span class="text-lightSlate-400 shrink-0 text-xs tabular-nums">
+                        {formatBytes(cacheSizes.data!.minecraft)}
                       </span>
-                      <span class="text-lightSlate-400 text-xs font-semibold uppercase tracking-wider">
-                        <Trans key={section.titleKey as any} />
-                      </span>
-                      <Show
-                        when={breakdown.data}
-                        fallback={<Skeleton class="h-3 w-14" />}
-                      >
-                        <span class="text-lightSlate-500 text-xs tabular-nums">
-                          {formatBytes(sectionBytes(section))}
-                        </span>
-                      </Show>
-                    </div>
-
-                    {/* Item rows */}
-                    <For each={section.items}>
-                      {(item) => (
-                        <div
-                          class="hover:bg-darkSlate-700 grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-1.5 pl-9"
-                          onClick={() =>
-                            setSelection(item.key, !selection[item.key])
-                          }
-                        >
-                          <span onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={selection[item.key]}
-                              onChange={(c) => setSelection(item.key, c)}
-                            />
-                          </span>
-                          <span class="text-sm">
-                            <Trans key={item.labelKey as any} />
-                          </span>
-                          <Show
-                            when={breakdown.data}
-                            fallback={<Skeleton class="h-3 w-14" />}
-                          >
-                            <span class="text-lightSlate-400 text-xs tabular-nums">
-                              {formatBytes(breakdown.data![item.key] ?? 0)}
-                            </span>
-                          </Show>
-                        </div>
-                      )}
-                    </For>
-                  </>
-                )}
-              </For>
+                    </Show>
+                  </div>
+                  <span class="text-lightSlate-500 text-xs">
+                    <Trans key="modals:_trn_cache_cleanup.deep_desc" />
+                  </span>
+                </div>
+              </ClickableRow>
             </div>
 
             <div class="flex items-center justify-between gap-3 pt-2">
-              <Button
-                type="secondary"
-                onClick={() => modalsContext?.closeModal()}
-              >
+              <Button type="secondary" onClick={() => modalsContext?.closeModal()}>
                 <Trans key="modals:_trn_cache_cleanup.cancel" />
               </Button>
               <Button
                 type="primary"
-                disabled={!anySelected() || startMutation.isPending}
+                disabled={!canSubmit() || startMutation.isPending}
                 loading={startMutation.isPending}
                 onClick={() => {
-                  setSizeBeforeStart(breakdown.data?.totalSize ?? 0)
-                  startMutation.mutate({ ...selection })
+                  setSizeBefore(totalSize() ?? 0)
+                  startMutation.mutate({ quick: quick(), deep: deep() })
                 }}
               >
                 <div class="i-hugeicons:delete-02 h-4 w-4" />
-                <Show
-                  when={selectedTotalBytes() > 0}
-                  fallback={
-                    <Trans key="modals:_trn_cache_cleanup.start_empty" />
-                  }
-                >
-                  <Trans
-                    key="modals:_trn_cache_cleanup.start"
-                    options={{ size: formatBytes(selectedTotalBytes()) }}
-                  />
-                </Show>
+                <Trans key="modals:_trn_cache_cleanup.start" />
               </Button>
             </div>
           </Match>
 
           <Match when={phase() === "running"}>
-            <div class="flex flex-col items-center justify-center gap-6 px-8 py-20 text-center">
+            <div class="flex flex-col items-center justify-center gap-6 px-8 py-16 text-center">
               <div class="text-xl font-semibold">
                 <Trans key="modals:_trn_cache_cleanup.in_progress" />
               </div>
-              <Progress indeterminate color="bg-primary-500" class="w-full" />
-              <div class="text-lightSlate-400 text-sm">
-                <Show when={vtask.data?.active_subtasks?.[0]}>
-                  {(sub) => (
-                    <Switch>
-                      <Match
-                        when={
-                          sub().name.translation === "CacheCleanupClearingTable"
-                        }
-                      >
-                        <Trans key="tasks:_trn_cache_cleanup_clearing_table" />
-                      </Match>
-                      <Match
-                        when={
-                          sub().name.translation === "CacheCleanupClearingDisk"
-                        }
-                      >
-                        <Trans key="tasks:_trn_cache_cleanup_clearing_disk" />
-                      </Match>
-                      <Match
-                        when={
-                          sub().name.translation === "CacheCleanupVacuuming"
-                        }
-                      >
-                        <Trans key="tasks:_trn_cache_cleanup_vacuuming" />
-                      </Match>
-                    </Switch>
-                  )}
+              <div class="flex w-full flex-col gap-2">
+                <Progress
+                  value={progressPercent()}
+                  indeterminate={progressPercent() === undefined}
+                  color="bg-primary-500"
+                  class="w-full"
+                />
+                <Show when={progressPercent() !== undefined}>
+                  <div class="text-lightSlate-500 text-xs tabular-nums">
+                    {Math.round(progressPercent()!)}%
+                  </div>
                 </Show>
               </div>
               <div class="text-yellow-400 text-xs">
@@ -475,27 +227,15 @@ const CacheCleanup = (props: ModalProps) => {
               <div class="text-lg font-medium">
                 <Trans key="modals:_trn_cache_cleanup.done_title" />
               </div>
-              <Show
-                when={
-                  breakdown.data &&
-                  sizeBeforeStart() > (breakdown.data.totalSize ?? 0)
-                }
-              >
+              <Show when={reclaimed() > 0}>
                 <div class="text-lightSlate-400 text-sm">
                   <Trans
                     key="modals:_trn_cache_cleanup.done_reclaimed"
-                    options={{
-                      size: formatBytes(
-                        sizeBeforeStart() - (breakdown.data?.totalSize ?? 0)
-                      )
-                    }}
+                    options={{ size: formatBytes(reclaimed()) }}
                   />
                 </div>
               </Show>
-              <Button
-                type="primary"
-                onClick={() => modalsContext?.closeModal()}
-              >
+              <Button type="primary" onClick={() => modalsContext?.closeModal()}>
                 <Trans key="modals:_trn_cache_cleanup.close" />
               </Button>
             </div>
@@ -510,10 +250,7 @@ const CacheCleanup = (props: ModalProps) => {
               <div class="text-lightSlate-400 max-w-96 break-words text-center text-sm">
                 {failedMessage()}
               </div>
-              <Button
-                type="secondary"
-                onClick={() => modalsContext?.closeModal()}
-              >
+              <Button type="secondary" onClick={() => modalsContext?.closeModal()}>
                 <Trans key="modals:_trn_cache_cleanup.close" />
               </Button>
             </div>

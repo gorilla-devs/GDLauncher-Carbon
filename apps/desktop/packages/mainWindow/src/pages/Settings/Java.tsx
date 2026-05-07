@@ -56,6 +56,14 @@ const Java = () => {
     mutationKey: ["settings.setSettings"]
   }))
 
+  const memoryWarningDismissed = rspc.createQuery(() => ({
+    queryKey: ["settings.getMemoryWarningDismissed"]
+  }))
+
+  const memoryWarningDismissedMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setMemoryWarningDismissed"]
+  }))
+
   const updateProfile = rspc.createMutation(() => ({
     mutationKey: ["java.updateJavaProfile"]
   }))
@@ -195,6 +203,25 @@ const Java = () => {
               <Trans key="java:_trn_ram_warning_high_allocation" />
             </div>
           </Show>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans key="java:_trn_show_memory_warning_text" />
+            }
+          >
+            <Trans key="java:_trn_show_memory_warning_title" />
+          </Title>
+          <RightHandSide>
+            <GDSwitch
+              checked={!memoryWarningDismissed.data}
+              onChange={(e) => {
+                memoryWarningDismissedMutation.mutate(
+                  !e.currentTarget.checked
+                )
+              }}
+            />
+          </RightHandSide>
         </Row>
         <Row class="flex-col items-stretch">
           <Title>

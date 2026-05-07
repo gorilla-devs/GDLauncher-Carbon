@@ -78,5 +78,6 @@
   "_trn_cache_storage_title": "キャッシュサイズ",
   "_trn_cache_storage_text": "GDLauncherは、Modプラットフォームからの応答とMinecraftのメタデータをキャッシュして、閲覧や起動を高速化します。キャッシュが予想以上に大きくなった場合、クリーンアップするとディスク容量を回収できます。キャッシュは必要に応じて自動的に再構築されます。",
   "_trn_cache_storage_clean_up": "クリーンアップ",
-  "_trn_cache_storage_bloat_banner": "キャッシュが通常より大きくなっています ({{size}})。クリーンアップするとディスク容量を回収できます。"
+  "_trn_cache_storage_bloat_banner_title": "ランチャーのデータベースが {{size}} を使用しています",
+  "_trn_cache_storage_bloat_banner_desc": "通常よりかなり大きいです。クリーンアップするとインストール済みのインスタンスに影響を与えずにディスク容量を解放できます。"
 }

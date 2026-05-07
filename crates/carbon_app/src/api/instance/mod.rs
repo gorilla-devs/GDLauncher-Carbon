@@ -298,7 +298,11 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 return Err(anyhow::anyhow!("attempted to launch instance without an account"));
             };
 
-            if !args.skip_memory_check {
+            let memory_check_dismissed = crate::api::settings::is_memory_warning_dismissed(
+                &app.prisma_client,
+            ).await.unwrap_or(false);
+
+            if !args.skip_memory_check && !memory_check_dismissed {
                 let instance_id = crate::domain::instance::InstanceId(args.id.0);
                 let (_xms, xmx) = app.instance_manager()
                     .get_effective_memory(instance_id)
