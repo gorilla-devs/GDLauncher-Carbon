@@ -1,6 +1,6 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 
-import { port, rspc } from "@/utils/rspcClient"
+import { apiUrl, rspc } from "@/utils/rspcClient"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
@@ -134,14 +134,16 @@ export const AccountsDropdown = (props: Props) => {
 
           <div class="flex items-center gap-4">
             <img
-              src={`http://127.0.0.1:${port}/account/headImage?uuid=${(() => {
-                const account = globalStore.accounts.data?.find(
-                  (account) =>
-                    account.uuid ===
-                    globalStore.currentlySelectedAccountUuid.data
-                )
-                return account ? getAccountImageUuid(account) : ""
-              })()}`}
+              src={apiUrl(
+                `/account/headImage?uuid=${(() => {
+                  const account = globalStore.accounts.data?.find(
+                    (account) =>
+                      account.uuid ===
+                      globalStore.currentlySelectedAccountUuid.data
+                  )
+                  return account ? getAccountImageUuid(account) : ""
+                })()}`
+              )}
               class="h-6 w-6 rounded-md"
             />
             <div class="max-w-30 truncate">
@@ -230,7 +232,9 @@ export const AccountsDropdown = (props: Props) => {
                 >
                   <div class="flex items-center gap-4">
                     <img
-                      src={`http://127.0.0.1:${port}/account/headImage?uuid=${getAccountImageUuid(account)}`}
+                      src={apiUrl(
+                        `/account/headImage?uuid=${getAccountImageUuid(account)}`
+                      )}
                       class="h-6 w-6 rounded-md"
                     />
                     <div class="max-w-30 truncate">{account.username}</div>

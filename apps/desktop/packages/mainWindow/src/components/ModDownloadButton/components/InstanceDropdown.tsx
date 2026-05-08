@@ -4,6 +4,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  onCleanup,
   Accessor
 } from "solid-js"
 import { Trans } from "@gd/i18n"
@@ -87,7 +88,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
       }
     }, 10)
 
-    return () => clearTimeout(timer)
+    onCleanup(() => clearTimeout(timer))
   })
 
   const renderInstance = (instance: {

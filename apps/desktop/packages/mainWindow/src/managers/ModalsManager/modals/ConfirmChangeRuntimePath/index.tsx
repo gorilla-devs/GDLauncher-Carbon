@@ -88,7 +88,10 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 setMigrationError(undefined)
 
                 try {
-                  await window.changeRuntimePath(props.data.runtimePath)
+                  await window.changeRuntimePath(
+                    props.data.runtimePath,
+                    props.data.isTargetFolderAlreadyUsed
+                  )
                   modalsContext?.closeModal()
                 } catch (e: any) {
                   setMigrationError(e.message)

@@ -14,21 +14,34 @@ use tokio::{
 };
 use tracing::{debug, error, info, warn};
 
+/// State shared with the callback handler — the expected `state` value (CSRF
+/// protection) and the slot to receive the authorization code.
+#[derive(Clone)]
+struct CallbackState {
+    code: Arc<RwLock<Option<String>>>,
+    expected_state: String,
+}
+
 /// OAuth callback server that runs temporarily to receive the authorization code
 /// from Microsoft's OAuth flow. Implements RFC 8252 (OAuth 2.0 for Native Apps)
 /// Section 7.3 - Loopback Interface Redirection.
 pub struct OAuthCallbackServer {
     /// The authorization code received from the OAuth callback
     code: Arc<RwLock<Option<String>>>,
+    /// Expected `state` parameter value (RFC 6749 §10.12 CSRF protection)
+    expected_state: String,
     /// Sender to signal when the code has been received
     shutdown_tx: Option<oneshot::Sender<()>>,
 }
 
 impl OAuthCallbackServer {
-    /// Creates a new OAuth callback server
-    pub fn new() -> Self {
+    /// Creates a new OAuth callback server. `expected_state` must be a
+    /// random, unguessable value passed to the IdP in the auth request and
+    /// compared on callback (CSRF defence).
+    pub fn new(expected_state: String) -> Self {
         Self {
             code: Arc::new(RwLock::new(None)),
+            expected_state,
             shutdown_tx: None,
         }
     }
@@ -76,12 +89,15 @@ impl OAuthCallbackServer {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         self.shutdown_tx = Some(shutdown_tx);
 
-        let code_clone = self.code.clone();
+        let state_for_router = CallbackState {
+            code: self.code.clone(),
+            expected_state: self.expected_state.clone(),
+        };
 
         // Build the Axum router
         let app = Router::new()
             .route("/auth", get(oauth_callback))
-            .with_state(code_clone);
+            .with_state(state_for_router);
 
         // Spawn the server task
         let server_task = tokio::spawn(async move {
@@ -187,9 +203,31 @@ struct OAuthCallbackQuery {
 /// OAuth callback handler - receives the authorization code from Microsoft
 async fn oauth_callback(
     Query(params): Query<OAuthCallbackQuery>,
-    State(code_storage): State<Arc<RwLock<Option<String>>>>,
+    State(callback_state): State<CallbackState>,
 ) -> impl IntoResponse {
-    debug!("OAuth callback received: {:?}", params);
+    // Don't log the code or state — they contain sensitive auth material.
+    debug!(
+        "OAuth callback received: code_present={}, state_present={}, error={:?}",
+        params.code.is_some(),
+        params.state.is_some(),
+        params.error
+    );
+
+    // Validate `state` against the value we sent to the IdP. If they don't
+    // match, this is either a CSRF attempt or a stray callback from a stale
+    // flow — refuse to accept the code.
+    let provided_state = params.state.clone().unwrap_or_default();
+    if !constant_time_eq(
+        provided_state.as_bytes(),
+        callback_state.expected_state.as_bytes(),
+    ) {
+        warn!("OAuth callback rejected: state parameter mismatch (CSRF guard)");
+        return Html(error_page(
+            "Invalid state",
+            "OAuth callback state did not match the expected value.",
+        ));
+    }
+    let code_storage = callback_state.code;
 
     // Check for error in callback
     if let Some(error) = params.error {
@@ -229,13 +267,24 @@ fn error_page(error: &str, description: &str) -> String {
         .replace("{ERROR_DESCRIPTION}", description)
 }
 
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test]
     async fn test_server_starts_and_stops() {
-        let server = OAuthCallbackServer::new();
+        let server = OAuthCallbackServer::new("test-state".to_string());
         let handle = server.start().await.expect("Server should start");
 
         assert!(handle.port() > 0);
@@ -246,7 +295,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_timeout_when_no_code_received() {
-        let server = OAuthCallbackServer::new();
+        let server = OAuthCallbackServer::new("test-state".to_string());
         let handle = server.start().await.expect("Server should start");
 
         let result = handle.wait_for_code(Duration::from_millis(100)).await;

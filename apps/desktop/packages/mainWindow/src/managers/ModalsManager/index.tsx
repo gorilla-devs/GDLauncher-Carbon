@@ -290,13 +290,19 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
       if (indexToRemove >= 0) {
         newStack.splice(indexToRemove, 1)
-        const newParams: Record<string, string | null> =
-          Object.fromEntries(urlSearchParams())
 
-        for (const key in Object.fromEntries(urlSearchParams())) {
-          if (key !== `m[${indexToRemove + 1}]`) {
-            newParams[`m[${indexToRemove + 1}]`] = null
+        // The URL stores the modal stack as `m[1]=name1`, `m[2]=name2`, ...
+        // (1-indexed). After mutating the stack we must rebuild every `m[k]`
+        // so positions reflect the new stack — closing a non-top modal would
+        // otherwise leave stale values pointing at the removed modal.
+        const newParams: Record<string, string | null> = {}
+        for (const key of Object.keys(Object.fromEntries(urlSearchParams()))) {
+          if (/^m\[\d+\]$/.test(key)) {
+            newParams[key] = null
           }
+        }
+        for (let i = 0; i < newStack.length; i++) {
+          newParams[`m[${i + 1}]`] = newStack[i].name
         }
 
         setSearchParams(newParams)

@@ -287,6 +287,7 @@ export type CoreModule = () => Promise<
       type: "success"
       result: {
         port: number
+        apiToken: string
         kill: () => void
       }
     }
@@ -299,18 +300,49 @@ export type CoreModule = () => Promise<
     }
 >
 
+async function readDevApiToken(): Promise<string> {
+  const tokenPath = path.join(CURRENT_RUNTIME_PATH!, ".gdl_api_token")
+  // The dev rust process may take a moment to start. Poll briefly.
+  for (let i = 0; i < 100; i++) {
+    try {
+      const value = await fs.readFile(tokenPath, "utf8")
+      const trimmed = value.trim()
+      if (trimmed.length > 0) {
+        return trimmed
+      }
+    } catch {
+      // file not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 200))
+  }
+  throw new Error(
+    `Could not read dev api token at ${tokenPath} — is the rust core running?`
+  )
+}
+
 const loadCoreModule: CoreModule = () =>
   new Promise((resolve, _) => {
     console.log("Loading core module...")
     if (isDev) {
-      resolve({
-        type: "success",
-        result: {
-          port: 4650,
-          kill: () => {}
-        }
-      })
-      console.log("Core module loaded in development mode")
+      readDevApiToken()
+        .then((apiToken) => {
+          resolve({
+            type: "success",
+            result: {
+              port: 4650,
+              apiToken,
+              kill: () => {}
+            }
+          })
+          console.log("Core module loaded in development mode")
+        })
+        .catch((err) => {
+          console.error("[CORE] Dev mode token load failed:", err)
+          resolve({
+            type: "error",
+            logs: [{ type: "error", message: String(err) }]
+          })
+        })
       return
     }
 
@@ -378,28 +410,54 @@ const loadCoreModule: CoreModule = () =>
     coreModule.stdout.on("data", (data) => {
       const dataString = data.toString()
 
-      console.log(`[CORE] Message: ${dataString}`)
+      // Redact the api token from the READY status line — it lands in the
+      // user-facing log buffer and the local log file. The user can already
+      // read their token from the runtime path, but log dumps shared via
+      // discord/issues should not leak it.
+      const sanitized = dataString.replace(
+        /(_STATUS_:READY\|\d+\|)[^\s|]+/g,
+        "$1<redacted>"
+      )
+
+      console.log(`[CORE] Message: ${sanitized}`)
 
       const rows = dataString.split(/\r?\n|\r|\n/g)
 
       logs.push({
         type: "info",
-        message: dataString
+        message: sanitized
       })
 
       for (const row of rows) {
         if (row.startsWith("_STATUS_:")) {
           const rightPart = row.split(":")[1]
-          const event = rightPart.split("|")[0]
-          const port: number = rightPart.split("|")[1]
+          const parts = rightPart.split("|")
+          const event = parts[0]
+          const port: number = parts[1] as unknown as number
+          const apiToken: string | undefined = parts[2]
           console.log(`[CORE] Event: ${event}, Port: ${port}`)
 
           if (event === "READY") {
+            if (!apiToken) {
+              console.error("[CORE] _STATUS_:READY missing api token")
+              resolve({
+                type: "error",
+                logs: [
+                  ...logs,
+                  {
+                    type: "error",
+                    message: "Core module did not provide an api token"
+                  }
+                ]
+              })
+              return
+            }
             started = true
             resolve({
               type: "success",
               result: {
                 port,
+                apiToken,
                 kill: () => coreModule?.kill()
               }
             })
@@ -520,19 +578,21 @@ const loadCoreModule: CoreModule = () =>
     coreModule.on("exit", (code) => {
       console.log(`[CORE] Exit with code: ${code}`)
 
-      if (code !== 0) {
-        resolve({
-          type: "error",
-          logs
-        })
+      // If we get here without `started` being true, the core module exited
+      // before emitting `_STATUS_:READY`. That's always an error condition,
+      // even if the exit code is 0.
+      if (started) {
+        return
       }
-
       resolve({
-        type: "success",
-        result: {
-          port: 0,
-          kill: () => coreModule?.kill()
-        }
+        type: "error",
+        logs: [
+          ...logs,
+          {
+            type: "error",
+            message: `Core module exited unexpectedly with code ${code} before READY`
+          }
+        ]
       })
     })
 
@@ -677,7 +737,23 @@ async function createWindow(): Promise<BrowserWindow> {
   win.webContents.on("will-navigate", (e, url) => {
     if (win && !win.isDestroyed() && url !== win.webContents.getURL()) {
       e.preventDefault()
-      shell.openExternal(url)
+      try {
+        const parsed = new URL(url)
+        if (
+          parsed.protocol === "http:" ||
+          parsed.protocol === "https:" ||
+          parsed.protocol === "mailto:"
+        ) {
+          shell.openExternal(url)
+        } else {
+          console.warn(
+            "[will-navigate] blocked navigation to unsafe scheme:",
+            url
+          )
+        }
+      } catch {
+        console.warn("[will-navigate] blocked invalid URL:", url)
+      }
     }
   })
 
@@ -696,8 +772,10 @@ async function createWindow(): Promise<BrowserWindow> {
   win.webContents.on("before-input-event", (event, input) => {
     if (input.alt && input.shift && input.code === "KeyI") {
       event.preventDefault()
-      console.log("dev tools open:", win?.webContents.isDevToolsOpened())
-      win?.webContents.toggleDevTools()
+      if (!app.isPackaged) {
+        console.log("dev tools open:", win?.webContents.isDevToolsOpened())
+        win?.webContents.toggleDevTools()
+      }
     }
   })
 
@@ -877,122 +955,207 @@ ipcMain.handle("getRuntimePath", async () => {
   return CURRENT_RUNTIME_PATH
 })
 
-ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
-  interface Progress {
-    action: "scan" | "copy" | "remove"
-    currentName: string
-    current: number
-    total: number
-  }
-
-  console.log(`[RTP] Migration request: ${CURRENT_RUNTIME_PATH} -> ${newPath}`)
-
-  if (newPath === CURRENT_RUNTIME_PATH) {
-    console.log(`[RTP] No-op: same path`)
-    return
-  }
-
-  const runtimeOverridePath = path.join(
-    app.getPath("userData"),
-    RUNTIME_PATH_OVERRIDE_NAME
-  )
-
-  try {
-    await fs.mkdir(newPath, { recursive: true })
-    console.log(`[RTP] Destination ready`)
-  } catch (e) {
-    console.error(`[RTP] Failed to create destination:`, e)
-    throw e
-  }
-
-  try {
-    const cm = await coreModule
-    if (cm.type === "success") {
-      console.log(`[RTP] Killing core module`)
-      cm.result.kill()
-      // Give the OS a moment to release file handles (SQLite WAL, logs)
-      await new Promise((r) => setTimeout(r, 1500))
+ipcMain.handle(
+  "changeRuntimePath",
+  async (_, newPath: string, switchOnly = false) => {
+    interface Progress {
+      action: "scan" | "copy" | "remove"
+      currentName: string
+      current: number
+      total: number
     }
-  } catch {
-    // No op
-  }
 
-  // Surface activity to the renderer immediately so the user doesn't
-  // see only the spinner during the (potentially slow) glob scan.
-  win?.webContents.send("changeRuntimePathProgress", {
-    action: "scan",
-    currentName: "",
-    current: 0,
-    total: 0
-  } satisfies Progress)
+    console.log(
+      `[RTP] Migration request: ${CURRENT_RUNTIME_PATH} -> ${newPath} (switchOnly=${switchOnly})`
+    )
 
-  console.log(`[RTP] Scanning source files...`)
-  const t0 = Date.now()
-  const files = await fg("**/*", {
-    cwd: CURRENT_RUNTIME_PATH!,
-    onlyFiles: true,
-    dot: true,
-    followSymbolicLinks: false,
-    suppressErrors: true,
-    ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
-  })
-  console.log(`[RTP] Scan: ${files.length} files in ${Date.now() - t0}ms`)
+    if (newPath === CURRENT_RUNTIME_PATH) {
+      console.log(`[RTP] No-op: same path`)
+      return
+    }
 
-  const total = files.length
+    const runtimeOverridePath = path.join(
+      app.getPath("userData"),
+      RUNTIME_PATH_OVERRIDE_NAME
+    )
 
-  for (let i = 0; i < total; i++) {
-    const file = files[i]
-
-    win?.webContents.send("changeRuntimePathProgress", {
-      action: "copy",
-      currentName: path.basename(file),
-      current: i,
-      total: total * 2
-    } satisfies Progress)
+    if (switchOnly) {
+      // Switch-only mode: the renderer already detected the dir exists with
+      // user data via validateRuntimePath. Don't mkdir — that would silently
+      // recreate the dir empty if it was deleted between confirm and now,
+      // resulting in a successful "switch" to an empty runtime.
+      if (!(await fse.pathExists(newPath))) {
+        console.error(`[RTP] Switch-only: target no longer exists: ${newPath}`)
+        throw new Error(
+          `Target directory no longer exists: ${newPath}. Aborting switch.`
+        )
+      }
+    } else {
+      try {
+        await fs.mkdir(newPath, { recursive: true })
+        console.log(`[RTP] Destination ready`)
+      } catch (e) {
+        console.error(`[RTP] Failed to create destination:`, e)
+        throw e
+      }
+    }
 
     try {
-      await fse.copy(
-        path.join(CURRENT_RUNTIME_PATH!, file),
-        path.join(newPath, file),
-        {
+      const cm = await coreModule
+      if (cm.type === "success") {
+        console.log(`[RTP] Killing core module`)
+        cm.result.kill()
+        // Give the OS a moment to release file handles (SQLite WAL, logs)
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+    } catch {
+      // No op
+    }
+
+    // Switch-only path: the target dir already contains the user's data and
+    // they want to use it as-is. Don't touch any files in either dir; just
+    // update the override pointer and relaunch. The previous runtime data
+    // remains as orphan disk space the user can delete manually.
+    if (switchOnly) {
+      console.log(`[RTP] Switch-only: writing override to point at ${newPath}`)
+      await fse.writeFile(runtimeOverridePath, newPath)
+      console.log(`[RTP] Switch complete, relaunching`)
+      app.relaunch()
+      app.exit()
+      return
+    }
+
+    // Surface activity to the renderer immediately so the user doesn't
+    // see only the spinner during the (potentially slow) glob scan.
+    win?.webContents.send("changeRuntimePathProgress", {
+      action: "scan",
+      currentName: "",
+      current: 0,
+      total: 0
+    } satisfies Progress)
+
+    console.log(`[RTP] Scanning source files...`)
+    const t0 = Date.now()
+    const files = await fg("**/*", {
+      cwd: CURRENT_RUNTIME_PATH!,
+      onlyFiles: true,
+      dot: true,
+      followSymbolicLinks: false,
+      suppressErrors: true,
+      ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
+    })
+    console.log(`[RTP] Scan: ${files.length} files in ${Date.now() - t0}ms`)
+
+    const total = files.length
+
+    // Drop a marker so a future startup can detect an interrupted migration if
+    // the host process crashes (we still won't have written the override file
+    // in that case).
+    const migrationMarker = path.join(newPath, ".gdl_migration_in_progress")
+    try {
+      await fse.writeFile(migrationMarker, "")
+    } catch (e) {
+      console.warn(`[RTP] Failed to write migration marker:`, e)
+    }
+
+    // Track which files we successfully copied, so a rollback only removes
+    // files we created — not pre-existing content the user had in newPath.
+    const copiedFiles: string[] = []
+    const cleanupPartial = async () => {
+      console.log(
+        `[RTP] Rolling back ${copiedFiles.length} files copied to ${newPath}`
+      )
+      for (const f of copiedFiles) {
+        try {
+          await fse.remove(path.join(newPath, f))
+        } catch {
+          // best-effort
+        }
+      }
+      try {
+        await fse.remove(migrationMarker)
+      } catch {
+        // best-effort
+      }
+    }
+
+    for (let i = 0; i < total; i++) {
+      const file = files[i]
+      const dest = path.join(newPath, file)
+
+      win?.webContents.send("changeRuntimePathProgress", {
+        action: "copy",
+        currentName: path.basename(file),
+        current: i,
+        total: total * 2
+      } satisfies Progress)
+
+      // Skip files that already exist with the same content — we don't want to
+      // touch (and later potentially roll back) files the user already had.
+      const destExisted = await fse.pathExists(dest)
+
+      try {
+        await fse.copy(path.join(CURRENT_RUNTIME_PATH!, file), dest, {
           overwrite: true,
           errorOnExist: false,
           recursive: true
+        })
+        // Only track for rollback if we actually created the destination —
+        // overwriting a pre-existing file is destructive and we don't try to
+        // recover those.
+        if (!destExisted) {
+          copiedFiles.push(file)
         }
-      )
-    } catch (e) {
-      console.error(`[RTP] Failed to copy ${file}:`, e)
-      throw new Error(`Failed to copy ${file}: ${(e as Error).message}`)
+      } catch (e) {
+        console.error(`[RTP] Failed to copy ${file}:`, e)
+        await cleanupPartial()
+        throw new Error(`Failed to copy ${file}: ${(e as Error).message}`)
+      }
     }
-  }
-  console.log(`[RTP] Copy complete, writing override`)
+    console.log(`[RTP] Copy complete, writing override`)
 
-  await fse.writeFile(runtimeOverridePath, newPath)
-
-  console.log(`[RTP] Removing source files`)
-  for (let i = 0; i < total; i++) {
-    const file = files[i]
-
-    win?.webContents.send("changeRuntimePathProgress", {
-      action: "remove",
-      currentName: path.basename(file),
-      current: total + i,
-      total: total * 2
-    } satisfies Progress)
-
-    // Don't fail the migration if a single remove fails — data is already
-    // safely in the new path and the override file points at it.
     try {
-      await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file))
+      await fse.writeFile(runtimeOverridePath, newPath)
     } catch (e) {
-      console.error(`[RTP] Failed to remove ${file}:`, e)
+      // Override write failed *after* we copied everything — old path is still
+      // authoritative; new path is duplicated data. Clean up the new path.
+      console.error(`[RTP] Failed to write override file, rolling back:`, e)
+      await cleanupPartial()
+      throw e
     }
-  }
 
-  console.log(`[RTP] Migration complete, relaunching`)
-  app.relaunch()
-  app.exit()
-})
+    // Clear marker — past this point, newPath is the authoritative location.
+    try {
+      await fse.remove(migrationMarker)
+    } catch {
+      // best-effort
+    }
+
+    console.log(`[RTP] Removing source files`)
+    for (let i = 0; i < total; i++) {
+      const file = files[i]
+
+      win?.webContents.send("changeRuntimePathProgress", {
+        action: "remove",
+        currentName: path.basename(file),
+        current: total + i,
+        total: total * 2
+      } satisfies Progress)
+
+      // Don't fail the migration if a single remove fails — data is already
+      // safely in the new path and the override file points at it.
+      try {
+        await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file))
+      } catch (e) {
+        console.error(`[RTP] Failed to remove ${file}:`, e)
+      }
+    }
+
+    console.log(`[RTP] Migration complete, relaunching`)
+    app.relaunch()
+    app.exit()
+  }
+)
 
 ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
   if (!newPath || newPath === CURRENT_RUNTIME_PATH) {
@@ -1024,7 +1187,8 @@ ipcMain.handle("getCoreModule", async () => {
   return {
     type: cm.type,
     logs: cm.type === "error" ? cm.logs : undefined,
-    port: cm.type === "success" ? cm.result.port : undefined
+    port: cm.type === "success" ? cm.result.port : undefined,
+    apiToken: cm.type === "success" ? cm.result.apiToken : undefined
   }
 })
 

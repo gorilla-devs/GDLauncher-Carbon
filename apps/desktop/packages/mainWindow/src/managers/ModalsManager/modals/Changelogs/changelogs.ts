@@ -88,6 +88,11 @@ const changelogs: Changelog = {
       title: "Third-Party Licenses",
       description:
         "Added third-party license attribution for all open-source dependencies."
+    },
+    {
+      title: "Switch to an Existing Data Folder",
+      description:
+        "When you point GDLauncher at a folder that already contains a runtime data set, you can now switch to it as-is — no files are copied or removed."
     }
   ],
   fixed: [
@@ -120,6 +125,30 @@ const changelogs: Changelog = {
     },
     {
       title: "Fixed view transition artifacts when switching library modes"
+    },
+    {
+      title:
+        "Fixed runtime path migration leaving copied files in the target folder if it failed partway through",
+      description:
+        "If migration aborts now, only files actually created by the migration are rolled back — pre-existing files in the target folder are left untouched."
+    },
+    {
+      title:
+        "Fixed servers being launchable while install, stop, or delete operations are in progress"
+    },
+    {
+      title:
+        "Fixed timers and listeners not being cleaned up in some dropdowns and search components",
+      description:
+        "Several search inputs, multi-selects, and instance dropdowns held onto pending timers or socket connections after closing or navigating away."
+    },
+    {
+      title:
+        "Fixed browser-style back/forward navigation losing modal state when closing a non-topmost modal"
+    },
+    {
+      title:
+        "Fixed instance deletion errors silently accumulating internal state over a long session"
     }
   ],
   improved: [
@@ -182,6 +211,11 @@ const changelogs: Changelog = {
       title: "Improved internal communication",
       description:
         "Switched to a more reliable transport layer between the frontend and backend."
+    },
+    {
+      title: "Security hardening",
+      description:
+        "The local API now requires per-session authentication so other applications on your machine can no longer issue commands to GDLauncher. Microsoft sign-in uses PKCE and state validation per RFC 8252. Mod downloads verify stronger checksums (SHA-512 from Modrinth, SHA-1 from CurseForge). Modpack archive extraction blocks path-traversal attacks, including malicious symlinks and absolute paths. External link handling is restricted to http, https, and mailto schemes. OAuth codes and API tokens are redacted in logs. Local database files and the API token file are created with restricted permissions on Linux and macOS. DevTools is disabled on packaged builds."
     }
   ]
 }

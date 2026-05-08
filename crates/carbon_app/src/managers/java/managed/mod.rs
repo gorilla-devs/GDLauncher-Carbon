@@ -18,8 +18,6 @@ use tokio::sync::{
     watch::{self, Sender},
 };
 
-// mod adoptopenjdk;
-// mod mojang;
 pub mod azul_zulu;
 
 #[derive(Debug, Default, Clone)]

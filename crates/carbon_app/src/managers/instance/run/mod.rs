@@ -581,7 +581,40 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let start_time = Utc::now();
 
-                    let process_id = child.id().expect("Failed to get process ID for child process. The process may have already exited.");
+                    let Some(process_id) = child.id() else {
+                        // Process exited before we could capture its PID.
+                        // Surface as a launch error rather than panicking the
+                        // task (which would leave the instance stuck in
+                        // Preparing).
+                        tracing::error!(
+                            "Process exited before PID could be captured (instance {})",
+                            *instance_id
+                        );
+                        let _ = app
+                            .instance_manager()
+                            .change_launch_state(
+                                instance_id,
+                                LaunchState::Inactive {
+                                    failed_task: Some(id),
+                                },
+                            )
+                            .await;
+                        return;
+                    };
+
+                    let Some(running_log_id) = log_id else {
+                        tracing::error!("log_id missing when launching instance {}", *instance_id);
+                        let _ = app
+                            .instance_manager()
+                            .change_launch_state(
+                                instance_id,
+                                LaunchState::Inactive {
+                                    failed_task: Some(id),
+                                },
+                            )
+                            .await;
+                        return;
+                    };
 
                     let _ = app
                         .instance_manager()
@@ -591,16 +624,27 @@ impl ManagerRef<'_, InstanceManager> {
                                 process_id,
                                 kill_tx,
                                 start_time,
-                                log: log_id.expect("log_id must exist when launching game"),
+                                log: running_log_id,
                             }),
                         )
                         .await;
 
                     let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take())
                     else {
-                        panic!(
-                            "Failed to capture stdout and stderr from child process. The process was created with piped stdio, but the streams are not available. This may indicate a system-level issue with process creation."
+                        tracing::error!(
+                            "Failed to capture stdout/stderr from child process for instance {}",
+                            *instance_id
                         );
+                        let _ = app
+                            .instance_manager()
+                            .change_launch_state(
+                                instance_id,
+                                LaunchState::Inactive {
+                                    failed_task: Some(id),
+                                },
+                            )
+                            .await;
+                        return;
                     };
 
                     let mut last_stored_time = start_time;
@@ -628,7 +672,13 @@ impl ManagerRef<'_, InstanceManager> {
                         },
                         _ = kill_rx.recv() => {
                             tracing::debug!("Instance killed");
-                            drop(child.kill().await);
+                            if let Err(e) = child.kill().await {
+                                tracing::warn!(
+                                    "Failed to kill child process for instance {}: {}",
+                                    *instance_id,
+                                    e
+                                );
+                            }
                         },
                         _ = read_logs(log.as_ref().expect("log must exist when launching game"), stdout, stderr, file.as_mut()) => {
                             tracing::debug!("Instance read logs");

@@ -124,7 +124,7 @@ impl ManagerRef<'_, InstanceImportManager> {
             // 90-95%: Scan archive
             let _ = tx.send(ImportShareCodeProgress::Progress(90)).await;
 
-            let scanner = Entity::GDLPack.create_importer();
+            let scanner = Entity::GDLPack.create_importer()?;
             scanner.scan(&app, file_path).await?;
 
             let _ = tx.send(ImportShareCodeProgress::Progress(95)).await;
@@ -167,7 +167,18 @@ impl ManagerRef<'_, InstanceImportManager> {
                         break;
                     };
 
-                    let scanner = entity.create_importer();
+                    let scanner = match entity.create_importer() {
+                        Ok(s) => s,
+                        Err(e) => {
+                            tracing::error!("Cannot create importer for {:?}: {}", entity, e);
+                            *app.instance_manager()
+                                .import_manager()
+                                .scanner
+                                .write()
+                                .await = None;
+                            continue;
+                        }
+                    };
 
                     *app.instance_manager()
                         .import_manager()
@@ -311,15 +322,20 @@ impl Entity {
             .collect()
     }
 
-    pub fn create_importer(self) -> Arc<dyn InstanceImporter> {
-        match self {
+    pub fn create_importer(self) -> anyhow::Result<Arc<dyn InstanceImporter>> {
+        Ok(match self {
             Self::LegacyGDLauncher => Arc::new(LegacyGDLauncherImporter::new()),
             Self::CurseForgeZip => Arc::new(CurseforgeArchiveImporter::new()),
             Self::MRPack => Arc::new(ModrinthArchiveImporter::new()),
             Self::CurseForge => Arc::new(CurseforgeImporter::new()),
             Self::GDLPack => Arc::new(GdlpackImporter::new()),
-            _ => todo!(),
-        }
+            other => {
+                return Err(anyhow::anyhow!(
+                    "Importer for {:?} is not implemented",
+                    other
+                ));
+            }
+        })
     }
 
     pub async fn get_default_scan_path(self) -> anyhow::Result<Option<PathBuf>> {

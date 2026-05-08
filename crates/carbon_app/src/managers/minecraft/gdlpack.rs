@@ -426,7 +426,17 @@ pub async fn prepare_modpack_from_gdlpack(
                             continue;
                         }
 
-                        let target = instance_data_path.join(&rel_path);
+                        let target = match secure_path_join(&instance_data_path, &rel_path) {
+                            Ok(p) => p,
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Skipping gdlpack override entry with unsafe path `{}`: {}",
+                                    rel_path,
+                                    e
+                                );
+                                continue;
+                            }
+                        };
 
                         if let Some(parent) = target.parent() {
                             std::fs::create_dir_all(parent)?;

@@ -1,4 +1,4 @@
-import { port, rspc } from "@/utils/rspcClient"
+import { apiWsUrl, rspc } from "@/utils/rspcClient"
 import {
   createEffect,
   createMemo,
@@ -522,9 +522,7 @@ const Console = (props: ConsoleProps) => {
         const connect = () => {
           if (cancelled) return
 
-          wsConnection = new WebSocket(
-            `ws://127.0.0.1:${port}/server/log?id=${serverId}`
-          )
+          wsConnection = new WebSocket(apiWsUrl(`/server/log?id=${serverId}`))
 
           wsConnection.onmessage = (event) => {
             // Effect re-run / unmount can flip `cancelled` between us
@@ -586,7 +584,11 @@ const Console = (props: ConsoleProps) => {
           if (reconnectTimer !== null) {
             clearTimeout(reconnectTimer)
           }
-          if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
+          if (
+            wsConnection &&
+            (wsConnection.readyState === wsConnection.OPEN ||
+              wsConnection.readyState === wsConnection.CONNECTING)
+          ) {
             wsConnection.close()
           }
         })

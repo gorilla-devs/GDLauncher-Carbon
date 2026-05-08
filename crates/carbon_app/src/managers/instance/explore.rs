@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 
 use crate::{
     domain::instance::{ExploreEntry, ExploreEntryType, InstanceId},
@@ -22,7 +22,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let shortpath = instance.shortpath.clone();
         drop(instances);
 
-        let mut data_path = self
+        let instance_data_path = self
             .app
             .settings_manager()
             .runtime_path
@@ -30,7 +30,45 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get_instance_path(&shortpath)
             .get_data_path();
 
-        data_path.extend(path);
+        // Refuse anything that could climb out of the instance dir.
+        for segment in &path {
+            if segment.is_empty()
+                || segment == "."
+                || segment == ".."
+                || segment.contains('/')
+                || segment.contains('\\')
+                || segment.contains('\0')
+            {
+                return Err(anyhow!(
+                    "Invalid path segment in explore_data: {:?}",
+                    segment
+                ));
+            }
+        }
+
+        let mut data_path = instance_data_path.clone();
+        for segment in path {
+            data_path.push(segment);
+        }
+
+        // Defensive symlink check: if both paths resolve cleanly, assert the
+        // canonical target sits under the canonical instance dir. We only run
+        // the check when BOTH canonicalize calls succeed — partial
+        // canonicalization can mismatch on Windows (case differences) and
+        // would falsely reject legitimate not-yet-existing subfolders, which
+        // `read_dir` will surface as a normal "not found" error below.
+        if let (Ok(canonical_data), Ok(canonical_target)) = tokio::join!(
+            tokio::fs::canonicalize(&instance_data_path),
+            tokio::fs::canonicalize(&data_path),
+        ) {
+            if !canonical_target.starts_with(&canonical_data) {
+                return Err(anyhow!(
+                    "Resolved path {:?} is not within instance dir {:?}",
+                    canonical_target,
+                    canonical_data
+                ));
+            }
+        }
 
         let mut dir = tokio::fs::read_dir(&data_path)
             .await

@@ -631,11 +631,29 @@ pub async fn generate_startup_command(
         substitute_arguments(&mut command, jvm_arguments);
     }
 
+    // Block JVM args that load arbitrary native code at launch. A malicious
+    // imported instance / modpack can carry these in `extra_java_args` and
+    // would otherwise gain RCE the moment the user clicks Play.
+    const BLOCKED_JVM_PREFIXES: &[&str] = &[
+        "-agentpath:",
+        "-agentlib:",
+        "-javaagent:",
+        "-Xbootclasspath/",
+    ];
+
     for cap in extra_args_regex.captures_iter(extra_java_args) {
         let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else {
             continue;
         };
-        command.push(arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\"));
+        let value = arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\");
+        if BLOCKED_JVM_PREFIXES.iter().any(|p| value.starts_with(p)) {
+            tracing::warn!(
+                "Blocked unsafe JVM argument from extra_java_args: {}",
+                value
+            );
+            continue;
+        }
+        command.push(value);
     }
 
     if Os::native() == Os::Osx {

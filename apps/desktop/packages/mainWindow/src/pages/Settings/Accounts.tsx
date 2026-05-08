@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
   Collapsable
 } from "@gd/ui"
-import { port, queryClient, rspc } from "@/utils/rspcClient"
+import { apiUrl, queryClient, rspc } from "@/utils/rspcClient"
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
 import Title from "./components/Title"
@@ -57,7 +57,9 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     cell: (info) => (
       <div class="flex items-center gap-4">
         <img
-          src={`http://127.0.0.1:${port}/account/headImage?uuid=${getAccountImageUuid(info.row.original)}`}
+          src={apiUrl(
+            `/account/headImage?uuid=${getAccountImageUuid(info.row.original)}`
+          )}
           class="h-8 w-8 rounded-md"
         />
         <div class="max-w-50 2xl:max-w-100 truncate">
@@ -357,7 +359,9 @@ const Accounts = () => {
               <img
                 src={
                   avatarPreview() ||
-                  `http://127.0.0.1:${port}/account/headImage?uuid=${globalStore.settings.data?.gdlAccountId}`
+                  apiUrl(
+                    `/account/headImage?uuid=${globalStore.settings.data?.gdlAccountId}`
+                  )
                 }
                 class="h-20 w-20 rounded-xl"
               />
@@ -454,7 +458,9 @@ const Accounts = () => {
                       <Trans key="accounts:_trn_microsoft_account" />:
                     </span>
                     <img
-                      src={`http://127.0.0.1:${port}/account/headImage?uuid=${globalStore.settings.data?.gdlAccountId}`}
+                      src={apiUrl(
+                        `/account/headImage?uuid=${globalStore.settings.data?.gdlAccountId}`
+                      )}
                       class="h-4 w-4 rounded"
                     />
                     <span>

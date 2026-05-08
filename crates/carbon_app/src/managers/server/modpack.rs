@@ -462,7 +462,17 @@ pub async fn process_modrinth_server_pack(
                     continue;
                 }
 
-                let out_path = data_path_clone.join(relative);
+                let out_path = match secure_path_join(&data_path_clone, relative) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tracing::warn!(
+                            "Skipping mrpack override entry with unsafe path `{}`: {}",
+                            relative,
+                            e
+                        );
+                        continue;
+                    }
+                };
 
                 if !entry.is_dir()
                     && is_preserved_config_file(relative)
@@ -585,7 +595,16 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
             continue;
         }
 
-        let out_path = target_dir.join(&relative);
+        let out_path = match secure_path_join(target_dir, &relative) {
+            Ok(p) => p,
+            Err(e) => {
+                warn!(
+                    "Skipping server pack entry with unsafe path `{}`: {}",
+                    relative, e
+                );
+                continue;
+            }
+        };
 
         // Don't clobber user-customized config files if they already exist
         // (server.properties, eula.txt, op/whitelist/banned lists, icon).

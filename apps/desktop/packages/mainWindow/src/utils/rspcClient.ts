@@ -152,6 +152,50 @@ export const queryClient = new QueryClient({
 // ---------------------------------------------------------------------------
 
 export let port: number | null = null
+export let apiToken: string | null = null
+
+const AUTH_HEADER = "x-api-token"
+const AUTH_QUERY = "_token"
+
+/** Returns `http://127.0.0.1:<port>` once initialised. */
+export function apiBase(): string {
+  if (port === null) {
+    throw new Error("rspc client not initialised")
+  }
+  return `http://127.0.0.1:${port}`
+}
+
+/** Builds a URL with the auth token appended as a query param. Use for `<img src=...>`
+ *  and any place where custom headers cannot be set. */
+export function apiUrl(path: string): string {
+  const base = `${apiBase()}${path.startsWith("/") ? path : `/${path}`}`
+  if (!apiToken) return base
+  const sep = base.includes("?") ? "&" : "?"
+  return `${base}${sep}${AUTH_QUERY}=${apiToken}`
+}
+
+/** Builds a `ws://...` URL with the auth token appended. */
+export function apiWsUrl(path: string): string {
+  if (port === null) {
+    throw new Error("rspc client not initialised")
+  }
+  const base = `ws://127.0.0.1:${port}${path.startsWith("/") ? path : `/${path}`}`
+  if (!apiToken) return base
+  const sep = base.includes("?") ? "&" : "?"
+  return `${base}${sep}${AUTH_QUERY}=${apiToken}`
+}
+
+/** Wrapper for `fetch` against the local API that attaches the auth token header. */
+export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const url = path.startsWith("http")
+    ? path
+    : `${apiBase()}${path.startsWith("/") ? path : `/${path}`}`
+  const headers = new Headers(init?.headers ?? {})
+  if (apiToken && !headers.has(AUTH_HEADER)) {
+    headers.set(AUTH_HEADER, apiToken)
+  }
+  return fetch(url, { ...init, headers })
+}
 
 async function rspcFetch<T>(
   method: "query" | "mutation",
@@ -161,17 +205,20 @@ async function rspcFetch<T>(
 ): Promise<T> {
   const base = `http://127.0.0.1:${port}/rspc/${key}`
 
+  const headers: Record<string, string> = {}
+  if (apiToken) headers[AUTH_HEADER] = apiToken
+
   let resp: Response
   if (method === "query") {
     const url =
       input !== undefined
         ? `${base}?input=${encodeURIComponent(JSON.stringify(input))}`
         : base
-    resp = await fetch(url, { signal: opts?.signal })
+    resp = await fetch(url, { signal: opts?.signal, headers })
   } else {
     resp = await fetch(base, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: input !== undefined ? JSON.stringify(input) : null,
       signal: opts?.signal
     })
@@ -287,8 +334,9 @@ export const rspc = {
 // Initialisation (called once when the backend port is known)
 // ---------------------------------------------------------------------------
 
-export default function initRspc(_port: number) {
+export default function initRspc(_port: number, _apiToken: string) {
   port = _port
+  apiToken = _apiToken
 
   const createInvalidateQuery = () => {
     let socket: WebSocket
@@ -299,7 +347,9 @@ export default function initRspc(_port: number) {
     }
 
     function connect() {
-      socket = new WebSocket(`ws://127.0.0.1:${_port}/invalidations`)
+      const base = `ws://127.0.0.1:${_port}/invalidations`
+      const url = _apiToken ? `${base}?${AUTH_QUERY}=${_apiToken}` : base
+      socket = new WebSocket(url)
 
       socket.addEventListener("open", () => {
         console.log("Invalidations channel connected")

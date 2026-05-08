@@ -52,7 +52,6 @@ export function DeviceCodeStepEnhanced(props: Props) {
   }))
 
   const userCode = () => props.deviceCodeObject?.userCode
-  const oldUserCode = () => props.deviceCodeObject?.userCode
   const deviceCodeLink = () => props.deviceCodeObject?.verificationUri
   const expiresAt = () => props.deviceCodeObject?.expiresAt
   const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime()
@@ -105,8 +104,12 @@ export function DeviceCodeStepEnhanced(props: Props) {
     }
   })
 
+  // Reset countdown when the device code rotates.
+  let prevUserCode: string | undefined
   createEffect(() => {
-    if (userCode() !== oldUserCode()) {
+    const current = userCode()
+    if (current !== prevUserCode) {
+      prevUserCode = current
       resetCountDown()
     }
   })

@@ -40,9 +40,12 @@ pub(super) async fn load_and_migrate(
 ) -> Result<PrismaClient, anyhow::Error> {
     let runtime_path = dunce::simplified(&runtime_path);
 
+    let db_path = runtime_path.join("gdl_conf.db");
     let db_uri = format!(
         "file:{}?connection_limit=1",
-        runtime_path.join("gdl_conf.db").to_str().unwrap()
+        db_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("DB path is not valid UTF-8: {:?}", db_path))?
     );
 
     let (migrations, migration_count) = carbon_repos::get_migrations();
@@ -52,6 +55,25 @@ pub(super) async fn load_and_migrate(
     debug!("Starting migration procedure");
 
     let mut conn = rusqlite::Connection::open(&db_uri)?;
+
+    // On Unix, restrict the DB (and -wal/-shm sidecars) to 0600 since they
+    // contain MS access/refresh tokens.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for sidecar in [
+            db_path.clone(),
+            db_path.with_extension("db-wal"),
+            db_path.with_extension("db-shm"),
+        ] {
+            if sidecar.exists() {
+                let _ = std::fs::set_permissions(&sidecar, std::fs::Permissions::from_mode(0o600));
+            }
+        }
+        if let Some(parent) = db_path.parent() {
+            let _ = std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700));
+        }
+    }
 
     let results: Result<i32, _> =
         conn.query_row("SELECT COUNT(*) FROM _prisma_migrations", [], |row| {
@@ -68,7 +90,8 @@ pub(super) async fn load_and_migrate(
         already_existing_migration_count
     );
 
-    conn.pragma_update(None, "journal_mode", &"WAL").unwrap();
+    conn.pragma_update(None, "journal_mode", &"WAL")
+        .map_err(|e| anyhow::anyhow!("Failed to set journal_mode=WAL: {e}"))?;
 
     if let Some(already_existing_migration_count) = already_existing_migration_count {
         conn.pragma_update(None, "user_version", &already_existing_migration_count)?;
@@ -96,7 +119,8 @@ pub(super) async fn load_and_migrate(
 
     debug!("Closing migration connection");
 
-    conn.close().unwrap();
+    conn.close()
+        .map_err(|(_, e)| anyhow::anyhow!("Failed to close migration DB connection: {e}"))?;
 
     debug!("Starting prisma connection");
 
@@ -111,22 +135,22 @@ pub(super) async fn load_and_migrate(
         ._query_raw(raw!("PRAGMA journal_mode=WAL;"))
         .exec()
         .await
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("PRAGMA journal_mode failed: {e}"))?;
     let _: Vec<Whatever> = db_client
         ._query_raw(raw!("PRAGMA synchronous=normal;"))
         .exec()
         .await
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("PRAGMA synchronous failed: {e}"))?;
     let _: Vec<Whatever> = db_client
         ._query_raw(raw!("PRAGMA temp_store=MEMORY;"))
         .exec()
         .await
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("PRAGMA temp_store failed: {e}"))?;
     let _: Vec<Whatever> = db_client
         ._query_raw(raw!("PRAGMA mmap_size = 30000000000;"))
         .exec()
         .await
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("PRAGMA mmap_size failed: {e}"))?;
 
     seed_init_db(&db_client, latest_consent_sha).await?;
 

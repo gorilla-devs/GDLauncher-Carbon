@@ -10,7 +10,7 @@ import {
   Show,
   untrack
 } from "solid-js"
-import { queryClient, rspc, port } from "@/utils/rspcClient"
+import { queryClient, rspc, apiFetch } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import ImagePicker from "@/components/ImagePicker"
 import { convertSecondsToHumanTime, blobToBase64 } from "@/utils/helpers"
@@ -243,8 +243,8 @@ const EditGDLProfile = () => {
     setAvatarDeleted(false)
 
     // Load preview
-    const response = await fetch(
-      `http://127.0.0.1:${port}/loadImage?path=${encodeURIComponent(filePath)}`
+    const response = await apiFetch(
+      `/loadImage?path=${encodeURIComponent(filePath)}`
     )
     const blob = await response.blob()
     const b64 = (await blobToBase64(blob)) as string

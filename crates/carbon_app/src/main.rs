@@ -12,7 +12,7 @@ use crate::managers::{
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{debug, info};
 
 pub mod api;
@@ -104,7 +104,7 @@ pub fn main() {
 
             // Clean up leftover temp files/folders from previous sessions
             let temp_path = carbon_rt_path::TempPath::new(runtime_path.join("temp"));
-            temp_path.cleanup_all();
+            temp_path.cleanup_all().await;
 
             info!("Starting Carbon App v{}", app_version::APP_VERSION);
 
@@ -153,20 +153,62 @@ async fn get_available_port() -> TcpListener {
     );
 }
 
+fn generate_api_token() -> String {
+    let a = uuid::Uuid::new_v4().simple().to_string();
+    let b = uuid::Uuid::new_v4().simple().to_string();
+    format!("{a}{b}")
+}
+
+async fn write_token_file(path: &std::path::Path, token: &str) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::write(path, token.as_bytes()).await?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = std::fs::Permissions::from_mode(0o600);
+        let _ = std::fs::set_permissions(path, perms);
+    }
+    Ok(())
+}
+
 async fn start_router(runtime_path: PathBuf, base_api_override: String, listener: TcpListener) {
     info!("Starting router");
     let startup_total = std::time::Instant::now();
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
 
+    // Per-process API token: required on every Axum/rspc request from the
+    // renderer. Rotated on each launch.
+    let api_token = generate_api_token();
+    crate::api::auth::set_expected_token(api_token.clone());
+
+    // Also write token to a file in the runtime path so dev-mode Electron
+    // (which doesn't pipe core_module stdout) can read it without stdout parsing.
+    let token_file = runtime_path.join(".gdl_api_token");
+    if let Err(e) = write_token_file(&token_file, &api_token).await {
+        tracing::warn!("Failed to write api token file at {:?}: {}", token_file, e);
+    }
+
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router(base_api_override.clone())
         .build()
         .arced();
 
-    // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
+    // CORS: allow renderer origins only. Electron's file:// origin appears as
+    // "null" in browsers; dev mode runs on http://localhost:* / 127.0.0.1:*.
     let cors = CorsLayer::new()
-        .allow_methods(Any)
-        .allow_headers(Any)
-        .allow_origin(Any);
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any)
+        .allow_origin(AllowOrigin::predicate(|origin, _req| {
+            let Ok(origin_str) = origin.to_str() else {
+                return false;
+            };
+            origin_str == "null"
+                || origin_str.starts_with("http://localhost:")
+                || origin_str.starts_with("http://127.0.0.1:")
+                || origin_str == "http://localhost"
+                || origin_str == "http://127.0.0.1"
+        }));
 
     let t = std::time::Instant::now();
     let app = AppInner::new(invalidation_sender, runtime_path, base_api_override).await;
@@ -220,6 +262,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
         .nest("/rspc", rspc_axum_router)
+        .layer(axum::middleware::from_fn(crate::api::auth::require_token))
         .layer(cors)
         .with_state(app1);
 
@@ -268,8 +311,8 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
                     "[startup-timing] READY emitted at {:.2}s after start_router",
                     startup_total.elapsed().as_secs_f64()
                 );
-                info!("_STATUS_:READY|{port}");
-                println!("_STATUS_:READY|{port}");
+                info!("_STATUS_:READY|{port}|<token redacted>");
+                println!("_STATUS_:READY|{port}|{api_token}");
                 break;
             }
         }

@@ -2334,16 +2334,41 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn delete_instance(&self, instance_id: InstanceId) -> anyhow::Result<()> {
         let app = self.app.clone();
 
+        // Run the actual deletion in a spawned task so the rspc call returns
+        // promptly, but log failures (previously they were dropped silently
+        // and the instance would re-appear next list).
         tokio::spawn(async move {
-            app.instance_manager()._delete_instance(instance_id).await?;
-
-            Ok::<_, anyhow::Error>(())
+            if let Err(e) = app.instance_manager()._delete_instance(instance_id).await {
+                tracing::error!("Failed to delete instance {}: {:#}", instance_id.0, e);
+                // Surface the error to the UI so the caller realizes the
+                // instance still exists.
+                app.invalidate(GET_GROUPS, None);
+                app.invalidate(GET_ALL_INSTANCES, None);
+                app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+            }
         });
 
         Ok(())
     }
 
     async fn _delete_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
+        // Drop the per-instance op-lock entry on EVERY exit path. Without this,
+        // a deletion that errors mid-way leaves an orphan entry in the DashMap,
+        // and repeated failed deletes accumulate unbounded over a long session.
+        struct OpLockGuard {
+            locks: Arc<DashMap<InstanceId, Arc<Mutex<()>>>>,
+            id: InstanceId,
+        }
+        impl Drop for OpLockGuard {
+            fn drop(&mut self) {
+                self.locks.remove(&self.id);
+            }
+        }
+        let _op_lock_guard = OpLockGuard {
+            locks: self.instance_op_locks.clone(),
+            id: instance_id,
+        };
+
         let mut instances = self.instances.write().await;
         let instance = instances
             .get_mut(&instance_id)
@@ -2440,16 +2465,24 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     /// # Locks
-    /// - [InstanceManager::instances] (w)
+    /// - [InstanceManager::instances] (w) — only briefly at start (read) and
+    ///   end (write); not held across the multi-second filesystem copy.
     pub async fn duplicate_instance(
         self,
         instance_id: InstanceId,
         name: String,
     ) -> anyhow::Result<InstanceId> {
-        let mut instances = self.instances.write().await;
-        let instance = instances
-            .get(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
+        // Step 1: snapshot what we need from `instances` under a read lock and
+        // release it before the long fs copy. Holding `instances` across the
+        // copy serialized every other op (prepare_game, list_mods, etc.) for
+        // the entire duration of duplication.
+        let (mut new_info, src_shortpath) = {
+            let instances = self.instances.read().await;
+            let instance = instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?;
+            (instance.data()?.config.clone(), instance.shortpath.clone())
+        };
 
         let group_id = self
             .app
@@ -2465,8 +2498,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             })?
             .group_id;
 
-        let mut new_info = instance.data()?.config.clone();
-        let (new_shortpath, new_path) = self.next_folder(&instance.shortpath)?;
+        let _path_guard = self.path_lock.lock().await;
+        let (new_shortpath, new_path) = self.next_folder(&src_shortpath)?;
         new_info.name = name;
 
         let path = self
@@ -2474,7 +2507,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .settings_manager()
             .runtime_path
             .get_instances()
-            .get_instance_path(&instance.shortpath)
+            .get_instance_path(&src_shortpath)
             .get_root();
 
         let tmpdir = self
@@ -2514,6 +2547,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             )
             .await?;
 
+        // Step 2: only now reacquire the write lock to insert the new entry.
+        let mut instances = self.instances.write().await;
         instances.insert(
             id,
             Instance {

@@ -1,9 +1,9 @@
 use std::{
     io::{Read, Seek},
-    path::Path,
+    path::{Component, Path, PathBuf},
 };
 use thiserror::Error;
-use tracing::trace;
+use tracing::{trace, warn};
 
 #[derive(Error, Debug)]
 pub enum CompressionError {
@@ -15,6 +15,28 @@ pub enum CompressionError {
     GenericDecompressionError(#[from] tokio::task::JoinError),
     #[error("Failed to process zip file: {0}")]
     ZipError(#[from] zip::result::ZipError),
+}
+
+/// Returns Some(joined_path) if `entry_path` is safe to extract under `dest`,
+/// or None if it is absolute, contains `..`, or otherwise escapes `dest`.
+fn safe_extract_path(dest: &Path, entry_path: &Path) -> Option<PathBuf> {
+    if entry_path.is_absolute() {
+        return None;
+    }
+    let mut joined = dest.to_path_buf();
+    for component in entry_path.components() {
+        match component {
+            Component::Normal(c) => joined.push(c),
+            Component::CurDir => (),
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return None;
+            }
+        }
+    }
+    if !joined.starts_with(dest) {
+        return None;
+    }
+    Some(joined)
 }
 
 #[derive(Debug, PartialEq)]
@@ -103,7 +125,38 @@ fn decompress_tar<R>(
 where
     R: Read,
 {
-    archive.unpack(dest_folder)?;
+    std::fs::create_dir_all(dest_folder)?;
+    let canonical_dest = dest_folder
+        .canonicalize()
+        .unwrap_or_else(|_| dest_folder.to_path_buf());
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let entry_path = entry.path()?.into_owned();
+
+        let Some(out_path) = safe_extract_path(&canonical_dest, &entry_path) else {
+            warn!(
+                "Skipping tar entry with unsafe path: {}",
+                entry_path.display()
+            );
+            continue;
+        };
+
+        if let tar::EntryType::Symlink | tar::EntryType::Link = entry.header().entry_type() {
+            warn!(
+                "Skipping tar symlink/hardlink entry: {}",
+                entry_path.display()
+            );
+            continue;
+        }
+
+        if let Some(parent) = out_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        entry.unpack(&out_path)?;
+    }
+
     Ok(())
 }
 
