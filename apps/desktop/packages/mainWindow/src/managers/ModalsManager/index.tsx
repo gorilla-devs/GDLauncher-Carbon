@@ -17,6 +17,7 @@ import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
 import { listenServerEula } from "@/utils/serverEulaBridge"
 import { cleanupRunning } from "./modals/CacheCleanup/state"
 import { shaderInstallRunning } from "./modals/ShaderLoaderSetup/state"
+import { isChangingRuntimePath } from "./modals/ConfirmChangeRuntimePath/state"
 
 export interface ModalProps {
   title: string
@@ -124,7 +125,11 @@ const getDefaultModals = (t: TypedTFunction) => ({
   },
   ConfirmChangeRuntimePath: {
     component: lazy(() => import("./modals/ConfirmChangeRuntimePath")),
-    title: t("modals:_trn_confirm_change_runtime_path")
+    title: t("modals:_trn_confirm_change_runtime_path"),
+    // Backdrop and side-panel close are blocked while the migration is
+    // running. Closing mid-flight would orphan files between old and new
+    // runtime paths.
+    preventClose: () => isChangingRuntimePath()
   },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),

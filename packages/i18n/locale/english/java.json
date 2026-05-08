@@ -51,6 +51,8 @@
   "_trn_confirm_change_runtime_path_already_used_text": "Are you sure you want to change the runtime path? Since the target folder is already in use, this will simply switch the runtime path configuration and no files will be moved or copied.",
   "_trn_applying_new_runtime_path": "Applying new runtime path...",
   "_trn_do_not_close_app": "Do not close the app. It will restart automatically once it's done.",
+  "_trn_do_not_close_app_or_pc_title": "Migration in progress — do not close the app or shut down your PC",
+  "_trn_do_not_close_app_or_pc_body": "Closing the launcher or powering off mid-migration will leave your data split between the old and new locations. The app will restart automatically once it's done.",
   "_trn_migration_errored": "Runtime path migration failed. State might be corrupted. Click <0>here</0> for more info on how to proceed.",
   "_trn_scanning_files": "Scanning files...",
   "_trn_copying_file": "Copying {{file}}",
