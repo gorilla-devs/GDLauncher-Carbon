@@ -88,7 +88,7 @@ function withAdsLayout(props: { children?: JSX.Element }) {
             </div>
           </div>
         </Show>
-        <div class="z-99 flex min-h-0 w-screen flex-1">
+        <div class="flex min-h-0 w-screen flex-1">
           <main class="relative grow">
             <div class="flex h-full justify-end">
               <div

@@ -1184,6 +1184,37 @@ ipcMain.handle("getCoreModule", async () => {
   // we can assume this promise never rejects
   const cm = await coreModule
 
+  // In dev mode the rust core can be restarted independently of Electron
+  // (e.g., the developer kills `pnpm watch:core` and re-runs it), and each
+  // boot rotates the per-process API token. The cached `coreModule` promise
+  // would then keep handing out the stale boot-time token, making every
+  // request 401 after a renderer reload (Ctrl+R) — even though the token
+  // file on disk is fresh. Re-read the file here so the renderer always
+  // gets whatever token the currently-running rust core is expecting.
+  //
+  // In production the rust core is a child process spawned by Electron, so
+  // its lifetime is tied to ours and the cached token cannot drift.
+  if (isDev && cm.type === "success") {
+    try {
+      const apiToken = await readDevApiToken()
+      return {
+        type: cm.type,
+        logs: undefined,
+        port: cm.result.port,
+        apiToken
+      }
+    } catch (err) {
+      // File disappeared (rust core stopped). Surface as an error so the
+      // renderer shows the same fatal-load UI it would on first start.
+      return {
+        type: "error" as const,
+        logs: [{ type: "error" as const, message: String(err) }],
+        port: undefined,
+        apiToken: undefined
+      }
+    }
+  }
+
   return {
     type: cm.type,
     logs: cm.type === "error" ? cm.logs : undefined,
