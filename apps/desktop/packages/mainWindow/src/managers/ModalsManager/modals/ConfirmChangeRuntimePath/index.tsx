@@ -105,9 +105,9 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
       </ModalLayout>
 
       <Show when={isChangingRuntimePath() || migrationError()}>
-        <Portal>
+        <Portal mount={document.getElementById("overlay")!}>
           <div
-            class="z-100 fixed inset-0 flex flex-col items-center justify-center bg-opacity-65 p-8 backdrop-blur-sm"
+            class="z-9999 fixed inset-0 flex flex-col items-center justify-center bg-opacity-65 p-8 backdrop-blur-sm"
             classList={{
               "bg-black": !migrationError(),
               "bg-red-900": !!migrationError()
