@@ -300,49 +300,24 @@ export type CoreModule = () => Promise<
     }
 >
 
-async function readDevApiToken(): Promise<string> {
-  const tokenPath = path.join(CURRENT_RUNTIME_PATH!, ".gdl_api_token")
-  // The dev rust process may take a moment to start. Poll briefly.
-  for (let i = 0; i < 100; i++) {
-    try {
-      const value = await fs.readFile(tokenPath, "utf8")
-      const trimmed = value.trim()
-      if (trimmed.length > 0) {
-        return trimmed
-      }
-    } catch {
-      // file not ready yet
-    }
-    await new Promise((r) => setTimeout(r, 200))
-  }
-  throw new Error(
-    `Could not read dev api token at ${tokenPath} — is the rust core running?`
-  )
-}
+// Must match DEV_API_TOKEN in crates/carbon_app/src/main.rs.
+// Debug builds of the rust core accept this fixed token; release builds
+// rotate randomly per launch.
+const DEV_API_TOKEN = "dev-mode-only-do-not-use-in-production"
 
 const loadCoreModule: CoreModule = () =>
   new Promise((resolve, _) => {
     console.log("Loading core module...")
     if (isDev) {
-      readDevApiToken()
-        .then((apiToken) => {
-          resolve({
-            type: "success",
-            result: {
-              port: 4650,
-              apiToken,
-              kill: () => {}
-            }
-          })
-          console.log("Core module loaded in development mode")
-        })
-        .catch((err) => {
-          console.error("[CORE] Dev mode token load failed:", err)
-          resolve({
-            type: "error",
-            logs: [{ type: "error", message: String(err) }]
-          })
-        })
+      resolve({
+        type: "success",
+        result: {
+          port: 4650,
+          apiToken: DEV_API_TOKEN,
+          kill: () => {}
+        }
+      })
+      console.log("Core module loaded in development mode")
       return
     }
 
@@ -1183,37 +1158,6 @@ ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
 ipcMain.handle("getCoreModule", async () => {
   // we can assume this promise never rejects
   const cm = await coreModule
-
-  // In dev mode the rust core can be restarted independently of Electron
-  // (e.g., the developer kills `pnpm watch:core` and re-runs it), and each
-  // boot rotates the per-process API token. The cached `coreModule` promise
-  // would then keep handing out the stale boot-time token, making every
-  // request 401 after a renderer reload (Ctrl+R) — even though the token
-  // file on disk is fresh. Re-read the file here so the renderer always
-  // gets whatever token the currently-running rust core is expecting.
-  //
-  // In production the rust core is a child process spawned by Electron, so
-  // its lifetime is tied to ours and the cached token cannot drift.
-  if (isDev && cm.type === "success") {
-    try {
-      const apiToken = await readDevApiToken()
-      return {
-        type: cm.type,
-        logs: undefined,
-        port: cm.result.port,
-        apiToken
-      }
-    } catch (err) {
-      // File disappeared (rust core stopped). Surface as an error so the
-      // renderer shows the same fatal-load UI it would on first start.
-      return {
-        type: "error" as const,
-        logs: [{ type: "error" as const, message: String(err) }],
-        port: undefined,
-        apiToken: undefined
-      }
-    }
-  }
 
   return {
     type: cm.type,

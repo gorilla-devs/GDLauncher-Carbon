@@ -153,24 +153,18 @@ async fn get_available_port() -> TcpListener {
     );
 }
 
+/// In dev builds the token must be a fixed value the Electron renderer can
+/// hardcode — production builds rotate per launch. This string is intentionally
+/// recognizable so it's obvious if it ever leaks into a non-debug build.
+const DEV_API_TOKEN: &str = "dev-mode-only-do-not-use-in-production";
+
 fn generate_api_token() -> String {
+    if cfg!(debug_assertions) {
+        return DEV_API_TOKEN.to_string();
+    }
     let a = uuid::Uuid::new_v4().simple().to_string();
     let b = uuid::Uuid::new_v4().simple().to_string();
     format!("{a}{b}")
-}
-
-async fn write_token_file(path: &std::path::Path, token: &str) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent).await?;
-    }
-    tokio::fs::write(path, token.as_bytes()).await?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o600);
-        let _ = std::fs::set_permissions(path, perms);
-    }
-    Ok(())
 }
 
 async fn start_router(runtime_path: PathBuf, base_api_override: String, listener: TcpListener) {
@@ -179,16 +173,10 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
 
     // Per-process API token: required on every Axum/rspc request from the
-    // renderer. Rotated on each launch.
+    // renderer. Rotated on each launch in release builds; fixed in dev so the
+    // Electron renderer can hardcode the same value.
     let api_token = generate_api_token();
     crate::api::auth::set_expected_token(api_token.clone());
-
-    // Also write token to a file in the runtime path so dev-mode Electron
-    // (which doesn't pipe core_module stdout) can read it without stdout parsing.
-    let token_file = runtime_path.join(".gdl_api_token");
-    if let Err(e) = write_token_file(&token_file, &api_token).await {
-        tracing::warn!("Failed to write api token file at {:?}: {}", token_file, e);
-    }
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router(base_api_override.clone())
         .build()

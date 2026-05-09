@@ -460,6 +460,29 @@ impl CacheTargets {
     }
 
     fn set_override(&mut self, target: CacheTarget) {
+        // Coalesce overrides for the same entity. Otherwise a second waiter
+        // (e.g. dependency mod + parent mod racing to wait on the same
+        // instance's cache pass) would cancel the first one's callback,
+        // failing the in-flight install with "Backend override was canceled".
+        if let Some(existing) = self.backend_override.as_mut() {
+            if existing.entity_id == target.entity_id {
+                let prior = existing.callback.take();
+                let new = target.callback;
+                existing.callback = Some(Box::new(move |r: anyhow::Result<()>| {
+                    let r2 = match &r {
+                        Ok(()) => Ok(()),
+                        Err(e) => Err(anyhow!("{e:#}")),
+                    };
+                    if let Some(cb) = prior {
+                        cb.complete(r);
+                    }
+                    if let Some(cb) = new {
+                        cb.complete(r2);
+                    }
+                }));
+                return;
+            }
+        }
         self.cancel_override();
         self.backend_override = Some(target);
     }
