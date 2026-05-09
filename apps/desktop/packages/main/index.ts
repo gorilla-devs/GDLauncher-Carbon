@@ -474,7 +474,10 @@ const loadCoreModule: CoreModule = () =>
             }
 
             lastCoreModuleProgress = progress
-            getWin()?.webContents.send("coreModuleProgress", progress)
+            const w = getWin()
+            if (w && !w.isDestroyed()) {
+              w.webContents.send("coreModuleProgress", progress)
+            }
           }
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
           const rightPart = row.split(":")[1]
@@ -486,14 +489,20 @@ const loadCoreModule: CoreModule = () =>
             console.log("Game launched, action:", action)
             switch (action) {
               case "closeWindow":
-                win?.close()
+                if (win && !win.isDestroyed()) {
+                  win.close()
+                }
                 win = null
                 break
               case "hideWindow":
-                win?.hide()
+                if (win && !win.isDestroyed()) {
+                  win.hide()
+                }
                 break
               case "minimizeWindow":
-                win?.minimize()
+                if (win && !win.isDestroyed()) {
+                  win.minimize()
+                }
                 break
               case "none":
                 break
@@ -672,6 +681,10 @@ async function createWindow(): Promise<BrowserWindow> {
       webSecurity: true,
       additionalArguments: [`--skip-intro-animation=${skipIntroAnimation}`]
     }
+  })
+
+  win.on("closed", () => {
+    win = null
   })
 
   win.on("move", () => {

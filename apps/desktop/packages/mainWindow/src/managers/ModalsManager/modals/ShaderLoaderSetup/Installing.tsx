@@ -1,19 +1,8 @@
 import { Progress, Spinner } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
-import {
-  createSignal,
-  onMount,
-  onCleanup,
-  Match,
-  Switch,
-  Show
-} from "solid-js"
-import type {
-  FETask,
-  FESubtask,
-  Translation
-} from "@gd/core_module/bindings"
+import { createSignal, onMount, onCleanup, Match, Switch, Show } from "solid-js"
+import type { FETask, FESubtask, Translation } from "@gd/core_module/bindings"
 import type { StepProps } from "."
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"

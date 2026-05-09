@@ -199,6 +199,8 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
               }}
               preventClick={props.justDropped()}
               onSelectExclusive={() => props.onSelectExclusive?.(props.item.id)}
+              selectedCount={props.selectedCount}
+              onBatchDelete={props.onBatchDelete}
             />
           )}
         </Show>
