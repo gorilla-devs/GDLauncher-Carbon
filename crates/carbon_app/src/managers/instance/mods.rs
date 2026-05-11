@@ -682,17 +682,23 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let metadata = m
-            .metadata
-            .expect("metadata must be associated with a ModFileCache entry");
+        let metadata = m.metadata.ok_or_else(|| {
+            anyhow!("metadata missing for ModFileCache entry {} on instance {instance_id} — cache row likely deleted concurrently", id)
+        })?;
 
-        let cf = metadata
-            .curseforge
-            .expect("curseforge metadata was queried but not returned");
+        let cf = metadata.curseforge.ok_or_else(|| {
+            anyhow!(
+                "curseforge metadata was queried but not returned for mod {}",
+                id
+            )
+        })?;
 
-        let mr = metadata
-            .modrinth
-            .expect("modrinth metadata was queried but not returned");
+        let mr = metadata.modrinth.ok_or_else(|| {
+            anyhow!(
+                "modrinth metadata was queried but not returned for mod {}",
+                id
+            )
+        })?;
 
         let mut versions = Vec::new();
 
@@ -759,14 +765,18 @@ impl ManagerRef<'_, InstanceManager> {
 
                     match &version {
                         RemoteVersion::Curseforge(file) => {
-                            let cf = cf.expect("curseforge metadata must be present if operating on a curseforge version");
+                            let cf = cf.as_ref().ok_or_else(|| {
+                                anyhow!("curseforge metadata missing while comparing curseforge version (mod {})", id)
+                            })?;
 
                             if cf.file_id == file.id {
                                 break 'select;
                             }
                         }
                         RemoteVersion::Modrinth(version) => {
-                            let mr = mr.expect("modrinth metadata must be present if operating on a modrinth version");
+                            let mr = mr.as_ref().ok_or_else(|| {
+                                anyhow!("modrinth metadata missing while comparing modrinth version (mod {})", id)
+                            })?;
 
                             if mr.version_id == version.id {
                                 break 'select;

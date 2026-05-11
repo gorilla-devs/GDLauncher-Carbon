@@ -1,6 +1,7 @@
 import { rspc } from "@/utils/rspcClient"
 import { createSignal } from "solid-js"
 import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
+import { useModal } from "@/managers/ModalsManager"
 
 interface UseModInstallationProps {
   addon: FEUnifiedSearchResult | undefined
@@ -9,6 +10,8 @@ interface UseModInstallationProps {
 }
 
 export const useModInstallation = (props: UseModInstallationProps) => {
+  const modalsContext = useModal()
+  const ctx = rspc.useContext()
   const [instanceLoadingStates, setInstanceLoadingStates] = createSignal<
     Map<number, boolean>
   >(new Map())
@@ -67,6 +70,49 @@ export const useModInstallation = (props: UseModInstallationProps) => {
         }
   }
 
+  const maybeOpenShaderWizard = async (
+    instanceId: number
+  ): Promise<boolean> => {
+    if (props.addon?.type !== "shader") return false
+    try {
+      const recommendation = await ctx.client.query([
+        "instance.checkShaderRequirements",
+        instanceId
+      ])
+      if (recommendation.kind === "LoaderPresent") return false
+
+      modalsContext?.openModal(
+        { name: "shaderLoaderSetup" },
+        {
+          recommendation,
+          instanceId,
+          installLatest: !props.fileId,
+          modSource: !props.fileId ? undefined : modInstallObj(),
+          latestModSource: !props.fileId ? latestModInstallObj() : undefined,
+          replacesMod: null,
+          onComplete: (taskId: number | null) => {
+            if (taskId !== null) {
+              setInstanceTaskIds((prev) => {
+                const newMap = new Map(prev)
+                newMap.set(instanceId, taskId)
+                return newMap
+              })
+            }
+            setInstanceLoadingStates((prev) => {
+              const newMap = new Map(prev)
+              newMap.delete(instanceId)
+              return newMap
+            })
+          }
+        }
+      )
+      return true
+    } catch (e) {
+      console.error("Shader preflight failed", e)
+      return false
+    }
+  }
+
   const handleInstanceSelection = async (instanceId: number) => {
     if (!props.addon) return
 
@@ -78,6 +124,10 @@ export const useModInstallation = (props: UseModInstallationProps) => {
     })
 
     try {
+      if (await maybeOpenShaderWizard(instanceId)) {
+        return
+      }
+
       let taskId: number
 
       if (!props.fileId) {
@@ -152,6 +202,7 @@ export const useModInstallation = (props: UseModInstallationProps) => {
     handleServerInstall,
     clearInstanceLoadingState,
     latestModInstallObj,
-    modInstallObj
+    modInstallObj,
+    maybeOpenShaderWizard
   }
 }

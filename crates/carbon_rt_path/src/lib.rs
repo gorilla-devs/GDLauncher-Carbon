@@ -331,19 +331,29 @@ impl TempPath {
     }
 
     /// Clean up all temp files/folders. Should be called on startup.
-    pub fn cleanup_all(&self) {
-        let Ok(read_dir) = std::fs::read_dir(&self.0) else {
-            return;
-        };
+    /// Runs the (potentially slow) tree walk on a blocking thread so it
+    /// doesn't stall the tokio runtime if temp accumulated GBs across
+    /// interrupted modpack installs.
+    pub async fn cleanup_all(&self) {
+        let root = self.0.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            let Ok(read_dir) = std::fs::read_dir(&root) else {
+                return;
+            };
 
-        for entry in read_dir.filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if path.is_dir() {
-                let _ = std::fs::remove_dir_all(&path);
-            } else {
-                let _ = std::fs::remove_file(&path);
+            for entry in read_dir.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                let res = if path.is_dir() {
+                    std::fs::remove_dir_all(&path)
+                } else {
+                    std::fs::remove_file(&path)
+                };
+                if let Err(e) = res {
+                    tracing::warn!("Failed to clean up temp entry {}: {}", path.display(), e);
+                }
             }
-        }
+        })
+        .await;
     }
 }
 
@@ -503,37 +513,43 @@ pub async fn copy_dir_filter<F>(from: &Path, to: &Path, filter: F) -> anyhow::Re
 where
     F: for<'a> Fn(&'a Path) -> bool,
 {
-    let entries = walkdir::WalkDir::new(from).into_iter().filter_map(|entry| {
-        let Ok(entry) = entry else { return None };
+    // Don't follow symlinks during recursive copy: a symlink in the source
+    // pointing outside `from` would otherwise leak files into `to` (or hang
+    // on cycles). The runtime-path migration in particular needs this safety.
+    let entries = walkdir::WalkDir::new(from)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|entry| {
+            let Ok(entry) = entry else { return None };
 
-        let srcpath = entry.path().to_path_buf();
-        let relpath = match srcpath.strip_prefix(from) {
-            Ok(rel) => rel,
-            Err(_) => {
-                // Path is not relative to source directory, skip it
+            let srcpath = entry.path().to_path_buf();
+            let relpath = match srcpath.strip_prefix(from) {
+                Ok(rel) => rel,
+                Err(_) => {
+                    // Path is not relative to source directory, skip it
+                    return None;
+                }
+            };
+
+            if !filter(&relpath) {
                 return None;
             }
-        };
 
-        if !filter(&relpath) {
-            return None;
-        }
+            let destpath = to.join(relpath);
 
-        let destpath = to.join(relpath);
-
-        Some(async move {
-            if entry.metadata()?.is_dir() {
-                tokio::fs::create_dir_all(destpath).await?;
-            } else {
-                if let Some(parent) = destpath.parent() {
-                    tokio::fs::create_dir_all(parent).await?;
+            Some(async move {
+                if entry.metadata()?.is_dir() {
+                    tokio::fs::create_dir_all(destpath).await?;
+                } else {
+                    if let Some(parent) = destpath.parent() {
+                        tokio::fs::create_dir_all(parent).await?;
+                    }
+                    tokio::fs::copy(srcpath, destpath).await?;
                 }
-                tokio::fs::copy(srcpath, destpath).await?;
-            }
 
-            Ok::<_, anyhow::Error>(())
-        })
-    });
+                Ok::<_, anyhow::Error>(())
+            })
+        });
 
     futures::future::join_all(entries)
         .await

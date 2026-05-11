@@ -1,4 +1,4 @@
-import { port } from "@/utils/rspcClient"
+import { apiWsUrl } from "@/utils/rspcClient"
 import { Progress } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import { createEffect, createSignal, onCleanup, Show } from "solid-js"
@@ -35,7 +35,7 @@ const Metrics = (props: MetricsProps) => {
     }
 
     const wsConnection = new WebSocket(
-      `ws://127.0.0.1:${port}/server/metrics?id=${props.serverId}`
+      apiWsUrl(`/server/metrics?id=${props.serverId}`)
     )
 
     wsConnection.onmessage = (event) => {

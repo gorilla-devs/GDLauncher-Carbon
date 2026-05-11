@@ -63,17 +63,19 @@ render(() => {
   >(undefined)
 
   const [coreModuleLoaded] = createResource(async () => {
-    let port
+    let result: { port: number; apiToken: string } | Error
     try {
       const coreModule = await window.getCoreModule()
 
       if (coreModule?.type === "success") {
-        const convertedPort = Number(coreModule.port)
-        port = convertedPort
+        result = {
+          port: Number(coreModule.port),
+          apiToken: coreModule.apiToken
+        }
       } else if (coreModule?.type === "backwardsMigration") {
         console.log("Backwards migration detected, showing dedicated UI")
         window.backwardsMigrationError()
-        port = new Error("BackwardsMigration")
+        result = new Error("BackwardsMigration")
       } else {
         if (coreModule.logs) {
           console.error(
@@ -86,19 +88,19 @@ render(() => {
           window.fatalError("Unknown error", "CoreModule")
         }
 
-        port = new Error("CoreModule")
+        result = new Error("CoreModule")
       }
     } catch (e) {
       console.error("CoreModule getCoreModule failed", e)
       window.fatalError(e as any, "CoreModule")
-      port = new Error("CoreModule")
+      result = new Error("CoreModule")
     }
 
-    if (port instanceof Error) {
-      throw port
+    if (result instanceof Error) {
+      throw result
     }
 
-    return port
+    return result
   })
 
   window.listenToCoreModuleProgress((_, progress) => {
@@ -144,7 +146,11 @@ render(() => {
           <Switch>
             <Match when={isReady()}>
               <InnerApp
-                port={coreModuleLoaded() as unknown as number}
+                port={(coreModuleLoaded() as unknown as { port: number }).port}
+                apiToken={
+                  (coreModuleLoaded() as unknown as { apiToken: string })
+                    .apiToken
+                }
                 isBackendReady={true}
               />
               <Toaster />
@@ -175,11 +181,12 @@ render(() => {
 
 interface InnerAppProps {
   port: number
+  apiToken: string
   isBackendReady: boolean
 }
 
 const InnerApp = (props: InnerAppProps) => {
-  const { createInvalidateQuery } = initRspc(props.port)
+  const { createInvalidateQuery } = initRspc(props.port, props.apiToken)
 
   return (
     <QueryClientProvider client={queryClient}>

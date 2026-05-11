@@ -12,12 +12,12 @@ export const createTypeColumn = (config: TypeColumnConfig) => {
   const [t] = useTransContext()
   const columnHelper = createColumnHelper<any>()
 
-  return columnHelper.display({
+  return columnHelper.accessor((row) => config.getAddonType(row), {
     id: "type",
     header: () => (
       <span class="hidden lg:inline">{t("content:_trn_table.type")}</span>
     ),
-    size: 104,
+    size: 124,
     cell: (props) => {
       const addonType = config.getAddonType(props.row.original)
       return (
@@ -31,6 +31,6 @@ export const createTypeColumn = (config: TypeColumnConfig) => {
         </div>
       )
     },
-    enableSorting: false
+    sortingFn: "alphanumeric"
   })
 }

@@ -43,11 +43,11 @@ const General = () => {
     mutationKey: ["settings.setSettings"]
   }))
 
-  // Cheap: just stats the db/wal files. The full breakdown (which runs
-  // SUM(length(col)) across every cache table + walks the assets/libs dirs)
-  // only runs when the user opens the cleanup modal.
-  const totalCacheSize = rspc.createQuery(() => ({
-    queryKey: ["settings.getTotalCacheSize"]
+  // Per-scope cache sizes — gdlauncher (db + temp + logs) and minecraft
+  // (assets + libraries + natives). Walks dirs once on the backend; the
+  // CacheCleanup modal shares this query so the walk runs once per visit.
+  const cacheSizes = rspc.createQuery(() => ({
+    queryKey: ["settings.getCacheSizes"]
   }))
 
   createEffect(() => {
@@ -486,11 +486,13 @@ const General = () => {
                 <Trans key="settings:_trn_cache_storage_clean_up" />
               </Button>
               <Show
-                when={totalCacheSize.data !== undefined}
+                when={cacheSizes.data !== undefined}
                 fallback={<Skeleton class="h-3 w-16" />}
               >
                 <div class="text-lightSlate-400 text-xs tabular-nums">
-                  {formatBytes(totalCacheSize.data!)}
+                  {formatBytes(
+                    cacheSizes.data!.gdlauncher + cacheSizes.data!.minecraft
+                  )}
                 </div>
               </Show>
             </div>

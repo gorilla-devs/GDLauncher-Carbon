@@ -592,7 +592,7 @@ const Mod = (props: Props) => {
                           size="small"
                           onClick={() => {
                             navigator.navigate(
-                              `/mods/${
+                              `/addon/${
                                 props.mod.curseforge?.project_id
                               }/curseforge?instanceId=${instanceId()}`
                             )
@@ -643,9 +643,9 @@ const Mod = (props: Props) => {
                           size="small"
                           onClick={() => {
                             navigator.navigate(
-                              `/mods/${
+                              `/addon/${
                                 props.mod.modrinth?.project_id
-                              }/modrith?instanceId=${instanceId()}`
+                              }/modrinth?instanceId=${instanceId()}`
                             )
                           }}
                         >
@@ -703,7 +703,7 @@ const Mod = (props: Props) => {
                         class="text-md hover:bg-darkSlate-800 flex justify-between gap-4 p-4"
                         onClick={() => {
                           navigator.navigate(
-                            `/mods/${
+                            `/addon/${
                               props.mod.modrinth?.project_id
                             }/modrinth/versions?instanceId=${instanceId()}`
                           )
@@ -722,7 +722,7 @@ const Mod = (props: Props) => {
                         class="hover:bg-darkSlate-800 text-md flex justify-between gap-4 p-4"
                         onClick={() => {
                           navigator.navigate(
-                            `/mods/${
+                            `/addon/${
                               props.mod.curseforge?.project_id
                             }/curseforge/versions?instanceId=${instanceId()}`
                           )

@@ -41,6 +41,8 @@ interface Props {
   onDragStart?: (e: PointerEvent) => void
   preventClick?: boolean
   onSelectExclusive?: () => void
+  selectedCount?: number
+  onBatchDelete?: () => void
 }
 
 interface ProgressState {
@@ -218,110 +220,133 @@ const ServerTile = (props: Props) => {
       }}
     >
       <ContextMenuContent>
-        <ContextMenuGroup>
-          <ContextMenuGroupLabel>{props.server.name}</ContextMenuGroupLabel>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            class="flex items-center gap-2"
-            onClick={handleClick}
-            disabled={isInstalling()}
-          >
-            <div class="i-hugeicons:computer-terminal-01 h-4 w-4" />
-            {t("instances:_trn_server_dashboard")}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <Switch>
-            <Match when={!isRunning()}>
+        <Show
+          when={props.isMultiSelected && (props.selectedCount ?? 0) > 1}
+          fallback={
+            <ContextMenuGroup>
+              <ContextMenuGroupLabel>{props.server.name}</ContextMenuGroupLabel>
+              <ContextMenuSeparator />
               <ContextMenuItem
                 class="flex items-center gap-2"
-                onClick={() => startServerMutation.mutate(props.server.id)}
-                disabled={isBusy() || isDeleting() || isInstalling()}
+                onClick={handleClick}
+                disabled={isInstalling()}
               >
-                <div class="i-hugeicons:play h-4 w-4" />
-                {t("instances:_trn_server_start")}
+                <div class="i-hugeicons:computer-terminal-01 h-4 w-4" />
+                {t("instances:_trn_server_dashboard")}
               </ContextMenuItem>
-            </Match>
-            <Match when={isRunning()}>
+              <ContextMenuSeparator />
+              <Switch>
+                <Match when={!isRunning()}>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={() => startServerMutation.mutate(props.server.id)}
+                    disabled={isBusy() || isDeleting() || isInstalling()}
+                  >
+                    <div class="i-hugeicons:play h-4 w-4" />
+                    {t("instances:_trn_server_start")}
+                  </ContextMenuItem>
+                </Match>
+                <Match when={isRunning()}>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={() => stopServerMutation.mutate(props.server.id)}
+                    disabled={isBusy()}
+                  >
+                    <div class="i-hugeicons:stop h-4 w-4" />
+                    {t("instances:_trn_server_stop")}
+                  </ContextMenuItem>
+                </Match>
+              </Switch>
+              <ContextMenuSeparator />
               <ContextMenuItem
                 class="flex items-center gap-2"
-                onClick={() => stopServerMutation.mutate(props.server.id)}
-                disabled={isBusy()}
+                closeOnSelect={false}
+                onClick={() => {
+                  setFavoriteMutation.mutate({
+                    id: props.server.id,
+                    favorite: !props.server.favorite
+                  })
+                }}
               >
-                <div class="i-hugeicons:stop h-4 w-4" />
-                {t("instances:_trn_server_stop")}
+                <div
+                  class="i-hugeicons:star h-4 w-4"
+                  classList={{ "text-yellow-500": props.server.favorite }}
+                />
+                {props.server.favorite
+                  ? t("instances:_trn_remove_favorite")
+                  : t("instances:_trn_add_favorite")}
               </ContextMenuItem>
-            </Match>
-          </Switch>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            class="flex items-center gap-2"
-            closeOnSelect={false}
-            onClick={() => {
-              setFavoriteMutation.mutate({
-                id: props.server.id,
-                favorite: !props.server.favorite
-              })
-            }}
-          >
-            <div
-              class="i-hugeicons:star h-4 w-4"
-              classList={{ "text-yellow-500": props.server.favorite }}
-            />
-            {props.server.favorite
-              ? t("instances:_trn_remove_favorite")
-              : t("instances:_trn_add_favorite")}
-          </ContextMenuItem>
-          <ContextMenuItem
-            class="flex items-center gap-2"
-            onClick={handleRename}
-          >
-            <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
-            {t("instances:_trn_server_rename")}
-          </ContextMenuItem>
-          <ContextMenuItem
-            class="flex items-center gap-2"
-            onClick={handleSettings}
-            disabled={isDeleting() || isInstalling()}
-          >
-            <div class="i-hugeicons:settings-01 h-4 w-4" />
-            {t("instances:_trn_action_settings")}
-          </ContextMenuItem>
-          <ContextMenuItem
-            class="flex items-center gap-2"
-            onClick={() => openFolderMutation.mutate(props.server.id)}
-          >
-            <div class="i-hugeicons:folder-open h-4 w-4" />
-            {t("instances:_trn_action_open_folder")}
-          </ContextMenuItem>
-          <ContextMenuItem
-            class="flex items-center gap-2"
-            onClick={() => {
-              modalsContext?.openModal(
-                { name: "confirmReinstall" },
-                {
-                  id: props.server.id,
-                  name: props.server.name,
-                  isServer: true
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={handleRename}
+              >
+                <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
+                {t("instances:_trn_server_rename")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={handleSettings}
+                disabled={isDeleting() || isInstalling()}
+              >
+                <div class="i-hugeicons:settings-01 h-4 w-4" />
+                {t("instances:_trn_action_settings")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={() => openFolderMutation.mutate(props.server.id)}
+              >
+                <div class="i-hugeicons:folder-open h-4 w-4" />
+                {t("instances:_trn_action_open_folder")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={() => {
+                  modalsContext?.openModal(
+                    { name: "confirmReinstall" },
+                    {
+                      id: props.server.id,
+                      name: props.server.name,
+                      isServer: true
+                    }
+                  )
+                }}
+                // Backend rejects reinstall on anything but a stopped server.
+                // Match that here instead of enumerating busy states piecemeal.
+                disabled={
+                  !props.server.modpackInfo || statusKey() !== "stopped"
                 }
-              )
-            }}
-            disabled={
-              !props.server.modpackInfo || isDeleting() || isInstalling()
-            }
-          >
-            <div class="i-hugeicons:refresh h-4 w-4" />
-            {t("instances:_trn_instance_settings.reinstall")}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            class="flex items-center gap-2 text-red-400"
-            onClick={handleDelete}
-            disabled={isDeleting()}
-          >
-            <div class="i-hugeicons:delete-02 h-4 w-4" />
-            {t("instances:_trn_action_delete")}
-          </ContextMenuItem>
-        </ContextMenuGroup>
+              >
+                <div class="i-hugeicons:refresh h-4 w-4" />
+                {t("instances:_trn_instance_settings.reinstall")}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                class="flex items-center gap-2 text-red-400"
+                onClick={handleDelete}
+                disabled={isDeleting()}
+              >
+                <div class="i-hugeicons:delete-02 h-4 w-4" />
+                {t("instances:_trn_action_delete")}
+              </ContextMenuItem>
+            </ContextMenuGroup>
+          }
+        >
+          <ContextMenuGroup>
+            <ContextMenuGroupLabel>
+              {t("content:_trn_selected_count", {
+                count: props.selectedCount
+              })}
+            </ContextMenuGroupLabel>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              class="flex items-center gap-2"
+              onClick={() => props.onBatchDelete?.()}
+            >
+              <div class="i-hugeicons:delete-02 h-4 w-4" />
+              {t("content:_trn_delete_selected")}
+            </ContextMenuItem>
+          </ContextMenuGroup>
+        </Show>
       </ContextMenuContent>
       <ContextMenuTrigger>
         <BaseTile

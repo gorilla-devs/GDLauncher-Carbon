@@ -49,11 +49,14 @@ const SelectionBorder = (props: SelectionBorderProps) => {
   const borderRadius = 16 // rounded-2xl = 1rem = 16px
   const strokeWidth = 2
 
-  // SVG is 4px larger than tile to accommodate stroke
+  // SVG matches the BaseTile's wrapper exactly (image + 2px padding on each side).
+  // The stroke is placed flush with the image's outer edge (centered on x=2,y=2 from
+  // the SVG origin) so there's no visible gap between the outline and the image.
   const svgSize = createMemo(() => tileDimension() + 4)
 
-  // Rect is inset by 1px on each side (for stroke centering)
-  const rectSize = createMemo(() => svgSize() - 2)
+  // Rect tracks the image bounds (inset 2px from SVG edges). Stroke is 2px wide
+  // and centers on the rect edge → 1px overlay on the image, 1px on the wrapper.
+  const rectSize = createMemo(() => tileDimension())
 
   // Calculate perimeter for rounded rectangle
   // P = 2(w - 2r) + 2(h - 2r) + 2πr = 2w + 2h - 8r + 2πr
@@ -67,15 +70,15 @@ const SelectionBorder = (props: SelectionBorderProps) => {
       <svg
         class="absolute pointer-events-none z-10"
         style={{
-          top: "-2px",
-          left: "-2px",
+          top: "0px",
+          left: "0px",
           width: `${svgSize()}px`,
           height: `${svgSize()}px`
         }}
       >
         <rect
-          x="1"
-          y="1"
+          x="2"
+          y="2"
           width={rectSize()}
           height={rectSize()}
           rx={borderRadius}

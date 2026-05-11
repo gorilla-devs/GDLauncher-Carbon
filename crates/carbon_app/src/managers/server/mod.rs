@@ -1060,17 +1060,32 @@ impl ManagerRef<'_, ServerManager> {
         let lock = self.get_op_lock(id);
         let _guard = lock.lock().await;
 
-        // Check current state
+        // Check current state — block start while any non-stopped state is
+        // active. In particular, `Installing` means a background task is
+        // wiping/repopulating server files, so launching now would point at
+        // an inconsistent data dir.
         {
             let servers = self.servers.read().await;
             let server = servers
                 .get(&id)
                 .ok_or_else(|| anyhow!("Server not found"))?;
-            if matches!(
-                server.state,
-                ServerState::Running { .. } | ServerState::Starting(_)
-            ) {
-                bail!("Server is already running or starting");
+            match &server.state {
+                ServerState::Stopped { .. } => {}
+                ServerState::Running { .. } => {
+                    bail!("Server is already running");
+                }
+                ServerState::Starting(_) => {
+                    bail!("Server is already starting");
+                }
+                ServerState::Installing(_) => {
+                    bail!("Server is currently installing — wait for install to finish");
+                }
+                ServerState::Stopping => {
+                    bail!("Server is stopping — wait for it to fully stop before starting");
+                }
+                ServerState::Deleting => {
+                    bail!("Server is being deleted");
+                }
             }
         }
 

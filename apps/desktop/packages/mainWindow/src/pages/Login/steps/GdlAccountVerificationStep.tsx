@@ -3,7 +3,7 @@ import { Trans } from "@gd/i18n"
 import { Button, toast } from "@gd/ui"
 import type { AuthStep } from "../flow/types"
 import { useFlow } from "../flow/FlowContext"
-import { rspc, port } from "@/utils/rspcClient"
+import { rspc, apiFetch } from "@/utils/rspcClient"
 import { convertSecondsToHumanTime } from "@/utils/helpers"
 
 interface GdlAccountVerificationStepProps {
@@ -40,8 +40,8 @@ export function GdlAccountVerificationStep(
     setIsVerifying(true)
 
     try {
-      const response = await fetch(
-        `http://127.0.0.1:${port}/account/awaitForAccountVerification?uuid=${encodeURIComponent(props.step.uuid)}`,
+      const response = await apiFetch(
+        `/account/awaitForAccountVerification?uuid=${encodeURIComponent(props.step.uuid)}`,
         {
           signal: abortController.signal
         }

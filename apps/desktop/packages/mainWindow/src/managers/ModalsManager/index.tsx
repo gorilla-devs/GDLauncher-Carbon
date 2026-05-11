@@ -16,6 +16,8 @@ import adSize from "@/utils/adhelper"
 import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
 import { listenServerEula } from "@/utils/serverEulaBridge"
 import { cleanupRunning } from "./modals/CacheCleanup/state"
+import { shaderInstallRunning } from "./modals/ShaderLoaderSetup/state"
+import { isChangingRuntimePath } from "./modals/ConfirmChangeRuntimePath/state"
 
 export interface ModalProps {
   title: string
@@ -60,6 +62,14 @@ const getDefaultModals = (t: TypedTFunction) => ({
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
     title: t("modals:_trn_java_setup")
+  },
+  shaderLoaderSetup: {
+    component: lazy(() => import("./modals/ShaderLoaderSetup")),
+    title: t("modals:_trn_shader_loader_setup"),
+    // Block backdrop close while the wizard is mid-install. Closing then
+    // would tear down the polling loop driving sequential steps and leave
+    // a half-installed loader/shader pair.
+    preventClose: () => shaderInstallRunning()
   },
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),
@@ -115,7 +125,11 @@ const getDefaultModals = (t: TypedTFunction) => ({
   },
   ConfirmChangeRuntimePath: {
     component: lazy(() => import("./modals/ConfirmChangeRuntimePath")),
-    title: t("modals:_trn_confirm_change_runtime_path")
+    title: t("modals:_trn_confirm_change_runtime_path"),
+    // Backdrop and side-panel close are blocked while the migration is
+    // running. Closing mid-flight would orphan files between old and new
+    // runtime paths.
+    preventClose: () => isChangingRuntimePath()
   },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
@@ -276,13 +290,19 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
       if (indexToRemove >= 0) {
         newStack.splice(indexToRemove, 1)
-        const newParams: Record<string, string | null> =
-          Object.fromEntries(urlSearchParams())
 
-        for (const key in Object.fromEntries(urlSearchParams())) {
-          if (key !== `m[${indexToRemove + 1}]`) {
-            newParams[`m[${indexToRemove + 1}]`] = null
+        // The URL stores the modal stack as `m[1]=name1`, `m[2]=name2`, ...
+        // (1-indexed). After mutating the stack we must rebuild every `m[k]`
+        // so positions reflect the new stack — closing a non-top modal would
+        // otherwise leave stale values pointing at the removed modal.
+        const newParams: Record<string, string | null> = {}
+        for (const key of Object.keys(Object.fromEntries(urlSearchParams()))) {
+          if (/^m\[\d+\]$/.test(key)) {
+            newParams[key] = null
           }
+        }
+        for (let i = 0; i < newStack.length; i++) {
+          newParams[`m[${i + 1}]`] = newStack[i].name
         }
 
         setSearchParams(newParams)

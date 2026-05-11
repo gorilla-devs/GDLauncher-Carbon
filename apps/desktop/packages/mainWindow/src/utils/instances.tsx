@@ -10,7 +10,7 @@ import {
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { Switch, Match, createSignal } from "solid-js"
-import { port } from "./rspcClient"
+import { apiUrl } from "./rspcClient"
 
 export const isListInstanceInvalid = (status: ListInstanceStatus) => {
   return "Invalid" in status
@@ -91,14 +91,14 @@ export const getInstanceImageUrl = (
   instanceId: string | number,
   rev: string | number
 ) => {
-  return `http://127.0.0.1:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`
+  return apiUrl(`/instance/instanceIcon?id=${instanceId}&rev=${rev}`)
 }
 
 export const getServerImageUrl = (
   serverId: string | number,
   rev: string | number
 ) => {
-  return `http://127.0.0.1:${port}/server/serverIcon?id=${serverId}&rev=${rev}`
+  return apiUrl(`/server/serverIcon?id=${serverId}&rev=${rev}`)
 }
 
 export const getModImageUrl = (
@@ -106,7 +106,9 @@ export const getModImageUrl = (
   modId: string,
   platform: string | null
 ) => {
-  return `http://127.0.0.1:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`
+  return apiUrl(
+    `/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`
+  )
 }
 
 export const getServerModImageUrl = (
@@ -114,7 +116,9 @@ export const getServerModImageUrl = (
   modId: string,
   platform: string
 ) => {
-  return `http://127.0.0.1:${port}/server/serverModIcon?server_id=${serverId}&mod_id=${modId}&platform=${platform}`
+  return apiUrl(
+    `/server/serverModIcon?server_id=${serverId}&mod_id=${modId}&platform=${platform}`
+  )
 }
 
 export const getUrlType = (url: string) => {

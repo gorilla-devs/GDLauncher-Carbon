@@ -14,6 +14,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 mod account;
+pub mod auth;
 pub mod instance;
 mod java;
 pub mod keys;
@@ -191,6 +192,31 @@ struct LoadImageQuery {
     path: String,
 }
 
+const MAX_LOAD_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
+
+async fn load_image_bounded(path: &str) -> Result<Vec<u8>, crate::error::AxumError> {
+    let p = std::path::Path::new(path);
+    let metadata = tokio::fs::metadata(p)
+        .await
+        .map_err(|e| crate::error::FeError::from_anyhow(&e.into()).make_axum())?;
+    if !metadata.is_file() {
+        return Err(crate::error::FeError::from_anyhow(&anyhow::anyhow!(
+            "Path is not a regular file"
+        ))
+        .make_axum());
+    }
+    if metadata.len() > MAX_LOAD_IMAGE_BYTES {
+        return Err(crate::error::FeError::from_anyhow(&anyhow::anyhow!(
+            "Image too large (>{} bytes)",
+            MAX_LOAD_IMAGE_BYTES
+        ))
+        .make_axum());
+    }
+    tokio::fs::read(p)
+        .await
+        .map_err(|e| crate::error::FeError::from_anyhow(&e.into()).make_axum())
+}
+
 pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new()
         .route("/", axum::routing::get(|| async { "Hello 'rspc'!" }))
@@ -203,10 +229,7 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
             "/loadImage",
             axum::routing::get(
                 |axum::extract::Query(query): axum::extract::Query<LoadImageQuery>| async move {
-                    let data = tokio::fs::read(&query.path)
-                        .await
-                        .map_err(|e| crate::error::FeError::from_anyhow(&e.into()).make_axum())?;
-                    Ok::<_, crate::error::AxumError>(data)
+                    Ok::<_, crate::error::AxumError>(load_image_bounded(&query.path).await?)
                 },
             ),
         )

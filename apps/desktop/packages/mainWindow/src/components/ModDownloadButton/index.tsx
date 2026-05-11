@@ -39,7 +39,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     handleServerInstall,
     clearInstanceLoadingState,
     latestModInstallObj,
-    modInstallObj
+    modInstallObj,
+    maybeOpenShaderWizard
   } = useModInstallation(props)
 
   const {
@@ -196,6 +197,10 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     // Instance install path
     const instanceId = props.selectedInstanceId
     if (!instanceId || isInstalled()) return
+
+    if (await maybeOpenShaderWizard(instanceId)) {
+      return
+    }
 
     if (!props.fileId) {
       await installLatestModMutation.mutateAsync({

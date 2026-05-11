@@ -1,5 +1,5 @@
 import { Button, toast, Progress } from "@gd/ui"
-import { port, rspc } from "@/utils/rspcClient"
+import { apiUrl, rspc } from "@/utils/rspcClient"
 import {
   createMemo,
   createSignal,
@@ -194,7 +194,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
 
     const params = new URLSearchParams({ shareCode: props.shareCode })
     sseStream = new EventSource(
-      `http://127.0.0.1:${port}/instance/importShareInstance?${params.toString()}`
+      apiUrl(`/instance/importShareInstance?${params.toString()}`)
     )
 
     sseStream.onmessage = (event) => {

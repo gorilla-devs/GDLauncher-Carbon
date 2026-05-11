@@ -2,20 +2,20 @@ use self::terms_and_privacy::TermsAndPrivacy;
 use super::ManagerRef;
 use crate::api::{
     keys::settings::*,
-    settings::{CacheBreakdown, CacheCleanupSelection, FESettingsUpdate},
+    settings::{CacheCleanupSelection, CacheSizes, FESettingsUpdate},
     translation::Translation,
 };
 use crate::domain::vtask::VisualTaskId;
-use crate::managers::vtask::VisualTask;
+use crate::managers::vtask::{Subtask, TaskState, VisualTask};
 use anyhow::{anyhow, bail};
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
 use carbon_repos::db::app_configuration;
 use carbon_repos::pcr::raw;
-use futures::future::join_all;
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tracing::{error, info, warn};
 
 pub mod terms_and_privacy;
@@ -377,219 +377,70 @@ impl ManagerRef<'_, SettingsManager> {
         Ok(())
     }
 
-    /// Returns the total clearable cache footprint: the sum of every item
-    /// the cleanup dialog can clear. Uses the per-table row-bytes
-    /// approximation (same as the modal's items) so the settings row, the
-    /// modal header, and the sum of items all agree.
-    ///
-    /// Intentionally excludes DB overhead (indexes, non-cache tables,
-    /// freelist, WAL) — those aren't cache content and the user can't
-    /// selectively clear them. They do get reclaimed when the user clears
-    /// everything + VACUUM runs, so the actual freed space is a bit more
-    /// than this number predicts (underpromise/overdeliver).
-    ///
-    /// Delegates to `get_cache_breakdown` so the settings row and the modal
-    /// share a single cached query result — open the modal after visiting
-    /// settings and the breakdown renders instantly.
-    pub async fn get_total_cache_size(self) -> f64 {
-        self.get_cache_breakdown().await.total_size
-    }
-
     /// Returns just the SQLite DB file footprint (gdl_conf.db + WAL).
-    /// Separate from `get_total_cache_size` because the bloat banner uses
-    /// this specifically — the banner's job is to flag *DB* bloat (the
-    /// original HTTPCache bug), not legitimate disk usage like `assets/`
-    /// and `libraries/`. Cheap: just two `stat` calls.
+    /// Cheap: two `stat` calls. Drives the bloat banner.
     pub async fn get_db_size(self) -> f64 {
-        db_total_bytes(&self.runtime_path).await
+        let db_path = self.runtime_path.join("gdl_conf.db");
+        let wal_path = self.runtime_path.join("gdl_conf.db-wal");
+        let size_of =
+            |p: PathBuf| async move { tokio::fs::metadata(&p).await.map(|m| m.len()).unwrap_or(0) };
+        (size_of(db_path).await + size_of(wal_path).await) as f64
     }
 
-    /// Returns approximate sizes (in bytes) of every clearable cache, both
-    /// in the SQLite DB and on disk. Used to populate the cleanup dialog so
-    /// users can see what they'd reclaim before clicking. Sizes are
-    /// approximations — DB sizes sum `length(col)` per row (close to the
-    /// actual page footprint but excludes index pages and free pages); disk
-    /// sizes walk and sum file lengths.
-    pub async fn get_cache_breakdown(self) -> CacheBreakdown {
-        let prisma = &self.app.prisma_client;
-
-        async fn table_bytes(prisma: &carbon_repos::db::PrismaClient, sql: &str) -> f64 {
-            #[derive(serde::Deserialize)]
-            struct Row {
-                bytes: Option<i64>,
-            }
-            match prisma
-                ._query_raw::<Row>(carbon_repos::pcr::raw::Raw::new(sql, vec![]))
-                .exec()
-                .await
-            {
-                Ok(rows) => rows
-                    .into_iter()
-                    .next()
-                    .and_then(|r| r.bytes)
-                    .map(|b| b as f64)
-                    .unwrap_or(0.0),
-                Err(e) => {
-                    warn!("Failed to size cache via `{sql}`: {e}");
-                    0.0
-                }
-            }
-        }
-
-        // Each query sums per-row length() across all relevant columns.
-        // For tables with binary blob columns, that's the dominant cost.
-        let (
-            http_cache,
-            curseforge_mod_metadata,
-            curseforge_mod_icons,
-            curseforge_modpack_metadata,
-            curseforge_modpack_icons,
-            modrinth_mod_metadata,
-            modrinth_mod_icons,
-            modrinth_modpack_metadata,
-            modrinth_modpack_icons,
-            local_mod_icons,
-            mc_version_manifests,
-            modloader_versions,
-            lwjgl_configs,
-            asset_indices,
-        ) = tokio::join!(
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(url) + length(data) + IFNULL(length(etag), 0) + IFNULL(length(lastModified), 0)), 0) AS bytes FROM HTTPCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(metadataId) + length(name) + length(version) + length(urlslug) + length(summary) + length(authors) + length(updatePaths)), 0) AS bytes FROM CurseForgeModCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(metadataId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM CurseForgeModImageCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(modpackName) + length(versionName) + length(urlSlug)), 0) AS bytes FROM CurseForgeModpackCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM CurseForgeModpackImageCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(metadataId) + length(sha512) + length(projectId) + length(versionId) + length(title) + length(version) + length(urlslug) + length(description) + length(authors) + length(updatePaths) + length(filename) + length(fileUrl)), 0) AS bytes FROM ModrinthModCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(metadataId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM ModrinthModImageCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(projectId) + length(versionId) + length(modpackName) + length(versionName) + length(urlSlug)), 0) AS bytes FROM ModrinthModpackCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(projectId) + length(versionId) + length(url) + IFNULL(length(data), 0)), 0) AS bytes FROM ModrinthModpackImageCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(metadataId) + length(data)), 0) AS bytes FROM LocalModImageCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(id) + length(versionInfo)), 0) AS bytes FROM VersionInfoCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(id) + length(partialVersionInfo)), 0) AS bytes FROM PartialVersionInfoCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(id) + length(lwjgl)), 0) AS bytes FROM LwjglMetaCache"
-            ),
-            table_bytes(
-                prisma,
-                "SELECT IFNULL(SUM(length(id) + length(assetsIndex)), 0) AS bytes FROM AssetsMetaCache"
-            ),
-        );
-
+    /// Returns the per-scope cache footprint that the cleanup modal exposes:
+    /// `gdlauncher` mirrors what the "quick" wipe targets (DB files + temp/
+    /// + __gdl_logs__/); `minecraft` mirrors the "deep" wipe (assets/ +
+    /// libraries/ + natives/). Both numbers walk their dirs once on a
+    /// blocking thread, so callers should treat this as moderately
+    /// expensive — the Settings row and the cleanup modal share the same
+    /// query so one walk feeds both.
+    pub async fn get_cache_sizes(self) -> CacheSizes {
         let runtime_path = self.runtime_path.clone();
-        let (temp_files, old_logs, mc_assets, mc_libraries, mc_natives) = tokio::join!(
-            dir_size(runtime_path.get_temp().to_path()),
-            dir_size(runtime_path.join("__gdl_logs__")),
-            dir_size(runtime_path.get_assets().to_path()),
-            dir_size(runtime_path.get_libraries().to_path()),
-            dir_size(runtime_path.join("natives")),
-        );
-
-        // Sum of every clearable item — the same total the user sees when
-        // they tick all the checkboxes. Per-table row-data bytes (not DB
-        // file stat), so indexes / freelist / WAL / non-cache tables like
-        // ModMetadata aren't counted. Keeps the settings row, modal
-        // header, item sums, and action button all consistent.
-        let total_size = http_cache
-            + curseforge_mod_metadata
-            + curseforge_mod_icons
-            + curseforge_modpack_metadata
-            + curseforge_modpack_icons
-            + modrinth_mod_metadata
-            + modrinth_mod_icons
-            + modrinth_modpack_metadata
-            + modrinth_modpack_icons
-            + local_mod_icons
-            + mc_version_manifests
-            + modloader_versions
-            + lwjgl_configs
-            + asset_indices
-            + temp_files
-            + old_logs
-            + mc_assets
-            + mc_libraries
-            + mc_natives;
-
-        CacheBreakdown {
-            http_cache,
-            curseforge_mod_metadata,
-            curseforge_mod_icons,
-            curseforge_modpack_metadata,
-            curseforge_modpack_icons,
-            modrinth_mod_metadata,
-            modrinth_mod_icons,
-            modrinth_modpack_metadata,
-            modrinth_modpack_icons,
-            local_mod_icons,
-            mc_version_manifests,
-            modloader_versions,
-            lwjgl_configs,
-            asset_indices,
-            temp_files,
-            old_logs,
-            mc_assets,
-            mc_libraries,
-            mc_natives,
-            total_size,
-        }
+        tokio::task::spawn_blocking(move || {
+            let file_len = |p: &Path| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
+            let gdlauncher = file_len(&runtime_path.join("gdl_conf.db"))
+                + file_len(&runtime_path.join("gdl_conf.db-wal"))
+                + dir_size_blocking(runtime_path.get_temp().to_path())
+                + dir_size_blocking(runtime_path.join("__gdl_logs__"));
+            let minecraft = dir_size_blocking(runtime_path.get_assets().to_path())
+                + dir_size_blocking(runtime_path.get_libraries().to_path())
+                + dir_size_blocking(runtime_path.join("natives"));
+            CacheSizes {
+                gdlauncher: gdlauncher as f64,
+                minecraft: minecraft as f64,
+            }
+        })
+        .await
+        .unwrap_or(CacheSizes {
+            gdlauncher: 0.0,
+            minecraft: 0.0,
+        })
     }
 
-    /// Spawns a background task that clears every cache marked `true` in
-    /// `selection`. Order of operations:
-    ///   1. Disk caches first, in parallel (they're independent).
-    ///   2. Per-table DB DELETEs, sequentially (Prisma's connection_limit=1
-    ///      would serialize them anyway; ordering image caches before their
-    ///      FK parents avoids redundant cascade work).
-    ///   3. A single `VACUUM` at the end iff any DB cache was selected. SQLite
-    ///      atomically swaps the file, so the Prisma client survives.
+    /// Two-tier cleanup. Spawns a background task that:
     ///
-    /// Rejects with an error if another cleanup is already running — we don't
-    /// want two tasks contending on the same DB lock or competing VACUUMs.
+    /// 1. If `quick`: clears every cache table, wipes `temp/` and
+    ///    `__gdl_logs__/`, then VACUUMs.
+    /// 2. If `deep`: also wipes `assets/`, `libraries/`, `natives/` —
+    ///    these are big, re-downloaded on next launch, opt-in.
     ///
-    /// Best-effort per-step: individual failures are logged and don't abort
-    /// the rest of the run.
+    /// Rejects with an error if another cleanup is already running. The
+    /// task is best-effort per step: individual failures are logged but
+    /// don't abort the rest of the run.
+    ///
+    /// Reports progress as a single linear 0..1 covering both the disk
+    /// file-by-file removal and the chunked DB row deletes; `VACUUM` is
+    /// a separate opaque subtask weighted at 10% of the total so the bar
+    /// doesn't sit at 100% while it runs. To compute that progress we
+    /// walk the disk dirs once to count files and run COUNT(*) per
+    /// table — both bounded by row/file count, not byte size, so they
+    /// stay fast even on huge DBs.
     pub async fn cleanup_caches(
         self,
         selection: CacheCleanupSelection,
     ) -> anyhow::Result<VisualTaskId> {
-        // Single-writer guard. `compare_exchange` atomically flips false→true
-        // and returns Err if another cleanup already set it.
+        // Single-writer guard. Two cleanups would race the same VACUUM and
+        // double-delete the same rows for no benefit.
         if self
             .cleanup_running
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -600,6 +451,32 @@ impl ManagerRef<'_, SettingsManager> {
 
         let task = VisualTask::new(Translation::CacheCleanup);
         let task_id = self.app.task_manager().spawn_task(&task).await;
+
+        // ---- Subtasks (created BEFORE the mutation returns) ----
+        // We enter KnownProgress with a 0/1 placeholder right here, so by
+        // the time the frontend receives task_id and starts polling
+        // `vtask.getTask`, the very first response is already
+        // KnownProgress(0%). Without this, the brief Indeterminate window
+        // makes the Progress bar render its full-width shimmer animation
+        // — which the user reads as "100%" before it snaps to 0/1%.
+        //
+        // The single "work" subtask linearizes file deletes and DB
+        // row deletes onto the same 0..total_units counter; the
+        // opaque VACUUM subtask (only on `quick`) is weighted at
+        // 10% so the bar advances 0→90% during deletes and 90→100%
+        // during VACUUM. With one subtask the bar is just
+        // delete_progress, which is also fine.
+        let work = Arc::new(task.subtask(Translation::CacheCleanup));
+        let vacuum_subtask = if selection.quick {
+            work.set_weight(0.9);
+            let s = task.subtask(Translation::CacheCleanup);
+            s.set_weight(0.1);
+            Some(s)
+        } else {
+            None
+        };
+        task.edit(|d| d.state = TaskState::KnownProgress).await;
+        work.update_items(0, 1);
 
         let app = self.app.clone();
         let runtime_path = self.runtime_path.clone();
@@ -619,168 +496,218 @@ impl ManagerRef<'_, SettingsManager> {
             }
             let _guard = ReleaseGuard(app.clone());
 
-            // ---- Disk caches (parallel) ----
+            // Trim launcher logs to the last LOGS_KEEP entries before
+            // anything else. This is intentionally NOT routed through the
+            // wholesale disk-wipe path: recent logs are useful for
+            // debugging the previous few launches, so we keep them
+            // regardless of whether the user picked quick or deep. The
+            // op is bounded (a handful of small files) so it doesn't
+            // need progress reporting.
+            const LOGS_KEEP: usize = 10;
+            if selection.quick {
+                let logs_path = runtime_path.join("__gdl_logs__");
+                tokio::task::spawn_blocking(move || {
+                    crate::logger::cleanup_old_logs(&logs_path, LOGS_KEEP)
+                })
+                .await
+                .ok();
+            }
+
+            // Build disk job list. Order matters only for the user-visible
+            // log; per-job execution is sequential so progress increments
+            // monotonically rather than racing.
             let mut disk_jobs: Vec<(&'static str, PathBuf)> = Vec::new();
-            if selection.temp_files {
+            if selection.quick {
                 disk_jobs.push(("temp files", runtime_path.get_temp().to_path()));
             }
-            if selection.old_logs {
-                disk_jobs.push(("old logs", runtime_path.join("__gdl_logs__")));
-            }
-            if selection.mc_assets {
+            if selection.deep {
                 disk_jobs.push(("Minecraft assets", runtime_path.get_assets().to_path()));
-            }
-            if selection.mc_libraries {
                 disk_jobs.push((
                     "Minecraft libraries",
                     runtime_path.get_libraries().to_path(),
                 ));
-            }
-            if selection.mc_natives {
                 disk_jobs.push(("native libraries", runtime_path.join("natives")));
             }
 
-            let disk_futures = disk_jobs.into_iter().map(|(label, path)| {
-                let subtask = task.subtask(Translation::CacheCleanupClearingDisk);
-                async move {
-                    subtask.start_opaque();
-                    if let Err(e) = clear_dir_contents(&path).await {
-                        warn!("Failed to clear {label} at {path:?}: {e}");
-                    }
-                    subtask.complete_opaque();
-                }
-            });
-            join_all(disk_futures).await;
-
-            // ---- DB tables ----
-            // Each entry: (sql, label, was_selected). Cascade-aware order:
-            // image caches first so their FK parents can be wiped after.
-            let db_targets: Vec<(&'static str, &'static str, bool)> = vec![
-                ("DELETE FROM HTTPCache", "HTTPCache", selection.http_cache),
-                (
-                    "DELETE FROM CurseForgeModImageCache",
-                    "CurseForgeModImageCache",
-                    selection.curseforge_mod_icons,
-                ),
-                (
-                    "DELETE FROM CurseForgeModpackImageCache",
-                    "CurseForgeModpackImageCache",
-                    selection.curseforge_modpack_icons,
-                ),
-                (
-                    "DELETE FROM ModrinthModImageCache",
-                    "ModrinthModImageCache",
-                    selection.modrinth_mod_icons,
-                ),
-                (
-                    "DELETE FROM ModrinthModpackImageCache",
-                    "ModrinthModpackImageCache",
-                    selection.modrinth_modpack_icons,
-                ),
-                (
-                    "DELETE FROM LocalModImageCache",
-                    "LocalModImageCache",
-                    selection.local_mod_icons,
-                ),
-                (
-                    "DELETE FROM CurseForgeModCache",
-                    "CurseForgeModCache",
-                    selection.curseforge_mod_metadata,
-                ),
-                (
-                    "DELETE FROM CurseForgeModpackCache",
-                    "CurseForgeModpackCache",
-                    selection.curseforge_modpack_metadata,
-                ),
-                (
-                    "DELETE FROM ModrinthModCache",
-                    "ModrinthModCache",
-                    selection.modrinth_mod_metadata,
-                ),
-                (
-                    "DELETE FROM ModrinthModpackCache",
-                    "ModrinthModpackCache",
-                    selection.modrinth_modpack_metadata,
-                ),
-                (
-                    "DELETE FROM VersionInfoCache",
-                    "VersionInfoCache",
-                    selection.mc_version_manifests,
-                ),
-                (
-                    "DELETE FROM PartialVersionInfoCache",
-                    "PartialVersionInfoCache",
-                    selection.modloader_versions,
-                ),
-                (
-                    "DELETE FROM LwjglMetaCache",
-                    "LwjglMetaCache",
-                    selection.lwjgl_configs,
-                ),
-                (
-                    "DELETE FROM AssetsMetaCache",
-                    "AssetsMetaCache",
-                    selection.asset_indices,
-                ),
+            // Tables to wipe on `quick`. Listed leaf-to-root so cascade-
+            // or-not behaves the same regardless of `PRAGMA foreign_keys`.
+            // ModMetadata is deliberately NOT here: it backs installed
+            // mods and wiping it would break instance state.
+            const TABLES: &[&str] = &[
+                "HTTPCache",
+                "CurseForgeModImageCache",
+                "ModrinthModImageCache",
+                "LocalModImageCache",
+                "CurseForgeModpackImageCache",
+                "ModrinthModpackImageCache",
+                "CurseForgeModCache",
+                "ModrinthModCache",
+                "CurseForgeModpackCache",
+                "ModrinthModpackCache",
+                "VersionInfoCache",
+                "PartialVersionInfoCache",
+                "LwjglMetaCache",
+                "AssetsMetaCache",
             ];
 
-            let mut any_db_cleared = false;
-            for (sql, label, selected) in db_targets {
-                if !selected {
-                    continue;
+            // ---- Pre-count work units ----
+            // One walk per disk dir, one COUNT per table. Both scan only
+            // metadata pages (file entries, rowid index), not row payloads.
+            let mut disk_total: u64 = 0;
+            for (_, path) in &disk_jobs {
+                disk_total = disk_total.saturating_add(count_files_blocking(path.clone()).await);
+            }
+            let mut db_total: u64 = 0;
+            if selection.quick {
+                for table in TABLES {
+                    db_total =
+                        db_total.saturating_add(count_table(&app.prisma_client, table).await);
                 }
-                let subtask = task.subtask(Translation::CacheCleanupClearingTable);
-                subtask.start_opaque();
-                match app
-                    .prisma_client
-                    ._execute_raw(carbon_repos::pcr::raw::Raw::new(sql, vec![]))
-                    .exec()
-                    .await
+            }
+            let total_units = disk_total + db_total;
+
+            // Cap to u32 for the Subtask wire format. >4B units would
+            // mean 4B+ files or rows which we'd never realistically hit;
+            // saturating_as keeps the math sane if it ever does.
+            let total_u32: u32 = total_units.try_into().unwrap_or(u32::MAX);
+            // Replace the placeholder denominator with the real total now
+            // that pre-count is done.
+            work.update_items(0, total_u32);
+
+            let progress = Arc::new(AtomicU64::new(0));
+
+            // ---- Disk phase ----
+            // Sequential per dir. Progress increments per-file, throttled
+            // inside the helper so we don't spam the watch channel on
+            // big trees.
+            for (label, path) in disk_jobs {
+                if let Err(e) =
+                    clear_dir_with_progress(path.clone(), progress.clone(), work.clone(), total_u32)
+                        .await
                 {
-                    Ok(n) => info!("Cleared {label}: {n} rows"),
-                    Err(e) => warn!("Failed to clear {label}: {e}"),
+                    warn!("Failed to clear {label} at {path:?}: {e}");
                 }
-                subtask.complete_opaque();
-                any_db_cleared = true;
             }
 
-            // ---- VACUUM ----
-            // Only worthwhile if we actually deleted DB rows. Without VACUUM
-            // the file stays its current size (freelist grows); space is
-            // reused on subsequent inserts, but disk size doesn't drop until
-            // next user-triggered cleanup.
-            if any_db_cleared {
-                let vacuum_subtask = task.subtask(Translation::CacheCleanupVacuuming);
-                vacuum_subtask.start_opaque();
+            // ---- DB phase ----
+            if selection.quick {
+                // Chunk size picked to balance per-statement overhead
+                // (~1 ms parse/plan + WAL commit) against progress
+                // granularity. 200 rows ≈ 10–20 ms per chunk on heavily
+                // indexed tables — frequent enough that the bar never
+                // appears frozen on multi-million-row HTTPCache wipes,
+                // small enough that the extra parse cost is in the noise.
+                const CHUNK: u32 = 200;
+
+                for table in TABLES {
+                    let sql = format!(
+                        "DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} LIMIT {CHUNK})"
+                    );
+                    loop {
+                        match app
+                            .prisma_client
+                            ._execute_raw(carbon_repos::pcr::raw::Raw::new(&sql, vec![]))
+                            .exec()
+                            .await
+                        {
+                            Ok(0) => break,
+                            Ok(n) => {
+                                let new =
+                                    progress.fetch_add(n as u64, Ordering::Relaxed) + n as u64;
+                                work.update_items(new.try_into().unwrap_or(u32::MAX), total_u32);
+                            }
+                            Err(e) => {
+                                warn!("Failed to clear {table}: {e}");
+                                break;
+                            }
+                        }
+                    }
+                }
+                work.complete_items();
+
+                // VACUUM reclaims the freelist pages the DELETEs created.
+                // Without it the file stays its current size on disk.
+                if let Some(vs) = vacuum_subtask.as_ref() {
+                    vs.start_opaque();
+                }
                 if let Err(e) = app.prisma_client._execute_raw(raw!("VACUUM")).exec().await {
                     error!("VACUUM failed: {e}");
                     task.fail(anyhow!("Failed to reclaim cache space: {e}"))
                         .await;
                     return;
                 }
-                vacuum_subtask.complete_opaque();
-
-                // Index creation is intentionally NOT done here. It happens
-                // exclusively on the next startup, gated on `db_file_bytes <=
-                // 2 GB`. That keeps index-build cost (which holds the writer
-                // lock) off the user-visible cleanup task and ensures it only
-                // runs on a DB small enough to make the build fast.
+                if let Some(vs) = vacuum_subtask.as_ref() {
+                    vs.complete_opaque();
+                }
+            } else {
+                // No DB phase: pin the work bar to 100% so the modal
+                // doesn't briefly show stale "0%" between disk-done and
+                // task-drop.
+                work.complete_items();
             }
 
             info!("Cache cleanup complete");
-            app.invalidate(GET_TOTAL_CACHE_SIZE, None);
             app.invalidate(GET_DB_SIZE, None);
-            app.invalidate(GET_CACHE_BREAKDOWN, None);
         });
 
         Ok(task_id)
     }
 }
 
-/// Recursively sums file sizes under `path`. Missing dir → 0.
-async fn dir_size(path: PathBuf) -> f64 {
-    // Sync walk on a blocking thread — async file IO has no efficiency win
-    // for size queries and adds complexity for recursion.
+/// COUNT(*) on a cache table. Uses the rowid index, so it scales with
+/// row count not byte count — fast even on a multi-GB HTTPCache.
+async fn count_table(prisma: &carbon_repos::db::PrismaClient, table: &str) -> u64 {
+    #[derive(serde::Deserialize)]
+    struct Row {
+        n: Option<i64>,
+    }
+    let sql = format!("SELECT COUNT(*) AS n FROM {table}");
+    match prisma
+        ._query_raw::<Row>(carbon_repos::pcr::raw::Raw::new(&sql, vec![]))
+        .exec()
+        .await
+    {
+        Ok(rows) => rows
+            .into_iter()
+            .next()
+            .and_then(|r| r.n)
+            .map(|n| n.max(0) as u64)
+            .unwrap_or(0),
+        Err(e) => {
+            warn!("Failed to count `{table}`: {e}");
+            0
+        }
+    }
+}
+
+/// Count files (recursively) under `path`. Reads directory entries +
+/// metadata only — bounded by file count, not file size. Missing dirs
+/// return 0 silently.
+/// Sync recursive walk that sums file byte sizes under `path`. Caller is
+/// responsible for running this on a blocking thread (e.g., inside
+/// `tokio::task::spawn_blocking`) — the FS calls are blocking.
+fn dir_size_blocking(path: PathBuf) -> u64 {
+    fn walk(p: &Path) -> u64 {
+        let Ok(entries) = std::fs::read_dir(p) else {
+            return 0;
+        };
+        let mut total = 0u64;
+        for entry in entries.flatten() {
+            let Ok(meta) = entry.metadata() else {
+                continue;
+            };
+            if meta.is_file() {
+                total = total.saturating_add(meta.len());
+            } else if meta.is_dir() {
+                total = total.saturating_add(walk(&entry.path()));
+            }
+        }
+        total
+    }
+    if path.exists() { walk(&path) } else { 0 }
+}
+
+async fn count_files_blocking(path: PathBuf) -> u64 {
     tokio::task::spawn_blocking(move || {
         fn walk(p: &Path) -> u64 {
             let Ok(entries) = std::fs::read_dir(p) else {
@@ -788,51 +715,71 @@ async fn dir_size(path: PathBuf) -> f64 {
             };
             let mut total = 0u64;
             for entry in entries.flatten() {
-                let Ok(meta) = entry.metadata() else { continue };
+                let Ok(meta) = entry.metadata() else {
+                    continue;
+                };
                 if meta.is_file() {
-                    total = total.saturating_add(meta.len());
+                    total = total.saturating_add(1);
                 } else if meta.is_dir() {
                     total = total.saturating_add(walk(&entry.path()));
                 }
             }
             total
         }
-        walk(&path) as f64
+        if path.exists() { walk(&path) } else { 0 }
     })
     .await
-    .unwrap_or(0.0)
+    .unwrap_or(0)
 }
 
-/// Total on-disk DB footprint (gdl_conf.db + WAL sidecar).
-async fn db_total_bytes(runtime_path: &carbon_rt_path::RuntimePath) -> f64 {
-    let db_path = runtime_path.join("gdl_conf.db");
-    let wal_path = runtime_path.join("gdl_conf.db-wal");
-    let size_of =
-        |p: PathBuf| async move { tokio::fs::metadata(&p).await.map(|m| m.len()).unwrap_or(0) };
-    (size_of(db_path).await + size_of(wal_path).await) as f64
-}
-
-/// Recursively delete files and subdirectories inside `path`, but leave the
-/// directory itself in place. Skips silently if the directory doesn't exist.
-async fn clear_dir_contents(path: &Path) -> std::io::Result<()> {
-    if !tokio::fs::try_exists(path).await.unwrap_or(false) {
+/// Recursively delete files and subdirectories inside `path`, leaving
+/// the directory itself in place, while incrementing `progress` per
+/// file deleted and pushing throttled `update_items` calls onto
+/// `subtask`. `total` is the same upper bound used to seed `subtask`'s
+/// progress so all reports share a denominator.
+async fn clear_dir_with_progress(
+    path: PathBuf,
+    progress: Arc<AtomicU64>,
+    subtask: Arc<Subtask>,
+    total: u32,
+) -> std::io::Result<()> {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Ok(());
     }
-    let path = path.to_path_buf();
     tokio::task::spawn_blocking(move || {
-        let entries = std::fs::read_dir(&path)?;
-        for entry in entries.flatten() {
-            let p = entry.path();
-            let meta = match entry.metadata() {
-                Ok(m) => m,
-                Err(_) => continue,
+        // Update granularity. One notify per file would flood the
+        // watch channel for huge trees; one per 25 keeps the bar
+        // ticking smoothly even when removing a handful of large files
+        // (where 100-file batches would visibly stall) without burning
+        // CPU on assets/ trees with tens of thousands of tiny files.
+        const PROGRESS_BATCH: u64 = 25;
+
+        fn walk_delete(p: &Path, progress: &AtomicU64, subtask: &Subtask, total: u32) {
+            let Ok(entries) = std::fs::read_dir(p) else {
+                return;
             };
-            if meta.is_dir() {
-                let _ = std::fs::remove_dir_all(&p);
-            } else {
-                let _ = std::fs::remove_file(&p);
+            for entry in entries.flatten() {
+                let pp = entry.path();
+                let Ok(meta) = entry.metadata() else {
+                    continue;
+                };
+                if meta.is_dir() {
+                    walk_delete(&pp, progress, subtask, total);
+                    let _ = std::fs::remove_dir(&pp);
+                } else {
+                    let _ = std::fs::remove_file(&pp);
+                    let n = progress.fetch_add(1, Ordering::Relaxed) + 1;
+                    if n % PROGRESS_BATCH == 0 {
+                        subtask.update_items(n.try_into().unwrap_or(u32::MAX), total);
+                    }
+                }
             }
         }
+        walk_delete(&path, &progress, &subtask, total);
+        // Final flush so the bar reflects the tail < PROGRESS_BATCH
+        // worth of files we just removed without notifying about.
+        let n = progress.load(Ordering::Relaxed);
+        subtask.update_items(n.try_into().unwrap_or(u32::MAX), total);
         Ok::<_, std::io::Error>(())
     })
     .await

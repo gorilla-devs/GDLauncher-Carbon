@@ -13,7 +13,7 @@ import {
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
-import { port, rspc } from "@/utils/rspcClient"
+import { apiUrl, rspc } from "@/utils/rspcClient"
 import {
   createEffect,
   createMemo,
@@ -189,7 +189,7 @@ function ShareInstance(props: ModalProps) {
     }
 
     sseStream = new EventSource(
-      `http://127.0.0.1:${port}/instance/shareInstance?${params.toString()}`
+      apiUrl(`/instance/shareInstance?${params.toString()}`)
     )
 
     sseStream.onmessage = (event) => {

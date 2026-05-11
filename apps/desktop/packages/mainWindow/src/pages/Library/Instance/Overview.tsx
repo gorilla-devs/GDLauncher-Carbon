@@ -5,7 +5,7 @@ import useInstanceData from "./instance.data"
 import { useParams } from "@solidjs/router"
 import { format, formatDuration, intervalToDuration } from "date-fns"
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner"
-import { port } from "@/utils/rspcClient"
+import { apiUrl } from "@/utils/rspcClient"
 import { Button } from "@gd/ui"
 import { getModpackPlatformIcon } from "@/utils/instances"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -118,13 +118,17 @@ const Overview = () => {
         >
           <div class="bg-darkSlate-700 min-h-23 relative box-border flex h-max w-full overflow-hidden rounded-xl p-5">
             <FadedBanner
-              imageUrl={`http://127.0.0.1:${port}/instance/modpackIcon?instance_id=${params.id}`}
+              imageUrl={apiUrl(
+                `/instance/modpackIcon?instance_id=${params.id}`
+              )}
             >
               <div class="z-10 flex w-full flex-col items-start justify-between gap-6 2xl:flex-row 2xl:items-center 2xl:gap-14">
                 <div class="flex flex-1 items-center gap-2">
                   <img
                     class="h-13 w-13 rounded-lg"
-                    src={`http://127.0.0.1:${port}/instance/modpackIcon?instance_id=${params.id}`}
+                    src={apiUrl(
+                      `/instance/modpackIcon?instance_id=${params.id}`
+                    )}
                   />
                   <div class="text-lightSlate-50 whitespace-nowrap">
                     <div class="text-lg font-bold">

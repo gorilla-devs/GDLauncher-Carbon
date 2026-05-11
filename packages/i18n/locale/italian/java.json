@@ -51,7 +51,10 @@
   "_trn_confirm_change_runtime_path_already_used_text": "Sei sicuro di voler cambiare il percorso runtime? Poiché la cartella di destinazione è già in uso, questo semplicemente cambierà la configurazione del percorso runtime e nessun file verrà spostato o copiato.",
   "_trn_applying_new_runtime_path": "Applicazione del nuovo percorso runtime...",
   "_trn_do_not_close_app": "Non chiudere l'app. Si riavvierà automaticamente una volta finito.",
+  "_trn_do_not_close_app_or_pc_title": "Migrazione in corso — non chiudere l'app né spegnere il PC",
+  "_trn_do_not_close_app_or_pc_body": "Chiudere il launcher o spegnere il computer durante la migrazione lascerà i dati divisi tra la vecchia e la nuova posizione. L'app si riavvierà automaticamente una volta finito.",
   "_trn_migration_errored": "La migrazione del percorso runtime non è riuscita. Lo stato potrebbe essere corrotto. Fai clic <0>qui</0> per ulteriori informazioni su come procedere.",
+  "_trn_scanning_files": "Scansione dei file...",
   "_trn_copying_file": "Copia di {{file}}",
   "_trn_removing_file": "Rimozione di {{file}}",
   "_trn_used_in_the_following_profiles": "Usato nei seguenti profili",
@@ -63,5 +66,8 @@
   "_trn_insufficient_memory_title": "Memoria Insufficiente",
   "_trn_insufficient_memory_body": "Minecraft è configurato per usare {{requested}} MB di RAM, ma solo {{available}} MB sono disponibili. Java richiede anche ~1,5 GB aggiuntivi per le sue operazioni interne. Il gioco probabilmente andrà in crash.",
   "_trn_launch_anyway": "Avvia Comunque",
-  "_trn_adjust_memory": "Regola Memoria"
+  "_trn_adjust_memory": "Regola Memoria",
+  "_trn_insufficient_memory_dont_show_again": "Non mostrare più questo avviso",
+  "_trn_show_memory_warning_title": "Mostra Avviso Memoria Insufficiente",
+  "_trn_show_memory_warning_text": "Mostra un avviso prima dell'avvio quando la RAM configurata supera la memoria disponibile."
 }

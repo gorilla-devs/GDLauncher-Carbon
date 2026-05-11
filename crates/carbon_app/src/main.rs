@@ -12,8 +12,8 @@ use crate::managers::{
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
-use tower_http::cors::{Any, CorsLayer};
-use tracing::info;
+use tower_http::cors::{AllowOrigin, CorsLayer};
+use tracing::{debug, info};
 
 pub mod api;
 mod app_version;
@@ -104,7 +104,7 @@ pub fn main() {
 
             // Clean up leftover temp files/folders from previous sessions
             let temp_path = carbon_rt_path::TempPath::new(runtime_path.join("temp"));
-            temp_path.cleanup_all();
+            temp_path.cleanup_all().await;
 
             info!("Starting Carbon App v{}", app_version::APP_VERSION);
 
@@ -153,24 +153,54 @@ async fn get_available_port() -> TcpListener {
     );
 }
 
+/// In dev builds the token must be a fixed value the Electron renderer can
+/// hardcode — production builds rotate per launch. This string is intentionally
+/// recognizable so it's obvious if it ever leaks into a non-debug build.
+const DEV_API_TOKEN: &str = "dev-mode-only-do-not-use-in-production";
+
+fn generate_api_token() -> String {
+    if cfg!(debug_assertions) {
+        return DEV_API_TOKEN.to_string();
+    }
+    let a = uuid::Uuid::new_v4().simple().to_string();
+    let b = uuid::Uuid::new_v4().simple().to_string();
+    format!("{a}{b}")
+}
+
 async fn start_router(runtime_path: PathBuf, base_api_override: String, listener: TcpListener) {
     info!("Starting router");
     let startup_total = std::time::Instant::now();
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
 
+    // Per-process API token: required on every Axum/rspc request from the
+    // renderer. Rotated on each launch in release builds; fixed in dev so the
+    // Electron renderer can hardcode the same value.
+    let api_token = generate_api_token();
+    crate::api::auth::set_expected_token(api_token.clone());
+
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router(base_api_override.clone())
         .build()
         .arced();
 
-    // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
+    // CORS: allow renderer origins only. Electron's file:// origin appears as
+    // "null" in browsers; dev mode runs on http://localhost:* / 127.0.0.1:*.
     let cors = CorsLayer::new()
-        .allow_methods(Any)
-        .allow_headers(Any)
-        .allow_origin(Any);
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any)
+        .allow_origin(AllowOrigin::predicate(|origin, _req| {
+            let Ok(origin_str) = origin.to_str() else {
+                return false;
+            };
+            origin_str == "null"
+                || origin_str.starts_with("http://localhost:")
+                || origin_str.starts_with("http://127.0.0.1:")
+                || origin_str == "http://localhost"
+                || origin_str == "http://127.0.0.1"
+        }));
 
     let t = std::time::Instant::now();
     let app = AppInner::new(invalidation_sender, runtime_path, base_api_override).await;
-    info!(
+    debug!(
         "[startup-timing] AppInner::new completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
@@ -181,7 +211,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     if let Err(e) = app.account_manager().refresh_all_gdl_tokens().await {
         tracing::warn!("Failed to refresh GDL tokens on startup: {}", e);
     }
-    info!(
+    debug!(
         "[startup-timing] refresh_all_gdl_tokens completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
@@ -193,7 +223,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .await
         .unwrap()
         .auto_manage_java_system_profiles;
-    info!(
+    debug!(
         "[startup-timing] settings.get_settings completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
@@ -207,7 +237,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     )
     .await
     .expect("Failed to scan and sync java system profiles");
-    info!(
+    debug!(
         "[startup-timing] JavaManager::scan_and_sync completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
@@ -220,6 +250,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
         .nest("/rspc", rspc_axum_router)
+        .layer(axum::middleware::from_fn(crate::api::auth::require_token))
         .layer(cors)
         .with_state(app1);
 
@@ -228,7 +259,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .expect("Failed to get local address from TCP listener")
         .port();
 
-    info!(
+    debug!(
         "[startup-timing] reached axum::serve in {:.2}s total",
         startup_total.elapsed().as_secs_f64()
     );
@@ -259,17 +290,17 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
                 .await;
 
             if res.is_ok() {
-                info!(
+                debug!(
                     "[startup-timing] health check responded after {:.2}s ({} polls)",
                     health_check_start.elapsed().as_secs_f64(),
                     counter
                 );
-                info!(
+                debug!(
                     "[startup-timing] READY emitted at {:.2}s after start_router",
                     startup_total.elapsed().as_secs_f64()
                 );
-                info!("_STATUS_:READY|{port}");
-                println!("_STATUS_:READY|{port}");
+                info!("_STATUS_:READY|{port}|<token redacted>");
+                println!("_STATUS_:READY|{port}|{api_token}");
                 break;
             }
         }

@@ -1,5 +1,5 @@
 import { LogEntry } from "@/utils/logs"
-import { port, rspc } from "@/utils/rspcClient.js"
+import { apiWsUrl, rspc } from "@/utils/rspcClient.js"
 import { useParams } from "@solidjs/router"
 import { createEffect, createSignal, onCleanup } from "solid-js"
 import LogsSidebar from "./LogsSidebar"
@@ -69,7 +69,7 @@ const Logs = () => {
     if (selectedLog() === undefined) return
 
     const wsConnection = new WebSocket(
-      `ws://127.0.0.1:${port}/instance/log?id=${selectedLog()}`
+      apiWsUrl(`/instance/log?id=${selectedLog()}`)
     )
 
     wsConnection.onmessage = (event) => {

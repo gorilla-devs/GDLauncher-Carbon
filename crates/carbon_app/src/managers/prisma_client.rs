@@ -40,9 +40,12 @@ pub(super) async fn load_and_migrate(
 ) -> Result<PrismaClient, anyhow::Error> {
     let runtime_path = dunce::simplified(&runtime_path);
 
+    let db_path = runtime_path.join("gdl_conf.db");
     let db_uri = format!(
         "file:{}?connection_limit=1",
-        runtime_path.join("gdl_conf.db").to_str().unwrap()
+        db_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("DB path is not valid UTF-8: {:?}", db_path))?
     );
 
     let (migrations, migration_count) = carbon_repos::get_migrations();
@@ -52,6 +55,25 @@ pub(super) async fn load_and_migrate(
     debug!("Starting migration procedure");
 
     let mut conn = rusqlite::Connection::open(&db_uri)?;
+
+    // On Unix, restrict the DB (and -wal/-shm sidecars) to 0600 since they
+    // contain MS access/refresh tokens.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for sidecar in [
+            db_path.clone(),
+            db_path.with_extension("db-wal"),
+            db_path.with_extension("db-shm"),
+        ] {
+            if sidecar.exists() {
+                let _ = std::fs::set_permissions(&sidecar, std::fs::Permissions::from_mode(0o600));
+            }
+        }
+        if let Some(parent) = db_path.parent() {
+            let _ = std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700));
+        }
+    }
 
     let results: Result<i32, _> =
         conn.query_row("SELECT COUNT(*) FROM _prisma_migrations", [], |row| {
@@ -68,7 +90,8 @@ pub(super) async fn load_and_migrate(
         already_existing_migration_count
     );
 
-    conn.pragma_update(None, "journal_mode", &"WAL").unwrap();
+    conn.pragma_update(None, "journal_mode", &"WAL")
+        .map_err(|e| anyhow::anyhow!("Failed to set journal_mode=WAL: {e}"))?;
 
     if let Some(already_existing_migration_count) = already_existing_migration_count {
         conn.pragma_update(None, "user_version", &already_existing_migration_count)?;
@@ -96,7 +119,8 @@ pub(super) async fn load_and_migrate(
 
     debug!("Closing migration connection");
 
-    conn.close().unwrap();
+    conn.close()
+        .map_err(|(_, e)| anyhow::anyhow!("Failed to close migration DB connection: {e}"))?;
 
     debug!("Starting prisma connection");
 
@@ -111,188 +135,26 @@ pub(super) async fn load_and_migrate(
         ._query_raw(raw!("PRAGMA journal_mode=WAL;"))
         .exec()
         .await
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("PRAGMA journal_mode failed: {e}"))?;
     let _: Vec<Whatever> = db_client
         ._query_raw(raw!("PRAGMA synchronous=normal;"))
         .exec()
         .await
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("PRAGMA synchronous failed: {e}"))?;
     let _: Vec<Whatever> = db_client
         ._query_raw(raw!("PRAGMA temp_store=MEMORY;"))
         .exec()
         .await
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("PRAGMA temp_store failed: {e}"))?;
     let _: Vec<Whatever> = db_client
         ._query_raw(raw!("PRAGMA mmap_size = 30000000000;"))
         .exec()
         .await
-        .unwrap();
-
-    // Maybe sweep expired HTTPCache rows + ensure expiresAt index. Both
-    // operations hold the SQLite writer lock for their duration, so we gate
-    // them on a cheap file-size estimate (PRAGMA page_count * page_size, no
-    // table scan) to avoid hanging startup for users with huge DBs.
-    maybe_sweep_http_cache_and_index(&db_client).await;
+        .map_err(|e| anyhow::anyhow!("PRAGMA mmap_size failed: {e}"))?;
 
     seed_init_db(&db_client, latest_consent_sha).await?;
 
     Ok(db_client)
-}
-
-/// Skip auto-sweep entirely above this size — the in-app DB-bloat banner
-/// (`pages/withAds.tsx`) takes over and the user cleans manually via the
-/// CacheCleanup modal. Must stay in sync with `DB_BLOAT_THRESHOLD_BYTES` on
-/// the frontend.
-const DB_SKIP_SWEEP_BYTES: i64 = 2 * 1024 * 1024 * 1024;
-
-/// Below this, the DB is essentially empty (fresh install, post-VACUUM, etc.)
-/// and there's nothing to sweep — we still try to ensure the index since
-/// it's free on an empty table.
-const DB_SKIP_SWEEP_MIN_BYTES: i64 = 1 * 1024 * 1024;
-
-/// Live-data threshold for ensuring the `HTTPCache(expiresAt)` index. The
-/// CREATE INDEX itself holds the writer lock for an O(table) build, so we
-/// only run it when the table is small enough that the build is brief
-/// (sub-second on SSD, a few seconds on HDD).
-const INDEX_BUILD_LIVE_BYTES: i64 = 200 * 1024 * 1024;
-
-async fn read_pragma_i64(db_client: &db::PrismaClient, sql: &str) -> Option<i64> {
-    #[derive(Deserialize)]
-    struct PragmaRow {
-        // SQLite returns the value as the column name of the pragma; deserializing
-        // an arbitrary single-column row is annoying, so we use a flat map.
-        #[serde(flatten)]
-        fields: std::collections::HashMap<String, serde_json::Value>,
-    }
-
-    match db_client
-        ._query_raw::<PragmaRow>(carbon_repos::pcr::raw::Raw::new(sql, vec![]))
-        .exec()
-        .await
-    {
-        Ok(rows) => rows
-            .into_iter()
-            .next()
-            .and_then(|row| row.fields.into_iter().next())
-            .and_then(|(_, v)| v.as_i64()),
-        Err(e) => {
-            tracing::warn!("[startup-timing] failed to read pragma `{sql}`: {e}");
-            None
-        }
-    }
-}
-
-async fn read_db_sizes(db_client: &db::PrismaClient) -> Option<(i64, i64)> {
-    let page_count = read_pragma_i64(db_client, "PRAGMA page_count;").await?;
-    let page_size = read_pragma_i64(db_client, "PRAGMA page_size;").await?;
-    let freelist = read_pragma_i64(db_client, "PRAGMA freelist_count;")
-        .await
-        .unwrap_or(0);
-    let file_bytes = page_count.saturating_mul(page_size);
-    let live_bytes = (page_count.saturating_sub(freelist)).saturating_mul(page_size);
-    Some((file_bytes, live_bytes))
-}
-
-/// Try to ensure the `HTTPCache(expiresAt)` index, gated on live data being
-/// small enough that the build is brief. Returns true if the index now
-/// exists (whether we just created it or it already did).
-async fn try_ensure_expires_at_index(db_client: &db::PrismaClient, live_bytes: i64) -> bool {
-    if live_bytes >= INDEX_BUILD_LIVE_BYTES {
-        tracing::info!(
-            "[startup-timing] live data is {} MB (>={} MB), skipping index build",
-            live_bytes / (1024 * 1024),
-            INDEX_BUILD_LIVE_BYTES / (1024 * 1024)
-        );
-        return false;
-    }
-    let t = std::time::Instant::now();
-    match db_client
-        ._execute_raw(raw!(
-            "CREATE INDEX IF NOT EXISTS HTTPCache_expiresAt_idx ON HTTPCache(expiresAt)"
-        ))
-        .exec()
-        .await
-    {
-        Ok(_) => {
-            tracing::info!(
-                "[startup-timing] HTTPCache(expiresAt) index ensured in {:.2}s (live={} MB)",
-                t.elapsed().as_secs_f64(),
-                live_bytes / (1024 * 1024)
-            );
-            true
-        }
-        Err(e) => {
-            tracing::warn!(
-                "[startup-timing] failed to ensure HTTPCache(expiresAt) index in {:.2}s: {e}",
-                t.elapsed().as_secs_f64()
-            );
-            false
-        }
-    }
-}
-
-async fn maybe_sweep_http_cache_and_index(db_client: &db::PrismaClient) {
-    let Some((file_bytes, live_bytes)) = read_db_sizes(db_client).await else {
-        // If we can't size the DB cheaply, do nothing — this is a best-effort
-        // maintenance pass and shouldn't fail startup.
-        return;
-    };
-
-    tracing::info!(
-        "[startup-timing] db size estimate: file={} MB live={} MB",
-        file_bytes / (1024 * 1024),
-        live_bytes / (1024 * 1024)
-    );
-
-    if file_bytes > DB_SKIP_SWEEP_BYTES {
-        tracing::info!(
-            "[startup-timing] db file is {} MB (>{} MB), skipping HTTPCache sweep + index — banner will prompt user to clean manually",
-            file_bytes / (1024 * 1024),
-            DB_SKIP_SWEEP_BYTES / (1024 * 1024)
-        );
-        return;
-    }
-
-    // Build the index BEFORE the sweep when live data is small enough. This
-    // turns the sweep's `WHERE expiresAt < ...` lookup from a full table scan
-    // into an index seek — important for HDD users on the first launch after
-    // this code ships, when no index exists yet.
-    let pre_sweep_indexed = try_ensure_expires_at_index(db_client, live_bytes).await;
-
-    if file_bytes >= DB_SKIP_SWEEP_MIN_BYTES {
-        let t = std::time::Instant::now();
-        match db_client
-            ._execute_raw(raw!(
-                "DELETE FROM HTTPCache WHERE expiresAt IS NOT NULL AND expiresAt < datetime('now')"
-            ))
-            .exec()
-            .await
-        {
-            Ok(deleted) => tracing::info!(
-                "[startup-timing] HTTPCache sweep deleted {deleted} row(s) in {:.2}s",
-                t.elapsed().as_secs_f64()
-            ),
-            Err(e) => tracing::warn!(
-                "[startup-timing] HTTPCache sweep failed in {:.2}s: {e}",
-                t.elapsed().as_secs_f64()
-            ),
-        }
-    } else {
-        tracing::info!(
-            "[startup-timing] db file is only {} MB, skipping sweep (nothing to clean)",
-            file_bytes / (1024 * 1024)
-        );
-    }
-
-    // If the index wasn't built pre-sweep (live was over the threshold), the
-    // sweep may have moved enough rows to the freelist that live data has now
-    // dropped below it — retry once so the next startup's sweep is fast.
-    if !pre_sweep_indexed {
-        let Some((_, live_after)) = read_db_sizes(db_client).await else {
-            return;
-        };
-        try_ensure_expires_at_index(db_client, live_after).await;
-    }
 }
 
 async fn find_appropriate_default_xmx() -> i32 {

@@ -4,7 +4,7 @@ use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use sha1::Sha1;
-use sha2::Sha256;
+use sha2::{Sha256, Sha512};
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt::Display;
@@ -64,11 +64,13 @@ pub enum DownloadError {
 pub enum Checksum {
     Sha1(String),
     Sha256(String),
+    Sha512(String),
     Md5(String),
 }
 
 enum HashDigest {
     Sha256(Sha256),
+    Sha512(Sha512),
     Sha1(sha1::Sha1),
     Md5(md5::Md5),
 }
@@ -77,6 +79,7 @@ impl HashDigest {
     fn update(&mut self, data: &[u8]) {
         match self {
             HashDigest::Sha256(h) => h.update(data),
+            HashDigest::Sha512(h) => h.update(data),
             HashDigest::Sha1(h) => h.update(data),
             HashDigest::Md5(h) => h.update(data),
         }
@@ -85,6 +88,7 @@ impl HashDigest {
     fn finalize(self) -> Vec<u8> {
         match self {
             HashDigest::Sha256(h) => h.finalize().to_vec(),
+            HashDigest::Sha512(h) => h.finalize().to_vec(),
             HashDigest::Sha1(h) => h.finalize().to_vec(),
             HashDigest::Md5(h) => h.finalize().to_vec(),
         }
@@ -93,6 +97,7 @@ impl HashDigest {
     fn finalize_reset(&mut self) -> Vec<u8> {
         match self {
             HashDigest::Sha256(h) => h.finalize_reset().to_vec(),
+            HashDigest::Sha512(h) => h.finalize_reset().to_vec(),
             HashDigest::Sha1(h) => h.finalize_reset().to_vec(),
             HashDigest::Md5(h) => h.finalize_reset().to_vec(),
         }
@@ -103,6 +108,7 @@ impl From<&Checksum> for HashDigest {
     fn from(value: &Checksum) -> Self {
         match value {
             Checksum::Sha256(_) => HashDigest::Sha256(Sha256::new()),
+            Checksum::Sha512(_) => HashDigest::Sha512(Sha512::new()),
             Checksum::Sha1(_) => HashDigest::Sha1(Sha1::new()),
             Checksum::Md5(_) => HashDigest::Md5(Md5::new()),
         }
@@ -663,7 +669,10 @@ async fn _download_file(
 
     if let Some(expected_checksum) = downloadable.checksum.as_ref() {
         let expected_hash = match expected_checksum {
-            Checksum::Sha256(hash) | Checksum::Sha1(hash) | Checksum::Md5(hash) => hash,
+            Checksum::Sha256(hash)
+            | Checksum::Sha512(hash)
+            | Checksum::Sha1(hash)
+            | Checksum::Md5(hash) => hash,
         };
 
         let actual_hash = hex::encode(
@@ -756,6 +765,7 @@ async fn prepare_download(
 
     let mut hasher = match downloadable.checksum {
         Some(Checksum::Sha256(_)) => Some(HashDigest::Sha256(Sha256::new())),
+        Some(Checksum::Sha512(_)) => Some(HashDigest::Sha512(Sha512::new())),
         Some(Checksum::Sha1(_)) => Some(HashDigest::Sha1(sha1::Sha1::new())),
         Some(Checksum::Md5(_)) => Some(HashDigest::Md5(md5::Md5::new())),
         None => None,
@@ -943,7 +953,10 @@ async fn validate_file(
             }?;
 
             let expected_hash = match expected_checksum {
-                Checksum::Sha256(hash) | Checksum::Sha1(hash) | Checksum::Md5(hash) => hash,
+                Checksum::Sha256(hash)
+                | Checksum::Sha512(hash)
+                | Checksum::Sha1(hash)
+                | Checksum::Md5(hash) => hash,
             };
 
             if actual_hash != *expected_hash {

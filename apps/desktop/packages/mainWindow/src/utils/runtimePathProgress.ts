@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js"
 
 interface Progress {
-  action: "copy" | "remove"
+  action: "scan" | "copy" | "remove"
   currentName: string
   current: number
   total: number

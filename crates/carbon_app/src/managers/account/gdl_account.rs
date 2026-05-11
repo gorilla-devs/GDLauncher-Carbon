@@ -621,7 +621,11 @@ impl GDLAccountTask {
         let url = format!("{}/v1/users/user", self.base_api);
         let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+        headers.insert(
+            AUTHORIZATION,
+            reqwest::header::HeaderValue::try_from(&authorization)
+                .map_err(|e| anyhow::anyhow!("Invalid GDL authorization header: {e}"))?,
+        );
 
         let resp = self.client.get(url).headers(headers).send().await?;
 
@@ -643,7 +647,14 @@ impl GDLAccountTask {
         let url = format!("{}/v1/users/request-new-verification-token", self.base_api);
         let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+        headers.insert(
+            AUTHORIZATION,
+            reqwest::header::HeaderValue::try_from(&authorization).map_err(|e| {
+                RequestNewVerificationTokenError::RequestFailed(anyhow::anyhow!(
+                    "Invalid GDL authorization header: {e}"
+                ))
+            })?,
+        );
 
         let resp = self
             .client
@@ -687,7 +698,14 @@ impl GDLAccountTask {
         let url = format!("{}/v1/users/request-email-change", self.base_api);
         let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+        headers.insert(
+            AUTHORIZATION,
+            reqwest::header::HeaderValue::try_from(&authorization).map_err(|e| {
+                RequestNewEmailChangeError::RequestFailed(anyhow::anyhow!(
+                    "Invalid GDL authorization header: {e}"
+                ))
+            })?,
+        );
         headers.insert(
             CONTENT_TYPE,
             "application/json"
@@ -735,7 +753,14 @@ impl GDLAccountTask {
 
         let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+        headers.insert(
+            AUTHORIZATION,
+            reqwest::header::HeaderValue::try_from(&authorization).map_err(|e| {
+                RequestGDLAccountDeletionError::RequestFailed(anyhow::anyhow!(
+                    "Invalid GDL authorization header: {e}"
+                ))
+            })?,
+        );
 
         let resp = self
             .client
@@ -785,7 +810,14 @@ impl GDLAccountTask {
 
         let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+        headers.insert(
+            AUTHORIZATION,
+            reqwest::header::HeaderValue::try_from(&authorization).map_err(|e| {
+                CancelGDLAccountDeletionError::RequestFailed(anyhow::anyhow!(
+                    "Invalid GDL authorization header: {e}"
+                ))
+            })?,
+        );
 
         let resp = self
             .client

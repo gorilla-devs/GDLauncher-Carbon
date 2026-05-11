@@ -695,6 +695,7 @@ dependencies = [
  "anyhow",
  "futures",
  "tokio",
+ "tracing",
  "walkdir",
 ]
 

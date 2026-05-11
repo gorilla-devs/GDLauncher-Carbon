@@ -140,94 +140,107 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     }),
 
     // 6. Platform
-    columnHelper.display({
-      id: "platform",
-      header: () => (
-        <span class="hidden md:inline">{t("content:_trn_table.platform")}</span>
-      ),
-      size: 78,
-      cell: (props: any) => {
-        const row = props.row.original
+    columnHelper.accessor(
+      (row: any) => {
         const info = config.getPlatformInfo?.(row)
+        if (!info) return "z_local"
+        if (info.hasCurseforge && info.hasModrinth) return "b_both"
+        if (info.hasCurseforge) return "a_curseforge"
+        if (info.hasModrinth) return "c_modrinth"
+        return "z_local"
+      },
+      {
+        id: "platform",
+        header: () => (
+          <span class="hidden md:inline">
+            {t("content:_trn_table.platform")}
+          </span>
+        ),
+        size: 98,
+        cell: (props: any) => {
+          const row = props.row.original
+          const info = config.getPlatformInfo?.(row)
 
-        if (!info) {
-          // No platform info available (e.g., server addons without metadata)
+          if (!info) {
+            // No platform info available (e.g., server addons without metadata)
+            return (
+              <Tooltip>
+                <TooltipTrigger>
+                  <div class="i-hugeicons:folder-01 hidden text-lg text-gray-500 md:flex" />
+                </TooltipTrigger>
+                <TooltipContent>{t("content:_trn_table.local")}</TooltipContent>
+              </Tooltip>
+            )
+          }
+
+          const { hasCurseforge, hasModrinth } = info
+
+          if (!hasCurseforge && !hasModrinth) {
+            return (
+              <Tooltip>
+                <TooltipTrigger>
+                  <div class="i-hugeicons:folder-01 hidden text-lg text-gray-500 md:flex" />
+                </TooltipTrigger>
+                <TooltipContent>{t("content:_trn_table.local")}</TooltipContent>
+              </Tooltip>
+            )
+          }
+
+          if (hasCurseforge && hasModrinth) {
+            return (
+              <div class="relative hidden h-6 w-6 md:block">
+                <Tooltip>
+                  <TooltipTrigger>
+                    <div class="bg-darkSlate-800 absolute -left-0.5 -top-0.5 h-4 w-4 rounded-full p-0.5">
+                      <img
+                        src={CurseforgeLogo}
+                        class="h-full w-full"
+                        alt={t("enums:_trn_curseforge")}
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("enums:_trn_curseforge")}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <div class="bg-darkSlate-800 absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full p-0.5 shadow-sm">
+                      <img
+                        src={ModrinthLogo}
+                        class="h-full w-full"
+                        alt={t("enums:_trn_modrinth")}
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("enums:_trn_modrinth")}</TooltipContent>
+                </Tooltip>
+              </div>
+            )
+          }
+
+          const platform = hasCurseforge ? "curseforge" : "modrinth"
+          const logo = hasCurseforge ? CurseforgeLogo : ModrinthLogo
           return (
             <Tooltip>
               <TooltipTrigger>
-                <div class="i-hugeicons:folder-01 hidden text-lg text-gray-500 md:flex" />
+                <img
+                  src={logo}
+                  class="hidden h-4 w-4 md:block"
+                  alt={t(getPlatformKey(platform))}
+                />
               </TooltipTrigger>
-              <TooltipContent>{t("content:_trn_table.local")}</TooltipContent>
+              <TooltipContent>{t(getPlatformKey(platform))}</TooltipContent>
             </Tooltip>
           )
         }
-
-        const { hasCurseforge, hasModrinth } = info
-
-        if (!hasCurseforge && !hasModrinth) {
-          return (
-            <Tooltip>
-              <TooltipTrigger>
-                <div class="i-hugeicons:folder-01 hidden text-lg text-gray-500 md:flex" />
-              </TooltipTrigger>
-              <TooltipContent>{t("content:_trn_table.local")}</TooltipContent>
-            </Tooltip>
-          )
-        }
-
-        if (hasCurseforge && hasModrinth) {
-          return (
-            <div class="relative hidden h-6 w-6 md:block">
-              <Tooltip>
-                <TooltipTrigger>
-                  <div class="bg-darkSlate-800 absolute -left-0.5 -top-0.5 h-4 w-4 rounded-full p-0.5">
-                    <img
-                      src={CurseforgeLogo}
-                      class="h-full w-full"
-                      alt={t("enums:_trn_curseforge")}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{t("enums:_trn_curseforge")}</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger>
-                  <div class="bg-darkSlate-800 absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full p-0.5 shadow-sm">
-                    <img
-                      src={ModrinthLogo}
-                      class="h-full w-full"
-                      alt={t("enums:_trn_modrinth")}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{t("enums:_trn_modrinth")}</TooltipContent>
-              </Tooltip>
-            </div>
-          )
-        }
-
-        const platform = hasCurseforge ? "curseforge" : "modrinth"
-        const logo = hasCurseforge ? CurseforgeLogo : ModrinthLogo
-        return (
-          <Tooltip>
-            <TooltipTrigger>
-              <img
-                src={logo}
-                class="hidden h-4 w-4 md:block"
-                alt={t(getPlatformKey(platform))}
-              />
-            </TooltipTrigger>
-            <TooltipContent>{t(getPlatformKey(platform))}</TooltipContent>
-          </Tooltip>
-        )
       }
-    }),
+    ),
 
     // 7. Update available
-    columnHelper.display({
+    columnHelper.accessor((row: any) => (config.hasUpdate?.(row) ? 0 : 1), {
       id: "update",
       header: () => t("content:_trn_table.update"),
-      size: 80,
+      size: 100,
+      sortingFn: "basic",
       cell: (props: any) => {
         const row = props.row.original
         const hasUpd = config.hasUpdate?.(row) ?? false
@@ -279,8 +292,7 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
             </Tooltip>
           </Show>
         )
-      },
-      enableSorting: false
+      }
     }),
 
     // 8. Enabled toggle

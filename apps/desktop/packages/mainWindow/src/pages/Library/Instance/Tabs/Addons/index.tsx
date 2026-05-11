@@ -101,6 +101,20 @@ const Addons = () => {
 
   const instanceId = () => parseInt(params.id, 10)
 
+  // If the user has filtered the view to exactly one addon type, that's
+  // the type they're interested in adding next; otherwise default to
+  // "mods" — the most common case across instances. Without an explicit
+  // type, gotoSearchPage emits an empty :type segment in the URL and the
+  // search page falls through to whatever projectType the search context
+  // last held (often "modpack"), which is the bug we're fixing.
+  const defaultSearchType = (): AddonType => {
+    const enabled = (
+      Object.keys(addonData.enabledAddonTypes) as AddonType[]
+    ).filter((t) => addonData.enabledAddonTypes[t])
+    if (enabled.length === 1) return enabled[0]
+    return hasModloaders() ? "mods" : "shaders"
+  }
+
   const columns = createAddonColumns({
     selectedCount: () => getSelectedRows().length,
     totalRows: () => addonData.filteredAddons().length,
@@ -152,7 +166,7 @@ const Addons = () => {
         setEnabledAddonTypes: (type, enabled) =>
           addonData.setEnabledAddonTypes(type as any, enabled),
         addonTypes: visibleAddonTypes,
-        onAddAddons: () => addonMutations.gotoSearchPage(),
+        onAddAddons: () => addonMutations.gotoSearchPage(defaultSearchType()),
         onOpenFolder: addonMutations.handleOpenFolder,
         searchInputClass: "hidden lg:flex flex-1 min-w-0",
         addButtonDisabled: isInstanceLocked(),
@@ -296,7 +310,7 @@ const Addons = () => {
         tableInstance = table
       }}
       scrollContainerId="main-container-instance-details"
-      onAddAddons={() => addonMutations.gotoSearchPage()}
+      onAddAddons={() => addonMutations.gotoSearchPage(defaultSearchType())}
       contextMenuContent={({ selectedAddons, selectionCount }) => (
         <Show
           when={selectionCount() === 1}

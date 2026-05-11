@@ -21,7 +21,8 @@ import {
   Show,
   createSignal,
   createMemo,
-  createEffect
+  createEffect,
+  onCleanup
 } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { capitalize } from "@/utils/helpers"
@@ -280,7 +281,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
       setDebouncedQuery(query)
     }, 150) // 150ms debounce
 
-    return () => clearTimeout(timeoutId)
+    onCleanup(() => clearTimeout(timeoutId))
   })
 
   // Auto-focus input when dropdown content becomes visible
@@ -296,7 +297,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
       }
     }, 10) // Very short delay just for DOM rendering
 
-    return () => clearTimeout(timer)
+    onCleanup(() => clearTimeout(timer))
   })
 
   // Memoized modloaders list
@@ -672,7 +673,7 @@ export function SearchGameVersionDropdown(_props: DropdownProps) {
       setDebouncedQuery(query)
     }, 150) // 150ms debounce
 
-    return () => clearTimeout(timeoutId)
+    onCleanup(() => clearTimeout(timeoutId))
   })
 
   // Auto-focus input when dropdown content becomes visible
@@ -688,7 +689,7 @@ export function SearchGameVersionDropdown(_props: DropdownProps) {
       }
     }, 10) // Very short delay just for DOM rendering
 
-    return () => clearTimeout(timer)
+    onCleanup(() => clearTimeout(timer))
   })
 
   // Memoized versions list

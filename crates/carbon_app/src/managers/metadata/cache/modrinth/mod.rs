@@ -131,6 +131,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     .unzip::<_, _, Vec<_>, Vec<_>>();
                 trace!("querying modrinth mod batch for {entity_id}");
 
+                mcm.modrinth_throttle.acquire().await;
                 let versions_response = app
                     .modplatforms_manager()
                     .modrinth
@@ -140,6 +141,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     })
                     .await?;
 
+                mcm.modrinth_throttle.acquire().await;
                 let projects_response = app
                     .modplatforms_manager()
                     .modrinth
@@ -151,6 +153,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     })
                     .await?;
 
+                mcm.modrinth_throttle.acquire().await;
                 let teams_response = app
                     .modplatforms_manager()
                     .modrinth
@@ -172,31 +175,19 @@ impl ModplatformCacher for ModrinthModCacher {
                     .collect::<Vec<_>>();
 
                 let mpm = app.modplatforms_manager();
-                let combined_version_futures = combined_versions_list
-                    .chunks(350) // ~13 chars per version, 500 worked fine at time of testing
-                    .map(|chunk| async {
-                        let resp = mpm
-                            .modrinth
-                            .get_versions(VersionIDs {
-                                ids: chunk.to_vec(),
-                            })
-                            .await;
-
-                        resp
-                    });
-
-                let combined_versions_response =
-                    futures::future::join_all(combined_version_futures)
-                        .await
-                        .into_iter()
-                        .fold(Ok::<_, anyhow::Error>(Vec::new()), |a, c| match (a, c) {
-                            (Ok(mut a), Ok(c)) => {
-                                a.extend(c.0);
-                                Ok(a)
-                            }
-                            (Err(e), _) => Err(anyhow!(e)),
-                            (_, Err(e)) => Err(anyhow!(e)),
-                        })?;
+                // Run version-batch requests sequentially so each one passes
+                // through the throttle. join_all here would race past it.
+                let mut combined_versions_response = Vec::new();
+                for chunk in combined_versions_list.chunks(350) {
+                    mcm.modrinth_throttle.acquire().await;
+                    let resp = mpm
+                        .modrinth
+                        .get_versions(VersionIDs {
+                            ids: chunk.to_vec(),
+                        })
+                        .await?;
+                    combined_versions_response.extend(resp.0);
+                }
 
                 sender.send((
                     sha512_hashes,

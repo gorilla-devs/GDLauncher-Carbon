@@ -21,7 +21,7 @@ import {
   Show,
   Switch
 } from "solid-js"
-import { port, rspc } from "@/utils/rspcClient"
+import { apiFetch, rspc } from "@/utils/rspcClient"
 import {
   CFFEModLoaderType,
   FEModdedManifestLoaderVersion,
@@ -360,8 +360,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
   // Load preview without side effects - just for display
   const loadPreview = async (filePath: string) => {
-    const response = await fetch(
-      `http://127.0.0.1:${port}/loadImage?path=${encodeURIComponent(filePath)}`
+    const response = await apiFetch(
+      `/loadImage?path=${encodeURIComponent(filePath)}`
     )
     const blob = await response.blob()
     const b64 = (await blobToBase64(blob)) as string
@@ -373,8 +373,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   const storeIconForBackend = async () => {
     const path = iconPath()
     if (path) {
-      const response = await fetch(
-        `http://127.0.0.1:${port}/instance/loadIcon?path=${encodeURIComponent(path)}`
+      const response = await apiFetch(
+        `/instance/loadIcon?path=${encodeURIComponent(path)}`
       )
       if (!response.ok) {
         throw new Error("Failed to upload icon")

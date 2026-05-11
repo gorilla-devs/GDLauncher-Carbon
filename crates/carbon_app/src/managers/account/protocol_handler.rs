@@ -52,11 +52,17 @@ impl ProtocolHandler {
     /// Note: The URL parser interprets `oauth` as the host component and `/callback`
     /// as the path. The validation logic handles this standard custom protocol format.
     pub async fn handle_callback(&self, protocol_url: &str) -> Result<()> {
-        info!("Handling protocol callback: {}", protocol_url);
-
-        // Parse the protocol URL
+        // Parse the protocol URL — do this before logging so we never write
+        // the raw URL (which carries the OAuth code) to disk.
         let url =
             Url::parse(protocol_url).map_err(|e| anyhow::anyhow!("Invalid protocol URL: {}", e))?;
+
+        info!(
+            "Handling protocol callback: scheme={}, host={:?}, path={}",
+            url.scheme(),
+            url.host_str(),
+            url.path()
+        );
 
         // Validate scheme
         if url.scheme() != "gdlauncher" {

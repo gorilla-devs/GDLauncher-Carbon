@@ -59,6 +59,7 @@ declare global {
       | {
           type: "success"
           port: string
+          apiToken: string
         }
       | {
           type: "error"
@@ -75,7 +76,10 @@ declare global {
     }>
     getInitialRuntimePath: () => Promise<string>
     getRuntimePath: () => Promise<string>
-    changeRuntimePath: (newPath: string | null) => Promise<void>
+    changeRuntimePath: (
+      newPath: string | null,
+      switchOnly?: boolean
+    ) => Promise<void>
     changeRuntimePathProgress: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void

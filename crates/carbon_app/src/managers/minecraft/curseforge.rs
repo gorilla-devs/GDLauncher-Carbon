@@ -232,6 +232,22 @@ pub async fn prepare_modpack_from_zip(
                 })
                 .flatten();
 
+            // CurseForge manifest exposes sha1/md5 per file — verify
+            // downloads against them to defend against MITM / CDN poisoning.
+            let checksum = mod_file
+                .hashes
+                .iter()
+                .find_map(|h| match h.algo {
+                    HashAlgo::Sha1 => Some(carbon_net::Checksum::Sha1(h.value.clone())),
+                    _ => None,
+                })
+                .or_else(|| {
+                    mod_file.hashes.iter().find_map(|h| match h.algo {
+                        HashAlgo::Md5 => Some(carbon_net::Checksum::Md5(h.value.clone())),
+                        _ => None,
+                    })
+                });
+
             let downloadable = Downloadable::new(
                 mod_file
                     .download_url
@@ -239,7 +255,8 @@ pub async fn prepare_modpack_from_zip(
                     .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?,
                 instance_path.join(&mod_file.file_name),
             )
-            .with_size(mod_file.file_length as u64);
+            .with_size(mod_file.file_length as u64)
+            .with_checksum(checksum);
 
             downloadables.push((downloadable, existing_path));
         }

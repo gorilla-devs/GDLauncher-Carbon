@@ -162,15 +162,33 @@ impl EnrollmentTask {
             };
 
             let task = || async {
+                // Generate per-flow `state` (CSRF) and PKCE values (RFC 8252 §6).
+                let state_token = format!(
+                    "{}{}",
+                    uuid::Uuid::new_v4().simple(),
+                    uuid::Uuid::new_v4().simple()
+                );
+                let code_verifier = format!(
+                    "{}{}",
+                    uuid::Uuid::new_v4().simple(),
+                    uuid::Uuid::new_v4().simple()
+                );
+                let code_challenge = {
+                    use base64::Engine;
+                    use sha2::Digest;
+                    let digest = sha2::Sha256::digest(code_verifier.as_bytes());
+                    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest)
+                };
+
                 // Start OAuth callback server
-                let oauth_server = OAuthCallbackServer::new();
+                let oauth_server = OAuthCallbackServer::new(state_token.clone());
                 let oauth_handle = oauth_server.start().await?;
 
                 let redirect_uri = oauth_handle.redirect_uri();
                 let port = oauth_handle.port();
 
                 // Build Microsoft OAuth authorization URL
-                // Using Authorization Code Flow (RFC 6749 Section 4.1)
+                // Using Authorization Code Flow (RFC 6749 Section 4.1) + PKCE (RFC 7636).
                 let mut auth_url =
                     Url::parse("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
                         .map_err(|e| anyhow!("Failed to parse OAuth URL: {}", e))?;
@@ -184,11 +202,19 @@ impl EnrollmentTask {
                         "XboxLive.signin XboxLive.offline_access profile openid email",
                     )
                     .append_pair("response_mode", "query")
-                    .append_pair("prompt", "select_account");
+                    .append_pair("prompt", "select_account")
+                    .append_pair("state", &state_token)
+                    .append_pair("code_challenge", &code_challenge)
+                    .append_pair("code_challenge_method", "S256");
 
                 let auth_url = auth_url.to_string();
 
-                info!("OAuth authorization URL: {}", auth_url);
+                // Don't log the full URL — it contains the state token which
+                // shouldn't appear in logs. Log just the host/path/port.
+                info!(
+                    "Starting OAuth flow against Microsoft on callback port {}",
+                    port
+                );
                 info!("Waiting for OAuth callback on port {}", port);
 
                 // Update status to waiting for browser
@@ -232,6 +258,7 @@ impl EnrollmentTask {
                         ("code", &code),
                         ("redirect_uri", &redirect_uri),
                         ("grant_type", "authorization_code"),
+                        ("code_verifier", &code_verifier),
                     ])
                     .send()
                     .await

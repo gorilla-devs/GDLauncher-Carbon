@@ -13,8 +13,7 @@ import {
 } from "solid-js"
 import Center from "./components/Center"
 import { useModal } from "@/managers/ModalsManager"
-
-const [isChangingRuntimePath, setIsChangingRuntimePath] = createSignal(false)
+import { isChangingRuntimePath } from "@/managers/ModalsManager/modals/ConfirmChangeRuntimePath/state"
 
 const RuntimePath = () => {
   const modalsContext = useModal()
@@ -145,9 +144,7 @@ const RuntimePath = () => {
                       {
                         runtimePath: runtimePath()!,
                         isTargetFolderAlreadyUsed:
-                          isPathValid() === "potentially_valid",
-                        setIsChangingRuntimePath,
-                        isChangingRuntimePath: isChangingRuntimePath
+                          isPathValid() === "potentially_valid"
                       }
                     )
                   }}

@@ -8,3 +8,4 @@ tokio = { workspace = true }
 anyhow = { workspace = true }
 walkdir = { workspace = true }
 futures = { workspace = true }
+tracing = { workspace = true }

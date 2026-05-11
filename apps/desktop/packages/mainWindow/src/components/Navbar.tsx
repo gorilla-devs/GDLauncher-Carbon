@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
-import { port } from "@/utils/rspcClient"
+import { apiUrl } from "@/utils/rspcClient"
 
 import { useGlobalStore } from "./GlobalStoreContext"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
@@ -49,7 +49,9 @@ const AppNavbar = () => {
         return {
           label: {
             name: account?.username,
-            icon: `http://127.0.0.1:${port}/account/headImage?uuid=${getAccountImageUuid(account)}`,
+            icon: apiUrl(
+              `/account/headImage?uuid=${getAccountImageUuid(account)}`
+            ),
             uuid: account.uuid,
             type: account.type,
             status: accountStatusQuery.data

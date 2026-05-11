@@ -1,5 +1,5 @@
 import { generateSequence } from "@/utils/helpers"
-import { port, queryClient, rspc } from "@/utils/rspcClient"
+import { apiUrl, queryClient, rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
   Button,
@@ -196,7 +196,7 @@ const Settings = () => {
           <div class="flex items-center gap-4">
             <img
               class="h-13 w-13 rounded-lg"
-              src={`http://127.0.0.1:${port}/instance/modpackIcon?instance_id=${params.id}`}
+              src={apiUrl(`/instance/modpackIcon?instance_id=${params.id}`)}
             />
             <div>
               <div class="text-lg font-bold">
