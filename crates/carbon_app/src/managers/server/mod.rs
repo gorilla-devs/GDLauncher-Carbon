@@ -2727,7 +2727,9 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
 
-        // Auto-delete empty non-default groups after moving server out
+        // Auto-dissolve a non-default group left empty or with a single
+        // server after moving one out: a one-server folder is pointless,
+        // so its last server also returns to the default group.
         if start_group != default_group_id && start_group != target_group {
             let remaining_count = self
                 .app
@@ -2745,6 +2747,25 @@ impl ManagerRef<'_, ServerManager> {
                     .exec()
                     .await?;
                 self.app.invalidate(GET_GROUPS, None);
+            } else if remaining_count == 1 {
+                if let Some(last) = self
+                    .app
+                    .prisma_client
+                    .server()
+                    .find_first(vec![WhereParam::GroupId(IntFilter::Equals(start_group.0))])
+                    .exec()
+                    .await?
+                {
+                    // Moving the last server out empties the group, which the
+                    // recursive call's branch above then deletes. Release the
+                    // index lock first since move_server re-acquires it.
+                    drop(_index_lock);
+                    Box::pin(self.move_server(
+                        ServerId(last.id),
+                        ServerMoveTarget::EndOfGroup(default_group_id),
+                    ))
+                    .await?;
+                }
             }
         }
 

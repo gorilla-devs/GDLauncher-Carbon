@@ -1067,7 +1067,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
 
-        // Auto-delete empty non-default groups after moving instance out
+        // Auto-dissolve a non-default group left empty or with a single
+        // instance after moving one out: a one-instance folder is pointless,
+        // so its last instance also returns to the default group.
         if start_group != default_group_id && start_group != target_group {
             let remaining_count = self
                 .app
@@ -1087,6 +1089,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .await?;
                 // GET_GROUPS already invalidated above, but invalidate again after deletion
                 self.app.invalidate(GET_GROUPS, None);
+            } else if remaining_count == 1 {
+                if let Some(last) = self
+                    .app
+                    .prisma_client
+                    .instance()
+                    .find_first(vec![WhereParam::GroupId(IntFilter::Equals(*start_group))])
+                    .exec()
+                    .await?
+                {
+                    // Moving the last instance out empties the group, which the
+                    // recursive call's branch above then deletes. Release the
+                    // index lock first since move_instance re-acquires it.
+                    drop(_index_lock);
+                    Box::pin(self.move_instance(
+                        InstanceId(last.id),
+                        InstanceMoveTarget::EndOfGroup(default_group_id),
+                    ))
+                    .await?;
+                }
             }
         }
 
