@@ -1,0 +1,160 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher のテーマを変更する方法",
+    description: "ランチャーの見た目を切替。GDLauncher は組み込みテーマを複数同梱 (main、pixelato、win95、inferno、aether、frost)、確定前にライブプレビュー可能。",
+    steps: [
+      { name: "Appearance 設定を開く", text: "Settings → Appearance。組み込みテーマがそれぞれカードとして並び、3 色プレビューが付きます。" },
+      { name: "ホバーでプレビュー", text: "任意のテーマカードにホバーするとランチャー全体がそのテーマでライブに塗り替えられます。カードから離れると元に戻る。確定なしで比較するのに便利。" },
+      { name: "クリックで適用", text: "カードをクリックしてテーマを選択。選択されたテーマの角にチェックマーク。設定は再起動を超えて維持されます。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher 테마 변경하는 법",
+    description: "런처의 룩을 다르게 골라 보세요. GDLauncher는 내장 테마 여러 개(main, pixelato, win95, inferno, aether, frost)를 제공하며 확정 전에 라이브 프리뷰가 가능합니다.",
+    steps: [
+      { name: "Appearance 설정 열기", text: "Settings → Appearance. 모든 내장 테마가 카드로 나열되며, 각각 3색 미리보기 스와치가 있습니다." },
+      { name: "마우스 호버로 미리보기", text: "테마 카드 위에 마우스를 올리면 런처 전체가 해당 테마로 라이브 페인트됩니다. 카드를 벗어나면 되돌아옴. 확정 없이 비교하는 데 사용." },
+      { name: "클릭해 적용", text: "카드를 클릭해 테마 선택. 선택된 테마 모서리에 체크 표시. 변경은 재실행을 넘어 유지됩니다." }
+    ]
+  },
+  de: {
+    title: "Das GDLauncher-Theme ändern",
+    description: "Such dir einen anderen Look für den Launcher aus. GDLauncher bringt mehrere eingebaute Themes mit (main, pixelato, win95, inferno, aether, frost) und zeigt eine Live-Vorschau, bevor du commitest.",
+    steps: [
+      { name: "Appearance-Settings öffnen", text: "Settings → Appearance. Die Seite listet jedes Built-in-Theme als Karte mit einem 3-Farben-Vorschau-Swatch." },
+      { name: "Mit Hover vorschauen", text: "Beim Hovern einer Theme-Karte wird der ganze Launcher live im Theme neu gemalt. Mauszeiger weg = zurück. So vergleichst du, ohne zu committen." },
+      { name: "Mit Klick anwenden", text: "Karte anklicken, um das Theme auszuwählen. In der Ecke des gewählten Themes erscheint ein Häkchen. Die Auswahl bleibt über Neustarts erhalten." }
+    ]
+  },
+  fr: {
+    title: "Comment changer le thème de GDLauncher",
+    description: "Choisis un look différent pour le launcher. GDLauncher embarque plusieurs thèmes intégrés (main, pixelato, win95, inferno, aether, frost) avec preview live avant validation.",
+    steps: [
+      { name: "Ouvrir les settings Appearance", text: "Settings → Appearance. La page liste chaque thème intégré en carte, avec un swatch de prévisualisation à 3 couleurs." },
+      { name: "Survoler pour prévisualiser", text: "Survole n'importe quelle carte de thème et le launcher entier est repeint en live dans ce thème. Sort de la carte et il revient. Utilise ça pour comparer sans valider." },
+      { name: "Cliquer pour appliquer", text: "Clique la carte pour choisir le thème. Une coche apparaît dans le coin du thème sélectionné. Le changement persiste à travers les lancements." }
+    ]
+  },
+  es: {
+    title: "Cómo cambiar el tema de GDLauncher",
+    description: "Elige otro look para el launcher. GDLauncher trae varios temas incorporados (main, pixelato, win95, inferno, aether, frost) con vista previa en vivo antes de confirmar.",
+    steps: [
+      { name: "Abrir ajustes Appearance", text: "Settings → Appearance. La página lista cada tema incorporado como una tarjeta, cada una con una muestra de previsualización de 3 colores." },
+      { name: "Pasar el ratón para previsualizar", text: "Pasa por encima de cualquier tarjeta de tema y el launcher entero se repinta en vivo en ese tema. Sal de la tarjeta y vuelve. Úsalo para comparar sin comprometerte." },
+      { name: "Clic para aplicar", text: "Pulsa la tarjeta para elegir el tema. Aparece una marca en la esquina del tema seleccionado. El cambio persiste entre arranques." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como mudar o tema do GDLauncher",
+    description: "Escolha um visual diferente pro launcher. O GDLauncher inclui vários temas internos (main, pixelato, win95, inferno, aether, frost) com preview ao vivo antes de confirmar.",
+    steps: [
+      { name: "Abra ajustes Appearance", text: "Settings → Appearance. A página lista cada tema interno como um card, cada um com um swatch de preview de 3 cores." },
+      { name: "Passe o mouse pra preview", text: "Passe o mouse em qualquer card de tema e o launcher inteiro é repintado ao vivo naquele tema. Saia do card e volta. Use pra comparar sem comprometer." },
+      { name: "Clique pra aplicar", text: "Clique no card pra escolher o tema. Aparece um check no canto do tema selecionado. A mudança persiste entre lançamentos." }
+    ]
+  },
+  it: {
+    title: "Come cambiare il tema di GDLauncher",
+    description: "Scegli un look diverso per il launcher. GDLauncher include diversi temi integrati (main, pixelato, win95, inferno, aether, frost) con anteprima dal vivo prima di confermare.",
+    steps: [
+      { name: "Apri le impostazioni Appearance", text: "Settings → Appearance. La pagina elenca ogni tema integrato come una card, ognuna con uno swatch di anteprima a 3 colori." },
+      { name: "Passa il mouse per l'anteprima", text: "Passa il mouse su una qualsiasi card di tema e l'intero launcher viene ridipinto dal vivo con quel tema. Esci dalla card e torna come prima. Usalo per confrontare senza impegnarti." },
+      { name: "Clicca per applicare", text: "Clicca sulla card per scegliere il tema. Appare una spunta nell'angolo del tema selezionato. La modifica persiste tra i riavvii." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["組み込みテーマ", "ライブプレビューの仕組み", "テーマは外観のみ", "今後の予定"],
+    paras: [
+      "<strong>main</strong>: デフォルト。暗い青/黒に控えめなアクセント。<strong>pixelato</strong>: ピクセル風レトロパレット。<strong>win95</strong>: Windows 95 のグレーとブルーへのオマージュ。<strong>inferno</strong>: 暖かい赤とオレンジ。<strong>aether</strong>: 軽やかなパレット。<strong>frost</strong>: クールなブルーとホワイト。",
+      "GDLauncher のテーマはドキュメントルートに適用される純粋な CSS カスタムプロパティ (変数)。カードへのホバーが実行中の値をホバー中テーマのものに置き換えるため、変更は即時かつカーソルを動かすだけで戻せます。比較に最も速い方法: マウスでカードを巡って、しっくり来るものを見つけ、クリックで確定。",
+      "テーマ切替で設定や動作は何も変わりません、色だけ。インスタンス設定、アカウント、Modpack、すべてそのまま。テーマは様式の選択であり、好きなだけ切替えてください。",
+      "Appearance ページに「Custom themes」というセクションが「Coming soon」と表示。ユーザーが自前でテーマをインポート / 構築できるようになる予定。現時点では 6 つの組み込みに限定。"
+    ]
+  },
+  ko: {
+    headings: ["내장 테마", "라이브 프리뷰 작동 방식", "테마는 외관만 바꿈", "예정된 것"],
+    paras: [
+      "<strong>main</strong>: 기본. 어두운 파랑/검정에 미묘한 액센트. <strong>pixelato</strong>: 픽셀화된 레트로 팔레트. <strong>win95</strong>: Windows 95의 회색-파랑 오마주. <strong>inferno</strong>: 따뜻한 빨강과 주황. <strong>aether</strong>: 가벼운 팔레트. <strong>frost</strong>: 시원한 파랑과 흰색.",
+      "GDLauncher의 테마는 문서 루트에 적용되는 순수 CSS 커스텀 프로퍼티(변수)입니다. 카드 호버가 현재 값을 호버 중인 테마의 것으로 교체하므로 변경이 즉각적이고 커서만 움직이면 되돌릴 수 있습니다. 비교에 가장 빠른 방법: 마우스로 카드를 훑으며 마음에 드는 걸 찾고 클릭해 확정.",
+      "테마 전환은 설정이나 동작을 바꾸지 않고 색만 바꿉니다. 인스턴스 설정, 계정, 모드팩 모두 그대로. 테마는 스타일적 선택이니 원하는 만큼 자주 바꾸세요.",
+      "Appearance 페이지에 'Custom themes' 섹션이 'Coming soon'으로 표시. 사용자가 자신만의 테마를 가져오거나 만들 수 있게 할 의도. 지금은 6개 내장으로 제한."
+    ]
+  },
+  de: {
+    headings: ["Die eingebauten Themes", "Wie die Live-Vorschau funktioniert", "Themes sind nur Optik", "Was kommt"],
+    paras: [
+      "<strong>main</strong>: Default. Dunkelblau/schwarz mit dezenten Akzenten. <strong>pixelato</strong>: pixelige, retro angehauchte Palette. <strong>win95</strong>: Hommage an Windows 95s Grau-Blau. <strong>inferno</strong>: warme Rot- und Orangetöne. <strong>aether</strong>: helle, luftige Palette. <strong>frost</strong>: kühle Blau- und Weißtöne.",
+      "Themes in GDLauncher sind reine CSS-Custom-Properties (Variablen) am Document-Root. Beim Hovern einer Karte werden die aktiven Werte durch die der gehoverten Variante ersetzt, die Änderung ist sofort und einfach durch Mausbewegung reversibel. Schnellster Weg zum Vergleich: Karten mit der Maus durchgehen, die richtige spüren, mit Klick committen.",
+      "Theme-Wechsel ändert keine Einstellungen oder Verhalten, nur Farben. Instanzeinstellungen, Accounts, Modpacks, alles bleibt. Das Theme ist Stil-Entscheidung, wechsel so oft du willst.",
+      "Auf der Appearance-Seite gibt's einen Bereich 'Custom themes' als Coming soon. Der Plan: Nutzer können eigene Themes importieren oder bauen. Aktuell bist du auf die sechs Built-Ins beschränkt."
+    ]
+  },
+  fr: {
+    headings: ["Les thèmes intégrés", "Comment marche la preview live", "Les thèmes ne changent que l'apparence", "Ce qui arrive"],
+    paras: [
+      "<strong>main</strong> : default. Bleu/noir foncé avec accents subtils. <strong>pixelato</strong> : palette pixelisée, rétro. <strong>win95</strong> : clin d'œil au gris-bleu de Windows 95. <strong>inferno</strong> : rouges et oranges chauds. <strong>aether</strong> : palette légère, aérienne. <strong>frost</strong> : bleus et blancs frais.",
+      "Les thèmes dans GDLauncher sont de pures CSS custom properties (variables) appliquées à la racine du document. Survoler une carte remplace les valeurs en cours par celles du thème survolé, donc le changement est instantané et réversible juste en bougeant le curseur. Le plus rapide pour comparer : balade-toi sur les cartes avec la souris, sens celle qui te parle, clique pour valider.",
+      "Changer de thème ne change aucun setting ni comportement, juste les couleurs. Settings d'instance, comptes, modpacks, tout reste en place. Le thème est un choix esthétique, switche autant que tu veux.",
+      "La page Appearance a une section 'Custom themes' marquée Coming soon. L'intention : permettre aux utilisateurs d'importer ou construire leurs propres thèmes. Pour l'instant, tu es limité aux six intégrés."
+    ]
+  },
+  es: {
+    headings: ["Los temas incorporados", "Cómo funciona la vista previa en vivo", "Los temas son solo apariencia", "Lo que viene"],
+    paras: [
+      "<strong>main</strong>: por defecto. Azul/negro oscuro con acentos sutiles. <strong>pixelato</strong>: paleta pixelada, retro. <strong>win95</strong>: guiño al gris-azul de Windows 95. <strong>inferno</strong>: rojos y naranjas cálidos. <strong>aether</strong>: paleta clara y aireada. <strong>frost</strong>: azules y blancos frescos.",
+      "Los temas en GDLauncher son puras CSS custom properties (variables) aplicadas a la raíz del documento. Pasar el ratón por una tarjeta sustituye los valores en marcha por los del tema sobre el que estás, así que el cambio es instantáneo y reversible solo moviendo el cursor. La forma más rápida de comparar: pasea con el ratón por las tarjetas, ve cuál te encaja, confirma con clic.",
+      "Cambiar el tema no cambia ningún ajuste ni comportamiento, solo colores. Ajustes de instancia, cuentas, modpacks, todo se mantiene. El tema es una elección estilística, cámbialo todas las veces que quieras.",
+      "La página Appearance tiene una sección 'Custom themes' marcada como Coming soon. La intención: permitir importar o construir temas propios. Por ahora estás limitado a los seis incorporados."
+    ]
+  },
+  "pt-BR": {
+    headings: ["Os temas internos", "Como o preview ao vivo funciona", "Temas são só aparência", "O que vem por aí"],
+    paras: [
+      "<strong>main</strong>: o padrão. Azul/preto escuro com acentos sutis. <strong>pixelato</strong>: paleta pixelada, retrô. <strong>win95</strong>: piscadela pro cinza-azul do Windows 95. <strong>inferno</strong>: vermelhos e laranjas quentes. <strong>aether</strong>: paleta leve e arejada. <strong>frost</strong>: azuis e brancos frescos.",
+      "Temas no GDLauncher são puras CSS custom properties (variáveis) aplicadas na raiz do documento. Passar o mouse num card substitui os valores ativos pelos do tema sob o cursor, então a mudança é instantânea e reversível só movendo o cursor. Jeito mais rápido de comparar: passeie com o mouse pelos cards, sinta qual combina, clique pra confirmar.",
+      "Trocar tema não muda nenhuma configuração ou comportamento, só cores. Ajustes de instância, contas, modpacks, tudo fica. O tema é uma escolha estilística, troque o quanto quiser.",
+      "A página Appearance tem uma seção 'Custom themes' marcada como Coming soon. A intenção: permitir que usuários importem ou construam temas próprios. Por enquanto, você está limitado aos seis internos."
+    ]
+  },
+  it: {
+    headings: ["I temi integrati", "Come funziona l'anteprima dal vivo", "I temi sono solo aspetto", "Cosa arriva"],
+    paras: [
+      "<strong>main</strong>: quello di default. Blu/nero scuro con accenti sottili. <strong>pixelato</strong>: palette pixelata, retrò. <strong>win95</strong>: omaggio al grigio-blu di Windows 95. <strong>inferno</strong>: rossi e arancioni caldi. <strong>aether</strong>: palette leggera e ariosa. <strong>frost</strong>: blu e bianchi freddi.",
+      "I temi di GDLauncher sono pure CSS custom properties (variabili) applicate alla radice del documento. Passare il mouse su una card sostituisce i valori attivi con quelli del tema sotto il cursore, quindi il cambio è istantaneo e reversibile solo muovendo il cursore. Il modo più veloce per confrontare: passa il mouse sulle card, senti quale ti convince, clicca per confermare.",
+      "Cambiare tema non modifica nessuna impostazione o comportamento, solo i colori. Impostazioni delle istanze, account, modpack, tutto resta com'è. Il tema è una scelta stilistica, cambialo quante volte vuoi.",
+      "La pagina Appearance ha una sezione 'Custom themes' marcata come Coming soon. L'intento: permettere agli utenti di importare o costruire temi propri. Per ora sei limitato ai sei integrati."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT1M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

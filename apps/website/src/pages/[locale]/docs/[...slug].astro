@@ -1,0 +1,57 @@
+---
+/**
+ * Localized doc routes: /<locale>/docs/<slug>.
+ *
+ * Looks up a locale-specific entry at `src/content/docs/<locale>/<slug>.md`
+ * first; falls back to the English entry if a translation hasn't been
+ * written yet. Either way, the layout chrome (breadcrumbs, JSON-LD) is
+ * locale-aware.
+ */
+import { type CollectionEntry, getCollection } from "astro:content"
+import Docs from "../../../layouts/Docs.astro"
+import { LOCALES, DEFAULT_LOCALE } from "../../../lib/i18n"
+
+export async function getStaticPaths() {
+  const posts = await getCollection("docs")
+  // Map of slug → entry, used for both English (slug) and locale lookup
+  // (locale/slug). Locale-prefixed entries override English ones below.
+  const englishBySlug = new Map<string, CollectionEntry<"docs">>()
+  for (const post of posts) {
+    if (!post.slug.includes("/")) englishBySlug.set(post.slug, post)
+  }
+  const localeIndex = new Map<string, CollectionEntry<"docs">>()
+  for (const post of posts) {
+    const parts = post.slug.split("/")
+    if (parts.length === 2 && (LOCALES as readonly string[]).includes(parts[0])) {
+      localeIndex.set(post.slug, post)
+    }
+  }
+
+  const out: Array<{
+    params: { locale: string; slug: string }
+    props: CollectionEntry<"docs">
+  }> = []
+  for (const loc of LOCALES) {
+    if (loc === DEFAULT_LOCALE) continue
+    for (const [enSlug, enPost] of englishBySlug) {
+      // Prefer locale-specific entry; fall back to English content with
+      // translated chrome if no localized .md exists yet.
+      const localized = localeIndex.get(`${loc}/${enSlug}`)
+      out.push({
+        params: { locale: loc, slug: enSlug },
+        props: localized ?? enPost
+      })
+    }
+  }
+  return out
+}
+
+type Props = CollectionEntry<"docs">
+
+const post = Astro.props
+const { Content } = await post.render()
+---
+
+<Docs {...post.data}>
+  <Content />
+</Docs>

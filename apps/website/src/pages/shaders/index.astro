@@ -3,108 +3,101 @@
  * Shaders Hub Page
  */
 import PageShell from "../../components/PageShell.astro"
+import { DownloadLink } from "../../components/DownloadLink"
 import Breadcrumb from "../../components/Breadcrumb.astro"
+import TopAddonsList from "../../components/TopAddonsList.astro"
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { ADDON_TYPE_PLURAL } from "../../lib/api/types"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
 
 Astro.locals.cache(300)
 ---
 
 <PageShell
-  title="Minecraft Shaders | GDLauncher"
-  description="Browse and install Minecraft shaders from CurseForge and Modrinth. Transform your graphics with GDLauncher."
+  title={t("shaders.title")}
+  description={t("shaders.description")}
   keywords="minecraft shaders, curseforge shaders, modrinth shaders, install shaders, shader packs, gdlauncher"
 >
     <main class="py-8">
-      <Breadcrumb items={[{ label: "Shaders" }]} maxWidth="max-w-6xl" />
+      <Breadcrumb items={[{ label: ADDON_TYPE_PLURAL.shaders }]} maxWidth="max-w-6xl" />
 
       <div class="max-w-6xl mx-auto px-4">
       <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-12">
         <div class="text-center mb-12">
           <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
-            Minecraft
-            <span class="text-primary-300">Shaders</span>
+            {t("shaders.h1.line1")}{" "}
+            <span class="text-primary-300">{t("shaders.h1.line2")}</span>
           </h1>
           <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
-            Shaders transform Minecraft's graphics with realistic lighting, shadows, reflections, and atmospheric effects.
-            Make your game look stunning.
+            {t("shaders.intro")}
           </p>
         </div>
 
         <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
-          <h2 class="text-lightSlate-50">What are Shaders?</h2>
-          <p class="text-darkSlate-100">
-            Shaders are graphical modifications that completely overhaul how Minecraft looks.
-            They add effects that aren't possible in vanilla Minecraft, creating stunning visuals.
-          </p>
-          <p class="text-darkSlate-100">Popular shader effects include:</p>
+          <h2 class="text-lightSlate-50">{t("shaders.section.what.heading")}</h2>
+          <p class="text-darkSlate-100">{t("shaders.section.what.p1")}</p>
+          <p class="text-darkSlate-100">{t("shaders.section.what.p2")}</p>
           <ul class="text-darkSlate-100">
-            <li><strong class="text-lightSlate-50">Dynamic Shadows</strong> - Realistic shadows that move with the sun</li>
-            <li><strong class="text-lightSlate-50">Water Reflections</strong> - Reflective, transparent water with waves</li>
-            <li><strong class="text-lightSlate-50">Volumetric Lighting</strong> - God rays streaming through trees</li>
-            <li><strong class="text-lightSlate-50">Atmospheric Effects</strong> - Fog, clouds, and weather improvements</li>
-            <li><strong class="text-lightSlate-50">Improved Colors</strong> - Better saturation and color grading</li>
+            <li>{t("shaders.section.what.li.shadows")}</li>
+            <li>{t("shaders.section.what.li.water")}</li>
+            <li>{t("shaders.section.what.li.volumetric")}</li>
+            <li>{t("shaders.section.what.li.atmosphere")}</li>
+            <li>{t("shaders.section.what.li.colors")}</li>
           </ul>
         </section>
 
         <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
-          <h2 class="text-lightSlate-50">Shader Loaders</h2>
-          <p class="text-darkSlate-100">
-            Shaders require a shader loader to work. The two main options are:
-          </p>
+          <h2 class="text-lightSlate-50">{t("shaders.section.loaders.heading")}</h2>
+          <p class="text-darkSlate-100">{t("shaders.section.loaders.intro")}</p>
           <ul class="text-darkSlate-100">
-            <li><strong class="text-lightSlate-50">Iris + Sodium</strong> (Fabric/Quilt) - Open-source with significantly better performance. Often delivers 2x the FPS of OptiFine. Updates quickly for new Minecraft versions and works with most OptiFine shader packs.</li>
-            <li><strong class="text-lightSlate-50">OptiFine</strong> (Forge or standalone) - The original shader loader since 2011. Also includes connected textures, zoom, and other visual features. Closed-source with slower updates for new versions.</li>
+            <li>{t("shaders.section.loaders.iris")}</li>
+            <li>{t("shaders.section.loaders.optifine")}</li>
           </ul>
-          <p class="text-darkSlate-100">
-            For best performance, we recommend Iris + Sodium. GDLauncher can set up either automatically when you install shaders.
-          </p>
+          <p class="text-darkSlate-100">{t("shaders.section.loaders.outro")}</p>
         </section>
 
         <section class="prose prose-invert prose-lg max-w-3xl mx-auto">
-          <h2 class="text-lightSlate-50">Performance Considerations</h2>
-          <p class="text-darkSlate-100">
-            Shaders are GPU-intensive. Here's what to expect based on shader complexity:
-          </p>
+          <h2 class="text-lightSlate-50">{t("shaders.section.perf.heading")}</h2>
+          <p class="text-darkSlate-100">{t("shaders.section.perf.intro")}</p>
           <ul class="text-darkSlate-100">
-            <li><strong class="text-lightSlate-50">Lightweight shaders</strong> (Sildur's Lite, Complementary Reimagined) - Playable on integrated graphics</li>
-            <li><strong class="text-lightSlate-50">Medium shaders</strong> (BSL, Complementary) - Need a dedicated GPU (GTX 1060 / RX 580 or better)</li>
-            <li><strong class="text-lightSlate-50">Heavy shaders</strong> (SEUS PTGI, Continuum RT) - Need a powerful GPU (RTX 3060 or better)</li>
+            <li>{t("shaders.section.perf.li.light")}</li>
+            <li>{t("shaders.section.perf.li.medium")}</li>
+            <li>{t("shaders.section.perf.li.heavy")}</li>
           </ul>
-          <p class="text-darkSlate-100">Tips for better shader performance:</p>
+          <p class="text-darkSlate-100">{t("shaders.section.perf.tipsIntro")}</p>
           <ul class="text-darkSlate-100">
-            <li>Lower render distance (8-12 chunks with shaders)</li>
-            <li>Disable shader features you don't need (reflections, volumetric lighting)</li>
-            <li>Use performance mods like Sodium alongside Iris</li>
+            <li>{t("shaders.section.perf.tip.render")}</li>
+            <li>{t("shaders.section.perf.tip.disable")}</li>
+            <li>{t("shaders.section.perf.tip.sodium")}</li>
           </ul>
         </section>
       </div>
+
+      <TopAddonsList type="shaders" />
 
       <section class="mb-12">
         <div class="bg-darkSlate-800 rounded-xl overflow-hidden">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div class="p-8 lg:p-12">
-              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">Browse Shaders in GDLauncher</h2>
-              <p class="text-darkSlate-100 mb-6">
-                Find and install stunning shader packs from CurseForge and Modrinth directly in GDLauncher.
-                We'll help you set up Iris or OptiFine automatically.
-              </p>
+              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">{t("shaders.browse.heading")}</h2>
+              <p class="text-darkSlate-100 mb-6">{t("shaders.browse.intro")}</p>
               <ul class="flex flex-col gap-3 mb-8">
                 <li class="flex items-center gap-3 text-darkSlate-50">
                   <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
-                  <span>Browse shaders from CurseForge & Modrinth</span>
+                  <span>{t("shaders.browse.li.both")}</span>
                 </li>
                 <li class="flex items-center gap-3 text-darkSlate-50">
                   <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
-                  <span>Auto-setup Iris or OptiFine</span>
+                  <span>{t("shaders.browse.li.autosetup")}</span>
                 </li>
                 <li class="flex items-center gap-3 text-darkSlate-50">
                   <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
-                  <span>One-click install and updates</span>
+                  <span>{t("shaders.browse.li.oneclick")}</span>
                 </li>
               </ul>
-              <a href="/download/windows" data-astro-prefetch="false" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/></svg>
-                Download GDLauncher
-              </a>
+              <DownloadLink client:idle class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95" iconClass="w-5 h-5" label={t("addon.downloadCta")} iconLeft />
             </div>
             <div class="relative">
               <img
@@ -119,18 +112,16 @@ Astro.locals.cache(300)
       </section>
 
       <section class="mt-8 bg-darkSlate-800 rounded-xl p-8 md:p-12">
-        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">Learn More</h2>
+        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">{t("shaders.learnmore.heading")}</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
           <a href="/guides/install-shaders" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
-            <span class="text-lightSlate-50 font-medium">How to Install Shaders</span>
+            <span class="text-lightSlate-50 font-medium">{t("shaders.learnmore.installshaders")}</span>
           </a>
-          <!--
-          <a href="/blog/best-shaders-2025" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
-            <span class="text-lightSlate-50 font-medium">Best Shaders 2025</span>
+          <a href="/blog/best-shaders-2026" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">{t("shaders.learnmore.bestshaders")}</span>
           </a>
-          -->
           <a href="/guides/performance-mods" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
-            <span class="text-lightSlate-50 font-medium">Performance Mods</span>
+            <span class="text-lightSlate-50 font-medium">{t("shaders.learnmore.performance")}</span>
           </a>
         </div>
       </section>

@@ -1,0 +1,38 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Change GDLauncher's Theme"
+  description="Pick a different look for the launcher. GDLauncher ships several built-in themes (main, pixelato, win95, inferno, aether, frost) with live preview before commit."
+  keywords="change gdlauncher theme, minecraft launcher theme, dark theme launcher, gdlauncher appearance, customize launcher"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT1M",
+    steps: [
+      { name: "Open Appearance settings", text: "Settings → Appearance. The page lists every built-in theme as a card, each with a 3-color preview swatch." },
+      { name: "Hover to preview", text: "Hover any theme card and the entire launcher repaints live in that theme. Move off the card and it reverts. Use this to compare without committing." },
+      { name: "Click to apply", text: "Click the card to pick the theme. A checkmark appears in the corner of the selected theme. The change persists across launches." }
+    ]
+  }}
+>
+  <h2>The built-in themes</h2>
+  <ul>
+    <li><strong>main</strong>: the default. Dark blue/black with subtle accents.</li>
+    <li><strong>pixelato</strong>: pixelated, retro-styled palette.</li>
+    <li><strong>win95</strong>: a callback to Windows 95's grey-and-blue.</li>
+    <li><strong>inferno</strong>: warm reds and oranges.</li>
+    <li><strong>aether</strong>: light, airy palette.</li>
+    <li><strong>frost</strong>: cool blues and whites.</li>
+  </ul>
+
+  <h2>How the live preview works</h2>
+  <p>Themes in GDLauncher are pure CSS custom properties (variables) applied at the document root. Hovering a card replaces the running values with the hovered theme's, so the change is instantaneous and reversible just by moving the cursor.</p>
+  <p>This is the fastest way to compare: walk through the cards with your mouse, see which one feels right, commit by clicking.</p>
+
+  <h2>Themes are appearance-only</h2>
+  <p>Switching themes doesn't change any setting or behavior, only colors. Instance settings, accounts, modpacks, all of it stays put. The theme is a stylistic choice, switch as often as you want.</p>
+
+  <h2>What's coming</h2>
+  <p>The Appearance page has a section labeled "Custom themes" marked as Coming soon. The intent is to let users import or build their own themes. For now you're limited to the six built-ins.</p>
+</GuideLayout>

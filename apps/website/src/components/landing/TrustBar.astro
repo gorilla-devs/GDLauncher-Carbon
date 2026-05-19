@@ -2,19 +2,23 @@
 /**
  * TrustBar - Shows platform logos and modloader support
  */
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
 
 const modPlatforms = [
   {
     name: "CurseForge",
     icon: "/assets/icons/curseforge_logo.svg",
     url: "https://curseforge.com",
-    description: "Browse thousands of mods and modpacks"
+    descriptionKey: "trustbar.platform.curseforge.desc"
   },
   {
     name: "Modrinth",
     icon: "/assets/icons/modrinth_logo.svg",
     url: "https://modrinth.com",
-    description: "Discover community-driven content"
+    descriptionKey: "trustbar.platform.modrinth.desc"
   }
 ]
 
@@ -31,13 +35,13 @@ const modLoaders = [
     <!-- Section header -->
     <div class="text-center mb-16" data-scroll="fade-up">
       <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
-        Supports Your
+        {t("trustbar.heading.line1")}{" "}
         <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
-          Favorite Platforms
+          {t("trustbar.heading.line2")}
         </span>
       </h2>
       <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
-        Install mods and modpacks from the biggest platforms with one click.
+        {t("trustbar.intro")}
       </p>
     </div>
 
@@ -60,7 +64,7 @@ const modLoaders = [
           />
           <div>
             <h3 class="text-lightSlate-50 font-semibold text-lg">{platform.name}</h3>
-            <p class="text-darkSlate-100 text-sm">{platform.description}</p>
+            <p class="text-darkSlate-100 text-sm">{t(platform.descriptionKey)}</p>
           </div>
         </a>
       ))}
@@ -69,7 +73,7 @@ const modLoaders = [
     <!-- Modloaders -->
     <div class="text-center" data-scroll="fade-up" data-scroll-delay="200">
       <p class="text-darkSlate-200 text-sm uppercase tracking-wider mb-6">
-        All major modloaders supported
+        {t("trustbar.loaders.label")}
       </p>
       <div class="flex flex-wrap items-center justify-center gap-8">
         {modLoaders.map((loader, index) => (

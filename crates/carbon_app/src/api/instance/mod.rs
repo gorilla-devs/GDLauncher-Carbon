@@ -787,6 +787,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 query.title,
                 query.expiration_days,
                 query.max_downloads,
+                query.include_saves,
                 cancel_token.clone(),
             )
             .await
@@ -2392,6 +2393,8 @@ struct ShareInstanceQuery {
     title: Option<String>,
     expiration_days: Option<i32>,
     max_downloads: Option<i32>,
+    #[serde(default)]
+    include_saves: bool,
 }
 
 #[derive(Debug, Serialize, Type)]

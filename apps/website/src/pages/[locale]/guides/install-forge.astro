@@ -1,0 +1,300 @@
+---
+/**
+ * Localized "How to Install Minecraft Forge" guide. Brand names left
+ * untranslated (Forge, NeoForge, Fabric, Quilt, GDLauncher, CurseForge,
+ * Modrinth, JEI, Create, Applied Energistics 2, Tinkers' Construct,
+ * Biomes O' Plenty).
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft Forge の導入方法",
+    description: "GDLauncher で Minecraft Forge を導入する手順ガイド。お気に入りの Forge Mod を簡単にプレイできます。",
+    steps: [
+      { name: "GDLauncher をダウンロード", text: "gdlauncher.com から GDLauncher をダウンロードしてインストール。無料で Windows / macOS / Linux に対応しています。" },
+      { name: "新しいインスタンスを作成", text: "GDLauncher を開き、Library ページの + ボタンから新しい Minecraft インスタンスを作成します。" },
+      { name: "ローダーで Forge を選択", text: "ローダーのドロップダウンで Forge を選び、遊びたい Minecraft バージョンを指定します (大型 Modpack なら 1.21.1、1.20.1、1.12.2 がよく使われます)。" },
+      { name: "GDLauncher にすべてを任せる", text: "GDLauncher が Minecraft、対応 Java、Forge 本体を自動でダウンロード・インストール。手動の JAR 実行や Java パスの設定は不要です。" },
+      { name: "Forge Mod を追加", text: "新しいインスタンスを開き、Addons タブの組み込みブラウザから CurseForge と Modrinth の Forge 対応 Mod をワンクリックで導入。依存関係も自動取得されます。" },
+      { name: "Play を押す", text: "Play をクリックすれば、追加した Mod がすべて読み込まれた状態で Forge インスタンスが起動します。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft Forge 설치 방법",
+    description: "GDLauncher로 Minecraft Forge를 설치하는 단계별 가이드. 좋아하는 Forge 모드를 손쉽게 즐기세요.",
+    steps: [
+      { name: "GDLauncher 다운로드", text: "gdlauncher.com에서 GDLauncher를 받아 설치하세요. 무료이며 Windows, macOS, Linux를 지원합니다." },
+      { name: "새 인스턴스 만들기", text: "GDLauncher를 열고 Library 페이지의 + 버튼을 눌러 새 Minecraft 인스턴스를 시작하세요." },
+      { name: "로더로 Forge 선택", text: "로더 드롭다운에서 Forge를 고르고, 플레이할 Minecraft 버전을 선택하세요 (대형 모드팩에는 1.21.1, 1.20.1, 1.12.2가 흔합니다)." },
+      { name: "GDLauncher가 알아서 설치", text: "GDLauncher가 Minecraft, 알맞은 Java 버전, Forge 본체를 자동으로 다운로드합니다. 수동 JAR 실행이나 Java 경로 설정이 없습니다." },
+      { name: "Forge 모드 추가", text: "새 인스턴스를 열고 Addons 탭의 내장 브라우저에서 CurseForge와 Modrinth의 Forge 호환 모드를 원클릭으로 설치하세요. 의존성은 자동으로 처리됩니다." },
+      { name: "Play 누르기", text: "Play를 클릭하면 설치된 모든 모드가 로드된 상태로 Forge 인스턴스가 실행됩니다." }
+    ]
+  },
+  de: {
+    title: "So installierst du Minecraft Forge",
+    description: "Schritt-für-Schritt-Anleitung zum Installieren von Minecraft Forge mit GDLauncher. Spiel deine Lieblings-Forge-Mods ohne Umwege.",
+    steps: [
+      { name: "GDLauncher herunterladen", text: "Lade GDLauncher von gdlauncher.com. Kostenlos und für Windows, macOS und Linux verfügbar." },
+      { name: "Neue Instanz erstellen", text: "Öffne GDLauncher und klick auf der Library-Seite auf das +, um eine neue Minecraft-Instanz anzulegen." },
+      { name: "Forge als Loader wählen", text: "Wähl im Loader-Dropdown Forge und dann die Minecraft-Version, die du spielen willst (1.21.1, 1.20.1 und 1.12.2 sind die häufigsten Versionen für große Modpacks)." },
+      { name: "GDLauncher alles installieren lassen", text: "GDLauncher lädt Minecraft, die richtige Java-Version und Forge automatisch. Kein manuelles JAR-Ausführen, keine Java-Pfade konfigurieren." },
+      { name: "Forge-Mods hinzufügen", text: "Öffne die neue Instanz, geh in den Addons-Tab und installiere mit dem eingebauten Browser Forge-kompatible Mods aus CurseForge oder Modrinth per Klick. Abhängigkeiten kommen automatisch mit." },
+      { name: "Auf Play drücken", text: "Klick auf Play. Deine Forge-Instanz startet mit allen installierten Mods." }
+    ]
+  },
+  fr: {
+    title: "Comment installer Minecraft Forge",
+    description: "Guide étape par étape pour installer Minecraft Forge avec GDLauncher. Joue à tes mods Forge préférés facilement.",
+    steps: [
+      { name: "Télécharger GDLauncher", text: "Télécharge GDLauncher depuis gdlauncher.com. Gratuit, dispo sur Windows, macOS et Linux." },
+      { name: "Créer une nouvelle instance", text: "Ouvre GDLauncher et clique sur le + de la page Library pour démarrer une nouvelle instance Minecraft." },
+      { name: "Choisir Forge comme loader", text: "Sélectionne Forge dans le dropdown du loader, puis choisis la version de Minecraft que tu veux (1.21.1, 1.20.1 et 1.12.2 sont les plus communes pour les gros modpacks)." },
+      { name: "Laisser GDLauncher tout installer", text: "GDLauncher télécharge Minecraft, la bonne version de Java et Forge automatiquement. Pas de JAR à exécuter manuellement, pas de chemin Java à configurer." },
+      { name: "Ajouter des mods Forge", text: "Ouvre la nouvelle instance, va dans Addons et installe des mods Forge depuis CurseForge ou Modrinth en un clic via le navigateur intégré. Les dépendances arrivent automatiquement." },
+      { name: "Appuyer sur Play", text: "Clique sur Play. Ton instance Forge démarre avec tous tes mods chargés." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar Minecraft Forge",
+    description: "Guía paso a paso para instalar Minecraft Forge con GDLauncher. Juega tus mods Forge favoritos fácilmente.",
+    steps: [
+      { name: "Descargar GDLauncher", text: "Descarga GDLauncher desde gdlauncher.com. Gratis, disponible para Windows, macOS y Linux." },
+      { name: "Crear una nueva instancia", text: "Abre GDLauncher y haz clic en el + de la página Library para empezar una nueva instancia de Minecraft." },
+      { name: "Elegir Forge como loader", text: "Selecciona Forge en el desplegable del loader y luego escoge la versión de Minecraft que quieras jugar (1.21.1, 1.20.1 y 1.12.2 son las más comunes para grandes modpacks)." },
+      { name: "Dejar que GDLauncher lo instale todo", text: "GDLauncher descarga Minecraft, la versión correcta de Java y el propio Forge automáticamente. Sin ejecutar JARs manualmente, sin configurar rutas de Java." },
+      { name: "Añadir mods Forge", text: "Abre la nueva instancia, ve a la pestaña Addons y usa el navegador integrado para instalar mods compatibles con Forge desde CurseForge o Modrinth con un clic. Las dependencias se añaden solas." },
+      { name: "Pulsar Play", text: "Haz clic en Play. Tu instancia Forge arranca con todos tus mods cargados." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar o Minecraft Forge",
+    description: "Guia passo a passo para instalar o Minecraft Forge com o GDLauncher. Jogue seus mods Forge favoritos sem complicação.",
+    steps: [
+      { name: "Baixar o GDLauncher", text: "Baixe o GDLauncher em gdlauncher.com. Grátis e disponível para Windows, macOS e Linux." },
+      { name: "Criar uma nova instância", text: "Abra o GDLauncher e clique no + da página Library para começar uma nova instância do Minecraft." },
+      { name: "Escolher Forge como loader", text: "Selecione Forge no dropdown do loader e escolha a versão do Minecraft que quer jogar (1.21.1, 1.20.1 e 1.12.2 são as mais comuns para modpacks grandes)." },
+      { name: "Deixar o GDLauncher instalar tudo", text: "O GDLauncher baixa o Minecraft, a versão certa do Java e o próprio Forge automaticamente. Sem rodar JAR manual, sem configurar caminho do Java." },
+      { name: "Adicionar mods Forge", text: "Abra a nova instância, vá na aba Addons e use o navegador embutido para instalar mods compatíveis com Forge do CurseForge ou Modrinth com um clique. Dependências entram automaticamente." },
+      { name: "Apertar Play", text: "Clique em Play. Sua instância Forge inicia com todos os mods instalados carregados." }
+    ]
+  },
+  it: {
+    title: "Come installare Minecraft Forge",
+    description: "Guida passo passo per installare Minecraft Forge con GDLauncher. Gioca le tue Mod Forge preferite senza complicazioni.",
+    steps: [
+      { name: "Scaricare GDLauncher", text: "Scarica GDLauncher da gdlauncher.com. Gratuito, disponibile per Windows, macOS e Linux." },
+      { name: "Creare una nuova istanza", text: "Apri GDLauncher e clicca sul + nella pagina Library per avviare la creazione di una nuova istanza Minecraft." },
+      { name: "Scegliere Forge come loader", text: "Seleziona Forge dal menu a tendina del loader, poi scegli la versione di Minecraft a cui vuoi giocare (1.21.1, 1.20.1 e 1.12.2 sono le più comuni per i Modpack grossi)." },
+      { name: "Lasciare che GDLauncher installi tutto", text: "GDLauncher scarica in automatico Minecraft, la versione di Java corretta e Forge stesso. Niente JAR da eseguire a mano, niente percorsi Java da configurare." },
+      { name: "Aggiungere Mod Forge", text: "Apri la nuova istanza, vai nella scheda Addons e usa il browser integrato per installare con un clic Mod compatibili con Forge da CurseForge o Modrinth. Le dipendenze vengono gestite per te." },
+      { name: "Premere Play", text: "Clicca su Play. L'istanza Forge si avvia con tutte le Mod installate già caricate." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install forge, minecraft forge, forge mod loader, how to install forge minecraft, forge mods, gdlauncher forge"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT5M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>Forge とは?</h2>
+      <p>Forge は Minecraft の元祖 Mod ローダーで、いまも最大級の Mod ライブラリを誇ります。Create、Applied Energistics、Tinkers' Construct など定番の有名 Mod は基本 Forge です。2011 年から続く老舗で、なくなる気配はありません。</p>
+
+      <h2>Forge のセットアップ</h2>
+      <p>GDLauncher で <strong>+</strong> ボタンを押し、新しいインスタンスを作成。Minecraft のバージョンを選び、Mod ローダーで <strong>Forge</strong> を選択します。GDLauncher が対応する Forge バージョンを表示してくれるので、"recommended" 版を選ぶのが基本的に安全です。</p>
+      <p>名前を付けて作成すれば、GDLauncher が Minecraft、Forge、対応 Java をすべて自動でダウンロード。Mod の追加準備が整います。</p>
+
+      <h2>Mod の追加</h2>
+      <p>インスタンスを開いて <strong>Addons</strong> タブから <strong>Add Addons</strong> をクリックすると、CurseForge と Modrinth を同時に検索できるブラウザが開きます。欲しい Mod を検索して <strong>Download</strong> を押すだけです。</p>
+      <p>Mod を見るときは Forge 用 (Fabric ではない) か、自分の Minecraft バージョンに合うかを必ず確認してください。多くの Mod ページにはこの情報が明記されています。</p>
+
+      <h2>Forge と他のローダー</h2>
+      <p>Forge は Mod 数が最大で、特に Tech 系・Magic 系が充実。Fabric は軽量で新バージョン対応が速め。NeoForge は Forge の現代的なフォークで活発に開発が続いています。Quilt はほとんどの Fabric Mod に対応しつつ独自機能も追加しています。</p>
+      <p>選び方は遊びたい Mod 次第。お目当ての Mod が Forge / Fabric どちらにあるかをまず確認しましょう。</p>
+
+      <h2>トラブルシューティング</h2>
+      <p>Forge が起動しない? RAM を最低 4GB は割り当てましょう (Modpack ならもっと)。特定の Forge バージョンで問題が出る場合は別バージョンに切り替え、最近追加した Mod を外して衝突を確認してください。</p>
+      <p>Mod 同士が動かない? すべての Mod が同じ Minecraft バージョンと同じ Forge バージョン用かを確認。Mod ページで既知の非互換情報や必要な依存関係を見直してください。ライブラリ Mod が必要な場合もあります。</p>
+
+      <h2>定番の Forge Mod</h2>
+      <p>始めるならこのあたり: JEI (Just Enough Items) はレシピ閲覧、Create は機械装置、Applied Energistics 2 はデジタルストレージ、Tinkers' Construct はカスタムツール、Biomes O' Plenty は新しい地形生成に役立ちます。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>Forge란?</h2>
+      <p>Forge는 Minecraft 최초의 모드 로더이며 여전히 가장 큰 모드 라이브러리를 갖고 있습니다. Create, Applied Energistics, Tinkers' Construct 같은 유명 클래식 모드는 대부분 Forge용입니다. 2011년부터 이어져 온 만큼 사라질 일은 없습니다.</p>
+
+      <h2>Forge 셋업</h2>
+      <p>GDLauncher에서 <strong>+</strong> 버튼을 눌러 새 인스턴스를 만드세요. Minecraft 버전을 고르고 모드 로더로 <strong>Forge</strong>를 선택합니다. GDLauncher가 해당 Minecraft 버전에서 사용 가능한 Forge 버전을 보여 주는데, "recommended" 버전이 가장 안전한 선택일 때가 많습니다.</p>
+      <p>이름을 정하고 생성하면 GDLauncher가 Minecraft, Forge, 알맞은 Java 버전을 자동으로 다운로드합니다. 이제 모드를 추가할 준비가 끝났습니다.</p>
+
+      <h2>모드 추가</h2>
+      <p>인스턴스를 열고 <strong>Addons</strong> 탭에서 <strong>Add Addons</strong>를 누르면 CurseForge와 Modrinth를 동시에 검색하는 브라우저가 열립니다. 원하는 모드를 검색해 <strong>Download</strong>를 누르면 끝.</p>
+      <p>모드를 볼 때는 Forge용(Fabric 아님)인지, 본인의 Minecraft 버전과 일치하는지 꼭 확인하세요. 대부분의 모드 페이지에 이 정보가 잘 표시되어 있습니다.</p>
+
+      <h2>Forge vs 다른 로더들</h2>
+      <p>Forge는 모드 수가 가장 많고, 특히 테크와 매직 모드가 강합니다. Fabric은 가볍고 새 Minecraft 버전 대응이 빠릅니다. NeoForge는 Forge의 현대적인 포크로 활발히 개발됩니다. Quilt는 대부분의 Fabric 모드를 돌리고 자체 추가 기능도 있습니다.</p>
+      <p>플레이할 모드에 따라 골라야 합니다. 원하는 모드가 Forge에 있는지 Fabric에 있는지 먼저 확인하세요.</p>
+
+      <h2>문제 해결</h2>
+      <p>Forge가 실행되지 않나요? 최소 4GB RAM을 할당했는지 확인하세요(모드팩이면 더). 특정 Forge 버전에 문제가 있다면 다른 버전을 시도하고, 최근에 추가한 모드를 제거해 충돌이 있는지 확인하세요.</p>
+      <p>모드끼리 충돌하나요? 모든 모드가 같은 Minecraft 버전과 같은 Forge 버전용인지 확인하세요. 모드 페이지에서 알려진 비호환성이나 필요한 의존성을 점검하세요. 어떤 모드는 라이브러리 모드를 필요로 합니다.</p>
+
+      <h2>인기 Forge 모드</h2>
+      <p>시작점으로 추천: 레시피 조회용 JEI(Just Enough Items), 기계 장치를 위한 Create, 디지털 저장 시스템 Applied Energistics 2, 커스텀 도구를 위한 Tinkers' Construct, 새 월드 생성을 위한 Biomes O' Plenty.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was ist Forge?</h2>
+      <p>Forge ist der ursprüngliche Mod-Loader für Minecraft und hat immer noch die größte Mod-Bibliothek. Die meisten klassischen Mods, die du kennst (Create, Applied Energistics, Tinkers' Construct) sind Forge-Mods. Forge gibt's seit 2011 und verschwindet so schnell nicht.</p>
+
+      <h2>Forge einrichten</h2>
+      <p>Klick im GDLauncher auf <strong>+</strong>, um eine neue Instanz zu erstellen. Wähle deine Minecraft-Version und nimm <strong>Forge</strong> als Mod-Loader. GDLauncher zeigt verfügbare Forge-Versionen für die jeweilige Minecraft-Version. Die "recommended"-Variante ist meist die sicherste Wahl.</p>
+      <p>Gib einen Namen ein und erstell die Instanz. GDLauncher lädt Minecraft, Forge und die richtige Java-Version automatisch, du kannst sofort Mods hinzufügen.</p>
+
+      <h2>Mods hinzufügen</h2>
+      <p>Öffne deine Instanz und geh in den <strong>Addons</strong>-Tab. Klick auf <strong>Add Addons</strong> für einen Browser, der CurseForge und Modrinth gemeinsam durchsucht. Such, was du willst, klick <strong>Download</strong>, fertig.</p>
+      <p>Achte beim Aussuchen darauf, dass die Mods für Forge sind (nicht Fabric) und zu deiner Minecraft-Version passen. Die meisten Mod-Seiten machen das deutlich.</p>
+
+      <h2>Forge im Vergleich</h2>
+      <p>Forge hat die größte Mod-Auswahl, vor allem bei Tech- und Magic-Mods. Fabric ist leichter und aktualisiert sich schneller für neue Minecraft-Versionen. NeoForge ist ein moderner Forge-Fork mit aktiver Entwicklung. Quilt läuft die meisten Fabric-Mods und legt noch was drauf.</p>
+      <p>Die Wahl hängt davon ab, welche Mods du spielen willst. Schau, ob der Mod, den du willst, auf Forge oder Fabric existiert, bevor du dich für einen Loader entscheidest.</p>
+
+      <h2>Problembehebung</h2>
+      <p>Forge startet nicht? Stell sicher, dass mindestens 4 GB RAM zugewiesen sind (mehr für Modpacks). Probier eine andere Forge-Version, falls eine bestimmte Probleme macht. Entferne kürzlich hinzugefügte Mods, um Konflikte zu prüfen.</p>
+      <p>Mods vertragen sich nicht? Verifizier, dass alle für die gleiche Minecraft-Version und Forge-Version sind. Schau auf den Mod-Seiten nach bekannten Inkompatibilitäten oder benötigten Abhängigkeiten. Manche Mods brauchen Bibliotheks-Mods.</p>
+
+      <h2>Beliebte Forge-Mods</h2>
+      <p>Gute Einstiegspunkte: JEI (Just Enough Items) zum Anzeigen von Rezepten, Create für mechanische Konstruktionen, Applied Energistics 2 für digitalen Speicher, Tinkers' Construct für eigene Werkzeuge und Biomes O' Plenty für neue Weltgenerierung.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>C'est quoi Forge ?</h2>
+      <p>Forge est le mod loader Minecraft d'origine et garde toujours la plus grosse bibliothèque de mods. La plupart des mods classiques que tu connais (Create, Applied Energistics, Tinkers' Construct) sont des mods Forge. Il existe depuis 2011 et n'est pas près de disparaître.</p>
+
+      <h2>Configurer Forge</h2>
+      <p>Clique sur <strong>+</strong> dans GDLauncher pour créer une nouvelle instance. Choisis ta version de Minecraft et sélectionne <strong>Forge</strong> comme mod loader. GDLauncher affiche les versions de Forge dispo pour cette version de Minecraft. La version "recommended" est en général le pari le plus sûr.</p>
+      <p>Donne un nom et crée. GDLauncher télécharge Minecraft, Forge et la bonne version de Java automatiquement. Tu es prêt à ajouter des mods.</p>
+
+      <h2>Ajouter des mods</h2>
+      <p>Ouvre ton instance et va dans l'onglet <strong>Addons</strong>. Clique sur <strong>Add Addons</strong> pour avoir un navigateur qui cherche dans CurseForge et Modrinth en même temps. Trouve ce que tu veux, clique <strong>Download</strong>, et c'est bon.</p>
+      <p>Quand tu regardes des mods, vérifie qu'ils sont bien pour Forge (pas Fabric) et qu'ils correspondent à ta version de Minecraft. La plupart des pages le précisent clairement.</p>
+
+      <h2>Forge vs autres loaders</h2>
+      <p>Forge a la plus grosse sélection de mods, surtout côté tech et magie. Fabric est plus léger et se met à jour plus vite pour les nouvelles versions de Minecraft. NeoForge est un fork moderne de Forge avec développement actif. Quilt fait tourner la plupart des mods Fabric plus quelques extras.</p>
+      <p>Ton choix dépend des mods que tu veux jouer. Vérifie si le mod qui t'intéresse est sur Forge ou sur Fabric avant de choisir un loader.</p>
+
+      <h2>Dépannage</h2>
+      <p>Forge ne démarre pas ? Vérifie que tu as au moins 4 Go de RAM alloués (plus pour les modpacks). Essaie une autre version de Forge si une version pose souci. Retire les mods récemment ajoutés pour repérer un conflit.</p>
+      <p>Les mods ne marchent pas ensemble ? Vérifie qu'ils sont tous pour la même version de Minecraft et la même version de Forge. Regarde les pages des mods pour les incompatibilités connues ou les dépendances requises. Certains mods ont besoin de mods bibliothèque pour fonctionner.</p>
+
+      <h2>Mods Forge populaires</h2>
+      <p>Quelques bons points de départ : JEI (Just Enough Items) pour voir les recettes, Create pour les constructions mécaniques, Applied Energistics 2 pour le stockage numérique, Tinkers' Construct pour des outils custom et Biomes O' Plenty pour la génération de monde.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>¿Qué es Forge?</h2>
+      <p>Forge es el mod loader original de Minecraft y sigue teniendo la mayor librería de mods. La mayoría de los mods clásicos que conoces (Create, Applied Energistics, Tinkers' Construct) son mods de Forge. Existe desde 2011 y no se va a ningún lado.</p>
+
+      <h2>Configurar Forge</h2>
+      <p>Pulsa <strong>+</strong> en GDLauncher para crear una nueva instancia. Elige la versión de Minecraft y selecciona <strong>Forge</strong> como mod loader. GDLauncher muestra las versiones de Forge disponibles para esa versión de Minecraft; la "recommended" suele ser la apuesta más segura.</p>
+      <p>Dale un nombre y crea. GDLauncher descarga Minecraft, Forge y la versión correcta de Java automáticamente. Listo para añadir mods.</p>
+
+      <h2>Añadir mods</h2>
+      <p>Abre tu instancia y ve a la pestaña <strong>Addons</strong>. Pulsa <strong>Add Addons</strong> para abrir un navegador que busca en CurseForge y Modrinth a la vez. Busca lo que quieras, pulsa <strong>Download</strong> y listo.</p>
+      <p>Al mirar mods, asegúrate de que son para Forge (no Fabric) y de que coinciden con tu versión de Minecraft. La mayoría de páginas lo indican claramente.</p>
+
+      <h2>Forge vs otros loaders</h2>
+      <p>Forge tiene la mayor variedad de mods, sobre todo en tech y magia. Fabric es más ligero y se actualiza antes para nuevas versiones de Minecraft. NeoForge es un fork moderno de Forge con desarrollo activo. Quilt corre la mayoría de mods de Fabric más algunos extras.</p>
+      <p>Tu elección depende de los mods que quieras jugar. Mira si el mod que buscas está en Forge o en Fabric antes de decidirte.</p>
+
+      <h2>Solución de problemas</h2>
+      <p>¿Forge no arranca? Asegúrate de tener al menos 4GB de RAM asignados (más para modpacks). Prueba otra versión de Forge si una en concreto da problemas. Quita los mods añadidos recientemente para detectar conflictos.</p>
+      <p>¿Los mods no funcionan juntos? Verifica que todos sean para la misma versión de Minecraft y la misma versión de Forge. Revisa las páginas de los mods por incompatibilidades conocidas o dependencias necesarias. Algunos mods necesitan mods de librería para funcionar.</p>
+
+      <h2>Mods Forge populares</h2>
+      <p>Buenos puntos de partida: JEI (Just Enough Items) para ver recetas, Create para máquinas mecánicas, Applied Energistics 2 para almacenamiento digital, Tinkers' Construct para herramientas personalizadas y Biomes O' Plenty para nueva generación de mundo.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que é o Forge?</h2>
+      <p>O Forge é o mod loader original do Minecraft e ainda tem a maior biblioteca de mods. A maioria dos clássicos que você conhece (Create, Applied Energistics, Tinkers' Construct) são mods Forge. Está por aí desde 2011 e não vai a lugar nenhum.</p>
+
+      <h2>Configurando o Forge</h2>
+      <p>Clique no <strong>+</strong> do GDLauncher para criar uma nova instância. Escolha a versão do Minecraft e selecione <strong>Forge</strong> como mod loader. O GDLauncher mostra as versões de Forge disponíveis para aquela versão do Minecraft; a "recommended" costuma ser a aposta mais segura.</p>
+      <p>Dê um nome e crie. O GDLauncher baixa Minecraft, Forge e a versão correta do Java automaticamente. Tudo pronto pra adicionar mods.</p>
+
+      <h2>Adicionando mods</h2>
+      <p>Abra a instância e vá na aba <strong>Addons</strong>. Clique em <strong>Add Addons</strong> para um navegador que busca no CurseForge e Modrinth juntos. Procure o que quiser, clique em <strong>Download</strong> e pronto.</p>
+      <p>Ao olhar os mods, confirme que são para Forge (não Fabric) e batem com sua versão do Minecraft. A maioria das páginas deixa isso claro.</p>
+
+      <h2>Forge vs outros loaders</h2>
+      <p>O Forge tem a maior variedade de mods, principalmente em tech e magia. O Fabric é mais leve e se atualiza mais rápido para novas versões do Minecraft. O NeoForge é um fork moderno do Forge com desenvolvimento ativo. O Quilt roda a maioria dos mods Fabric e tem extras próprios.</p>
+      <p>Sua escolha depende dos mods que quer jogar. Veja se o mod que você quer está no Forge ou no Fabric antes de escolher um loader.</p>
+
+      <h2>Solução de problemas</h2>
+      <p>Forge não inicia? Garanta pelo menos 4GB de RAM alocados (mais para modpacks). Tente outra versão do Forge se alguma estiver dando problema. Remova os mods adicionados recentemente para checar conflitos.</p>
+      <p>Mods não funcionam juntos? Confira se todos são para a mesma versão do Minecraft e a mesma versão do Forge. Veja nas páginas dos mods incompatibilidades conhecidas ou dependências necessárias. Alguns mods precisam de mods de biblioteca pra funcionar.</p>
+
+      <h2>Mods Forge populares</h2>
+      <p>Bons pontos de partida: JEI (Just Enough Items) para ver receitas, Create para engenhocas mecânicas, Applied Energistics 2 para armazenamento digital, Tinkers' Construct para ferramentas customizadas e Biomes O' Plenty para nova geração de mundo.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cos'è Forge?</h2>
+      <p>Forge è il Mod loader originale di Minecraft e ha tuttora la libreria di Mod più grande in assoluto. La maggior parte dei classici che conosci (Create, Applied Energistics, Tinkers' Construct) sono Mod Forge. Esiste dal 2011 e non sparirà tanto presto.</p>
+
+      <h2>Configurare Forge</h2>
+      <p>Clicca sul <strong>+</strong> in GDLauncher per creare una nuova istanza. Scegli la versione di Minecraft e seleziona <strong>Forge</strong> come Mod loader. GDLauncher mostra le versioni di Forge disponibili per quella versione di Minecraft, e la "recommended" è di solito la scelta più sicura.</p>
+      <p>Dai un nome e crea. GDLauncher scarica automaticamente Minecraft, Forge e la versione di Java corretta. Sei pronto ad aggiungere Mod.</p>
+
+      <h2>Aggiungere Mod</h2>
+      <p>Apri l'istanza e vai nella scheda <strong>Addons</strong>. Clicca su <strong>Add Addons</strong> per aprire un browser che cerca in CurseForge e Modrinth contemporaneamente. Trova quello che vuoi, clicca <strong>Download</strong> e il gioco è fatto.</p>
+      <p>Quando guardi un Mod, controlla che sia per Forge (non Fabric) e che corrisponda alla tua versione di Minecraft. La maggior parte delle pagine lo indica chiaramente.</p>
+
+      <h2>Forge contro gli altri loader</h2>
+      <p>Forge ha la più ampia varietà di Mod, soprattutto in ambito tech e magia. Fabric è più leggero e si aggiorna prima alle nuove versioni di Minecraft. NeoForge è un fork moderno di Forge con sviluppo molto attivo. Quilt fa girare la maggior parte dei Mod Fabric e aggiunge qualcosa in più.</p>
+      <p>La scelta dipende dai Mod che vuoi giocare. Controlla se il Mod che ti interessa è disponibile su Forge o Fabric prima di decidere quale loader usare.</p>
+
+      <h2>Risoluzione dei problemi</h2>
+      <p>Forge non parte? Assicurati di aver allocato almeno 4 GB di RAM (di più per i Modpack). Prova un'altra versione di Forge se una specifica ti dà problemi. Rimuovi i Mod aggiunti di recente per individuare conflitti.</p>
+      <p>I Mod non vanno d'accordo? Verifica che siano tutti per la stessa versione di Minecraft e la stessa versione di Forge. Controlla nelle pagine dei Mod le incompatibilità note o le dipendenze richieste. Alcuni Mod hanno bisogno di Mod libreria per funzionare.</p>
+
+      <h2>Mod Forge popolari</h2>
+      <p>Ottimi punti di partenza: JEI (Just Enough Items) per vedere le ricette, Create per i macchinari meccanici, Applied Energistics 2 per lo storage digitale, Tinkers' Construct per strumenti personalizzati e Biomes O' Plenty per nuove generazioni delle mappe.</p>
+    </Fragment>
+  )}
+</GuideLayout>

@@ -1,0 +1,53 @@
+---
+import KeywordLandingLayout from "../components/KeywordLandingLayout.astro"
+
+const faq = [
+  {
+    question: "What's the easiest Forge launcher for Minecraft?",
+    answer: "GDLauncher. Pick Forge as the loader when creating an instance, it installs Forge automatically, including the right version for whatever Minecraft version you chose. There's no manual JAR running, no Java path configuration."
+  },
+  {
+    question: "Do I need to install Forge separately?",
+    answer: "Not with GDLauncher. When you create an instance and pick Forge as the mod loader, GDLauncher downloads and installs the right Forge version automatically. The same is true for NeoForge, Fabric, and Quilt."
+  },
+  {
+    question: "What's the difference between Forge and NeoForge?",
+    answer: "NeoForge is a 2023 fork of Forge started by a group of Forge contributors after a governance split. It keeps Forge's API style (most mods are source-compatible) but ships releases faster. For Minecraft 1.20.4 and newer, NeoForge is where most new Forge-style mod development is happening. Older modpacks still ship on Forge. GDLauncher supports both, pick whichever your mod or modpack requires."
+  },
+  {
+    question: "Can I install Forge mods through GDLauncher?",
+    answer: "Yes. Once you have a Forge instance set up, open the Addons tab and use the built-in browser to install any Forge-compatible mod from CurseForge or Modrinth. Dependencies are handled automatically."
+  },
+  {
+    question: "Is GDLauncher safe for Forge?",
+    answer: "Yes. GDLauncher uses official sources (the Forge Maven, CurseForge, Modrinth) for downloads. Authentication uses Mojang's official Microsoft account API."
+  }
+]
+---
+
+<KeywordLandingLayout
+  pageSlug="forge-launcher"
+  title="Minecraft Forge Launcher: Auto-Install Forge in One Click"
+  description="The easiest Minecraft Forge launcher. GDLauncher installs Forge automatically when you create an instance. Plus NeoForge, Fabric, and Quilt support, all in one app."
+  intro="Forge is the original Minecraft mod loader and still hosts the largest mod library. GDLauncher installs Forge for you automatically when you create an instance, no manual JAR running, no Java setup."
+  keywords="forge launcher, minecraft forge launcher, install forge minecraft, forge mod launcher, neoforge launcher, gdlauncher forge"
+  faq={faq}
+>
+  <h2>How GDLauncher handles Forge</h2>
+  <p>Open GDLauncher, click <strong>+ New Instance</strong>, pick a Minecraft version, and select <strong>Forge</strong> from the loader dropdown. GDLauncher downloads and installs the right Forge version automatically, no separate installer JAR, no Java path issues, no manual configuration. The instance is ready to mod within a minute.</p>
+
+  <h2>Forge, NeoForge, Fabric, Quilt: all supported</h2>
+  <p>Different mods target different loaders. Most classic mods (Tinkers' Construct, Create, Twilight Forest, Botania, Applied Energistics) are Forge or NeoForge. Modern performance mods (Sodium, Lithium, Iris) are Fabric. GDLauncher installs whichever loader you choose, and the Addons browser filters mods by loader so you only see compatible content.</p>
+  <ul>
+    <li><strong>Forge</strong>: Original mod loader since 2011. Largest mod catalog. Default for big modpacks like ATM, FTB, Better MC.</li>
+    <li><strong>NeoForge</strong>: 2023 fork by the original team. Modern improvements. Becoming standard on 1.20.4+.</li>
+    <li><strong>Fabric</strong>: Lightweight, fast-updating. Best for performance and bleeding-edge versions.</li>
+    <li><strong>Quilt</strong>: Fabric fork with extra features. Compatible with most Fabric mods.</li>
+  </ul>
+
+  <h2>Forge modpacks in one click</h2>
+  <p>Most popular modpacks are Forge or NeoForge. GDLauncher installs them whole, every mod, the right Forge version, the right Minecraft version, the right Java runtime, and the right configs. Try <a href="/modpacks">All The Mods 10, RLCraft, Better Minecraft</a>, or <a href="/guides/install-modpack">browse the modpack guide</a>.</p>
+
+  <h2>Adding individual Forge mods</h2>
+  <p>Once you have a Forge instance, open its Addons tab, click Add Addons, filter for the Forge loader, and search. CurseForge and Modrinth are searched together, most popular Forge mods are on both. <a href="/guides/install-mods">How to install mods →</a></p>
+</KeywordLandingLayout>

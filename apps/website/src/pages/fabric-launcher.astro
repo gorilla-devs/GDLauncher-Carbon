@@ -1,0 +1,57 @@
+---
+import KeywordLandingLayout from "../components/KeywordLandingLayout.astro"
+
+const faq = [
+  {
+    question: "How do I install Fabric on Minecraft?",
+    answer: "The easiest way is GDLauncher. Create a new instance, pick the Minecraft version, and select Fabric as the mod loader. GDLauncher downloads and installs the right Fabric version automatically. No manual JAR, no Java setup."
+  },
+  {
+    question: "What's the best Fabric launcher?",
+    answer: "GDLauncher is the simplest, it installs Fabric automatically when you create an instance and lets you browse Fabric mods from CurseForge and Modrinth in the same UI. The Modrinth App and Prism Launcher are alternatives; both also support Fabric but require more setup."
+  },
+  {
+    question: "Why use Fabric instead of Forge?",
+    answer: "Fabric is lighter, updates faster for new Minecraft versions, and is preferred for performance mods (Sodium, Lithium, Iris shaders). Forge has a deeper library of established mods, especially for older versions. Many players install both, different instances for different mods. GDLauncher supports either."
+  },
+  {
+    question: "Where do I get Fabric mods?",
+    answer: "Modrinth has the largest Fabric mod library, but most popular Fabric mods are also on CurseForge. GDLauncher's built-in browser searches both at once and filters to the Fabric loader so you only see compatible mods."
+  },
+  {
+    question: "Does GDLauncher support Fabric API and Sodium?",
+    answer: "Yes. Fabric API is the dependency most Fabric mods need; Sodium is the must-have performance mod. Both are one-click installs through the Addons browser, and GDLauncher pulls in their dependencies (like Indium for Sodium + shader compatibility) automatically."
+  }
+]
+---
+
+<KeywordLandingLayout
+  pageSlug="fabric-launcher"
+  title="Minecraft Fabric Launcher: Install Fabric & Fabric Mods in One Click"
+  description="The easiest Minecraft Fabric launcher. GDLauncher installs Fabric automatically and gives you one-click access to every Fabric mod on CurseForge and Modrinth."
+  intro="Fabric is the lightweight, fast-updating mod loader behind Sodium, Iris, Lithium, and most modern performance mods. GDLauncher installs it for you automatically and gives you a built-in Fabric mod browser."
+  keywords="fabric launcher, minecraft fabric launcher, install fabric minecraft, fabric mod launcher, sodium launcher, iris launcher, gdlauncher fabric"
+  faq={faq}
+>
+  <h2>Fabric in one click</h2>
+  <p>Open GDLauncher, click <strong>+ New Instance</strong>, pick a Minecraft version, and select <strong>Fabric</strong> as the loader. GDLauncher downloads and installs the right Fabric version, the matching Java runtime, and you're ready to mod. <a href="/guides/install-fabric">Step-by-step Fabric guide →</a></p>
+
+  <h2>Why Fabric is the modern choice for performance</h2>
+  <p>Fabric is built around being lightweight, and most of the modern performance scene grew up around it. <strong>Sodium</strong> (rewritten chunk renderer for substantially higher FPS), <strong>Lithium</strong> (game logic optimization), and <strong>Iris</strong> (a Sodium-compatible shader loader) all shipped Fabric-first. <strong>FerriteCore</strong> (memory reduction) is multi-loader but a staple of the Fabric stack. Combined, they noticeably improve frame rates and load times compared to vanilla.</p>
+  <p>Fabric also updates within hours of a new Minecraft release. Forge can take weeks. If you want to play the latest version, Fabric is usually ready first.</p>
+
+  <h2>Top Fabric mods to install</h2>
+  <ul>
+    <li><strong>Fabric API</strong>: Required dependency for most Fabric mods. Auto-installed by GDLauncher when needed.</li>
+    <li><strong>Sodium</strong>: Rewritten chunk renderer for substantially higher FPS.</li>
+    <li><strong>Lithium</strong>: Server-side game logic optimization.</li>
+    <li><strong>Iris</strong>: Sodium-compatible shader loader. Use it instead of OptiFine.</li>
+    <li><strong>Mod Menu</strong>: In-game mod settings UI.</li>
+    <li><strong>FerriteCore</strong>: Reduces RAM use without changing gameplay.</li>
+  </ul>
+
+  <h2>Fabric vs Forge in GDLauncher</h2>
+  <p>You can have both. GDLauncher's instances are isolated, one Fabric instance for performance and Iris shaders, another Forge or NeoForge instance for big modpacks. Switch between them with one click. <a href="/forge-launcher">See the Forge launcher overview →</a></p>
+
+  <p><a href="/mods">Browse Fabric mods</a> · <a href="/guides/performance-mods">Performance mods guide</a> · <a href="/guides/install-shaders">Install shaders with Iris</a></p>
+</KeywordLandingLayout>

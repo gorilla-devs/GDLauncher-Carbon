@@ -3,56 +3,68 @@ import HeaderLink from "./HeaderLink.astro";
 import { Image } from "astro:assets";
 import Logo from "../assets/logo.svg";
 import DownloadButton from "./DownloadButton.astro";
+import LocaleSwitcher from "./LocaleSwitcher.astro";
 import { APP_URLS } from "../consts";
 import DocsSideNav from "./DocsSideNav.astro";
+import {
+  getLocaleFromUrl,
+  pathWithoutLocale,
+  localizedPath,
+  useTranslations,
+} from "../lib/i18n";
 
 const { pathname } = Astro.url;
+const locale = getLocaleFromUrl(pathname);
+const t = useTranslations(locale);
+// Active-state checks compare against the locale-stripped path so the
+// nav highlights correctly on /ja/blog, /es/guides, etc.
+const basePath = pathWithoutLocale(pathname);
 ---
 
 <header class="sticky top-0 z-50 bg-darkSlate-800/80 backdrop-blur-lg border-b border-darkSlate-700/50">
   <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
     <!-- Logo -->
-    <a href="/" class="group relative flex items-center px-3 py-2 transition-transform duration-100 ease-spring active:scale-95">
+    <a href={localizedPath("/", locale)} class="group relative flex items-center px-3 py-2 transition-transform duration-100 ease-spring active:scale-95">
       <div class="absolute inset-0 bg-darkSlate-700 rounded-lg scale-75 opacity-0 transition-all duration-150 ease-out group-hover:scale-100 group-hover:opacity-100"></div>
-      <Image src={Logo} alt="gdlauncher logo" width="150" height="35" class="relative z-10" loading="eager" />
+      <Image src={Logo} alt="GDLauncher logo" width="150" height="35" class="relative z-10" loading="eager" />
     </a>
 
     <!-- Desktop Navigation -->
     <nav class="hidden md:flex items-center bg-darkSlate-700 rounded-lg p-1 gap-1">
       <HeaderLink
         class="nav-tab"
-        href="/"
-        data-active={pathname === "/" ? "true" : "false"}
+        href={localizedPath("/", locale)}
+        data-active={basePath === "/" ? "true" : "false"}
       >
         <div class="i-hugeicons:home-01 w-5 h-5"></div>
-        <span>Home</span>
+        <span>{t("nav.home")}</span>
       </HeaderLink>
 
       <HeaderLink
         class="nav-tab"
-        href="/blog"
-        data-active={pathname.startsWith("/blog") ? "true" : "false"}
+        href={localizedPath("/blog", locale)}
+        data-active={basePath.startsWith("/blog") ? "true" : "false"}
       >
         <div class="i-hugeicons:news w-5 h-5"></div>
-        <span>Blog</span>
+        <span>{t("nav.blog")}</span>
       </HeaderLink>
 
       <HeaderLink
         class="nav-tab"
-        href="/guides"
-        data-active={pathname.startsWith("/guides") ? "true" : "false"}
+        href={localizedPath("/guides", locale)}
+        data-active={basePath.startsWith("/guides") ? "true" : "false"}
       >
         <div class="i-hugeicons:book-open-01 w-5 h-5"></div>
-        <span>Guides</span>
+        <span>{t("nav.guides")}</span>
       </HeaderLink>
 
       <HeaderLink
         class="nav-tab"
-        href="/docs"
-        data-active={pathname.startsWith("/docs") ? "true" : "false"}
+        href={localizedPath("/docs", locale)}
+        data-active={basePath.startsWith("/docs") ? "true" : "false"}
       >
         <div class="i-hugeicons:book-02 w-5 h-5"></div>
-        <span>Docs</span>
+        <span>{t("nav.docs")}</span>
       </HeaderLink>
 
       <a
@@ -62,17 +74,24 @@ const { pathname } = Astro.url;
         rel="noopener noreferrer"
       >
         <div class="i-hugeicons:github w-5 h-5"></div>
-        <span>GitHub</span>
+        <span>{t("nav.github")}</span>
       </a>
     </nav>
 
-    <!-- Download Button (Desktop) -->
-    <div class="hidden md:block">
+    <!-- Download Button + Locale Switcher (Desktop) -->
+    <div class="hidden md:flex items-center gap-2">
+      <LocaleSwitcher />
       <DownloadButton />
     </div>
 
     <!-- Mobile Menu Button -->
-    <button class="md:hidden p-2 rounded-lg hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-95" onclick="openNav()" aria-label="Open navigation menu">
+    <button
+      class="md:hidden p-2 rounded-lg hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-95"
+      data-open-nav
+      aria-controls="sidebar"
+      aria-expanded="false"
+      aria-label={t("nav.openMenu")}
+    >
       <div class="i-hugeicons:menu-02 w-6 h-6 text-lightSlate-100"></div>
     </button>
   </div>
@@ -81,39 +100,44 @@ const { pathname } = Astro.url;
 <!-- Mobile Navigation Overlay (outside header to avoid backdrop-blur stacking context) -->
 <nav id="sidebar" class="mobile-nav">
   <div class="flex items-center justify-between px-4 h-16 border-b border-darkSlate-700">
-    <a href="/" class="px-3 py-2">
-      <Image src={Logo} alt="gdlauncher logo" width="150" height="35" loading="eager" />
+    <a href={localizedPath("/", locale)} class="px-3 py-2">
+      <Image src={Logo} alt="GDLauncher logo" width="150" height="35" loading="eager" />
     </a>
-    <button class="p-2 rounded-lg hover:bg-darkSlate-700 transition-colors" onclick="closeNav()" aria-label="Close navigation menu">
+    <button class="p-2 rounded-lg hover:bg-darkSlate-700 transition-colors" data-close-nav aria-label={t("nav.closeMenu")}>
       <div class="i-hugeicons:cancel-01 w-6 h-6 text-lightSlate-100"></div>
     </button>
   </div>
 
   <div class="flex flex-col p-4 gap-2">
-    <HeaderLink class="mobile-nav-link" href="/">
+    <HeaderLink class="mobile-nav-link" href={localizedPath("/", locale)}>
       <div class="i-hugeicons:home-01 w-5 h-5"></div>
-      <span>Home</span>
+      <span>{t("nav.home")}</span>
     </HeaderLink>
 
-    <HeaderLink class="mobile-nav-link" href="/blog">
+    <HeaderLink class="mobile-nav-link" href={localizedPath("/blog", locale)}>
       <div class="i-hugeicons:news w-5 h-5"></div>
-      <span>Blog</span>
+      <span>{t("nav.blog")}</span>
     </HeaderLink>
 
-    <HeaderLink class="mobile-nav-link" href="/guides">
+    <HeaderLink class="mobile-nav-link" href={localizedPath("/guides", locale)}>
       <div class="i-hugeicons:book-open-01 w-5 h-5"></div>
-      <span>Guides</span>
+      <span>{t("nav.guides")}</span>
     </HeaderLink>
 
-    <HeaderLink class="mobile-nav-link" href="/docs">
+    <HeaderLink class="mobile-nav-link" href={localizedPath("/docs", locale)}>
       <div class="i-hugeicons:book-02 w-5 h-5"></div>
-      <span>Docs</span>
+      <span>{t("nav.docs")}</span>
     </HeaderLink>
 
     <a class="mobile-nav-link" href={APP_URLS.socials.github} target="_blank" rel="noopener noreferrer">
       <div class="i-hugeicons:github w-5 h-5"></div>
-      <span>GitHub</span>
+      <span>{t("nav.github")}</span>
     </a>
+
+    <div class="mt-4 pt-4 border-t border-darkSlate-700">
+      <p class="px-4 mb-2 text-xs uppercase tracking-wider text-darkSlate-200">{t("nav.language")}</p>
+      <LocaleSwitcher />
+    </div>
   </div>
 
   {pathname.includes("docs") && (
@@ -215,21 +239,58 @@ const { pathname } = Astro.url;
   }
 </style>
 
-<script defer>
-  window.addEventListener("resize", () => {
-    if (window.innerWidth > 768) {
-      document.getElementById("sidebar")?.classList.remove("visible");
-      document.body.classList.remove("no-scroll");
+<script>
+  // Mobile-nav controller. Bound via data-attributes (not inline onclick) so
+  // Astro's default module-scoped script processing doesn't break it.
+  // Setup runs on initial load and on every view-transition swap; handlers
+  // are tagged idempotently so re-running on the same node is safe.
+
+  function setOpen(open: boolean) {
+    const sidebar = document.getElementById("sidebar");
+    const triggers = document.querySelectorAll<HTMLButtonElement>("[data-open-nav]");
+    sidebar?.classList.toggle("visible", open);
+    document.body.classList.toggle("no-scroll", open);
+    triggers.forEach((t) => t.setAttribute("aria-expanded", String(open)));
+    if (open) {
+      // Move focus into the menu so keyboard users can navigate it; the
+      // close button is the natural first stop.
+      const closeBtn = document.querySelector<HTMLButtonElement>("[data-close-nav]");
+      closeBtn?.focus();
+    } else {
+      // Return focus to whichever open trigger was last visible.
+      const trigger = document.querySelector<HTMLButtonElement>("[data-open-nav]");
+      trigger?.focus();
     }
-  });
-
-  function openNav() {
-    document.getElementById("sidebar")?.classList.add("visible");
-    document.body.classList.add("no-scroll");
   }
 
-  function closeNav() {
-    document.getElementById("sidebar")?.classList.remove("visible");
-    document.body.classList.remove("no-scroll");
+  function setup() {
+    document.querySelectorAll<HTMLButtonElement>("[data-open-nav]").forEach((btn) => {
+      if (btn.dataset.navInit === "1") return;
+      btn.dataset.navInit = "1";
+      btn.addEventListener("click", () => setOpen(true));
+    });
+    document.querySelectorAll<HTMLButtonElement>("[data-close-nav]").forEach((btn) => {
+      if (btn.dataset.navInit === "1") return;
+      btn.dataset.navInit = "1";
+      btn.addEventListener("click", () => setOpen(false));
+    });
   }
+
+  // Document-level handlers attach exactly once. They keep working across
+  // view transitions because the listener stays bound to `document`, which
+  // persists, while the menu DOM nodes get re-resolved each fire.
+  if (!(window as unknown as { __navDocBound?: boolean }).__navDocBound) {
+    (window as unknown as { __navDocBound?: boolean }).__navDocBound = true;
+    window.addEventListener("resize", () => {
+      if (window.innerWidth > 768) setOpen(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.getElementById("sidebar")?.classList.contains("visible")) {
+        setOpen(false);
+      }
+    });
+  }
+
+  setup();
+  document.addEventListener("astro:page-load", setup);
 </script>

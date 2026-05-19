@@ -1,0 +1,45 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Move GDLauncher's Data to Another Drive"
+  description="Change GDLauncher's runtime path to move all instances, assets, libraries, and the launcher database to a different drive or folder, with migration handled automatically."
+  keywords="move gdlauncher data, change runtime path, move minecraft instances drive, gdlauncher migration, free up ssd space"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT10M",
+    steps: [
+      { name: "Open Runtime Path settings", text: "Open GDLauncher and go to Settings → Runtime Path. The current location is shown in the input field." },
+      { name: "Enter the new path", text: "Type the new location (e.g. D:\\gdlauncher-data on Windows, or /mnt/data/gdlauncher on Linux), or click the folder icon to browse. The folder doesn't need to exist yet, GDLauncher creates it if needed." },
+      { name: "Confirm the change", text: "When the path is valid and differs from the current one, the apply button (circle-arrow icon) lights up. Click it. A confirmation modal shows the old and new paths. If the target folder already contains GDLauncher data (from a previous move), the modal warns you in yellow; confirming switches to the existing data without copying. Otherwise it copies everything over." },
+      { name: "Wait for the migration", text: "An overlay shows scan → copy → cleanup with a progress bar. Don't close the app or shut down the computer during this. Time scales with data size, from seconds for an empty install to half an hour or more for hundreds of GB." },
+      { name: "Verify", text: "GDLauncher restarts automatically when the migration finishes. Check Settings → Runtime Path shows the new location, then launch an instance to confirm everything still works." }
+    ]
+  }}
+>
+  <h2>What gets moved</h2>
+  <p>Everything in the runtime path: instances (with their mods, worlds, configs), Minecraft's shared assets, Minecraft's shared libraries, Java installations downloaded by GDLauncher, the launcher database, and the app-wide logs. This is essentially everything heavy GDLauncher created on your machine.</p>
+  <p>What doesn't move: the app data path (window state, Electron cache, top-level config). That stays in its OS-standard location; you usually never touch it.</p>
+
+  <h2>What size to expect</h2>
+  <p>A clean install with no instances is around 1 GB (mostly the Minecraft assets and a Java install). Each modpack adds roughly its own download size, so a few large packs can push it past 50 GB. Check your current data path's size in your OS file manager before moving to estimate how long migration will take.</p>
+
+  <h2>If you've already moved data manually</h2>
+  <p>If you copied <code>gdlauncher_carbon/data</code> to another location by hand (without going through Settings), you can point GDLauncher at the new location. When you type a path that already contains valid GDLauncher data, the migration is skipped, GDLauncher just updates its config to point there. Useful for moving to a different machine and then pointing a fresh install at the migrated data.</p>
+
+  <h2>If migration fails</h2>
+  <p>The overlay turns red and shows the error. GDLauncher rolls back the files it copied to the new path, keeps the marker pointing at the old location, so you can retry without losing anything. Most common causes:</p>
+  <ul>
+    <li><strong>Out of disk space on the target.</strong> The target drive needs at least as much free space as the source uses.</li>
+    <li><strong>Permission denied.</strong> On Windows, some folders (Program Files, the root of C:\) need admin rights. On Linux/macOS, the target must be in a path you own. Pick a user-owned folder.</li>
+    <li><strong>Target is read-only.</strong> Some network drives mount read-only by default. Check that you can create files there outside GDLauncher first.</li>
+  </ul>
+  <p>App-wide logs at <code>&lt;runtime_path&gt;/__gdl_logs__/</code> have more detail if you need it.</p>
+
+  <h2>The runtime_path_override marker</h2>
+  <p>After a successful move, GDLauncher writes a small text file named <code>runtime_path_override</code> inside the <strong>app data path</strong> (not the runtime path). The file contains the new runtime path; every launch reads it to know where data lives. If you delete it by accident, the launcher falls back to its default location and won't see your moved data until you go to Settings → Runtime Path and point it back at the folder you moved to (it'll register as "already in use" and switch to it without copying).</p>
+
+  <h2>Don't sync the runtime path while playing</h2>
+  <p>OneDrive, iCloud, Dropbox, etc. compete with GDLauncher for file handles. If the runtime path is in a folder these tools actively sync, you'll see weird "file in use" errors and occasional save corruption. Put the runtime path on a drive that's only backed up offline (e.g. by snapshots, restic, Backblaze), not one that's continuously syncing.</p>
+</GuideLayout>

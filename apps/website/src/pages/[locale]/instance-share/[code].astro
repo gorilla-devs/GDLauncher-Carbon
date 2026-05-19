@@ -1,0 +1,67 @@
+---
+export const prerender = false
+
+import PageShell from "../../../components/PageShell.astro"
+import InstanceSharePreviewBody from "../../../components/InstanceSharePreviewBody.astro"
+import {
+  fetchSharePreview,
+  formatFileSize,
+  formatModloader,
+} from "../../../lib/api/share"
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  localizedPath,
+  type Locale,
+} from "../../../lib/i18n"
+
+const LOCALE_SET = new Set<Locale>(LOCALES)
+const { locale, code } = Astro.params
+
+if (
+  !locale ||
+  !LOCALE_SET.has(locale as Locale) ||
+  locale === DEFAULT_LOCALE
+) {
+  return Astro.redirect(code ? `/instance-share/${code}` : "/")
+}
+
+if (!code) {
+  return Astro.redirect(localizedPath("/", locale as Locale))
+}
+
+const preview = await fetchSharePreview(code)
+
+const title = preview?.title || "Shared Instance"
+const modCount = preview?.mods?.length || 0
+const description = preview
+  ? `${title} - ${preview.minecraft_version || "Minecraft"} modpack with ${modCount} mods. Import directly into GDLauncher.`
+  : "View and import this shared Minecraft instance in GDLauncher."
+const ogImage = preview?.background_url || undefined
+
+const modloader = preview
+  ? formatModloader(preview.modloader_type, preview.modloader_version)
+  : null
+const fileSize = preview ? formatFileSize(preview.size_kilobytes) : null
+const expiresAt = preview ? new Date(preview.expires_at) : null
+const isExpired = expiresAt ? expiresAt < new Date() : false
+
+const deepLinkUrl = `gdlauncher://share/${code}`
+---
+
+<PageShell
+  title={`${title} | GDLauncher`}
+  description={description}
+  image={ogImage}
+  particles
+>
+  <InstanceSharePreviewBody
+    preview={preview}
+    title={title}
+    modloader={modloader}
+    fileSize={fileSize}
+    expiresAt={expiresAt}
+    isExpired={isExpired}
+    deepLinkUrl={deepLinkUrl}
+  />
+</PageShell>

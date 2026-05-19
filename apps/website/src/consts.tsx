@@ -1,9 +1,9 @@
 // Place any global data in this file.
 // You can import this data from anywhere in your site by using the `import` keyword.
 
-import Apple from "./assets/Apple";
-import Linux from "./assets/Linux";
-import Windows from "./assets/Windows";
+/** Canonical site origin. Single source of truth for absolute URLs in JSON-LD,
+ *  canonical tags, and hand-built og:image fallbacks. */
+export const SITE_URL = "https://gdlauncher.com";
 
 export const APP_URLS = {
   cdn: "https://cdn.gdl.gg",
@@ -23,35 +23,21 @@ export const APP_URLS = {
     releases: "https://github.com/gorilla-devs/GDLauncher/releases",
   },
 };
+if (!APP_URLS.newsletter) {
+  // Fail loudly at build time rather than silently producing
+  // `undefined/mailing` URLs that 404 in the browser.
+  throw new Error(
+    "ENDERIUM_API_BASE is not set. Add it to .env or the deploy environment.",
+  );
+}
 export const ADD_USER_ENDPOINT = `${APP_URLS.newsletter}/mailing`;
 
 export const SITE_TITLE =
-  "GDLauncher - Your All-In-One Modded Minecraft Launcher";
+  "GDLauncher: Free Modded Minecraft Launcher for CurseForge & Modrinth";
 export const SITE_DESCRIPTION =
-  "GDLauncher - Your All-In-One Modded Minecraft Launcher";
+  "Free Minecraft launcher for mods and modpacks. One-click installs from CurseForge and Modrinth. Auto Java, auto updates, Cloud Instance Sharing. Windows, macOS, Linux.";
 
-export const DownloadItems: Array<{
-  item: Element | string;
-}> = [
-  {
-    item: (
-      <a class="flex items-center gap-2 p-1">
-        <Apple /> MacOS
-      </a>
-    ) as Element,
-  },
-  {
-    item: (
-      <a class="flex items-center gap-2 p-1">
-        <Windows /> Windows
-      </a>
-    ) as Element,
-  },
-  {
-    item: (
-      <a class="flex items-center gap-2 p-1">
-        <Linux /> Linux
-      </a>
-    ) as Element,
-  },
-];
+export const SITE_KEYWORDS =
+  "minecraft launcher, modded minecraft launcher, minecraft mod launcher, minecraft modpack launcher, curseforge launcher, modrinth launcher, forge launcher, fabric launcher, neoforge launcher, best minecraft launcher, free minecraft launcher, gdlauncher";
+
+export const TWITTER_HANDLE = "@gdlauncher";

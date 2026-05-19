@@ -1,8 +1,12 @@
 ---
 import Button from "./button/Button";
 import { DownloadLink } from "./DownloadLink";
+import { getLocaleFromUrl, useTranslations } from "../lib/i18n";
+
+const locale = getLocaleFromUrl(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <Button intent="primary" size="small" class="uppercase items-center rounded-xsgd">
-  <DownloadLink client:only="solid-js" />
+  <DownloadLink client:only="solid-js" label={t("download.short")} />
 </Button>

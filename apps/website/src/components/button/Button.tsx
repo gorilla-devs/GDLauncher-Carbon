@@ -1,19 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { createSignal, Show } from "solid-js";
-import { ButtonDropdown } from "./ButtonDropdown";
-import { type JSX } from "solid-js";
-import Apple from "../../assets/Apple";
-import Windows from "../../assets/Windows";
-import Linux from "../../assets/Linux";
-
-interface Props {
-  transparent?: boolean;
-  children: JSX.Element | JSX.Element[] | string;
-  onClick?: any;
-  isDropdown?: boolean;
-  icon?: JSX.Element | JSX.Element[] | string;
-  items?: Array<string>;
-}
+import { splitProps, type JSX } from "solid-js";
 
 const button = cva("button", {
   variants: {
@@ -57,65 +43,39 @@ const button = cva("button", {
   },
 });
 
-export interface ButtonProps
-  extends JSX.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof button> {}
+export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> &
+  VariantProps<typeof button> & {
+    /** Optional icon slot (rendered before children). */
+    icon?: JSX.Element | JSX.Element[] | string;
+  };
 
-const Button = (props: ButtonProps & Props) => {
-  const [showDropdown, setShowDropdown] = createSignal(false);
-  const intent = props.intent;
-  const size = props.size;
-  const className = props.class;
+const Button = (props: ButtonProps) => {
+  // splitProps so the variant inputs stay reactive (reading from `props` keeps
+  // the cva call live) and every other HTML attribute (type, disabled,
+  // aria-*, id, name, autofocus, onClick, etc.) flows through to the
+  // underlying <button>. Default type="button" prevents accidental form
+  // submission when dropped inside a <form>.
+  const [local, others] = splitProps(props, [
+    "intent",
+    "size",
+    "class",
+    "icon",
+    "children",
+    "type",
+  ]);
 
   return (
     <button
-      onClick={() => {
-        if (props.isDropdown) {
-          setShowDropdown(!showDropdown());
-        }
-        if (props.onClick) props.onClick();
-      }}
-      class={button({ intent, size, className })}
+      type={local.type ?? "button"}
+      class={button({
+        intent: local.intent,
+        size: local.size,
+        className: local.class,
+      })}
+      {...others}
     >
-      {props.children}
-
-      <Show when={props.isDropdown && showDropdown()}>
-        <ButtonDropdown
-          onClose={() => setShowDropdown(false)}
-          items={[
-            {
-              item: (
-                <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
-                  href={props.items![1]}
-                >
-                  <Apple /> MacOS
-                </a>
-              ) as Element,
-            },
-            {
-              item: (
-                <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
-                  href={props.items![0]}
-                >
-                  <Windows /> Windows
-                </a>
-              ) as Element,
-            },
-            {
-              item: (
-                <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
-                  href={props.items![2]}
-                >
-                  <Linux /> Linux
-                </a>
-              ) as Element,
-            },
-          ]}
-        />
-      </Show>
+      {local.icon}
+      {local.children}
     </button>
   );
 };

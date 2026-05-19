@@ -1,0 +1,194 @@
+---
+/**
+ * Localized "How to Change the Minecraft Version of an Instance" guide.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizedPath,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "インスタンスの Minecraft バージョンを変更する方法",
+    description: "GDLauncher のカスタムインスタンスを別の Minecraft バージョンに切り替える手順。ワールドやスクリーンショットなどインスタンス内のファイルは保持されます。",
+    steps: [
+      { name: "インスタンスを右クリック", text: "Library で対象のインスタンスを右クリックし、Edit を選択。" },
+      { name: "Minecraft Version ドロップダウンを開く", text: "Edit Instance ダイアログ内の Minecraft Version フィールドをクリック。リリース、スナップショット、ベータ、アルファが表示されます。" },
+      { name: "新しいバージョンを選択", text: "希望のバージョンを選びます。Mod ローダーを使っている場合は対応する Fabric / Forge / NeoForge / Quilt のバージョンも選択。" },
+      { name: "保存", text: "確定すると GDLauncher が新しいクライアント、ライブラリ、アセットをダウンロード。すでにキャッシュ済みの場合はサイズ小さめ。" },
+      { name: "起動して Mod を確認", text: "Play を押して起動。Mod は前のバージョンから引き継がれますが、ほとんどは特定の MC バージョン専用なので非対応のものは入れ替えが必要です。" }
+    ]
+  },
+  ko: {
+    title: "인스턴스의 Minecraft 버전을 바꾸는 방법",
+    description: "GDLauncher의 커스텀 인스턴스를 다른 Minecraft 버전으로 전환하는 방법. 월드와 스크린샷 등 인스턴스 안의 파일은 유지됩니다.",
+    steps: [
+      { name: "인스턴스를 오른쪽 클릭", text: "Library에서 대상 인스턴스를 오른쪽 클릭하고 Edit를 선택하세요." },
+      { name: "Minecraft Version 드롭다운 열기", text: "Edit Instance 대화상자에서 Minecraft Version 항목을 클릭. 릴리스, 스냅샷, 베타, 알파가 모두 보입니다." },
+      { name: "새 버전 선택", text: "원하는 버전을 고르세요. 모드 로더를 쓰는 인스턴스라면 호환되는 Fabric/Forge/NeoForge/Quilt 버전도 함께 선택." },
+      { name: "저장", text: "확인을 누르면 GDLauncher가 새 클라이언트, 라이브러리, 에셋을 내려받습니다. 이미 캐시된 경우 다운로드는 적습니다." },
+      { name: "실행하고 모드 확인", text: "Play로 실행. 이전 버전의 모드는 그대로 남지만 대부분의 모드는 특정 MC 버전에서만 동작하므로 호환되지 않는 모드는 교체해야 합니다." }
+    ]
+  },
+  de: {
+    title: "Die Minecraft-Version einer Instanz ändern",
+    description: "Wechsle eine Custom-Instanz im GDLauncher auf eine andere Minecraft-Version. Welten, Screenshots und andere Instanzdateien bleiben erhalten.",
+    steps: [
+      { name: "Rechtsklick auf die Instanz", text: "In der Library rechtsklick auf die Instanz und Edit wählen." },
+      { name: "Minecraft-Version-Dropdown öffnen", text: "Im Edit-Instance-Dialog auf das Feld Minecraft Version klicken. Du siehst Release-, Snapshot-, Beta- und Alpha-Versionen." },
+      { name: "Neue Version auswählen", text: "Gewünschte Version wählen. Bei Mod-Loader-Instanzen auch eine passende Fabric/Forge/NeoForge/Quilt-Version mit auswählen." },
+      { name: "Speichern", text: "Bestätigen. GDLauncher lädt Client, Libraries und Assets der neuen Version. Wenn schon im Cache, fällt die Downloadgröße klein aus." },
+      { name: "Starten und Mods prüfen", text: "Play drücken. Mods werden übernommen, aber die meisten gelten nur für eine bestimmte MC-Version, inkompatible musst du tauschen." }
+    ]
+  },
+  fr: {
+    title: "Comment changer la version de Minecraft d'une instance",
+    description: "Bascule une instance custom de GDLauncher sur une autre version de Minecraft. Les mondes, screenshots et autres fichiers de l'instance sont conservés.",
+    steps: [
+      { name: "Clic droit sur l'instance", text: "Dans la Library, clic droit sur l'instance et choisis Edit." },
+      { name: "Ouvrir le dropdown Minecraft Version", text: "Dans le dialogue Edit Instance, clique sur le champ Minecraft Version. Tu vois les release, snapshot, beta et alpha." },
+      { name: "Choisir la nouvelle version", text: "Sélectionne la version voulue. Si l'instance a un mod loader, choisis aussi une version compatible de Fabric / Forge / NeoForge / Quilt." },
+      { name: "Sauvegarder", text: "Confirme. GDLauncher télécharge le client, les libraries et les assets de la nouvelle version. La taille dépend de ce qui est déjà en cache." },
+      { name: "Lancer et vérifier les mods", text: "Appuie sur Play. Les mods sont conservés, mais la plupart visent une version précise, il faudra remplacer les incompatibles." }
+    ]
+  },
+  es: {
+    title: "Cómo cambiar la versión de Minecraft de una instancia",
+    description: "Cambia una instancia personalizada de GDLauncher a otra versión de Minecraft. Los mundos, capturas y demás archivos de la instancia se conservan.",
+    steps: [
+      { name: "Clic derecho en la instancia", text: "En la Library, haz clic derecho en la instancia y elige Edit." },
+      { name: "Abrir el desplegable Minecraft Version", text: "En el diálogo Edit Instance pulsa el campo Minecraft Version. Verás release, snapshot, beta y alpha." },
+      { name: "Elegir la nueva versión", text: "Selecciona la versión que quieras. Si la instancia usa mod loader, escoge también una versión compatible de Fabric / Forge / NeoForge / Quilt." },
+      { name: "Guardar", text: "Confirma. GDLauncher descarga el cliente, las librerías y los assets de la nueva versión. El tamaño depende de lo que ya tengas en caché." },
+      { name: "Lanzar y revisar mods", text: "Pulsa Play. Los mods se mantienen, pero la mayoría apuntan a una versión concreta, tendrás que reemplazar los incompatibles." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como mudar a versão do Minecraft de uma instância",
+    description: "Troque uma instância custom do GDLauncher para outra versão do Minecraft. Mundos, prints e outros arquivos da instância permanecem.",
+    steps: [
+      { name: "Clique com o botão direito na instância", text: "Na Library, clique com o botão direito na instância e escolha Edit." },
+      { name: "Abrir o dropdown Minecraft Version", text: "No diálogo Edit Instance, clique no campo Minecraft Version. Você vê release, snapshot, beta e alpha." },
+      { name: "Escolher a nova versão", text: "Selecione a versão desejada. Se a instância usa mod loader, escolha também uma versão compatível de Fabric / Forge / NeoForge / Quilt." },
+      { name: "Salvar", text: "Confirme. O GDLauncher baixa o cliente, libraries e assets da nova versão. O tamanho depende do que já está em cache." },
+      { name: "Iniciar e conferir os mods", text: "Aperte Play. Os mods permanecem, mas a maioria mira uma versão específica, vai precisar trocar os incompatíveis." }
+    ]
+  },
+  it: {
+    title: "Come cambiare la versione di Minecraft di un'istanza",
+    description: "Cambia un'istanza custom di GDLauncher su un'altra versione di Minecraft. Mappe, screenshot e altri file dell'istanza vengono conservati.",
+    steps: [
+      { name: "Clic destro sull'istanza", text: "Nella Library, fai clic destro sull'istanza e scegli Edit." },
+      { name: "Apri il dropdown Minecraft Version", text: "Nel dialogo Edit Instance clicca sul campo Minecraft Version. Vedi release, snapshot, beta e alpha." },
+      { name: "Scegli la nuova versione", text: "Seleziona la versione che vuoi. Se l'istanza usa un mod loader, scegli anche una versione compatibile di Fabric / Forge / NeoForge / Quilt." },
+      { name: "Salva", text: "Conferma. GDLauncher scarica client, libraries e asset della nuova versione. La dimensione dipende da cosa hai già in cache." },
+      { name: "Avvia e controlla le mod", text: "Premi Play. Le mod restano, ma la maggior parte mira a una versione specifica, dovrai sostituire quelli incompatibili." }
+    ]
+  }
+}
+const m = meta[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>変わるもの・変わらないもの</h2>
+      <p>Minecraft バージョンの変更で更新されるのはゲームクライアント本体と付随するライブラリ・アセットです。インスタンスフォルダー (セーブ、スクリーンショット、options.txt、リソースパック、Mod) はそのまま。便利な反面、古い Mod は新バージョンで動かないことが多いです。</p>
+
+      <h2>カスタム / Modpack インスタンス</h2>
+      <p>このガイドは自分で作った <strong>カスタム インスタンス</strong> 用です。CurseForge / Modrinth から導入した <strong>Modpack インスタンス</strong> で MC バージョンだけ変えると Pack のマニフェストが壊れます。代わりに <a href={localizedPath("/guides/update-modpack-version", locale)}>Modpack の更新</a> を使ってください。</p>
+
+      <h2>Mod の互換性</h2>
+      <p>1.20.1 → 1.21 のような変更ではほとんどの Mod が動かなくなります。Addons タブで新 MC バージョン用に絞って入れ直すのが確実です。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>바뀌는 것과 바뀌지 않는 것</h2>
+      <p>Minecraft 버전 변경은 게임 클라이언트와 함께 제공되는 라이브러리/에셋을 업데이트합니다. 인스턴스 폴더(세이브, 스크린샷, options.txt, 리소스 팩, 모드)는 그대로 둡니다. 편리한 반면 옛 모드는 새 버전에서 안 돌아가는 경우가 많습니다.</p>
+
+      <h2>커스텀 / 모드팩 인스턴스</h2>
+      <p>이 가이드는 직접 만든 <strong>커스텀 인스턴스</strong>용입니다. CurseForge/Modrinth 모드팩 인스턴스에서 MC 버전만 바꾸면 매니페스트가 깨집니다. 대신 <a href={localizedPath("/guides/update-modpack-version", locale)}>모드팩 업데이트</a>를 사용하세요.</p>
+
+      <h2>모드 호환성</h2>
+      <p>1.20.1 → 1.21 같은 전환에서는 대부분의 모드가 동작하지 않습니다. Addons 탭에서 새 MC 버전용으로 필터링해 다시 설치하는 게 확실합니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was sich ändert und was nicht</h2>
+      <p>Die MC-Versions-Änderung tauscht den Spielclient samt Libraries und Assets aus. Der Instanz-Ordner (Welten, Screenshots, options.txt, Resource Packs, Mods) bleibt unangetastet. Praktisch, aber alte Mods laufen meist nicht mehr.</p>
+
+      <h2>Custom vs Modpack-Instanz</h2>
+      <p>Dieser Guide ist für <strong>Custom-Instanzen</strong>, die du selbst erstellt hast. Bei CurseForge-/Modrinth-<strong>Modpack-Instanzen</strong> würde das Ändern der MC-Version das Pack-Manifest zerlegen, nutz stattdessen <a href={localizedPath("/guides/update-modpack-version", locale)}>Modpack-Update</a>.</p>
+
+      <h2>Mod-Kompatibilität</h2>
+      <p>Beim Wechsel z. B. von 1.20.1 auf 1.21 laufen die meisten Mods nicht mehr. Im Addons-Tab nach der neuen MC-Version filtern und neu installieren.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Ce qui change et ce qui ne change pas</h2>
+      <p>Le changement de version MC met à jour le client du jeu, ses libraries et ses assets. Le dossier de l'instance (sauvegardes, screenshots, options.txt, resource packs, mods) n'est pas touché. Pratique, mais la plupart des anciens mods ne tourneront plus.</p>
+
+      <h2>Custom vs modpack</h2>
+      <p>Ce guide concerne les <strong>instances custom</strong> que tu as créées toi-même. Pour les <strong>instances de modpack</strong> (CurseForge/Modrinth), changer la version MC casse le manifest du pack, utilise plutôt <a href={localizedPath("/guides/update-modpack-version", locale)}>la mise à jour du modpack</a>.</p>
+
+      <h2>Compatibilité des mods</h2>
+      <p>Sur des sauts comme 1.20.1 → 1.21, la majorité des mods ne tournent plus. Dans l'onglet Addons, filtre par la nouvelle version MC et réinstalle.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Qué cambia y qué no</h2>
+      <p>El cambio de versión MC actualiza el cliente, sus librerías y assets. La carpeta de la instancia (mundos, capturas, options.txt, resource packs, mods) no se toca. Útil, aunque la mayoría de mods antiguos dejarán de funcionar.</p>
+
+      <h2>Custom vs modpack</h2>
+      <p>Esta guía es para <strong>instancias personalizadas</strong> creadas por ti. Para <strong>instancias de modpack</strong> (CurseForge/Modrinth), cambiar la versión MC rompe el manifest del pack, usa en su lugar <a href={localizedPath("/guides/update-modpack-version", locale)}>actualizar el modpack</a>.</p>
+
+      <h2>Compatibilidad de mods</h2>
+      <p>En saltos como 1.20.1 → 1.21 la mayoría de mods dejan de funcionar. En la pestaña Addons filtra por la nueva versión MC y reinstala.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que muda e o que não muda</h2>
+      <p>A mudança de versão MC atualiza o cliente, suas libraries e assets. A pasta da instância (saves, prints, options.txt, resource packs, mods) fica intacta. Útil, mas a maioria dos mods antigos param de funcionar.</p>
+
+      <h2>Custom vs modpack</h2>
+      <p>Este guia é para <strong>instâncias custom</strong> que você criou. Em <strong>instâncias de modpack</strong> (CurseForge/Modrinth), mudar a versão do MC quebra o manifest do pack, use <a href={localizedPath("/guides/update-modpack-version", locale)}>atualizar modpack</a>.</p>
+
+      <h2>Compatibilidade de mods</h2>
+      <p>Em saltos como 1.20.1 → 1.21 a maioria dos mods deixa de funcionar. Na aba Addons, filtre pela nova versão do MC e reinstale.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cosa cambia e cosa no</h2>
+      <p>Il cambio di versione MC aggiorna il client del gioco, le sue libraries e gli asset. La cartella dell'istanza (mappe, screenshot, options.txt, resource pack, mod) resta intatta. Comodo, ma la maggior parte delle vecchie mod non funzionerà più.</p>
+
+      <h2>Custom vs modpack</h2>
+      <p>Questa guida è per le <strong>istanze custom</strong> che hai creato tu. Per le <strong>istanze di modpack</strong> (CurseForge/Modrinth), cambiare la versione MC rompe il manifest del pack: usa invece <a href={localizedPath("/guides/update-modpack-version", locale)}>aggiornare il modpack</a>.</p>
+
+      <h2>Compatibilità dei mod</h2>
+      <p>Su salti come 1.20.1 → 1.21 la maggior parte dei mod smette di funzionare. Nella scheda Addons filtra per la nuova versione MC e reinstalla.</p>
+    </Fragment>
+  )}
+</GuideLayout>

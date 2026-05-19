@@ -1,0 +1,73 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Allocate More RAM to a Minecraft Server"
+  description="Increase the memory available to a Minecraft server in GDLauncher so it handles more players, more chunks, and heavier modpacks without out-of-memory crashes."
+  keywords="minecraft server ram, allocate ram server, gdlauncher server memory, minecraft server out of memory, server xmx, server jvm settings"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Open the server", text: "In the Library page, flip the Instances/Servers toggle to Servers and click the server you want to tune. (Or right-click the server tile and pick Settings to skip straight to the right tab.)" },
+      { name: "Go to the Settings tab", text: "Inside the server, click the Settings tab. Server memory lives there alongside the name, port, and modloader version." },
+      { name: "Adjust Max Memory (Xmx)", text: "Find the memory section. Set Max Memory (Xmx) to the value you want. The Min Memory (Xms) field controls Java's starting heap and can usually stay at the default." },
+      { name: "Restart the server", text: "RAM changes don't apply to a running server. Stop it (Console tab → stop, or the Stop button) and start it again to pick up the new value." }
+    ]
+  }}
+>
+  <h2>How much RAM does a server need?</h2>
+  <p>
+    Vanilla servers run comfortably on 1–2 GB for 1–4 players. Each additional player adds overhead, mostly from chunks loaded around them. Modded servers need substantially more, the mods themselves consume RAM regardless of player count, and chunk loading gets heavier with mods that add new dimensions or generate complex structures.
+  </p>
+  <p>
+    Rough starting points by load:
+  </p>
+  <ul>
+    <li><strong>Vanilla, 1–4 players:</strong> 2 GB.</li>
+    <li><strong>Vanilla, 5–20 players:</strong> 4 GB.</li>
+    <li><strong>Light modpack (50 mods), 1–4 players:</strong> 4–6 GB.</li>
+    <li><strong>Medium modpack (100 mods), 5–10 players:</strong> 6–8 GB.</li>
+    <li><strong>Heavy modpack (All The Mods, GregTech, etc.):</strong> 8–12 GB and up.</li>
+  </ul>
+
+  <h2>Don't allocate everything you have</h2>
+  <p>
+    Leave headroom for the OS, the launcher itself, and any other running apps. Going past about 80% of system RAM causes swap thrashing, the server freezes for seconds at a time while the OS pages memory to disk.
+  </p>
+  <p>
+    If your machine has 16 GB total, 8–10 GB for the server is the sweet spot. If you want to allocate more, get more system RAM.
+  </p>
+
+  <h2>Server vs instance memory</h2>
+  <p>
+    The server's RAM setting is independent from any instance you've configured for the same modpack. They run in separate Java processes, one on your machine for the player instance, one for the server. Each has its own memory pool.
+  </p>
+  <p>
+    If you're running both at the same time on the same machine (a player joining a local server you host), make sure their combined allocation leaves headroom for the OS. 4 GB for the server plus 6 GB for the instance fits in a 16 GB machine; 8 GB plus 12 GB does not.
+  </p>
+
+  <h2>Watching for out-of-memory</h2>
+  <p>
+    The server console (Server view → Console tab) prints memory warnings when Java is close to the limit. If you see <code>OutOfMemoryError</code> or repeated long GC pauses ("garbage collector took N seconds"), bump the RAM up by 2 GB and restart.
+  </p>
+  <p>
+    Conversely, if the console shows the server using only a fraction of what you've allocated, you've over-provisioned. Java doesn't release unused heap back to the OS, so you're not gaining anything by giving it more than it needs, and oversized heaps actually <em>hurt</em> performance because GC pauses get longer.
+  </p>
+
+  <h2>Garbage collection on bigger servers</h2>
+  <p>
+    For servers above 8 GB, the same Aikar's flags that help client instances also help servers. They tune Java's G1 garbage collector to keep pause times predictable. Paste them into the Java Arguments field in the server's Settings tab:
+  </p>
+  <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+  <p>
+    For smaller servers (under 4 GB) the defaults are fine, the flags are tuned for medium and large heaps.
+  </p>
+
+  <h2>Allocating instance RAM instead</h2>
+  <p>
+    If you're tuning the player side rather than the server, see the dedicated guide on <a href="/guides/allocate-more-ram">allocating more RAM to a Minecraft instance</a>. The flow is similar but the trade-offs are different.
+  </p>
+
+</GuideLayout>

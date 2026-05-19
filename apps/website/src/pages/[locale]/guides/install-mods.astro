@@ -1,0 +1,287 @@
+---
+/**
+ * Localized "How to Install Minecraft Mods" guide. Brand names left
+ * untranslated (Forge, Fabric, NeoForge, Quilt, GDLauncher, CurseForge,
+ * Modrinth).
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizedPath,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft Mod の導入方法",
+    description: "GDLauncher で Minecraft の Mod を導入する完全ガイド。CurseForge と Modrinth から探して入れる方法を解説。",
+    steps: [
+      { name: "インスタンスを開くか作成", text: "GDLauncher で既存のインスタンスを選ぶか、Mod が要求する Mod ローダー (Forge / Fabric / NeoForge / Quilt) と対応する Minecraft バージョンの新規インスタンスを作成します。" },
+      { name: "Addons タブを開く", text: "インスタンス内で Addons タブを開き、Add Addons をクリック。組み込みブラウザで CurseForge と Modrinth を同時に検索できます。" },
+      { name: "Mod を探す", text: "名前で検索するか Quick Install ID を貼り付け。Mod ローダーと Minecraft バージョンでフィルターして、自分のインスタンスで動くものを見つけます。" },
+      { name: "Download をクリック", text: "GDLauncher が Mod 本体と依存関係を取得。バージョンの不一致や衝突は起動前に検出されます。" },
+      { name: "Play を押す", text: "インスタンスを起動すれば Mod が有効になります。同じ手順で他の Mod も追加できます。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 모드 설치 방법",
+    description: "GDLauncher로 Minecraft 모드를 설치하는 완전 가이드. CurseForge와 Modrinth에서 모드를 찾아 설치하는 방법.",
+    steps: [
+      { name: "인스턴스 열기 또는 생성", text: "GDLauncher에서 기존 인스턴스를 고르거나, 모드가 요구하는 로더(Forge, Fabric, NeoForge 또는 Quilt)와 일치하는 Minecraft 버전으로 새 인스턴스를 만드세요." },
+      { name: "Addons 탭 열기", text: "인스턴스 내부에서 Addons 탭을 열고 Add Addons를 누르세요. 내장 브라우저가 CurseForge와 Modrinth를 동시에 검색합니다." },
+      { name: "모드 찾기", text: "이름으로 검색하거나 Quick Install ID를 붙여넣으세요. 모드 로더와 Minecraft 버전 필터로 본인 인스턴스에서 정말 동작하는 결과만 보세요." },
+      { name: "Download 클릭", text: "GDLauncher가 모드와 의존성을 가져옵니다. 버전 불일치와 충돌은 실행 전에 표시됩니다." },
+      { name: "Play 누르기", text: "인스턴스를 실행하면 모드가 적용됩니다. 다른 모드도 같은 방식으로 추가하세요." }
+    ]
+  },
+  de: {
+    title: "So installierst du Minecraft-Mods",
+    description: "Komplett-Guide zum Installieren von Minecraft-Mods mit GDLauncher. So findest und installierst du Mods aus CurseForge und Modrinth.",
+    steps: [
+      { name: "Instanz öffnen oder erstellen", text: "Wähl im GDLauncher eine bestehende Instanz oder erstell eine neue mit dem Loader, den der Mod will (Forge, Fabric, NeoForge oder Quilt) und passender Minecraft-Version." },
+      { name: "Addons-Tab öffnen", text: "In deiner Instanz auf den Addons-Tab und dann auf Add Addons. Der eingebaute Browser durchsucht CurseForge und Modrinth gleichzeitig." },
+      { name: "Mod finden", text: "Such per Name oder füg eine Quick Install ID ein. Filter nach Mod-Loader und Minecraft-Version, damit das Ergebnis in deiner Instanz wirklich läuft." },
+      { name: "Auf Download klicken", text: "GDLauncher holt den Mod und seine Abhängigkeiten. Konflikte und Versions-Mismatches werden vor dem Start angezeigt." },
+      { name: "Auf Play drücken", text: "Starte die Instanz. Der Mod ist aktiv. Wiederhol das für weitere Mods, die du willst." }
+    ]
+  },
+  fr: {
+    title: "Comment installer des mods Minecraft",
+    description: "Guide complet pour installer des mods Minecraft avec GDLauncher. Trouver et installer des mods depuis CurseForge et Modrinth.",
+    steps: [
+      { name: "Ouvrir ou créer une instance", text: "Dans GDLauncher, choisis une instance existante ou crée-en une nouvelle avec le loader que le mod veut (Forge, Fabric, NeoForge ou Quilt) et une version Minecraft compatible." },
+      { name: "Ouvrir l'onglet Addons", text: "Dans ton instance, clique sur l'onglet Addons puis sur Add Addons. Le navigateur intégré cherche dans CurseForge et Modrinth en même temps." },
+      { name: "Trouver le mod", text: "Cherche par nom ou colle un Quick Install ID. Filtre par mod loader et version Minecraft pour t'assurer que le résultat fonctionne dans ton instance." },
+      { name: "Cliquer sur Download", text: "GDLauncher récupère le mod et ses dépendances. Les conflits et incompatibilités de version sont signalés avant que ça casse au lancement." },
+      { name: "Appuyer sur Play", text: "Lance l'instance. Le mod est actif. Répète pour les autres mods que tu veux." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar mods de Minecraft",
+    description: "Guía completa para instalar mods de Minecraft con GDLauncher. Cómo encontrar e instalar mods desde CurseForge y Modrinth.",
+    steps: [
+      { name: "Abrir o crear una instancia", text: "En GDLauncher, elige una instancia existente o crea una nueva con el loader que el mod requiera (Forge, Fabric, NeoForge o Quilt) y una versión de Minecraft compatible." },
+      { name: "Abrir la pestaña Addons", text: "Dentro de tu instancia, pulsa la pestaña Addons y luego Add Addons. El navegador integrado busca en CurseForge y Modrinth a la vez." },
+      { name: "Encontrar el mod", text: "Busca por nombre o pega un Quick Install ID. Filtra por mod loader y versión de Minecraft para que el resultado funcione en tu instancia." },
+      { name: "Pulsar Download", text: "GDLauncher descarga el mod y sus dependencias. Los conflictos y desajustes de versión se marcan antes de que rompan el arranque." },
+      { name: "Pulsar Play", text: "Arranca la instancia. El mod está activo. Repite para cualquier otro mod que quieras." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar mods do Minecraft",
+    description: "Guia completo para instalar mods do Minecraft com o GDLauncher. Como encontrar e instalar mods do CurseForge e Modrinth.",
+    steps: [
+      { name: "Abrir ou criar uma instância", text: "No GDLauncher, escolha uma instância existente ou crie uma nova com o loader que o mod exige (Forge, Fabric, NeoForge ou Quilt) e uma versão do Minecraft compatível." },
+      { name: "Abrir a aba Addons", text: "Dentro da instância, clique na aba Addons e em Add Addons. O navegador embutido busca no CurseForge e Modrinth ao mesmo tempo." },
+      { name: "Encontrar o mod", text: "Pesquise pelo nome ou cole um Quick Install ID. Filtre por mod loader e versão do Minecraft para garantir que o resultado funcione na sua instância." },
+      { name: "Clicar em Download", text: "O GDLauncher baixa o mod e qualquer dependência. Conflitos e incompatibilidades de versão são sinalizados antes de quebrar o launch." },
+      { name: "Apertar Play", text: "Inicie a instância. O mod está ativo. Repita para outros mods que quiser." }
+    ]
+  },
+  it: {
+    title: "Come installare Mod di Minecraft",
+    description: "Guida completa per installare Mod di Minecraft con GDLauncher. Come trovare e installare Mod da CurseForge e Modrinth.",
+    steps: [
+      { name: "Aprire o creare un'istanza", text: "In GDLauncher, scegli un'istanza esistente oppure creane una nuova con il loader richiesto dalla Mod (Forge, Fabric, NeoForge o Quilt) e una versione di Minecraft compatibile." },
+      { name: "Aprire la scheda Addons", text: "All'interno dell'istanza, clicca sulla scheda Addons e poi su Add Addons. Il browser integrato cerca in CurseForge e Modrinth contemporaneamente." },
+      { name: "Trovare la Mod", text: "Cerca per nome oppure incolla un Quick Install ID. Filtra per Mod loader e versione di Minecraft così sei sicuro che il risultato funzioni nella tua istanza." },
+      { name: "Cliccare su Download", text: "GDLauncher scarica la Mod e tutte le sue dipendenze. Conflitti e incompatibilità di versione vengono segnalati prima che mandino in crash l'avvio." },
+      { name: "Premere Play", text: "Avvia l'istanza. La Mod è attiva. Ripeti per ogni altra Mod che vuoi aggiungere." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install mods minecraft, how to install mods, minecraft mod guide, curseforge mods, modrinth mods, gdlauncher mods, forge mods, fabric mods"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT3M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>Mod とは?</h2>
+      <p>Mod はバニラの Minecraft にない機能を追加します。Modpack (多数の Mod をまとめたもの) と違い、個々の Mod は 1 つのテーマにフォーカス: 新 Mob、自動化の強化、魔術系、軽量化など。</p>
+      <p>あらゆる Mod があります: 新アイテム・ブロック、Tech、機械、魔術系、QoL の改善、軽量化など。Minecraft Mod コミュニティは 10 年以上これらを作り続けています。</p>
+
+      <h2>Mod ローダー</h2>
+      <p>Mod を動かすには Mod ローダーが必要です。主要な 2 つは Forge と Fabric で、両者に互換はありません。Forge 用 Mod は Fabric では動かず、その逆も同様。Mod を入れる前に、対応ローダーを必ず確認しましょう。</p>
+      <p>Forge は古参で Mod 数が最大。Fabric は新しく軽量で、Minecraft 新バージョン対応が速め。NeoForge は Forge の現代的フォーク、Quilt はほとんどの Fabric Mod に互換。遊びたい Mod があるローダーを選びます。</p>
+
+      <h2>GDLauncher での Mod 導入</h2>
+      <p>まず Mod ローダーを入れたインスタンスが必要です。GDLauncher で <strong>+</strong> ボタンを押し、Minecraft バージョンを選んで Mod ローダーで Forge か Fabric を選択。すでにインスタンスがあるならこの手順は飛ばします。</p>
+      <p>インスタンスを開いて <strong>Addons</strong> タブから <strong>Add Addons</strong> をクリック。CurseForge と Modrinth を同時検索するブラウザが開きます。欲しい Mod を見つけたら <strong>Download</strong>。依存関係も自動取得されます。</p>
+      <p>これで完了。ゲームを起動すれば Mod が有効です。</p>
+
+      <h2>手動インストール</h2>
+      <p>外部から入手した Mod ファイル (.jar) がある場合: インスタンスを右クリック → <strong>More options</strong> → <strong>Open folder</strong>。<code>instance</code> フォルダ内の <code>mods</code> フォルダに .jar をドロップ。</p>
+      <p>手動でファイルを追加した後はホーム画面に戻ってインスタンスをもう一度クリックすると、GDLauncher が再スキャンして新しい Mod を検出します。</p>
+
+      <h2>うまく行かないとき</h2>
+      <p>Mod が動かない場合、原因の定番はバージョンずれとローダー違い。Minecraft バージョンが厳密に一致していて、ローダーも正しいかを確認. Forge 用 Mod は Fabric では動きません (逆も同様)。Mod ページで必要な依存関係が抜けていないかも要チェック。</p>
+      <p>起動時のクラッシュは大抵どこかで競合しています。最近追加した Mod を 1 つずつ外して原因を特定しましょう。相性が悪い組み合わせも存在します。Mod を大量に入れているなら RAM 不足の可能性も (<a href={localizedPath("/guides/allocate-more-ram", locale)}>RAM ガイド</a>)。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>모드란?</h2>
+      <p>모드는 바닐라 Minecraft에 없는 기능을 더해 줍니다. 모드팩(여러 모드를 묶은 것)과 달리, 개별 모드는 한 가지에 집중합니다: 새 몹, 자동화, 마법, 또는 그냥 부드러운 성능 같은.</p>
+      <p>거의 모든 분야에 모드가 있습니다: 새 아이템과 블록, 기술과 기계, 마법 시스템, 편의성 개선, 성능 향상 등. Minecraft 모딩 커뮤니티는 10년 넘게 이런 걸 만들어 왔습니다.</p>
+
+      <h2>모드 로더</h2>
+      <p>모드는 모드 로더가 있어야 동작합니다. 주요 두 가지는 Forge와 Fabric인데 서로 호환되지 않습니다. Forge용 모드는 Fabric에서 안 돌아가고 그 반대도 같습니다. 받기 전에 모드가 어떤 로더를 필요로 하는지 꼭 확인하세요.</p>
+      <p>Forge는 오래되어 모드 라이브러리가 가장 큽니다. Fabric은 더 새롭고 가벼우며, 새 Minecraft 버전 대응이 빠릅니다. NeoForge는 Forge의 현대적인 포크, Quilt는 대부분의 Fabric 모드와 호환됩니다. 원하는 모드가 있는 쪽을 고르세요.</p>
+
+      <h2>GDLauncher로 모드 설치</h2>
+      <p>먼저 모드 로더가 설치된 인스턴스가 필요합니다. GDLauncher에서 <strong>+</strong> 버튼을 눌러 Minecraft 버전을 고르고 Forge나 Fabric을 모드 로더로 선택하세요. 이미 인스턴스가 있다면 이 단계는 건너뜁니다.</p>
+      <p>인스턴스를 열고 <strong>Addons</strong> 탭에서 <strong>Add Addons</strong>를 누르면 CurseForge와 Modrinth를 한 번에 검색하는 브라우저가 열립니다. 원하는 걸 찾아 <strong>Download</strong>. 의존성은 GDLauncher가 알아서 가져옵니다.</p>
+      <p>이걸로 끝. 게임을 실행하면 모드가 적용된 채로 시작합니다.</p>
+
+      <h2>수동 설치</h2>
+      <p>다른 곳에서 받은 모드 파일(.jar)이 있나요? 인스턴스를 오른쪽 클릭 → <strong>More options</strong> → <strong>Open folder</strong>. <code>instance</code> 폴더 안의 <code>mods</code> 폴더에 .jar 파일을 넣으세요.</p>
+      <p>수동으로 파일을 추가한 뒤 홈 화면으로 돌아가 인스턴스를 다시 클릭하면 GDLauncher가 재스캔해 새 모드를 인식합니다.</p>
+
+      <h2>잘 안될 때</h2>
+      <p>모드가 안 돌아간다면 흔한 원인은 버전이나 로더가 안 맞는 것입니다. 모드가 정확히 같은 Minecraft 버전과 같은 모드 로더를 위한 것인지 확인하세요. Forge 모드는 Fabric에서 안 돌고 반대도 같습니다. 모드 페이지에서 빠진 의존성도 살펴보세요.</p>
+      <p>실행 시 크래시는 보통 어딘가에서 충돌이 있다는 뜻입니다. 가장 최근에 추가한 모드부터 하나씩 제거해 범인을 찾으세요. 두 모드가 그냥 안 맞을 때도 있습니다. 모드가 아주 많다면 RAM이 더 필요할 수도 있습니다(<a href={localizedPath("/guides/allocate-more-ram", locale)}>RAM 가이드</a>).</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was sind Mods?</h2>
+      <p>Mods fügen Minecraft Features hinzu, die das Basisspiel nicht hat. Anders als Modpacks (die viele Mods bündeln) konzentriert sich ein einzelner Mod auf eine Sache: vielleicht neue Mobs, bessere Automatisierung, Magie-Sprüche oder einfach flüssigere Performance.</p>
+      <p>Es gibt Mods für so ziemlich alles: neue Items und Blöcke, Tech und Maschinen, Magie-Systeme, Komfortverbesserungen, Performance-Verbesserungen. Die Minecraft-Modding-Community baut sowas seit über einem Jahrzehnt.</p>
+
+      <h2>Mod-Loader</h2>
+      <p>Mods brauchen einen Mod-Loader. Die zwei wichtigsten sind Forge und Fabric, und sie sind nicht zueinander kompatibel. Ein Forge-Mod läuft nicht auf Fabric und umgekehrt. Prüf immer, welchen Loader ein Mod braucht, bevor du ihn lädst.</p>
+      <p>Forge gibt es länger und hat die größte Mod-Bibliothek. Fabric ist neuer, leichter und aktualisiert sich schneller bei neuen Minecraft-Versionen. NeoForge ist ein moderner Forge-Fork, Quilt ist mit den meisten Fabric-Mods kompatibel. Wähl das, wo deine Wunsch-Mods sind.</p>
+
+      <h2>Mods im GDLauncher installieren</h2>
+      <p>Erstmal brauchst du eine Instanz mit installiertem Mod-Loader. Klick im GDLauncher auf <strong>+</strong>, wähl deine Minecraft-Version und Forge oder Fabric als Mod-Loader. Wenn du schon eine Instanz hast, überspring den Schritt.</p>
+      <p>Öffne die Instanz und geh in den <strong>Addons</strong>-Tab. Klick <strong>Add Addons</strong> für einen Browser, der CurseForge und Modrinth gemeinsam durchsucht. Such, was du willst, klick <strong>Download</strong>. GDLauncher zieht die Abhängigkeiten automatisch mit.</p>
+      <p>Fertig. Starte das Spiel, deine Mods sind aktiv.</p>
+
+      <h2>Manuelle Installation</h2>
+      <p>Du hast eine Mod-Datei (.jar) anderswo her? Rechtsklick auf die Instanz → <strong>More options</strong> → <strong>Open folder</strong>. Geh in den <code>instance</code>-Ordner, dann <code>mods</code>, und leg deine .jar dort ab.</p>
+      <p>Nach dem manuellen Ablegen geh zurück zum Startbildschirm und klick die Instanz nochmal an. GDLauncher scannt neu und erkennt die neuen Mods.</p>
+
+      <h2>Wenn was nicht klappt</h2>
+      <p>Mod läuft nicht? Die üblichen Verdächtigen sind Versions-Mismatches und Mod-Loader-Mismatches. Stell sicher, dass der Mod genau für deine Minecraft-Version und den richtigen Mod-Loader ist, ein Forge-Mod läuft nicht auf Fabric und umgekehrt. Prüf die Mod-Seite auf fehlende Abhängigkeiten.</p>
+      <p>Crashes beim Start bedeuten meist Konflikte. Entferne kürzlich hinzugefügte Mods einen nach dem anderen, bis du den Übeltäter findest. Manchmal vertragen sich zwei Mods einfach nicht. Wenn du viele Mods hast, brauchst du vielleicht mehr RAM (siehe <a href={localizedPath("/guides/allocate-more-ram", locale)}>RAM-Guide</a>).</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>C'est quoi des mods ?</h2>
+      <p>Les mods ajoutent à Minecraft des features que le jeu de base n'a pas. Contrairement aux modpacks (qui regroupent plein de mods), un mod individuel se concentre sur une chose : peut-être de nouveaux mobs, une meilleure automatisation, des sorts magiques, ou juste de meilleures perfs.</p>
+      <p>Tu trouveras des mods pour à peu près tout : nouveaux objets et blocs, tech et machines, systèmes de magie, améliorations de confort et de performance. La communauté de modding Minecraft construit ça depuis plus de dix ans.</p>
+
+      <h2>Mod loaders</h2>
+      <p>Les mods ont besoin d'un mod loader pour fonctionner. Les deux principaux sont Forge et Fabric, et ils ne sont pas compatibles entre eux. Un mod Forge ne marche pas sur Fabric et inversement. Vérifie toujours quel loader un mod demande avant de le télécharger.</p>
+      <p>Forge est le plus ancien et a la plus grosse bibliothèque. Fabric est plus récent, plus léger, et se met à jour plus vite quand de nouvelles versions de Minecraft sortent. NeoForge est un fork moderne de Forge, Quilt est compatible avec la plupart des mods Fabric. Prends celui où sont les mods que tu veux.</p>
+
+      <h2>Installer des mods avec GDLauncher</h2>
+      <p>D'abord, il te faut une instance avec un mod loader installé. Clique sur <strong>+</strong> dans GDLauncher, choisis ta version de Minecraft et sélectionne Forge ou Fabric comme mod loader. Si tu as déjà une instance, passe cette étape.</p>
+      <p>Ouvre ton instance et va dans <strong>Addons</strong>. Clique sur <strong>Add Addons</strong> et un navigateur s'ouvre qui cherche dans CurseForge et Modrinth en même temps. Trouve ce que tu veux et clique sur <strong>Download</strong>. GDLauncher récupère les dépendances automatiquement.</p>
+      <p>Voilà. Lance le jeu et tes mods sont prêts.</p>
+
+      <h2>Installation manuelle</h2>
+      <p>T'as un fichier mod (.jar) qui vient d'ailleurs ? Clic droit sur ton instance → <strong>More options</strong> → <strong>Open folder</strong>. Va dans le dossier <code>instance</code>, puis <code>mods</code>, et dépose ton .jar dedans.</p>
+      <p>Après avoir ajouté des fichiers manuellement, retourne à l'écran d'accueil et reclique sur l'instance. GDLauncher rescanne et détecte les nouveaux mods.</p>
+
+      <h2>Quand ça plante</h2>
+      <p>Si un mod ne marche pas, les suspects habituels sont les versions et les mod loaders qui ne correspondent pas. Vérifie que le mod est exactement pour ta version de Minecraft et le bon mod loader, un mod Forge ne marche pas sur Fabric et inversement. Regarde la page du mod pour les dépendances manquantes.</p>
+      <p>Crash au démarrage ? Probablement un conflit. Retire les mods récemment ajoutés un par un jusqu'à trouver le coupable. Parfois deux mods ne se supportent juste pas. Si tu as beaucoup de mods, tu auras peut-être besoin de plus de RAM (voir notre <a href={localizedPath("/guides/allocate-more-ram", locale)}>guide RAM</a>).</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>¿Qué son los mods?</h2>
+      <p>Los mods añaden a Minecraft funciones que el juego base no tiene. A diferencia de los modpacks (que agrupan muchos mods), un mod individual se centra en una cosa: a lo mejor nuevos mobs, mejor automatización, hechizos mágicos o simplemente mejor rendimiento.</p>
+      <p>Hay mods para prácticamente cualquier cosa: items y bloques nuevos, tech y maquinaria, sistemas de magia, mejoras de calidad de vida y de rendimiento. La comunidad de modding de Minecraft lleva construyendo estas cosas más de una década.</p>
+
+      <h2>Mod loaders</h2>
+      <p>Los mods necesitan un mod loader para funcionar. Los dos principales son Forge y Fabric, y no son compatibles entre sí. Un mod de Forge no funciona en Fabric y viceversa. Comprueba siempre qué loader necesita un mod antes de descargarlo.</p>
+      <p>Forge lleva más tiempo y tiene la mayor librería. Fabric es más nuevo, más ligero y se actualiza más rápido cuando salen versiones nuevas de Minecraft. NeoForge es un fork moderno de Forge, Quilt es compatible con la mayoría de mods de Fabric. Elige el que tenga los mods que quieras.</p>
+
+      <h2>Instalar mods con GDLauncher</h2>
+      <p>Primero necesitas una instancia con un mod loader instalado. Pulsa <strong>+</strong> en GDLauncher, elige la versión de Minecraft y selecciona Forge o Fabric como mod loader. Si ya tienes una instancia, salta este paso.</p>
+      <p>Abre tu instancia y ve a la pestaña <strong>Addons</strong>. Pulsa <strong>Add Addons</strong> y se abrirá un navegador que busca en CurseForge y Modrinth a la vez. Encuentra lo que quieras y pulsa <strong>Download</strong>. GDLauncher se ocupa de las dependencias.</p>
+      <p>Eso es todo. Lanza el juego y tus mods están listos.</p>
+
+      <h2>Instalación manual</h2>
+      <p>¿Tienes un archivo de mod (.jar) de otro sitio? Clic derecho en la instancia → <strong>More options</strong> → <strong>Open folder</strong>. Entra en la carpeta <code>instance</code>, luego en <code>mods</code> y deja el .jar ahí.</p>
+      <p>Tras añadir archivos manualmente, vuelve a la pantalla principal y haz clic en la instancia otra vez. GDLauncher reescaneará y detectará los nuevos mods.</p>
+
+      <h2>Cuando algo falla</h2>
+      <p>Si un mod no funciona, los sospechosos habituales son versiones y mod loaders que no encajan. Asegúrate de que el mod es exactamente para tu versión de Minecraft y el mod loader correcto, un mod de Forge no funciona en Fabric y al revés. Revisa la página del mod por dependencias que falten.</p>
+      <p>Crashes al lanzar suelen indicar un conflicto. Quita los mods añadidos recientemente uno a uno hasta encontrar el culpable. A veces dos mods simplemente no se llevan bien. Si tienes muchos mods, puede que necesites más RAM (mira nuestra <a href={localizedPath("/guides/allocate-more-ram", locale)}>guía de RAM</a>).</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que são mods?</h2>
+      <p>Mods adicionam ao Minecraft recursos que o jogo base não tem. Diferente dos modpacks (que juntam vários mods), um mod individual foca em uma coisa: novos mobs, melhor automação, feitiços, ou só performance mais suave.</p>
+      <p>Existe mod para praticamente tudo: novos itens e blocos, tech e maquinário, sistemas de magia, melhorias de qualidade de vida e de performance. A comunidade de modding do Minecraft constrói isso há mais de uma década.</p>
+
+      <h2>Mod loaders</h2>
+      <p>Mods precisam de um mod loader para funcionar. Os dois principais são Forge e Fabric, e eles não são compatíveis entre si. Um mod do Forge não roda no Fabric e vice-versa. Sempre veja qual loader um mod exige antes de baixar.</p>
+      <p>O Forge é mais antigo e tem a maior biblioteca. O Fabric é mais novo, mais leve e se atualiza mais rápido quando saem novas versões do Minecraft. O NeoForge é um fork moderno do Forge, o Quilt é compatível com a maioria dos mods Fabric. Escolha aquele em que estão os mods que você quer.</p>
+
+      <h2>Instalando mods com o GDLauncher</h2>
+      <p>Primeiro você precisa de uma instância com um mod loader instalado. Clique no <strong>+</strong> do GDLauncher, escolha a versão do Minecraft e selecione Forge ou Fabric como mod loader. Se já tem uma instância, pule essa parte.</p>
+      <p>Abra sua instância e vá na aba <strong>Addons</strong>. Clique em <strong>Add Addons</strong> e um navegador abre buscando no CurseForge e Modrinth ao mesmo tempo. Encontre o que quer e clique em <strong>Download</strong>. O GDLauncher pega as dependências automaticamente.</p>
+      <p>É isso. Lance o jogo e seus mods estão prontos.</p>
+
+      <h2>Instalação manual</h2>
+      <p>Tem um arquivo de mod (.jar) de outro lugar? Clique direito na instância → <strong>More options</strong> → <strong>Open folder</strong>. Entre na pasta <code>instance</code>, depois <code>mods</code>, e solte seu .jar lá.</p>
+      <p>Depois de adicionar arquivos manualmente, volte para a tela inicial e clique na instância de novo. O GDLauncher faz uma re-varredura e detecta os novos mods.</p>
+
+      <h2>Quando dá ruim</h2>
+      <p>Se um mod não funciona, os culpados de sempre são versões e mod loaders incompatíveis. Confirme que o mod é exatamente para a sua versão do Minecraft e para o mod loader certo, mod do Forge não roda no Fabric e vice-versa. Veja na página do mod se está faltando alguma dependência.</p>
+      <p>Crash na inicialização geralmente é conflito. Remova os mods adicionados recentemente um por um até achar o responsável. Às vezes dois mods simplesmente não se dão. Se você tem muitos mods, pode precisar de mais RAM (veja nosso <a href={localizedPath("/guides/allocate-more-ram", locale)}>guia de RAM</a>).</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cosa sono le Mod?</h2>
+      <p>Le Mod aggiungono a Minecraft funzionalità che il gioco base non ha. A differenza dei Modpack (che raggruppano tante Mod), una singola Mod si concentra su una cosa sola: nuovi mob, automazione migliore, incantesimi, oppure semplicemente prestazioni più fluide.</p>
+      <p>Esiste una Mod per praticamente qualsiasi cosa: nuovi oggetti e blocchi, tech e macchinari, sistemi di magia, miglioramenti di comodità e di performance. La community di modding di Minecraft crea questa roba da oltre dieci anni.</p>
+
+      <h2>Mod loader</h2>
+      <p>Le Mod hanno bisogno di un Mod loader per funzionare. I due principali sono Forge e Fabric, e non sono compatibili tra loro. Una Mod per Forge non gira su Fabric e viceversa. Controlla sempre quale loader serve a una Mod prima di scaricarlo.</p>
+      <p>Forge è il più vecchio e ha la libreria di Mod più ampia. Fabric è più recente, più leggero, e si aggiorna prima quando escono nuove versioni di Minecraft. NeoForge è un fork moderno di Forge, Quilt è compatibile con la maggior parte delle Mod Fabric. Scegli quello dove si trovano le Mod che vuoi usare.</p>
+
+      <h2>Installare Mod con GDLauncher</h2>
+      <p>Per prima cosa ti serve un'istanza con un Mod loader installato. Clicca sul <strong>+</strong> in GDLauncher, scegli la versione di Minecraft e seleziona Forge o Fabric come Mod loader. Se hai già un'istanza, salta questo passaggio.</p>
+      <p>Apri l'istanza e vai nella scheda <strong>Addons</strong>. Clicca su <strong>Add Addons</strong> e si apre un browser che cerca in CurseForge e Modrinth contemporaneamente. Trova quello che vuoi e clicca su <strong>Download</strong>. GDLauncher si occupa delle dipendenze in automatico.</p>
+      <p>Fatto. Avvia il gioco e le tue Mod sono pronte.</p>
+
+      <h2>Installazione manuale</h2>
+      <p>Hai un file Mod (.jar) preso da altre parti? Tasto destro sull'istanza, <strong>More options</strong>, <strong>Open folder</strong>. Entra nella cartella <code>instance</code>, poi in <code>mods</code>, e trascina lì il tuo .jar.</p>
+      <p>Dopo aver aggiunto file manualmente, torna alla schermata principale e clicca di nuovo sull'istanza: GDLauncher fa una nuova scansione e riconosce le Mod appena aggiunte.</p>
+
+      <h2>Quando qualcosa non va</h2>
+      <p>Se una Mod non funziona, i sospettati di sempre sono versioni e Mod loader che non corrispondono. Verifica che la Mod sia esattamente per la tua versione di Minecraft e per il giusto Mod loader: una Mod per Forge non gira su Fabric e viceversa. Controlla la pagina della Mod per eventuali dipendenze mancanti.</p>
+      <p>Crash all'avvio? Di solito è un conflitto. Rimuovi le Mod aggiunte di recente uno alla volta finché non trovi il colpevole. A volte due Mod proprio non si sopportano. Se hai molte Mod potresti aver bisogno di più RAM (vedi la nostra <a href={localizedPath("/guides/allocate-more-ram", locale)}>guida sulla RAM</a>).</p>
+    </Fragment>
+  )}
+</GuideLayout>

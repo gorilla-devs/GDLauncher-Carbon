@@ -7,6 +7,15 @@ import GuideLayout from "../../components/GuideLayout.astro"
   description="Improve Minecraft performance by allocating more memory. Step-by-step guide for GDLauncher users."
   keywords="allocate more ram minecraft, minecraft ram, increase minecraft memory, minecraft lag fix, gdlauncher ram settings, minecraft performance"
   lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Open instance settings", text: "In GDLauncher, right-click the instance you want to tune and choose Settings (or open it and click the gear icon). The Settings tab is also reachable from the More Options submenu of the right-click menu." },
+      { name: "Find Instance Java Memory", text: "Scroll to the Instance Java Memory row in the Settings tab. By default it's off, the instance uses the global Settings → Java → Java Memory value. Flip the toggle on to enable a per-instance override." },
+      { name: "Set the slider", text: "Drag the slider to the value you want. 4 GB is a sane default for vanilla, 6–8 GB for medium modpacks, 8–12 GB for heavy modpacks like ATM10. The launcher warns past 80% of system RAM." },
+      { name: "Save and relaunch", text: "The setting saves automatically. Relaunch the instance and the new ceiling is in effect. Watch the F3 debug screen's Mem: line in-game to confirm." }
+    ]
+  }}
 >
   <h2>When you need more RAM</h2>
   <p>
@@ -26,10 +35,10 @@ import GuideLayout from "../../components/GuideLayout.astro"
 
   <h2>Changing RAM in GDLauncher</h2>
   <p>
-    For all instances: open Settings (gear icon), go to Java, and adjust the Maximum Memory slider. This becomes the default for new instances.
+    <strong>Global default</strong>: open the app's <strong>Settings → Java → Java Memory</strong> and adjust the slider. This is the default value any instance uses when its own override is off.
   </p>
   <p>
-    For one specific instance: right-click the instance, open Settings, go to the Java tab, enable "Override Global Settings", and set the memory there. This is useful when one modpack needs more than your default.
+    <strong>Per-instance</strong>: right-click the instance, choose <strong>Settings</strong>, find the <strong>Instance Java Memory</strong> row, flip its toggle on, and drag the slider. Useful when one modpack needs more than your default.
   </p>
 
   <h2>Checking your system</h2>

@@ -271,6 +271,8 @@
   "_trn_instance_share.max_downloads_label": "Max Downloads (optional)",
   "_trn_instance_share.max_downloads_placeholder": "Leave empty for unlimited",
   "_trn_instance_share.advanced": "Advanced",
+  "_trn_instance_share.include_saves_label": "Include saves",
+  "_trn_instance_share.include_saves_description": "Ship your worlds and player data with the share. Off by default; can make the upload much larger.",
   "_trn_my_shares.title": "My Instance Shares",
   "_trn_my_shares.empty": "You haven't shared any instances yet",
   "_trn_my_shares.deleted": "Share deleted",

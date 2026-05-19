@@ -1,0 +1,174 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher でインスタンスを安全に削除する方法",
+    description: "1 つ / 複数の Minecraft インスタンスを削除、削除されるもの、残るもの、誤削除からの回復。",
+    steps: [
+      { name: "インスタンスを右クリック", text: "Library で削除したいインスタンスを右クリックし Delete (ゴミ箱アイコン)。" },
+      { name: "モーダルで確認", text: "ConfirmInstanceDeletion モーダルが確認を求めます。インスタンス名が表示されるので正しいものを削除しているかダブルチェック。" },
+      { name: "削除完了を待つ", text: "GDLauncher がディスクからインスタンスフォルダーを削除しデータベース行も除去。大型 Modpack なら数秒。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 인스턴스 안전하게 삭제하는 법",
+    description: "단일 또는 다중 Minecraft 인스턴스 제거, 무엇이 삭제되고 무엇이 남는지, 실수로 삭제 시 복구 방법.",
+    steps: [
+      { name: "인스턴스 오른쪽 클릭", text: "Library에서 삭제할 인스턴스를 오른쪽 클릭하고 Delete(휴지통 아이콘) 선택." },
+      { name: "모달에서 확인", text: "ConfirmInstanceDeletion 모달이 확인을 요구. 인스턴스 이름이 표시되어 올바른 걸 삭제하는지 다시 확인 가능." },
+      { name: "삭제 완료 대기", text: "GDLauncher가 디스크에서 인스턴스 폴더와 DB 행을 제거. 대형 모드팩은 몇 초." }
+    ]
+  },
+  de: {
+    title: "Instanzen in GDLauncher sicher löschen",
+    description: "Eine oder mehrere Minecraft-Instanzen entfernen, was gelöscht und was behalten wird, und wie du nach versehentlichem Löschen wiederherstellst.",
+    steps: [
+      { name: "Rechtsklick auf die Instanz", text: "In der Library Rechtsklick auf die zu löschende Instanz, Delete wählen (Mülleimer-Icon)." },
+      { name: "Im Modal bestätigen", text: "Das ConfirmInstanceDeletion-Modal fragt nach Bestätigung. Der Instanzname wird gezeigt, so dass du sicher die richtige löschst." },
+      { name: "Auf die Löschung warten", text: "GDLauncher entfernt den Instanz-Ordner von der Platte und die Datenbankzeile. Bei großen Modpacks dauert das wenige Sekunden." }
+    ]
+  },
+  fr: {
+    title: "Comment supprimer des instances en toute sécurité dans GDLauncher",
+    description: "Retire une ou plusieurs instances Minecraft, ce qui est supprimé, ce qui est gardé, et comment récupérer après une suppression accidentelle.",
+    steps: [
+      { name: "Clic droit sur l'instance", text: "Dans la Library, clic droit sur l'instance à supprimer et choisis Delete (icône poubelle)." },
+      { name: "Confirmer dans le modal", text: "Le modal ConfirmInstanceDeletion demande confirmation. Il affiche le nom de l'instance pour que tu puisses vérifier que c'est la bonne." },
+      { name: "Attendre la suppression", text: "GDLauncher retire le dossier de l'instance du disque et la ligne en base de données. Pour les gros modpacks, ça prend quelques secondes." }
+    ]
+  },
+  es: {
+    title: "Cómo borrar instancias con seguridad en GDLauncher",
+    description: "Elimina una o varias instancias de Minecraft, qué se borra, qué se queda y cómo recuperar de un borrado accidental.",
+    steps: [
+      { name: "Clic derecho en la instancia", text: "En la Library, clic derecho en la instancia a borrar y elige Delete (icono papelera)." },
+      { name: "Confirmar en el modal", text: "El modal ConfirmInstanceDeletion pide confirmación. Muestra el nombre de la instancia para que verifiques que es la correcta." },
+      { name: "Esperar el borrado", text: "GDLauncher quita la carpeta de la instancia del disco y la fila de la base de datos. Para modpacks grandes tarda algunos segundos." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como deletar instâncias com segurança no GDLauncher",
+    description: "Remova uma ou várias instâncias do Minecraft, o que é apagado, o que fica, e como recuperar de uma exclusão acidental.",
+    steps: [
+      { name: "Botão direito na instância", text: "Na Library, botão direito na instância que vai apagar e escolha Delete (ícone de lixeira)." },
+      { name: "Confirme no modal", text: "O modal ConfirmInstanceDeletion pede confirmação. Mostra o nome da instância pra você conferir se é a certa." },
+      { name: "Espere a exclusão", text: "O GDLauncher remove a pasta da instância do disco e a linha do banco. Pra modpacks grandes leva alguns segundos." }
+    ]
+  },
+  it: {
+    title: "Come eliminare istanze in sicurezza in GDLauncher",
+    description: "Rimuovi una o più istanze Minecraft, cosa viene cancellato, cosa resta, e come recuperare da una cancellazione accidentale.",
+    steps: [
+      { name: "Clic destro sull'istanza", text: "Nella Library, fai clic destro sull'istanza da eliminare e scegli Delete (icona cestino)." },
+      { name: "Conferma nel modal", text: "Il modal ConfirmInstanceDeletion chiede conferma. Mostra il nome dell'istanza così controlli che sia quella giusta." },
+      { name: "Attendi la cancellazione", text: "GDLauncher rimuove la cartella dell'istanza dal disco e la riga dal database. Per i modpack grandi richiede qualche secondo." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["単一 / 一括削除", "削除されるもの", "残るもの", "削除は取り消せる？", "ワールドとセーブ", "削除が失敗したら"],
+    paras: [
+      "1 インスタンス: 右クリック → Delete。複数: Ctrl (macOS では Cmd) を押しながら各インスタンスをクリックして複数選択、右クリック → Delete Selected。別のモーダル (<code>ConfirmBatchInstanceDeletion</code>) が削除予定一覧と進行バーを表示。",
+      "インスタンスフォルダー内のすべて: Mod、設定、ワールド、スクリーンショット、options.txt、リソースパック、シェーダーパック、ログ、クラッシュレポート。インスタンスを追跡していたデータベース行も削除。インスタンスが Library から消えます。",
+      "インスタンスフォルダー外: そのインスタンスの何も残りません。ただし Minecraft の *共有* アセットとライブラリ (インスタンスではなく Runtime Path 内) は他のインスタンスがまだ使う可能性があるため保持。Java インストールも同じ。アカウント、ランチャー設定、他のインスタンスは影響を受けません。",
+      "GDLauncher 自体に Trash や Recently Deleted ビューはありませんが、デフォルトでインスタンスフォルダーを OS のごみ箱に送ります。これを制御する設定は <strong>Settings → General → Delete through Recycle Bin</strong>、デフォルトで ON。ON なら削除したインスタンスは Windows のごみ箱、macOS のゴミ箱、Linux デスクトップのトラッシュに入り、OS の標準ツールで復元可能。OFF だとファイルは直接削除され復元不可。インスタンスを追跡していたデータベース行はどちらの場合も消えます。ごみ箱からフォルダーを復元した場合、Library → + → Import Instance → legacy GDLauncher で再インポート (または孤立解決の仕方によっては手動) が必要。リスキーな変更前の意図的なバックアップとしては <a href=\"/guides/duplicate-an-instance\">インスタンスを複製する方法</a> を参照するか、OS のファイルマネージャーで Runtime Path 外にインスタンスフォルダーをコピー。",
+      "<code>instance/saves/</code> のワールドはインスタンスと一緒に消えます。ワールドを残してインスタンスを削除したい場合は、削除前にインスタンスフォルダーから <code>saves/&lt;world-name&gt;</code> をコピー。新しいインスタンスを開始し、その <code>saves/</code> にワールドを戻す。Minecraft が検出します。",
+      "まれですが起こる、通常は別プロセスがファイルをロックしているため。モーダルにエラー表示。Minecraft が動いていれば閉じる (インスタンスのファイルをロック)、インスタンスのファイルを開いているテキストエディタを閉じ、再試行。最終手段として GDLauncher を完全終了、OS ファイルマネージャーで手動でインスタンスフォルダーを削除、次回起動時に GDLauncher が孤立したデータベース行をクリーンアップ。"
+    ]
+  },
+  ko: {
+    headings: ["단일 vs 일괄 삭제", "삭제되는 것", "남는 것", "삭제는 되돌릴 수 있나?", "월드와 세이브", "삭제가 실패하면"],
+    paras: [
+      "한 인스턴스: 오른쪽 클릭 → Delete. 여러 개: Ctrl(macOS에선 Cmd)을 누르고 각 인스턴스 클릭으로 다중 선택, 오른쪽 클릭 → Delete Selected. 별도 모달(<code>ConfirmBatchInstanceDeletion</code>)이 삭제 예정 목록과 진행 바를 보여줍니다.",
+      "인스턴스 폴더 안의 모든 것: 모드, 설정, 월드, 스크린샷, options.txt, 리소스 팩, 셰이더 팩, 로그, 크래시 리포트. 인스턴스를 추적하던 DB 행도 제거. 인스턴스가 Library에서 사라집니다.",
+      "인스턴스 폴더 밖: 그 인스턴스의 어떤 것도 남지 않음. 하지만 Minecraft의 *공유* 에셋과 라이브러리(인스턴스가 아니라 Runtime Path에 있음)는 다른 인스턴스가 여전히 필요할 수 있어 유지. Java 설치도 마찬가지. 계정, 런처 설정, 다른 인스턴스는 영향 없음.",
+      "GDLauncher 자체에는 Trash나 Recently Deleted 뷰가 없지만, 기본적으로 인스턴스 폴더를 OS의 휴지통으로 보냅니다. 이를 제어하는 설정은 <strong>Settings → General → Delete through Recycle Bin</strong>, 기본 ON. ON이면 삭제된 인스턴스가 Windows 휴지통, macOS Trash, Linux 데스크톱 휴지통으로 들어가고 OS 표준 도구로 복원 가능. OFF면 파일이 바로 제거되어 복원 불가. 인스턴스를 추적하던 DB 행은 어느 쪽이든 사라집니다. 휴지통에서 폴더를 복원한 경우, Library → + → Import Instance → legacy GDLauncher로 재가져오기(혹은 런처의 고아 해결 방식에 따라 수동)가 필요. 위험한 변경 전 의도적 백업으로는 <a href=\"/guides/duplicate-an-instance\">인스턴스 복제</a>를 보거나 OS 파일 매니저로 Runtime Path 밖에 인스턴스 폴더를 복사하세요.",
+      "<code>instance/saves/</code>의 월드는 인스턴스와 함께 사라집니다. 월드는 유지하고 인스턴스만 삭제하려면 삭제 전에 인스턴스 폴더 밖으로 <code>saves/&lt;world-name&gt;</code>을 복사. 새 인스턴스를 시작해 그 <code>saves/</code>에 다시 두면 Minecraft가 인식.",
+      "드물게 발생, 보통 다른 프로세스가 파일을 잠궜기 때문. 모달에 오류 표시. 실행 중이라면 Minecraft 종료(인스턴스 파일을 잠그고 있음), 인스턴스에서 파일을 연 텍스트 에디터를 닫고 재시도. 최후의 수단으로 GDLauncher를 완전히 종료하고 OS 파일 매니저로 인스턴스 폴더를 수동 삭제, 다음 실행에서 GDLauncher가 고아 DB 행을 정리합니다."
+    ]
+  },
+  de: {
+    headings: ["Einzeln vs. Batch", "Was gelöscht wird", "Was bleibt", "Lässt sich Löschen rückgängig machen?", "Welten und Saves", "Wenn Löschen fehlschlägt"],
+    paras: [
+      "Eine Instanz: Rechtsklick → Delete. Mehrere: Strg gedrückt halten (Cmd auf macOS), Instanzen einzeln anklicken zum Multi-Select, dann Rechtsklick → Delete Selected. Ein anderes Modal (<code>ConfirmBatchInstanceDeletion</code>) listet, was du löschst, und zeigt einen Fortschrittsbalken.",
+      "Alles im Instanz-Ordner: Mods, Configs, Welten, Screenshots, options.txt, Resource Packs, Shader Packs, Logs, Crash-Reports. Die Datenbankzeile zur Instanz wird entfernt. Die Instanz verschwindet aus der Library.",
+      "Außerhalb des Instanz-Ordners überlebt nichts von der Instanz. Aber Minecrafts *gemeinsame* Assets und Libraries (im Runtime Path, nicht in der Instanz) bleiben, weil andere Instanzen sie noch brauchen können. Genauso die Java-Installationen. Accounts, Launcher-Settings und andere Instanzen sind nicht betroffen.",
+      "GDLauncher selbst hat keinen Papierkorb oder Recently Deleted, schickt den Instanz-Ordner aber standardmäßig in den Papierkorb deines OS. Das Setting dafür ist <strong>Settings → General → Delete through Recycle Bin</strong>, default an. An: gelöschte Instanzen landen im Windows-Papierkorb, macOS Trash oder dem Trash-Bucket deines Linux-Desktops und lassen sich mit den OS-Tools wiederherstellen. Aus: Dateien werden direkt gelöscht und sind weg. Die DB-Zeile zur Instanz ist so oder so weg. Stellst du den Ordner aus dem Papierkorb wieder her, musst du ihn neu importieren via Library → + → Import Instance → legacy GDLauncher (oder von Hand, je nachdem, wie der Launcher die Verwaiste auflöst). Für bewusste Backups vor riskanten Änderungen siehe <a href=\"/guides/duplicate-an-instance\">Eine Instanz duplizieren</a> oder kopier den Instanz-Ordner per OS-Datei-Explorer irgendwohin außerhalb des Runtime Path.",
+      "Welten in <code>instance/saves/</code> gehen mit der Instanz mit. Soll eine Welt erhalten bleiben, vor dem Löschen <code>saves/&lt;welt-name&gt;</code> aus dem Instanz-Ordner kopieren. Später eine neue Instanz starten und die Welt dort in <code>saves/</code> ablegen, Minecraft erkennt sie wieder.",
+      "Selten, kommt aber vor, meistens weil eine Datei noch von einem anderen Prozess gesperrt ist. Im Modal steht der Fehler. Minecraft schließen, falls's läuft (es sperrt Dateien in der Instanz). Texteditoren mit Dateien aus der Instanz schließen. Nochmal versuchen. Notfalls GDLauncher komplett beenden, den Instanz-Ordner manuell per OS-Explorer löschen, und beim nächsten Start räumt GDLauncher die verwaiste DB-Zeile auf."
+    ]
+  },
+  fr: {
+    headings: ["Suppression simple vs en lot", "Ce qui est supprimé", "Ce qui est gardé", "La suppression est-elle réversible ?", "Mondes et sauvegardes", "Si la suppression échoue"],
+    paras: [
+      "Pour une instance : clic droit → Delete. Pour plusieurs : maintiens Ctrl (Cmd sur macOS) et clique sur chaque instance pour multi-sélectionner, puis clic droit et choisis Delete Selected. Un autre modal (<code>ConfirmBatchInstanceDeletion</code>) liste tout ce que tu vas supprimer et affiche une barre de progression.",
+      "Tout ce qui est dans le dossier de l'instance : mods, configs, mondes, screenshots, options.txt, resource packs, shader packs, logs, crash reports. La ligne en base de données qui suit l'instance est retirée. L'instance disparaît de la Library.",
+      "Hors du dossier d'instance : rien de l'instance ne survit. Mais les assets et bibliothèques *partagés* de Minecraft (dans le runtime path, pas l'instance) sont gardés parce que d'autres instances peuvent encore en avoir besoin. Idem pour les installs Java. Tes comptes, settings de launcher et autres instances ne sont pas touchés.",
+      "GDLauncher lui-même n'a pas de corbeille ni de vue Recently Deleted, mais il envoie le dossier d'instance à la corbeille de ton OS par défaut. Le réglage qui contrôle ça est <strong>Settings → General → Delete through Recycle Bin</strong>, activé par défaut. Activé : les instances supprimées vont dans la corbeille Windows, la Corbeille macOS ou le bucket trash de ton bureau Linux, et tu peux les restaurer avec les outils OS standard. Désactivé : les fichiers sont supprimés directement et ne sont pas récupérables. La ligne en base qui suit l'instance disparaît dans les deux cas. Si tu restaures le dossier depuis la corbeille, il faudra le ré-importer via Library → + → Import Instance → legacy GDLauncher (ou à la main, selon comment le launcher résout l'orpheline). Pour des backups délibérés avant des changements risqués, voir <a href=\"/guides/duplicate-an-instance\">Comment dupliquer une instance</a>, ou copie le dossier d'instance ailleurs hors du runtime path via l'explorateur de fichiers OS.",
+      "Les mondes dans <code>instance/saves/</code> partent avec l'instance. Si tu veux garder un monde mais supprimer l'instance, copie <code>saves/&lt;nom-monde&gt;</code> hors du dossier d'instance avant de supprimer. Tu peux ensuite démarrer une nouvelle instance et déposer le monde dans son <code>saves/</code>. Minecraft le récupère.",
+      "Rare, mais ça arrive, généralement parce qu'un fichier est encore verrouillé par un autre processus. Le modal montre une erreur. Ferme Minecraft s'il tourne (il verrouille les fichiers de l'instance), ferme les éditeurs de texte qui ont des fichiers ouverts depuis l'instance, et réessaie. En dernier recours, quitte GDLauncher entièrement, supprime manuellement le dossier d'instance via l'explorateur de fichiers OS, et au prochain lancement GDLauncher nettoiera la ligne DB orpheline."
+    ]
+  },
+  es: {
+    headings: ["Borrado individual vs por lotes", "Qué se borra", "Qué se queda", "¿El borrado es reversible?", "Mundos y guardados", "Si el borrado falla"],
+    paras: [
+      "Para una instancia: clic derecho → Delete. Para varias: mantén Ctrl (Cmd en macOS) y haz clic en cada instancia para multi-selección, luego clic derecho y elige Delete Selected. Un modal distinto (<code>ConfirmBatchInstanceDeletion</code>) lista todo lo que vas a borrar y muestra una barra de progreso.",
+      "Todo en la carpeta de la instancia: mods, configs, mundos, capturas, options.txt, resource packs, shader packs, logs, crash reports. La fila de la base de datos que rastreaba la instancia se elimina. La instancia desaparece de la Library.",
+      "Fuera de la carpeta de la instancia: nada de la instancia sobrevive. Pero los assets y bibliotecas *compartidos* de Minecraft (en el runtime path, no la instancia) se mantienen porque otras instancias pueden seguir necesitándolos. Lo mismo con las instalaciones de Java. Tus cuentas, settings del launcher y otras instancias no se ven afectadas.",
+      "GDLauncher en sí no tiene Papelera ni vista Recently Deleted, pero por defecto envía la carpeta de la instancia a la papelera del SO. El ajuste que lo controla es <strong>Settings → General → Delete through Recycle Bin</strong>, activado por defecto. Activado: las instancias borradas van a la Papelera de Windows, Trash de macOS, o la papelera de tu escritorio Linux, y puedes restaurarlas con las herramientas estándar del SO. Desactivado: los archivos se borran directamente y no son recuperables. La fila de la base de datos que rastreaba la instancia se va en cualquier caso. Si restauras la carpeta desde la papelera, tendrás que reimportarla vía Library → + → Import Instance → legacy GDLauncher (o a mano, según cómo el launcher resuelva la huérfana). Para backups deliberados antes de cambios arriesgados, ver <a href=\"/guides/duplicate-an-instance\">Cómo duplicar una instancia</a>, o copia la carpeta de instancia fuera del runtime path con el explorador del SO.",
+      "Los mundos en <code>instance/saves/</code> se van con la instancia. Si quieres conservar un mundo pero borrar la instancia, copia <code>saves/&lt;nombre-mundo&gt;</code> fuera de la carpeta antes de borrar. Luego inicia una nueva instancia y mete el mundo en su <code>saves/</code>. Minecraft lo detecta.",
+      "Raro, pero pasa, normalmente porque un archivo sigue bloqueado por otro proceso. El modal muestra el error. Cierra Minecraft si está corriendo (bloquea archivos de la instancia), cierra editores de texto que tengan archivos abiertos de la instancia, e inténtalo de nuevo. Como último recurso, sal de GDLauncher entero, borra a mano la carpeta de instancia con el explorador del SO, y en el siguiente arranque GDLauncher limpiará la fila huérfana de la base de datos."
+    ]
+  },
+  "pt-BR": {
+    headings: ["Único vs lote", "O que é apagado", "O que fica", "Dá pra desfazer?", "Mundos e saves", "Se a exclusão falhar"],
+    paras: [
+      "Pra uma instância: botão direito → Delete. Pra várias: segure Ctrl (Cmd no macOS) e clique em cada instância pra multisseleção, depois botão direito e escolha Delete Selected. Um modal diferente (<code>ConfirmBatchInstanceDeletion</code>) lista tudo que você vai apagar e mostra uma barra de progresso.",
+      "Tudo na pasta da instância: mods, configs, mundos, prints, options.txt, resource packs, shader packs, logs, crash reports. A linha no banco que rastreava a instância é removida. A instância some da Library.",
+      "Fora da pasta da instância: nada da instância sobrevive. Mas os assets e libraries *compartilhados* do Minecraft (no runtime path, não na instância) ficam porque outras instâncias ainda podem precisar. Idem pras instalações de Java. Suas contas, settings do launcher e outras instâncias não são afetadas.",
+      "O GDLauncher em si não tem Lixeira ou Recently Deleted, mas manda a pasta da instância pra lixeira do SO por padrão. A configuração que controla isso é <strong>Settings → General → Delete through Recycle Bin</strong>, ligada por padrão. Ligada: instâncias apagadas vão pra Lixeira do Windows, Trash do macOS, ou a lixeira do seu desktop Linux, e dá pra restaurar com as ferramentas padrão do SO. Desligada: arquivos são removidos direto e não dá pra recuperar. A linha do banco que rastreava a instância some de qualquer jeito. Se você restaurar a pasta da lixeira, precisa reimportar via Library → + → Import Instance → legacy GDLauncher (ou na mão, dependendo de como o launcher resolve a órfã). Pra backups intencionais antes de mudanças arriscadas, veja <a href=\"/guides/duplicate-an-instance\">Como duplicar uma instância</a>, ou copie a pasta da instância pra fora do runtime path pelo gerenciador de arquivos do SO.",
+      "Os mundos em <code>instance/saves/</code> vão junto. Se quer manter um mundo mas apagar a instância, copie <code>saves/&lt;nome-mundo&gt;</code> pra fora da pasta antes de apagar. Depois pode iniciar uma nova instância e jogar o mundo de volta no <code>saves/</code> dela. O Minecraft reconhece.",
+      "Raro, mas acontece, normalmente porque um arquivo ainda está travado por outro processo. O modal mostra o erro. Feche o Minecraft se estiver rodando (ele trava arquivos da instância), feche editores de texto com arquivos abertos da instância, e tente de novo. Em último caso, saia do GDLauncher inteiro, apague a pasta da instância manualmente pelo gerenciador de arquivos do SO, e no próximo start o GDLauncher limpa a linha órfã do banco."
+    ]
+  },
+  it: {
+    headings: ["Singolo vs in blocco", "Cosa viene cancellato", "Cosa resta", "L'eliminazione si può annullare?", "Mappe e save", "Se l'eliminazione fallisce"],
+    paras: [
+      "Per una sola istanza: clic destro → Delete. Per più di una: tieni premuto Ctrl (Cmd su macOS) e clicca su ogni istanza per la selezione multipla, poi clic destro e scegli Delete Selected. Un modal diverso (<code>ConfirmBatchInstanceDeletion</code>) elenca tutto quello che stai per cancellare e mostra una barra di progresso.",
+      "Tutto nella cartella dell'istanza: mod, config, mappe, screenshot, options.txt, resource pack, shader pack, log, crash report. La riga del database che teneva traccia dell'istanza viene rimossa. L'istanza sparisce dalla Library.",
+      "Fuori dalla cartella dell'istanza non sopravvive nulla di quella istanza. Però gli asset e le libraries *condivise* di Minecraft (nel runtime path, non nell'istanza) vengono conservati perché altre istanze potrebbero ancora averne bisogno. Idem per le installazioni di Java. Account, impostazioni del launcher e altre istanze non sono toccati.",
+      "GDLauncher in sé non ha un cestino o una vista Recently Deleted, ma di default manda la cartella dell'istanza nel cestino del sistema operativo. L'impostazione che lo controlla è <strong>Settings → General → Delete through Recycle Bin</strong>, attiva di default. Attiva: le istanze cancellate finiscono nel Cestino di Windows, nel Trash di macOS o nel cestino del tuo desktop Linux, e si possono ripristinare con gli strumenti standard del sistema. Disattiva: i file vengono rimossi direttamente e non sono recuperabili. La riga del database che teneva traccia dell'istanza sparisce comunque. Se ripristini la cartella dal cestino, devi reimportarla via Library → + → Import Instance → legacy GDLauncher (oppure a mano, a seconda di come il launcher risolve la orfana). Per backup deliberati prima di modifiche rischiose, vedi <a href=\"/guides/duplicate-an-instance\">Come duplicare un'istanza</a>, oppure copia la cartella dell'istanza fuori dal runtime path con il file manager del sistema.",
+      "Le mappe in <code>instance/saves/</code> se ne vanno insieme all'istanza. Se vuoi tenere una mappa ma cancellare l'istanza, copia <code>saves/&lt;nome-mappa&gt;</code> fuori dalla cartella prima di cancellare. Poi avvia una nuova istanza e rimetti la mappa nel suo <code>saves/</code>. Minecraft la rileva.",
+      "Raro, ma capita, di solito perché un file è ancora bloccato da un altro processo. Il modal mostra l'errore. Chiudi Minecraft se è in esecuzione (blocca i file dell'istanza), chiudi gli editor di testo che hanno aperto file dell'istanza, e riprova. Come ultima risorsa, esci completamente da GDLauncher, cancella la cartella dell'istanza a mano dal file manager del sistema, e al prossimo avvio GDLauncher pulirà la riga orfana nel database."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT1M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

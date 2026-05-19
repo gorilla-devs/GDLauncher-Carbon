@@ -1,0 +1,19 @@
+---
+import type { GetStaticPaths } from "astro"
+import Layout from "../../layouts/Layout.astro"
+import LegalDocument from "../../components/LegalDocument.astro"
+import { LOCALES, DEFAULT_LOCALE } from "../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+---
+
+<Layout
+  title="Terms of Service"
+  description="gdlauncher terms of service"
+  pubDate={new Date("August 08 2021")}
+>
+  <LegalDocument url="https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy/master/terms-of-service.md" />
+</Layout>

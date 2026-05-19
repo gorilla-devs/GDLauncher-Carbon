@@ -7,13 +7,22 @@ import GuideLayout from "../../components/GuideLayout.astro"
   description="Learn how to install data packs in Minecraft. Add new recipes, loot tables, and game mechanics without mods."
   keywords="install datapack minecraft, how to install data packs, minecraft datapack guide, vanilla tweaks, gdlauncher datapack"
   lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Open the instance", text: "Data packs apply to a single world, so first open the Minecraft instance you want to use the pack in." },
+      { name: "Browse data packs in GDLauncher", text: "Open the Addons tab, click Add Addons, switch the addon type to Data Packs, and search for the pack you want." },
+      { name: "Download to the instance", text: "Click Download. GDLauncher places the data pack in the instance's instance/datapacks/ folder, which applies to every world in that instance. If you need per-world scoping, see the manual flow below." },
+      { name: "Reload the world", text: "Open the world (or run /reload from inside it). The data pack's recipes, advancements, and game changes are now active." }
+    ]
+  }}
 >
   <h2>What data packs do</h2>
   <p>
     Data packs tweak Minecraft's mechanics without mods. They can add crafting recipes, change what mobs drop, create custom advancements, modify world generation, and run commands automatically. All in vanilla Minecraft.
   </p>
   <p>
-    They're more limited than mods—you can't add truly new blocks or items, just tweak existing mechanics. But they work on servers without requiring players to install anything, and removing them is as simple as deleting a file.
+    They're more limited than mods. You can't add truly new blocks or items, just tweak existing mechanics. But they work on servers without requiring players to install anything, and removing them is as simple as deleting a file.
   </p>
 
   <h2>Installing with GDLauncher (all worlds)</h2>

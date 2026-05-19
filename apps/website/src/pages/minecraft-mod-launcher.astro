@@ -1,0 +1,55 @@
+---
+import KeywordLandingLayout from "../components/KeywordLandingLayout.astro"
+
+const faq = [
+  {
+    question: "What's a Minecraft mod launcher?",
+    answer: "A mod launcher is a Minecraft launcher that installs and manages mods for you. Instead of downloading mod JARs, dropping them in folders, and configuring Java by hand, a mod launcher does all of that automatically, including installing the right mod loader (Forge, Fabric, NeoForge, or Quilt) for the version you want."
+  },
+  {
+    question: "What's the easiest mod launcher for Minecraft beginners?",
+    answer: "GDLauncher is the easiest. It auto-detects the Java version each modpack needs, installs the right mod loader for you, and lets you browse mods from CurseForge and Modrinth in the same UI. You can also paste a slug prefixed with # (e.g. #sodium) straight into the search bar to jump to that mod."
+  },
+  {
+    question: "Do I need Forge or Fabric to install mods?",
+    answer: "Yes, mods need a mod loader to run. Forge has the largest mod library (especially older Forge mods like Tinkers' Construct, Create, and Twilight Forest). Fabric is lighter and updates faster. NeoForge is a 2023 fork of Forge that's becoming standard for new versions. GDLauncher installs whichever loader your chosen mods require, automatically."
+  },
+  {
+    question: "Can a mod launcher install modpacks too?",
+    answer: "Yes. GDLauncher installs both individual mods and full modpacks (which are bundles of mods + configs + resource packs) in one click. You can install RLCraft, All The Mods 10, Better MC, FTB packs, and thousands of others directly through the browser."
+  },
+  {
+    question: "Is GDLauncher free?",
+    answer: "Yes. GDLauncher is free. There's no premium tier; the app is ad-supported with in-app banners that help fund development and mod authors. It runs on Windows, macOS, and Linux."
+  }
+]
+---
+
+<KeywordLandingLayout
+  pageSlug="minecraft-mod-launcher"
+  title="Minecraft Mod Launcher: Install Any Mod in One Click"
+  description="The easiest Minecraft mod launcher. GDLauncher installs mods from CurseForge and Modrinth automatically, manages Java, and handles Forge, Fabric, NeoForge, and Quilt for you."
+  intro="If you've ever copied JARs into folders or hunted down the right Java version for a modpack, you don't have to anymore. GDLauncher is a Minecraft mod launcher that handles all of that, for you, automatically, free."
+  keywords="minecraft mod launcher, mod launcher minecraft, install minecraft mods, forge launcher, fabric launcher, neoforge launcher, quilt launcher, free mod launcher"
+  faq={faq}
+>
+  <h2>What a mod launcher actually does</h2>
+  <p>A mod launcher takes everything that's annoying about modded Minecraft and automates it: figuring out which Java version a mod needs, installing the mod loader (Forge, Fabric, NeoForge, or Quilt), downloading the mod files into the right folders, resolving dependencies, and keeping everything updated. You browse, click install, hit play.</p>
+  <p>Without a mod launcher, you'd be downloading JARs by hand from random websites, copying them into <code>mods/</code> folders, fighting with Java versions for different modpacks, and rebuilding it all when something breaks. With one, none of that exists.</p>
+
+  <h2>How GDLauncher works as a mod launcher</h2>
+  <p>You pick a Minecraft version when you create an instance. GDLauncher detects which Java that version needs and installs it. You pick a mod loader. GDLauncher installs the right Forge/Fabric/NeoForge/Quilt build. You open the Addons tab, search a mod, click Download. The dependencies are pulled in automatically.</p>
+  <p>The shortest possible workflow: type the mod's slug prefixed with <code>#</code> (for example <code>#sodium</code>) into the search bar, the mod loads, you click Download. That's it.</p>
+
+  <h2>Supported mod loaders</h2>
+  <ul>
+    <li><a href="/guides/install-forge"><strong>Forge</strong></a>: The original mod loader (since 2011). Largest library. Best for big modpacks like ATM10, Create-based packs, Twilight Forest.</li>
+    <li><a href="/guides/install-fabric"><strong>Fabric</strong></a>: Lightweight, fast-updating. Best for performance mods (Sodium, Lithium) and bleeding-edge versions.</li>
+    <li><strong>NeoForge</strong>: 2023 fork of Forge. Modern improvements, becoming the standard for new Forge-style mods on 1.20.4+.</li>
+    <li><strong>Quilt</strong>: Fabric fork with extra features. Mostly compatible with Fabric mods.</li>
+  </ul>
+
+  <h2>CurseForge and Modrinth in one place</h2>
+  <p>GDLauncher's mod browser searches CurseForge and Modrinth simultaneously. Most popular mods are on both platforms; some are exclusive to one. You don't have to know in advance which is which, search, find, install.</p>
+  <p><a href="/mods">Browse Minecraft mods</a> · <a href="/modpacks">Browse modpacks</a> · <a href="/guides/install-mods">How to install mods</a></p>
+</KeywordLandingLayout>

@@ -1,0 +1,52 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Manage Java Versions and Per-Instance Overrides in GDLauncher"
+  description="Add custom Java installations, create profiles, and set a per-instance Java override so each modpack runs on the right Java version automatically."
+  keywords="java version minecraft, manage java gdlauncher, java path, java profile, java override instance, java 17 minecraft"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Open Java settings", text: "Settings → Java. Scroll past the memory slider and Java arguments; the lower half of the page has a tabbed view with Manage Paths and Manage Profiles tabs." },
+      { name: "Add a Java installation", text: "On the Manage Paths tab, click the + button and pick Add Managed (download a fresh Java) or Add Custom (point at a Java already on your system). Managed Javas live in the runtime path and can be removed via the trash icon; system-discovered Javas can't be removed from the launcher." },
+      { name: "Check or assign profiles", text: "On the Manage Profiles tab, system profiles (named after Mojang's Java runtime tiers, Legacy, Alpha, Beta, Gamma, Delta, etc.) are auto-managed by default. If you want to assign Javas to them manually, turn the 'Automatically Manage Java System Profiles' toggle off above the tabs. You can also create your own profile with the + button." },
+      { name: "Override Java per instance", text: "Open the instance, go to the Settings tab. Toggle the Java Override on. Pick Path (a specific Java executable) or Profile (a named one), then specify which. The override applies only to this instance." },
+      { name: "Verify on launch", text: "Launch the instance. The launcher logs (right-click → View Logs) include the full Java executable path that was used. If the wrong one got picked, check the override or the profile assignment." }
+    ]
+  }}
+>
+  <h2>The Java situation in Minecraft</h2>
+  <p>Minecraft requires different Java versions depending on its own version: 1.16 and earlier need Java 8, 1.17 needs Java 16, 1.18 through 1.20.4 need Java 17, and 1.20.5+ needs Java 21. Mods compile against a specific Java version. A mod built for Java 17 cannot run on a Java 8 JVM (the bytecode is too new). The reverse direction technically works at the bytecode level, but in practice old Minecraft modloaders (Forge 1.12.2, etc.) don't support modern Java versions, so each MC version still wants a matching Java.</p>
+  <p>GDLauncher solves this with two things: managed Java installations (it can download the right Java per Minecraft version automatically) and per-instance overrides (you can force a specific Java for one instance).</p>
+
+  <h2>Managed vs custom Java</h2>
+  <p><strong>Managed</strong>: GDLauncher downloads and installs the Java itself, from Azul's Zulu builds. The install lives inside the runtime path under <code>managed_javas/</code>. You can remove it later with the trash icon if you want to free up disk space.</p>
+  <p><strong>Custom</strong>: You point at a Java already installed on your system (Adoptium Temurin, Oracle JDK, GraalVM, whatever). GDLauncher only validates the path; it doesn't manage the install. Useful if you already have a tuned JDK you want to use.</p>
+  <p>System-discovered Javas (the ones GDLauncher finds without you doing anything) can't be deleted from the launcher because GDLauncher doesn't own them.</p>
+
+  <h2>Profiles</h2>
+  <p>A profile is a named "use this Java when something asks for the Foo runtime" rule. The system profiles match Mojang's Java runtime tiers (Legacy for Java 8, Alpha for Java 16, Beta/Gamma for Java 17, Delta for Java 21, Epsilon for Java 25). With the auto-manage toggle on, GDLauncher picks the right Java for each tier on its own. With it off, you assign them yourself. Custom profiles let you give a specific path a name to reference from instance overrides.</p>
+  <p>Most people don't need custom profiles. System profiles plus auto-management cover the common case.</p>
+
+  <h2>Per-instance override</h2>
+  <p>In Instance Settings, the Java Path/Profile section has a toggle. Off (default): the instance uses whichever Java the launcher picks based on the Minecraft version (via system profiles). On: you specify either a Path (a literal file) or a Profile (a named profile).</p>
+  <p>When you'd want an override:</p>
+  <ul>
+    <li>The modpack explicitly says "must run on Java X.Y.Z" and you want to pin it.</li>
+    <li>You're testing a JVM (GraalVM, Liberica NIK) and want to try it on one instance without changing your default.</li>
+    <li>You have multiple Java 17 installs (Adoptium, Microsoft, etc.) and want to pick a specific one.</li>
+  </ul>
+
+  <h2>Checking which Java actually got used</h2>
+  <p>Right-click the instance → View Logs after a launch. The launcher log lists the full Java executable path it called. Match that against your expected override.</p>
+
+  <h2>Common Java errors</h2>
+  <ul>
+    <li><strong>UnsupportedClassVersionError</strong>: the mod or server was built for a newer Java than the one running. The error includes a "class file version" number; 61.0 means Java 17, 65.0 means Java 21. Switch to a newer Java via profile or override.</li>
+    <li><strong>"Could not reserve enough space for object heap"</strong>: you're using a 32-bit Java (limited to roughly 1.5 GB heap on Windows), or asking for more contiguous memory than the system can give. Confirm you've installed a 64-bit JDK and that's the one the override points at; if it still fails, lower the RAM slider.</li>
+    <li><strong>"Could not find or load main class"</strong>: usually a broken or partial mod loader install (Forge, NeoForge, Fabric), missing libraries or jvm args files, not Java itself. Reinstall the loader from the instance settings, or recreate the instance. If it persists after that, try a different Java in the override.</li>
+  </ul>
+</GuideLayout>

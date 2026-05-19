@@ -1,0 +1,188 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher で Java バージョンとインスタンス別オーバーライドを管理",
+    description: "カスタム Java インストールを追加し、プロファイルを作成し、インスタンス別の Java オーバーライドを設定して、各 Modpack が正しい Java で自動実行されるように。",
+    steps: [
+      { name: "Java 設定を開く", text: "Settings → Java。タブが 2 つ: Manage Paths と Manage Profiles。" },
+      { name: "Java インストールを追加", text: "Manage Paths タブで Add Managed (新しくダウンロード) または Add Custom (システム上の既存 Java を指定) をクリック。Managed Java は GDLauncher がダウンロードしたもので後で削除可、システム検出された Java は削除不可。" },
+      { name: "プロファイルを確認・割当", text: "Manage Profiles タブのシステムプロファイル (Mojang の Java ランタイム階層に対応: Legacy、Alpha、Beta、Gamma、Delta など) はデフォルトで自動管理。手動で割り当てたい場合はタブ上部の「Automatically Manage Java System Profiles」トグルをオフ。+ ボタンで独自プロファイルも作成可能。" },
+      { name: "インスタンス別 Java オーバーライド", text: "インスタンスを開き、歯車 → Settings タブ。「Override Java path/profile」トグルを ON。Path (特定のファイル) または Profile (名前付き) を選択し、内容を指定。オーバーライドはこのインスタンスのみに適用。" },
+      { name: "起動時に確認", text: "インスタンスを起動。右クリック → View Logs に使用された Java 実行ファイルが表示。意図と異なる場合はオーバーライド設定やプロファイルに有効な Java があるか確認。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 Java 버전과 인스턴스별 오버라이드 관리",
+    description: "커스텀 Java 설치를 추가하고, 프로필을 만들고, 인스턴스별 Java 오버라이드를 설정해 각 모드팩이 올바른 Java로 자동 실행되도록.",
+    steps: [
+      { name: "Java 설정 열기", text: "Settings → Java. 탭 두 개: Manage Paths와 Manage Profiles." },
+      { name: "Java 설치 추가", text: "Manage Paths 탭에서 Add Managed(새로 다운로드) 또는 Add Custom(시스템에 이미 있는 Java 지정) 클릭. Managed Java는 GDLauncher가 다운로드한 것으로 나중에 삭제 가능, 시스템 감지된 Java는 삭제 불가." },
+      { name: "프로필 확인/할당", text: "Manage Profiles 탭의 시스템 프로필(Mojang Java 런타임 계층 이름: Legacy, Alpha, Beta, Gamma, Delta 등)은 기본적으로 자동 관리됩니다. 수동 할당하고 싶다면 탭 위의 'Automatically Manage Java System Profiles' 토글을 끄세요. + 버튼으로 자체 프로필도 만들 수 있습니다." },
+      { name: "인스턴스별 Java 오버라이드", text: "인스턴스 열고 톱니바퀴 → Settings 탭. 'Override Java path/profile' 토글 ON. Path(특정 파일) 또는 Profile(이름 있는 프로필) 선택 후 내용 지정. 오버라이드는 이 인스턴스에만 적용." },
+      { name: "실행 시 확인", text: "인스턴스 실행. 오른쪽 클릭 → View Logs에 사용된 Java 실행 파일이 표시. 잘못 잡혔다면 오버라이드 설정이 맞는지, 프로필에 유효한 Java가 있는지 확인." }
+    ]
+  },
+  de: {
+    title: "Java-Versionen und Per-Instanz-Overrides in GDLauncher verwalten",
+    description: "Eigene Java-Installationen hinzufügen, Profile anlegen und einen Per-Instanz-Java-Override setzen, damit jedes Modpack automatisch auf der richtigen Java-Version läuft.",
+    steps: [
+      { name: "Java-Settings öffnen", text: "Settings → Java. Zwei Tabs: Manage Paths und Manage Profiles." },
+      { name: "Java-Installation hinzufügen", text: "Im Manage-Paths-Tab Add Managed klicken (lädt frisch runter) oder Add Custom (zeigt auf ein bereits installiertes Java). Managed Javas lädt GDLauncher selbst und kannst du wieder löschen; system-erkannte Javas kannst du nicht löschen." },
+      { name: "Profile prüfen oder zuweisen", text: "Im Manage-Profiles-Tab werden System-Profile (benannt nach Mojangs Java-Runtime-Stufen: Legacy, Alpha, Beta, Gamma, Delta usw.) standardmäßig automatisch verwaltet. Willst du Javas selbst zuweisen, schalt den Toggle 'Automatically Manage Java System Profiles' oben aus. Mit dem +-Button legst du ein eigenes Profil an." },
+      { name: "Java per Instanz überschreiben", text: "Instanz öffnen, Zahnrad → Settings-Tab. 'Override Java path/profile' aktivieren. Path (bestimmte Datei) oder Profile (benanntes Profil) wählen und festlegen. Override gilt nur für diese Instanz." },
+      { name: "Beim Start verifizieren", text: "Instanz starten. Rechtsklick → View Logs zeigt das benutzte Java-Executable. Wurde das Falsche genommen, prüf, ob der Override richtig sitzt oder ob das Profil ein gültiges Java enthält." }
+    ]
+  },
+  fr: {
+    title: "Comment gérer les versions de Java et les overrides par instance dans GDLauncher",
+    description: "Ajoute des installations Java custom, crée des profils, et règle un override Java par instance pour que chaque modpack tourne automatiquement sur la bonne version Java.",
+    steps: [
+      { name: "Ouvrir les settings Java", text: "Settings → Java. Deux onglets : Manage Paths et Manage Profiles." },
+      { name: "Ajouter une installation Java", text: "Dans l'onglet Manage Paths, clique Add Managed (pour télécharger une nouvelle) ou Add Custom (pour pointer sur une Java déjà installée sur ton système). Les Java managed sont téléchargées par GDLauncher et peuvent être supprimées plus tard ; les Java détectées du système ne peuvent pas être supprimées." },
+      { name: "Vérifier ou assigner des profils", text: "Dans l'onglet Manage Profiles, les profils système (nommés d'après les paliers de runtime Java de Mojang : Legacy, Alpha, Beta, Gamma, Delta, etc.) sont auto-gérés par défaut. Pour leur assigner des Java manuellement, désactive le toggle 'Automatically Manage Java System Profiles' au-dessus des onglets. Tu peux aussi créer ton propre profil avec le bouton +." },
+      { name: "Override Java par instance", text: "Ouvre l'instance, roue dentée → onglet Settings. Active 'Override Java path/profile'. Choisis Path (un fichier précis) ou Profile (un profil nommé), puis spécifie lequel. L'override ne s'applique qu'à cette instance." },
+      { name: "Vérifier au lancement", text: "Lance l'instance. Clic droit → View Logs montre quelle exécutable Java a été utilisée. Si la mauvaise a été prise, vérifie que l'override est correct ou que le profil contient un Java valide." }
+    ]
+  },
+  es: {
+    title: "Cómo gestionar versiones de Java y overrides por instancia en GDLauncher",
+    description: "Añade instalaciones Java custom, crea perfiles y configura un override de Java por instancia para que cada modpack corra automáticamente en la versión Java correcta.",
+    steps: [
+      { name: "Abrir ajustes de Java", text: "Settings → Java. Dos pestañas: Manage Paths y Manage Profiles." },
+      { name: "Añadir una instalación de Java", text: "En la pestaña Manage Paths, pulsa Add Managed (para descargar una nueva) o Add Custom (para apuntar a una Java ya instalada en tu sistema). Las Java managed las descarga GDLauncher y puedes borrarlas luego; las Java detectadas del sistema no se pueden borrar." },
+      { name: "Verificar o asignar perfiles", text: "En la pestaña Manage Profiles, los perfiles de sistema (nombrados según los niveles de runtime Java de Mojang: Legacy, Alpha, Beta, Gamma, Delta, etc.) se auto-gestionan por defecto. Para asignarles Java a mano, desactiva el toggle 'Automatically Manage Java System Profiles' sobre las pestañas. Con el botón + puedes crear tu propio perfil." },
+      { name: "Override de Java por instancia", text: "Abre la instancia, engranaje → pestaña Settings. Activa 'Override Java path/profile'. Elige Path (un archivo concreto) o Profile (un perfil con nombre), luego especifica cuál. El override solo aplica a esta instancia." },
+      { name: "Verificar al lanzar", text: "Lanza la instancia. Clic derecho → View Logs muestra qué ejecutable Java se usó. Si se tomó la equivocada, comprueba que el override está bien o que el perfil contiene un Java válido." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como gerenciar versões de Java e overrides por instância no GDLauncher",
+    description: "Adicione instalações Java customizadas, crie perfis e configure um override de Java por instância pra cada modpack rodar automaticamente na versão Java certa.",
+    steps: [
+      { name: "Abrir settings de Java", text: "Settings → Java. Duas abas: Manage Paths e Manage Profiles." },
+      { name: "Adicionar uma instalação Java", text: "Na aba Manage Paths, clique Add Managed (pra baixar uma nova) ou Add Custom (pra apontar pra um Java já instalado no sistema). Javas managed são baixadas pelo GDLauncher e podem ser apagadas depois; Javas detectadas do sistema não podem ser apagadas." },
+      { name: "Verificar ou atribuir perfis", text: "Na aba Manage Profiles, perfis de sistema (nomeados conforme os níveis de runtime Java da Mojang: Legacy, Alpha, Beta, Gamma, Delta etc.) são auto-gerenciados por padrão. Pra atribuir Java manualmente, desligue o toggle 'Automatically Manage Java System Profiles' acima das abas. Com o botão + dá pra criar um perfil próprio." },
+      { name: "Override de Java por instância", text: "Abra a instância, engrenagem → aba Settings. Ative 'Override Java path/profile'. Escolha Path (um arquivo específico) ou Profile (um perfil nomeado), depois especifique qual. O override só aplica nessa instância." },
+      { name: "Verificar no lançamento", text: "Lance a instância. Botão direito → View Logs mostra qual executável Java foi usado. Se o errado foi pego, confira se o override está certo ou se o perfil tem um Java válido." }
+    ]
+  },
+  it: {
+    title: "Come gestire le versioni di Java e gli override per istanza in GDLauncher",
+    description: "Aggiungi installazioni Java custom, crea profili e imposta un override Java per istanza in modo che ogni Modpack giri automaticamente sulla versione Java giusta.",
+    steps: [
+      { name: "Apri le impostazioni Java", text: "Settings → Java. Due schede: Manage Paths e Manage Profiles." },
+      { name: "Aggiungi un'installazione Java", text: "Nella scheda Manage Paths, clicca Add Managed (per scaricarne una nuova) o Add Custom (per puntare a un Java già installato sul sistema). I Java managed li scarica GDLauncher e si possono cancellare in seguito, i Java rilevati dal sistema non si possono cancellare." },
+      { name: "Verifica o assegna i profili", text: "Nella scheda Manage Profiles, i profili di sistema (chiamati come i livelli di runtime Java di Mojang: Legacy, Alpha, Beta, Gamma, Delta ecc.) sono auto-gestiti di default. Per assegnare Java a mano, disattiva il toggle 'Automatically Manage Java System Profiles' sopra le schede. Col pulsante + puoi anche creare un profilo tuo." },
+      { name: "Override Java per istanza", text: "Apri l'istanza, ingranaggio, scheda Settings. Attiva 'Override Java path/profile'. Scegli Path (un file specifico) o Profile (un profilo nominato), poi indica quale. L'override si applica solo a questa istanza." },
+      { name: "Verifica al lancio", text: "Avvia l'istanza. Clic destro, View Logs mostra quale eseguibile Java è stato usato. Se è stato preso quello sbagliato, controlla che l'override sia corretto e che il profilo contenga un Java valido." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["Minecraft の Java 事情", "Managed と Custom Java", "プロファイル", "インスタンス別オーバーライド", "実際にどの Java が使われたか確認", "よくある Java エラー"],
+    paras: [
+      "Minecraft はバージョンによって異なる Java バージョンを要求: 1.16 以前は Java 8、1.17 は Java 16、1.18 から 1.20.4 は Java 17、1.20.5 以降は Java 21。Mod は特定の Java バージョン向けにコンパイルされます。Java 17 向けにビルドされた Mod は Java 8 の JVM では動きません (バイトコードが新しすぎる)。逆方向はバイトコードレベルでは技術的に動きますが、実際には古い Minecraft Mod ローダー (Forge 1.12.2 など) がモダンな Java をサポートしていないため、結局 MC バージョンごとにマッチする Java が必要になります。GDLauncher は 2 つで解決: managed Java インストール (Minecraft バージョンに応じて自動ダウンロード) とインスタンス別オーバーライド (特定インスタンスに特定 Java を強制)。",
+      "<strong>Managed</strong>: GDLauncher が Azul の Zulu ビルドから Java をダウンロード / インストール。Runtime Path 内の <code>managed_javas/</code> に存在。容量解放したいときはゴミ箱アイコンで削除。<strong>Custom</strong>: システムにすでにある Java を指定 (Adoptium Temurin、Oracle JDK、GraalVM 等)。GDLauncher はパスを検証するだけでインストール自体は管理しません。チューニング済み JDK を使いたい場合に有用。システム検出された Java (何もせずに見つかるもの) はランチャーから削除できません、GDLauncher が所有していないため。",
+      "プロファイルは「Foo ランタイムを要求されたらこの Java を使う」という名前付きルール。システムプロファイルは Mojang の Java ランタイム階層に対応 (Java 8 → Legacy、Java 16 → Alpha、Java 17 → Beta/Gamma、Java 21 → Delta、Java 25 → Epsilon)。自動管理トグルが ON ならランチャーが各階層に適した Java を自動選択、OFF なら自分で割り当て。カスタムプロファイルでは特定パスに名前を付けてインスタンスオーバーライドから参照可能。多くの人にはカスタムプロファイル不要、システムプロファイル + 自動管理で一般ケースは対応。",
+      "インスタンス設定の Java Path/Profile セクションにトグル。Off (デフォルト): Minecraft バージョンに基づいてランチャーが選んだ Java を使用 (システムプロファイル経由)。On: Path (リテラルファイル) または Profile (名前付きプロファイル) を指定。オーバーライドが欲しい場面: Modpack が「Java X.Y.Z で動かすこと」と明示している、特定 JVM (GraalVM、Liberica NIK) を 1 インスタンスでテストしたいがデフォルト変更はしたくない、複数の Java 17 インストール (Adoptium、Microsoft など) があり特定のものを選びたい。",
+      "起動後インスタンス右クリック → View Logs。ランチャーログに呼び出した Java 実行ファイルのフルパスが記載。期待するオーバーライドと一致するか照合。",
+      "<strong>UnsupportedClassVersionError</strong>: Mod またはサーバーが動作中の Java より新しい Java 向けにビルドされている。エラーには「class file version」番号が含まれ、61.0 は Java 17、65.0 は Java 21 を意味する。プロファイルまたはオーバーライドで新しい Java に切替。<strong>「Could not reserve enough space for object heap」</strong>: 32 ビット Java が使われている (Windows では約 1.5 GB ヒープ制限)、またはシステムが連続したメモリを十分に提供できない。64 ビット JDK をインストールし、オーバーライドがそれを指していることを確認。それでも失敗するなら RAM スライダーを下げる。<strong>「Could not find or load main class」</strong>: 通常は Mod ローダー (Forge、NeoForge、Fabric) の不完全な / 壊れたインストール、または欠落したライブラリ / jvm args ファイルが原因で、Java 本体の問題ではない。インスタンス設定からローダーを再インストールするか、インスタンスを再作成。それでも続くなら、オーバーライドで別の Java を試す。"
+    ]
+  },
+  ko: {
+    headings: ["Minecraft의 Java 사정", "Managed와 Custom Java", "프로필", "인스턴스별 오버라이드", "실제로 어떤 Java가 쓰였는지 확인", "흔한 Java 오류"],
+    paras: [
+      "Minecraft는 자체 버전에 따라 다른 Java 버전이 필요합니다: 1.16 이전은 Java 8, 1.17은 Java 16, 1.18부터 1.20.4는 Java 17, 1.20.5 이후는 Java 21. 모드는 특정 Java 버전에 대해 컴파일됩니다. Java 17용으로 빌드된 모드는 Java 8 JVM에서 돌아가지 않습니다(바이트코드가 너무 새로움). 반대 방향은 바이트코드 수준에서는 기술적으로 동작하지만, 실제로는 옛 Minecraft 모드 로더(Forge 1.12.2 등)가 최신 Java를 지원하지 않기 때문에 결국 각 MC 버전은 맞는 Java를 원합니다. GDLauncher는 두 가지로 해결: managed Java 설치(Minecraft 버전에 따라 자동 다운로드)와 인스턴스별 오버라이드(특정 인스턴스에 특정 Java 강제).",
+      "<strong>Managed</strong>: GDLauncher가 Azul Zulu 빌드에서 Java를 직접 다운로드/설치. Runtime Path 안 <code>managed_javas/</code>에 존재. 디스크 정리하려면 휴지통 아이콘으로 삭제. <strong>Custom</strong>: 시스템에 이미 설치된 Java를 가리킴(Adoptium Temurin, Oracle JDK, GraalVM 등). GDLauncher는 경로만 검증; 설치는 관리하지 않음. 이미 튜닝된 JDK를 쓰고 싶을 때 유용. 시스템 감지 Java(아무것도 안 해도 찾아지는 것)는 런처에서 삭제할 수 없음, GDLauncher가 소유하지 않기 때문.",
+      "프로필은 'Foo 런타임을 요청하면 이 Java를 사용'이라는 이름 있는 규칙. 시스템 프로필은 Mojang Java 런타임 계층에 매칭(Java 8 → Legacy, Java 16 → Alpha, Java 17 → Beta/Gamma, Java 21 → Delta, Java 25 → Epsilon). 자동 관리 토글이 켜져 있으면 런처가 각 계층에 알맞은 Java를 자동 선택, 끄면 직접 할당. 커스텀 프로필은 특정 경로에 이름을 주고 인스턴스 오버라이드에서 참조할 수 있게 함. 대부분의 사람에겐 커스텀 프로필 불필요, 시스템 프로필 + 자동 관리로 일반 케이스는 처리.",
+      "인스턴스 설정의 Java Path/Profile 섹션에 토글. Off(기본): 인스턴스가 Minecraft 버전 기반(시스템 프로필 경유)으로 런처가 고른 Java를 사용. On: Path(리터럴 파일) 또는 Profile(이름 있는 프로필)을 지정. 오버라이드가 필요한 때: 모드팩이 명시적으로 'Java X.Y.Z에서 실행해야 함'이라 못 박을 때, 특정 JVM(GraalVM, Liberica NIK)을 한 인스턴스에서만 테스트해 보고 기본값은 그대로 두고 싶을 때, 여러 Java 17 설치(Adoptium, Microsoft 등)가 있어 특정 걸 고르고 싶을 때.",
+      "실행 후 인스턴스 오른쪽 클릭 → View Logs. 런처 로그에 호출된 Java 실행 파일의 전체 경로가 적혀 있음. 기대한 오버라이드와 일치하는지 대조.",
+      "<strong>UnsupportedClassVersionError</strong>: 모드 또는 서버가 실행 중인 Java보다 새 Java용으로 빌드됨. 에러에 'class file version' 번호가 포함되며, 61.0은 Java 17, 65.0은 Java 21을 의미. 프로필 또는 오버라이드로 더 새 Java로 전환. <strong>'Could not reserve enough space for object heap'</strong>: 32비트 Java가 쓰이는 중(Windows에서 약 1.5 GB 힙 제한), 또는 시스템이 연속된 메모리를 충분히 줄 수 없음. 64비트 JDK를 설치했고 오버라이드가 그것을 가리키는지 확인하고, 그래도 실패하면 RAM 슬라이더를 낮추세요. <strong>'Could not find or load main class'</strong>: 보통 모드 로더(Forge, NeoForge, Fabric)의 불완전한/손상된 설치 또는 누락된 라이브러리/jvm args 파일이 원인이고, Java 자체의 문제가 아닙니다. 인스턴스 설정에서 로더를 다시 설치하거나 인스턴스를 새로 만드세요. 그래도 지속된다면 오버라이드에서 다른 Java를 시도하세요."
+    ]
+  },
+  de: {
+    headings: ["Die Java-Situation bei Minecraft", "Managed vs. Custom Java", "Profile", "Per-Instanz-Override", "Welches Java wurde wirklich genutzt", "Häufige Java-Fehler"],
+    paras: [
+      "Minecraft braucht je nach Version unterschiedliches Java: 1.16 und früher Java 8, 1.17 Java 16, 1.18 bis 1.20.4 Java 17, 1.20.5+ Java 21. Mods werden gegen eine bestimmte Java-Version kompiliert. Ein für Java 17 gebauter Mod läuft nicht auf einer Java-8-JVM (Bytecode zu neu). Andersrum klappt's auf Bytecode-Ebene technisch, aber alte Minecraft-Mod-Loader (Forge 1.12.2 usw.) unterstützen moderne Java-Versionen schlicht nicht, also will jede MC-Version am Ende doch ein passendes Java. GDLauncher löst das mit zweierlei: managed Java-Installationen (lädt automatisch das passende Java pro Minecraft-Version) und Per-Instanz-Overrides (du erzwingst eine bestimmte Java-Version für eine Instanz).",
+      "<strong>Managed</strong>: GDLauncher lädt und installiert das Java selbst, aus Azuls Zulu-Builds. Liegt im Runtime Path unter <code>managed_javas/</code>. Über das Mülleimer-Icon löschbar, wenn du Platz brauchst. <strong>Custom</strong>: Du zeigst auf ein Java, das schon auf dem System liegt (Adoptium Temurin, Oracle JDK, GraalVM, was auch immer). GDLauncher prüft nur den Pfad und verwaltet die Installation nicht. Praktisch, wenn du ein getuntes JDK hast, das du nutzen willst. System-erkannte Javas (die GDLauncher ohne Zutun findet) kannst du im Launcher nicht löschen, GDLauncher besitzt sie nicht.",
+      "Ein Profil ist eine benannte Regel 'nimm dieses Java, wenn etwas nach der Foo-Runtime fragt'. System-Profile entsprechen Mojangs Java-Runtime-Stufen (Java 8 → Legacy, Java 16 → Alpha, Java 17 → Beta/Gamma, Java 21 → Delta, Java 25 → Epsilon). Mit Auto-Management an wählt der Launcher das passende Java pro Stufe selbst, mit aus weist du sie selbst zu. Custom-Profile geben einem bestimmten Pfad einen Namen, auf den du im Instanz-Override verweisen kannst. Die meisten brauchen keine Custom-Profile, System-Profile plus Auto-Management decken den Standardfall ab.",
+      "In den Instance Settings hat die Java-Path/Profile-Sektion einen Toggle. Aus (default): Die Instanz nutzt das Java, das der Launcher anhand der Minecraft-Version wählt (über System-Profile). An: Du gibst entweder Path (eine konkrete Datei) oder Profile (ein benanntes Profil) an. Wann du einen Override willst: das Modpack sagt explizit 'muss auf Java X.Y.Z laufen' und du willst's pinnen; du testest eine JVM (GraalVM, Liberica NIK) und willst's auf einer Instanz probieren, ohne den Default zu ändern; du hast mehrere Java-17-Installs (Adoptium, Microsoft etc.) und willst gezielt eines.",
+      "Nach dem Start Rechtsklick auf die Instanz → View Logs. Das Launcher-Log listet den vollen Pfad des aufgerufenen Java-Executables. Mit deinem erwarteten Override abgleichen.",
+      "<strong>UnsupportedClassVersionError</strong>: Der Mod oder Server ist für ein neueres Java gebaut als das laufende. Die Fehlermeldung enthält eine 'class file version' (61.0 = Java 17, 65.0 = Java 21). Über Profil oder Override auf neueres Java wechseln. <strong>'Could not reserve enough space for object heap'</strong>: Ein 32-Bit-Java wird benutzt (auf Windows etwa 1,5 GB Heap-Limit), oder du fragst nach mehr zusammenhängendem Speicher, als das System bereitstellen kann. Sicherstellen, dass ein 64-Bit-JDK installiert ist und der Override darauf zeigt; wenn es weiter scheitert, den RAM-Regler runterziehen. <strong>'Could not find or load main class'</strong>: Meist eine unvollständige oder kaputte Mod-Loader-Installation (Forge, NeoForge, Fabric), fehlende Libraries oder jvm-args-Dateien, nicht Java selbst. Loader aus den Instanz-Einstellungen neu installieren oder die Instanz neu anlegen. Wenn's danach noch klemmt, im Override ein anderes Java probieren."
+    ]
+  },
+  fr: {
+    headings: ["La situation Java chez Minecraft", "Managed vs Custom Java", "Profils", "Override par instance", "Vérifier quelle Java a vraiment été utilisée", "Erreurs Java courantes"],
+    paras: [
+      "Minecraft demande des versions Java différentes selon sa propre version : 1.16 et avant Java 8, 1.17 Java 16, 1.18 à 1.20.4 Java 17, 1.20.5+ Java 21. Les mods sont compilés contre une version Java précise. Un mod construit pour Java 17 ne tourne pas sur une JVM Java 8 (bytecode trop récent). Dans l'autre sens, ça marche techniquement au niveau bytecode, mais en pratique les vieux mod loaders Minecraft (Forge 1.12.2 etc.) ne supportent pas les versions Java modernes, donc chaque version MC veut quand même une Java assortie. GDLauncher résout ça avec deux choses : les installations Java managed (il peut télécharger la bonne Java par version Minecraft automatiquement) et les overrides par instance (tu peux forcer une Java précise pour une instance).",
+      "<strong>Managed</strong> : GDLauncher télécharge et installe la Java lui-même, depuis les builds Zulu d'Azul. Vit dans le Runtime Path sous <code>managed_javas/</code>. Supprimée avec l'icône poubelle quand tu veux libérer du disque. <strong>Custom</strong> : tu pointes sur une Java déjà installée sur ton système (Adoptium Temurin, Oracle JDK, GraalVM, etc.). GDLauncher valide juste le chemin ; il ne gère pas l'install. Utile si tu as déjà un JDK tuné que tu veux utiliser. Les Java détectées du système (celles que GDLauncher trouve sans que tu fasses rien) ne peuvent pas être supprimées depuis le launcher parce que GDLauncher n'en est pas propriétaire.",
+      "Un profil est une règle nommée 'utilise cette Java quand on demande la runtime Foo'. Les profils système correspondent aux paliers de runtime Java de Mojang (Java 8 → Legacy, Java 16 → Alpha, Java 17 → Beta/Gamma, Java 21 → Delta, Java 25 → Epsilon). Avec l'auto-management activé, le launcher choisit le bon Java pour chaque palier ; désactivé, tu les assignes toi-même. Les profils custom permettent de donner un nom à un chemin précis et de le référencer depuis les overrides d'instance. La plupart des gens n'ont pas besoin de profils custom, les profils système + auto-management gèrent le cas commun.",
+      "Dans Instance Settings, la section Java Path/Profile a un toggle. Off (default) : l'instance utilise la Java choisie par le launcher selon la version Minecraft (via les profils système). On : tu spécifies soit un Path (un fichier littéral) soit un Profile (un profil nommé). Quand tu veux un override : le modpack dit explicitement 'doit tourner sur Java X.Y.Z' et tu veux le pinner ; tu testes une JVM (GraalVM, Liberica NIK) et tu veux l'essayer sur une instance sans toucher au défaut ; tu as plusieurs installs Java 17 (Adoptium, Microsoft, etc.) et tu veux en choisir une précise.",
+      "Après lancement, clic droit sur l'instance → View Logs. Le log launcher liste le chemin complet de l'exécutable Java appelé. À comparer avec ton override attendu.",
+      "<strong>UnsupportedClassVersionError</strong> : le mod ou le serveur a été construit pour une Java plus neuve que celle qui tourne. L'erreur inclut un numéro 'class file version' (61.0 = Java 17, 65.0 = Java 21). Bascule sur une Java plus récente via profil ou override. <strong>'Could not reserve enough space for object heap'</strong> : une Java 32-bit est utilisée (limite d'environ 1,5 Go de heap sur Windows), ou tu demandes plus de mémoire contiguë que le système peut donner. Confirme que tu as installé un JDK 64-bit et que c'est celui que pointe l'override ; si ça échoue encore, baisse le slider RAM. <strong>'Could not find or load main class'</strong> : généralement une install de mod loader (Forge, NeoForge, Fabric) cassée ou partielle, des libraries ou des fichiers jvm args manquants, pas Java lui-même. Réinstalle le loader depuis les settings d'instance, ou recrée l'instance. Si ça persiste après ça, essaie une autre Java dans l'override."
+    ]
+  },
+  es: {
+    headings: ["La situación de Java en Minecraft", "Managed vs Custom Java", "Perfiles", "Override por instancia", "Verificar qué Java se usó de verdad", "Errores de Java comunes"],
+    paras: [
+      "Minecraft requiere versiones distintas de Java según su propia versión: 1.16 y anteriores Java 8, 1.17 Java 16, 1.18 a 1.20.4 Java 17, 1.20.5+ Java 21. Los mods se compilan contra una versión Java concreta. Un mod construido para Java 17 no corre en una JVM Java 8 (bytecode demasiado nuevo). En el sentido inverso funciona técnicamente a nivel de bytecode, pero en la práctica los mod loaders viejos de Minecraft (Forge 1.12.2, etc.) no soportan versiones modernas de Java, así que cada versión MC acaba queriendo una Java a juego. GDLauncher lo resuelve con dos cosas: instalaciones Java managed (puede bajar la Java correcta por versión Minecraft automáticamente) y overrides por instancia (puedes forzar una Java concreta para una instancia).",
+      "<strong>Managed</strong>: GDLauncher descarga e instala la Java él mismo, de las builds Zulu de Azul. Vive dentro del Runtime Path bajo <code>managed_javas/</code>. Se borra con el icono papelera cuando quieras liberar disco. <strong>Custom</strong>: apuntas a una Java ya instalada en tu sistema (Adoptium Temurin, Oracle JDK, GraalVM, etc.). GDLauncher solo valida el path; no gestiona la instalación. Útil si ya tienes un JDK tuneado que quieres usar. Las Java detectadas del sistema (las que GDLauncher encuentra sin que hagas nada) no se pueden borrar desde el launcher porque GDLauncher no es propietario.",
+      "Un perfil es una regla con nombre 'usa esta Java cuando algo pida la runtime Foo'. Los perfiles de sistema corresponden a los niveles de runtime Java de Mojang (Java 8 → Legacy, Java 16 → Alpha, Java 17 → Beta/Gamma, Java 21 → Delta, Java 25 → Epsilon). Con auto-gestión activa, el launcher elige la Java adecuada para cada nivel; desactivada, las asignas tú. Los perfiles custom permiten dar un nombre a un path concreto y referenciarlo desde los overrides de instancia. La mayoría no necesita perfiles custom, los perfiles de sistema + auto-gestión cubren el caso común.",
+      "En Instance Settings, la sección Java Path/Profile tiene un toggle. Off (default): la instancia usa la Java que el launcher elija basándose en la versión Minecraft (vía perfiles de sistema). On: especificas o un Path (un archivo literal) o un Profile (un perfil con nombre). Cuándo quieres un override: el modpack dice explícitamente 'debe correr en Java X.Y.Z' y quieres pinnearlo; estás probando una JVM (GraalVM, Liberica NIK) y la quieres en una instancia sin tocar el default; tienes varias instalaciones de Java 17 (Adoptium, Microsoft, etc.) y quieres una concreta.",
+      "Tras lanzar, clic derecho en la instancia → View Logs. El log del launcher lista la ruta completa del ejecutable Java al que llamó. Compáralo con tu override esperado.",
+      "<strong>UnsupportedClassVersionError</strong>: el mod o servidor fue compilado para una Java más nueva que la que corre. El error incluye un número 'class file version' (61.0 = Java 17, 65.0 = Java 21). Cambia a una Java más nueva vía perfil u override. <strong>'Could not reserve enough space for object heap'</strong>: se está usando una Java 32-bit (límite de ~1,5 GB de heap en Windows), o pides más memoria contigua de la que el sistema puede dar. Confirma que has instalado un JDK 64-bit y que es ese al que apunta el override; si sigue fallando, baja el slider de RAM. <strong>'Could not find or load main class'</strong>: normalmente una instalación incompleta o rota del mod loader (Forge, NeoForge, Fabric), o faltan libraries o ficheros jvm args, no es problema de Java en sí. Reinstala el loader desde los ajustes de instancia, o recrea la instancia. Si persiste, prueba con otra Java en el override."
+    ]
+  },
+  "pt-BR": {
+    headings: ["A situação do Java no Minecraft", "Managed vs Custom Java", "Perfis", "Override por instância", "Verificar qual Java foi usado de verdade", "Erros comuns de Java"],
+    paras: [
+      "Minecraft exige versões diferentes de Java dependendo da própria versão: 1.16 e anteriores Java 8, 1.17 Java 16, 1.18 a 1.20.4 Java 17, 1.20.5+ Java 21. Mods compilam contra uma versão Java específica. Um mod construído pra Java 17 não roda numa JVM Java 8 (bytecode novo demais). No sentido inverso funciona tecnicamente no nível do bytecode, mas na prática os mod loaders antigos de Minecraft (Forge 1.12.2 etc.) não suportam versões modernas de Java, então cada versão MC acaba querendo um Java casado. O GDLauncher resolve isso com duas coisas: instalações Java managed (consegue baixar o Java certo por versão Minecraft automaticamente) e overrides por instância (você pode forçar um Java específico pra uma instância).",
+      "<strong>Managed</strong>: o GDLauncher baixa e instala o Java ele mesmo, das builds Zulu da Azul. Vive dentro do Runtime Path em <code>managed_javas/</code>. Apagado com o ícone de lixeira quando quiser liberar disco. <strong>Custom</strong>: você aponta pra um Java já instalado no sistema (Adoptium Temurin, Oracle JDK, GraalVM, o que for). O GDLauncher só valida o caminho; não gerencia a instalação. Útil se você já tem um JDK tunado que quer usar. Javas detectados do sistema (os que o GDLauncher acha sem você fazer nada) não dá pra apagar do launcher porque o GDLauncher não é dono.",
+      "Um perfil é uma regra nomeada 'use esse Java quando algo pedir a runtime Foo'. Perfis de sistema correspondem aos níveis de runtime Java da Mojang (Java 8 → Legacy, Java 16 → Alpha, Java 17 → Beta/Gamma, Java 21 → Delta, Java 25 → Epsilon). Com auto-gerenciamento ligado, o launcher escolhe o Java certo pra cada nível; desligado, você atribui na mão. Perfis custom deixam dar nome a um caminho específico e referenciar dos overrides de instância. A maioria não precisa de perfis custom, perfis de sistema + auto-gerenciamento cobrem o caso comum.",
+      "Em Instance Settings, a seção Java Path/Profile tem um toggle. Off (padrão): a instância usa o Java que o launcher escolher baseado na versão Minecraft (via perfis de sistema). On: você especifica ou um Path (arquivo literal) ou um Profile (perfil nomeado). Quando você quer um override: o modpack diz explicitamente 'tem que rodar no Java X.Y.Z' e quer travar; está testando uma JVM (GraalVM, Liberica NIK) e quer em uma instância sem mexer no padrão; tem várias instalações de Java 17 (Adoptium, Microsoft etc.) e quer uma específica.",
+      "Após lançar, botão direito na instância → View Logs. O log do launcher lista o caminho completo do executável Java chamado. Confira contra o override esperado.",
+      "<strong>UnsupportedClassVersionError</strong>: o mod ou servidor foi construído pra Java mais novo que o que está rodando. O erro inclui um número 'class file version' (61.0 = Java 17, 65.0 = Java 21). Mude pra Java mais novo via perfil ou override. <strong>'Could not reserve enough space for object heap'</strong>: um Java 32-bit está sendo usado (limite de ~1,5 GB de heap no Windows), ou você pede mais memória contígua do que o sistema consegue. Confirme que você instalou um JDK 64-bit e que é pra esse que o override aponta; se ainda assim falhar, abaixe o slider de RAM. <strong>'Could not find or load main class'</strong>: normalmente uma instalação incompleta ou quebrada do mod loader (Forge, NeoForge, Fabric), libraries ou arquivos jvm args faltando, não é o Java em si. Reinstale o loader pelas configurações da instância, ou recrie a instância. Se ainda persistir, tente outro Java no override."
+    ]
+  },
+  it: {
+    headings: ["La situazione di Java in Minecraft", "Managed vs Custom Java", "Profili", "Override per istanza", "Verifica quale Java è stato usato davvero", "Errori Java comuni"],
+    paras: [
+      "Minecraft richiede versioni di Java diverse a seconda della propria versione: 1.16 e precedenti Java 8, 1.17 Java 16, dalla 1.18 alla 1.20.4 Java 17, 1.20.5+ Java 21. Le mod sono compilate contro una versione Java precisa. Una mod costruita per Java 17 non gira su una JVM Java 8 (il bytecode è troppo nuovo). Nella direzione opposta a livello di bytecode tecnicamente funziona, ma in pratica i vecchi mod loader Minecraft (Forge 1.12.2 ecc.) non supportano le versioni moderne di Java, quindi ogni versione MC alla fine vuole comunque un Java abbinato. GDLauncher risolve la cosa con due strumenti: installazioni Java managed (può scaricare automaticamente il Java giusto per la versione Minecraft) e override per istanza (puoi forzare un Java specifico per una singola istanza).",
+      "<strong>Managed</strong>: è GDLauncher a scaricare e installare il Java, dalle build Zulu di Azul. Vive nel Runtime Path sotto <code>managed_javas/</code>. Si cancella con l'icona del cestino quando vuoi liberare spazio. <strong>Custom</strong>: punti a un Java già installato sul sistema (Adoptium Temurin, Oracle JDK, GraalVM, quello che ti pare). GDLauncher valida solo il percorso, non gestisce l'installazione. Comodo se hai già un JDK tunato che vuoi usare. I Java rilevati dal sistema (quelli che GDLauncher trova senza che tu faccia nulla) non si possono cancellare dal launcher, perché GDLauncher non ne è proprietario.",
+      "Un profilo è una regola con nome del tipo 'usa questo Java quando qualcosa chiede la runtime Foo'. I profili di sistema corrispondono ai livelli di runtime Java di Mojang (Java 8 → Legacy, Java 16 → Alpha, Java 17 → Beta/Gamma, Java 21 → Delta, Java 25 → Epsilon). Con l'auto-gestione attiva, il launcher sceglie il Java adatto a ogni livello, disattivata li assegni tu. I profili custom permettono di dare un nome a un percorso specifico e di referenziarlo dagli override d'istanza. A molti non servono profili custom, profili di sistema più auto-gestione coprono il caso comune.",
+      "In Instance Settings, la sezione Java Path/Profile ha un toggle. Off (default): l'istanza usa il Java scelto dal launcher in base alla versione di Minecraft (tramite i profili di sistema). On: specifichi o un Path (un file letterale) o un Profile (un profilo nominato). Quando ti serve un override: il Modpack dice esplicitamente 'deve girare su Java X.Y.Z' e vuoi fissarlo, stai testando una JVM (GraalVM, Liberica NIK) e vuoi provarla su un'istanza senza toccare il default, hai più installazioni di Java 17 (Adoptium, Microsoft ecc.) e ne vuoi una precisa.",
+      "Dopo il lancio, clic destro sull'istanza, View Logs. Il log del launcher elenca il percorso completo dell'eseguibile Java chiamato. Confrontalo con l'override che ti aspettavi.",
+      "<strong>UnsupportedClassVersionError</strong>: la Mod o il server è stato compilato per un Java più nuovo di quello in esecuzione. L'errore include un numero 'class file version' (61.0 = Java 17, 65.0 = Java 21). Passa a un Java più nuovo via profilo o override. <strong>'Could not reserve enough space for object heap'</strong>: viene usato un Java a 32 bit (limite di circa 1,5 GB di heap su Windows), oppure stai chiedendo più memoria contigua di quanta il sistema possa dare. Conferma di aver installato un JDK a 64 bit e che l'override punti a quello, se continua a fallire abbassa lo slider della RAM. <strong>'Could not find or load main class'</strong>: di solito è un'installazione incompleta o rotta del mod loader (Forge, NeoForge, Fabric), librerie o file jvm args mancanti, non è Java in sé. Reinstalla il loader dalle impostazioni dell'istanza, o ricrea l'istanza. Se persiste, prova un altro Java nell'override."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT3M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

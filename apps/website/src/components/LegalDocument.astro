@@ -1,0 +1,16 @@
+---
+import { marked } from "marked"
+
+interface Props {
+  url: string
+}
+
+const { url } = Astro.props
+const response = await fetch(url)
+const data = await response.text()
+const md = marked(data)
+---
+
+<div class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
+  <div set:html={md} />
+</div>

@@ -1,0 +1,104 @@
+---
+/**
+ * SSR catch-all for localised addon detail pages. Mirrors the root
+ * [type]/[platform]/[slug].astro for the 7 non-English locales, plus
+ * validates the locale param. Same O(1) slug lookup. Unknown / default-
+ * locale paths return 404 (no redirect) so external links to `/en/...`
+ * or `/xx/...` surface as missing in Search Console rather than masking
+ * as soft-302s.
+ */
+export const prerender = false
+
+import AddonInstallLayout from "../../../../components/AddonInstallLayout.astro"
+import PageShell from "../../../../components/PageShell.astro"
+import type { AddonType, Platform } from "../../../../lib/api/types"
+import { getAddon } from "../../../../lib/addonsData"
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  getLocaleFromUrl,
+  useTranslations,
+  localizedPath,
+  type Locale,
+} from "../../../../lib/i18n"
+
+const ADDON_TYPES = new Set<AddonType>([
+  "mods",
+  "modpacks",
+  "shaders",
+  "resourcepacks",
+  "datapacks",
+  "worlds",
+])
+const PLATFORMS = new Set<Platform>(["curseforge", "modrinth"])
+const LOCALE_SET = new Set<Locale>(LOCALES)
+
+const { locale, type, platform, slug } = Astro.params
+
+const invalid =
+  !locale ||
+  !type ||
+  !platform ||
+  !slug ||
+  !LOCALE_SET.has(locale as Locale) ||
+  locale === DEFAULT_LOCALE ||
+  !ADDON_TYPES.has(type as AddonType) ||
+  !PLATFORMS.has(platform as Platform)
+
+const addon = invalid
+  ? undefined
+  : getAddon(platform as Platform, type as AddonType, slug as string)
+
+if (!addon) {
+  Astro.response.status = 404
+  Astro.response.statusText = "Not Found"
+} else {
+  Astro.locals.cache(3600)
+}
+
+const fallbackLocale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(fallbackLocale)
+---
+
+{addon ? (
+  <AddonInstallLayout
+    addonName={addon.name}
+    addonSlug={addon.slug}
+    addonType={type as AddonType}
+    platform={platform as Platform}
+    imageUrl={addon.imageUrl}
+    websiteUrl={addon.websiteUrl}
+    description={addon.description}
+    authors={addon.authors}
+    author={addon.author}
+    categories={addon.categories}
+    loaders={addon.loaders}
+    gameVersions={addon.gameVersions}
+    downloads={addon.downloads}
+    license={addon.license}
+    sourceUrl={addon.sourceUrl}
+    issuesUrl={addon.issuesUrl}
+    wikiUrl={addon.wikiUrl}
+    dateModified={addon.dateModified}
+  />
+) : (
+  <PageShell
+    title={t("addon.notfound.title")}
+    description={t("addon.notfound.description")}
+    noindex
+  >
+    <div class="min-h-screen flex flex-col">
+      <div class="flex-1 flex items-center justify-center p-6">
+        <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 max-w-lg text-center">
+          <div class="text-7xl font-bold text-primary-400 mb-4">404</div>
+          <h1 class="text-2xl font-bold text-lightSlate-50 mb-3">{t("addon.notfound.heading")}</h1>
+          <p class="text-darkSlate-100 mb-8">{t("addon.notfound.body")}</p>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href={localizedPath("/", fallbackLocale)} class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors">{t("addon.notfound.cta.home")}</a>
+            <a href={localizedPath("/mods", fallbackLocale)} class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-darkSlate-700 hover:bg-darkSlate-600 text-lightSlate-50 font-semibold transition-colors">{t("addon.notfound.cta.browse")}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </PageShell>
+)}

@@ -3,118 +3,111 @@
  * Data Packs Hub Page
  */
 import PageShell from "../../components/PageShell.astro"
+import { DownloadLink } from "../../components/DownloadLink"
 import Breadcrumb from "../../components/Breadcrumb.astro"
+import TopAddonsList from "../../components/TopAddonsList.astro"
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { ADDON_TYPE_PLURAL } from "../../lib/api/types"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
 
 Astro.locals.cache(300)
 ---
 
 <PageShell
-  title="Minecraft Data Packs | GDLauncher"
-  description="Browse and install Minecraft data packs from CurseForge and Modrinth. Add new recipes and mechanics without mods."
+  title={t("datapacks.title")}
+  description={t("datapacks.description")}
   keywords="minecraft data packs, curseforge datapacks, modrinth datapacks, vanilla tweaks, gdlauncher"
 >
     <main class="py-8">
-      <Breadcrumb items={[{ label: "Data Packs" }]} maxWidth="max-w-6xl" />
+      <Breadcrumb items={[{ label: ADDON_TYPE_PLURAL.datapacks }]} maxWidth="max-w-6xl" />
 
       <div class="max-w-6xl mx-auto px-4">
       <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-12">
         <div class="text-center mb-12">
           <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
-            Minecraft
-            <span class="text-primary-300">Data Packs</span>
+            {t("datapacks.h1.line1")}{" "}
+            <span class="text-primary-300">{t("datapacks.h1.line2")}</span>
           </h1>
           <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
-            Data packs add new recipes, loot tables, and game mechanics to vanilla Minecraft.
-            No mods required - works natively with the game.
+            {t("datapacks.intro")}
           </p>
         </div>
 
         <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
-          <h2 class="text-lightSlate-50">What are Data Packs?</h2>
-          <p class="text-darkSlate-100">
-            Data packs are a vanilla Minecraft feature that lets you customize game behavior.
-            They're perfect for adding tweaks without needing a mod loader.
-          </p>
-          <p class="text-darkSlate-100">Data packs can modify:</p>
+          <h2 class="text-lightSlate-50">{t("datapacks.section.what.heading")}</h2>
+          <p class="text-darkSlate-100">{t("datapacks.section.what.p1")}</p>
+          <p class="text-darkSlate-100">{t("datapacks.section.what.p2")}</p>
           <ul class="text-darkSlate-100">
-            <li><strong class="text-lightSlate-50">Crafting Recipes</strong> - Add or change how items are crafted</li>
-            <li><strong class="text-lightSlate-50">Loot Tables</strong> - Modify what mobs drop and chest contents</li>
-            <li><strong class="text-lightSlate-50">Advancements</strong> - Add custom achievements and rewards</li>
-            <li><strong class="text-lightSlate-50">World Generation</strong> - Change biome distribution and structures</li>
-            <li><strong class="text-lightSlate-50">Functions</strong> - Run commands automatically</li>
+            <li>{t("datapacks.section.what.li.recipes")}</li>
+            <li>{t("datapacks.section.what.li.loot")}</li>
+            <li>{t("datapacks.section.what.li.advancements")}</li>
+            <li>{t("datapacks.section.what.li.worldgen")}</li>
+            <li>{t("datapacks.section.what.li.functions")}</li>
           </ul>
         </section>
 
         <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
-          <h2 class="text-lightSlate-50">Data Packs vs Mods</h2>
-          <p class="text-darkSlate-100">
-            Data packs and mods serve different purposes:
-          </p>
-          <p class="text-darkSlate-100"><strong class="text-lightSlate-50">Data Packs:</strong></p>
+          <h2 class="text-lightSlate-50">{t("datapacks.section.vsmods.heading")}</h2>
+          <p class="text-darkSlate-100">{t("datapacks.section.vsmods.intro")}</p>
+          <p class="text-darkSlate-100"><strong class="text-lightSlate-50">{t("datapacks.section.vsmods.dpHeading")}</strong></p>
           <ul class="text-darkSlate-100">
-            <li>Drop directly into your world folder - no mod loader needed</li>
-            <li>Limited to vanilla mechanics (can't add new blocks or mobs)</li>
-            <li>Only needed on the server - clients stay vanilla</li>
-            <li>Usually survive Minecraft updates without breaking</li>
-            <li>Minimal performance impact</li>
+            <li>{t("datapacks.section.vsmods.dp.li.drop")}</li>
+            <li>{t("datapacks.section.vsmods.dp.li.vanilla")}</li>
+            <li>{t("datapacks.section.vsmods.dp.li.server")}</li>
+            <li>{t("datapacks.section.vsmods.dp.li.survive")}</li>
+            <li>{t("datapacks.section.vsmods.dp.li.perf")}</li>
           </ul>
-          <p class="text-darkSlate-100"><strong class="text-lightSlate-50">Mods:</strong></p>
+          <p class="text-darkSlate-100"><strong class="text-lightSlate-50">{t("datapacks.section.vsmods.modsHeading")}</strong></p>
           <ul class="text-darkSlate-100">
-            <li>Require a mod loader (Forge, Fabric, etc.)</li>
-            <li>Can add entirely new content, mechanics, and systems</li>
-            <li>Usually needed on both server and client</li>
-            <li>Often break when Minecraft updates until the author patches them</li>
-            <li>Can significantly impact performance</li>
+            <li>{t("datapacks.section.vsmods.mods.li.loader")}</li>
+            <li>{t("datapacks.section.vsmods.mods.li.content")}</li>
+            <li>{t("datapacks.section.vsmods.mods.li.both")}</li>
+            <li>{t("datapacks.section.vsmods.mods.li.break")}</li>
+            <li>{t("datapacks.section.vsmods.mods.li.perf")}</li>
           </ul>
-          <p class="text-darkSlate-100">
-            Data packs are perfect for vanilla-compatible tweaks. Use mods when you need entirely new content or mechanics.
-          </p>
+          <p class="text-darkSlate-100">{t("datapacks.section.vsmods.outro")}</p>
         </section>
 
         <section class="prose prose-invert prose-lg max-w-3xl mx-auto">
-          <h2 class="text-lightSlate-50">Full Capabilities</h2>
-          <p class="text-darkSlate-100">
-            Data packs can modify many vanilla systems. Introduced in Minecraft 1.13 (2018), they're officially supported by Mojang:
-          </p>
+          <h2 class="text-lightSlate-50">{t("datapacks.section.capabilities.heading")}</h2>
+          <p class="text-darkSlate-100">{t("datapacks.section.capabilities.intro")}</p>
           <ul class="text-darkSlate-100">
-            <li><strong class="text-lightSlate-50">Recipes</strong> - Add new crafting recipes or modify existing ones</li>
-            <li><strong class="text-lightSlate-50">Loot tables</strong> - Change mob drops, chest contents, fishing loot</li>
-            <li><strong class="text-lightSlate-50">Advancements</strong> - Create custom achievements with rewards</li>
-            <li><strong class="text-lightSlate-50">World generation</strong> - Modify biome placement, structures, ore distribution</li>
-            <li><strong class="text-lightSlate-50">Functions</strong> - Run command sequences (like command blocks, but file-based)</li>
-            <li><strong class="text-lightSlate-50">Predicates</strong> - Create complex conditions for game events</li>
-            <li><strong class="text-lightSlate-50">Tags</strong> - Group blocks/items for consistent behavior</li>
+            <li>{t("datapacks.section.capabilities.li.recipes")}</li>
+            <li>{t("datapacks.section.capabilities.li.loot")}</li>
+            <li>{t("datapacks.section.capabilities.li.advancements")}</li>
+            <li>{t("datapacks.section.capabilities.li.worldgen")}</li>
+            <li>{t("datapacks.section.capabilities.li.functions")}</li>
+            <li>{t("datapacks.section.capabilities.li.predicates")}</li>
+            <li>{t("datapacks.section.capabilities.li.tags")}</li>
           </ul>
         </section>
       </div>
+
+      <TopAddonsList type="datapacks" />
 
       <section class="mb-12">
         <div class="bg-darkSlate-800 rounded-xl overflow-hidden">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div class="p-8 lg:p-12">
-              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">Browse Data Packs in GDLauncher</h2>
-              <p class="text-darkSlate-100 mb-6">
-                Find and install data packs from CurseForge and Modrinth directly in GDLauncher.
-                Enhance vanilla Minecraft without needing mods.
-              </p>
+              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">{t("datapacks.browse.heading")}</h2>
+              <p class="text-darkSlate-100 mb-6">{t("datapacks.browse.intro")}</p>
               <ul class="flex flex-col gap-3 mb-8">
                 <li class="flex items-center gap-3 text-darkSlate-50">
                   <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
-                  <span>Browse data packs from CurseForge & Modrinth</span>
+                  <span>{t("datapacks.browse.li.both")}</span>
                 </li>
                 <li class="flex items-center gap-3 text-darkSlate-50">
                   <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
-                  <span>Works with vanilla Minecraft - no mods required</span>
+                  <span>{t("datapacks.browse.li.vanilla")}</span>
                 </li>
                 <li class="flex items-center gap-3 text-darkSlate-50">
                   <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
-                  <span>Easy installation and management</span>
+                  <span>{t("datapacks.browse.li.easy")}</span>
                 </li>
               </ul>
-              <a href="/download/windows" data-astro-prefetch="false" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/></svg>
-                Download GDLauncher
-              </a>
+              <DownloadLink client:idle class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95" iconClass="w-5 h-5" label={t("addon.downloadCta")} iconLeft />
             </div>
             <div class="relative">
               <img
@@ -129,13 +122,13 @@ Astro.locals.cache(300)
       </section>
 
       <section class="mt-8 bg-darkSlate-800 rounded-xl p-8 md:p-12">
-        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">Learn More</h2>
+        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">{t("datapacks.learnmore.heading")}</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
           <a href="/guides/install-datapacks" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
-            <span class="text-lightSlate-50 font-medium">How to Install Data Packs</span>
+            <span class="text-lightSlate-50 font-medium">{t("datapacks.learnmore.installdatapacks")}</span>
           </a>
           <a href="/guides/install-mods" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
-            <span class="text-lightSlate-50 font-medium">How to Install Mods</span>
+            <span class="text-lightSlate-50 font-medium">{t("datapacks.learnmore.installmods")}</span>
           </a>
         </div>
       </section>

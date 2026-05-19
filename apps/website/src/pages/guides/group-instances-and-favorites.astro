@@ -1,0 +1,42 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Group Instances and Mark Favorites in GDLauncher"
+  description="Organize a large Minecraft library by sorting instances into groups (folders) and marking the ones you play most as favorites."
+  keywords="organize minecraft instances, instance groups gdlauncher, instance folders, favorite minecraft instances, sort instances"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Drag instances into groups", text: "In the Library, drag an instance onto a group header or onto another instance to make a new group. Drop on an existing group to add the instance there." },
+      { name: "Rename or collapse a group", text: "Click the group header to expand or collapse it. Right-click the header to rename, change icon, or delete the group (deleting the group puts its instances back at the top level)." },
+      { name: "Favorite an instance", text: "Right-click an instance and toggle Add Favorite. A yellow star appears on the tile and the instance shows up in the Favorites bar at the top of the Library." },
+      { name: "Sort by drag", text: "Within a group, drag instances to reorder them. The order persists, so you can put the ones you play most at the top." }
+    ]
+  }}
+>
+  <h2>Why groups</h2>
+  <p>Once you have more than a handful of instances, the Library gets cluttered fast. Groups let you fold related instances into named folders, "1.21 Forge servers", "Vault Hunters playthroughs", "Old packs I want to keep around", and only expand what you need.</p>
+  <p>Groups are purely organizational. They don't affect how instances work; an instance in a group launches identically to one at the top level.</p>
+
+  <h2>Creating a group</h2>
+  <p>The simplest way: drag an instance onto another instance. GDLauncher creates a new group containing both, names it after the target. Rename the group from its header context menu.</p>
+  <p>You can nest however many instances you want in a group. Each group can be collapsed to keep the library short.</p>
+
+  <h2>Moving instances between groups</h2>
+  <p>Drag and drop. You can also drag an instance out of a group, back to the top-level Library, by dropping on the empty area.</p>
+  <p>Dragging onto a group header drops the instance at the end of that group. Dragging onto a specific position within a group lets you place it at that exact position.</p>
+
+  <h2>Favorites</h2>
+  <p>Right-click any instance → toggle Add Favorite. The instance gets a yellow star on its tile and also shows up in the Floating Favorites Bar at the top of the Library, regardless of which group it's in.</p>
+  <p>Useful when your "currently playing" instance is buried in a group three folders deep, you can favorite it and launch from the bar instead of digging.</p>
+  <p>Remove the favorite the same way: right-click → toggle Remove Favorite.</p>
+
+  <h2>Group by folder vs auto-grouping</h2>
+  <p>Everything above describes the Library when "Group by" is set to <strong>Folders</strong>, the manual mode where you drag instances into folders yourself. The same Group-by dropdown also offers <strong>Game Version</strong>, <strong>Modloader</strong>, and <strong>Modpack Platform</strong>. Pick one of those and GDLauncher hides your folders and re-buckets every instance automatically into collapsible sections (1.21.1, 1.20.4, Forge, Fabric, CurseForge, Modrinth, etc.). That auto-grouped layout is read-only: you can't drag, reorder, or make folders inside it. Your folders still exist; switch back to Group by Folders any time to see them.</p>
+
+  <h2>What you can't do</h2>
+  <p>Nested groups (a group inside another group) aren't supported and aren't on the roadmap. Each instance is in exactly one group (or none, at the top level). If you find yourself wanting deeply nested organization, naming groups well, "MC 1.21 Forge", "MC 1.21 Fabric", tends to work better than trying to fight the flat structure.</p>
+</GuideLayout>

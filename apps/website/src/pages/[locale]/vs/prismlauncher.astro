@@ -1,0 +1,12 @@
+---
+import type { GetStaticPaths } from "astro"
+import ComparisonPageLayout from "../../../components/ComparisonPageLayout.astro"
+import { LOCALES, DEFAULT_LOCALE } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+---
+
+<ComparisonPageLayout pageSlug="prismlauncher" />

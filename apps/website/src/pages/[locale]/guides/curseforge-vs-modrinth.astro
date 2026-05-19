@@ -1,0 +1,240 @@
+---
+/**
+ * Localized "CurseForge vs Modrinth" guide. Brand names left untranslated
+ * (CurseForge, Modrinth, Sodium, Create, JEI, FTB, GDLauncher, Overwolf).
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Meta { title: string; description: string }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "CurseForge と Modrinth - プラットフォーム比較",
+    description: "Minecraft の Mod や Modpack をダウンロードするなら CurseForge と Modrinth どちら? 主要 Mod プラットフォームを比較。"
+  },
+  ko: {
+    title: "CurseForge vs Modrinth - 플랫폼 비교",
+    description: "Minecraft 모드와 모드팩을 다운로드하기에 CurseForge와 Modrinth 중 어느 쪽이 더 나을까? 주요 모드 플랫폼 비교."
+  },
+  de: {
+    title: "CurseForge vs Modrinth – Plattform-Vergleich",
+    description: "CurseForge und Modrinth im Vergleich. Wo lädst du Minecraft-Mods und -Modpacks am besten?"
+  },
+  fr: {
+    title: "CurseForge vs Modrinth - Comparaison des plateformes",
+    description: "Compare CurseForge et Modrinth. Quelle est la meilleure plateforme pour télécharger des mods et modpacks Minecraft ?"
+  },
+  es: {
+    title: "CurseForge vs Modrinth - Comparativa de plataformas",
+    description: "Compara CurseForge y Modrinth. ¿Cuál es mejor para descargar mods y modpacks de Minecraft?"
+  },
+  "pt-BR": {
+    title: "CurseForge vs Modrinth - Comparativo das plataformas",
+    description: "Compare CurseForge e Modrinth. Qual é melhor para baixar mods e modpacks de Minecraft?"
+  },
+  it: {
+    title: "CurseForge vs Modrinth, confronto tra le piattaforme",
+    description: "Confronta CurseForge e Modrinth. Quale conviene per scaricare Mod e Modpack di Minecraft?"
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="curseforge vs modrinth, minecraft mod platforms, best mod site, modrinth or curseforge, mod download comparison"
+  lastUpdated="April 2026"
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>どちらも使う価値があります</h2>
+      <p>CurseForge と Modrinth は Minecraft の Mod、Modpack、シェーダー、リソースパックを入手できる場所です。どちらも優秀。GDLauncher は両方を同時検索するため、選ぶ必要はあまりありません。とはいえ違いはあるので整理します。</p>
+
+      <h2>CurseForge</h2>
+      <p>CurseForge は 2006 年から続く老舗。最大級のライブラリを持ち、特に古い Mod や定着したコンテンツに強いです。1.7.10 や 1.12.2 時代のものを探すなら、たいていここにしかありません。Minecraft のワールドダウンロードを扱う唯一のプラットフォームでもあります。</p>
+      <p>欠点: ウェブサイトに広告があり、動作が重いことも。サードパーティのランチャーは特別な許可なしにダウンロードへアクセスできず、サードパーティ配布を制限する作者もいます。Overwolf 傘下である点を気にする人もいます。</p>
+
+      <h2>Modrinth</h2>
+      <p>Modrinth は新興で、もっと良いものを作ろうとした人たちが立ち上げました。サイトは高速・クリーン・広告なし。API もオープンなので、どのランチャーからでも利用可能。検索も優秀。多くのプレイヤーや作者がそのアプローチを好んでいます。</p>
+      <p>欠点はライブラリが小さいこと。急速に成長していますが、古い Mod が無いことが多いです。CurseForge と違ってワールドダウンロードはありません。</p>
+
+      <h2>どこに何がある?</h2>
+      <p>人気の現行 Mod のほとんどは両方にあります。Sodium、Create、JEI、大型 Modpack、シェーダーパック、リソースパックなど。リーチを広げるために両方にアップロードする作者は多いです。</p>
+      <p>CurseForge 専属になりがちなのは、古い Mod、FTB パック、Modrinth 登場以前のもの。Modrinth にはその方針を好む新世代の作者の Mod、活発なオープンソース系のエコシステムがあります。</p>
+
+      <h2>Mod 作者の視点</h2>
+      <p>CurseForge はダウンロード数と広告収入に応じて報酬を支払います。オーディエンスが大きく、ダウンロード数も伸びやすい。Modrinth は直接的なクリエイタープログラムと、優れた開発者体験を提供します。多くの作者は両方に公開してリーチと収益を最大化します。</p>
+
+      <h2>実用的な答え</h2>
+      <p>両方使いましょう。GDLauncher の Mod ブラウザは両プラットフォームを同時検索するので、CurseForge と Modrinth 双方のライブラリを意識せずに使えます。同じ Mod が両方にあれば、好きな方を選べばよいですし、どちらから入れても更新は普通に効きます。</p>
+      <p>どうしても片方を選ぶなら: 古いコンテンツやワールドダウンロードが必要なら CurseForge。オープンソース志向、広告嫌い、UI 重視なら Modrinth。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>둘 다 쓸 만합니다</h2>
+      <p>CurseForge와 Modrinth는 Minecraft 모드, 모드팩, 셰이더, 리소스 팩을 받을 수 있는 곳입니다. 둘 다 좋습니다. GDLauncher는 두 플랫폼을 동시에 검색하므로 굳이 한쪽만 고를 필요는 없습니다. 그래도 차이는 있으니 정리해 봅니다.</p>
+
+      <h2>CurseForge</h2>
+      <p>CurseForge는 2006년부터 운영된 오래된 플랫폼. 라이브러리가 가장 크고, 특히 오래된 모드와 자리 잡은 콘텐츠에 강합니다. 1.7.10이나 1.12.2 시절의 무언가를 찾는다면 보통 CurseForge에만 있을 가능성이 큽니다. Minecraft 월드 다운로드를 다루는 유일한 플랫폼이기도 합니다.</p>
+      <p>단점: 웹사이트에 광고가 있고 무거운 편입니다. 서드파티 런처는 다운로드에 접근하려면 특별 허가가 필요하고, 일부 작자들은 서드파티 배포를 제한합니다. Overwolf 소속이라는 점을 신경 쓰는 사람도 있습니다.</p>
+
+      <h2>Modrinth</h2>
+      <p>Modrinth는 더 나은 것을 만들고 싶었던 사람들이 만든 신생 플랫폼. 사이트가 빠르고, 깔끔하고, 광고가 없습니다. API가 오픈이라 어떤 런처도 사용할 수 있고, 검색도 뛰어납니다. 그 방식을 선호하는 플레이어와 작자가 많습니다.</p>
+      <p>단점은 라이브러리가 더 작다는 점. Modrinth는 빠르게 성장 중이지만, 오래된 모드는 없는 경우가 많습니다. 또한 CurseForge와 달리 월드 다운로드는 호스팅하지 않습니다.</p>
+
+      <h2>무엇이 어디에?</h2>
+      <p>대부분의 인기 현행 모드는 양쪽에 모두 있습니다. Sodium, Create, JEI, 대형 모드팩, 셰이더 팩, 리소스 팩 등. 작자들은 더 많은 사람에게 닿기 위해 양쪽에 올리는 경우가 많습니다.</p>
+      <p>CurseForge 독점은 보통 오래된 모드, FTB 팩, Modrinth 이전의 것들. Modrinth에는 정책 측면에서 그쪽을 선호하는 작자들의 새 모드들과 강력한 오픈소스 모딩 생태계가 있습니다.</p>
+
+      <h2>모드 작자의 관점</h2>
+      <p>CurseForge는 다운로드와 광고 수익을 기반으로 보상을 지급합니다. 더 큰 오디언스, 더 많은 다운로드. Modrinth는 직접적인 크리에이터 프로그램과 더 좋은 개발자 경험을 제공합니다. 많은 작자들이 도달 범위와 수익을 극대화하려고 양쪽 다 게시합니다.</p>
+
+      <h2>실용적인 답</h2>
+      <p>둘 다 쓰세요. GDLauncher의 모드 브라우저가 두 플랫폼을 한꺼번에 검색하므로, CurseForge와 Modrinth의 라이브러리를 의식 없이 모두 누릴 수 있습니다. 같은 모드가 양쪽에 있으면 그냥 좋아하는 쪽을 고르면 되고, 어디서 설치했든 업데이트는 잘 동작합니다.</p>
+      <p>꼭 한쪽만 골라야 한다면: 옛 콘텐츠나 월드 다운로드가 필요하면 CurseForge. 오픈소스를 중시하거나 광고가 싫거나 인터페이스가 중요하면 Modrinth.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Beide Plattformen sind brauchbar</h2>
+      <p>CurseForge und Modrinth sind die Anlaufstellen für Minecraft-Mods, -Modpacks, -Shader und -Resource-Packs. Beide sind gut. GDLauncher durchsucht beide gleichzeitig, also musst du dich nicht wirklich entscheiden. Aber so unterscheiden sie sich.</p>
+
+      <h2>CurseForge</h2>
+      <p>CurseForge gibt's seit 2006. Die größte Bibliothek, vor allem für ältere Mods und etablierten Content. Wenn du was aus der 1.7.10- oder 1.12.2-Ära suchst, findest du es wahrscheinlich nur hier. Es ist auch die einzige Plattform mit Minecraft-Welt-Downloads.</p>
+      <p>Nachteile: Die Webseite hat Werbung und kann sich träge anfühlen. Drittanbieter-Launcher brauchen spezielle Berechtigung für Downloads, und manche Autoren beschränken Drittanbieter-Distribution. Sie gehört zu Overwolf, was manche kritisch sehen.</p>
+
+      <h2>Modrinth</h2>
+      <p>Modrinth ist neuer und wurde von Leuten gebaut, die was Besseres wollten. Die Webseite ist schnell, sauber und werbefrei. Die API ist offen, also kann jeder Launcher sie nutzen. Die Suche ist klasse. Viele Spieler und Mod-Autoren bevorzugen die Herangehensweise.</p>
+      <p>Der Nachteil: kleinere Bibliothek. Modrinth wächst schnell, aber ältere Mods fehlen oft. Und im Gegensatz zu CurseForge hostet Modrinth keine Welt-Downloads.</p>
+
+      <h2>Was findet man wo?</h2>
+      <p>Die meisten populären aktuellen Mods sind auf beiden Plattformen. Sodium, Create, JEI, die großen Modpacks, Shaderpacks, Resource Packs. Autoren laden oft auf beide hoch, um mehr Leute zu erreichen.</p>
+      <p>CurseForge-Exklusives sind meist ältere Mods, FTB-Packs und alles, was vor Modrinth existierte. Modrinth hat einige neuere Mods von Autoren, die seine Policies bevorzugen, plus ein starkes Open-Source-Modding-Ökosystem.</p>
+
+      <h2>Für Mod-Autoren</h2>
+      <p>CurseForge zahlt basierend auf Downloads und Werbeeinnahmen. Größere Reichweite, mehr Downloads. Modrinth hat ein direktes Creator-Programm und eine bessere Developer-Experience. Viele Autoren veröffentlichen auf beiden Plattformen, um Reichweite und Einnahmen zu maximieren.</p>
+
+      <h2>Die praktische Antwort</h2>
+      <p>Nutze beide. Der Mod-Browser von GDLauncher durchsucht beide Plattformen auf einmal. Du bekommst CurseForges Bibliothek plus Modrinths, ohne nachdenken zu müssen. Wenn der gleiche Mod auf beiden ist, nimm den, den du magst. Updates funktionieren egal, woher du installiert hast.</p>
+      <p>Wenn du dich entscheiden musst: CurseForge, wenn du älteren Content oder Welt-Downloads brauchst. Modrinth, wenn dir Open Source wichtig ist, du Werbung hasst oder einfach das Interface bevorzugst.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Les deux plateformes valent le coup</h2>
+      <p>CurseForge et Modrinth, c'est là que tu choppes les mods, modpacks, shaders et resource packs Minecraft. Les deux sont bien. GDLauncher cherche dans les deux en même temps, donc t'as pas vraiment à choisir. Mais voilà comment elles diffèrent.</p>
+
+      <h2>CurseForge</h2>
+      <p>CurseForge existe depuis 2006. La plus grosse bibliothèque, surtout pour les mods anciens et le contenu établi. Si tu cherches un truc de l'ère 1.7.10 ou 1.12.2, c'est sûrement seulement sur CurseForge. C'est aussi la seule plateforme avec les world downloads Minecraft.</p>
+      <p>Les défauts : le site a de la pub et peut paraître lent. Les launchers tiers ont besoin d'une permission spéciale pour accéder aux téléchargements, et certains auteurs de mods restreignent la distribution tierce. C'est détenu par Overwolf, ce que certains apprécient moyennement.</p>
+
+      <h2>Modrinth</h2>
+      <p>Modrinth est plus récent, créé par des gens qui voulaient mieux. Site rapide, propre, sans pub. L'API est ouverte donc n'importe quel launcher peut l'utiliser. La recherche est excellente. Plein de joueurs et d'auteurs préfèrent leur approche.</p>
+      <p>Le défaut : bibliothèque plus petite. Modrinth grandit vite, mais les vieux mods manquent souvent. Et contrairement à CurseForge, Modrinth n'héberge pas de world downloads.</p>
+
+      <h2>Qu'est-ce qui est où ?</h2>
+      <p>La plupart des mods populaires actuels sont sur les deux. Sodium, Create, JEI, les gros modpacks, les shader packs, les resource packs. Les auteurs uploadent souvent sur les deux pour toucher plus de monde.</p>
+      <p>Les exclusivités CurseForge sont surtout des vieux mods, les packs FTB, et tout ce qui date d'avant Modrinth. Modrinth a quelques mods plus récents d'auteurs qui préfèrent ses policies, plus un solide écosystème open source.</p>
+
+      <h2>Pour les auteurs de mods</h2>
+      <p>CurseForge paie selon les téléchargements et les revenus pubs. Plus large audience, plus de téléchargements. Modrinth a un programme créateur direct et une meilleure expérience développeur. Beaucoup d'auteurs publient sur les deux pour maximiser la portée et les revenus.</p>
+
+      <h2>La réponse pratique</h2>
+      <p>Utilise les deux. Le navigateur de mods de GDLauncher cherche sur les deux plateformes en même temps. T'as la bibliothèque de CurseForge plus celle de Modrinth sans avoir à y réfléchir. Quand le même mod est sur les deux, prends celui que tu préfères. Les mises à jour marchent peu importe où tu l'as installé.</p>
+      <p>Si tu dois en choisir un : CurseForge si tu cherches du contenu ancien ou des world downloads. Modrinth si tu tiens à l'open source, tu détestes les pubs ou tu préfères juste l'interface.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Las dos plataformas valen la pena</h2>
+      <p>CurseForge y Modrinth son donde consigues mods, modpacks, shaders y resource packs de Minecraft. Las dos son buenas. GDLauncher busca en ambas a la vez, así que en realidad no tienes que elegir. Pero así se diferencian.</p>
+
+      <h2>CurseForge</h2>
+      <p>CurseForge lleva desde 2006. Tiene la mayor biblioteca, sobre todo de mods más antiguos y contenido consolidado. Si buscas algo de la era 1.7.10 o 1.12.2, probablemente solo esté en CurseForge. También es la única plataforma con world downloads de Minecraft.</p>
+      <p>Lo malo: la web tiene anuncios y puede sentirse lenta. Los launchers de terceros necesitan permiso especial para acceder a las descargas, y algunos autores restringen la distribución por terceros. Es de Overwolf, algo que a algunos no les hace gracia.</p>
+
+      <h2>Modrinth</h2>
+      <p>Modrinth es más nuevo y lo construyeron quienes querían algo mejor. La web es rápida, limpia y sin anuncios. La API es abierta, así que cualquier launcher puede usarla. La búsqueda es excelente. Muchos jugadores y autores prefieren su enfoque.</p>
+      <p>El inconveniente: biblioteca más pequeña. Modrinth crece rápido, pero a menudo faltan los mods antiguos. Y a diferencia de CurseForge, Modrinth no aloja world downloads.</p>
+
+      <h2>¿Qué hay dónde?</h2>
+      <p>La mayoría de mods populares actuales están en ambas. Sodium, Create, JEI, los grandes modpacks, shader packs, resource packs. Los autores suelen subir a las dos para llegar a más gente.</p>
+      <p>Las exclusivas de CurseForge suelen ser mods más antiguos, packs de FTB y cualquier cosa anterior a Modrinth. Modrinth tiene algunos mods más nuevos de autores que prefieren sus políticas, además de un fuerte ecosistema open source.</p>
+
+      <h2>Para los autores de mods</h2>
+      <p>CurseForge paga según descargas e ingresos por publicidad. Mayor audiencia, más descargas. Modrinth tiene un programa de creadores directo y mejor experiencia de desarrollo. Muchos autores publican en ambas para maximizar alcance y ingresos.</p>
+
+      <h2>La respuesta práctica</h2>
+      <p>Usa las dos. El navegador de mods de GDLauncher busca en ambas plataformas a la vez. Tienes la biblioteca de CurseForge más la de Modrinth sin tener que pensarlo. Cuando el mismo mod está en ambas, elige la que te guste. Las actualizaciones funcionan independientemente de dónde lo instalaste.</p>
+      <p>Si tienes que escoger una: CurseForge si necesitas contenido antiguo o world downloads. Modrinth si te importa el open source, odias los anuncios o simplemente prefieres la interfaz.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>As duas plataformas valem a pena</h2>
+      <p>CurseForge e Modrinth são onde você pega mods, modpacks, shaders e resource packs do Minecraft. As duas são boas. O GDLauncher busca nas duas ao mesmo tempo, então você não precisa realmente escolher. Mas é assim que elas se diferenciam.</p>
+
+      <h2>CurseForge</h2>
+      <p>O CurseForge existe desde 2006. Tem a maior biblioteca, principalmente para mods mais antigos e conteúdo já consolidado. Se você procura algo da era 1.7.10 ou 1.12.2, provavelmente está só no CurseForge. Também é a única plataforma com world downloads do Minecraft.</p>
+      <p>Os contras: o site tem ads e pode parecer lento. Launchers de terceiros precisam de permissão especial pra acessar downloads, e alguns autores restringem a distribuição via terceiros. É da Overwolf, o que algumas pessoas não curtem.</p>
+
+      <h2>Modrinth</h2>
+      <p>O Modrinth é mais novo, construído por pessoas que queriam algo melhor. O site é rápido, limpo e sem anúncios. A API é aberta, então qualquer launcher pode usar. A busca é excelente. Muitos jogadores e autores preferem essa abordagem.</p>
+      <p>O ponto negativo: biblioteca menor. O Modrinth está crescendo rápido, mas mods antigos muitas vezes não estão lá. E, diferente do CurseForge, o Modrinth não hospeda world downloads.</p>
+
+      <h2>O que está onde?</h2>
+      <p>A maioria dos mods populares atuais está nos dois. Sodium, Create, JEI, os modpacks maiores, shader packs, resource packs. Os autores costumam publicar em ambos para alcançar mais gente.</p>
+      <p>Exclusividades do CurseForge tendem a ser mods antigos, packs FTB e tudo que é anterior ao Modrinth. O Modrinth tem alguns mods mais novos de autores que preferem suas políticas, além de um ecossistema open source forte.</p>
+
+      <h2>Para autores de mods</h2>
+      <p>O CurseForge paga com base em downloads e receita de anúncios. Audiência maior, mais downloads. O Modrinth tem programa de criador direto e uma experiência melhor pra desenvolvedor. Muitos autores publicam nos dois pra maximizar alcance e receita.</p>
+
+      <h2>A resposta prática</h2>
+      <p>Use os dois. O navegador de mods do GDLauncher busca nas duas plataformas ao mesmo tempo. Você ganha a biblioteca do CurseForge mais a do Modrinth sem ter que pensar nisso. Quando o mesmo mod está nos dois, escolha aquele que você prefere. As atualizações funcionam independente de onde foi instalado.</p>
+      <p>Se você tiver mesmo que escolher um: CurseForge se precisa de conteúdo antigo ou de world downloads. Modrinth se você se importa com open source, odeia anúncios ou só prefere a interface.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Entrambe le piattaforme valgono</h2>
+      <p>CurseForge e Modrinth sono i posti dove prendi Mod, Modpack, Shader e Resource Pack di Minecraft. Entrambe vanno bene. GDLauncher cerca su tutte e due insieme, quindi non devi davvero scegliere. Ma ecco come si differenziano.</p>
+
+      <h2>CurseForge</h2>
+      <p>CurseForge esiste dal 2006. Ha la libreria più grande, soprattutto per le Mod più vecchie e i contenuti ormai affermati. Se cerchi qualcosa dell'era 1.7.10 o 1.12.2, probabilmente sta solo su CurseForge. È anche l'unica piattaforma con i World download di Minecraft.</p>
+      <p>Punti deboli: il sito ha pubblicità e a tratti può sembrare lento. I launcher di terze parti hanno bisogno di un permesso speciale per accedere ai download e alcuni autori limitano la distribuzione tramite terze parti. È di proprietà di Overwolf, cosa che ad alcuni non piace.</p>
+
+      <h2>Modrinth</h2>
+      <p>Modrinth è più recente, costruito da persone che volevano fare meglio. Sito veloce, pulito, senza pubblicità. L'API è aperta, quindi qualsiasi launcher può usarla. La ricerca è ottima. Tanti giocatori e autori preferiscono questo approccio.</p>
+      <p>Lo svantaggio: libreria più piccola. Modrinth cresce in fretta, ma le Mod vecchie spesso non ci sono. E a differenza di CurseForge, Modrinth non ospita i World download.</p>
+
+      <h2>Cosa si trova dove?</h2>
+      <p>La maggior parte delle Mod popolari attuali sta su entrambe. Sodium, Create, JEI, i Modpack grossi, gli Shader Pack, i Resource Pack. Gli autori spesso caricano su entrambe per raggiungere più persone.</p>
+      <p>Le esclusive di CurseForge tendono a essere Mod più vecchie, pack FTB e tutto ciò che è precedente a Modrinth. Modrinth ha alcune Mod più nuove di autori che ne preferiscono le policy, oltre a un solido ecosistema open source.</p>
+
+      <h2>Per gli autori di Mod</h2>
+      <p>CurseForge paga in base a download e ricavi pubblicitari. Pubblico più grande, più download. Modrinth ha un programma creator diretto e una migliore esperienza per gli sviluppatori. Tanti autori pubblicano su entrambe per massimizzare reach e ricavi.</p>
+
+      <h2>La risposta pratica</h2>
+      <p>Usale entrambe. Il browser delle Mod di GDLauncher cerca su tutte e due le piattaforme insieme. Ottieni la libreria di CurseForge più quella di Modrinth senza doverci pensare. Quando lo stessa Mod è su entrambe, scegli quella che preferisci. Gli aggiornamenti funzionano comunque, indipendentemente da dove l'hai installato.</p>
+      <p>Se proprio devi sceglierne una: CurseForge se ti servono contenuti vecchi o World download. Modrinth se tieni all'open source, detesti la pubblicità o semplicemente preferisci l'interfaccia.</p>
+    </Fragment>
+  )}
+</GuideLayout>

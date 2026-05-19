@@ -1,0 +1,39 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Enable Potato PC mode in GDLauncher"
+  description="Turn off the launcher's animations to reduce CPU and GPU load on older machines. What Potato Mode actually changes and what it doesn't."
+  keywords="potato mode minecraft launcher, reduce animations, low end pc launcher, accessibility minecraft launcher, reduced motion"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT1M",
+    steps: [
+      { name: "Open General settings", text: "Settings → General. Scroll near the bottom of the page." },
+      { name: "Find Potato PC mode", text: "There's a toggle labeled Potato PC mode with a short description." },
+      { name: "Toggle it on", text: "Click the switch. The change applies immediately, animations across the launcher stop using easing, fade-in, and motion effects." }
+    ]
+  }}
+>
+  <h2>What Potato Mode actually does</h2>
+  <p>Potato PC mode is GDLauncher's reduced-motion setting. Under the hood it's a single boolean (called <code>reducedMotion</code> internally) that adds a CSS class to the root of the UI; styles attached to that class disable animations and transitions everywhere in the launcher.</p>
+  <p>Concretely: button hover effects, panel slide-ins, opacity fades, the spinning download progress indicators, and the splash animations all stop animating. The UI becomes snappy and static.</p>
+
+  <h2>What it doesn't do</h2>
+  <p>Potato Mode is launcher-side only. It doesn't change anything about Minecraft itself: not the render distance, not the FPS, not the mods that load, not how much RAM gets allocated. The toggle is purely about the launcher's chrome.</p>
+  <p>If your Minecraft is the problem (low FPS in-game, stuttering), Potato Mode won't help; you'll want to look at <a href="/guides/performance-mods">performance mods</a>, <a href="/guides/allocate-more-ram">RAM allocation</a>, or Minecraft's own video settings.</p>
+
+  <h2>When it's worth turning on</h2>
+  <ul>
+    <li>Older hardware where Electron itself struggles. Discord, Slack, and similar Electron apps feel sluggish? The launcher will too. Potato Mode helps.</li>
+    <li>Battery savings on laptops. Animations consume GPU. Static UI consumes nearly none.</li>
+    <li>Accessibility, reduced motion preference. Some people get motion sickness or distraction from UI animations.</li>
+  </ul>
+
+  <h2>Does it follow my OS reduced-motion setting?</h2>
+  <p>Currently it's a separate toggle. macOS, Windows, and most Linux desktops have a system-wide "reduce motion" accessibility setting, GDLauncher doesn't read that yet. If you want motion off, flip the launcher's toggle yourself.</p>
+
+  <h2>Reverting</h2>
+  <p>Flip the same toggle off. Animations return immediately, no restart needed.</p>
+</GuideLayout>

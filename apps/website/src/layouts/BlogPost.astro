@@ -4,23 +4,68 @@ import PageShell from "../components/PageShell.astro";
 import FormattedDate from "../components/FormattedDate.astro";
 import ArticleInteractiveMarkdown from "../components/ArticleInteractiveMarkdown";
 import Breadcrumb from "../components/Breadcrumb.astro";
+import { DownloadLink } from "../components/DownloadLink";
+import { articleJsonLd, breadcrumbsJsonLd } from "../lib/jsonld";
+import {
+  getLocaleFromUrl,
+  localizedPath,
+  useTranslations,
+} from "../lib/i18n";
 
 type Props = CollectionEntry<"blog">["data"];
 
-const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, author } =
+  Astro.props;
+const locale = getLocaleFromUrl(Astro.url.pathname);
+const t = useTranslations(locale);
+
+const canonicalUrl = new URL(
+  Astro.url.pathname,
+  "https://gdlauncher.com",
+).toString();
+const publishedIso = pubDate ? new Date(pubDate).toISOString() : undefined;
+const modifiedIso = updatedDate
+  ? new Date(updatedDate).toISOString()
+  : publishedIso;
+
+const jsonLd = [
+  breadcrumbsJsonLd([
+    { name: t("breadcrumb.home"), url: "https://gdlauncher.com/" },
+    {
+      name: t("blog.breadcrumb"),
+      url: new URL(localizedPath("/blog", locale), "https://gdlauncher.com").toString(),
+    },
+    { name: title, url: canonicalUrl },
+  ]),
+  articleJsonLd({
+    title,
+    description,
+    url: canonicalUrl,
+    image: heroImage,
+    publishedTime: publishedIso,
+    modifiedTime: modifiedIso,
+    author,
+  }),
+];
 ---
 
 <PageShell
   title={`${title} | GDLauncher Blog`}
   description={description}
   image={heroImage}
+  imageAlt={title}
+  ogType="article"
+  publishedTime={publishedIso}
+  modifiedTime={modifiedIso}
+  author={author}
+  jsonLd={jsonLd}
   particles
 >
     <ArticleInteractiveMarkdown client:idle />
 
     <main class="py-8">
       <Breadcrumb items={[
-        { label: "Blog", href: "/blog" },
+        { label: t("blog.breadcrumb"), href: localizedPath("/blog", locale) },
         { label: title }
       ]} />
 
@@ -31,6 +76,11 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
             <img
               src={heroImage}
               alt={title}
+              width="1200"
+              height="630"
+              fetchpriority="high"
+              loading="eager"
+              decoding="async"
               class="w-full h-auto rounded-xl shadow-2xl shadow-black/20"
             />
           </div>
@@ -64,7 +114,7 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
                 {updatedDate && (
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:refresh w-4 h-4"></div>
-                    <span>Updated <FormattedDate date={updatedDate} /></span>
+                    <span>{t("blog.updated")} <FormattedDate date={updatedDate} /></span>
                   </div>
                 )}
               </div>
@@ -82,29 +132,28 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
           <!-- Download CTA -->
           <div class="bg-gradient-to-r from-primary-600/20 to-primary-800/20 border border-primary-500/30 rounded-xl p-8 text-center">
             <h2 class="text-2xl font-bold text-lightSlate-50 mb-3">
-              Ready to Try GDLauncher?
+              {t("blog.cta.heading")}
             </h2>
             <p class="text-darkSlate-100 mb-6 max-w-xl mx-auto">
-              Download GDLauncher and start playing modded Minecraft in minutes. One-click install for modpacks, mods, and more.
+              {t("blog.cta.body")}
             </p>
-            <a
-              href="/download/windows"
-              data-astro-prefetch="false"
+            <DownloadLink
+              client:idle
               class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors"
-            >
-              <div class="i-simple-icons:windows11 w-5 h-5"></div>
-              Download GDLauncher
-            </a>
+              iconClass="w-5 h-5"
+              label={t("blog.cta.button")}
+              iconLeft
+            />
           </div>
 
           <!-- Back to blog -->
           <div class="mt-12 text-center">
             <a
-              href="/blog"
+              href={localizedPath("/blog", locale)}
               class="inline-flex items-center gap-2 text-darkSlate-100 hover:text-lightSlate-50 transition-colors"
             >
               <div class="i-hugeicons:arrow-left-01 w-5 h-5"></div>
-              Back to all posts
+              {t("blog.backToList")}
             </a>
           </div>
         </div>

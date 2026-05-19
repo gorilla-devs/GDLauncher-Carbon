@@ -1,0 +1,106 @@
+---
+import PageShell from "../../../components/PageShell.astro";
+import Breadcrumb from "../../../components/Breadcrumb.astro";
+import { getCollection } from "astro:content";
+import ArticleCard from "../../../components/ArticleCard.astro";
+
+const posts = (await getCollection("blog")).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+
+import type { GetStaticPaths } from "astro"
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  getLocaleFromUrl,
+  useTranslations,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const locale = getLocaleFromUrl(Astro.url.pathname);
+const t = useTranslations(locale);
+---
+
+<PageShell title={t("blog.index.title")} description={t("blog.index.description")}>
+  <Fragment slot="head">
+    <style>
+      .blog-content {
+        display: flex;
+        justify-content: center;
+        margin: 0 auto;
+        padding: 0 20px;
+        max-width: 1200px;
+      }
+      ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+        list-style-type: none;
+        padding: 0;
+      }
+      ul li {
+        flex: 1 1 calc(50% - 2rem);
+        max-width: calc(50% - 2rem);
+      }
+      ul li a {
+        text-decoration: none;
+        color: inherit;
+      }
+      ul li img {
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+        transition: transform 0.3s ease;
+      }
+      .title,
+      .date {
+        display: block; /* Ensure these are block-level for proper spacing */
+        color: white;
+        text-align: center;
+      }
+      .title {
+        margin-top: 0.5rem;
+        font-size: 1.2rem;
+      }
+      .date {
+        font-size: 0.9rem;
+        color: rgba(147, 153, 170, 1);
+      }
+      @media (max-width: 720px) {
+        ul {
+          gap: 1rem;
+        }
+        ul li {
+          /* flex-basis: 100%; */
+          max-width: 100%;
+        }
+        .title {
+          font-size: 1rem;
+        }
+      }
+    </style>
+  </Fragment>
+
+    <main class="py-8">
+      <Breadcrumb items={[{ label: t("blog.breadcrumb") }]} maxWidth="max-w-6xl" />
+      <div class="blog-content flex-col">
+        <header class="text-center mb-8 px-4">
+          <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
+            {t("blog.index.h1")}
+          </h1>
+          <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+            {t("blog.index.intro")}
+          </p>
+        </header>
+        <section class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
+          <ul>
+            {posts.map((post) => <ArticleCard post={post} />)}
+          </ul>
+        </section>
+      </div>
+    </main>
+</PageShell>

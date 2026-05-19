@@ -1,30 +1,70 @@
 ---
 /**
- * GuideLayout - Layout for guide/tutorial pages
+ * GuideLayout - Layout for guide/tutorial pages.
+ *
+ * Pages can opt into HowTo structured data by passing `howTo`, an ordered
+ * list of steps. We emit it as JSON-LD so eligible guides can earn Google's
+ * "How-to" rich result, which both takes more SERP real estate and lifts
+ * CTR substantially.
  */
 import PageShell from "./PageShell.astro"
 import Breadcrumb from "./Breadcrumb.astro"
+import { DownloadLink } from "./DownloadLink"
+import { howToJsonLd, breadcrumbsJsonLd } from "../lib/jsonld"
+import { getLocaleFromUrl, localizedPath, useTranslations } from "../lib/i18n"
 
 interface Props {
   title: string
   description: string
   keywords?: string
   lastUpdated?: string
+  /** Optional HowTo schema. Pass an array of steps to emit it. */
+  howTo?: {
+    steps: Array<{ name: string; text: string }>
+    totalTimeIso?: string
+    image?: string
+  }
 }
 
-const { title, description, keywords, lastUpdated } = Astro.props
+const { title, description, keywords, lastUpdated, howTo } = Astro.props
 
-const seoTitle = `${title} | GDLauncher Guides`
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+
+const seoTitle = `${title} | GDLauncher`
+const canonicalUrl = new URL(Astro.url.pathname, "https://gdlauncher.com").toString()
+const guidesUrl = new URL(localizedPath("/guides", locale), "https://gdlauncher.com").toString()
+
+const jsonLd: Record<string, unknown>[] = [
+  breadcrumbsJsonLd([
+    { name: t("breadcrumb.home"), url: "https://gdlauncher.com/" },
+    { name: t("nav.guides"), url: guidesUrl },
+    { name: title, url: canonicalUrl },
+  ]),
+]
+if (howTo) {
+  jsonLd.push(
+    howToJsonLd({
+      name: title,
+      description,
+      url: canonicalUrl,
+      steps: howTo.steps,
+      totalTimeIso: howTo.totalTimeIso,
+      image: howTo.image,
+    })
+  )
+}
 ---
 
 <PageShell
   title={seoTitle}
   description={description}
   keywords={keywords}
+  jsonLd={jsonLd}
 >
     <main class="py-8">
       <Breadcrumb items={[
-        { label: "Guides", href: "/guides" },
+        { label: t("nav.guides"), href: localizedPath("/guides", locale) },
         { label: title }
       ]} />
 
@@ -40,7 +80,7 @@ const seoTitle = `${title} | GDLauncher Guides`
           </p>
           {lastUpdated && (
             <p class="text-sm text-darkSlate-200">
-              Last updated: {lastUpdated}
+              {t("blog.updated")}: {lastUpdated}
             </p>
           )}
         </header>
@@ -54,21 +94,18 @@ const seoTitle = `${title} | GDLauncher Guides`
         <!-- Download CTA -->
         <div class="mt-8 bg-gradient-to-r from-primary-600/20 to-primary-800/20 border border-primary-500/30 rounded-xl p-8 text-center">
         <h2 class="text-2xl font-bold text-lightSlate-50 mb-3">
-          Ready to Get Started?
+          {t("blog.cta.heading")}
         </h2>
         <p class="text-darkSlate-100 mb-6 max-w-xl mx-auto">
-          Download GDLauncher and start playing modded Minecraft in minutes. One-click install for modpacks, mods, and more.
+          {t("blog.cta.body")}
         </p>
-        <a
-          href="/download/windows"
-          data-astro-prefetch="false"
+        <DownloadLink
+          client:idle
           class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors"
-        >
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/>
-          </svg>
-          Download GDLauncher
-        </a>
+          iconClass="w-5 h-5"
+          label={t("blog.cta.button")}
+          iconLeft
+        />
         </div>
       </div>
     </main>

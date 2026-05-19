@@ -1,0 +1,139 @@
+---
+/**
+ * Mods Hub Page
+ */
+import PageShell from "../../../components/PageShell.astro"
+import { DownloadLink } from "../../../components/DownloadLink"
+import Breadcrumb from "../../../components/Breadcrumb.astro"
+import TopAddonsList from "../../../components/TopAddonsList.astro"
+import { getLocaleFromUrl, useTranslations,
+  localizedPath,
+} from "../../../lib/i18n"
+import { addonTypePlural } from "../../../lib/api/types"
+
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+
+Astro.locals.cache(300)
+---
+
+<PageShell
+  title={t("mods.title")}
+  description={t("mods.description")}
+  keywords="minecraft mods, curseforge mods, modrinth mods, install mods, mod manager, gdlauncher"
+>
+    <main class="py-8">
+      <Breadcrumb items={[{ label: addonTypePlural("mods", locale) }]} maxWidth="max-w-6xl" />
+
+      <div class="max-w-6xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-12">
+        <div class="text-center mb-12">
+          <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
+            {t("mods.h1.line1")}{" "}
+            <span class="text-primary-300">{t("mods.h1.line2")}</span>
+          </h1>
+          <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+            {t("mods.intro")}
+          </p>
+        </div>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">{t("mods.section.what.heading")}</h2>
+          <p class="text-darkSlate-100">{t("mods.section.what.p1")}</p>
+          <p class="text-darkSlate-100">{t("mods.section.what.p2")}</p>
+          <ul class="text-darkSlate-100">
+            <li>{t("mods.section.what.li.content")}</li>
+            <li>{t("mods.section.what.li.tech")}</li>
+            <li>{t("mods.section.what.li.magic")}</li>
+            <li>{t("mods.section.what.li.qol")}</li>
+            <li>{t("mods.section.what.li.performance")}</li>
+          </ul>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">{t("mods.section.loaders.heading")}</h2>
+          <p class="text-darkSlate-100">{t("mods.section.loaders.intro")}</p>
+          <ul class="text-darkSlate-100">
+            <li>{t("mods.section.loaders.forge")}</li>
+            <li>{t("mods.section.loaders.fabric")}</li>
+            <li>{t("mods.section.loaders.neoforge")}</li>
+            <li>{t("mods.section.loaders.quilt")}</li>
+          </ul>
+          <p class="text-darkSlate-100">{t("mods.section.loaders.outro")}</p>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto">
+          <h2 class="text-lightSlate-50">{t("mods.section.compat.heading")}</h2>
+          <p class="text-darkSlate-100">{t("mods.section.compat.intro")}</p>
+          <ul class="text-darkSlate-100">
+            <li>{t("mods.section.compat.li.version")}</li>
+            <li>{t("mods.section.compat.li.server")}</li>
+            <li>{t("mods.section.compat.li.client")}</li>
+            <li>{t("mods.section.compat.li.conflict")}</li>
+            <li>{t("mods.section.compat.li.major")}</li>
+          </ul>
+        </section>
+      </div>
+
+      <TopAddonsList type="mods" />
+
+      <section class="mb-12">
+        <div class="bg-darkSlate-800 rounded-xl overflow-hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div class="p-8 lg:p-12">
+              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">{t("mods.browse.heading")}</h2>
+              <p class="text-darkSlate-100 mb-6">{t("mods.browse.intro")}</p>
+              <ul class="flex flex-col gap-3 mb-8">
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>{t("mods.browse.li.count")}</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>{t("mods.browse.li.deps")}</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>{t("mods.browse.li.updates")}</span>
+                </li>
+              </ul>
+              <DownloadLink client:idle class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95" iconClass="w-5 h-5" label={t("addon.downloadCta")} iconLeft />
+            </div>
+            <div class="relative">
+              <img
+                src="https://cdn.gdl.gg/assets/website-browse-mods.jpg"
+                alt="GDLauncher mod browser interface"
+                class="w-full h-auto"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-8 bg-darkSlate-800 rounded-xl p-8 md:p-12">
+        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">{t("mods.learnmore.heading")}</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+          <a href={localizedPath("/guides/install-mods", locale)} class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">{t("mods.learnmore.installmods")}</span>
+          </a>
+          <a href={localizedPath("/guides/performance-mods", locale)} class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">{t("mods.learnmore.performance")}</span>
+          </a>
+          <a href={localizedPath("/guides/install-forge", locale)} class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">{t("mods.learnmore.installforge")}</span>
+          </a>
+        </div>
+      </section>
+      </div>
+    </main>
+</PageShell>

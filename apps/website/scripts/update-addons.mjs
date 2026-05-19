@@ -4,9 +4,12 @@
  * Append-only addon registry updater.
  *
  * Fetches the top addons from CurseForge and Modrinth, then merges them into
- * data/addons.json. New entries are added, existing entries are updated
- * (name, imageUrl, websiteUrl), but nothing is ever removed. This prevents
- * broken links that would hurt SEO.
+ * data/addons/{platform}-{type}.json (one file per (platform, type), slug-
+ * indexed). New entries are added, existing entries are updated (name,
+ * imageUrl, websiteUrl), but nothing is ever removed. This prevents broken
+ * links that would hurt SEO. The split layout exists so the SSR Worker can
+ * import just the (platform, type) it needs per request without parsing the
+ * full ~7 MB combined dataset on every cold start.
  *
  * Usage:
  *   pnpm update-addons            # reads CURSEFORGE_API_KEY from .env
@@ -14,12 +17,43 @@
  *   pnpm update-addons --dry-run  # print stats without writing
  */
 
-import { readFileSync, writeFileSync } from "node:fs"
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+} from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const DATA_PATH = resolve(__dirname, "../data/addons.json")
+const DATA_DIR = resolve(__dirname, "../data/addons")
+
+function loadShard(platform, type) {
+  const path = resolve(DATA_DIR, `${platform}-${type}.json`)
+  if (!existsSync(path)) return []
+  try {
+    const indexed = JSON.parse(readFileSync(path, "utf-8"))
+    return Object.values(indexed)
+  } catch {
+    return []
+  }
+}
+
+function writeShard(platform, type, list) {
+  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
+  const indexed = {}
+  for (const a of list) {
+    if (!a.slug) continue
+    indexed[a.slug] = a
+  }
+  // Minified: each shard is bundled into the Worker output, so indentation
+  // would inflate the compressed Worker size without helping the
+  // (machine-only) consumer.
+  const path = resolve(DATA_DIR, `${platform}-${type}.json`)
+  writeFileSync(path, JSON.stringify(indexed) + "\n")
+  return path
+}
 
 // ---------------------------------------------------------------------------
 // CLI args
@@ -59,7 +93,87 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms))
 // ---------------------------------------------------------------------------
 // Data extraction helpers
 // ---------------------------------------------------------------------------
+
+const KNOWN_LOADERS = new Set([
+  "forge",
+  "fabric",
+  "neoforge",
+  "quilt",
+  "liteloader",
+  "rift",
+  "modloader"
+])
+
+const LOADER_DISPLAY = {
+  forge: "Forge",
+  fabric: "Fabric",
+  neoforge: "NeoForge",
+  quilt: "Quilt",
+  liteloader: "LiteLoader",
+  rift: "Rift",
+  modloader: "ModLoader"
+}
+
+/**
+ * Pull the canonical loader label out of a freeform category string.
+ * Returns null for non-loader categories so they stay in `categories`.
+ */
+function loaderFromCategory(cat) {
+  const lc = cat.toLowerCase().replace(/\s+/g, "")
+  return KNOWN_LOADERS.has(lc) ? LOADER_DISPLAY[lc] : null
+}
+
+function partitionLoaders(categories) {
+  const loaders = new Set()
+  const others = []
+  for (const cat of categories) {
+    const loader = loaderFromCategory(cat)
+    if (loader) loaders.add(loader)
+    else others.push(cat)
+  }
+  return { loaders: [...loaders], categories: others }
+}
+
+/**
+ * Reduce a long list of game versions to the highest-impact ones for SEO:
+ * the latest stable release per major-minor band. This keeps the FAQ and
+ * structured data legible (e.g., "1.21.x, 1.20.x, 1.19.x") instead of dumping
+ * every patch version on the page.
+ */
+function summarizeGameVersions(versions) {
+  if (!versions?.length) return []
+  const isRelease = (v) => /^\d+\.\d+(\.\d+)?$/.test(v)
+  const releases = versions.filter(isRelease)
+  // Sort descending by semver-ish comparison
+  const parsed = releases
+    .map((v) => v.split(".").map(Number))
+    .sort((a, b) => b[0] - a[0] || b[1] - a[1] || (b[2] ?? 0) - (a[2] ?? 0))
+  const seen = new Set()
+  const summary = []
+  for (const tuple of parsed) {
+    const key = `${tuple[0]}.${tuple[1]}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    summary.push(tuple.join("."))
+    if (summary.length >= 6) break
+  }
+  return summary
+}
+
 function extractCurseForge(p) {
+  // CurseForge encodes loader info on each file index. modLoader is a
+  // numeric enum: 1=Forge, 4=Fabric, 5=Quilt, 6=NeoForge.
+  const cfLoaderMap = { 1: "Forge", 4: "Fabric", 5: "Quilt", 6: "NeoForge" }
+  const loaderSet = new Set()
+  const versionSet = new Set()
+  for (const f of p.latestFilesIndexes ?? []) {
+    if (cfLoaderMap[f.modLoader]) loaderSet.add(cfLoaderMap[f.modLoader])
+    if (f.gameVersion) versionSet.add(f.gameVersion)
+  }
+  const rawCategories = p.categories?.map((c) => c.name) ?? []
+  const { loaders: catLoaders, categories } = partitionLoaders(rawCategories)
+  for (const l of catLoaders) loaderSet.add(l)
+
   return {
     id: p.id,
     name: p.name,
@@ -67,37 +181,70 @@ function extractCurseForge(p) {
     description: p.summary || null,
     imageUrl: p.logo?.url || p.logo?.thumbnailUrl || null,
     websiteUrl: p.links.websiteUrl,
+    sourceUrl: p.links.sourceUrl || null,
+    issuesUrl: p.links.issuesUrl || null,
+    wikiUrl: p.links.wikiUrl || null,
     authors: p.authors?.map((a) => a.name) || [],
-    categories: p.categories?.map((c) => c.name) || [],
-    dateModified: p.dateModified ?? p.date_modified ?? null
+    categories,
+    loaders: [...loaderSet],
+    gameVersions: summarizeGameVersions([...versionSet]),
+    downloads: typeof p.downloadCount === "number" ? p.downloadCount : null,
+    dateModified: p.dateModified ?? p.date_modified ?? null,
+    license: null // CurseForge doesn't expose license cleanly
   }
 }
 
-function extractModrinthSearch(hit) {
+function extractModrinthSearch(hit, urlType) {
+  const rawCategories = hit.categories || []
+  const { loaders, categories } = partitionLoaders(rawCategories)
+  // urlType is the Modrinth URL segment for the requested addon type
+  // ("datapack", "mod", etc.). For datapacks Modrinth files projects as
+  // project_type:"mod" but canonicalises browse URLs to /datapack/<slug>,
+  // so trust the caller's intent over the API field here.
+  const segment = urlType || hit.project_type
   return {
     id: hit.project_id,
     name: hit.title,
     slug: hit.slug,
     description: hit.description || null,
     imageUrl: hit.icon_url,
-    websiteUrl: `https://modrinth.com/${hit.project_type}/${hit.slug}`,
+    websiteUrl: `https://modrinth.com/${segment}/${hit.slug}`,
+    sourceUrl: null,
+    issuesUrl: null,
+    wikiUrl: null,
     author: hit.author || null,
-    categories: hit.categories || [],
-    dateModified: hit.date_modified ?? null
+    categories,
+    loaders,
+    gameVersions: summarizeGameVersions(hit.versions || []),
+    downloads: typeof hit.downloads === "number" ? hit.downloads : null,
+    dateModified: hit.date_modified ?? null,
+    license: hit.license || null
   }
 }
 
-function extractModrinthProject(p) {
+function extractModrinthProject(p, urlType) {
+  const rawCategories = [...(p.categories || []), ...(p.loaders || [])]
+  const { loaders, categories } = partitionLoaders(rawCategories)
+  const segment = urlType || p.project_type
   return {
     id: p.id,
     name: p.title,
     slug: p.slug,
     description: p.description || null,
     imageUrl: p.icon_url,
-    websiteUrl: `https://modrinth.com/${p.project_type}/${p.slug}`,
-    author: null, // not in project endpoint
-    categories: p.categories || [],
-    dateModified: p.updated ?? null
+    websiteUrl: p.source_url
+      ? p.source_url
+      : `https://modrinth.com/${segment}/${p.slug}`,
+    sourceUrl: p.source_url || null,
+    issuesUrl: p.issues_url || null,
+    wikiUrl: p.wiki_url || null,
+    author: null,
+    categories,
+    loaders,
+    gameVersions: summarizeGameVersions(p.game_versions || []),
+    downloads: typeof p.downloads === "number" ? p.downloads : null,
+    dateModified: p.updated ?? null,
+    license: p.license?.id || p.license?.name || null
   }
 }
 
@@ -140,6 +287,9 @@ async function fetchCurseForge(type, limit) {
 
     if (data.data.length < pageSize) break
     if (addons.length >= limit) break
+    // CurseForge documents 200 req/min per key; 250ms between pages keeps
+    // us well under that even with multiple types in the same run.
+    await delay(250)
   }
 
   return addons.slice(0, limit)
@@ -184,6 +334,12 @@ async function batchLookupCurseForge(ids) {
 // ---------------------------------------------------------------------------
 async function fetchModrinth(type, limit) {
   const projectType = MR_PROJECT_TYPES[type]
+  // Modrinth's `project_type:datapack` facet returns projects whose
+  // server-side project_type is "mod" (datapack is a loader, not a
+  // first-class project type on the API). The facet filter is reliable,
+  // so for datapacks we skip the secondary project_type check that other
+  // types use as a safety net.
+  const trustFacet = type === "datapacks"
   const addons = []
   const pageSize = 100
 
@@ -208,8 +364,8 @@ async function fetchModrinth(type, limit) {
 
     const data = await res.json()
     for (const hit of data.hits) {
-      if (hit.project_type !== projectType) continue
-      addons.push(extractModrinthSearch(hit))
+      if (!trustFacet && hit.project_type !== projectType) continue
+      addons.push(extractModrinthSearch(hit, projectType))
     }
 
     if (data.hits.length < pageSize) break
@@ -223,7 +379,7 @@ async function fetchModrinth(type, limit) {
 // ---------------------------------------------------------------------------
 // Modrinth: batch lookup by IDs (GET /v2/projects?ids=[...])
 // ---------------------------------------------------------------------------
-async function batchLookupModrinth(ids) {
+async function batchLookupModrinth(ids, urlSegment) {
   if (ids.length === 0) return []
 
   const results = []
@@ -247,7 +403,7 @@ async function batchLookupModrinth(ids) {
 
     const projects = await res.json()
     for (const p of projects) {
-      results.push(extractModrinthProject(p))
+      results.push(extractModrinthProject(p, urlSegment))
     }
 
     await delay(250)
@@ -310,11 +466,12 @@ async function refreshStaleCurseForge(merged, staleEntries) {
   return refreshed
 }
 
-async function refreshStaleModrinth(merged, staleEntries) {
+async function refreshStaleModrinth(merged, staleEntries, type) {
   const withIds = staleEntries.filter((a) => a.id)
   if (withIds.length === 0) return 0
 
-  const freshList = await batchLookupModrinth(withIds.map((a) => a.id))
+  const urlSegment = MR_PROJECT_TYPES[type]
+  const freshList = await batchLookupModrinth(withIds.map((a) => a.id), urlSegment)
   const freshBySlug = new Map(freshList.map((a) => [a.slug, a]))
   let refreshed = 0
 
@@ -335,23 +492,16 @@ async function refreshStaleModrinth(merged, staleEntries) {
 async function main() {
   console.log(`Updating addon registry (limit=${LIMIT}, dryRun=${dryRun})\n`)
 
-  // Load existing data
-  let data
-  try {
-    data = JSON.parse(readFileSync(DATA_PATH, "utf-8"))
-  } catch {
-    data = { curseforge: {}, modrinth: {} }
-  }
-
   let totalAdded = 0
   let totalUpdated = 0
   let totalRefreshed = 0
   let totalExisting = 0
+  const updatedShards = []
 
   // CurseForge types
   for (const type of Object.keys(CF_CLASS_IDS)) {
     process.stdout.write(`CurseForge ${type}...`)
-    const existing = data.curseforge[type] || []
+    const existing = loadShard("curseforge", type)
     const fetched = await fetchCurseForge(type, LIMIT)
     const { merged, added, updated, stale } = mergeAddons(existing, fetched)
     console.log(
@@ -367,7 +517,7 @@ async function main() {
       totalRefreshed += refreshed
     }
 
-    data.curseforge[type] = merged
+    updatedShards.push(["curseforge", type, merged])
     totalAdded += added
     totalUpdated += updated
     totalExisting += existing.length
@@ -376,7 +526,7 @@ async function main() {
   // Modrinth types (no worlds)
   for (const type of Object.keys(MR_PROJECT_TYPES)) {
     process.stdout.write(`Modrinth ${type}...`)
-    const existing = data.modrinth[type] || []
+    const existing = loadShard("modrinth", type)
     const fetched = await fetchModrinth(type, LIMIT)
     const { merged, added, updated, stale } = mergeAddons(existing, fetched)
     console.log(
@@ -387,12 +537,12 @@ async function main() {
       process.stdout.write(
         `  Refreshing ${stale.length} stale entries via batch...`
       )
-      const refreshed = await refreshStaleModrinth(merged, stale)
+      const refreshed = await refreshStaleModrinth(merged, stale, type)
       console.log(` ${refreshed} refreshed`)
       totalRefreshed += refreshed
     }
 
-    data.modrinth[type] = merged
+    updatedShards.push(["modrinth", type, merged])
     totalAdded += added
     totalUpdated += updated
     totalExisting += existing.length
@@ -403,10 +553,12 @@ async function main() {
   )
 
   if (dryRun) {
-    console.log("Dry run — not writing file.")
+    console.log("Dry run, not writing files.")
   } else {
-    writeFileSync(DATA_PATH, JSON.stringify(data, null, 2) + "\n")
-    console.log(`Written to ${DATA_PATH}`)
+    for (const [platform, type, list] of updatedShards) {
+      const path = writeShard(platform, type, list)
+      console.log(`Written ${platform}/${type} (${list.length}) to ${path}`)
+    }
   }
 }
 

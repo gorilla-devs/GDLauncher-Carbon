@@ -1,0 +1,82 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Install Minecraft Quilt"
+  description="Step-by-step guide to installing the Quilt mod loader with GDLauncher. Runs most Fabric mods plus its own."
+  keywords="install quilt, minecraft quilt, quilt mod loader, how to install quilt minecraft, quilt mods, gdlauncher quilt"
+  lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      {
+        name: "Download GDLauncher",
+        text: "Download and install GDLauncher from gdlauncher.com. Free, available for Windows, macOS, and Linux."
+      },
+      {
+        name: "Create a new instance",
+        text: "Open GDLauncher and click the + button on the Library page to create a new Minecraft instance."
+      },
+      {
+        name: "Pick Quilt as the loader",
+        text: "Select Quilt in the loader dropdown, then pick the Minecraft version you want. Quilt supports most of the modern MC range that Fabric does."
+      },
+      {
+        name: "Let GDLauncher install everything",
+        text: "GDLauncher downloads Minecraft, the matching Java version, and the Quilt loader automatically. No manual installer."
+      },
+      {
+        name: "Add mods",
+        text: "Open the new instance, go to the Addons tab, and install any Fabric or Quilt mod in one click. The Quilted Fabric API is pulled in automatically as a dependency."
+      },
+      {
+        name: "Hit Play",
+        text: "Click Play. Your Quilt instance launches with all installed mods loaded."
+      }
+    ]
+  }}
+>
+  <h2>What's Quilt?</h2>
+  <p>
+    Quilt is a fork of Fabric started in 2021, built to be a superset rather than a competitor. The Quilt loader runs almost every Fabric mod out of the box, plus a smaller set of Quilt-only mods that use its own APIs. The goal: keep Fabric compatibility while iterating faster on loader features.
+  </p>
+  <p>
+    In practice, if you've used Fabric, Quilt feels nearly identical. The community is smaller, so Quilt-exclusive mods are rare, but you don't lose access to the Fabric ecosystem by picking it.
+  </p>
+
+  <h2>Setting up Quilt</h2>
+  <p>
+    Click the <strong>+</strong> in GDLauncher, pick your Minecraft version, and choose <strong>Quilt</strong>. Use the latest stable loader version and create the instance. GDLauncher handles Minecraft, Java, and Quilt itself in the background.
+  </p>
+  <p>
+    The Quilt equivalent of Fabric API is <strong>Quilted Fabric API (QFAPI)</strong>. It includes Fabric API, so installing it lets you run both Fabric and Quilt mods in the same instance. GDLauncher resolves it as a dependency automatically when you install a mod that needs it.
+  </p>
+
+  <h2>Adding mods</h2>
+  <p>
+    Open your instance, go to <strong>Addons</strong>, and use the browser. Filter by Quilt and search for what you want. Fabric mods generally show up too and will load fine on Quilt, but the explicitly-Quilt versions are smoother when available.
+  </p>
+
+  <h2>Quilt vs Fabric</h2>
+  <p>
+    Same lineage, mostly the same mods. Fabric has the bigger community and is where most mods get released first. Quilt offers some loader-level improvements (better mixin handling, richer mod metadata, more flexible dependency resolution) and runs the Fabric ecosystem on top.
+  </p>
+  <p>
+    Pick Fabric if you want the mainstream option with the largest active modder base. Pick Quilt if you're curious about its loader features or you're following a modpack that specifically targets Quilt. For most players, the practical difference is small.
+  </p>
+
+  <h2>OptiFine replacement</h2>
+  <p>
+    OptiFine doesn't work with Quilt either. The same Fabric-side replacements apply: Sodium for performance, Iris for shaders, Continuity for connected textures (so adjacent glass, bookshelves, sandstone, etc. visually merge into one surface instead of showing per-block borders), LambDynamicLights for dynamic lighting (held torches actually light the area around you).
+  </p>
+
+  <h2>Troubleshooting</h2>
+  <p>
+    Seeing "missing Fabric API" or "missing Quilted Fabric API" errors? Open the instance's <strong>Addons</strong> tab and check QFAPI is in the list. If it isn't, search for "Quilted Fabric API" and install it manually.
+  </p>
+  <p>
+    A Fabric mod refusing to load on Quilt is rare but happens, usually with mods that hook into Fabric internals. If swapping to the Quilt-specific version (when one exists) doesn't help, the mod itself may not yet support Quilt.
+  </p>
+
+</GuideLayout>

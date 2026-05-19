@@ -1,0 +1,192 @@
+---
+/**
+ * Localized "How to Change an Instance's Icon" guide.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "インスタンスのアイコンを変更する方法",
+    description: "GDLauncher の各 Minecraft インスタンスに、お好みの PNG / JPG をアイコンとして設定する手順。",
+    steps: [
+      { name: "インスタンスを右クリック", text: "Library で対象のインスタンスを右クリックし、Edit を選択。" },
+      { name: "アイコンのサムネイルをクリック", text: "Edit Instance ダイアログで名前の横にある正方形の画像プレビューをクリック。ファイル選択ダイアログが開きます。" },
+      { name: "画像ファイルを選択", text: "PC から PNG または JPG を選びます。正方形が最も綺麗。GDLauncher は自動クロップしないため非正方形は余白が入ります。" },
+      { name: "保存", text: "Edit Instance で確定。Library のタイルにすぐ反映されます。" },
+      { name: "(任意) カスタムアイコンを削除", text: "再度 Edit Instance を開き、アイコン横のゴミ箱ボタンを押して保存。デフォルトに戻ります (Modpack の場合は Modpack のアイコン)。" }
+    ]
+  },
+  ko: {
+    title: "인스턴스 아이콘을 변경하는 방법",
+    description: "GDLauncher의 각 Minecraft 인스턴스에 원하는 PNG/JPG 아이콘을 지정하는 방법.",
+    steps: [
+      { name: "인스턴스를 오른쪽 클릭", text: "Library에서 대상 인스턴스를 오른쪽 클릭하고 Edit을 선택하세요." },
+      { name: "아이콘 썸네일 클릭", text: "Edit Instance 대화상자에서 이름 옆의 정사각형 이미지 미리보기를 클릭. 파일 선택 창이 열립니다." },
+      { name: "이미지 파일 선택", text: "PC에서 PNG 또는 JPG를 선택하세요. 정사각형이 가장 깔끔합니다. GDLauncher가 자동 크롭하지 않아 정사각형이 아니면 여백이 생깁니다." },
+      { name: "저장", text: "Edit Instance에서 확인. Library 타일에 즉시 반영됩니다." },
+      { name: "(선택) 커스텀 아이콘 제거", text: "Edit Instance를 다시 열고 아이콘 옆 휴지통 버튼을 눌러 저장. 기본 아이콘(모드팩이라면 모드팩 아이콘)으로 되돌아갑니다." }
+    ]
+  },
+  de: {
+    title: "Das Icon einer Instanz ändern",
+    description: "Gib jeder Minecraft-Instanz im GDLauncher dein eigenes PNG- oder JPG-Icon.",
+    steps: [
+      { name: "Rechtsklick auf die Instanz", text: "In der Library rechtsklick auf die Instanz, deren Icon du tauschen willst, und Edit wählen." },
+      { name: "Icon-Thumbnail anklicken", text: "Im Edit-Instance-Dialog auf das quadratische Bildvorschau neben dem Namen klicken. Es öffnet sich der Datei-Dialog." },
+      { name: "Bild auswählen", text: "Wähl ein PNG oder JPG vom Rechner. Quadratisch sieht am besten aus. GDLauncher schneidet nicht automatisch zu, nicht-quadratische Bilder werden mit Rahmen dargestellt." },
+      { name: "Speichern", text: "Edit Instance bestätigen. Das Icon erscheint sofort auf der Library-Kachel." },
+      { name: "(Optional) Custom-Icon entfernen", text: "Edit Instance erneut öffnen, auf das Mülleimer-Icon im Picker klicken und speichern. Es kommt das Default-Icon zurück (bzw. das Modpack-Icon)." }
+    ]
+  },
+  fr: {
+    title: "Comment changer l'icône d'une instance",
+    description: "Personnalise chaque instance Minecraft de GDLauncher avec ta propre icône PNG ou JPG.",
+    steps: [
+      { name: "Clic droit sur l'instance", text: "Dans la Library, clic droit sur l'instance dont tu veux changer l'icône et choisis Edit." },
+      { name: "Cliquer sur la vignette de l'icône", text: "Dans le dialogue Edit Instance, clique sur la prévisualisation carrée à côté du nom. Le sélecteur de fichier s'ouvre." },
+      { name: "Choisir un fichier image", text: "Prends un PNG ou un JPG sur ton PC. Le carré rend le mieux. GDLauncher ne recadre pas, les images non carrées seront affichées avec marges." },
+      { name: "Sauvegarder", text: "Confirme dans Edit Instance. L'icône apparaît immédiatement sur la tuile dans la Library." },
+      { name: "(Optionnel) Retirer l'icône custom", text: "Rouvre Edit Instance, clique sur la poubelle du picker et sauvegarde. L'icône revient à celle par défaut (ou à celle du modpack le cas échéant)." }
+    ]
+  },
+  es: {
+    title: "Cómo cambiar el icono de una instancia",
+    description: "Personaliza cada instancia de Minecraft en GDLauncher con tu propio icono PNG o JPG.",
+    steps: [
+      { name: "Clic derecho en la instancia", text: "En la Library, haz clic derecho en la instancia cuya imagen quieras cambiar y elige Edit." },
+      { name: "Pulsar la miniatura del icono", text: "En el diálogo Edit Instance, pulsa la vista previa cuadrada junto al nombre. Se abre el selector de archivos." },
+      { name: "Elegir un archivo de imagen", text: "Selecciona un PNG o JPG de tu PC. Lo cuadrado se ve mejor. GDLauncher no recorta, así que las imágenes no cuadradas saldrán con marco." },
+      { name: "Guardar", text: "Confirma en Edit Instance. El icono aparece de inmediato en la tarjeta de la Library." },
+      { name: "(Opcional) Quitar el icono personalizado", text: "Reabre Edit Instance, pulsa la papelera del picker y guarda. Vuelve al icono por defecto (o al del modpack si aplica)." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como mudar o ícone de uma instância",
+    description: "Personalize cada instância do Minecraft no GDLauncher com seu próprio ícone PNG ou JPG.",
+    steps: [
+      { name: "Clique com o botão direito na instância", text: "Na Library, clique com o botão direito na instância que quer alterar e escolha Edit." },
+      { name: "Clicar na miniatura do ícone", text: "No diálogo Edit Instance, clique no preview quadrado ao lado do nome. O seletor de arquivos abre." },
+      { name: "Escolher um arquivo de imagem", text: "Selecione um PNG ou JPG do seu PC. Quadrado fica melhor, o GDLauncher não corta automaticamente, então imagens não quadradas terão margens." },
+      { name: "Salvar", text: "Confirme no Edit Instance. O ícone aparece na hora no card da Library." },
+      { name: "(Opcional) Remover o ícone personalizado", text: "Reabra o Edit Instance, clique na lixeira do picker e salve. Volta para o ícone padrão (ou para o do modpack, se for o caso)." }
+    ]
+  },
+  it: {
+    title: "Come cambiare l'icona di un'istanza",
+    description: "Personalizza ogni istanza Minecraft in GDLauncher con la tua icona PNG o JPG.",
+    steps: [
+      { name: "Clic destro sull'istanza", text: "Nella Library, fai clic destro sull'istanza di cui vuoi cambiare l'icona e scegli Edit." },
+      { name: "Clicca sulla miniatura dell'icona", text: "Nel dialogo Edit Instance, clicca sull'anteprima quadrata accanto al nome. Si apre il selettore file." },
+      { name: "Scegli un file immagine", text: "Seleziona un PNG o un JPG dal tuo PC. Il quadrato rende meglio. GDLauncher non ritaglia automaticamente, quindi le immagini non quadrate avranno dei margini." },
+      { name: "Salva", text: "Conferma in Edit Instance. L'icona appare subito sulla tile nella Library." },
+      { name: "(Opzionale) Rimuovi l'icona personalizzata", text: "Riapri Edit Instance, clicca sul cestino del picker e salva. Torna all'icona di default (o a quella del modpack, se applicabile)." }
+    ]
+  }
+}
+const m = meta[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT1M", steps: m.steps }}>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>アイコンの出どころ</h2>
+      <p>CurseForge / Modrinth から導入した Modpack インスタンスの初期アイコンは Pack のロゴです。自作のカスタムインスタンスは汎用プレースホルダー。どちらも上書きできます。設定したアイコンはインスタンスのデータフォルダーにコピーされるので、元ファイルを移動・削除してもアイコンは残ります。</p>
+
+      <h2>サイズと形式の目安</h2>
+      <p>Library のグリッドでは約 80×80 px、詳細表示では拡大されます。256×256 や 512×512 px の正方形が綺麗。ピクセルアートやスクリーンショットなら可逆圧縮の PNG、写真系の画像なら JPG が無難です。</p>
+
+      <h2>デフォルトに戻す</h2>
+      <p>Edit Instance を再度開いてアイコン横のゴミ箱ボタンを押し、保存するだけ。Modpack インスタンスなら Pack のロゴ、カスタムなら汎用アイコンに戻ります。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>아이콘의 출처</h2>
+      <p>CurseForge/Modrinth에서 설치한 모드팩 인스턴스의 기본 아이콘은 팩의 로고입니다. 직접 만든 커스텀 인스턴스는 일반 플레이스홀더. 둘 다 덮어쓸 수 있습니다. 선택한 아이콘은 인스턴스의 데이터 폴더에 복사되므로 원본 파일을 옮기거나 삭제해도 아이콘은 남습니다.</p>
+
+      <h2>권장 사이즈와 포맷</h2>
+      <p>Library 그리드에서는 약 80×80 px, 상세 보기에서는 확대됩니다. 256×256 또는 512×512 px 정사각형이 깨끗합니다. 픽셀 아트나 스크린샷은 무손실 PNG, 사진은 JPG가 무난합니다.</p>
+
+      <h2>기본으로 되돌리기</h2>
+      <p>Edit Instance를 다시 열어 아이콘 옆 휴지통 버튼을 누르고 저장. 모드팩 인스턴스라면 팩 로고로, 커스텀이라면 일반 아이콘으로 돌아갑니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Woher das Icon stammt</h2>
+      <p>Bei CurseForge-/Modrinth-Modpack-Instanzen ist das Default-Icon das Logo des Packs. Bei Custom-Instanzen ist es ein Generic-Platzhalter. Beides lässt sich überschreiben. Das gewählte Bild wird in den Instanz-Datenordner kopiert, du kannst die Originaldatei danach verschieben oder löschen, ohne dass das Icon verschwindet.</p>
+
+      <h2>Empfohlene Größen und Formate</h2>
+      <p>In der Library-Grid wird das Icon mit ~80×80 px dargestellt, im Detail-View größer. Quadratisch bei 256×256 oder 512×512 px sieht überall scharf aus. PNG für Pixelart/Screenshots, JPG für Fotos.</p>
+
+      <h2>Auf Default zurücksetzen</h2>
+      <p>Edit Instance nochmal öffnen, auf das Mülleimer-Symbol im Picker klicken und speichern. Bei Modpack-Instanzen kommt das Pack-Logo zurück, bei Custom-Instanzen das Generic-Icon.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>D'où vient l'icône</h2>
+      <p>Pour les instances de modpack (CurseForge/Modrinth), l'icône par défaut est le logo du pack. Pour les instances custom que tu as créées, c'est un placeholder générique. Les deux sont remplaçables. L'icône choisie est copiée dans le dossier de données de l'instance, tu peux ensuite déplacer ou supprimer le fichier original sans perdre l'icône.</p>
+
+      <h2>Tailles et formats recommandés</h2>
+      <p>Dans la grille Library, l'icône fait ~80×80 px ; en vue détaillée, elle est agrandie. Du carré en 256×256 ou 512×512 px reste net partout. PNG pour pixel art/screenshots, JPG pour les photos.</p>
+
+      <h2>Revenir au défaut</h2>
+      <p>Rouvre Edit Instance, clique sur la poubelle du picker et sauvegarde. Pour une instance modpack, le logo du pack revient ; pour une custom, l'icône générique.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>De dónde viene el icono</h2>
+      <p>En las instancias de modpack (CurseForge/Modrinth), el icono por defecto es el logo del pack. En las instancias personalizadas que tú creaste, es un marcador genérico. Ambos se pueden sobrescribir. La imagen que elijas se copia a la carpeta de datos de la instancia, luego puedes mover o borrar el original sin perder el icono.</p>
+
+      <h2>Tamaños y formatos recomendados</h2>
+      <p>En la cuadrícula de la Library el icono ronda los 80×80 px; en la vista de detalle se amplía. Cuadrado a 256×256 o 512×512 px se ve nítido en cualquier zoom. PNG para pixel art/capturas, JPG para fotos.</p>
+
+      <h2>Volver al icono por defecto</h2>
+      <p>Reabre Edit Instance, pulsa la papelera del picker y guarda. En una instancia de modpack vuelve el logo del pack; en una custom, el icono genérico.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>De onde vem o ícone</h2>
+      <p>Em instâncias de modpack (CurseForge/Modrinth), o ícone padrão é o logo do pack. Em instâncias custom criadas por você, é um placeholder genérico. Os dois podem ser sobrescritos. A imagem escolhida é copiada para a pasta de dados da instância, você pode mover ou apagar o original depois sem perder o ícone.</p>
+
+      <h2>Tamanhos e formatos recomendados</h2>
+      <p>Na grade da Library o ícone fica em torno de 80×80 px; na visão de detalhes é ampliado. Quadrado a 256×256 ou 512×512 px fica nítido em qualquer zoom. PNG para pixel art/prints, JPG para fotos.</p>
+
+      <h2>Voltar para o padrão</h2>
+      <p>Reabra o Edit Instance, clique na lixeira do picker e salve. Em instância de modpack volta o logo do pack; em custom, o ícone genérico.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Da dove arriva l'icona</h2>
+      <p>Nelle istanze di modpack (CurseForge/Modrinth) l'icona di default è il logo del pack. Nelle istanze custom che hai creato tu, è un placeholder generico. Entrambi si possono sovrascrivere. L'immagine scelta viene copiata nella cartella dati dell'istanza, quindi puoi spostare o cancellare il file originale senza perdere l'icona.</p>
+
+      <h2>Dimensioni e formati consigliati</h2>
+      <p>Nella griglia della Library l'icona è circa 80×80 px, nella vista dettagli viene ingrandita. Quadrata a 256×256 o 512×512 px resta nitida a qualsiasi zoom. PNG per pixel art e screenshot, JPG per le foto.</p>
+
+      <h2>Tornare al default</h2>
+      <p>Riapri Edit Instance, clicca sul cestino del picker e salva. In un'istanza modpack torna il logo del pack, in una custom l'icona generica.</p>
+    </Fragment>
+  )}
+</GuideLayout>

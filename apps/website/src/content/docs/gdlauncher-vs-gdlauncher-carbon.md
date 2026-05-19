@@ -20,11 +20,13 @@ We have already reached and surpassed feature-parity with the old versions, and 
 
 Some of the new features include:
 
-- **A new Java Manager**: You can choose to let GDLauncher take care of Java for you, or you can use our advanced java management system to manually manage versions.
-- **Seamless Mod and Modloader Installation**: Installing any Minecraft version and modloaders like Forge, Fabric, Quilt, and Neoforge is now easier than ever.
-- **Extensive Addon and Modpack Support**: You can directly install addons and modpacks from CurseForge and Modrinth.
-- **Modpack Updater**: Change modpack version at any time, and generate a precise changelog of applied changes.
-- **Import/Export Instances**: (Work in Progress) We're working on making it possible to move your game instances between GDLauncher Carbon and other launchers like CurseForge, MultiMC, ATLauncher, Technic, Prism, Modrinth, FTB, and more.
+- **A new Java Manager**: You can choose to let GDLauncher take care of Java for you, or you can use our advanced Java management system to manually manage versions.
+- **Seamless Mod and Modloader Installation**: Installing any Minecraft version and modloaders like Forge, NeoForge, Fabric, and Quilt is now easier than ever.
+- **Extensive Addon and Modpack Support**: Install addons and modpacks directly from CurseForge and Modrinth, in the same search.
+- **Modpack Updater**: Change modpack version at any time, with a precise changelog of applied changes.
+- **Import/Export Instances**: Move existing instances into GDLauncher Carbon from legacy GDLauncher, MultiMC, ATLauncher, PrismLauncher, Technic, FTB, and the official CurseForge and Modrinth apps. Export back to a `.gdlpack`, `.zip`, or `.mrpack` for sharing.
+- **Built-in Minecraft Server Management**: Create, configure, and run Vanilla, Forge, NeoForge, Fabric, or Quilt servers from the same launcher you use to play.
+- **Cloud Instance Sharing**: Generate a short share code that recreates the exact same instance on another player's GDLauncher.
 
 ## What will happen to the old version?
 

@@ -1,0 +1,385 @@
+---
+/**
+ * Localized Forge launcher landing page. Brand names left untranslated
+ * (GDLauncher, Forge, NeoForge, Fabric, Quilt, CurseForge, Modrinth, ATM,
+ * FTB, Better MC, Sodium, Lithium, Iris). UI labels (Addons, Add Addons,
+ * Download, Play) stay in English.
+ */
+import KeywordLandingLayout from "../../components/KeywordLandingLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizedPath,
+} from "../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface FaqEntry { question: string; answer: string }
+interface Meta {
+  title: string
+  description: string
+  intro: string
+  faq: FaqEntry[]
+}
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft Forge ランチャー: ワンクリックで Forge を自動インストール",
+    description: "もっとも簡単な Minecraft Forge ランチャー。GDLauncher はインスタンス作成時に Forge を自動でインストール。NeoForge、Fabric、Quilt にも対応、すべてひとつのアプリで。",
+    intro: "Forge は Minecraft 最古の Mod ローダーで、いまでも最大規模の Mod ライブラリを抱えています。GDLauncher はインスタンス作成時に Forge を自動でインストール。JAR の手動実行や Java の準備は不要です。",
+    faq: [
+      {
+        question: "Minecraft でいちばん簡単な Forge ランチャーは?",
+        answer: "GDLauncher です。インスタンス作成時にローダーで Forge を選べば、選んだ Minecraft バージョンに合った Forge を自動でインストール。JAR の手動実行も Java のパス設定もありません。"
+      },
+      {
+        question: "Forge は別途インストールが必要?",
+        answer: "GDLauncher なら不要です。インスタンスを作って Mod ローダーに Forge を選ぶと、対応する Forge バージョンを自動でダウンロード・インストールします。NeoForge、Fabric、Quilt も同様です。"
+      },
+      {
+        question: "Forge と NeoForge の違いは?",
+        answer: "NeoForge は 2023 年にガバナンスを巡る分裂のあと、Forge コントリビューター数名が立ち上げた Forge のフォークです。Forge の API スタイルを維持しており (大半の Mod はソース互換)、リリースサイクルは速め。Minecraft 1.20.4 以降では、新規 Forge 系 Mod の多くは NeoForge で開発されています。古い Modpack はいまでも Forge 中心。GDLauncher は両方サポートしているので、Mod や Modpack が要求するほうを選んでください。"
+      },
+      {
+        question: "GDLauncher から Forge Mod を導入できる?",
+        answer: "はい。Forge インスタンスを用意したあとは Addons タブを開き、組み込みブラウザから CurseForge と Modrinth の Forge 対応 Mod をインストールできます。依存関係は自動で解決されます。"
+      },
+      {
+        question: "Forge を使うのに GDLauncher は安全?",
+        answer: "はい。GDLauncher は公式ソース (Forge Maven、CurseForge、Modrinth) からダウンロードします。認証は Mojang 公式の Microsoft アカウント API を使用しています。"
+      }
+    ]
+  },
+  ko: {
+    title: "Minecraft Forge 런처: 원클릭 Forge 자동 설치",
+    description: "가장 쉬운 Minecraft Forge 런처. GDLauncher가 인스턴스 생성 시 Forge를 자동으로 설치합니다. NeoForge, Fabric, Quilt까지 한 앱에서.",
+    intro: "Forge는 Minecraft의 원조 모드 로더이고 여전히 가장 큰 모드 라이브러리를 가지고 있습니다. GDLauncher가 인스턴스를 만들 때 Forge를 자동으로 설치해 줍니다. JAR 수동 실행도, Java 셋업도 필요 없습니다.",
+    faq: [
+      {
+        question: "Minecraft에서 가장 쉬운 Forge 런처는?",
+        answer: "GDLauncher입니다. 인스턴스를 만들 때 로더로 Forge를 고르면 선택한 Minecraft 버전에 맞는 Forge가 자동으로 설치됩니다. JAR을 직접 실행하거나 Java 경로를 설정할 필요가 없습니다."
+      },
+      {
+        question: "Forge를 따로 설치해야 하나요?",
+        answer: "GDLauncher에서는 아닙니다. 인스턴스를 만들고 모드 로더로 Forge를 고르면 알맞은 Forge 버전이 자동으로 다운로드되고 설치됩니다. NeoForge, Fabric, Quilt도 같은 방식입니다."
+      },
+      {
+        question: "Forge와 NeoForge의 차이는?",
+        answer: "NeoForge는 2023년 거버넌스 분열 이후 Forge 컨트리뷰터들이 만든 Forge의 포크입니다. Forge의 API 스타일을 유지해서 대부분의 모드가 소스 호환이고, 릴리스는 더 빠른 편입니다. Minecraft 1.20.4 이상에서는 새 Forge 계열 모드 개발이 대부분 NeoForge에서 일어나고 있습니다. 오래된 모드팩은 여전히 Forge 기반이 많습니다. GDLauncher는 두 가지 모두 지원하니, 모드나 모드팩이 요구하는 쪽을 고르세요."
+      },
+      {
+        question: "GDLauncher로 Forge 모드를 설치할 수 있나요?",
+        answer: "네. Forge 인스턴스가 준비되면 Addons 탭을 열고 내장 브라우저로 CurseForge나 Modrinth에서 Forge 호환 모드를 설치하면 됩니다. 의존성은 자동으로 처리됩니다."
+      },
+      {
+        question: "Forge 용도로 GDLauncher는 안전한가요?",
+        answer: "네. GDLauncher는 공식 출처(Forge Maven, CurseForge, Modrinth)에서만 다운로드합니다. 인증은 Mojang 공식 Microsoft 계정 API를 사용합니다."
+      }
+    ]
+  },
+  de: {
+    title: "Minecraft Forge Launcher: Forge mit einem Klick automatisch installieren",
+    description: "Der einfachste Minecraft-Forge-Launcher. GDLauncher installiert Forge automatisch, wenn du eine Instanz erstellst. Plus NeoForge, Fabric und Quilt, alles in einer App.",
+    intro: "Forge ist der ursprüngliche Minecraft-Mod-Loader und hat immer noch die größte Mod-Bibliothek. GDLauncher installiert Forge automatisch, wenn du eine Instanz anlegst, kein manuelles JAR, kein Java-Setup.",
+    faq: [
+      {
+        question: "Was ist der einfachste Forge-Launcher für Minecraft?",
+        answer: "GDLauncher. Beim Anlegen einer Instanz wählst du Forge als Loader, GDLauncher installiert die passende Forge-Version automatisch, für die Minecraft-Version, die du gewählt hast. Kein manueller JAR-Lauf, keine Java-Pfad-Konfiguration."
+      },
+      {
+        question: "Muss ich Forge separat installieren?",
+        answer: "Mit GDLauncher nicht. Beim Erstellen einer Instanz und der Wahl von Forge als Mod-Loader lädt GDLauncher die richtige Forge-Version runter und installiert sie. Genauso bei NeoForge, Fabric und Quilt."
+      },
+      {
+        question: "Was ist der Unterschied zwischen Forge und NeoForge?",
+        answer: "NeoForge ist ein 2023er Forge-Fork, gestartet von einer Gruppe Forge-Contributors nach einer Governance-Spaltung. Der API-Stil von Forge bleibt erhalten (die meisten Mods sind quelltext-kompatibel), aber Releases kommen schneller. Für Minecraft 1.20.4 und neuer findet die neue Forge-Style-Mod-Entwicklung vor allem auf NeoForge statt. Ältere Modpacks bleiben auf Forge. GDLauncher unterstützt beides, nimm das, was dein Mod oder Modpack braucht."
+      },
+      {
+        question: "Kann ich Forge-Mods über GDLauncher installieren?",
+        answer: "Ja. Sobald deine Forge-Instanz steht, öffne den Addons-Tab und installier mit dem eingebauten Browser jeden Forge-kompatiblen Mod aus CurseForge oder Modrinth. Abhängigkeiten werden automatisch gezogen."
+      },
+      {
+        question: "Ist GDLauncher sicher für Forge?",
+        answer: "Ja. GDLauncher nutzt offizielle Quellen (Forge Maven, CurseForge, Modrinth) für Downloads. Die Authentifizierung läuft über Mojangs offizielle Microsoft-Account-API."
+      }
+    ]
+  },
+  fr: {
+    title: "Launcher Minecraft Forge : installation auto de Forge en un clic",
+    description: "Le launcher Minecraft Forge le plus simple. GDLauncher installe Forge automatiquement à la création d'une instance. Avec aussi le support de NeoForge, Fabric et Quilt, dans une seule appli.",
+    intro: "Forge est le mod loader Minecraft d'origine, et il abrite toujours la plus grosse bibliothèque de mods. GDLauncher installe Forge pour toi automatiquement à la création d'une instance, pas de JAR à lancer à la main, pas de setup Java.",
+    faq: [
+      {
+        question: "Quel est le launcher Forge le plus simple pour Minecraft ?",
+        answer: "GDLauncher. À la création d'une instance, choisis Forge comme loader, GDLauncher installe Forge automatiquement, la bonne version pour la version Minecraft choisie. Pas de JAR à lancer à la main, pas de chemin Java à configurer."
+      },
+      {
+        question: "Faut-il installer Forge à part ?",
+        answer: "Pas avec GDLauncher. Quand tu crées une instance et choisis Forge comme mod loader, GDLauncher télécharge et installe la bonne version de Forge automatiquement. Pareil pour NeoForge, Fabric et Quilt."
+      },
+      {
+        question: "Quelle est la différence entre Forge et NeoForge ?",
+        answer: "NeoForge est un fork de Forge lancé en 2023 par un groupe de contributeurs de Forge après une scission sur la gouvernance. Il garde le style d'API de Forge (la plupart des mods sont compatibles au niveau source) mais sort des versions plus vite. Pour Minecraft 1.20.4 et plus, NeoForge est là où se fait l'essentiel du développement de nouveaux mods de style Forge. Les anciens modpacks restent sur Forge. GDLauncher supporte les deux, prends celui que ton mod ou modpack demande."
+      },
+      {
+        question: "Peut-on installer des mods Forge via GDLauncher ?",
+        answer: "Oui. Une fois ton instance Forge en place, ouvre l'onglet Addons et utilise le navigateur intégré pour installer n'importe quel mod compatible Forge depuis CurseForge ou Modrinth. Les dépendances sont gérées automatiquement."
+      },
+      {
+        question: "GDLauncher est-il sûr pour Forge ?",
+        answer: "Oui. GDLauncher utilise des sources officielles (le Maven Forge, CurseForge, Modrinth) pour les téléchargements. L'authentification passe par l'API officielle des comptes Microsoft de Mojang."
+      }
+    ]
+  },
+  es: {
+    title: "Launcher Minecraft Forge: instala Forge en un clic",
+    description: "El launcher de Minecraft Forge más fácil. GDLauncher instala Forge automáticamente al crear una instancia. Más soporte para NeoForge, Fabric y Quilt, todo en una sola app.",
+    intro: "Forge es el mod loader original de Minecraft y sigue siendo el que tiene la mayor librería de mods. GDLauncher instala Forge por ti automáticamente al crear una instancia, sin lanzar JARs a mano ni configurar Java.",
+    faq: [
+      {
+        question: "¿Cuál es el launcher Forge más fácil para Minecraft?",
+        answer: "GDLauncher. Al crear una instancia, elige Forge como loader, GDLauncher instala Forge automáticamente, la versión correcta para la versión de Minecraft que has elegido. Sin JARs manuales, sin rutas de Java que configurar."
+      },
+      {
+        question: "¿Tengo que instalar Forge aparte?",
+        answer: "Con GDLauncher no. Al crear una instancia y elegir Forge como mod loader, GDLauncher descarga e instala la versión correcta de Forge automáticamente. Lo mismo con NeoForge, Fabric y Quilt."
+      },
+      {
+        question: "¿Cuál es la diferencia entre Forge y NeoForge?",
+        answer: "NeoForge es un fork de Forge de 2023 iniciado por un grupo de colaboradores de Forge tras una división por la gobernanza. Mantiene el estilo de API de Forge (la mayoría de mods son compatibles a nivel de código) pero saca releases más rápido. Para Minecraft 1.20.4 y posteriores, NeoForge es donde se está moviendo casi todo el desarrollo nuevo de mods estilo Forge. Los modpacks antiguos siguen en Forge. GDLauncher soporta ambos, elige el que tu mod o modpack requiera."
+      },
+      {
+        question: "¿Puedo instalar mods Forge desde GDLauncher?",
+        answer: "Sí. Cuando tengas la instancia Forge, abre la pestaña Addons y usa el navegador integrado para instalar cualquier mod compatible con Forge desde CurseForge o Modrinth. Las dependencias se manejan automáticamente."
+      },
+      {
+        question: "¿GDLauncher es seguro para Forge?",
+        answer: "Sí. GDLauncher usa fuentes oficiales (el Maven de Forge, CurseForge, Modrinth) para las descargas. La autenticación usa la API oficial de cuentas Microsoft de Mojang."
+      }
+    ]
+  },
+  "pt-BR": {
+    title: "Launcher Minecraft Forge: instale o Forge automaticamente em um clique",
+    description: "O launcher Minecraft Forge mais fácil. O GDLauncher instala o Forge automaticamente quando você cria uma instância. Mais suporte a NeoForge, Fabric e Quilt, tudo em um só app.",
+    intro: "O Forge é o mod loader original do Minecraft e ainda tem a maior biblioteca de mods. O GDLauncher instala o Forge para você automaticamente quando você cria uma instância, sem rodar JAR na mão, sem setup do Java.",
+    faq: [
+      {
+        question: "Qual é o launcher Forge mais fácil para Minecraft?",
+        answer: "O GDLauncher. Ao criar uma instância, escolha Forge como loader, o GDLauncher instala o Forge automaticamente, na versão certa para a versão do Minecraft que você escolheu. Sem rodar JAR na mão, sem configurar caminho do Java."
+      },
+      {
+        question: "Preciso instalar o Forge separadamente?",
+        answer: "Com o GDLauncher, não. Quando você cria uma instância e escolhe Forge como mod loader, o GDLauncher baixa e instala a versão certa do Forge automaticamente. O mesmo vale para NeoForge, Fabric e Quilt."
+      },
+      {
+        question: "Qual é a diferença entre Forge e NeoForge?",
+        answer: "O NeoForge é um fork do Forge feito em 2023 por um grupo de contribuidores do Forge após uma divergência na governança. Ele mantém o estilo de API do Forge (a maioria dos mods é compatível no nível de código), mas lança versões mais rápido. No Minecraft 1.20.4 em diante, é no NeoForge que está rolando a maior parte do desenvolvimento novo de mods estilo Forge. Modpacks mais antigos continuam no Forge. O GDLauncher suporta os dois, escolha o que seu mod ou modpack exige."
+      },
+      {
+        question: "Dá para instalar mods Forge pelo GDLauncher?",
+        answer: "Sim. Com a instância Forge pronta, abra a aba Addons e use o navegador embutido para instalar qualquer mod compatível com Forge do CurseForge ou Modrinth. As dependências são resolvidas automaticamente."
+      },
+      {
+        question: "O GDLauncher é seguro para Forge?",
+        answer: "Sim. O GDLauncher usa fontes oficiais (Forge Maven, CurseForge, Modrinth) nos downloads. A autenticação usa a API oficial de contas Microsoft da Mojang."
+      }
+    ]
+  },
+  it: {
+    title: "Launcher Minecraft Forge: installa Forge in automatico con un click",
+    description: "Il launcher Minecraft Forge più semplice. GDLauncher installa Forge in automatico quando crei un'istanza. In più supporta NeoForge, Fabric e Quilt, tutto in un'unica app.",
+    intro: "Forge è il mod loader storico di Minecraft e ha ancora la libreria di mod più grande. GDLauncher installa Forge al posto tuo quando crei un'istanza: niente JAR da lanciare a mano, niente Java da configurare.",
+    faq: [
+      {
+        question: "Qual è il launcher Forge più semplice per Minecraft?",
+        answer: "GDLauncher. Quando crei un'istanza, scegli Forge come loader: GDLauncher installa Forge in automatico nella versione giusta per la versione di Minecraft che hai scelto. Niente JAR da lanciare a mano, niente percorsi Java da configurare."
+      },
+      {
+        question: "Devo installare Forge separatamente?",
+        answer: "Con GDLauncher no. Quando crei un'istanza e scegli Forge come mod loader, GDLauncher scarica e installa la versione corretta di Forge in automatico. Stessa cosa per NeoForge, Fabric e Quilt."
+      },
+      {
+        question: "Qual è la differenza tra Forge e NeoForge?",
+        answer: "NeoForge è un fork di Forge lanciato nel 2023 da un gruppo di contributor di Forge dopo una spaccatura sulla governance. Mantiene lo stile di API di Forge (la maggior parte delle mod è compatibile a livello di sorgente), ma rilascia versioni più in fretta. Su Minecraft 1.20.4 e successivi, lo sviluppo nuovo di mod in stile Forge si concentra soprattutto su NeoForge. I modpack più vecchi restano su Forge. GDLauncher li supporta entrambi: scegli quello che richiedono la tua mod o il tuo modpack."
+      },
+      {
+        question: "Posso installare le mod Forge da GDLauncher?",
+        answer: "Sì. Una volta pronta l'istanza Forge, apri la scheda Addons e usa il browser integrato per installare qualsiasi mod compatibile con Forge da CurseForge o Modrinth. Le dipendenze vengono gestite in automatico."
+      },
+      {
+        question: "GDLauncher è sicuro per Forge?",
+        answer: "Sì. GDLauncher usa fonti ufficiali (Forge Maven, CurseForge, Modrinth) per i download. L'autenticazione passa dall'API ufficiale Microsoft di Mojang."
+      }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<KeywordLandingLayout
+  pageSlug="forge-launcher"
+  title={m.title}
+  description={m.description}
+  intro={m.intro}
+  keywords="forge launcher, minecraft forge launcher, install forge minecraft, forge mod launcher, neoforge launcher, gdlauncher forge"
+  faq={m.faq}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>GDLauncher での Forge の扱い</h2>
+      <p>GDLauncher を開いて <strong>+ New Instance</strong> をクリック、Minecraft のバージョンを選び、ローダーのドロップダウンから <strong>Forge</strong> を選択。GDLauncher が対応する Forge を自動でダウンロード・インストールします。インストーラー JAR も Java パスのトラブルも、手作業の設定もありません。1 分以内に Mod 導入可能なインスタンスができます。</p>
+
+      <h2>Forge、NeoForge、Fabric、Quilt をすべてサポート</h2>
+      <p>Mod ごとに対応ローダーは異なります。クラシックな大型 Mod (Tinkers' Construct、Create、Twilight Forest、Botania、Applied Energistics) の多くは Forge か NeoForge。モダンな軽量化 Mod (Sodium、Lithium、Iris) は Fabric です。GDLauncher は選んだローダーを必ずインストール、Addons ブラウザはローダーでフィルタするので互換 Mod だけが表示されます。</p>
+      <ul>
+        <li><strong>Forge</strong>: 2011 年からの元祖 Mod ローダー。Mod カタログ最大。ATM、FTB、Better MC のような大型 Modpack の定番。</li>
+        <li><strong>NeoForge</strong>: 2023 年に元チームがフォーク。現代的な改善。1.20.4 以降の標準になりつつあります。</li>
+        <li><strong>Fabric</strong>: 軽量で更新が速い。軽量化や最新版での Mod プレイに向く選択肢。</li>
+        <li><strong>Quilt</strong>: Fabric のフォークで機能追加版。ほとんどの Fabric Mod と互換。</li>
+      </ul>
+
+      <h2>ワンクリックで Forge Modpack</h2>
+      <p>主要な Modpack の多くは Forge か NeoForge ベース。GDLauncher はそれをまるごと導入: 全 Mod、対応 Forge バージョン、対応 Minecraft バージョン、適切な Java ランタイム、適切な config まで。<a href={localizedPath("/modpacks", locale)}>All The Mods 10、RLCraft、Better Minecraft</a> を試すか、<a href={localizedPath("/guides/install-modpack", locale)}>Modpack ガイド</a> を参照してください。</p>
+
+      <h2>個別の Forge Mod を追加</h2>
+      <p>Forge インスタンスが用意できたら、その Addons タブを開いて Add Addons をクリック、ローダーを Forge でフィルタして検索。CurseForge と Modrinth が同時に検索され、人気の Forge Mod の大半は両方にあります。<a href={localizedPath("/guides/install-mods", locale)}>Mod の導入方法 →</a></p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>GDLauncher가 Forge를 다루는 방식</h2>
+      <p>GDLauncher를 열고 <strong>+ New Instance</strong>를 클릭, Minecraft 버전을 고른 뒤 로더 드롭다운에서 <strong>Forge</strong>를 선택하세요. GDLauncher가 알맞은 Forge 버전을 자동으로 받아 설치합니다. 별도의 인스톨러 JAR도, Java 경로 문제도, 수동 설정도 없습니다. 1분 안에 모드 작업이 가능한 인스턴스가 만들어집니다.</p>
+
+      <h2>Forge, NeoForge, Fabric, Quilt 모두 지원</h2>
+      <p>모드마다 대상 로더가 다릅니다. 클래식 대형 모드(Tinkers' Construct, Create, Twilight Forest, Botania, Applied Energistics)는 대부분 Forge나 NeoForge. 모던 성능 모드(Sodium, Lithium, Iris)는 Fabric입니다. GDLauncher는 어떤 로더든 골라서 설치해 주고, Addons 브라우저는 로더 기준으로 필터링되므로 호환되는 모드만 보입니다.</p>
+      <ul>
+        <li><strong>Forge</strong>: 2011년부터 이어진 원조 모드 로더. 가장 큰 모드 카탈로그. ATM, FTB, Better MC 같은 대형 모드팩의 기본.</li>
+        <li><strong>NeoForge</strong>: 2023년 원래 팀이 만든 포크. 현대적 개선들. 1.20.4 이상에서 표준이 되고 있습니다.</li>
+        <li><strong>Fabric</strong>: 가볍고 업데이트가 빠름. 성능 위주거나 최신 버전을 빨리 즐기고 싶을 때 좋습니다.</li>
+        <li><strong>Quilt</strong>: 기능을 더한 Fabric 포크. 대부분의 Fabric 모드와 호환됩니다.</li>
+      </ul>
+
+      <h2>모드팩을 원클릭으로</h2>
+      <p>인기 모드팩은 대부분 Forge나 NeoForge 기반입니다. GDLauncher가 통째로 설치합니다: 모든 모드, 알맞은 Forge 버전, 알맞은 Minecraft 버전, 알맞은 Java 런타임, 설정까지. <a href={localizedPath("/modpacks", locale)}>All The Mods 10, RLCraft, Better Minecraft</a>를 써 보거나 <a href={localizedPath("/guides/install-modpack", locale)}>모드팩 가이드</a>를 보세요.</p>
+
+      <h2>개별 Forge 모드 추가</h2>
+      <p>Forge 인스턴스가 준비됐다면 Addons 탭을 열고 Add Addons를 클릭, Forge 로더로 필터한 뒤 검색하세요. CurseForge와 Modrinth를 동시에 검색하며, 인기 Forge 모드 대부분은 두 곳 모두에 있습니다. <a href={localizedPath("/guides/install-mods", locale)}>모드 설치 방법 →</a></p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Wie GDLauncher Forge handhabt</h2>
+      <p>Öffne GDLauncher, klick auf <strong>+ New Instance</strong>, wähl eine Minecraft-Version und nimm im Loader-Dropdown <strong>Forge</strong>. GDLauncher zieht die richtige Forge-Version automatisch und installiert sie, kein separater Installer-JAR, keine Java-Pfad-Probleme, keine manuelle Konfiguration. Innerhalb einer Minute ist die Instanz mod-bereit.</p>
+
+      <h2>Forge, NeoForge, Fabric, Quilt: alles unterstützt</h2>
+      <p>Verschiedene Mods zielen auf verschiedene Loader. Die meisten klassischen Mods (Tinkers' Construct, Create, Twilight Forest, Botania, Applied Energistics) laufen auf Forge oder NeoForge. Moderne Performance-Mods (Sodium, Lithium, Iris) sind Fabric. GDLauncher installiert, was du wählst, und der Addons-Browser filtert nach Loader, du siehst also nur kompatible Inhalte.</p>
+      <ul>
+        <li><strong>Forge</strong>: Der ursprüngliche Mod-Loader seit 2011. Größter Mod-Katalog. Standard für die großen Modpacks wie ATM, FTB, Better MC.</li>
+        <li><strong>NeoForge</strong>: 2023er Fork vom Original-Team. Moderne Verbesserungen. Wird auf 1.20.4+ zum Standard.</li>
+        <li><strong>Fabric</strong>: Leichtgewichtig, schnelle Updates. Beste Wahl für Performance und Bleeding-Edge-Versionen.</li>
+        <li><strong>Quilt</strong>: Fabric-Fork mit Zusatzfeatures. Mit den meisten Fabric-Mods kompatibel.</li>
+      </ul>
+
+      <h2>Forge-Modpacks mit einem Klick</h2>
+      <p>Die meisten beliebten Modpacks sind Forge oder NeoForge. GDLauncher installiert sie komplett, jeden Mod, die passende Forge-Version, die passende Minecraft-Version, die passende Java-Runtime und die passenden Configs. Probier <a href={localizedPath("/modpacks", locale)}>All The Mods 10, RLCraft, Better Minecraft</a> oder schau in den <a href={localizedPath("/guides/install-modpack", locale)}>Modpack-Guide</a>.</p>
+
+      <h2>Einzelne Forge-Mods hinzufügen</h2>
+      <p>Sobald die Forge-Instanz steht, öffne ihren Addons-Tab, klick Add Addons, filter auf den Forge-Loader und such. CurseForge und Modrinth werden zusammen durchsucht, die meisten beliebten Forge-Mods sind auf beiden. <a href={localizedPath("/guides/install-mods", locale)}>So installierst du Mods →</a></p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Comment GDLauncher gère Forge</h2>
+      <p>Ouvre GDLauncher, clique sur <strong>+ New Instance</strong>, choisis une version de Minecraft et sélectionne <strong>Forge</strong> dans le dropdown du loader. GDLauncher télécharge et installe la bonne version de Forge automatiquement, pas d'installer JAR à part, pas de souci de chemin Java, pas de config manuelle. L'instance est prête à modder en moins d'une minute.</p>
+
+      <h2>Forge, NeoForge, Fabric, Quilt : tous supportés</h2>
+      <p>Différents mods visent différents loaders. La plupart des mods classiques (Tinkers' Construct, Create, Twilight Forest, Botania, Applied Energistics) sont sur Forge ou NeoForge. Les mods de performance modernes (Sodium, Lithium, Iris) sont sur Fabric. GDLauncher installe le loader que tu choisis, et le navigateur Addons filtre par loader, donc tu ne vois que du contenu compatible.</p>
+      <ul>
+        <li><strong>Forge</strong> : le mod loader original depuis 2011. Plus grand catalogue de mods. Choix par défaut des gros modpacks comme ATM, FTB, Better MC.</li>
+        <li><strong>NeoForge</strong> : fork de 2023 par l'équipe d'origine. Améliorations modernes. Devient le standard sur 1.20.4+.</li>
+        <li><strong>Fabric</strong> : léger, mises à jour rapides. Meilleur pour la performance et les versions bleeding-edge.</li>
+        <li><strong>Quilt</strong> : fork de Fabric avec des features en plus. Compatible avec la plupart des mods Fabric.</li>
+      </ul>
+
+      <h2>Les modpacks Forge en un clic</h2>
+      <p>La majorité des modpacks populaires sont Forge ou NeoForge. GDLauncher les installe en entier : chaque mod, la bonne version de Forge, la bonne version de Minecraft, le bon runtime Java, les bons configs. Essaie <a href={localizedPath("/modpacks", locale)}>All The Mods 10, RLCraft, Better Minecraft</a> ou regarde le <a href={localizedPath("/guides/install-modpack", locale)}>guide modpack</a>.</p>
+
+      <h2>Ajouter des mods Forge individuels</h2>
+      <p>Une fois l'instance Forge prête, ouvre son onglet Addons, clique Add Addons, filtre sur le loader Forge et cherche. CurseForge et Modrinth sont cherchés ensemble, les mods Forge les plus populaires sont sur les deux. <a href={localizedPath("/guides/install-mods", locale)}>Comment installer des mods →</a></p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Cómo gestiona GDLauncher el Forge</h2>
+      <p>Abre GDLauncher, pulsa <strong>+ New Instance</strong>, elige una versión de Minecraft y selecciona <strong>Forge</strong> en el desplegable de loader. GDLauncher descarga e instala la versión correcta de Forge automáticamente, sin JAR de instalación a parte, sin problemas de ruta de Java, sin configuración manual. La instancia está lista para moddear en menos de un minuto.</p>
+
+      <h2>Forge, NeoForge, Fabric, Quilt: todos soportados</h2>
+      <p>Cada mod apunta a un loader concreto. La mayoría de mods clásicos (Tinkers' Construct, Create, Twilight Forest, Botania, Applied Energistics) son Forge o NeoForge. Los mods modernos de rendimiento (Sodium, Lithium, Iris) son Fabric. GDLauncher instala el loader que elijas, y el navegador de Addons filtra por loader, así que solo ves contenido compatible.</p>
+      <ul>
+        <li><strong>Forge</strong>: el mod loader original desde 2011. El mayor catálogo de mods. Por defecto en los grandes modpacks como ATM, FTB, Better MC.</li>
+        <li><strong>NeoForge</strong>: fork de 2023 hecho por el equipo original. Mejoras modernas. Se está volviendo estándar en 1.20.4+.</li>
+        <li><strong>Fabric</strong>: ligero, se actualiza rápido. Lo mejor para rendimiento y versiones recién salidas.</li>
+        <li><strong>Quilt</strong>: fork de Fabric con extras. Compatible con la mayoría de mods Fabric.</li>
+      </ul>
+
+      <h2>Modpacks Forge en un clic</h2>
+      <p>La mayoría de los modpacks populares son Forge o NeoForge. GDLauncher los instala enteros: cada mod, la versión correcta de Forge, la versión correcta de Minecraft, el runtime de Java correcto y los configs correctos. Prueba <a href={localizedPath("/modpacks", locale)}>All The Mods 10, RLCraft, Better Minecraft</a> o mira la <a href={localizedPath("/guides/install-modpack", locale)}>guía de modpacks</a>.</p>
+
+      <h2>Añadir mods Forge sueltos</h2>
+      <p>Cuando tengas la instancia Forge lista, abre su pestaña Addons, pulsa Add Addons, filtra por el loader Forge y busca. CurseForge y Modrinth se buscan a la vez, la mayoría de mods Forge populares están en los dos. <a href={localizedPath("/guides/install-mods", locale)}>Cómo instalar mods →</a></p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>Como o GDLauncher cuida do Forge</h2>
+      <p>Abra o GDLauncher, clique em <strong>+ New Instance</strong>, escolha uma versão do Minecraft e selecione <strong>Forge</strong> no dropdown do loader. O GDLauncher baixa e instala a versão certa do Forge automaticamente, sem JAR de instalador à parte, sem problema de caminho do Java, sem configuração manual. A instância fica pronta para moddar em menos de um minuto.</p>
+
+      <h2>Forge, NeoForge, Fabric, Quilt: todos suportados</h2>
+      <p>Cada mod mira em um loader diferente. A maioria dos mods clássicos (Tinkers' Construct, Create, Twilight Forest, Botania, Applied Energistics) são Forge ou NeoForge. Os mods modernos de performance (Sodium, Lithium, Iris) são Fabric. O GDLauncher instala o loader que você escolher, e o navegador de Addons filtra por loader, então você só vê conteúdo compatível.</p>
+      <ul>
+        <li><strong>Forge</strong>: o mod loader original desde 2011. Maior catálogo de mods. Padrão dos modpacks grandes como ATM, FTB, Better MC.</li>
+        <li><strong>NeoForge</strong>: fork de 2023 feito pelo time original. Melhorias modernas. Virando padrão nas versões 1.20.4+.</li>
+        <li><strong>Fabric</strong>: leve, atualiza rápido. Melhor para performance e versões recém-lançadas.</li>
+        <li><strong>Quilt</strong>: fork do Fabric com extras. Compatível com a maioria dos mods Fabric.</li>
+      </ul>
+
+      <h2>Modpacks Forge em um clique</h2>
+      <p>A maior parte dos modpacks populares é Forge ou NeoForge. O GDLauncher instala tudo de uma vez: cada mod, a versão certa do Forge, a versão certa do Minecraft, o runtime Java certo e os configs certos. Experimente <a href={localizedPath("/modpacks", locale)}>All The Mods 10, RLCraft, Better Minecraft</a> ou veja o <a href={localizedPath("/guides/install-modpack", locale)}>guia de modpacks</a>.</p>
+
+      <h2>Adicionando mods Forge individuais</h2>
+      <p>Com a instância Forge pronta, abra a aba Addons, clique em Add Addons, filtre pelo loader Forge e procure. CurseForge e Modrinth são pesquisados juntos, e a maioria dos mods Forge populares está nos dois. <a href={localizedPath("/guides/install-mods", locale)}>Como instalar mods →</a></p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Come GDLauncher gestisce Forge</h2>
+      <p>Apri GDLauncher, clicca <strong>+ New Instance</strong>, scegli una versione di Minecraft e seleziona <strong>Forge</strong> dal menu del loader. GDLauncher scarica e installa la versione giusta di Forge in automatico: niente installer JAR a parte, niente problemi con i percorsi di Java, nessuna configurazione manuale. L'istanza è pronta a moddare in meno di un minuto.</p>
+
+      <h2>Forge, NeoForge, Fabric, Quilt: supportati tutti</h2>
+      <p>Mod diverse puntano a loader diversi. La maggior parte delle mod classiche (Tinkers' Construct, Create, Twilight Forest, Botania, Applied Energistics) gira su Forge o NeoForge. Le mod moderne di performance (Sodium, Lithium, Iris) sono Fabric. GDLauncher installa il loader che scegli, e il browser Addons filtra in base al loader, così vedi solo contenuti compatibili.</p>
+      <ul>
+        <li><strong>Forge</strong>: il mod loader originale dal 2011. Il catalogo più grande. Predefinito sui grossi modpack come ATM, FTB, Better MC.</li>
+        <li><strong>NeoForge</strong>: fork del 2023 nato dal team originale. Miglioramenti moderni. Sta diventando lo standard su 1.20.4 e successivi.</li>
+        <li><strong>Fabric</strong>: leggero, aggiornamenti rapidi. La scelta migliore per le prestazioni e per le versioni più recenti.</li>
+        <li><strong>Quilt</strong>: fork di Fabric con feature aggiuntive. In gran parte compatibile con le mod Fabric.</li>
+      </ul>
+
+      <h2>Modpack Forge con un click</h2>
+      <p>La maggior parte dei modpack popolari è basata su Forge o NeoForge. GDLauncher li installa per intero: ogni mod, la versione giusta di Forge, la versione giusta di Minecraft, il runtime Java corretto e le config corrette. Prova <a href={localizedPath("/modpacks", locale)}>All The Mods 10, RLCraft, Better Minecraft</a> oppure dai un'occhiata alla <a href={localizedPath("/guides/install-modpack", locale)}>guida ai modpack</a>.</p>
+
+      <h2>Aggiungere singole mod Forge</h2>
+      <p>Una volta pronta l'istanza Forge, apri la scheda Addons, clicca Add Addons, filtra per il loader Forge e cerca. CurseForge e Modrinth vengono cercati insieme, e la maggior parte delle mod Forge popolari si trova su entrambi. <a href={localizedPath("/guides/install-mods", locale)}>Come installare le mod →</a></p>
+    </Fragment>
+  )}
+</KeywordLandingLayout>

@@ -1,0 +1,61 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Change the Minecraft Version of an Instance"
+  description="Switch a custom Minecraft instance to a different version in GDLauncher while keeping your worlds, screenshots, and other in-instance files."
+  keywords="change minecraft version, change instance version, gdlauncher change version, minecraft version switch, update minecraft version, downgrade minecraft"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Right-click the instance", text: "In GDLauncher's Library, right-click the instance you want to change and pick Edit." },
+      { name: "Open the Minecraft Version dropdown", text: "In the Edit Instance dialog, click the Minecraft Version field. You'll see release, snapshot, beta, and alpha versions." },
+      { name: "Pick the new version", text: "Choose the version you want. If your instance has a mod loader, also pick a compatible loader version. Fabric, Forge, NeoForge, and Quilt all release per-Minecraft-version builds." },
+      { name: "Save", text: "Confirm. GDLauncher downloads the new client, libraries, and assets. The download size depends on what you already have cached." },
+      { name: "Launch and check mods", text: "Hit Play. Mods carry over from the previous version, but most mods only work on a specific Minecraft version, expect to remove or update incompatible ones." }
+    ]
+  }}
+>
+  <h2>What this does and doesn't change</h2>
+  <p>
+    Changing the Minecraft version updates the game client itself plus the libraries and assets that ship with it. The instance folder, your saves, screenshots, options.txt, resource packs, and mods, is untouched. That's both the convenience and the catch: your old mods are still there but probably won't load on the new version.
+  </p>
+  <p>
+    If you're moving to a Minecraft version that uses a different save format, your existing worlds may need a one-time format upgrade. Minecraft handles that on first load when the version is supported, but the upgrade is one-way, you can't open the upgraded world in the older version afterwards.
+  </p>
+
+  <h2>Custom vs modpack instances</h2>
+  <p>
+    This guide is for <strong>custom instances</strong>, the ones you created yourself with a chosen Minecraft version. For <strong>modpack instances</strong> (installed from CurseForge or Modrinth), the Minecraft version is part of the pack and switching it would break the pack's manifest. Use the <a href="/guides/update-modpack-version">Change Modpack Version</a> flow instead, which lets you move to a release of the pack that targets a newer Minecraft version.
+  </p>
+
+  <h2>Mod compatibility after a version change</h2>
+  <p>
+    Most mods declare a strict Minecraft version range. If you switch from 1.20.1 to 1.21, expect the majority of your mods to be incompatible. GDLauncher won't auto-update them, you'll need to reinstall the new versions from the Addons tab.
+  </p>
+  <p>
+    A practical workflow:
+  </p>
+  <ul>
+    <li>Note which mods you currently have (Mods tab).</li>
+    <li>Change the Minecraft version.</li>
+    <li>Open the Mods tab. Disable or delete the mods that don't load.</li>
+    <li>Open Addons → Add Addons and reinstall the same mods, filtering by the new Minecraft version.</li>
+  </ul>
+
+  <h2>Picking a compatible loader version</h2>
+  <p>
+    Fabric, Forge, NeoForge, and Quilt each tag versions per Minecraft release. When you change the Minecraft version, the loader version dropdown will reload to show only loader versions that target that Minecraft version. Pick the latest stable one unless a specific mod requires a particular loader build.
+  </p>
+
+  <h2>Downgrading vs upgrading</h2>
+  <p>
+    Both are supported. Downgrading is more often required than people expect, many of the largest modpacks sit on 1.20.1 or 1.21.1 because that's where the mod ecosystem is mature. Upgrading is what you do when you want to play with the newest Minecraft features.
+  </p>
+  <p>
+    If you're downgrading and the world won't open, that's the save-format issue. Minecraft can't downgrade a save once it's been upgraded. You'd need a backup of the world from before it was upgraded.
+  </p>
+
+</GuideLayout>

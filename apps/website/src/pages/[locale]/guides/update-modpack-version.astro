@@ -1,0 +1,199 @@
+---
+/**
+ * Localized "How to Update a Modpack to a New Version" guide.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Modpack を新しいバージョンに更新する方法",
+    description: "GDLauncher で CurseForge / Modrinth の Modpack インスタンスを、ワールドや設定を失わずに新バージョンへ更新する手順。",
+    steps: [
+      { name: "インスタンス設定を開く", text: "更新したい Modpack インスタンスを右クリックして Settings を選択 (またはインスタンスを開いて歯車アイコン)。" },
+      { name: "Modpack info セクションを確認", text: "設定ページの上部に Modpack のアイコン、名前、現在のバージョンが表示され、その下に Change Modpack Version ボタンがあります。" },
+      { name: "新しいバージョンを選ぶ", text: "Change Modpack Version をクリック。CurseForge または Modrinth (元のプラットフォーム) からバージョン一覧が読み込まれるので、希望のリリースを選択。" },
+      { name: "更新を確定", text: "確認ダイアログで OK。GDLauncher が Mod、設定、スクリプトを新バージョンに置き換えます。ワールド、スクリーンショット、インスタンス設定はそのまま。" },
+      { name: "起動して確認", text: "Play を押して起動し、ロード画面で警告が出ないか確認。問題があれば同じボタンで前のバージョンに戻せます。" }
+    ]
+  },
+  ko: {
+    title: "모드팩을 새 버전으로 업데이트하는 방법",
+    description: "GDLauncher에서 CurseForge 또는 Modrinth 모드팩 인스턴스를 월드나 설정을 잃지 않고 새 버전으로 업데이트하는 방법.",
+    steps: [
+      { name: "인스턴스 설정 열기", text: "업데이트할 모드팩 인스턴스를 오른쪽 클릭하고 Settings 선택 (또는 인스턴스를 열고 톱니바퀴 아이콘)." },
+      { name: "Modpack info 섹션 찾기", text: "설정 페이지 상단에 모드팩 아이콘, 이름, 현재 버전이 보이고 그 아래에 Change Modpack Version 버튼이 있습니다." },
+      { name: "새 버전 선택", text: "Change Modpack Version 클릭. CurseForge 또는 Modrinth (원본 플랫폼)에서 버전 목록을 가져옵니다. 원하는 릴리스를 고르세요." },
+      { name: "업데이트 확정", text: "모달에서 확인. GDLauncher가 모드, 설정, 스크립트를 새 버전에 맞게 바꿉니다. 저장된 월드, 스크린샷, 인스턴스별 옵션은 그대로 남습니다." },
+      { name: "실행해서 확인", text: "Play를 눌러 실행하고 로딩 화면에 누락 모드 경고가 없는지 확인. 문제가 있으면 같은 버튼으로 이전 버전으로 돌아갈 수 있습니다." }
+    ]
+  },
+  de: {
+    title: "Ein Modpack auf eine neue Version aktualisieren",
+    description: "Aktualisier eine CurseForge- oder Modrinth-Modpack-Instanz im GDLauncher, ohne Welten, Einstellungen oder Fortschritt zu verlieren.",
+    steps: [
+      { name: "Instanz-Einstellungen öffnen", text: "Rechtsklick auf die Modpack-Instanz und Settings wählen (oder Instanz öffnen und auf das Zahnrad klicken)." },
+      { name: "Den Modpack-Info-Bereich finden", text: "Oben auf der Einstellungsseite siehst du Modpack-Icon, Name und aktuelle Version. Darunter sitzt ein Change Modpack Version-Button." },
+      { name: "Neue Version auswählen", text: "Klick Change Modpack Version. GDLauncher lädt die Versionsliste von CurseForge oder Modrinth (je nach Quelle). Wähl das gewünschte Release." },
+      { name: "Update bestätigen", text: "Bestätigen. GDLauncher tauscht Mods, Configs und Scripts gegen die der neuen Version. Welten, Screenshots und Instanz-Optionen bleiben." },
+      { name: "Starten und prüfen", text: "Play drücken. Achte beim Ladebildschirm auf Warnungen zu fehlenden Mods. Falls etwas nicht passt, kannst du mit demselben Button zurück." }
+    ]
+  },
+  fr: {
+    title: "Comment mettre à jour un modpack vers une nouvelle version",
+    description: "Mets à jour une instance de modpack CurseForge ou Modrinth dans GDLauncher sans perdre tes mondes, tes réglages ni ta progression.",
+    steps: [
+      { name: "Ouvrir les paramètres de l'instance", text: "Clic droit sur l'instance modpack et choisis Settings (ou ouvre l'instance et clique sur la roue dentée)." },
+      { name: "Trouver la section Modpack info", text: "En haut de la page Settings, tu vois l'icône, le nom et la version actuelle du modpack. Dessous, le bouton Change Modpack Version." },
+      { name: "Choisir la nouvelle version", text: "Clique Change Modpack Version. GDLauncher charge la liste depuis CurseForge ou Modrinth (selon la plateforme d'origine). Sélectionne la release voulue." },
+      { name: "Confirmer la mise à jour", text: "Confirme dans le modal. GDLauncher remplace mods, configs et scripts par ceux de la nouvelle version. Mondes, screenshots et options par instance restent en place." },
+      { name: "Lancer et vérifier", text: "Appuie sur Play. Surveille l'écran de chargement pour des avertissements de mods manquants. Si ça coince, le même bouton te permet de revenir en arrière." }
+    ]
+  },
+  es: {
+    title: "Cómo actualizar un modpack a una nueva versión",
+    description: "Actualiza una instancia de modpack de CurseForge o Modrinth en GDLauncher sin perder mundos, ajustes ni progreso.",
+    steps: [
+      { name: "Abrir la configuración de la instancia", text: "Haz clic derecho en la instancia del modpack y selecciona Settings (o abre la instancia y pulsa el icono del engranaje)." },
+      { name: "Buscar la sección Modpack info", text: "Arriba en la página de Settings verás el icono, el nombre y la versión actual del modpack. Debajo está el botón Change Modpack Version." },
+      { name: "Elegir la nueva versión", text: "Pulsa Change Modpack Version. GDLauncher carga la lista desde CurseForge o Modrinth (según la plataforma de origen). Escoge la release que quieras." },
+      { name: "Confirmar la actualización", text: "Confirma en el modal. GDLauncher cambia mods, configs y scripts a los de la nueva versión. Mundos guardados, capturas y opciones por instancia se quedan." },
+      { name: "Arrancar y verificar", text: "Pulsa Play. Vigila la pantalla de carga por avisos de mods faltantes. Si algo no cuadra, el mismo botón te deja volver atrás." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como atualizar um modpack para uma versão mais nova",
+    description: "Atualize uma instância de modpack do CurseForge ou Modrinth no GDLauncher sem perder mundos, configurações ou progresso.",
+    steps: [
+      { name: "Abrir as configurações da instância", text: "Clique com o botão direito na instância do modpack e escolha Settings (ou abra a instância e clique no ícone de engrenagem)." },
+      { name: "Localizar a seção Modpack info", text: "No topo da página de Settings você vê o ícone, nome e versão atual do modpack. Logo abaixo fica o botão Change Modpack Version." },
+      { name: "Escolher a nova versão", text: "Clique em Change Modpack Version. O GDLauncher carrega a lista no CurseForge ou Modrinth (conforme a origem). Escolha a release desejada." },
+      { name: "Confirmar a atualização", text: "Confirme no modal. O GDLauncher troca mods, configs e scripts pelos da nova versão. Mundos salvos, prints e opções da instância continuam." },
+      { name: "Iniciar e conferir", text: "Aperte Play. Fique de olho na tela de carregamento por avisos de mods faltando. Se algo não bater, o mesmo botão permite voltar." }
+    ]
+  },
+  it: {
+    title: "Come aggiornare un Modpack a una nuova versione",
+    description: "Aggiorna un'istanza Modpack di CurseForge o Modrinth in GDLauncher senza perdere mappe, impostazioni o progressi.",
+    steps: [
+      { name: "Apri le impostazioni dell'istanza", text: "Clic destro sull'istanza del Modpack e scegli Settings (oppure apri l'istanza e clicca l'icona dell'ingranaggio)." },
+      { name: "Trova la sezione Modpack info", text: "In cima alla pagina Settings vedi icona, nome e versione attuale del Modpack. Sotto trovi il pulsante Change Modpack Version." },
+      { name: "Scegli la nuova versione", text: "Clicca Change Modpack Version. GDLauncher carica la lista da CurseForge o Modrinth (a seconda della piattaforma d'origine). Seleziona la release desiderata." },
+      { name: "Conferma l'aggiornamento", text: "Conferma nel modal. GDLauncher sostituisce mod, config e script con quelli della nuova versione. Mappe salvate, screenshot e opzioni dell'istanza restano." },
+      { name: "Avvia e controlla", text: "Premi Play. Tieni d'occhio la schermata di caricamento per avvisi di mod mancanti. Se qualcosa non torna, lo stesso pulsante ti permette di tornare indietro." }
+    ]
+  }
+}
+const m = meta[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT3M", steps: m.steps }}>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>置き換えられるもの・残るもの</h2>
+      <p>更新では Modpack に含まれる Mod、設定、スクリプト、リソースパックが新バージョンの内容に置き換わります。プレイで生成されたもの, ワールド、スクリーンショット、サーバーリスト、options.txt、自分で追加した Mod, はそのまま残ります。</p>
+      <p>大きなバージョン跨ぎ (1.20 → 1.21 など) ではセーブ形式が変わることがあるので、プレイ途中なら更新前にワールドフォルダーをコピーしておくのが安全です。</p>
+
+      <h2>ロック / アンロック</h2>
+      <p>Modpack インスタンスはデフォルトでロックされており、GDLauncher が同梱 Mod を管理してマニフェストとの整合性を保ちます。アンロックして自分で追加した Mod は更新時もそのまま維持されます。</p>
+
+      <h2>うまくいかない場合</h2>
+      <p>同じ Change Modpack Version ボタンで前のバージョンに戻せます。クラッシュ時はインスタンスフォルダー内の <code>__logs__</code> を確認。多くは Settings → Reinstall で解決します。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>교체되는 것과 남는 것</h2>
+      <p>업데이트는 모드팩이 함께 제공하는 모드, 설정, 스크립트, 리소스 팩을 새 버전 것으로 바꿉니다. 플레이로 생긴 것, 월드, 스크린샷, 서버 목록, options.txt, 직접 추가한 모드, 는 그대로 남습니다.</p>
+      <p>큰 버전 전환(예: 1.20 → 1.21)에서는 세이브 포맷이 바뀔 수 있으니, 진행 중인 월드가 있다면 업데이트 전에 월드 폴더를 복사해 두는 게 안전합니다.</p>
+
+      <h2>잠금 / 잠금 해제</h2>
+      <p>모드팩 인스턴스는 기본적으로 잠겨 있어 GDLauncher가 번들 모드를 관리하며 매니페스트와의 정합성을 유지합니다. 잠금을 풀고 직접 추가한 모드는 업데이트 시에도 그대로 유지됩니다.</p>
+
+      <h2>문제가 생기면</h2>
+      <p>같은 Change Modpack Version 버튼으로 이전 버전으로 되돌릴 수 있습니다. 크래시하면 인스턴스 폴더의 <code>__logs__</code>를 확인하세요. 대부분 Settings → Reinstall로 해결됩니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was ersetzt wird und was bleibt</h2>
+      <p>Das Update tauscht die Modpack-eigenen Inhalte aus. Mods, Configs, Scripts und Resource Packs, die der Pack mitliefert. Alles, was du beim Spielen erzeugt hast. Welten, Screenshots, Serverliste, options.txt, eigene Mods, bleibt unangetastet.</p>
+      <p>Bei größeren Versionssprüngen (z. B. 1.20 → 1.21) ändert sich oft das Save-Format. Wenn du mitten im Spielstand bist, kopier den Welt-Ordner vor dem Update als Backup.</p>
+
+      <h2>Locked vs unlocked</h2>
+      <p>Modpack-Instanzen sind standardmäßig gesperrt. GDLauncher verwaltet dann die Pack-Mods und verhindert Konflikte mit dem Manifest. Eigene Mods, die du nach Entsperren hinzugefügt hast, bleiben beim Update erhalten.</p>
+
+      <h2>Wenn was schiefgeht</h2>
+      <p>Mit demselben Change Modpack Version-Button kommst du auf die vorige Version zurück. Bei Crashes prüf <code>__logs__</code> in der Instanz. Viele Probleme löst Settings → Reinstall.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Ce qui est remplacé et ce qui reste</h2>
+      <p>La mise à jour remplace les éléments embarqués par le modpack, mods, configs, scripts et resource packs livrés avec le pack. Tout ce que tu as créé en jouant, mondes, screenshots, liste de serveurs, options.txt, tes mods perso, reste en place.</p>
+      <p>Sur des sauts de version importants (1.20 → 1.21 par exemple), le format de sauvegarde change parfois. En pleine partie, copie le dossier du monde avant la mise à jour pour avoir un backup.</p>
+
+      <h2>Verrouillé vs déverrouillé</h2>
+      <p>Les instances de modpack sont verrouillées par défaut. GDLauncher gère alors les mods du pack et évite les conflits avec le manifest. Les mods que tu as ajoutés après déverrouillage restent à travers la mise à jour.</p>
+
+      <h2>Quand ça coince</h2>
+      <p>Le même bouton Change Modpack Version permet de revenir à la version précédente. Si ça crash, regarde <code>__logs__</code> dans l'instance. La plupart des cas se règlent avec Settings → Reinstall.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Qué se reemplaza y qué se queda</h2>
+      <p>La actualización cambia el contenido propio del modpack, mods, configs, scripts y resource packs que vienen con el pack. Todo lo que generaste jugando, mundos, capturas, lista de servidores, options.txt, mods que añadiste tú, permanece intacto.</p>
+      <p>En saltos grandes de versión (por ejemplo 1.20 → 1.21) el formato de guardado puede cambiar. Si estás a medio juego, copia la carpeta del mundo antes de actualizar como copia de seguridad.</p>
+
+      <h2>Locked vs unlocked</h2>
+      <p>Las instancias de modpack vienen bloqueadas por defecto. GDLauncher gestiona los mods del pack y evita conflictos con el manifest. Los mods que añadiste tras desbloquear la instancia se mantienen al actualizar.</p>
+
+      <h2>Si algo va mal</h2>
+      <p>El mismo botón Change Modpack Version te permite volver a la versión anterior. Si crashea, revisa <code>__logs__</code> en la instancia. La mayoría se arregla con Settings → Reinstall.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que é trocado e o que permanece</h2>
+      <p>A atualização troca o conteúdo próprio do modpack, mods, configs, scripts e resource packs que vêm com o pack. Tudo que você gerou jogando, mundos, prints, lista de servidores, options.txt, mods que você adicionou, fica como está.</p>
+      <p>Em saltos grandes de versão (por exemplo 1.20 → 1.21) o formato de save pode mudar. Se estiver no meio de uma partida, copie a pasta do mundo antes de atualizar como backup.</p>
+
+      <h2>Locked vs unlocked</h2>
+      <p>Instâncias de modpack vêm bloqueadas por padrão. O GDLauncher gerencia os mods do pack e evita conflitos com o manifest. Mods que você adicionou após desbloquear continuam após a atualização.</p>
+
+      <h2>Se algo der errado</h2>
+      <p>O mesmo botão Change Modpack Version permite voltar para a versão anterior. Se travar, veja <code>__logs__</code> na instância. A maioria resolve com Settings → Reinstall.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cosa viene sostituito e cosa resta</h2>
+      <p>L'aggiornamento sostituisce i contenuti propri del Modpack: mod, config, script e Resource Pack che il pack include. Tutto quello che hai generato giocando (mappe, screenshot, lista server, options.txt, mod aggiunte da te) resta intatto.</p>
+      <p>Sui salti di versione grossi (per esempio 1.20 → 1.21) il formato dei salvataggi può cambiare. Se sei a metà di una partita, copia la cartella della mappa prima di aggiornare come backup.</p>
+
+      <h2>Locked vs unlocked</h2>
+      <p>Le istanze Modpack sono bloccate di default. GDLauncher gestisce le mod del pack ed evita conflitti col manifest. Le mod che hai aggiunte dopo aver sbloccato l'istanza restano dopo l'aggiornamento.</p>
+
+      <h2>Se qualcosa va storto</h2>
+      <p>Lo stesso pulsante Change Modpack Version ti permette di tornare alla versione precedente. Se crasha, controlla <code>__logs__</code> nella cartella dell'istanza. La maggior parte si risolve con Settings → Reinstall.</p>
+    </Fragment>
+  )}
+</GuideLayout>

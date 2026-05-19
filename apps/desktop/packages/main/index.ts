@@ -385,14 +385,19 @@ const loadCoreModule: CoreModule = () =>
     coreModule.stdout.on("data", (data) => {
       const dataString = data.toString()
 
-      // Redact the api token from the READY status line — it lands in the
-      // user-facing log buffer and the local log file. The user can already
-      // read their token from the runtime path, but log dumps shared via
-      // discord/issues should not leak it.
-      const sanitized = dataString.replace(
-        /(_STATUS_:READY\|\d+\|)[^\s|]+/g,
-        "$1<redacted>"
-      )
+      // Strip sensitive payloads before lines reach the user-facing buffer
+      // or main.log:
+      //   - `_STATUS_:READY|<port>|<api-token>` — the core API token. The
+      //     user can already read it from disk, but log dumps shared via
+      //     Discord / GitHub should not leak it.
+      //   - `_GDL_ACCOUNT_EMAIL_:<email>` — the signed-in user's email,
+      //     forwarded to Overwolf for ad personalisation. PII; must not
+      //     end up in shared support logs.
+      // IPC parsing below uses the raw `dataString`, so redaction here only
+      // affects what gets persisted/displayed.
+      const sanitized = dataString
+        .replace(/(_STATUS_:READY\|\d+\|)[^\s|]+/g, "$1<redacted>")
+        .replace(/(_GDL_ACCOUNT_EMAIL_:)[^\s\r\n]+/g, "$1<redacted>")
 
       console.log(`[CORE] Message: ${sanitized}`)
 

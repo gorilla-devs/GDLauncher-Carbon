@@ -3,6 +3,11 @@
  * Breadcrumb - Reusable breadcrumb navigation component
  * Shows on all pages except homepage
  */
+import {
+  getLocaleFromUrl,
+  localizedPath,
+  useTranslations,
+} from "../lib/i18n"
 
 interface BreadcrumbItem {
   label: string
@@ -15,16 +20,18 @@ interface Props {
 }
 
 const { items, maxWidth = "max-w-4xl" } = Astro.props
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
 ---
 
 <nav class={`${maxWidth} mx-auto px-4 py-4 text-sm`}>
   <ol class="flex items-center gap-2 text-darkSlate-100">
     <li>
-      <a href="/" class="hover:text-lightSlate-50 transition-colors">Home</a>
+      <a href={localizedPath("/", locale)} class="hover:text-lightSlate-50 transition-colors">{t("breadcrumb.home")}</a>
     </li>
     {items.map((item) => (
       <>
-        <li class="text-darkSlate-300">/</li>
+        <li class="text-darkSlate-300" aria-hidden="true">/</li>
         {item.href ? (
           <li>
             <a href={item.href} class="hover:text-lightSlate-50 transition-colors">

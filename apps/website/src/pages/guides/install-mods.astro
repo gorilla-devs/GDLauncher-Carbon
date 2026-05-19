@@ -7,6 +7,16 @@ import GuideLayout from "../../components/GuideLayout.astro"
   description="Learn how to install Minecraft mods using GDLauncher. Complete guide to finding and installing mods from CurseForge and Modrinth."
   keywords="install mods minecraft, how to install mods, minecraft mod guide, curseforge mods, modrinth mods, gdlauncher mods, forge mods, fabric mods"
   lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Open or create an instance", text: "In GDLauncher, pick an existing instance or create a new one with the loader the mod expects (Forge, Fabric, NeoForge, or Quilt) and a matching Minecraft version." },
+      { name: "Open the Addons tab", text: "Inside your instance, click the Addons tab and then click Add Addons. The built-in browser searches CurseForge and Modrinth at once." },
+      { name: "Find the mod", text: "Search by name or paste a Quick Install ID. Filter by mod loader and Minecraft version to make sure the result actually works in your instance." },
+      { name: "Click Download", text: "GDLauncher fetches the mod and any dependencies. Conflicts and version mismatches are flagged before they break the launch." },
+      { name: "Hit Play", text: "Launch the instance. The mod is now active. Repeat for any other mods you want." }
+    ]
+  }}
 >
   <h2>What are mods?</h2>
   <p>
@@ -45,7 +55,7 @@ import GuideLayout from "../../components/GuideLayout.astro"
 
   <h2>When things go wrong</h2>
   <p>
-    If a mod isn't working, the usual suspects are version mismatches and modloader mismatches. Make sure the mod is for your exact Minecraft version and the right mod loader — a Forge mod won't work on Fabric and vice versa. Check the mod's page for any dependencies you might be missing.
+    If a mod isn't working, the usual suspects are version mismatches and modloader mismatches. Make sure the mod is for your exact Minecraft version and the right mod loader, a Forge mod won't work on Fabric and vice versa. Check the mod's page for any dependencies you might be missing.
   </p>
   <p>
     Crashes on launch usually mean a conflict somewhere. Remove the most recently added mods one at a time until you find the culprit. Sometimes two mods just don't play nice together. If you have a ton of mods, you might also need more RAM (see our <a href="/guides/allocate-more-ram">RAM guide</a>).

@@ -2,7 +2,15 @@
 /**
  * ComparisonTable - GDLauncher vs other launchers comparison
  */
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { DownloadLink } from "../DownloadLink"
 
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+
+// Launcher names are proper nouns, kept untranslated. "Mojang Launcher"
+// is the first-party Minecraft Launcher shipped by Mojang/Microsoft; the
+// short label keeps the table column narrow.
 const launchers = [
   { name: "GDLauncher", highlight: true },
   { name: "Modrinth App" },
@@ -10,73 +18,37 @@ const launchers = [
   { name: "Prism Launcher" },
   { name: "ATLauncher" },
   { name: "MultiMC" },
-  { name: "Official" }
+  { name: "Mojang Launcher" }
 ]
 
-const features: Array<{ name: string; values: (boolean | string)[]; note?: string }> = [
-  {
-    name: "CurseForge Support",
-    values: [true, false, true, "partial", "partial", "partial", false]
-  },
-  {
-    name: "Modrinth Support",
-    values: [true, true, false, true, true, true, false]
-  },
-  {
-    name: "Auto Java Management",
-    values: [true, true, true, false, true, false, true]
-  },
-  {
-    name: "Mods Auto Updater",
-    values: [true, true, true, false, true, false, false]
-  },
-  {
-    name: "Modpacks Auto Updater",
-    values: [true, true, true, false, true, false, false]
-  },
-  {
-    name: "Multi-Instance",
-    values: [true, true, true, true, true, true, false]
-  },
-  {
-    name: "Instance Sharing",
-    values: [true, false, false, false, false, false, false]
-  },
-  {
-    name: "Server Management",
-    values: [true, false, false, false, false, false, false]
-  },
-  {
-    name: "Modern UI",
-    values: [true, true, true, false, false, false, false]
-  },
-  {
-    name: "Pays Addon Authors",
-    values: [true, true, true, false, false, false, false]
-  },
-  {
-    name: "Extremely Lightweight",
-    values: [false, false, false, true, false, true, false]
-  },
-  {
-    name: "Cloud Saves Sync",
-    values: ["coming-soon", false, false, false, false, false, false]
-  }
+// Feature/value matrix. Order of values matches `launchers` above.
+// We intentionally do NOT list cloudSaves: it's roadmap, not shipped, and
+// landing-page comparison tables shouldn't make forward-looking promises.
+const features: Array<{ nameKey: string; values: (boolean | string)[]; note?: string }> = [
+  { nameKey: "compare.feature.curseforgeSupport", values: [true, false, true, "partial", "partial", false, false] },
+  { nameKey: "compare.feature.modrinthSupport", values: [true, true, false, true, true, true, false] },
+  { nameKey: "compare.feature.autoJava", values: [true, true, true, true, true, false, true] },
+  { nameKey: "compare.feature.modUpdater", values: [true, true, true, false, true, false, false] },
+  { nameKey: "compare.feature.modpackUpdater", values: [true, true, true, false, true, false, false] },
+  { nameKey: "compare.feature.multiInstance", values: [true, true, true, true, true, true, false] },
+  { nameKey: "compare.feature.instanceSharing", values: [true, false, false, false, false, false, false] },
+  { nameKey: "compare.feature.serverMgmt", values: [true, true, false, false, false, false, false] },
+  { nameKey: "compare.feature.modernUi", values: [true, true, true, false, false, false, false] },
+  { nameKey: "compare.feature.paysAuthors", values: [true, true, true, false, false, false, false] },
+  { nameKey: "compare.feature.lightweight", values: [false, false, false, true, false, true, false] }
 ]
 
 function getValueDisplay(value: boolean | string) {
   if (value === true) {
-    return { icon: "check", class: "text-green-400", label: null, srText: "Yes" }
+    return { icon: "check", class: "text-green-400", label: null, srText: t("compare.sr.yes") }
   } else if (value === false) {
-    return { icon: "x", class: "text-darkSlate-400", label: null, srText: "No" }
+    return { icon: "x", class: "text-darkSlate-400", label: null, srText: t("compare.sr.no") }
   } else if (value === "partial") {
-    return { icon: "check", class: "text-yellow-400", label: "requires workaround", srText: "Partial, requires workaround" }
-  } else if (value === "coming-soon") {
-    return { icon: "clock", class: "text-yellow-400", label: "coming soon", srText: "Coming soon" }
+    return { icon: "check", class: "text-yellow-400", label: t("compare.label.partial"), srText: t("compare.sr.partial") }
   } else if (value === "?") {
-    return { icon: "?", class: "text-darkSlate-300", label: null, srText: "Unknown" }
+    return { icon: "?", class: "text-darkSlate-300", label: null, srText: t("compare.sr.unknown") }
   } else {
-    return { icon: "x", class: "text-darkSlate-400", label: null, srText: "No" }
+    return { icon: "x", class: "text-darkSlate-400", label: null, srText: t("compare.sr.no") }
   }
 }
 ---
@@ -86,24 +58,24 @@ function getValueDisplay(value: boolean | string) {
     <!-- Section header -->
     <div class="text-center mb-16" data-scroll="fade-up">
       <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
-        How We
+        {t("compare.heading.line1")}{" "}
         <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
-          Compare
+          {t("compare.heading.line2")}
         </span>
       </h2>
       <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
-        See how GDLauncher stacks up against other popular Minecraft launchers.
+        {t("compare.subheading")}
       </p>
     </div>
 
     <!-- Comparison table -->
     <div class="overflow-x-auto" data-scroll="scale" data-scroll-delay="150">
       <table class="w-full border-collapse">
-        <caption class="sr-only">Feature comparison between GDLauncher and other Minecraft launchers</caption>
+        <caption class="sr-only">{t("compare.tableCaption")}</caption>
         <thead>
           <tr>
             <th scope="col" class="text-left p-4 text-darkSlate-100 font-medium border-b border-darkSlate-700">
-              Feature
+              {t("compare.column.feature")}
             </th>
             {launchers.map((launcher) => (
               <th
@@ -123,7 +95,7 @@ function getValueDisplay(value: boolean | string) {
           {features.map((feature, rowIndex) => (
             <tr class={rowIndex % 2 === 0 ? "bg-darkSlate-800/30" : ""}>
               <th scope="row" class="p-4 text-lightSlate-100 font-normal text-left border-b border-darkSlate-700/50">
-                {feature.name}
+                {t(feature.nameKey)}
                 {feature.note && (
                   <span class="block text-xs text-darkSlate-200 mt-1">{feature.note}</span>
                 )}
@@ -152,17 +124,6 @@ function getValueDisplay(value: boolean | string) {
                         <path d="M18 6L6 18M6 6l12 12"/>
                       </svg>
                     )}
-                    {display.icon === "clock" && (
-                      <div class="flex flex-col items-center gap-1">
-                        <svg aria-hidden="true" class={`w-5 h-5 ${display.class}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <circle cx="12" cy="12" r="10"/>
-                          <path d="M12 6v6l4 2"/>
-                        </svg>
-                        {display.label && (
-                          <span class="text-xs text-darkSlate-200">{display.label}</span>
-                        )}
-                      </div>
-                    )}
                     {display.icon === "?" && (
                       <span aria-hidden="true" class={`text-lg font-bold ${display.class}`}>?</span>
                     )}
@@ -177,16 +138,13 @@ function getValueDisplay(value: boolean | string) {
 
     <!-- CTA -->
     <div class="text-center mt-12" data-scroll="fade-up" data-scroll-delay="300">
-      <a
-        href="/download/windows"
-        data-astro-prefetch="false"
+      <DownloadLink
+        client:idle
         class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95"
-      >
-        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-        </svg>
-        Try GDLauncher Today
-      </a>
+        iconClass="w-5 h-5"
+        label={t("compare.cta")}
+        iconLeft
+      />
     </div>
   </div>
 </section>

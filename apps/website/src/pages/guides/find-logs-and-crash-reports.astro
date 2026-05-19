@@ -1,0 +1,45 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Find Minecraft Logs and Crash Reports in GDLauncher"
+  description="Where GDLauncher stores Minecraft logs and crash reports, how to view them in-app, and how to attach them to a support request."
+  keywords="minecraft crash report, gdlauncher logs, latest.log location, view minecraft logs, find crash report, minecraft troubleshooting"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Right-click the instance", text: "In the GDLauncher Library, right-click the instance you want to inspect logs for. Open the More Options submenu and select View Logs." },
+      { name: "Pick the launch session", text: "The Logs sidebar lists every launch grouped by date (Today, Yesterday, X days ago). The most recent is highlighted at the top. Click any session to load its log into the main panel." },
+      { name: "Search the log", text: "Use the search bar to filter lines. Enable regex, case-sensitive, or whole-word matching with the toggles next to the search box. For crashes, search for 'caused by', 'Exception', or the name of a suspect mod." },
+      { name: "Find the Minecraft side", text: "GDLauncher's View Logs shows the launcher's per-instance log. For Minecraft's own log files (latest.log) and crash dumps, right-click the instance → Open Folder, then go into instance/logs/ or instance/crash-reports/." },
+      { name: "Share for support", text: "Open the instance folder, copy latest.log (or the relevant crash report file) somewhere you can attach it to a Discord message or GitHub issue. Don't paste it into chat directly, log files are usually too large." }
+    ]
+  }}
+>
+  <h2>Where logs actually live on disk</h2>
+  <p>GDLauncher and Minecraft each write their own logs to different places. Knowing which is which saves time:</p>
+  <ul>
+    <li><strong>GDLauncher per-instance log</strong>: <code>&lt;instance&gt;/logs/&lt;timestamp&gt;.log</code>. Covers the launcher's view of the launch, Java arguments, asset downloads, mod loader install, exit code. This is what the View Logs UI shows.</li>
+    <li><strong>Minecraft's own game log</strong>: <code>&lt;instance&gt;/instance/logs/latest.log</code>. Rotated to <code>&lt;date&gt;-1.log.gz</code> on the next launch. This is what the game writes once it starts up.</li>
+    <li><strong>Minecraft crash report</strong>: <code>&lt;instance&gt;/instance/crash-reports/crash-&lt;date&gt;-&lt;side&gt;.txt</code>. Only created when the game crashes hard.</li>
+    <li><strong>App-wide GDLauncher log</strong>: <code>&lt;runtime_path&gt;/__gdl_logs__/&lt;timestamp&gt;.log</code>. Used for anything not tied to a single instance (account sign-in, updates, settings changes). Up to ten most-recent are kept.</li>
+  </ul>
+
+  <h2>Reading a crash report</h2>
+  <p>Crash reports have a predictable shape. The first useful line is usually a few paragraphs in, prefixed with <code>Caused by:</code> or <code>java.lang.…Exception</code>. Right after that is the stack trace; the top of the stack is the actual point of failure. If the top mentions a mod's class name (something like <code>com.example.modid.…</code>), that mod is the suspect.</p>
+  <p>Common patterns:</p>
+  <ul>
+    <li><code>OutOfMemoryError</code>: not enough RAM allocated. Raise the slider in instance Settings.</li>
+    <li><code>NoClassDefFoundError</code> / <code>NoSuchMethodError</code>: mod compiled against a different version of another mod. Check mod versions match.</li>
+    <li><code>Mixin apply failed</code>: typically a Fabric mod conflict; the report tells you which mixin and from which mod.</li>
+  </ul>
+
+  <h2>Attaching logs to a support request</h2>
+  <p>When you ask for help, attach the entire log, not just the line you think is the error. The full file usually contains the missing context. Use a paste site like <code>mclo.gs</code> (designed for Minecraft logs) for big files, or attach as a file in Discord.</p>
+  <p>Before sharing, skim for personal info, your Minecraft username and UUID appear in the logs. Both are public information already, but you may want to redact your home directory path on Linux/macOS if it contains your real name.</p>
+
+  <h2>Clearing old logs</h2>
+  <p>Logs and crash reports are append-only and safe to delete. To reclaim disk space, open the instance folder and delete the contents of <code>logs/</code>, <code>instance/logs/</code>, and <code>instance/crash-reports/</code>. The launcher recreates them on the next launch.</p>
+</GuideLayout>

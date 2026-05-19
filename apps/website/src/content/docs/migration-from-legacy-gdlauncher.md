@@ -15,18 +15,19 @@ You can download GDLauncher Carbon from our [official website](https://gdlaunche
 Once you've downloaded the new version, you can install it by following the installation instructions for your operating system [here](/docs/installation).
 Installing GDLauncher Carbon will replace the old version as they share the same exact app id. By installing GDLauncher Carbon you will not lose any of your old instances, as they are stored in a different folder.
 
-## Auto Import your old instance
+## Auto Import your old instances
 
-After running GDLauncher Carbon and logging in, you'll be welcomed with an onboarding modal that will ask you if you want to import your old instances.
+After installing GDLauncher Carbon and logging in, the onboarding flow asks if you want to import your existing instances from legacy GDLauncher. If you skipped onboarding, you can run the same flow at any time: open the Library page, click the **+** in the Library toolbar → **Import** tab → pick **GDLauncher (legacy)** as the source. GDLauncher Carbon reads the legacy launcher's instance list directly and imports each instance into its own folder.
 
-## Manually Import your old instance
+## Manually Import your old instances
 
-If for any reason the auto import doesn't work, you should first of all report the issue to us [here](https://discord.gdlauncher.com).
-You can manually import your old instances by doing the following:
+If the importer can't find the legacy launcher (e.g. installed in a non-default location), point it at the folder manually from the same Import tab.
 
-- Create a new instance in GDLauncher Carbon with the same configuration. If it's a modpack, install the same exact version of the modpack. If it's a vanilla instance, install the same version of minecraft and modloader.
-- Open old GDLauncher data path.
-- Copy the content of the instance folder from the old GDLauncher instance path to the new GDLauncher Carbon instance path. Refer to the [troobleshooting](/docs/troubleshooting) page for details on the data path, or you can simply right click the instance tile and click "Open Instance Folder".
+If something still fails, please report it on our [Discord](https://discord.gdlauncher.com). As a last resort you can copy files by hand:
+
+- Create a new instance in GDLauncher Carbon with the same configuration (same Minecraft version and mod loader; if it's a modpack, install the same exact pack version first).
+- Open the legacy GDLauncher data path, find the source instance folder.
+- Open the new Carbon instance: right-click → **More Options** → **Open Folder**. Copy the contents of the legacy instance into Carbon's `instance/` subfolder. See the [troubleshooting](/docs/troubleshooting) page for the exact data path locations.
 
 ## Deleting old instances (optional)
 
