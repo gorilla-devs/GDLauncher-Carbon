@@ -765,10 +765,7 @@ async function createWindow(): Promise<BrowserWindow> {
   win.webContents.on("before-input-event", (event, input) => {
     if (input.alt && input.shift && input.code === "KeyI") {
       event.preventDefault()
-      if (!app.isPackaged) {
-        console.log("dev tools open:", win?.webContents.isDevToolsOpened())
-        win?.webContents.toggleDevTools()
-      }
+      win?.webContents.toggleDevTools()
     }
   })
 
