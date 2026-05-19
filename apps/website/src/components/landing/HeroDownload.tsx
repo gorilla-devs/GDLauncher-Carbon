@@ -1,4 +1,4 @@
-import { createSignal, onMount, For, Show } from "solid-js"
+import { createSignal, onMount, For } from "solid-js"
 import { detectOS } from "../../utils/detectOS"
 import type { OS } from "../../utils/detectOS"
 
@@ -8,22 +8,22 @@ const OS_CONFIG = {
     requirement: "Windows 10+",
     icon: "i-simple-icons:windows11",
     url: "/download/windows",
-    labelKey: "windows" as const,
+    labelKey: "windows" as const
   },
   MacOS: {
     label: "macOS",
     requirement: "macOS 10.15+",
     icon: "i-simple-icons:apple",
     url: "/download/mac",
-    labelKey: "macos" as const,
+    labelKey: "macos" as const
   },
   Linux: {
     label: "Linux",
     requirement: "Linux (glibc 2.31+)",
     icon: "i-simple-icons:linux",
     url: "/download/linux",
-    labelKey: "linux" as const,
-  },
+    labelKey: "linux" as const
+  }
 } as const
 
 export interface HeroDownloadLabels {
@@ -31,27 +31,19 @@ export interface HeroDownloadLabels {
   macos: string
   linux: string
   alsoAvailable: string
-  loading: string
 }
 
 interface Props {
   labels: HeroDownloadLabels
+  /** Resolved at build time, see src/lib/launcherManifests.ts */
+  version: string
 }
 
 export default function HeroDownload(props: Props) {
   const [currentOS, setCurrentOS] = createSignal<OS>("Windows")
-  const [version, setVersion] = createSignal<string | null>(null)
 
-  onMount(async () => {
+  onMount(() => {
     setCurrentOS(detectOS())
-
-    try {
-      const response = await fetch("/api/version")
-      const data = await response.json()
-      setVersion(data.version)
-    } catch {
-      setVersion("latest")
-    }
   })
 
   const config = () => OS_CONFIG[currentOS()]
@@ -71,19 +63,16 @@ export default function HeroDownload(props: Props) {
 
       {/* Version and Requirements */}
       <p class="text-sm text-darkSlate-100 flex items-center gap-2">
-        <Show
-          when={version()}
-          fallback={<span class="text-lightSlate-200">{props.labels.loading}</span>}
-        >
-          <span class="text-lightSlate-200">v{version()}</span>
-        </Show>
+        <span class="text-lightSlate-200">v{props.version}</span>
         <span class="text-darkSlate-300">|</span>
         <span>{config().requirement}</span>
       </p>
 
       {/* All OS Icons */}
       <div class="flex items-center gap-4">
-        <span class="text-xs text-darkSlate-200 uppercase tracking-wider">{props.labels.alsoAvailable}</span>
+        <span class="text-xs text-darkSlate-200 uppercase tracking-wider">
+          {props.labels.alsoAvailable}
+        </span>
         <div class="flex items-center gap-2">
           <For each={Object.entries(OS_CONFIG)}>
             {([_os, cfg]) => (

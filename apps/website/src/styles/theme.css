@@ -120,6 +120,7 @@ html {
   font-family: var(--font-family);
   scroll-behavior: smooth;
   background-color: rgb(var(--darkSlate-800));
+  scrollbar-gutter: stable;
 }
 
 body {

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "include": [
-    "/api/*",
     "/rss.xml",
+    "/download/*",
     "/instance-share/*",
     "/datapacks/*/*",
     "/modpacks/*/*",

@@ -2,6 +2,7 @@
 import { Image } from "astro:assets"
 import HeroDownload from "./HeroDownload"
 import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { LAUNCHER_VERSION } from "../../lib/launcherManifests"
 
 const locale = getLocaleFromUrl(Astro.url.pathname)
 const t = useTranslations(locale)
@@ -51,12 +52,12 @@ const t = useTranslations(locale)
         <div class="mb-8" data-scroll="fade-up" data-scroll-delay="200">
           <HeroDownload
             client:only="solid-js"
+            version={LAUNCHER_VERSION}
             labels={{
               windows: t("download.button.windows"),
               macos: t("download.button.macos"),
               linux: t("download.button.linux"),
               alsoAvailable: t("download.alsoAvailable"),
-              loading: t("common.loading"),
             }}
           />
         </div>

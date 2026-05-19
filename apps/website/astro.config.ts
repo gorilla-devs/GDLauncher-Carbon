@@ -5,7 +5,6 @@ import sitemap from "@astrojs/sitemap"
 import cloudflare from "@astrojs/cloudflare"
 import solidJs from "@astrojs/solid-js"
 
-import yaml from "js-yaml"
 import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -13,23 +12,8 @@ import { fileURLToPath } from "node:url"
 import {
   LOCALES,
   DEFAULT_LOCALE,
-  LOCALIZED_PATH_PREFIXES,
+  LOCALIZED_PATH_PREFIXES
 } from "./src/lib/i18n/constants"
-
-type LauncherManifest = { path: string }
-
-const response = await Promise.all([
-  fetch("https://cdn-raw.gdl.gg/launcher/latest.yml"),
-  fetch("https://cdn-raw.gdl.gg/launcher/latest-mac.yml"),
-  fetch("https://cdn-raw.gdl.gg/launcher/latest-linux.yml")
-])
-const yamlfiles = await Promise.all(response.map((val) => val.text()))
-const downloadLinks = yamlfiles
-  .map((val) => yaml.load(val) as LauncherManifest)
-  .map(
-    (val) =>
-      `https://cdn-raw.gdl.gg/launcher/${val.path.includes("zip") ? val.path.replace("zip", "dmg") : val.path}`
-  )
 
 const excludedPages = [
   "user-account-confirmed/",
@@ -117,8 +101,8 @@ const { urls: addonSitemapUrls, alternatesByPath: addonAlternatesByPath } =
   buildAddonSitemap()
 console.log(
   `[sitemap] enumerated ${addonSitemapUrls.length} SSR addon URLs ` +
-  `across ${LOCALES.length} locales ` +
-  `(${addonAlternatesByPath.size} canonical paths)`
+    `across ${LOCALES.length} locales ` +
+    `(${addonAlternatesByPath.size} canonical paths)`
 )
 
 /**
@@ -130,8 +114,8 @@ console.log(
  * blow up the exclude list past 1000 entries.
  *
  * Our SSR routes are narrow enough to enumerate explicitly:
- *   - /api/* (api/version)
  *   - /rss.xml
+ *   - /download/<os>
  *   - /instance-share/<code> (and locale-prefixed)
  *   - /<addon-type>/<platform>/<slug> (and locale-prefixed)
  *
@@ -146,25 +130,25 @@ const ADDON_TYPES = [
   "mods",
   "resourcepacks",
   "shaders",
-  "worlds",
+  "worlds"
 ] as const
 
 const NON_DEFAULT_LOCALES = LOCALES.filter((l) => l !== DEFAULT_LOCALE)
 
 const routesInclude = [
-  "/api/*",
   "/rss.xml",
+  "/download/*",
   "/instance-share/*",
   ...ADDON_TYPES.map((t) => `/${t}/*/*`),
   ...NON_DEFAULT_LOCALES.flatMap((l) => [
     `/${l}/instance-share/*`,
-    ...ADDON_TYPES.map((t) => `/${l}/${t}/*/*`),
-  ]),
+    ...ADDON_TYPES.map((t) => `/${l}/${t}/*/*`)
+  ])
 ]
 
 writeFileSync(
   resolve(dirname(fileURLToPath(import.meta.url)), "public/_routes.json"),
-  JSON.stringify({ version: 1, include: routesInclude, exclude: [] }, null, 2),
+  JSON.stringify({ version: 1, include: routesInclude, exclude: [] }, null, 2)
 )
 
 /**
@@ -176,7 +160,10 @@ function stripLocaleFromPath(pathname: string): string {
   const segments = pathname.split("/").filter(Boolean)
   if (segments.length === 0) return "/"
   const first = segments[0]
-  if ((LOCALES as readonly string[]).includes(first) && first !== DEFAULT_LOCALE) {
+  if (
+    (LOCALES as readonly string[]).includes(first) &&
+    first !== DEFAULT_LOCALE
+  ) {
     const rest = segments.slice(1).join("/")
     return rest ? `/${rest}` : "/"
   }
@@ -195,7 +182,7 @@ function stripLocaleFromPath(pathname: string): string {
 function isPathLocalized(canonicalPath: string): boolean {
   if (canonicalPath === "/" || canonicalPath === "") return true
   return LOCALIZED_PATH_PREFIXES.some(
-    (p) => canonicalPath === p || canonicalPath.startsWith(`${p}/`),
+    (p) => canonicalPath === p || canonicalPath.startsWith(`${p}/`)
   )
 }
 
@@ -307,9 +294,6 @@ export default defineConfig({
     solidJs()
   ],
   redirects: {
-    "/download/windows": downloadLinks[0],
-    "/download/mac": downloadLinks[1],
-    "/download/linux": downloadLinks[2],
     // Previous year's slugs. Keep these forever so inbound links from
     // Reddit/Discord/etc. don't 404 after the annual content refresh.
     "/blog/best-modpacks-2025": "/blog/best-modpacks-2026",
