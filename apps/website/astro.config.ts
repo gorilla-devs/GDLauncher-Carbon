@@ -6,7 +6,7 @@ import cloudflare from "@astrojs/cloudflare"
 import solidJs from "@astrojs/solid-js"
 
 import yaml from "js-yaml"
-import { readFileSync, readdirSync, existsSync } from "node:fs"
+import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -119,6 +119,52 @@ console.log(
   `[sitemap] enumerated ${addonSitemapUrls.length} SSR addon URLs ` +
   `across ${LOCALES.length} locales ` +
   `(${addonAlternatesByPath.size} canonical paths)`
+)
+
+/**
+ * Pre-write `public/_routes.json` so @astrojs/cloudflare skips auto-generation
+ * (it checks for an existing file at `astro:build:done`). Cloudflare Pages caps
+ * `_routes.json` at 100 rules. The adapter's `auto` strategy would emit
+ * `/*\/*\/*` and `/*\/*\/*\/*` includes for our addon catch-all routes, which
+ * collide with every prerendered guide/doc/blog/vs page across 8 locales and
+ * blow up the exclude list past 1000 entries.
+ *
+ * Our SSR routes are narrow enough to enumerate explicitly:
+ *   - /api/* (api/version)
+ *   - /rss.xml
+ *   - /instance-share/<code> (and locale-prefixed)
+ *   - /<addon-type>/<platform>/<slug> (and locale-prefixed)
+ *
+ * Total: 1 + 1 + 1 + 7 + 6 + 7*6 = 58 rules, well under the cap. Each `*`
+ * matches exactly one path segment in Cloudflare's glob, so 3-segment routes
+ * like /datapacks/curseforge/foo use /datapacks/*\/* and don't collide with
+ * 1- or 2-segment prerendered pages like /datapacks or /datapacks/index.html.
+ */
+const ADDON_TYPES = [
+  "datapacks",
+  "modpacks",
+  "mods",
+  "resourcepacks",
+  "shaders",
+  "worlds",
+] as const
+
+const NON_DEFAULT_LOCALES = LOCALES.filter((l) => l !== DEFAULT_LOCALE)
+
+const routesInclude = [
+  "/api/*",
+  "/rss.xml",
+  "/instance-share/*",
+  ...ADDON_TYPES.map((t) => `/${t}/*/*`),
+  ...NON_DEFAULT_LOCALES.flatMap((l) => [
+    `/${l}/instance-share/*`,
+    ...ADDON_TYPES.map((t) => `/${l}/${t}/*/*`),
+  ]),
+]
+
+writeFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), "public/_routes.json"),
+  JSON.stringify({ version: 1, include: routesInclude, exclude: [] }, null, 2),
 )
 
 /**

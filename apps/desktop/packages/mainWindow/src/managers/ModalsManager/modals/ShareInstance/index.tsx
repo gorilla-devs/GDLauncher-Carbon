@@ -344,9 +344,7 @@ function ShareInstance(props: ModalProps) {
                     <GdlSwitch
                       checked={includeSaves()}
                       disabled={isLoading()}
-                      onChange={(e) =>
-                        setIncludeSaves(e.currentTarget.checked)
-                      }
+                      onChange={(e) => setIncludeSaves(e.currentTarget.checked)}
                     />
                   </div>
                 </div>

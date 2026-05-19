@@ -735,7 +735,9 @@ pub async fn launch_minecraft(
     }
 
     let logged_command = match &secret_to_redact {
-        Some(token) => startup_command.join(" ").replace(token.as_str(), "<REDACTED>"),
+        Some(token) => startup_command
+            .join(" ")
+            .replace(token.as_str(), "<REDACTED>"),
         None => startup_command.join(" "),
     };
     info!(
