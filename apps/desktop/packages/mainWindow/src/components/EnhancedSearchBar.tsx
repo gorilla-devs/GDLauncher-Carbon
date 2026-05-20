@@ -90,7 +90,7 @@ export function EnhancedSearchBar() {
       placement="bottom"
     >
       <div
-        class="bg-darkSlate-700 outline-2 outline outline-offset-2 outline-transparent has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 flex h-10 items-center gap-2 overflow-hidden rounded-md duration-300"
+        class="bg-darkSlate-700 outline-2 outline outline-offset-2 outline-transparent has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 flex h-10 max-w-[600px] items-center gap-2 overflow-hidden rounded-md duration-300"
         style={{
           transition:
             "width 300ms cubic-bezier(0.4, 0, 0.2, 1), padding 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), outline-color 150ms cubic-bezier(0.4, 0, 0.2, 1)",
@@ -100,7 +100,7 @@ export function EnhancedSearchBar() {
         }}
         classList={{
           "w-80 px-4": !isExpanded(),
-          "w-full max-w-[600px] px-2": isExpanded()
+          "w-full px-2": isExpanded()
         }}
       >
         <div
@@ -108,7 +108,7 @@ export function EnhancedSearchBar() {
           classList={{
             "opacity-0 pointer-events-none max-w-0 overflow-hidden":
               !isExpanded(),
-            "opacity-100 delay-[40ms]": isExpanded()
+            "opacity-100 max-w-[260px]": isExpanded()
           }}
         >
           <AddonTypeDropdown />
@@ -118,7 +118,7 @@ export function EnhancedSearchBar() {
           class="bg-darkSlate-500 h-6 transition-[opacity,width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
           classList={{
             "opacity-0 w-0": !isExpanded(),
-            "opacity-100 w-px delay-[75ms]": isExpanded()
+            "opacity-100 w-px": isExpanded()
           }}
         />
 
@@ -198,7 +198,7 @@ export function EnhancedSearchBar() {
           class="bg-darkSlate-500 h-6 transition-[opacity,width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
           classList={{
             "opacity-0 w-0": !isExpanded(),
-            "opacity-100 w-px delay-[75ms]": isExpanded()
+            "opacity-100 w-px": isExpanded()
           }}
         />
 
@@ -207,7 +207,7 @@ export function EnhancedSearchBar() {
           classList={{
             "opacity-0 pointer-events-none max-w-0 overflow-hidden":
               !isExpanded(),
-            "opacity-100 delay-[100ms]": isExpanded()
+            "opacity-100": isExpanded()
           }}
         >
           <Popover gutter={8} placement="bottom-end">
@@ -231,7 +231,7 @@ export function EnhancedSearchBar() {
           classList={{
             "opacity-0 pointer-events-none max-w-0 overflow-hidden":
               !isExpanded(),
-            "opacity-100 delay-[110ms]": isExpanded()
+            "opacity-100": isExpanded()
           }}
         >
           <button
