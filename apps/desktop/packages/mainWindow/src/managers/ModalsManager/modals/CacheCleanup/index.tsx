@@ -42,11 +42,12 @@ const CacheCleanup = (props: ModalProps) => {
   const [phase, setPhase] = createSignal<Phase>("select")
   const [taskId, setTaskId] = createSignal<number | null>(null)
   const [failedMessage, setFailedMessage] = createSignal("")
-  // The two-tier selection. Quick is on by default — it's the safe wipe
-  // and the reason most people open this dialog. Deep is opt-in because
-  // it forces a multi-GB Minecraft re-download on next launch.
-  const [quick, setQuick] = createSignal(true)
-  const [deep, setDeep] = createSignal(false)
+  // The two-tier selection. The GDLauncher cache is on by default — it's
+  // the safe wipe and the reason most people open this dialog. The
+  // Minecraft cache is opt-in because clearing it forces a multi-GB
+  // re-download on next launch.
+  const [gdlauncher, setGdlauncher] = createSignal(true)
+  const [minecraft, setMinecraft] = createSignal(false)
 
   // Captured at click time so we can show "reclaimed X" once the post-
   // cleanup invalidation has resolved.
@@ -77,7 +78,7 @@ const CacheCleanup = (props: ModalProps) => {
     }
   }))
 
-  const canSubmit = () => quick() || deep()
+  const canSubmit = () => gdlauncher() || minecraft()
 
   // Detect task completion. Backend drops the task from the manager when
   // it finishes; vtask.data flips to null at that point.
@@ -138,14 +139,14 @@ const CacheCleanup = (props: ModalProps) => {
             </div>
 
             <div class="bg-darkSlate-800 divide-darkSlate-700 flex flex-col divide-y rounded">
-              <ClickableRow onToggle={() => setQuick((v) => !v)}>
+              <ClickableRow onToggle={() => setGdlauncher((v) => !v)}>
                 <div class="pointer-events-none">
-                  <Checkbox checked={quick()} />
+                  <Checkbox checked={gdlauncher()} />
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div class="flex items-baseline justify-between gap-2">
                     <span class="text-lightSlate-50 text-sm font-medium">
-                      <Trans key="modals:_trn_cache_cleanup.quick_title" />
+                      <Trans key="modals:_trn_cache_cleanup.gdlauncher_title" />
                     </span>
                     <Show when={cacheSizes.data}>
                       <span class="text-lightSlate-400 shrink-0 text-xs tabular-nums">
@@ -154,19 +155,19 @@ const CacheCleanup = (props: ModalProps) => {
                     </Show>
                   </div>
                   <span class="text-lightSlate-500 text-xs">
-                    <Trans key="modals:_trn_cache_cleanup.quick_desc" />
+                    <Trans key="modals:_trn_cache_cleanup.gdlauncher_desc" />
                   </span>
                 </div>
               </ClickableRow>
 
-              <ClickableRow onToggle={() => setDeep((v) => !v)}>
+              <ClickableRow onToggle={() => setMinecraft((v) => !v)}>
                 <div class="pointer-events-none">
-                  <Checkbox checked={deep()} />
+                  <Checkbox checked={minecraft()} />
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div class="flex items-baseline justify-between gap-2">
                     <span class="text-lightSlate-50 text-sm font-medium">
-                      <Trans key="modals:_trn_cache_cleanup.deep_title" />
+                      <Trans key="modals:_trn_cache_cleanup.minecraft_title" />
                     </span>
                     <Show when={cacheSizes.data}>
                       <span class="text-lightSlate-400 shrink-0 text-xs tabular-nums">
@@ -175,7 +176,7 @@ const CacheCleanup = (props: ModalProps) => {
                     </Show>
                   </div>
                   <span class="text-lightSlate-500 text-xs">
-                    <Trans key="modals:_trn_cache_cleanup.deep_desc" />
+                    <Trans key="modals:_trn_cache_cleanup.minecraft_desc" />
                   </span>
                 </div>
               </ClickableRow>
@@ -194,7 +195,10 @@ const CacheCleanup = (props: ModalProps) => {
                 loading={startMutation.isPending}
                 onClick={() => {
                   setSizeBefore(totalSize() ?? 0)
-                  startMutation.mutate({ quick: quick(), deep: deep() })
+                  startMutation.mutate({
+                    gdlauncher: gdlauncher(),
+                    minecraft: minecraft()
+                  })
                 }}
               >
                 <div class="i-hugeicons:delete-02 h-4 w-4" />

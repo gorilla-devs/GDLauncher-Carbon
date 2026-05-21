@@ -391,7 +391,7 @@ export type MRFEProjectSearchResponse = { hits: MRFEProjectSearchResult[]; offse
  * `libraries`, and `natives` — those are also re-downloadable but cost
  * the user a multi-GB re-download on next launch, so it's opt-in.
  */
-export type CacheCleanupSelection = { quick: boolean; deep: boolean }
+export type CacheCleanupSelection = { gdlauncher: boolean; minecraft: boolean }
 
 export type CFFEPagination = { index: number; pageSize: number; resultCount: number; totalCount: number }
 

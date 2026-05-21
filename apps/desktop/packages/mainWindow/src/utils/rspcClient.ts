@@ -11,6 +11,7 @@ import {
 } from "@tanstack/solid-query"
 import type { Procedures } from "@gd/core_module"
 import { toast } from "@gd/ui"
+import { i18n } from "@gd/i18n"
 import { dispatchBannedEvent } from "./bannedEventBridge"
 import {
   dispatchMemoryWarningEvent,
@@ -357,6 +358,18 @@ export default function initRspc(_port: number, _apiToken: string) {
 
       socket.addEventListener("message", (event) => {
         const data = JSON.parse(event.data as never) as InvalidateOperation
+
+        // Not a real query invalidation: the backend deletes instances in a
+        // detached task, so a deletion failure can't surface through the rspc
+        // mutation's onError. Show a toast instead.
+        if (data.key === "instance.deleteInstanceFailed") {
+          const args = data.args as { error?: string } | null
+          toast.error(i18n.t("notifications:_trn_cannot_delete_instance"), {
+            description: args?.error
+          })
+          return
+        }
+
         const key = [data.key]
         if (data.args !== null) {
           key.push(data.args)

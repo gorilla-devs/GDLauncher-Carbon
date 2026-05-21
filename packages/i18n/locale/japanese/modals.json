@@ -74,8 +74,8 @@
   "_trn_cache_cleanup.done_title": "クリーンアップが完了しました",
   "_trn_cache_cleanup.done_reclaimed": "データベースから {{size}} を解放しました。",
   "_trn_cache_cleanup.failed_title": "クリーンアップに失敗しました",
-  "_trn_cache_cleanup.quick_title": "GDLauncherキャッシュ",
-  "_trn_cache_cleanup.quick_desc": "キャッシュされた mod ・ modpack 情報、プロジェクト画像、バージョンメタデータ、一時ダウンロード、古いランチャーログ。",
-  "_trn_cache_cleanup.deep_title": "Minecraftキャッシュ",
-  "_trn_cache_cleanup.deep_desc": "ゲームアセット、Java ライブラリ、ネイティブライブラリ。該当インスタンスを次回起動時にオンデマンドで再ダウンロードされます。"
+  "_trn_cache_cleanup.gdlauncher_title": "GDLauncherキャッシュ",
+  "_trn_cache_cleanup.gdlauncher_desc": "キャッシュされた mod ・ modpack 情報、プロジェクト画像、バージョンメタデータ、一時ダウンロード、古いランチャーログ。",
+  "_trn_cache_cleanup.minecraft_title": "Minecraftキャッシュ",
+  "_trn_cache_cleanup.minecraft_desc": "ゲームアセット、Java ライブラリ、ネイティブライブラリ。該当インスタンスを次回起動時にオンデマンドで再ダウンロードされます。"
 }

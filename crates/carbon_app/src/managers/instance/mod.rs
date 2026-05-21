@@ -2361,11 +2361,41 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         tokio::spawn(async move {
             if let Err(e) = app.instance_manager()._delete_instance(instance_id).await {
                 tracing::error!("Failed to delete instance {}: {:#}", instance_id.0, e);
+
+                // The instance was put into `LaunchState::Deleting` before the
+                // deletion failed. Without restoring it, the frontend stays
+                // stuck on the deleting/loading state forever. Reset it back to
+                // Inactive so the UI recovers.
+                let instance_name = {
+                    let instance_manager = app.instance_manager();
+                    let mut instances = instance_manager.instances.write().await;
+                    instances.get_mut(&instance_id).and_then(|instance| {
+                        if let InstanceType::Valid(data) = &mut instance.type_ {
+                            data.state = LaunchState::Inactive { failed_task: None };
+                            Some(data.config.name.clone())
+                        } else {
+                            None
+                        }
+                    })
+                };
+
                 // Surface the error to the UI so the caller realizes the
                 // instance still exists.
                 app.invalidate(GET_GROUPS, None);
                 app.invalidate(GET_ALL_INSTANCES, None);
                 app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+
+                // Push a dedicated failure event so the frontend can show a
+                // toast (the rspc call already returned Ok before the spawned
+                // deletion ran, so the caller's onError never fires).
+                app.invalidate(
+                    DELETE_INSTANCE_FAILED,
+                    Some(serde_json::json!({
+                        "instanceId": instance_id.0,
+                        "instanceName": instance_name,
+                        "error": format!("{e:#}"),
+                    })),
+                );
             }
         });
 

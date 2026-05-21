@@ -75,8 +75,8 @@
   "_trn_cache_cleanup.done_title": "Cleanup complete",
   "_trn_cache_cleanup.done_reclaimed": "Reclaimed {{size}} from the database.",
   "_trn_cache_cleanup.failed_title": "Cleanup failed",
-  "_trn_cache_cleanup.quick_title": "GDLauncher cache",
-  "_trn_cache_cleanup.quick_desc": "Cached mod and modpack info, project images, version metadata, temporary downloads, and old launcher logs.",
-  "_trn_cache_cleanup.deep_title": "Minecraft cache",
-  "_trn_cache_cleanup.deep_desc": "Game assets, Java libraries, and native libraries. Re-downloaded on demand the next time you launch an affected instance."
+  "_trn_cache_cleanup.gdlauncher_title": "GDLauncher cache",
+  "_trn_cache_cleanup.gdlauncher_desc": "Cached mod and modpack info, project images, version metadata, temporary downloads, and old launcher logs.",
+  "_trn_cache_cleanup.minecraft_title": "Minecraft cache",
+  "_trn_cache_cleanup.minecraft_desc": "Game assets, Java libraries, and native libraries. Re-downloaded on demand the next time you launch an affected instance."
 }
