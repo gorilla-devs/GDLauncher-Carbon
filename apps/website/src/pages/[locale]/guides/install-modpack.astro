@@ -1,0 +1,266 @@
+---
+/**
+ * Localized "How to Install Modpacks in Minecraft" guide. Brand names left
+ * untranslated (RLCraft, All The Mods, Better Minecraft, Cobblemon, FTB
+ * Skies, GDLauncher, CurseForge, Modrinth).
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizedPath,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft の Modpack を導入する方法",
+    description: "GDLauncher で CurseForge と Modrinth の Minecraft Modpack を導入する方法。ワンクリック導入ガイド。",
+    steps: [
+      { name: "GDLauncher をダウンロード", text: "gdlauncher.com から GDLauncher を入手。無料で Windows / macOS / Linux に対応。" },
+      { name: "Modpack ブラウザを開く", text: "Library ページの + ボタンを押すと、CurseForge と Modrinth を同時検索する内蔵ブラウザが開きます。" },
+      { name: "Modpack を選ぶ", text: "RLCraft、All The Mods 10、Better MC、FTB Skies などを名前で検索するか、カテゴリーで探します。各 Modpack にはバージョン、Mod 数、ダウンロード数、対応 Minecraft バージョンが表示されます。" },
+      { name: "Install をクリック", text: "GDLauncher が全 Mod、対応する Minecraft バージョン、適合 Java、Mod ローダーを自動でダウンロードします。依存関係や設定もすべて処理されます。" },
+      { name: "必要なら RAM を割り当てる", text: "200 個以上の Mod を含む大型 Modpack は 6〜12 GB の RAM が必要なことがよくあります。インスタンス設定 → Java から最大 RAM を設定。詳細は『RAM を増やす』ガイドへ。" },
+      { name: "Play を押す", text: "Play をクリック。すべて事前設定済みの状態で Modpack が起動します。手動設定は不要です。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 모드팩 설치 방법",
+    description: "GDLauncher로 CurseForge와 Modrinth의 Minecraft 모드팩을 설치하는 방법. 원클릭 설치 가이드.",
+    steps: [
+      { name: "GDLauncher 다운로드", text: "gdlauncher.com에서 GDLauncher를 받으세요, 무료이며 Windows, macOS, Linux를 지원합니다." },
+      { name: "모드팩 브라우저 열기", text: "Library 페이지의 + 버튼을 누르세요. GDLauncher의 내장 브라우저가 CurseForge와 Modrinth를 동시에 검색합니다." },
+      { name: "모드팩 고르기", text: "RLCraft, All The Mods 10, Better MC, FTB Skies 등 원하는 팩을 이름으로 검색하거나 카테고리로 둘러보세요. 각 팩에는 버전, 모드 수, 다운로드 수, 지원 Minecraft 버전이 표시됩니다." },
+      { name: "Install 클릭", text: "GDLauncher가 모든 모드, 알맞은 Minecraft 버전, 매칭되는 Java, 모드 로더를 자동으로 다운로드합니다. 의존성과 설정도 알아서 처리됩니다." },
+      { name: "필요하면 RAM 할당", text: "200개 이상의 모드를 포함한 대형 모드팩은 6~12GB의 RAM이 필요합니다. 인스턴스 설정 → Java → 최대 RAM 설정. 자세한 내용은 'RAM 늘리기' 가이드를 참고하세요." },
+      { name: "Play 누르기", text: "Play를 클릭하면 모든 게 이미 설정된 채로 모드팩이 실행됩니다, 추가 설정 불필요." }
+    ]
+  },
+  de: {
+    title: "So installierst du Modpacks in Minecraft",
+    description: "Lerne, wie du Minecraft-Modpacks aus CurseForge und Modrinth mit GDLauncher installierst. Ein-Klick-Anleitung.",
+    steps: [
+      { name: "GDLauncher herunterladen", text: "Hol dir GDLauncher von gdlauncher.com, kostenlos und für Windows, macOS und Linux verfügbar." },
+      { name: "Modpack-Browser öffnen", text: "Klick auf der Library-Seite auf das +. Der eingebaute Browser durchsucht CurseForge und Modrinth gleichzeitig." },
+      { name: "Modpack auswählen", text: "Such nach dem Pack, den du willst (RLCraft, All The Mods 10, Better MC, FTB Skies usw.) oder stöber nach Kategorie. Jeder Pack zeigt Version, Anzahl der Mods, Downloads und unterstützte Minecraft-Version." },
+      { name: "Auf Install klicken", text: "GDLauncher lädt jeden Mod, die richtige Minecraft-Version, die passende Java-Runtime und den Mod-Loader automatisch. Abhängigkeiten und Configs werden mit erledigt." },
+      { name: "Wenn nötig RAM zuweisen", text: "Große Modpacks (200+ Mods) brauchen oft 6–12 GB RAM. Geh in die Instanz-Einstellungen → Java → Maximum RAM einstellen. Details siehe 'Mehr RAM zuweisen'-Guide." },
+      { name: "Auf Play drücken", text: "Klick auf Play. Das Modpack startet mit allem vorkonfiguriert, keine manuelle Einrichtung." }
+    ]
+  },
+  fr: {
+    title: "Comment installer des modpacks dans Minecraft",
+    description: "Apprends à installer des modpacks Minecraft de CurseForge et Modrinth avec GDLauncher. Guide d'installation en un clic.",
+    steps: [
+      { name: "Télécharger GDLauncher", text: "Récupère GDLauncher sur gdlauncher.com, gratuit, dispo sur Windows, macOS et Linux." },
+      { name: "Ouvrir le navigateur de modpacks", text: "Clique sur le + de la page Library. Le navigateur intégré cherche dans CurseForge et Modrinth en même temps." },
+      { name: "Choisir un modpack", text: "Cherche le pack que tu veux (RLCraft, All The Mods 10, Better MC, FTB Skies, etc.) ou navigue par catégorie. Chaque pack affiche la version, le nombre de mods, les téléchargements et la version Minecraft supportée." },
+      { name: "Cliquer sur Install", text: "GDLauncher télécharge chaque mod, la bonne version de Minecraft, le runtime Java adapté et le mod loader automatiquement. Les dépendances et configs sont gérées." },
+      { name: "Allouer de la RAM si besoin", text: "Les gros modpacks (200+ mods) ont souvent besoin de 6 à 12 Go de RAM. Va dans les paramètres de l'instance → Java → règle Maximum RAM. Détails dans le guide 'Augmenter la RAM'." },
+      { name: "Appuyer sur Play", text: "Clique sur Play. Le modpack démarre avec tout préconfiguré, aucune installation manuelle." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar modpacks en Minecraft",
+    description: "Aprende a instalar modpacks de Minecraft de CurseForge y Modrinth con GDLauncher. Guía de instalación con un clic.",
+    steps: [
+      { name: "Descargar GDLauncher", text: "Obtén GDLauncher en gdlauncher.com, gratis, disponible para Windows, macOS y Linux." },
+      { name: "Abrir el navegador de modpacks", text: "Pulsa el + de la página Library. El navegador integrado busca en CurseForge y Modrinth a la vez." },
+      { name: "Elegir un modpack", text: "Busca el pack que quieras (RLCraft, All The Mods 10, Better MC, FTB Skies, etc.) o navega por categoría. Cada pack muestra la versión, el número de mods, las descargas y la versión de Minecraft soportada." },
+      { name: "Pulsar Install", text: "GDLauncher descarga cada mod, la versión correcta de Minecraft, el runtime Java compatible y el mod loader automáticamente. Las dependencias y configuraciones se gestionan solas." },
+      { name: "Asignar RAM si es necesario", text: "Los modpacks grandes (200+ mods) suelen necesitar 6–12 GB de RAM. Ve a Configuración de instancia → Java → ajusta Maximum RAM. Más detalles en la guía 'Asignar más RAM'." },
+      { name: "Pulsar Play", text: "Haz clic en Play. El modpack arranca con todo preconfigurado, sin configuración manual." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar modpacks no Minecraft",
+    description: "Aprenda a instalar modpacks do Minecraft do CurseForge e Modrinth usando o GDLauncher. Guia de instalação com um clique.",
+    steps: [
+      { name: "Baixar o GDLauncher", text: "Pegue o GDLauncher em gdlauncher.com, grátis, disponível para Windows, macOS e Linux." },
+      { name: "Abrir o navegador de modpacks", text: "Clique no + da página Library. O navegador embutido busca no CurseForge e Modrinth ao mesmo tempo." },
+      { name: "Escolher um modpack", text: "Procure o pack que quer (RLCraft, All The Mods 10, Better MC, FTB Skies etc.) ou navegue por categoria. Cada pack mostra a versão, número de mods, downloads e versão do Minecraft suportada." },
+      { name: "Clicar em Install", text: "O GDLauncher baixa todos os mods, a versão correta do Minecraft, o runtime Java apropriado e o mod loader automaticamente. Dependências e configurações são tratadas." },
+      { name: "Alocar RAM se necessário", text: "Modpacks grandes (200+ mods) costumam precisar de 6–12 GB de RAM. Vá em configurações da instância → Java → ajuste Maximum RAM. Detalhes no guia 'Alocar mais RAM'." },
+      { name: "Apertar Play", text: "Clique em Play. O modpack inicia com tudo pré-configurado, sem setup manual." }
+    ]
+  },
+  it: {
+    title: "Come installare Modpack su Minecraft",
+    description: "Scopri come installare Modpack di Minecraft da CurseForge e Modrinth con GDLauncher. Guida all'installazione con un clic.",
+    steps: [
+      { name: "Scaricare GDLauncher", text: "Scarica GDLauncher da gdlauncher.com, gratuito, disponibile per Windows, macOS e Linux." },
+      { name: "Aprire il browser dei Modpack", text: "Clicca sul + nella pagina Library. Il browser integrato cerca in CurseForge e Modrinth contemporaneamente." },
+      { name: "Scegliere un Modpack", text: "Cerca il pack che vuoi (RLCraft, All The Mods 10, Better MC, FTB Skies ecc.) o sfoglia per categoria. Ogni pack mostra la versione, il numero di Mod, i download e la versione di Minecraft supportata." },
+      { name: "Cliccare su Install", text: "GDLauncher scarica automaticamente ogni Mod, la versione corretta di Minecraft, la runtime Java compatibile e il Mod loader. Dipendenze e configurazioni vengono gestite per te." },
+      { name: "Allocare RAM se necessario", text: "I Modpack grossi (200+ Mod) richiedono spesso 6–12 GB di RAM. Vai nelle impostazioni dell'istanza → Java → imposta Maximum RAM. Dettagli nella guida 'Allocare più RAM'." },
+      { name: "Premere Play", text: "Clicca su Play. Il Modpack parte con tutto già preconfigurato, senza alcun setup manuale." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install modpack minecraft, how to install modpacks, minecraft modpack guide, curseforge modpack, modrinth modpack, gdlauncher modpack"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT5M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>Modpack とは?</h2>
+      <p>Modpack は複数のアドオンをひとまとめにして、最初から相性よく動くようにしたものです。中身のほとんどは Mod ですが、シェーダー、リソースパック、独自マップが含まれることもあります。設定はすべて事前にチューニング済みなので、入れて遊ぶだけ。</p>
+      <p>あらゆる Modpack があります: 数百もの Mod を詰め込んだ Kitchen Sink、Tech や Magic などの特定テーマ、ハードコアサバイバル、バニラ強化型など。代表例は All The Mods、Better Minecraft、RLCraft、Cobblemon。</p>
+
+      <h2>Modpack のインストール</h2>
+      <p>GDLauncher の上部の検索バーをクリック。Modpack がデフォルトで表示されるので、入力を始めるか一覧から探します。気に入ったものを見つけたら <strong>Download</strong> をクリック。</p>
+      <p>GDLauncher が新しいインスタンスを作り、Mod・Mod ローダー・Java・メモリをすべてセットアップします。完了を待って Play を押すだけ。</p>
+
+      <h2>システム要件</h2>
+      <p>Modpack はバニラ Minecraft より要求スペックが高めです。50 個程度の軽量 Modpack は 4〜6GB の RAM で快適に動きます。中規模なら 6〜8GB、All The Mods のような大型は 10GB 以上必要なこともあります。</p>
+      <p>GDLauncher は適切なデフォルト値を設定しますが、Modpack 側に推奨設定があればそれに従いましょう。Modpack のページに目安が書かれているのが普通です。</p>
+
+      <h2>トラブルシューティング</h2>
+      <p>Modpack が起動しない場合、まず RAM を確認。インスタンス設定からメモリ割り当てを増やしましょう。大型 Modpack は最低でも 8GB、場合によってはそれ以上が本当に必要です。</p>
+      <p>動作が重い? 動画設定で描画距離を下げます。ほとんどの Modpack で 10〜12 チャンクで十分。Modpack に軽量化 Mod が含まれていなければ、<a href={localizedPath("/guides/performance-mods", locale)}>軽量化 Mod ガイド</a> をご覧ください。</p>
+      <p>クラッシュした場合はゲームのログを確認 (GDLauncher で簡単にアクセス可能)。エラーメッセージで原因が分かることが多いです。Mod の更新が必要だったり、特定設定の既知の問題だったりします。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>모드팩이란?</h2>
+      <p>모드팩은 여러 애드온을 묶어 처음부터 잘 어울려 동작하게 만든 패키지입니다. 안쪽 대부분은 모드지만, 셰이더, 리소스 팩, 커스텀 맵이 함께 들어 있는 경우도 많습니다. 설정이 미리 맞춰져 있어 설치하고 그대로 플레이하면 됩니다.</p>
+      <p>온갖 종류가 있습니다: 수백 개의 모드를 담은 Kitchen Sink, Tech나 Magic 같은 특정 테마, 하드코어 서바이벌 도전, 바닐라 강화형 등. 대표 사례로 All The Mods, Better Minecraft, RLCraft, Cobblemon이 있습니다.</p>
+
+      <h2>모드팩 설치</h2>
+      <p>GDLauncher 상단의 검색창을 클릭하세요. 모드팩이 기본으로 표시되니 검색을 시작하거나 둘러보면 됩니다. 마음에 드는 걸 찾으면 <strong>Download</strong> 클릭.</p>
+      <p>GDLauncher가 새 인스턴스를 만들고 모드, 모드 로더, Java, 메모리까지 모두 셋업합니다. 끝날 때까지 기다리고 Play를 누르면 됩니다.</p>
+
+      <h2>시스템 요구사항</h2>
+      <p>모드팩은 바닐라 Minecraft보다 사양을 더 요구합니다. 모드 50개 정도의 가벼운 팩은 4~6GB RAM이면 충분합니다. 중간 규모는 6~8GB가 필요하고, All The Mods 같은 대형 팩은 10GB 이상 필요할 수 있습니다.</p>
+      <p>GDLauncher가 보통 합리적인 기본값을 설정하지만, 모드팩에서 특정 설정을 권장한다면 그걸 따르세요. 보통 모드팩 페이지에 권장사항이 적혀 있습니다.</p>
+
+      <h2>문제 해결</h2>
+      <p>모드팩이 시작되지 않는다면 가장 먼저 RAM을 확인하세요. 인스턴스 설정에서 메모리 할당을 올리세요. 대형 팩은 정말 최소 8GB, 때로는 그 이상이 필요합니다.</p>
+      <p>느리게 돌아가나요? 비디오 설정에서 렌더 거리를 낮추세요. 대부분의 모드팩은 10~12 청크 이상이 필요 없습니다. 일부 팩은 이미 성능 모드가 포함돼 있지만, 그렇지 않다면 <a href={localizedPath("/guides/performance-mods", locale)}>성능 모드 가이드</a>를 참고하세요.</p>
+      <p>크래시가 발생하면 게임 로그를 확인하세요(GDLauncher에서 쉽게 찾을 수 있습니다). 보통 오류 메시지가 원인을 가리킵니다. 모드 업데이트가 필요하거나 특정 설정에 알려진 문제가 있을 수 있습니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was ist ein Modpack?</h2>
+      <p>Ein Modpack bündelt Addons so, dass sie out-of-the-box gut zusammenspielen. Das meiste sind Mods, aber Packs enthalten oft auch Shader, Resource Packs und manchmal eigene Maps. Die Configs sind so gesetzt, dass alles harmoniert. Du installierst und spielst.</p>
+      <p>Es gibt Modpacks für alles: Kitchen-Sink-Packs mit Hunderten Mods, fokussierte Packs zu Themen wie Tech oder Magic, Hardcore-Survival-Challenges und aufgewertete Vanilla-Erlebnisse. Beliebte Beispiele: All The Mods, Better Minecraft, RLCraft, Cobblemon.</p>
+
+      <h2>Ein Modpack installieren</h2>
+      <p>Klick auf die Suchleiste oben im GDLauncher. Modpacks sind standardmäßig angezeigt, also einfach tippen oder stöbern. Wenn du eines magst, klick auf <strong>Download</strong>.</p>
+      <p>GDLauncher erstellt eine neue Instanz mit allem dabei: Mods, Mod-Loader, Java und Speicher. Warte bis es fertig ist und drück auf Play.</p>
+
+      <h2>Systemanforderungen</h2>
+      <p>Modpacks sind anspruchsvoller als Vanilla. Leichte Packs mit ~50 Mods laufen mit 4–6 GB RAM gut. Mittlere brauchen 6–8 GB. Große Packs wie All The Mods können 10 GB oder mehr brauchen.</p>
+      <p>GDLauncher setzt meist vernünftige Defaults; folge aber Pack-spezifischen Empfehlungen, wenn vorhanden. Die Modpack-Seite verrät dir oft, was zu erwarten ist.</p>
+
+      <h2>Problembehebung</h2>
+      <p>Wenn ein Modpack nicht startet, prüf zuerst den RAM. Öffne die Instanz-Einstellungen und erhöh den Speicher. Große Packs brauchen wirklich mindestens 8 GB, manchmal mehr.</p>
+      <p>Läuft langsam? Senk die Render-Distanz in den Video-Einstellungen. Die meisten Modpacks brauchen nicht mehr als 10–12 Chunks. Manche Packs haben schon Performance-Mods drin, sonst schau in unseren <a href={localizedPath("/guides/performance-mods", locale)}>Performance-Mods-Guide</a>.</p>
+      <p>Bei Crashes prüf die Spiel-Logs (GDLauncher macht sie leicht auffindbar). Die Fehlermeldungen weisen meist auf das Problem hin. Manchmal braucht ein Mod nur ein Update oder es gibt ein bekanntes Problem mit einer bestimmten Konfiguration.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>C'est quoi un modpack ?</h2>
+      <p>Un modpack regroupe des addons pour qu'ils fonctionnent bien ensemble dès l'installation. La plupart sont des mods, mais les packs incluent souvent des shaders, des resource packs et parfois des maps. Toutes les configs sont réglées pour que ça tourne. Tu installes et tu joues.</p>
+      <p>Il y a des modpacks pour tout : kitchen-sink avec des centaines de mods, packs centrés sur un thème (tech, magie), survies hardcore, expériences vanilla améliorées. Les classiques : All The Mods, Better Minecraft, RLCraft, Cobblemon.</p>
+
+      <h2>Installer un modpack</h2>
+      <p>Clique sur la barre de recherche en haut de GDLauncher. Les modpacks sont affichés par défaut, donc tu peux taper directement ou parcourir. Quand tu en trouves un qui te plaît, clique sur <strong>Download</strong>.</p>
+      <p>GDLauncher crée une nouvelle instance avec tout dedans : mods, loader, Java et mémoire. Attends que ça finisse et appuie sur Play.</p>
+
+      <h2>Configuration requise</h2>
+      <p>Les modpacks sont plus exigeants que Minecraft vanilla. Les packs légers (50 mods environ) tournent bien avec 4–6 Go de RAM. Les moyens veulent 6–8 Go. Les gros comme All The Mods peuvent demander 10 Go ou plus.</p>
+      <p>GDLauncher met des défauts raisonnables, mais si un pack recommande des réglages spécifiques, suis-les. La page du modpack indique souvent ce qu'il faut prévoir.</p>
+
+      <h2>Dépannage</h2>
+      <p>Si un modpack ne démarre pas, vérifie d'abord la RAM. Ouvre les paramètres de l'instance et monte l'allocation. Les gros packs ont vraiment besoin d'au moins 8 Go, parfois plus.</p>
+      <p>Ça rame ? Baisse la distance de rendu dans les paramètres vidéo. La plupart des modpacks n'ont pas besoin de plus de 10–12 chunks. Certains packs incluent déjà des mods de performance, sinon va voir notre <a href={localizedPath("/guides/performance-mods", locale)}>guide des mods de performance</a>.</p>
+      <p>En cas de crashs, regarde les logs (GDLauncher les rend faciles à trouver). Les messages d'erreur pointent en général le problème. Parfois un mod a juste besoin d'une mise à jour, ou il y a un souci connu avec une certaine config.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>¿Qué es un modpack?</h2>
+      <p>Un modpack agrupa addons para que funcionen bien juntos desde el principio. La mayoría son mods, pero los packs suelen incluir shaders, resource packs y, a veces, mapas personalizados. Todas las configuraciones están preparadas para que todo encaje. Lo instalas y a jugar.</p>
+      <p>Hay modpacks para todo: kitchen-sink con cientos de mods, packs centrados en temas como tech o magia, retos de supervivencia hardcore y experiencias vanilla mejoradas. Los populares incluyen All The Mods, Better Minecraft, RLCraft y Cobblemon.</p>
+
+      <h2>Instalar un modpack</h2>
+      <p>Haz clic en la barra de búsqueda arriba de GDLauncher. Los modpacks se muestran por defecto, así que empieza a teclear o navega. Cuando encuentres uno que te guste, haz clic en <strong>Download</strong>.</p>
+      <p>GDLauncher crea una nueva instancia con todo configurado: mods, mod loader, Java y memoria. Espera a que termine y pulsa Play.</p>
+
+      <h2>Requisitos del sistema</h2>
+      <p>Los modpacks son más exigentes que Minecraft vanilla. Packs ligeros con unos 50 mods van bien con 4–6 GB de RAM. Los medianos necesitan 6–8 GB. Los grandes como All The Mods pueden pedir 10 GB o más.</p>
+      <p>GDLauncher suele establecer valores por defecto razonables, pero si un pack recomienda ajustes concretos, síguelos. La página del modpack suele indicarte qué esperar.</p>
+
+      <h2>Solución de problemas</h2>
+      <p>Si un modpack no arranca, lo primero es revisar la RAM. Abre la configuración de la instancia y sube la asignación de memoria. Los packs grandes necesitan de verdad al menos 8 GB, a veces más.</p>
+      <p>¿Va lento? Baja la distancia de renderizado en los ajustes de vídeo. La mayoría de modpacks no necesitan más de 10–12 chunks. Algunos packs ya incluyen mods de rendimiento; si no, mira nuestra <a href={localizedPath("/guides/performance-mods", locale)}>guía de mods de rendimiento</a>.</p>
+      <p>Para crashes, revisa los logs del juego (GDLauncher los hace fáciles de encontrar). Los mensajes de error suelen señalar lo que falla. A veces un mod solo necesita actualizarse, o hay un problema conocido con una configuración concreta.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que é um modpack?</h2>
+      <p>Um modpack junta addons para funcionarem bem juntos desde o início. A maior parte são mods, mas os packs costumam incluir shaders, resource packs e às vezes mapas custom. Todas as configurações estão prontas para o conjunto se dar bem. Você instala e joga.</p>
+      <p>Tem modpack para tudo: kitchen-sink com centenas de mods, packs focados em temas como tech ou magia, desafios hardcore de sobrevivência e experiências vanilla turbinadas. Conhecidos são All The Mods, Better Minecraft, RLCraft e Cobblemon.</p>
+
+      <h2>Instalando um modpack</h2>
+      <p>Clique na barra de busca no topo do GDLauncher. Modpacks aparecem por padrão, então é só começar a digitar ou navegar. Quando achar um que goste, clique em <strong>Download</strong>.</p>
+      <p>O GDLauncher cria uma nova instância com tudo configurado: mods, mod loader, Java e memória. Espere terminar e aperte Play.</p>
+
+      <h2>Requisitos de sistema</h2>
+      <p>Modpacks são mais exigentes que o Minecraft vanilla. Packs leves com cerca de 50 mods rodam bem com 4–6 GB de RAM. Médios pedem 6–8 GB. Os grandes como All The Mods podem precisar de 10 GB ou mais.</p>
+      <p>O GDLauncher costuma definir padrões razoáveis, mas se um pack recomenda configurações específicas, siga-as. A página do modpack normalmente diz o que esperar.</p>
+
+      <h2>Solução de problemas</h2>
+      <p>Se um modpack não inicia, primeiro veja a RAM. Abra as configurações da instância e aumente a alocação de memória. Packs grandes realmente precisam de no mínimo 8 GB, às vezes mais.</p>
+      <p>Rodando devagar? Diminua a distância de renderização nas configurações de vídeo. A maioria dos modpacks não precisa de mais de 10–12 chunks. Alguns packs já incluem mods de performance; se o seu não inclui, dê uma olhada no <a href={localizedPath("/guides/performance-mods", locale)}>guia de mods de performance</a>.</p>
+      <p>Em caso de crashes, veja os logs do jogo (o GDLauncher facilita encontrá-los). As mensagens de erro normalmente indicam o que está errado. Às vezes um mod só precisa de atualização, ou há um problema conhecido com alguma configuração.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cos'è un Modpack?</h2>
+      <p>Un Modpack raggruppa diversi addon in modo che funzionino bene insieme fin da subito. La maggior parte sono Mod, ma i pack includono spesso anche Shader, Resource Pack e a volte mappe personalizzate. Tutte le configurazioni sono già regolate perché il tutto giri bene: tu installi e giochi.</p>
+      <p>Esistono Modpack per ogni gusto: kitchen-sink con centinaia di Mod, pack focalizzati su temi come tech o magia, sfide hardcore di sopravvivenza ed esperienze Vanilla migliorate. Tra i più noti ci sono All The Mods, Better Minecraft, RLCraft e Cobblemon.</p>
+
+      <h2>Installare un Modpack</h2>
+      <p>Clicca sulla barra di ricerca in alto in GDLauncher. I Modpack sono mostrati di default, quindi puoi iniziare a digitare o sfogliare. Quando ne trovi uno che ti piace, clicca su <strong>Download</strong>.</p>
+      <p>GDLauncher crea una nuova istanza con tutto al suo posto: Mod, Mod loader, Java e memoria. Aspetta che finisca e premi Play.</p>
+
+      <h2>Requisiti di sistema</h2>
+      <p>I Modpack sono più esigenti di Minecraft Vanilla. I pack leggeri (circa 50 Mod) girano bene con 4–6 GB di RAM. Quelli medi ne vogliono 6–8 GB. I grossi come All The Mods possono richiederne 10 o più.</p>
+      <p>GDLauncher imposta in genere dei valori di default ragionevoli, ma se un pack consiglia impostazioni specifiche conviene seguirle. La pagina del Modpack di solito ti dice cosa aspettarti.</p>
+
+      <h2>Risoluzione dei problemi</h2>
+      <p>Se un Modpack non parte, controlla per prima cosa la RAM. Apri le impostazioni dell'istanza e aumenta l'allocazione di memoria. I pack grossi hanno davvero bisogno di almeno 8 GB, a volte di più.</p>
+      <p>Va a scatti? Abbassa la distanza di rendering nelle impostazioni video. La maggior parte dei Modpack non ha bisogno di più di 10–12 chunk. Alcuni pack includono già Mod di ottimizzazione; se il tuo non lo fa, dai un'occhiata alla <a href={localizedPath("/guides/performance-mods", locale)}>guida ai Mod di ottimizzazione</a>.</p>
+      <p>In caso di crash, controlla i log di gioco (GDLauncher li rende facili da trovare). I messaggi di errore di solito indicano dove sta il problema. A volte basta aggiornare un Mod, oppure c'è un problema noto con una determinata configurazione.</p>
+    </Fragment>
+  )}
+</GuideLayout>

@@ -121,7 +121,7 @@ pub enum InstanceShareError {
     ModerationRateLimited,
     #[error("Image too large, maximum size is 5MB")]
     ImageTooLarge,
-    #[error("Invalid image format, must be PNG or JPEG")]
+    #[error("Invalid image format, must be PNG, JPEG, GIF, or WebP")]
     InvalidImageFormat,
     #[error("Invalid header: {0}")]
     InvalidHeader(#[from] InvalidHeaderValue),

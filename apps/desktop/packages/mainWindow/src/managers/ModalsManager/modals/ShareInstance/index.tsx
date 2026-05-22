@@ -9,7 +9,8 @@ import {
   SelectItem,
   SelectValue,
   CopyText,
-  Collapsable
+  Collapsable,
+  Switch as GdlSwitch
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
@@ -141,6 +142,10 @@ function ShareInstance(props: ModalProps) {
   const [title, setTitle] = createSignal("")
   const [expirationDays, setExpirationDays] = createSignal("1")
   const [maxDownloads, setMaxDownloads] = createSignal<string>("")
+  // Off by default. Including saves ships your worlds with the share, which
+  // is rarely what people want and can balloon the upload size; opt in here
+  // and the backend stops filtering out the `saves` directory.
+  const [includeSaves, setIncludeSaves] = createSignal(false)
 
   const waitForShareInstanceMutation = rspc.createQuery(() => ({
     queryKey: [
@@ -186,6 +191,10 @@ function ShareInstance(props: ModalProps) {
     const maxDownloadsValue = maxDownloads().trim()
     if (maxDownloadsValue && parseInt(maxDownloadsValue) >= 1) {
       params.set("maxDownloads", maxDownloadsValue)
+    }
+
+    if (includeSaves()) {
+      params.set("includeSaves", "true")
     }
 
     sseStream = new EventSource(
@@ -319,6 +328,23 @@ function ShareInstance(props: ModalProps) {
                       disabled={isLoading()}
                       inputColor="bg-darkSlate-800"
                       class="w-full"
+                    />
+                  </div>
+
+                  {/* Include Saves Toggle */}
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0 flex-1">
+                      <div class="text-lightSlate-50 text-sm font-medium">
+                        <Trans key="instances:_trn_instance_share.include_saves_label" />
+                      </div>
+                      <div class="text-lightSlate-500 mt-0.5 text-xs">
+                        <Trans key="instances:_trn_instance_share.include_saves_description" />
+                      </div>
+                    </div>
+                    <GdlSwitch
+                      checked={includeSaves()}
+                      disabled={isLoading()}
+                      onChange={(e) => setIncludeSaves(e.currentTarget.checked)}
                     />
                   </div>
                 </div>

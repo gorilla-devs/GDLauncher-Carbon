@@ -1,4 +1,4 @@
-import { createSignal, onMount, For, Show } from "solid-js"
+import { createSignal, onMount, For } from "solid-js"
 import { detectOS } from "../../utils/detectOS"
 import type { OS } from "../../utils/detectOS"
 
@@ -7,40 +7,47 @@ const OS_CONFIG = {
     label: "Windows",
     requirement: "Windows 10+",
     icon: "i-simple-icons:windows11",
-    url: "/download/windows"
+    url: "/download/windows",
+    labelKey: "windows" as const
   },
   MacOS: {
     label: "macOS",
     requirement: "macOS 10.15+",
     icon: "i-simple-icons:apple",
-    url: "/download/mac"
+    url: "/download/mac",
+    labelKey: "macos" as const
   },
   Linux: {
     label: "Linux",
     requirement: "Linux (glibc 2.31+)",
     icon: "i-simple-icons:linux",
-    url: "/download/linux"
+    url: "/download/linux",
+    labelKey: "linux" as const
   }
 } as const
 
-export default function HeroDownload() {
+export interface HeroDownloadLabels {
+  windows: string
+  macos: string
+  linux: string
+  alsoAvailable: string
+}
+
+interface Props {
+  labels: HeroDownloadLabels
+  /** Resolved at build time, see src/lib/launcherManifests.ts */
+  version: string
+}
+
+export default function HeroDownload(props: Props) {
   const [currentOS, setCurrentOS] = createSignal<OS>("Windows")
-  const [version, setVersion] = createSignal<string | null>(null)
 
-  onMount(async () => {
+  onMount(() => {
     setCurrentOS(detectOS())
-
-    // Fetch version from API
-    try {
-      const response = await fetch("/api/version")
-      const data = await response.json()
-      setVersion(data.version)
-    } catch {
-      setVersion("latest")
-    }
   })
 
   const config = () => OS_CONFIG[currentOS()]
+  const buttonLabel = () => props.labels[config().labelKey]
 
   return (
     <div class="flex flex-col items-start gap-4">
@@ -51,22 +58,28 @@ export default function HeroDownload() {
         class="group relative inline-flex items-center gap-3 px-6 py-3.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 active:scale-95 ease-spring"
       >
         <div class={`${config().icon} w-5 h-5`}></div>
-        <span>Download for {config().label}</span>
+        <span>{buttonLabel()}</span>
       </a>
 
       {/* Version and Requirements */}
-      <p class="text-sm text-darkSlate-100 flex items-center gap-2"><Show when={version()} fallback={<span class="text-lightSlate-200">Loading...</span>}><span class="text-lightSlate-200">v{version()}</span></Show><span class="text-darkSlate-300">|</span><span>{config().requirement}</span></p>
+      <p class="text-sm text-darkSlate-100 flex items-center gap-2">
+        <span class="text-lightSlate-200">v{props.version}</span>
+        <span class="text-darkSlate-300">|</span>
+        <span>{config().requirement}</span>
+      </p>
 
       {/* All OS Icons */}
       <div class="flex items-center gap-4">
-        <span class="text-xs text-darkSlate-200 uppercase tracking-wider">Also available for</span>
+        <span class="text-xs text-darkSlate-200 uppercase tracking-wider">
+          {props.labels.alsoAvailable}
+        </span>
         <div class="flex items-center gap-2">
           <For each={Object.entries(OS_CONFIG)}>
             {([_os, cfg]) => (
               <a
                 href={cfg.url}
-                title={`Download for ${cfg.label}`}
-                aria-label={`Download for ${cfg.label}`}
+                title={props.labels[cfg.labelKey]}
+                aria-label={props.labels[cfg.labelKey]}
                 data-astro-prefetch="false"
                 class="p-2 rounded-lg transition-all duration-200 text-darkSlate-200 hover:text-lightSlate-100 hover:bg-darkSlate-700/50 active:scale-90 ease-spring"
               >

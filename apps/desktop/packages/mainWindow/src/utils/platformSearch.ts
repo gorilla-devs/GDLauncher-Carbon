@@ -1,6 +1,7 @@
 import {
   FEUnifiedBatchRequest,
   FEUnifiedModLoaderType,
+  FEUnifiedPlatform,
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
   FEUnifiedSearchType
@@ -29,7 +30,7 @@ const defaultSearchQuery: FEUnifiedSearchParameters = {
   projectType: "modpack",
   platformFilters: null,
   index: 0,
-  pageSize: 40,
+  pageSize: 15,
   searchApi: null,
   environment: null
 }
@@ -111,7 +112,11 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   let prevCacheKeyStr = ""
 
   createEffect(() => {
-    const key = JSON.stringify(searchCacheKey(debouncedSearchQuery()))
+    const params = debouncedSearchQuery()
+    const key = JSON.stringify([
+      cfSearchCacheKey(params),
+      mrSearchCacheKey(params)
+    ])
     if (prevCacheKeyStr && key !== prevCacheKeyStr) {
       setSearchGeneration((g) => g + 1)
     }
@@ -295,15 +300,10 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     return selectedInstanceId()
   }, undefined)
 
-  const actualPageSize = () => {
-    let pageSize = debouncedSearchQuery().pageSize || 40
-
-    if (debouncedSearchQuery().searchApi) {
-      // Use Math.ceil to handle odd numbers properly
-      pageSize = Math.ceil(pageSize / 2)
-    }
-    return pageSize
-  }
+  const actualPageSize = () =>
+    debouncedSearchQuery().searchApi
+      ? 20
+      : debouncedSearchQuery().pageSize || 15
 
   // Direct search mode - for URLs, protocols, and # prefix IDs
   // Must be defined before infinite queries so isDirectMode() is available
@@ -344,21 +344,59 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     enabled: isDirectMode() && !isShareMode() && parsedQuery().items.length > 0
   }))
 
-  // Extract cache-relevant fields from search params (excludes pagination and searchApi)
-  const searchCacheKey = (params: FEUnifiedSearchParameters) => ({
+  // Fields shared by both platforms — changing any of these re-runs both
+  // the CurseForge and Modrinth queries.
+  const sharedSearchKey = (params: FEUnifiedSearchParameters) => ({
     q: params.searchQuery ?? "",
-    cat: params.categories,
     gv: params.gameVersions,
     ml: params.modloaders,
     pt: params.projectType,
-    pf: params.platformFilters,
     env: params.environment
+  })
+
+  // CurseForge category ids are numbers, Modrinth category ids are strings,
+  // so the unified `categories` array can be split by type. Returns null when
+  // empty to match the shape the rest of the search params use.
+  const platformCategories = (
+    params: FEUnifiedSearchParameters,
+    platform: FEUnifiedPlatform
+  ) => {
+    const ids = (params.categories ?? []).filter((id) =>
+      platform === "curseforge"
+        ? typeof id === "number"
+        : typeof id === "string"
+    )
+    return ids.length > 0 ? ids : null
+  }
+
+  // `platformFilters` carries the sort field/order for a single platform.
+  const platformSort = (
+    params: FEUnifiedSearchParameters,
+    platform: FEUnifiedPlatform
+  ) =>
+    params.platformFilters?.platform === platform
+      ? params.platformFilters.filters
+      : null
+
+  // Per-platform cache keys: the shared fields plus that platform's own
+  // categories and sort settings. A Modrinth-only filter change leaves the
+  // CurseForge key untouched, so its query is not re-fetched, and vice versa.
+  const cfSearchCacheKey = (params: FEUnifiedSearchParameters) => ({
+    ...sharedSearchKey(params),
+    cat: platformCategories(params, "curseforge"),
+    sort: platformSort(params, "curseforge")
+  })
+
+  const mrSearchCacheKey = (params: FEUnifiedSearchParameters) => ({
+    ...sharedSearchKey(params),
+    cat: platformCategories(params, "modrinth"),
+    sort: platformSort(params, "modrinth")
   })
 
   const cfInfiniteResults = createInfiniteQuery(() => ({
     queryKey: [
       "modplatforms.unifiedSearch.cf",
-      searchCacheKey(debouncedSearchQuery())
+      cfSearchCacheKey(debouncedSearchQuery())
     ],
     enabled:
       !isDirectMode() &&
@@ -370,7 +408,10 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
           "modplatforms.unifiedSearch",
           {
             searchQuery: debouncedSearchQuery().searchQuery,
-            categories: debouncedSearchQuery().categories,
+            categories: platformCategories(
+              debouncedSearchQuery(),
+              "curseforge"
+            ),
             gameVersions: debouncedSearchQuery().gameVersions,
             modloaders: !shouldBypassModloaderFilter(
               debouncedSearchQuery().projectType
@@ -400,7 +441,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const mrInfiniteResults = createInfiniteQuery(() => ({
     queryKey: [
       "modplatforms.unifiedSearch.mr",
-      searchCacheKey(debouncedSearchQuery())
+      mrSearchCacheKey(debouncedSearchQuery())
     ],
     enabled:
       !isDirectMode() &&
@@ -412,7 +453,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
           "modplatforms.unifiedSearch",
           {
             searchQuery: debouncedSearchQuery().searchQuery,
-            categories: debouncedSearchQuery().categories,
+            categories: platformCategories(debouncedSearchQuery(), "modrinth"),
             gameVersions: debouncedSearchQuery().gameVersions,
             modloaders: !shouldBypassModloaderFilter(
               debouncedSearchQuery().projectType

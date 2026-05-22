@@ -1,0 +1,188 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher で Microsoft アカウントを追加・切替・削除する方法",
+    description: "複数の Microsoft アカウントにサインインし、Play が使うアカウントを選び、期限切れトークンを更新し、不要なアカウントを削除。",
+    steps: [
+      { name: "Accounts ページを開く", text: "Settings → Accounts。Microsoft Accounts テーブルは GDL Account セクションの下、列は Active、Username、Type、Status、UUID、Actions。" },
+      { name: "新しいアカウントを追加", text: "セクションヘッダーの + ボタンをクリック。Microsoft のサインインフローがウィンドウで開きます。使いたい Minecraft ライセンス所有の Microsoft アカウントでサインイン。成功するとアカウントがテーブルに表示。" },
+      { name: "アクティブアカウントを切替", text: "アクティブにしたい行の Active セルをクリック。チェックマークが付き、それが Play が使うアカウントに。" },
+      { name: "期限切れ/無効トークンを再認証", text: "Status が expired や invalid なら Actions 列のリフレッシュアイコンをクリック。ランチャーが Microsoft のサインインフローへ戻し、成功すれば Status が ok に戻ります。" },
+      { name: "アカウントを削除", text: "Actions 列のゴミ箱アイコンをクリック。モーダルで確認。GDL Account にリンクされている場合は別の確認モーダルが出て、リンク解除の意図を確認します。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 Microsoft 계정 추가, 전환, 삭제하는 법",
+    description: "여러 Microsoft 계정에 로그인하고, Play가 쓰는 계정을 선택하고, 만료된 토큰을 갱신하고, 더 안 쓰는 계정을 제거.",
+    steps: [
+      { name: "Accounts 페이지 열기", text: "Settings → Accounts. Microsoft Accounts 테이블은 GDL Account 섹션 아래에 있고, 열은 Active, Username, Type, Status, UUID, Actions." },
+      { name: "새 계정 추가", text: "섹션 헤더의 + 버튼 클릭. GDLauncher가 창에서 Microsoft 로그인 흐름을 엽니다. 사용할 Minecraft 라이선스를 소유한 Microsoft 계정으로 로그인. 성공하면 계정이 테이블에 나타납니다." },
+      { name: "활성 계정 전환", text: "활성화할 행의 Active 셀을 클릭. 체크마크가 나타나며, 그 계정이 이제 Play가 쓰는 계정." },
+      { name: "만료/무효 계정 재인증", text: "Status가 expired나 invalid면 Actions 열의 새로고침 아이콘을 클릭. 런처가 Microsoft 로그인 흐름으로 다시 보내고, 성공하면 Status가 ok로 돌아옵니다." },
+      { name: "계정 제거", text: "Actions 열의 휴지통 아이콘 클릭. 모달에서 확인. 계정이 GDL Account에 연결돼 있으면 별도의 확인 모달이 떠서 연결을 끊을지 묻습니다." }
+    ]
+  },
+  de: {
+    title: "Microsoft-Accounts in GDLauncher hinzufügen, wechseln und entfernen",
+    description: "Mehrere Microsoft-Accounts anmelden, den aktiven für Play auswählen, abgelaufene Tokens erneuern und nicht mehr genutzte Accounts entfernen.",
+    steps: [
+      { name: "Accounts-Seite öffnen", text: "Settings → Accounts. Die Microsoft-Accounts-Tabelle sitzt unter dem GDL-Account-Bereich, Spalten Active, Username, Type, Status, UUID, Actions." },
+      { name: "Neuen Account hinzufügen", text: "Auf das +-Symbol im Section-Header klicken. GDLauncher öffnet Microsofts Sign-in-Flow im Fenster. Mit dem Microsoft-Account einloggen, dem die zu nutzende Minecraft-Lizenz gehört. Bei Erfolg erscheint der Account in der Tabelle." },
+      { name: "Aktiven Account wechseln", text: "In die Active-Zelle der gewünschten Zeile klicken. Häkchen erscheint, das ist ab jetzt der Account, den Play nutzt." },
+      { name: "Abgelaufene oder ungültige Accounts neu authentifizieren", text: "Bei Status expired oder invalid das Refresh-Icon in der Actions-Spalte klicken. Der Launcher führt dich erneut durch Microsofts Sign-in-Flow; bei Erfolg geht der Status zurück auf ok." },
+      { name: "Account entfernen", text: "Mülleimer-Icon in der Actions-Spalte klicken. Im Modal bestätigen. Ist der Account mit deinem GDL-Account verlinkt, kommt ein anderes Modal, das den Linkbruch separat bestätigen lässt." }
+    ]
+  },
+  fr: {
+    title: "Comment ajouter, changer et retirer des comptes Microsoft dans GDLauncher",
+    description: "Connecte-toi à plusieurs comptes Microsoft, choisis celui qu'utilise Play, rafraîchis les tokens expirés et retire les comptes que tu n'utilises plus.",
+    steps: [
+      { name: "Ouvrir la page Accounts", text: "Settings → Accounts. La table des comptes Microsoft est sous la section GDL Account, colonnes Active, Username, Type, Status, UUID, Actions." },
+      { name: "Ajouter un nouveau compte", text: "Clique le bouton + dans l'en-tête de la section. GDLauncher ouvre le flow de connexion Microsoft dans une fenêtre. Connecte-toi avec le compte Microsoft qui possède la licence Minecraft à utiliser. En cas de succès, le compte apparaît dans la table." },
+      { name: "Changer le compte actif", text: "Clique la case Active de la ligne à activer. Une coche apparaît, c'est le compte qu'utilise désormais Play." },
+      { name: "Réauthentifier les comptes expired ou invalid", text: "Si Status affiche expired ou invalid, clique l'icône refresh dans la colonne Actions. Le launcher te repasse par le flow de connexion Microsoft ; en cas de succès, Status repasse à ok." },
+      { name: "Retirer un compte", text: "Clique l'icône poubelle dans la colonne Actions. Confirme dans le modal. Si le compte est lié à ton GDL Account, un autre modal de confirmation apparaît demandant si tu veux casser le lien." }
+    ]
+  },
+  es: {
+    title: "Cómo añadir, cambiar y eliminar cuentas Microsoft en GDLauncher",
+    description: "Inicia sesión en varias cuentas Microsoft, elige cuál usa Play, refresca tokens expirados y elimina las cuentas que ya no usas.",
+    steps: [
+      { name: "Abrir la página Accounts", text: "Settings → Accounts. La tabla de cuentas Microsoft está bajo la sección GDL Account, columnas Active, Username, Type, Status, UUID, Actions." },
+      { name: "Añadir una cuenta nueva", text: "Pulsa el botón + en la cabecera de la sección. GDLauncher abre el flujo de inicio de sesión de Microsoft en una ventana. Inicia sesión con la cuenta Microsoft que posee la licencia de Minecraft que quieras usar. Al tener éxito, la cuenta aparece en la tabla." },
+      { name: "Cambiar cuenta activa", text: "Pulsa la celda Active de la fila a activar. Aparece una marca, esa es la cuenta que ahora usa Play." },
+      { name: "Reautenticar cuentas expired o invalid", text: "Si Status muestra expired o invalid, pulsa el icono de refresh en la columna Actions. El launcher te lleva otra vez por el flujo de inicio de sesión de Microsoft; al tener éxito, Status vuelve a ok." },
+      { name: "Eliminar una cuenta", text: "Pulsa el icono de papelera en la columna Actions. Confirma en el modal. Si la cuenta está vinculada a tu GDL Account, aparece un modal de confirmación distinto preguntando si quieres romper el vínculo." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como adicionar, trocar e remover contas Microsoft no GDLauncher",
+    description: "Entre em várias contas Microsoft, escolha qual o Play usa, renove tokens expirados e remova contas que você não usa mais.",
+    steps: [
+      { name: "Abra a página Accounts", text: "Settings → Accounts. A tabela de contas Microsoft fica abaixo da seção GDL Account, com colunas Active, Username, Type, Status, UUID, Actions." },
+      { name: "Adicionar uma conta nova", text: "Clique no botão + no cabeçalho da seção. O GDLauncher abre o fluxo de login da Microsoft numa janela. Entre com a conta Microsoft que tem a licença Minecraft que você vai usar. Em caso de sucesso, a conta aparece na tabela." },
+      { name: "Trocar conta ativa", text: "Clique na célula Active da linha que vai ativar. Aparece um check, agora é a conta que o Play usa." },
+      { name: "Reautenticar contas expired ou invalid", text: "Se Status mostra expired ou invalid, clique no ícone de refresh na coluna Actions. O launcher te leva de novo pelo fluxo de login da Microsoft; em caso de sucesso, Status volta pra ok." },
+      { name: "Remover uma conta", text: "Clique no ícone de lixeira na coluna Actions. Confirme no modal. Se a conta está vinculada à sua conta GDL, aparece um modal de confirmação diferente perguntando se quer quebrar o vínculo." }
+    ]
+  },
+  it: {
+    title: "Come aggiungere, cambiare e rimuovere account Microsoft in GDLauncher",
+    description: "Accedi a più account Microsoft, scegli quale usa Play, rinnova i token scaduti e rimuovi gli account che non usi più.",
+    steps: [
+      { name: "Apri la pagina Accounts", text: "Settings → Accounts. La tabella dei Microsoft Accounts sta sotto la sezione GDL Account, con colonne Active, Username, Type, Status, UUID, Actions." },
+      { name: "Aggiungi un nuovo account", text: "Clicca il pulsante + nell'header della sezione. GDLauncher apre il flusso di login Microsoft in una finestra. Accedi con l'account Microsoft che possiede la licenza Minecraft che vuoi usare. Al successo, l'account compare nella tabella." },
+      { name: "Cambia l'account attivo", text: "Clicca la cella Active della riga da attivare. Compare un check, è l'account che adesso usa Play." },
+      { name: "Riautentica account expired o invalid", text: "Se Status mostra expired o invalid, clicca l'icona di refresh nella colonna Actions. Il launcher ti rimanda al flusso di login Microsoft, al successo Status torna su ok." },
+      { name: "Rimuovi un account", text: "Clicca l'icona del cestino nella colonna Actions. Conferma nel modal. Se l'account è collegato al tuo GDL Account, compare un modal di conferma diverso che chiede se vuoi davvero spezzare il collegamento." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["「Active」の意味", "Status 状態の説明", "なぜアカウントが急に invalid になるか", "リンクされた GDL アカウント", "子供アカウントとファミリーグループ", "最後のアカウントを削除"],
+    paras: [
+      "Active アカウントはインスタンス起動時に Play が使うアカウント。複数の Microsoft アカウントに同時にサインインでき、ランチャーはすべて記憶しますが、一度に「アクティブ」なのは 1 つだけ。切替はワンクリック、他は触る必要なし。",
+      "<strong>ok (緑チェック)</strong>: アクセストークン有効、起動可能。<strong>expired (黄色アラート)</strong>: アクセストークン期限切れ、まだ自動更新されていない。Actions の Refresh アイコンをクリックして Microsoft 経由で再認証するか、待つ, ランチャーが次の機会にバックグラウンド更新を試みます。<strong>refreshing (黄色リフレッシュ)</strong>: バックグラウンドで更新中。何もしなくて OK。<strong>invalid (赤い X)</strong>: リフレッシュトークン自体が Microsoft に拒否されたため、バックグラウンド更新では復旧不可。よくある原因: Microsoft パスワード変更、Microsoft Web サイトからのサインアウト、セキュリティポリシーにヒット。Actions の Refresh アイコンをクリックして Microsoft サインインをやり直すか、削除して再追加。",
+      "Microsoft はいつでもサーバー側でリフレッシュトークンを無効化できます。よくあるトリガー: Microsoft パスワードを変更した、2 要素認証を有効化/無効化した、microsoft.com や account.microsoft.com から明示的にサインアウトした、何か月もアカウントを使わず Microsoft が古いトークンをクリーンアップとして期限切れにした。どれも GDLauncher のせいではなく、ランチャーは「トークン拒否」レスポンスを受け取るだけ。修正は常に同じ: アカウントを削除、再度追加、新規サインイン。",
+      "GDL アカウントにサインアップしている場合、Microsoft アカウントの 1 つがそのリンクオーナーです。その Microsoft アカウントを削除すると確認モーダルがトリガーされ、リンクを切ると GDL プロフィールのアンカーに影響します。後で GDL Account 設定から別の Microsoft アカウントに再リンクできます。",
+      "子供 Microsoft アカウント、または Family Group 内のアカウントを持っている場合、親アカウントがプラットフォーム上で Minecraft アクセスを許可する必要があります。<code>account.microsoft.com/family</code> に行き子供のアプリ権限を確認。これがないと GDLauncher のサインインフローは「console access required」や「Xbox Live not allowed」エラーを表示。",
+      "最後のサインイン済み Microsoft アカウントを削除すると GDLauncher から完全にサインアウトされます。ホームページに戻され、何かを起動するには再度アカウントを追加する必要があります。"
+    ]
+  },
+  ko: {
+    headings: ["'Active'의 의미", "Status 상태 설명", "왜 계정이 갑자기 invalid가 되나", "연결된 GDL 계정", "어린이 계정과 가족 그룹", "마지막 계정 삭제"],
+    paras: [
+      "Active 계정은 인스턴스를 시작할 때 Play가 사용하는 계정. 동시에 여러 Microsoft 계정에 로그인할 수 있고 런처가 모두 기억하지만, 한 번에 '활성'인 건 하나뿐. 전환은 클릭 한 번, 다른 건 만질 필요 없음.",
+      "<strong>ok(녹색 체크)</strong>: 액세스 토큰 유효, 실행 가능. <strong>expired(노란 경고)</strong>: 액세스 토큰 만료, 아직 자동 갱신되지 않음. Actions의 새로고침 아이콘을 눌러 Microsoft를 통해 재인증하거나, 기다리세요, 런처가 다음 기회에 백그라운드 갱신을 시도합니다. <strong>refreshing(노란 새로고침)</strong>: 백그라운드에서 갱신 중. 별도 작업 불필요. <strong>invalid(빨간 X)</strong>: 리프레시 토큰 자체가 Microsoft에 의해 거부됨, 백그라운드 갱신으로는 복구 불가. 흔한 원인: Microsoft 비밀번호 변경, Microsoft 웹사이트에서 명시적 로그아웃, 보안 정책 발동. Actions의 새로고침 아이콘을 눌러 Microsoft 로그인을 다시 진행하거나, 제거 후 재추가.",
+      "Microsoft는 언제든 서버 측에서 리프레시 토큰을 무효화할 수 있습니다. 가장 흔한 트리거: Microsoft 비밀번호 변경, 이중 인증 활성/비활성, microsoft.com이나 account.microsoft.com에서 명시적 로그아웃, 몇 달 안 써서 Microsoft가 옛 토큰을 청소로 만료. 어느 것도 GDLauncher 잘못이 아니며 런처는 그냥 '토큰 거부' 응답을 받습니다. 해결은 항상 같음: 계정 제거, 다시 추가, 새로 로그인.",
+      "GDL 계정에 가입했다면 Microsoft 계정 중 하나가 그것의 연결 소유자. 그 Microsoft 계정 제거는 확인 모달을 띄우고, 연결을 끊으면 GDL 프로필이 무엇에 묶여 있는지 영향을 줍니다. 나중에 GDL Account 설정에서 다른 Microsoft 계정으로 다시 연결 가능.",
+      "자녀 Microsoft 계정이나 가족 그룹 안의 계정을 가지고 있다면 부모 계정이 플랫폼에서 Minecraft 접근을 허용해야 로그인이 작동할 수 있습니다. <code>account.microsoft.com/family</code>에 가서 자녀의 앱 권한을 확인하세요. 그게 없으면 GDLauncher 로그인 흐름이 'console access required'나 'Xbox Live not allowed' 오류를 보입니다.",
+      "마지막으로 로그인된 Microsoft 계정을 제거하면 GDLauncher에서 완전히 로그아웃되어 홈페이지로 이동합니다. 어떤 걸 실행하려면 계정을 다시 추가해야 합니다."
+    ]
+  },
+  de: {
+    headings: ["Was 'Active' bedeutet", "Status-Zustände erklärt", "Warum ein Account plötzlich invalid wird", "Verlinkte GDL-Accounts", "Kinder-Accounts und Familiengruppe", "Den letzten Account entfernen"],
+    paras: [
+      "Der aktive Account ist der, den Play beim Launch nutzt. Du kannst gleichzeitig in mehreren Microsoft-Accounts angemeldet sein, der Launcher merkt sich alle, aber nur einer ist 'aktiv'. Wechsel per Klick, sonst nichts.",
+      "<strong>ok (grüner Haken)</strong>: Access-Token gültig, kann starten. <strong>expired (gelbe Warnung)</strong>: Access-Token ist abgelaufen und wurde noch nicht automatisch erneuert. Klicke das Refresh-Icon in Actions, um dich erneut über Microsoft anzumelden, oder warte – der Launcher versucht den Background-Refresh bei nächster Gelegenheit. <strong>refreshing (gelbes Refresh)</strong>: Der Launcher erneuert das Token gerade im Hintergrund. Kein Handeln nötig. <strong>invalid (rotes X)</strong>: Der Refresh-Token selbst wurde von Microsoft abgelehnt, ein Background-Refresh hilft hier nicht. Häufige Auslöser: Microsoft-Passwort geändert, von Microsofts Webseite abgemeldet, Security-Policy-Treffer. Klicke das Refresh-Icon in Actions, um den Microsoft-Sign-in erneut zu durchlaufen, oder entferne den Account und füge ihn neu hinzu.",
+      "Microsoft kann Refresh-Tokens jederzeit serverseitig entwerten. Häufige Auslöser: Microsoft-Passwort geändert, 2FA an-/ausgeschaltet, von microsoft.com oder account.microsoft.com explizit abgemeldet, monatelang nicht genutzt und Microsoft hat alte Tokens als Cleanup auslaufen lassen. Nichts davon ist GDLaunchers Fehler, der Launcher sieht nur eine 'Token rejected'-Antwort. Lösung immer gleich: Account weg, neu hinzufügen, neu anmelden.",
+      "Hast du dich für einen GDL-Account registriert, ist einer deiner Microsoft-Accounts dessen verlinkter Owner. Diesen MS-Account zu entfernen löst ein eigenes Confirm-Modal aus, denn der Linkbruch wirkt auf das, woran dein GDL-Profil hängt. Später in den GDL-Account-Einstellungen kannst du auf einen anderen MS-Account re-linken.",
+      "Hast du einen Kinder-Microsoft-Account oder einen in einer Family Group, muss der Eltern-Account die Minecraft-Nutzung auf der Plattform freigeben, sonst klappt die Anmeldung nicht. Auf <code>account.microsoft.com/family</code> die App-Berechtigungen des Kinds checken. Ohne das zeigt GDLaunchers Sign-in-Flow 'console access required' oder 'Xbox Live not allowed'.",
+      "Den letzten verbleibenden Microsoft-Account entfernen meldet dich komplett aus GDLauncher ab. Du landest auf der Startseite und musst einen Account neu hinzufügen, bevor du irgendwas starten kannst."
+    ]
+  },
+  fr: {
+    headings: ["Ce que veut dire 'Active'", "Les états Status expliqués", "Pourquoi un compte devient soudain invalid", "Comptes GDL liés", "Comptes enfants et Family Group", "Retirer le dernier compte"],
+    paras: [
+      "Le compte Active est celui qu'utilise Play quand tu lances une instance. Tu peux être connecté à plusieurs comptes Microsoft à la fois, le launcher les retient tous, mais un seul est 'actif' à la fois. Le changement est en un clic ; rien d'autre n'a besoin d'être touché.",
+      "<strong>ok (coche verte)</strong> : token d'accès valide, prêt à lancer. <strong>expired (alerte jaune)</strong> : token d'accès expiré, pas encore rafraîchi automatiquement. Clique l'icône refresh dans Actions pour te réauthentifier via Microsoft, ou attends, le launcher essaiera son refresh en arrière-plan à la prochaine occasion. <strong>refreshing (refresh jaune)</strong> : le launcher rafraîchit le token en arrière-plan. Rien à faire. <strong>invalid (X rouge)</strong> : le refresh token lui-même a été rejeté par Microsoft, aucun refresh en arrière-plan ne récupère ça. Déclencheurs courants : mot de passe Microsoft changé, déconnexion du site Microsoft, politique de sécurité. Clique l'icône refresh dans Actions pour refaire la connexion Microsoft, ou retire et ré-ajoute le compte.",
+      "Microsoft peut invalider des refresh tokens côté serveur n'importe quand. Les déclencheurs les plus courants : tu as changé ton mot de passe Microsoft, tu as activé ou désactivé l'authentification à deux facteurs, tu t'es déconnecté de microsoft.com ou account.microsoft.com explicitement, tu n'as pas utilisé le compte depuis des mois et Microsoft a expiré les vieux tokens en nettoyage. Aucune n'est la faute de GDLauncher, le launcher voit juste une réponse 'token rejected'. Le fix est toujours le même : retire le compte, ajoute-le à nouveau, reconnecte-toi fresh.",
+      "Si tu as créé un compte GDL, un de tes comptes Microsoft est son owner lié. Retirer ce compte Microsoft déclenche un modal de confirmation, casser le lien affecte ce sur quoi ton profil GDL est ancré. Tu peux re-link à un autre compte Microsoft plus tard dans les settings GDL Account.",
+      "Si tu as un compte Microsoft enfant ou un dans un Family Group, le compte parent peut avoir besoin d'autoriser l'accès Minecraft sur la plateforme avant que la connexion fonctionne. Va sur <code>account.microsoft.com/family</code> et vérifie les permissions d'app de l'enfant. Sans ça, le flow de connexion GDLauncher affiche une erreur 'console access required' ou 'Xbox Live not allowed'.",
+      "Retirer le dernier compte Microsoft connecté te déconnecte entièrement de GDLauncher. Tu es redirigé vers la page d'accueil ; il faudra ajouter un compte à nouveau avant de pouvoir lancer quoi que ce soit."
+    ]
+  },
+  es: {
+    headings: ["Qué significa 'Active'", "Estados Status explicados", "Por qué una cuenta se vuelve invalid de repente", "Cuentas GDL vinculadas", "Cuentas de menores y Family Group", "Eliminar la última cuenta"],
+    paras: [
+      "La cuenta Active es la que usa Play cuando lanzas una instancia. Puedes estar conectado a varias cuentas Microsoft a la vez, el launcher las recuerda todas, pero solo una es 'activa' a la vez. Cambiar es un clic, nada más hay que tocar.",
+      "<strong>ok (check verde)</strong>: token de acceso válido, listo para lanzar. <strong>expired (alerta amarilla)</strong>: token de acceso caducado, aún no refrescado automáticamente. Pulsa el icono de refresh en Actions para reautenticarte por Microsoft, o espera, el launcher intentará el refresh en segundo plano a la próxima oportunidad. <strong>refreshing (refresh amarillo)</strong>: el launcher refresca el token en segundo plano. Nada que hacer. <strong>invalid (X roja)</strong>: el propio refresh token lo rechazó Microsoft, ningún refresh en segundo plano lo recupera. Disparadores comunes: contraseña Microsoft cambiada, cierre de sesión desde el web de Microsoft, política de seguridad. Pulsa el icono de refresh en Actions para volver a pasar por el inicio de sesión Microsoft, o elimina y vuelve a añadir la cuenta.",
+      "Microsoft puede invalidar refresh tokens del lado servidor en cualquier momento. Los disparadores más comunes: cambiaste la contraseña de Microsoft, activaste o desactivaste la autenticación de dos factores, te desconectaste de microsoft.com o account.microsoft.com explícitamente, no usaste la cuenta en meses y Microsoft expiró tokens viejos en limpieza. Ninguno es culpa de GDLauncher, el launcher solo ve una respuesta 'token rejected'. El fix siempre es el mismo: elimina la cuenta, vuelve a añadirla, inicia sesión fresca.",
+      "Si te has registrado en una cuenta GDL, una de tus cuentas Microsoft es el owner vinculado. Eliminar esa cuenta Microsoft dispara un modal de confirmación, romper el vínculo afecta a aquello en lo que tu perfil GDL está anclado. Más tarde puedes vincular a otra cuenta Microsoft en los ajustes de GDL Account.",
+      "Si tienes una cuenta Microsoft de menor o una dentro de un Family Group, la cuenta del progenitor puede tener que conceder acceso a Minecraft en la plataforma antes de que el inicio de sesión funcione. Ve a <code>account.microsoft.com/family</code> y revisa los permisos de app del menor. Sin eso, el flujo de inicio de sesión de GDLauncher muestra un error 'console access required' o 'Xbox Live not allowed'.",
+      "Eliminar la última cuenta Microsoft conectada te desconecta de GDLauncher por completo. Vuelves a la página de inicio; tendrás que añadir una cuenta otra vez antes de poder lanzar nada."
+    ]
+  },
+  "pt-BR": {
+    headings: ["O que 'Active' significa", "Estados Status explicados", "Por que uma conta vira invalid de repente", "Contas GDL vinculadas", "Contas de criança e Family Group", "Remover a última conta"],
+    paras: [
+      "A conta Active é a que o Play usa quando você lança uma instância. Você pode estar logado em várias contas Microsoft ao mesmo tempo, o launcher lembra de todas, mas só uma é 'ativa' por vez. Trocar é um clique, nada mais precisa ser mexido.",
+      "<strong>ok (check verde)</strong>: token de acesso válido, pronto pra lançar. <strong>expired (alerta amarelo)</strong>: token de acesso expirado, ainda não renovado automaticamente. Clique o ícone de refresh em Actions pra reautenticar pela Microsoft, ou espere, o launcher vai tentar o refresh em segundo plano na próxima oportunidade. <strong>refreshing (refresh amarelo)</strong>: o launcher está renovando o token em segundo plano. Nada a fazer. <strong>invalid (X vermelho)</strong>: o próprio refresh token foi rejeitado pela Microsoft, nenhum refresh em segundo plano recupera. Gatilhos comuns: senha Microsoft mudada, deslogou no site da Microsoft, política de segurança. Clique o ícone de refresh em Actions pra refazer o login Microsoft, ou remova e adicione a conta de novo.",
+      "A Microsoft pode invalidar refresh tokens do lado servidor a qualquer hora. Os gatilhos mais comuns: você mudou a senha Microsoft, ligou/desligou autenticação em dois fatores, deslogou de microsoft.com ou account.microsoft.com explicitamente, não usou a conta por meses e a Microsoft expirou tokens antigos como limpeza. Nenhum é culpa do GDLauncher, o launcher só vê uma resposta 'token rejected'. A solução é sempre a mesma: remova a conta, adicione de novo, faça login fresco.",
+      "Se você criou uma conta GDL, uma das suas contas Microsoft é o owner vinculado dela. Remover essa conta Microsoft dispara um modal de confirmação, quebrar o vínculo afeta o que sua identidade GDL está ancorada. Você pode reconectar a outra conta Microsoft mais tarde nos settings de GDL Account.",
+      "Se você tem uma conta Microsoft de criança ou uma dentro de Family Group, a conta dos pais pode precisar liberar o acesso ao Minecraft na plataforma antes que o login funcione. Vá em <code>account.microsoft.com/family</code> e veja as permissões de app da criança. Sem isso, o fluxo de login do GDLauncher mostra erro 'console access required' ou 'Xbox Live not allowed'.",
+      "Remover a última conta Microsoft logada te desloga do GDLauncher por completo. Você volta pra página inicial; vai precisar adicionar uma conta de novo antes de lançar qualquer coisa."
+    ]
+  },
+  it: {
+    headings: ["Cosa significa 'Active'", "Stati di Status spiegati", "Perché un account diventa improvvisamente invalid", "GDL Account collegati", "Account per minori e Family Group", "Rimuovere l'ultimo account"],
+    paras: [
+      "L'account Active è quello che Play usa quando avvii un'istanza. Puoi essere collegato a più account Microsoft contemporaneamente, il launcher li ricorda tutti, ma uno solo è 'attivo' alla volta. Cambiarlo è un clic, non serve toccare altro.",
+      "<strong>ok (check verde)</strong>: token di accesso valido, pronto al lancio. <strong>expired (avviso giallo)</strong>: token di accesso scaduto, non ancora rinnovato automaticamente. Clicca l'icona refresh in Actions per riautenticarti tramite Microsoft, oppure aspetta: il launcher proverà il refresh in background alla prima occasione. <strong>refreshing (refresh giallo)</strong>: il launcher sta rinnovando il token in background. Niente da fare. <strong>invalid (X rossa)</strong>: il refresh token stesso è stato rifiutato da Microsoft, nessun refresh in background lo recupera. Cause tipiche: password Microsoft cambiata, logout esplicito dal sito Microsoft, criterio di sicurezza. Clicca l'icona refresh in Actions per rifare il login Microsoft, oppure rimuovi e riaggiungi l'account.",
+      "Microsoft può invalidare i refresh token lato server in qualsiasi momento. Le cause più comuni: hai cambiato la password Microsoft, hai attivato o disattivato l'autenticazione a due fattori, ti sei disconnesso esplicitamente da microsoft.com o account.microsoft.com, non hai usato l'account per mesi e Microsoft ha fatto scadere i vecchi token come pulizia. Nessuna è colpa di GDLauncher, il launcher vede solo una risposta 'token rejected'. La soluzione è sempre la stessa: rimuovi l'account, riaggiungilo, fai un login fresco.",
+      "Se ti sei registrato un GDL Account, uno dei tuoi account Microsoft ne è l'owner collegato. Rimuovere quell'account Microsoft fa partire un modal di conferma dedicato, perché spezzare il collegamento incide su ciò a cui è ancorata la tua identità GDL. Potrai ricollegare un altro account Microsoft più avanti dalle impostazioni di GDL Account.",
+      "Se hai un account Microsoft per minori o uno dentro un Family Group, l'account del genitore potrebbe dover autorizzare l'accesso a Minecraft sulla piattaforma prima che il login funzioni. Vai su <code>account.microsoft.com/family</code> e controlla i permessi app del minore. Senza, il flusso di login di GDLauncher mostra un errore 'console access required' o 'Xbox Live not allowed'.",
+      "Rimuovere l'ultimo account Microsoft collegato ti disconnette completamente da GDLauncher. Vieni rimandato alla home, dovrai aggiungere di nuovo un account prima di poter lanciare qualcosa."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

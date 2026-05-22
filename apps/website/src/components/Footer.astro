@@ -6,86 +6,98 @@ import Twitter from "../assets/twitter.svg";
 import Discord from "../assets/discord.svg";
 import NewsLetter from "./Newsletter";
 import { APP_URLS } from "../consts";
+import { getLocaleFromUrl, localizedPath, useTranslations } from "../lib/i18n";
+
+const locale = getLocaleFromUrl(Astro.url.pathname);
+const t = useTranslations(locale);
+const year = new Date().getFullYear();
 ---
 
 <footer class="flex flex-col">
   <div class="flex flex-col lg:flex-row justify-between p-16 space-x-0.5">
     <div class="flex flex-col items-start flex-1">
-      <Image src={Logo} alt="BH Logo" class="pb-4" />
-      <p class="text-graygd w-1/2">
-        GDLauncher is a simple, yet powerful Minecraft custom launcher with a
-        strong focus on the user experience.
-      </p>
+      <Image src={Logo} alt="GDLauncher logo" class="pb-4" />
+      <p class="text-graygd w-1/2">{t("footer.tagline")}</p>
     </div>
 
     <div class="flex-[0.5]">
-      <span class="text-white font-medium">Download</span>
+      <span class="text-white font-medium">{t("footer.section.download")}</span>
       <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
         <li>
-          <HeaderLink href="/download/windows">Windows</HeaderLink>
+          <HeaderLink href="/download/windows">{t("footer.os.windows")}</HeaderLink>
         </li>
         <li>
-          <HeaderLink href="/download/mac">MacOs</HeaderLink>
+          <HeaderLink href="/download/mac">{t("footer.os.macos")}</HeaderLink>
         </li>
         <li>
-          <HeaderLink href="/download/linux">Linux</HeaderLink>
+          <HeaderLink href="/download/linux">{t("footer.os.linux")}</HeaderLink>
         </li>
       </ul>
     </div>
 
-    <NewsLetter client:idle />
+    <NewsLetter
+      client:idle
+      labels={{
+        heading: t("newsletter.heading"),
+        emailPlaceholder: t("newsletter.emailPlaceholder"),
+        subscribe: t("newsletter.subscribe"),
+        errorAlreadySubscribed: t("newsletter.error.alreadySubscribed"),
+        errorMissingInfo: t("newsletter.error.missingInfo"),
+        errorInvalidEmail: t("newsletter.error.invalidEmail"),
+        success: t("newsletter.success"),
+      }}
+    />
     <div class="flex-[0.5]">
-      <span class="text-white font-medium">Download old GDL</span>
+      <span class="text-white font-medium">{t("footer.section.oldDownload")}</span>
       <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
         <li>
-          <HeaderLink href={APP_URLS.olddownload.win}>Windows</HeaderLink>
+          <HeaderLink href={APP_URLS.olddownload.win}>{t("footer.os.windows")}</HeaderLink>
         </li>
         <li>
-          <HeaderLink href={APP_URLS.olddownload.macOs}>MacOs</HeaderLink>
+          <HeaderLink href={APP_URLS.olddownload.macOs}>{t("footer.os.macos")}</HeaderLink>
         </li>
         <li>
-          <HeaderLink href={APP_URLS.olddownload.linux}>Linux</HeaderLink>
+          <HeaderLink href={APP_URLS.olddownload.linux}>{t("footer.os.linux")}</HeaderLink>
         </li>
       </ul>
     </div>
     <div class="flex-[0.5]">
-      <span class="text-white font-medium">Legal</span>
+      <span class="text-white font-medium">{t("footer.section.legal")}</span>
       <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
         <li>
-          <HeaderLink href="/terms-of-service" class="pt-4">
-            Terms of service
+          <HeaderLink href={localizedPath("/terms-of-service", locale)} class="pt-4">
+            {t("footer.legal.tos")}
           </HeaderLink>
         </li>
         <li>
-          <HeaderLink href="/privacy-statement">Privacy statement</HeaderLink>
+          <HeaderLink href={localizedPath("/privacy-statement", locale)}>{t("footer.legal.privacy")}</HeaderLink>
         </li>
       </ul>
     </div>
     <div class="flex-1">
-      <span class="text-white font-medium">Get in Touch!</span>
+      <span class="text-white font-medium">{t("footer.section.contact")}</span>
       <ul class="flex gap-2 pt-4">
         <li>
-          <HeaderLink href="https://discord.gdlauncher.com/">
-            <Image src={Discord} alt="social discord" />
+          <HeaderLink href={APP_URLS.socials.discord}>
+            <Image src={Discord} alt="GDLauncher on Discord" />
           </HeaderLink>
         </li>
         <li>
-          <HeaderLink href="https://twitter.com/gdlauncher">
-            <Image src={Twitter} alt="social twitter" />
+          <HeaderLink href={APP_URLS.socials.twitter}>
+            <Image src={Twitter} alt="GDLauncher on Twitter" />
           </HeaderLink>
         </li>
       </ul>
       <div class="flex flex-col">
-        <span class="text-graygd"
-          >(C) {new Date().getFullYear()} by GorillaDevs Inc. | All Right Reserved</span
-        >
+        <span class="text-graygd">
+          {t("footer.copyrightLine").replace("{year}", String(year))}
+        </span>
       </div>
     </div>
   </div>
-  <span class="text-graygd text-center pb-2 text-sm"
-    >NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH
-    MOJANG.</span
-  >
+  <span class="text-graygd text-center pb-2 text-sm">
+    {t("footer.disclaimer")}
+  </span>
 </footer>
 <style>
   a {

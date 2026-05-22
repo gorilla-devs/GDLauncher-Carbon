@@ -1,0 +1,134 @@
+---
+/**
+ * TopAddonsList - shows the top N addons of a given type as a clickable
+ * grid. Lives on hub pages so users (and crawlers) actually see real content
+ * instead of a wall of essay text. Pulls from the same addonsData the slug
+ * pages use, sorted by download count.
+ */
+import { listAddons } from "../lib/addonsData"
+import type { AddonType } from "../lib/api/types"
+import { addonTypePlural } from "../lib/api/types"
+import { getLocaleFromUrl, localizedPath, useTranslations, getHtmlLang } from "../lib/i18n"
+
+interface Props {
+  type: AddonType
+  /** Max number of addons to render */
+  limit?: number
+}
+
+const { type, limit = 24 } = Astro.props
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+const intlLocale = getHtmlLang(locale)
+
+// Heading and intro come from translation templates that interpolate the
+// addon-type label. Labels stay English in every locale except Italian,
+// where Worlds → "Mappe" (addonTypePlural handles the override).
+const interp = (s: string, vars: Record<string, string>) =>
+  Object.entries(vars).reduce(
+    (acc, [k, v]) => acc.replaceAll(`{${k}}`, v),
+    s,
+  )
+const heading = interp(t("addonsHub.top.headingTemplate"), {
+  type: addonTypePlural(type, locale),
+})
+const intro = t(`addonsHub.top.intro.${type}`)
+
+// Merge CurseForge + Modrinth addons of this type, dedupe by slug
+// (a few addons live on both platforms), sort by total downloads.
+type Entry = {
+  name: string
+  slug: string
+  imageUrl: string | null
+  description: string | null
+  downloads: number
+  platform: "curseforge" | "modrinth"
+  loaders: string[]
+}
+
+const cfList = listAddons("curseforge", type)
+const mrList = type === "worlds" ? [] : listAddons("modrinth", type)
+
+const entries: Entry[] = []
+const seenSlugs = new Set<string>()
+
+for (const arr of [cfList, mrList]) {
+  for (const a of arr) {
+    if (!a.slug || seenSlugs.has(a.slug)) continue
+    seenSlugs.add(a.slug)
+    entries.push({
+      name: a.name,
+      slug: a.slug,
+      imageUrl: a.imageUrl ?? null,
+      description: a.description ?? null,
+      downloads: typeof a.downloads === "number" ? a.downloads : 0,
+      platform: arr === cfList ? "curseforge" : "modrinth",
+      loaders: a.loaders ?? [],
+    })
+  }
+}
+
+entries.sort((a, b) => b.downloads - a.downloads)
+const top = entries.slice(0, limit)
+
+function formatDownloads(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  try { return n.toLocaleString(intlLocale) } catch { return n.toLocaleString("en-US") }
+}
+---
+
+{top.length > 0 && (
+  <section class="bg-darkSlate-800 rounded-xl p-6 md:p-10 mb-12">
+    <div class="text-center mb-8">
+      <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-2">{heading}</h2>
+      <p class="text-darkSlate-100">{intro}</p>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+      {top.map((addon) => (
+        <a
+          href={localizedPath(`/${type}/${addon.platform}/${addon.slug}`, locale)}
+          class="block p-3 rounded-lg bg-darkSlate-700/40 hover:bg-darkSlate-700 border border-darkSlate-600/50 hover:border-primary-500/30 transition-colors"
+        >
+          <div class="flex items-start gap-3">
+            {addon.imageUrl ? (
+              <img
+                src={addon.imageUrl}
+                alt={`${addon.name} icon`}
+                width="48"
+                height="48"
+                loading="lazy"
+                class="w-10 h-10 rounded-md flex-shrink-0 bg-darkSlate-600 object-cover"
+                onerror="this.style.display='none'"
+              />
+            ) : (
+              <div class="w-10 h-10 rounded-md flex-shrink-0 bg-darkSlate-600"></div>
+            )}
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-lightSlate-50 truncate">{addon.name}</div>
+              {addon.downloads > 0 && (
+                <div class="text-xs text-darkSlate-200">{`${formatDownloads(addon.downloads)} ${t("addon.meta.downloads").toLowerCase()}`}</div>
+              )}
+            </div>
+          </div>
+          {addon.description && (
+            <p class="text-xs text-darkSlate-200 mt-2 line-clamp-2">
+              {addon.description}
+            </p>
+          )}
+        </a>
+      ))}
+    </div>
+  </section>
+)}
+
+<style>
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>

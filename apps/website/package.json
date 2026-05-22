@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "pnpm --filter @gd/config build && astro check && astro build",
+    "build": "pnpm --filter @gd/config build && tsc --noEmit && astro build",
+    "check": "NODE_OPTIONS=--max-old-space-size=16384 astro check",
     "preview": "astro preview",
     "astro": "astro",
     "update-addons": "node --env-file=.env scripts/update-addons.mjs"

@@ -1,0 +1,184 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  localizeInternalLinks,
+  type Locale,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft インスタンスを友達と共有する方法",
+    description: "GDLauncher Share コードを生成して、友達が同じ Mod、設定、リソースパックを入れられるようにする。GDL アカウントと認証済みメールが必要。",
+    steps: [
+      { name: "GDL アカウントにサインイン", text: "共有には認証済みメール付きの GDL アカウントが必要。なければ Settings → Accounts の GDL Account セクションで Sign in / Sign up し、メール認証。" },
+      { name: "インスタンスを右クリック", text: "Library で共有したいインスタンスを右クリックし Share Instance (share-line アイコン) を選択。Share Instance モーダルが開きます。" },
+      { name: "共有を設定", text: "任意でタイトルを付ける (受け側のプレビューで表示)。Advanced を展開して有効期限 (1 または 7 日) や最大ダウンロード数を設定。" },
+      { name: "アップロード", text: "Share Instance をクリック。GDLauncher がインスタンスのスナップショットを GDL サービスにアップロードし進行を表示、その後コード (gdl.gg/i/<code> リンクとしても切替表示可能) を表示しコピーできます。" },
+      { name: "コードを送る", text: "コードかリンクを友達に貼り付け (Discord、DM、どこでも)。受け側はインスタンス作成モーダルの Code Share タブを開いて貼り付けます。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 인스턴스를 친구와 공유하는 방법",
+    description: "GDLauncher 공유 코드를 생성해 친구가 동일한 모드, 설정, 리소스 팩을 설치할 수 있게 합니다. GDL 계정과 인증된 이메일 필요.",
+    steps: [
+      { name: "GDL 계정 로그인", text: "공유에는 인증된 이메일이 있는 GDL 계정 필요. 없다면 Settings → Accounts의 GDL Account 섹션에서 Sign in / Sign up 후 이메일 인증." },
+      { name: "인스턴스 오른쪽 클릭", text: "Library에서 공유할 인스턴스를 오른쪽 클릭하고 Share Instance(share-line 아이콘)를 선택. Share Instance 모달이 열립니다." },
+      { name: "공유 구성", text: "선택적으로 제목을 지정(받는 쪽 미리보기에 보임). Advanced를 펼쳐 만료(1 또는 7일)와 최대 다운로드 횟수를 설정." },
+      { name: "업로드", text: "Share Instance 클릭. GDLauncher가 인스턴스 스냅샷을 GDL 서비스에 업로드하면서 진행을 보여주고, 그 다음 복사 가능한 코드(gdl.gg/i/<code> 링크로 토글 표시 가능)를 표시." },
+      { name: "코드 전송", text: "코드나 링크를 친구에게 붙여 넣기(디스코드, DM, 어디든). 받는 쪽은 인스턴스 생성 모달에서 Code Share 탭을 열고 붙여 넣습니다." }
+    ]
+  },
+  de: {
+    title: "Eine Minecraft-Instanz mit einem Freund teilen",
+    description: "Einen GDLauncher-Share-Code generieren, damit ein Freund dieselben Mods, Configs und Resource Packs bekommt. Braucht einen GDL-Account und eine verifizierte E-Mail.",
+    steps: [
+      { name: "Bei einem GDL-Account einloggen", text: "Teilen braucht einen GDL-Account mit verifizierter E-Mail. Hast du keinen, gehe in Settings → Accounts auf Sign in / Sign up im GDL-Account-Bereich und verifizier deine E-Mail." },
+      { name: "Rechtsklick auf die Instanz", text: "In der Library Rechtsklick auf die Instanz, Share Instance wählen (share-line-Icon). Das Share-Instance-Modal öffnet sich." },
+      { name: "Share konfigurieren", text: "Optional einen Titel geben (sieht der Empfänger in der Vorschau). Advanced aufklappen für Ablauf (1 oder 7 Tage) und maximale Downloads." },
+      { name: "Hochladen", text: "Share Instance klicken. GDLauncher lädt einen Snapshot der Instanz zum GDL-Service hoch und zeigt den Fortschritt, danach einen Code (per Toggle als gdl.gg/i/<code>-Link anzeigbar) zum Kopieren." },
+      { name: "Code verschicken", text: "Code oder Link an den Freund schicken, in Discord, DM, egal wo. Der öffnet im Instance-Creation-Modal den Code-Share-Tab und fügt ihn ein." }
+    ]
+  },
+  fr: {
+    title: "Comment partager une instance Minecraft avec un ami",
+    description: "Génère un code de partage GDLauncher pour qu'un ami puisse installer les mêmes mods, configs et resource packs que toi. Demande un compte GDL et un email vérifié.",
+    steps: [
+      { name: "Connecte-toi à un compte GDL", text: "Le partage demande un compte GDL avec email vérifié. Si tu n'en as pas, va dans Settings → Accounts et clique Sign in / Sign up dans la section GDL Account, puis vérifie ton email." },
+      { name: "Clic droit sur l'instance", text: "Dans la Library, clic droit sur l'instance à partager et choisis Share Instance (icône share-line). La modale Share Instance s'ouvre." },
+      { name: "Configurer le partage", text: "Optionnellement donne un titre (ce que le destinataire voit dans la preview). Déplie Advanced pour définir l'expiration (1 ou 7 jours) et une limite de téléchargements." },
+      { name: "Uploader", text: "Clique Share Instance. GDLauncher upload un snapshot de l'instance vers le service GDL en affichant le progrès, puis montre un code (toggle pour le voir en lien gdl.gg/i/<code>) à copier." },
+      { name: "Envoyer le code", text: "Colle le code ou le lien à ton ami, sur Discord, en DM, n'importe où. Lui ouvre l'onglet Code Share dans la modale de création d'instance et le colle." }
+    ]
+  },
+  es: {
+    title: "Cómo compartir una instancia de Minecraft con un amigo",
+    description: "Genera un código de compartición de GDLauncher para que un amigo pueda instalar los mismos mods, configs y resource packs que tú. Requiere cuenta GDL y email verificado.",
+    steps: [
+      { name: "Inicia sesión en una cuenta GDL", text: "Compartir requiere una cuenta GDL con email verificado. Si no tienes, ve a Settings → Accounts y pulsa Sign in / Sign up en la sección GDL Account, luego verifica tu email." },
+      { name: "Clic derecho en la instancia", text: "En la Library, clic derecho en la instancia a compartir y elige Share Instance (icono share-line). Se abre el modal Share Instance." },
+      { name: "Configurar el share", text: "Opcionalmente ponle un título (eso ve el destinatario en la preview). Expande Advanced para fijar expiración (1 o 7 días) y un límite máximo de descargas." },
+      { name: "Subir", text: "Pulsa Share Instance. GDLauncher sube un snapshot de la instancia al servicio GDL mostrando el progreso, luego muestra un código (toggle para verlo como enlace gdl.gg/i/<code>) que puedes copiar." },
+      { name: "Enviar el código", text: "Pega el código o el enlace al amigo, en Discord, en DM, donde sea. El amigo abre la pestaña Code Share en el modal de creación de instancia y lo pega." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como compartilhar uma instância do Minecraft com um amigo",
+    description: "Gere um código de compartilhamento do GDLauncher pra um amigo poder instalar os mesmos mods, configs e resource packs que você. Precisa de conta GDL e email verificado.",
+    steps: [
+      { name: "Entre em uma conta GDL", text: "Compartilhar exige uma conta GDL com email verificado. Se você não tem, vá em Settings → Accounts e clique Sign in / Sign up na seção GDL Account, depois verifique o email." },
+      { name: "Botão direito na instância", text: "Na Library, botão direito na instância que vai compartilhar e escolha Share Instance (ícone share-line). O modal Share Instance abre." },
+      { name: "Configure o share", text: "Opcionalmente dê um título (é o que o destinatário vê na preview). Expanda Advanced pra definir expiração (1 ou 7 dias) e limite máximo de downloads." },
+      { name: "Upload", text: "Clique Share Instance. O GDLauncher faz upload de um snapshot da instância pro serviço GDL mostrando o progresso, depois mostra um código (toggle pra ver como link gdl.gg/i/<code>) pra copiar." },
+      { name: "Envie o código", text: "Cole o código ou link pro amigo, no Discord, DM, onde quiser. O amigo abre a aba Code Share no modal de criação de instância e cola." }
+    ]
+  },
+  it: {
+    title: "Come condividere un'istanza Minecraft con un amico",
+    description: "Genera un codice di condivisione GDLauncher in modo che un amico possa installare le stesse mod, le stesse config e gli stessi resource pack che hai tu. Richiede un account GDL e un'email verificata.",
+    steps: [
+      { name: "Accedi a un account GDL", text: "La condivisione richiede un account GDL con email verificata. Se non ne hai uno, vai in Settings → Accounts e clicca Sign in / Sign up nella sezione GDL Account, poi verifica l'email." },
+      { name: "Clic destro sull'istanza", text: "Nella Library, fai clic destro sull'istanza da condividere e scegli Share Instance (icona share-line). Si apre il modal Share Instance." },
+      { name: "Configura la condivisione", text: "In opzione assegna un titolo (è quello che vede il destinatario nell'anteprima). Espandi Advanced per impostare la scadenza (1 o 7 giorni) e un limite massimo di download." },
+      { name: "Upload", text: "Clicca Share Instance. GDLauncher carica uno snapshot dell'istanza al servizio GDL mostrando il progresso, poi presenta un codice (con un toggle puoi vederlo come link gdl.gg/i/<code>) pronto da copiare." },
+      { name: "Invia il codice", text: "Incolla il codice o il link al tuo amico, su Discord, in DM, dove vuoi. L'amico apre la scheda Code Share nel modal di creazione istanza e lo incolla." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["共有に含まれるもの", "GDL アカウントが必要な理由", "有効期限とダウンロード制限", "コードをインポート (受け側)", "Mod が削除されている場合"],
+    paras: [
+      "Mod (可能な限り CurseForge / Modrinth から解決、JAR の再配布なし)、設定、スクリプト、リソースパック、インスタンスが Modpack とペアならその Modpack ペアリング。ワールドとスクリーンショットは含まれません。共有は実質「セーブデータを除き、このインスタンスを再現するすべて」のスナップショット。",
+      "Share コードはサーバー側で追跡され、有効期限とカウントを管理。これは両側に GDL アカウントが必要を意味します。GDL がアップロード、ダウンロード、有効期限、任意の最大ダウンロード上限を処理。サーバー側追跡を望まない場合は <a href=\"/guides/export-an-instance\">インスタンスのエクスポート</a>を使用。Export はオフライン配布可能なローカル .zip を出力。",
+      "有効期限のデフォルトは 1 日。1 週間使えるコードにするなら 7 日に切替。期限切れ後、GDL サービスは「code expired」エラーを返し、友達は新しいコードを依頼する必要があります。最大ダウンロード数はコードが redeem できる回数の上限。1 に設定するとはじめのインポート後にコードが死ぬ。リンクを転送されたくない 1 対 1 共有に有用。",
+      "受け側の GDLauncher で: Library ページを開く → ツールバーの <strong>+</strong> をクリック (または空きスペースを右クリック → Import Instance)。<strong>Code Share</strong> タブに切替。コード (または <code>gdl.gg/i/&lt;code&gt;</code> リンク) を貼り付け。GDLauncher が GDL サービスからプレビューを取得 (タイトル、Mod リスト、共有者の識別子)。確定。Mod は元の CDN から新規ダウンロード、設定は Share スナップショットから。",
+      "Share は Mod をプラットフォーム ID で参照。あなたが Share を生成してから友達がインポートするまでの間に Mod の 1 つが CurseForge / Modrinth から削除されていると、その Mod のインポートが失敗。GDLauncher は可能な分をインポートし、欠落分のエラーを表示。欠落 Mod を置き換えて Share を再生成するか、友達が残りを入れて欠落分を手動で探すか。"
+    ]
+  },
+  ko: {
+    headings: ["공유에 포함되는 것", "GDL 계정이 필요한 이유", "만료와 다운로드 제한", "코드 가져오기(받는 쪽)", "모드가 제거된 경우"],
+    paras: [
+      "모드(가능한 한 CurseForge/Modrinth에서 해결, JAR 재배포 없음), 설정, 스크립트, 리소스 팩, 인스턴스가 모드팩과 페어되어 있다면 그 모드팩 페어링. 월드와 스크린샷은 포함되지 않음. 공유는 실질적으로 \"이 인스턴스를 재구성하기 위한 모든 것, 세이브 제외\"의 스냅샷.",
+      "공유 코드는 만료와 카운팅을 위해 서버 측에서 추적됩니다. 즉 양쪽에 GDL 계정 필요. GDL이 업로드, 다운로드, 만료, 선택적 최대 다운로드 상한을 처리. 서버 측 추적이 싫다면 <a href=\"/guides/export-an-instance\">인스턴스 내보내기</a>를 사용. Export는 비대역폭으로 전달 가능한 로컬 .zip을 만듭니다.",
+      "만료 기본값은 1일. 한 주 동안 쓰고 싶다면 7일로 전환. 만료 후 GDL 서비스는 'code expired' 오류를 반환하고 친구는 새 코드를 요청해야 합니다. 최대 다운로드는 코드가 사용될 수 있는 횟수의 상한. 1로 두면 첫 가져오기 이후 코드가 사라짐. 링크가 전달되지 않길 바라는 1대1 공유에 유용.",
+      "받는 쪽 GDLauncher에서: Library 페이지 열기 → 툴바의 <strong>+</strong> 클릭(또는 빈 공간 오른쪽 클릭 → Import Instance). <strong>Code Share</strong> 탭으로 전환. 코드(또는 <code>gdl.gg/i/&lt;code&gt;</code> 링크) 붙여 넣기. GDLauncher가 GDL 서비스에서 미리보기(제목, 모드 목록, 공유자 식별자)를 가져옴. 확정. 모드는 원래 CDN에서 새로 다운로드, 설정은 공유 스냅샷에서.",
+      "공유는 모드를 플랫폼 ID로 참조. 공유 생성 시점부터 친구가 가져올 때까지 사이에 모드 중 하나가 CurseForge/Modrinth에서 제거되면 그 모드의 가져오기가 실패. GDLauncher는 가능한 만큼 가져오고 누락에 대한 오류를 표시. 누락된 모드를 대체해 공유를 재생성하거나 친구가 나머지를 설치하고 누락 모드를 수동으로 찾을 수 있음."
+    ]
+  },
+  de: {
+    headings: ["Was im Share enthalten ist", "Warum ein GDL-Account nötig ist", "Ablauf und Download-Limits", "Code importieren (Empfängerseite)", "Wenn ein Mod entfernt wurde"],
+    paras: [
+      "Mods (wo möglich gegen CurseForge / Modrinth aufgelöst, keine JAR-Weitergabe), Configs, Scripts, Resource Packs, und das Modpack-Pairing falls die Instanz mit einem Pack gepairt ist. Welten und Screenshots sind nicht dabei. Der Share ist funktional ein Snapshot von 'allem, was nötig ist, diese Instanz neu zu erstellen, ohne deine Savedaten'.",
+      "Share-Codes werden serverseitig getrackt, damit sie ablaufen und gezählt werden können. Heißt: GDL-Account auf beiden Seiten. GDL kümmert sich um Upload, Download, Ablauf und optionales Max-Download-Limit. Wenn du kein serverseitiges Tracking willst, siehe <a href=\"/guides/export-an-instance\">Eine Instanz exportieren</a>. Export produziert eine lokale .zip, die du außerhalb von GDL übergeben kannst.",
+      "Ablauf default 1 Tag. Auf 7 Tage stellen, wenn der Share eine Woche nutzbar sein soll. Nach Ablauf gibt der GDL-Dienst 'code expired' zurück und dein Freund braucht einen neuen. Max Downloads cappt, wie oft der Code eingelöst werden kann. Auf 1 = Code stirbt nach dem ersten Import. Praktisch für 1-zu-1-Share, wenn der Link nicht weitergeleitet werden soll.",
+      "Im Empfänger-GDLauncher: Library-Seite öffnen → das <strong>+</strong> in der Library-Toolbar klicken (oder Rechtsklick in leere Fläche → Import Instance). Auf den Tab <strong>Code Share</strong> wechseln. Code (oder <code>gdl.gg/i/&lt;code&gt;</code>-Link) einfügen. GDLauncher zieht eine Vorschau vom GDL-Service (Titel, Mod-Liste, Identifier des Sharers). Bestätigen. Die Mods kommen frisch aus ihren Original-CDNs, Configs aus dem Share-Snapshot.",
+      "Der Share referenziert Mods per Plattform-IDs. Wird einer dieser Mods zwischen Erzeugung und Empfangsimport von CurseForge oder Modrinth entfernt, scheitert der Import dieses Mods. GDLauncher importiert was geht und zeigt einen Fehler für den fehlenden. Du kannst den Share nach Ersetzen des Mods neu erzeugen, oder der Freund installiert den Rest und sucht den fehlenden Mod manuell."
+    ]
+  },
+  fr: {
+    headings: ["Ce qui est inclus dans un partage", "Pourquoi un compte GDL est requis", "Expiration et limites de téléchargement", "Importer un code (côté destinataire)", "Si un mod a été retiré"],
+    paras: [
+      "Mods (résolus depuis CurseForge / Modrinth quand possible, pas de redistribution de JAR), configs, scripts, resource packs, et le pairing modpack si l'instance est appairée à un pack. Mondes et screenshots ne sont pas inclus. Le partage est fonctionnellement un snapshot de 'tout ce qu'il faut pour recréer cette instance, moins tes données de save'.",
+      "Les codes de partage sont trackés côté serveur pour pouvoir expirer et être comptés. Ça veut dire un compte GDL des deux côtés. GDL gère l'upload, le download, l'expiration et le cap max-downloads optionnel. Si tu ne veux pas de tracking côté serveur, voir <a href=\"/guides/export-an-instance\">Exporter une instance</a>. Export produit un .zip local que tu peux livrer hors de GDL.",
+      "Expiration par défaut 1 jour. Passe à 7 jours pour des codes utilisables une semaine. Après expiration, le service GDL renvoie une erreur 'code expired' et ton ami doit en redemander un. Max downloads cappe combien de fois le code peut être utilisé. À 1, le code meurt après le premier import. Utile pour un partage un-à-un quand tu ne veux pas que le lien soit forwardé.",
+      "Côté GDLauncher du destinataire : ouvre la page Library → clique le <strong>+</strong> dans la barre d'outils de la Library (ou clic droit sur l'espace vide → Import Instance). Bascule sur l'onglet <strong>Code Share</strong>. Colle le code (ou le lien <code>gdl.gg/i/&lt;code&gt;</code>). GDLauncher récupère un preview depuis le service GDL (titre, liste de mods, identifiant du partageur). Confirme. Les mods se téléchargent depuis leur CDN d'origine ; les configs viennent du snapshot du partage.",
+      "Le partage référence les mods par leurs IDs de plateforme. Si l'un de ces mods a été retiré de CurseForge ou Modrinth entre la génération du partage et l'import par ton ami, l'import de ce mod précis échoue. GDLauncher importe ce qu'il peut et affiche une erreur pour le manquant. Tu peux regénérer le partage après remplacement du mod manquant, ou ton ami installe le reste et trouve le mod manquant à la main."
+    ]
+  },
+  es: {
+    headings: ["Qué se incluye en un share", "Por qué se requiere cuenta GDL", "Expiración y límites de descarga", "Importar un código (lado destinatario)", "Si un mod ha sido retirado"],
+    paras: [
+      "Mods (resueltos desde CurseForge / Modrinth donde sea posible, sin redistribución de JAR), configs, scripts, resource packs, y el emparejamiento de modpack si la instancia está pareada con un pack. Mundos y capturas no se incluyen. El share es funcionalmente un snapshot de 'todo lo necesario para recrear esta instancia, menos tus saves'.",
+      "Los códigos de share se rastrean del lado servidor para que puedan caducar y contarse. Eso significa una cuenta GDL en ambos lados. GDL maneja el upload, el download, la expiración y el límite de descargas opcional. Si no quieres tracking de servidor, ver <a href=\"/guides/export-an-instance\">Exportar una instancia</a>. Export produce un .zip local que puedes entregar fuera de GDL.",
+      "Expiración por defecto 1 día. Cambia a 7 días para códigos que quieras utilizables durante una semana. Tras expirar, el servicio GDL devuelve un error 'code expired' y tu amigo tiene que pedir uno nuevo. El máximo de descargas pone tope a cuántas veces se puede usar el código. A 1, el código muere tras la primera importación. Útil para compartir uno a uno cuando no quieres que el enlace se reenvíe.",
+      "En el GDLauncher del destinatario: abre la página Library → pulsa el <strong>+</strong> en la barra de la Library (o clic derecho en espacio vacío → Import Instance). Cambia a la pestaña <strong>Code Share</strong>. Pega el código (o enlace <code>gdl.gg/i/&lt;code&gt;</code>). GDLauncher trae una previsualización del servicio GDL (título, lista de mods, identificador del que comparte). Confirma. Los mods se bajan frescos desde sus CDN originales; las configs vienen del snapshot del share.",
+      "El share referencia mods por sus IDs de plataforma. Si uno de esos mods se ha retirado de CurseForge o Modrinth entre la generación del share y la importación del amigo, la importación de ese mod en concreto falla. GDLauncher importa lo que puede y muestra un error por el que falta. Puedes regenerar el share tras reemplazar el mod ausente, o tu amigo instala el resto y busca el mod faltante a mano."
+    ]
+  },
+  "pt-BR": {
+    headings: ["O que entra no share", "Por que conta GDL é necessária", "Expiração e limite de downloads", "Importar um código (lado quem recebe)", "Se um mod foi removido"],
+    paras: [
+      "Mods (resolvidos do CurseForge / Modrinth quando possível, sem redistribuição de JAR), configs, scripts, resource packs e o emparelhamento de modpack se a instância estiver pareada com um pack. Mundos e prints não vão. O share é funcionalmente um snapshot de 'tudo o que é preciso pra recriar essa instância, menos seus saves'.",
+      "Códigos de share são rastreados no lado servidor pra poderem expirar e ser contados. Isso significa conta GDL nos dois lados. O GDL cuida do upload, download, expiração e do limite opcional de downloads. Se você não quer rastreio do servidor, veja <a href=\"/guides/export-an-instance\">Exportar uma instância</a>. Export produz um .zip local que dá pra entregar fora do GDL.",
+      "Expiração padrão é 1 dia. Mude pra 7 dias se quiser o código usável por uma semana. Após expirar, o serviço GDL retorna um erro 'code expired' e seu amigo precisa pedir um novo. Max downloads limita quantas vezes o código pode ser usado. Em 1, o código morre depois da primeira importação. Útil pra compartilhamento 1 a 1 quando você não quer que o link seja repassado.",
+      "No GDLauncher de quem recebe: abra a página Library → clique o <strong>+</strong> na barra da Library (ou botão direito no espaço vazio → Import Instance). Mude pra aba <strong>Code Share</strong>. Cole o código (ou link <code>gdl.gg/i/&lt;code&gt;</code>). O GDLauncher busca uma preview no serviço GDL (título, lista de mods, identificador de quem compartilhou). Confirme. Os mods baixam frescos dos CDNs originais; configs vêm do snapshot do share.",
+      "O share referencia mods pelos IDs da plataforma. Se um desses mods foi removido do CurseForge ou Modrinth entre você gerar o share e seu amigo importar, a importação desse mod falha. O GDLauncher importa o que dá e mostra erro pelo que falta. Você pode regerar o share depois de substituir o mod ausente, ou seu amigo instala o resto e acha o mod faltante manualmente."
+    ]
+  },
+  it: {
+    headings: ["Cosa entra in una condivisione", "Perché serve un account GDL", "Scadenza e limite di download", "Importare un codice (lato destinatario)", "Se una mod è stata rimossa"],
+    paras: [
+      "Mod (risolti tramite CurseForge / Modrinth dove possibile, senza ridistribuzione dei JAR), config, script, resource pack e l'abbinamento al modpack se l'istanza è appaiata a un pack. Mappe e screenshot non sono inclusi. La condivisione è di fatto uno snapshot di 'tutto ciò che serve per ricreare questa istanza, esclusi i tuoi save'.",
+      "I codici di condivisione vengono tracciati lato server per poter scadere ed essere conteggiati. Vuol dire account GDL su entrambi i lati. GDL gestisce upload, download, scadenza e il limite massimo di download opzionale. Se non vuoi tracciamento server side, vedi <a href=\"/guides/export-an-instance\">Esportare un'istanza</a>. Export produce uno .zip locale che puoi consegnare al di fuori di GDL.",
+      "Scadenza di default 1 giorno. Passa a 7 giorni se vuoi un codice utilizzabile per una settimana. Scaduto, il servizio GDL restituisce un errore 'code expired' e il tuo amico deve farsene mandare uno nuovo. Max downloads imposta un tetto a quante volte il codice può essere usato. A 1 il codice muore dopo il primo import. Utile per una condivisione uno a uno quando non vuoi che il link venga inoltrato.",
+      "Nel GDLauncher di chi riceve: apri la pagina Library → clicca il <strong>+</strong> nella toolbar della Library (oppure clic destro sullo spazio vuoto → Import Instance). Passa alla scheda <strong>Code Share</strong>. Incolla il codice (o il link <code>gdl.gg/i/&lt;code&gt;</code>). GDLauncher recupera un'anteprima dal servizio GDL (titolo, lista delle mod, identificativo di chi ha condiviso). Conferma. Le mod vengono scaricate fresche dai loro CDN originali, i config arrivano dallo snapshot della condivisione.",
+      "La condivisione referenzia le mod tramite gli ID di piattaforma. Se una di quelle mod è stata rimossa da CurseForge o Modrinth tra il momento in cui generi la condivisione e quello in cui il tuo amico importa, l'import di quella mod fallisce. GDLauncher importa ciò che può e mostra un errore per quella mancante. Puoi rigenerare la condivisione dopo aver sostituito la mod assente, oppure il tuo amico installa il resto e cerca a mano la mod mancante."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT3M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

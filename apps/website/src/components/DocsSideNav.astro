@@ -1,60 +1,318 @@
 ---
-// Normalize pathname by removing trailing slash
+import {
+  getLocaleFromUrl,
+  pathWithoutLocale,
+  localizedPath,
+  type Locale,
+} from "../lib/i18n";
+
+// Locale-aware active-state: compare the current path with its locale prefix
+// stripped against the canonical page slug. Hrefs are built with
+// localizedPath() so clicking inside /ja/docs stays in /ja/docs.
 const rawPathname = Astro.url.pathname;
-const pathname = rawPathname.endsWith('/') && rawPathname !== '/'
+const trimmed = rawPathname.endsWith("/") && rawPathname !== "/"
   ? rawPathname.slice(0, -1)
   : rawPathname;
+const locale = getLocaleFromUrl(trimmed);
+const basePath = pathWithoutLocale(trimmed);
 
-const sidebar = [
+interface Category {
+  key: "introduction" | "installation" | "troubleshooting" | "concepts" | "accounts" | "system" | "faq";
+  pages: Array<{ slug: string; titleKey: string }>;
+}
+
+const sidebar: Category[] = [
   {
-    category: "Introduction",
+    key: "introduction",
+    pages: [{ slug: "", titleKey: "welcome" }],
+  },
+  {
+    key: "installation",
     pages: [
-      {
-        title: "Welcome to GDLauncher",
-        slug: "",
-      },
+      { slug: "migration-from-legacy-gdlauncher", titleKey: "migration" },
+      { slug: "installation", titleKey: "installation" },
     ],
   },
   {
-    category: "Installation",
+    key: "troubleshooting",
     pages: [
-      {
-        title: "Migration from Legacy GDLauncher",
-        slug: "migration-from-legacy-gdlauncher",
-      },
-      {
-        title: "Installation",
-        slug: "installation",
-      },
+      { slug: "troubleshooting", titleKey: "troubleshooting" },
+      { slug: "authentication-errors", titleKey: "authErrors" },
     ],
   },
   {
-    category: "Troubleshooting",
+    key: "concepts",
     pages: [
-      {
-        title: "Troubleshooting",
-        slug: "troubleshooting",
-      },
+      { slug: "locked-modpack-instances", titleKey: "lockedInstances" },
+      { slug: "instance-folder-anatomy", titleKey: "instanceFolderAnatomy" },
+      { slug: "mod-loaders-compared", titleKey: "modLoadersCompared" },
+      { slug: "save-format-compatibility", titleKey: "saveFormatCompatibility" },
+      { slug: "modpack-manifest-format", titleKey: "modpackManifestFormat" },
     ],
   },
   {
-    category: "FAQ",
+    key: "accounts",
     pages: [
-      {
-        title: "GDLauncher vs GDLauncher Carbon",
-        slug: "gdlauncher-vs-gdlauncher-carbon",
-      },
+      { slug: "gdl-account-vs-microsoft-account", titleKey: "gdlVsMicrosoft" },
+      { slug: "offline-mode", titleKey: "offlineMode" },
+    ],
+  },
+  {
+    key: "system",
+    pages: [
+      { slug: "runtime-path-vs-app-data", titleKey: "runtimePath" },
+      { slug: "java-memory-and-gc", titleKey: "javaMemory" },
+    ],
+  },
+  {
+    key: "faq",
+    pages: [
+      { slug: "gdlauncher-vs-gdlauncher-carbon", titleKey: "gdlVsCarbon" },
     ],
   },
 ];
+
+interface LocaleLabels {
+  categories: Record<Category["key"], string>;
+  pages: Record<string, string>;
+}
+
+const LABELS: Record<Locale, LocaleLabels> = {
+  en: {
+    categories: {
+      introduction: "Introduction",
+      installation: "Installation",
+      troubleshooting: "Troubleshooting",
+      concepts: "Concepts",
+      accounts: "Accounts",
+      system: "System",
+      faq: "FAQ",
+    },
+    pages: {
+      welcome: "Welcome to GDLauncher",
+      migration: "Migration from Legacy GDLauncher",
+      installation: "Installation",
+      troubleshooting: "Troubleshooting",
+      authErrors: "Authentication Errors",
+      lockedInstances: "Locked Modpack Instances",
+      instanceFolderAnatomy: "Anatomy of an Instance Folder",
+      modLoadersCompared: "Mod Loaders Compared",
+      saveFormatCompatibility: "Save Format Compatibility",
+      modpackManifestFormat: "Modpack Manifest Format",
+      gdlVsMicrosoft: "GDL Account vs Microsoft Account",
+      offlineMode: "Offline Mode",
+      runtimePath: "Runtime Path vs App Data Path",
+      javaMemory: "Java Memory and Garbage Collection",
+      gdlVsCarbon: "GDLauncher vs GDLauncher Carbon",
+    },
+  },
+  ja: {
+    categories: {
+      introduction: "はじめに",
+      installation: "インストール",
+      troubleshooting: "トラブルシューティング",
+      concepts: "用語と概念",
+      accounts: "アカウント",
+      system: "システム",
+      faq: "FAQ",
+    },
+    pages: {
+      welcome: "GDLauncher へようこそ",
+      migration: "従来の GDLauncher からの移行",
+      installation: "インストール",
+      troubleshooting: "トラブルシューティング",
+      authErrors: "認証エラー",
+      lockedInstances: "ロックされた Modpack インスタンス",
+      instanceFolderAnatomy: "インスタンスフォルダーの構造",
+      modLoadersCompared: "Mod ローダー比較",
+      saveFormatCompatibility: "セーブ形式の互換性",
+      modpackManifestFormat: "Modpack マニフェスト形式",
+      gdlVsMicrosoft: "GDL アカウントと Microsoft アカウント",
+      offlineMode: "オフラインモード",
+      runtimePath: "Runtime Path と App Data Path",
+      javaMemory: "Java メモリと GC",
+      gdlVsCarbon: "GDLauncher と GDLauncher Carbon",
+    },
+  },
+  ko: {
+    categories: {
+      introduction: "소개",
+      installation: "설치",
+      troubleshooting: "문제 해결",
+      concepts: "개념",
+      accounts: "계정",
+      system: "시스템",
+      faq: "FAQ",
+    },
+    pages: {
+      welcome: "GDLauncher에 오신 것을 환영합니다",
+      migration: "기존 GDLauncher에서 이전",
+      installation: "설치",
+      troubleshooting: "문제 해결",
+      authErrors: "인증 오류",
+      lockedInstances: "잠긴 모드팩 인스턴스",
+      instanceFolderAnatomy: "인스턴스 폴더의 구조",
+      modLoadersCompared: "모드 로더 비교",
+      saveFormatCompatibility: "세이브 포맷 호환성",
+      modpackManifestFormat: "모드팩 매니페스트 포맷",
+      gdlVsMicrosoft: "GDL 계정 vs Microsoft 계정",
+      offlineMode: "오프라인 모드",
+      runtimePath: "Runtime Path와 App Data Path",
+      javaMemory: "Java 메모리와 GC",
+      gdlVsCarbon: "GDLauncher vs GDLauncher Carbon",
+    },
+  },
+  de: {
+    categories: {
+      introduction: "Einführung",
+      installation: "Installation",
+      troubleshooting: "Problembehebung",
+      concepts: "Konzepte",
+      accounts: "Accounts",
+      system: "System",
+      faq: "FAQ",
+    },
+    pages: {
+      welcome: "Willkommen bei GDLauncher",
+      migration: "Migration vom alten GDLauncher",
+      installation: "Installation",
+      troubleshooting: "Problembehebung",
+      authErrors: "Authentifizierungsfehler",
+      lockedInstances: "Gesperrte Modpack-Instanzen",
+      instanceFolderAnatomy: "Aufbau eines Instanz-Ordners",
+      modLoadersCompared: "Mod-Loader im Vergleich",
+      saveFormatCompatibility: "Save-Format-Kompatibilität",
+      modpackManifestFormat: "Modpack-Manifest-Format",
+      gdlVsMicrosoft: "GDL-Account vs Microsoft-Account",
+      offlineMode: "Offline-Modus",
+      runtimePath: "Runtime Path vs App Data Path",
+      javaMemory: "Java-Speicher und GC",
+      gdlVsCarbon: "GDLauncher vs GDLauncher Carbon",
+    },
+  },
+  fr: {
+    categories: {
+      introduction: "Introduction",
+      installation: "Installation",
+      troubleshooting: "Dépannage",
+      concepts: "Concepts",
+      accounts: "Comptes",
+      system: "Système",
+      faq: "FAQ",
+    },
+    pages: {
+      welcome: "Bienvenue sur GDLauncher",
+      migration: "Migration depuis l'ancien GDLauncher",
+      installation: "Installation",
+      troubleshooting: "Dépannage",
+      authErrors: "Erreurs d'authentification",
+      lockedInstances: "Instances de modpack verrouillées",
+      instanceFolderAnatomy: "Anatomie d'un dossier d'instance",
+      modLoadersCompared: "Mod loaders comparés",
+      saveFormatCompatibility: "Compatibilité du format de sauvegarde",
+      modpackManifestFormat: "Format du manifest de modpack",
+      gdlVsMicrosoft: "Compte GDL vs compte Microsoft",
+      offlineMode: "Mode hors ligne",
+      runtimePath: "Runtime Path vs App Data Path",
+      javaMemory: "Mémoire Java et GC",
+      gdlVsCarbon: "GDLauncher vs GDLauncher Carbon",
+    },
+  },
+  es: {
+    categories: {
+      introduction: "Introducción",
+      installation: "Instalación",
+      troubleshooting: "Solución de problemas",
+      concepts: "Conceptos",
+      accounts: "Cuentas",
+      system: "Sistema",
+      faq: "FAQ",
+    },
+    pages: {
+      welcome: "Bienvenido a GDLauncher",
+      migration: "Migración desde el GDLauncher antiguo",
+      installation: "Instalación",
+      troubleshooting: "Solución de problemas",
+      authErrors: "Errores de autenticación",
+      lockedInstances: "Instancias de modpack bloqueadas",
+      instanceFolderAnatomy: "Anatomía de una carpeta de instancia",
+      modLoadersCompared: "Mod loaders comparados",
+      saveFormatCompatibility: "Compatibilidad del formato de guardado",
+      modpackManifestFormat: "Formato del manifest de modpack",
+      gdlVsMicrosoft: "Cuenta GDL vs cuenta Microsoft",
+      offlineMode: "Modo sin conexión",
+      runtimePath: "Runtime Path vs App Data Path",
+      javaMemory: "Memoria Java y GC",
+      gdlVsCarbon: "GDLauncher vs GDLauncher Carbon",
+    },
+  },
+  "pt-BR": {
+    categories: {
+      introduction: "Introdução",
+      installation: "Instalação",
+      troubleshooting: "Solução de problemas",
+      concepts: "Conceitos",
+      accounts: "Contas",
+      system: "Sistema",
+      faq: "FAQ",
+    },
+    pages: {
+      welcome: "Bem-vindo ao GDLauncher",
+      migration: "Migração do GDLauncher antigo",
+      installation: "Instalação",
+      troubleshooting: "Solução de problemas",
+      authErrors: "Erros de autenticação",
+      lockedInstances: "Instâncias de modpack bloqueadas",
+      instanceFolderAnatomy: "Anatomia de uma pasta de instância",
+      modLoadersCompared: "Mod loaders comparados",
+      saveFormatCompatibility: "Compatibilidade do formato de save",
+      modpackManifestFormat: "Formato do manifest de modpack",
+      gdlVsMicrosoft: "Conta GDL vs conta Microsoft",
+      offlineMode: "Modo offline",
+      runtimePath: "Runtime Path vs App Data Path",
+      javaMemory: "Memória Java e GC",
+      gdlVsCarbon: "GDLauncher vs GDLauncher Carbon",
+    },
+  },
+  it: {
+    categories: {
+      introduction: "Introduzione",
+      installation: "Installazione",
+      troubleshooting: "Risoluzione dei problemi",
+      concepts: "Concetti",
+      accounts: "Account",
+      system: "Sistema",
+      faq: "FAQ",
+    },
+    pages: {
+      welcome: "Benvenuto in GDLauncher",
+      migration: "Migrazione dal vecchio GDLauncher",
+      installation: "Installazione",
+      troubleshooting: "Risoluzione dei problemi",
+      authErrors: "Errori di autenticazione",
+      lockedInstances: "Istanze di modpack bloccate",
+      instanceFolderAnatomy: "Anatomia della cartella di un'istanza",
+      modLoadersCompared: "Mod loader a confronto",
+      saveFormatCompatibility: "Compatibilità del formato dei save",
+      modpackManifestFormat: "Formato del manifest di un modpack",
+      gdlVsMicrosoft: "Account GDL vs account Microsoft",
+      offlineMode: "Modalità offline",
+      runtimePath: "Runtime Path vs App Data Path",
+      javaMemory: "Memoria Java e GC",
+      gdlVsCarbon: "GDLauncher vs GDLauncher Carbon",
+    },
+  },
+};
+
+const labels = LABELS[locale] ?? LABELS.en;
 ---
 
 <nav class="docs-nav py-6">
   {
-    sidebar.map(({ category, pages }) => {
+    sidebar.map(({ key, pages }) => {
       const hasActivePage = pages.some(({ slug }) => {
-        const pageUrl = slug ? `/docs/${slug}` : '/docs';
-        return pathname === pageUrl;
+        const canonicalUrl = slug ? `/docs/${slug}` : "/docs";
+        return basePath === canonicalUrl;
       });
 
       return (
@@ -63,18 +321,19 @@ const sidebar = [
             type="button"
             class="category-header w-full flex items-center justify-between px-3 py-2 text-sm font-semibold uppercase tracking-wider text-darkSlate-100 hover:text-lightSlate-50 transition-colors rounded-lg hover:bg-darkSlate-700/50"
           >
-            <span>{category}</span>
+            <span>{labels.categories[key]}</span>
             <div class="i-hugeicons:arrow-down-01 w-4 h-4 chevron-icon transition-transform duration-200"></div>
           </button>
           <ul class="category-items mt-1 ml-1 space-y-1 overflow-hidden">
-            {pages.map(({ title, slug }) => {
-              const pageUrl = slug ? `/docs/${slug}` : '/docs';
-              const isActive = pathname === pageUrl;
+            {pages.map(({ slug, titleKey }) => {
+              const canonicalUrl = slug ? `/docs/${slug}` : "/docs";
+              const href = localizedPath(canonicalUrl, locale);
+              const isActive = basePath === canonicalUrl;
 
               return (
                 <li>
                   <a
-                    href={pageUrl}
+                    href={href}
                     class:list={[
                       "nav-link block py-1.5 px-3 text-sm transition-colors duration-150",
                       {
@@ -83,7 +342,7 @@ const sidebar = [
                       },
                     ]}
                   >
-                    {title}
+                    {labels.pages[titleKey]}
                   </a>
                 </li>
               );
@@ -132,9 +391,7 @@ const sidebar = [
     });
   }
 
-  // Run on initial load
   initDocsSideNav();
 
-  // Re-run on Astro page transitions
   document.addEventListener('astro:page-load', initDocsSideNav);
 </script>

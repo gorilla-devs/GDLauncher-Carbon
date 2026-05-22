@@ -1,7 +1,16 @@
 ---
 /**
- * Testimonials - User quotes and community feedback
+ * Testimonials - User quotes and community feedback.
+ *
+ * Quotes are intentionally kept in their original (English) language across
+ * all locales. Translating real user quotes feels misleading and changes
+ * their authenticity. We translate only the section chrome.
  */
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { APP_URLS } from "../../consts"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
 
 const testimonials = [
   {
@@ -60,7 +69,7 @@ const testimonials = [
     platform: "Discord"
   },
   {
-    quote: "GDLauncher is the easiest Minecraft launcher I have used. It can download mods from CurseForge (including the ones that you can't download in non-CurseForge clients) and Modrinth. It has all the popular modloaders (Forge, NeoForge, Fabric and Quilt).",
+    quote: "GDLauncher is the easiest Minecraft launcher I have used. It can download mods from CurseForge (including the ones that you can't download in non-CurseForge clients) and Modrinth. It has all the popular mod loaders (Forge, NeoForge, Fabric and Quilt).",
     author: "magic",
     platform: "Discord"
   }
@@ -87,14 +96,13 @@ function getPlatformIcon(platform: string) {
     <!-- Section header -->
     <div class="text-center mb-16" data-scroll="fade-up">
       <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
-        What
+        {t("testimonials.heading.line1")}{" "}
         <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
-          Players
+          {t("testimonials.heading.line2")}
         </span>
-        Say
       </h2>
       <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
-        Real feedback from our Discord community.
+        {t("testimonials.intro")}
       </p>
     </div>
   </div>
@@ -150,13 +158,13 @@ function getPlatformIcon(platform: string) {
   <div class="max-w-6xl mx-auto px-4">
     <div class="text-center mt-12" data-scroll="scale" data-scroll-delay="200">
       <a
-        href="https://discord.gdlauncher.com"
+        href={APP_URLS.socials.discord}
         target="_blank"
         rel="noopener noreferrer"
         class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-brands-discord hover:bg-brands-discord/90 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95"
       >
         <div class="i-simple-icons:discord w-5 h-5"></div>
-        Join Our Discord Community
+        {t("testimonials.cta")}
       </a>
     </div>
   </div>

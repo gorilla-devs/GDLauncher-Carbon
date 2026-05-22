@@ -6,19 +6,25 @@ import FeaturesShowcase from "../components/landing/FeaturesShowcase.astro"
 import ComparisonTable from "../components/landing/ComparisonTable.astro"
 import Testimonials from "../components/landing/Testimonials.astro"
 import CTABanner from "../components/landing/CTABanner.astro"
-import { SITE_TITLE, SITE_DESCRIPTION } from "../consts"
+import { SITE_KEYWORDS, APP_URLS } from "../consts"
+import { getLocaleFromUrl, useTranslations } from "../lib/i18n"
+import { homepageJsonLd } from "../lib/jsonld"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
 
 // Cache the page for 60 seconds
 Astro.locals.cache(60)
 ---
 
 <PageShell
-  title={SITE_TITLE}
-  description={SITE_DESCRIPTION}
-  keywords="minecraft launcher, modpack launcher, curseforge launcher, modrinth launcher, minecraft mods, minecraft modpacks, gdlauncher, minecraft mod manager, forge launcher, fabric launcher"
+  title={t("site.title")}
+  description={t("site.description")}
+  keywords={SITE_KEYWORDS}
   particles
   bodyClass="overflow-x-hidden"
   backgroundClass="bg-darkSlate-800"
+  jsonLd={homepageJsonLd({ locale, socials: APP_URLS.socials })}
 >
     <main>
       <!-- Hero: Split layout with text left, app preview right -->

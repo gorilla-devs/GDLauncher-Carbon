@@ -1,0 +1,70 @@
+---
+import Docs from "../../../layouts/Docs.astro";
+import type { GetStaticPaths } from "astro";
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  getLocaleFromUrl,
+  useTranslations,
+  localizedPath,
+} from "../../../lib/i18n";
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }));
+
+const locale = getLocaleFromUrl(Astro.url.pathname);
+const t = useTranslations(locale);
+---
+
+<Docs
+  title={t("docs.title")}
+  category={t("docs.category")}
+>
+  <style></style>
+  <header>
+    <h1>{t("docs.welcome.heading")}</h1>
+  </header>
+
+  <section>
+    <h2>{t("docs.what.heading")}</h2>
+    <p>{t("docs.what.body")}</p>
+  </section>
+
+  <section>
+    <h2>{t("docs.gettingStarted.heading")}</h2>
+    <p>{t("docs.gettingStarted.intro")}</p>
+    <ul>
+      <li>
+        <a href={`${localizedPath("/docs/installation", locale)}#windows`}>
+          {t("docs.gettingStarted.windows")}
+        </a>
+      </li>
+      <li>
+        <a href={`${localizedPath("/docs/installation", locale)}#macos`}>
+          {t("docs.gettingStarted.macos")}
+        </a>
+      </li>
+      <li>
+        <a href={`${localizedPath("/docs/installation", locale)}#linux`}>
+          {t("docs.gettingStarted.linux")}
+        </a>
+      </li>
+    </ul>
+
+    <section>
+      <h2>{t("docs.features.heading")}</h2>
+      <ul>
+        <li>{t("docs.features.li.versions")}</li>
+        <li>{t("docs.features.li.addons")}</li>
+        <li>{t("docs.features.li.modpacks")}</li>
+        <li>{t("docs.features.li.java")}</li>
+        <li>{t("docs.features.li.updater")}</li>
+        <li>{t("docs.features.li.multiAccount")}</li>
+        <li>{t("docs.features.li.potatoPC")}</li>
+        <li>{t("docs.features.li.import")}</li>
+      </ul>
+    </section>
+  </section>
+</Docs>

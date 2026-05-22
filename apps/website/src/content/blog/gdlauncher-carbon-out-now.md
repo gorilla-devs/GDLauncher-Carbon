@@ -35,7 +35,7 @@ You can still refer to the app as "GDLauncher", but if you want to be more speci
 
 # Development
 
-We originally announced the development of GDLauncher Carbon in September 2022 and it's been a little more than a year of hard work to get to this point.
+We originally announced the development of GDLauncher Carbon in [November 2022](/blog/curseforge-partnership-announcement), and it's been about a year and a half of hard work to get to this point.
 
 Deciding the new tech stack was my first blocker. In the end, GDLauncher Carbon still uses Electron to power the UI, but with a small twist. The UI is now built with SolidJS, a modern and efficient UI library that I've grown to love. All the heavy lifting is done by a separate binary written in Rust, which we call "the Core Module". This has allowed us to make the app more reliable and efficient, and it's also made it easier to maintain and add new features.
 
@@ -47,7 +47,7 @@ This official release is just the beginning, it marks a new chapter for GDLaunch
 
 Starting now, we will be focusing on polishing the experience and adding new features. We have a lot of exciting things planned, and we can't wait to share them with you.
 
-As always, GDLauncher is a community-driven project, and we are always open to feedbacks and suggestions. If you have any ideas or requests, feel free to join our [Discord server](https://discord.gdlauncher.com) and let us know.
+As always, GDLauncher is a community-driven project, and we are always open to feedback and suggestions. If you have any ideas or requests, feel free to join our [Discord server](https://discord.gdlauncher.com) and let us know.
 
 # Migration from legacy GDLauncher
 

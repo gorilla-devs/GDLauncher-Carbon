@@ -1,0 +1,62 @@
+---
+/**
+ * Localized homepage routes: /ja, /ko, /de, /fr, /es, /pt-BR.
+ *
+ * The default-locale homepage (English) lives at src/pages/index.astro and
+ * stays at the root URL, that preserves all existing inbound links and SEO
+ * equity. This dynamic route only renders the non-default locales.
+ *
+ * The components themselves read the locale from `Astro.url.pathname` via
+ * `getLocaleFromUrl`, so no per-locale prop drilling is needed; we just need
+ * the route to exist for Astro to generate the page at build time.
+ */
+import type { GetStaticPaths } from "astro"
+import PageShell from "../../components/PageShell.astro"
+import HeroSection from "../../components/landing/HeroSection.astro"
+import TrustBar from "../../components/landing/TrustBar.astro"
+import FeaturesShowcase from "../../components/landing/FeaturesShowcase.astro"
+import ComparisonTable from "../../components/landing/ComparisonTable.astro"
+import Testimonials from "../../components/landing/Testimonials.astro"
+import CTABanner from "../../components/landing/CTABanner.astro"
+import { SITE_KEYWORDS, APP_URLS } from "../../consts"
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  useTranslations,
+  type Locale,
+} from "../../lib/i18n"
+import { homepageJsonLd } from "../../lib/jsonld"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Locale }
+const t = useTranslations(locale)
+
+Astro.locals.cache(60)
+---
+
+<PageShell
+  title={t("site.title")}
+  description={t("site.description")}
+  keywords={SITE_KEYWORDS}
+  particles
+  bodyClass="overflow-x-hidden"
+  backgroundClass="bg-darkSlate-800"
+  jsonLd={homepageJsonLd({ locale, socials: APP_URLS.socials })}
+>
+    <main>
+      <HeroSection />
+      <TrustBar />
+      <FeaturesShowcase />
+      <ComparisonTable />
+      <Testimonials />
+      <CTABanner />
+    </main>
+
+    <script>
+      import "../../scripts/scroll-animations"
+    </script>
+</PageShell>

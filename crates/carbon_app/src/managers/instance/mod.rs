@@ -1067,7 +1067,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
 
-        // Auto-delete empty non-default groups after moving instance out
+        // Auto-dissolve a non-default group left empty or with a single
+        // instance after moving one out: a one-instance folder is pointless,
+        // so its last instance also returns to the default group.
         if start_group != default_group_id && start_group != target_group {
             let remaining_count = self
                 .app
@@ -1087,6 +1089,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .await?;
                 // GET_GROUPS already invalidated above, but invalidate again after deletion
                 self.app.invalidate(GET_GROUPS, None);
+            } else if remaining_count == 1 {
+                if let Some(last) = self
+                    .app
+                    .prisma_client
+                    .instance()
+                    .find_first(vec![WhereParam::GroupId(IntFilter::Equals(*start_group))])
+                    .exec()
+                    .await?
+                {
+                    // Moving the last instance out empties the group, which the
+                    // recursive call's branch above then deletes. Release the
+                    // index lock first since move_instance re-acquires it.
+                    drop(_index_lock);
+                    Box::pin(self.move_instance(
+                        InstanceId(last.id),
+                        InstanceMoveTarget::EndOfGroup(default_group_id),
+                    ))
+                    .await?;
+                }
             }
         }
 
@@ -2340,11 +2361,41 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         tokio::spawn(async move {
             if let Err(e) = app.instance_manager()._delete_instance(instance_id).await {
                 tracing::error!("Failed to delete instance {}: {:#}", instance_id.0, e);
+
+                // The instance was put into `LaunchState::Deleting` before the
+                // deletion failed. Without restoring it, the frontend stays
+                // stuck on the deleting/loading state forever. Reset it back to
+                // Inactive so the UI recovers.
+                let instance_name = {
+                    let instance_manager = app.instance_manager();
+                    let mut instances = instance_manager.instances.write().await;
+                    instances.get_mut(&instance_id).and_then(|instance| {
+                        if let InstanceType::Valid(data) = &mut instance.type_ {
+                            data.state = LaunchState::Inactive { failed_task: None };
+                            Some(data.config.name.clone())
+                        } else {
+                            None
+                        }
+                    })
+                };
+
                 // Surface the error to the UI so the caller realizes the
                 // instance still exists.
                 app.invalidate(GET_GROUPS, None);
                 app.invalidate(GET_ALL_INSTANCES, None);
                 app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+
+                // Push a dedicated failure event so the frontend can show a
+                // toast (the rspc call already returned Ok before the spawned
+                // deletion ran, so the caller's onError never fires).
+                app.invalidate(
+                    DELETE_INSTANCE_FAILED,
+                    Some(serde_json::json!({
+                        "instanceId": instance_id.0,
+                        "instanceName": instance_name,
+                        "error": format!("{e:#}"),
+                    })),
+                );
             }
         });
 

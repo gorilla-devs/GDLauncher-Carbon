@@ -518,18 +518,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 .and_then(|account| account.gdl_token.clone())
             {
                 if let Ok(Some(user)) = self.gdl_account_task.get_account(auth_token).await {
-                    info!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
                     println!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
                 } else {
-                    info!("_GDL_ACCOUNT_EMAIL_:");
                     println!("_GDL_ACCOUNT_EMAIL_:");
                 }
             } else {
-                info!("_GDL_ACCOUNT_EMAIL_:");
                 println!("_GDL_ACCOUNT_EMAIL_:");
             }
         } else {
-            info!("_GDL_ACCOUNT_EMAIL_:");
             println!("_GDL_ACCOUNT_EMAIL_:");
         }
 

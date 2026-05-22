@@ -1,0 +1,19 @@
+---
+import type { GetStaticPaths } from "astro"
+import PageShell from "../../components/PageShell.astro"
+import AccountDeletedBody from "../../components/AccountDeletedBody.astro"
+import { SITE_DESCRIPTION } from "../../consts"
+import { LOCALES, DEFAULT_LOCALE } from "../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+---
+
+<PageShell
+  title="Account Deleted - GDLauncher"
+  description={SITE_DESCRIPTION}
+>
+  <AccountDeletedBody />
+</PageShell>

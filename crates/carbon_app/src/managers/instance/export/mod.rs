@@ -311,6 +311,7 @@ impl ManagerRef<'_, InstanceExportManager> {
         title: Option<String>,
         expiration_days: Option<i32>,
         max_downloads: Option<i32>,
+        include_saves: bool,
         cancel_token: CancellationToken,
     ) -> anyhow::Result<(
         mpsc::Receiver<ShareInstanceProgress>,
@@ -348,8 +349,11 @@ impl ManagerRef<'_, InstanceExportManager> {
             let name = entry.file_name();
             let name = name.to_string_lossy().to_string();
 
-            if name == "saves" {
-                // saves is super heavy and not worth adding
+            // `saves` holds the user's worlds and player data. Off by default
+            // because (a) it can be very large, (b) most shares are "give me
+            // your modpack, I'll start a new world" — opt-in via the UI when
+            // the user actually wants their world to travel with the share.
+            if name == "saves" && !include_saves {
                 continue;
             }
 

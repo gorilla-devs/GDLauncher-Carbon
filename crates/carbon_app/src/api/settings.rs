@@ -466,21 +466,22 @@ pub(super) fn mount() -> RouterBuilder<App> {
     }
 }
 
-/// Two-tier cleanup selection. `quick` wipes the cache tables, temp dir,
+/// Two-tier cleanup selection. `gdlauncher` wipes the cache tables, temp dir,
 /// and log dir — fast, low-impact, the next browse/launch refills only what
-/// the user actually touches. `deep` additionally clears `assets`,
+/// the user actually touches. `minecraft` additionally clears `assets`,
 /// `libraries`, and `natives` — those are also re-downloadable but cost
 /// the user a multi-GB re-download on next launch, so it's opt-in.
 #[derive(Type, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct CacheCleanupSelection {
-    pub quick: bool,
-    pub deep: bool,
+    pub gdlauncher: bool,
+    pub minecraft: bool,
 }
 
 /// Per-scope cache footprint reported by `getCacheSizes`. `gdlauncher`
-/// covers what the "quick" cleanup wipes (DB files, temp, logs); `minecraft`
-/// covers what "deep" wipes (assets, libraries, natives). Sum is the total
+/// covers what the GDLauncher-cache cleanup wipes (DB files, temp, logs);
+/// `minecraft` covers the Minecraft-cache cleanup (assets, libraries,
+/// natives). Sum is the total
 /// the Settings row displays — splitting per-scope lets the cleanup modal
 /// label each option with its real reclaim estimate.
 #[derive(Type, Serialize, Debug, Clone, Copy)]

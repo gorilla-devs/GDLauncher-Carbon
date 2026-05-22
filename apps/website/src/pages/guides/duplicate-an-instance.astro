@@ -1,0 +1,41 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Duplicate an Instance in GDLauncher"
+  description="Make a full copy of an existing GDLauncher instance, useful for testing mod changes safely or branching a playthrough."
+  keywords="duplicate minecraft instance, clone instance, copy instance gdlauncher, branch modpack, backup instance"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Right-click the instance", text: "In the Library, right-click the instance you want to duplicate." },
+      { name: "Open More Options", text: "Hover over More Options to reveal the submenu." },
+      { name: "Click Duplicate", text: "Pick Duplicate (the copy icon). GDLauncher copies the instance folder to a new name and registers it as a separate instance." },
+      { name: "Wait for the copy", text: "For small instances the copy completes in seconds. Big modpacks with hundreds of mods can take a minute or two; the launcher is blocking on a filesystem copy during that time. When done, the new instance appears next to the original." },
+      { name: "Rename if you want", text: "The duplicate gets a suffixed name derived from the original. Right-click → Edit to rename it to something meaningful." }
+    ]
+  }}
+>
+  <h2>What gets copied</h2>
+  <p>The entire instance folder, including mods, configs, worlds, screenshots, options.txt, resource packs, shader packs, and the per-instance GDLauncher metadata. The duplicate is independent of the original; changes on one don't affect the other.</p>
+
+  <h2>When to use Duplicate</h2>
+  <ul>
+    <li><strong>Testing mod changes safely.</strong> Want to try adding a new mod but worried it'll break things? Duplicate first, test on the copy, only update the original once you know it's stable.</li>
+    <li><strong>Branching a playthrough.</strong> Reached a turning point in a world and want to try going both ways? Duplicate, then play each branch separately.</li>
+    <li><strong>Trying a different mod loader on the same base.</strong> Duplicate, switch the duplicate's loader (see <a href="/guides/switch-mod-loader">How to Switch Mod Loaders</a>).</li>
+    <li><strong>Cheap backup before risky changes.</strong> Updating a modpack version mid-playthrough is one example; duplicate first, do the update on the copy.</li>
+  </ul>
+
+  <h2>What doesn't get copied</h2>
+  <p>Things outside the instance folder are not duplicated. Your accounts and launcher-level settings stay the same (they're not per-instance anyway). Some modpacks have content under the app data path or elsewhere; those aren't duplicated either, but it's rare enough not to matter.</p>
+
+  <h2>Locked vs unlocked, paired vs unpaired</h2>
+  <p>Duplicating preserves the lock state and the modpack pairing. A locked modpack instance produces a locked modpack duplicate, still pointing at the same modpack. Both can be updated independently via Change Modpack Version on the instance's Settings tab.</p>
+  <p>If you want the duplicate to no longer track the source pack, open its Settings tab and click <strong>Unpair</strong> in the Modpack Info section after duplicating.</p>
+
+  <h2>Disk space caveat</h2>
+  <p>Duplicates are full filesystem copies, not symlinks or copy-on-write. Each duplicate doubles the disk usage of the original. For 50 GB modpacks, this can add up quickly; consider what you actually need to keep around long-term.</p>
+</GuideLayout>

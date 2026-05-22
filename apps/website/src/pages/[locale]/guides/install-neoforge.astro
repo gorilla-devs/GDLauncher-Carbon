@@ -1,0 +1,309 @@
+---
+/**
+ * Localized "How to Install Minecraft NeoForge" guide.
+ *
+ * One file, seven locales. The locale comes from the route param; we look up
+ * translated metadata + steps and render the matching body block. Brand
+ * names (NeoForge, Forge, Fabric, Quilt, GDLauncher, CurseForge, Modrinth,
+ * Create, Mekanism, Applied Energistics 2, JEI) stay untranslated.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft NeoForge の導入方法",
+    description: "GDLauncher で NeoForge を Minecraft に導入する手順。大型コンテンツ Mod の主軸となっているモダンな Forge フォーク。",
+    steps: [
+      { name: "GDLauncher をダウンロード", text: "gdlauncher.com から GDLauncher をダウンロードしてインストール。無料で Windows / macOS / Linux に対応。" },
+      { name: "新しいインスタンスを作成", text: "GDLauncher を開き、Library ページの + ボタンから新しい Minecraft インスタンスを作成します。" },
+      { name: "ローダーで NeoForge を選択", text: "Mod ローダーの選択で NeoForge を選び、Minecraft バージョンを指定 (1.20.1 が NeoForge 初リリース、新規開発は主に 1.21.x)。" },
+      { name: "インストールが終わるまで待つ", text: "GDLauncher が Minecraft、対応する Java、NeoForge ローダーを自動でダウンロード。手動インストーラーは不要です。" },
+      { name: "NeoForge Mod を追加", text: "新しいインスタンスを開いて Addons タブから、CurseForge や Modrinth の NeoForge 対応 Mod をワンクリックで導入。依存関係も自動解決。" },
+      { name: "Play を押す", text: "Play をクリック。NeoForge インスタンスがセットアップ済みで起動します。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft NeoForge 설치 방법",
+    description: "GDLauncher로 Minecraft NeoForge를 설치하는 단계별 가이드. 큰 콘텐츠 모드들이 모이는 현대적 Forge 포크.",
+    steps: [
+      { name: "GDLauncher 다운로드", text: "gdlauncher.com에서 GDLauncher를 받아 설치하세요. 무료이며 Windows, macOS, Linux 지원." },
+      { name: "새 인스턴스 만들기", text: "GDLauncher를 열고 Library 페이지의 + 버튼을 눌러 새 Minecraft 인스턴스를 만드세요." },
+      { name: "로더로 NeoForge 선택", text: "모드 로더 드롭다운에서 NeoForge를 고르고 Minecraft 버전을 선택하세요(1.20.1이 첫 NeoForge 릴리스, 새 모딩은 1.21.x 위주)." },
+      { name: "설치가 끝날 때까지 대기", text: "GDLauncher가 Minecraft, 알맞은 Java 버전, NeoForge 로더를 자동으로 받아옵니다. 수동 설치 파일 없음." },
+      { name: "NeoForge 모드 추가", text: "새 인스턴스를 열고 Addons 탭에서 CurseForge / Modrinth의 NeoForge 호환 모드를 원클릭으로 설치. 의존성은 자동으로 함께 받습니다." },
+      { name: "Play 누르기", text: "Play를 클릭하면 NeoForge 인스턴스가 모두 연결된 상태로 실행됩니다." }
+    ]
+  },
+  de: {
+    title: "So installierst du Minecraft NeoForge",
+    description: "Schritt-für-Schritt-Anleitung zur Installation von NeoForge mit GDLauncher. Der moderne Forge-Fork, auf den die meisten großen Content-Mods setzen.",
+    steps: [
+      { name: "GDLauncher herunterladen", text: "Lade GDLauncher von gdlauncher.com herunter und installiere es. Kostenlos, verfügbar für Windows, macOS und Linux." },
+      { name: "Neue Instanz erstellen", text: "Öffne GDLauncher und klick auf der Library-Seite auf das +, um eine neue Minecraft-Instanz anzulegen." },
+      { name: "NeoForge als Loader wählen", text: "Wähl NeoForge im Loader-Dropdown und such die Minecraft-Version aus (1.20.1 war die erste NeoForge-Version; 1.21.x ist, wo das meiste neue Modding passiert)." },
+      { name: "Installation abwarten", text: "GDLauncher lädt Minecraft, die passende Java-Version und den NeoForge-Loader automatisch. Kein manueller Installer." },
+      { name: "NeoForge-Mods hinzufügen", text: "Öffne die neue Instanz, geh in den Addons-Tab und installiere NeoForge-kompatible Mods aus CurseForge oder Modrinth per Klick. Abhängigkeiten kommen automatisch mit." },
+      { name: "Auf Play drücken", text: "Klick auf Play. Deine NeoForge-Instanz startet komplett eingerichtet." }
+    ]
+  },
+  fr: {
+    title: "Comment installer Minecraft NeoForge",
+    description: "Guide pas-à-pas pour installer NeoForge avec GDLauncher. Le fork moderne de Forge que ciblent désormais la plupart des gros mods de contenu.",
+    steps: [
+      { name: "Télécharger GDLauncher", text: "Télécharge et installe GDLauncher depuis gdlauncher.com. Gratuit, dispo sur Windows, macOS et Linux." },
+      { name: "Créer une nouvelle instance", text: "Ouvre GDLauncher et clique sur + dans la page Library pour démarrer une nouvelle instance Minecraft." },
+      { name: "Choisir NeoForge comme loader", text: "Sélectionne NeoForge dans le menu de loader, puis choisis la version de Minecraft (1.20.1 a été la première version NeoForge ; le 1.21.x concentre le nouveau modding)." },
+      { name: "Attendre la fin de l'installation", text: "GDLauncher télécharge Minecraft, la bonne version de Java et le loader NeoForge automatiquement. Pas d'installeur à lancer." },
+      { name: "Ajouter des mods NeoForge", text: "Ouvre l'instance, va dans l'onglet Addons et installe en un clic les mods NeoForge depuis CurseForge ou Modrinth. Les dépendances sont récupérées toutes seules." },
+      { name: "Appuyer sur Play", text: "Clique sur Play. Ton instance NeoForge se lance avec tout déjà branché." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar Minecraft NeoForge",
+    description: "Guía paso a paso para instalar NeoForge con GDLauncher. El fork moderno de Forge al que apuntan la mayoría de los grandes mods de contenido.",
+    steps: [
+      { name: "Descargar GDLauncher", text: "Descarga e instala GDLauncher desde gdlauncher.com. Gratis, disponible para Windows, macOS y Linux." },
+      { name: "Crear una nueva instancia", text: "Abre GDLauncher y haz clic en el botón + de la página Library para iniciar una nueva instancia de Minecraft." },
+      { name: "Elegir NeoForge como loader", text: "Selecciona NeoForge en el desplegable de loader y escoge la versión de Minecraft (1.20.1 fue la primera versión de NeoForge; el 1.21.x es donde se hace el nuevo modding)." },
+      { name: "Esperar a que termine la instalación", text: "GDLauncher descarga Minecraft, la versión de Java correcta y el loader NeoForge automáticamente. Sin instaladores manuales." },
+      { name: "Añadir mods de NeoForge", text: "Abre la nueva instancia, ve a la pestaña Addons e instala mods compatibles con NeoForge desde CurseForge o Modrinth con un clic. Las dependencias se traen solas." },
+      { name: "Pulsar Play", text: "Haz clic en Play. Tu instancia NeoForge arranca con todo ya conectado." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar o Minecraft NeoForge",
+    description: "Guia passo a passo para instalar o NeoForge com o GDLauncher. O fork moderno do Forge para onde a maioria dos grandes mods de conteúdo está mirando.",
+    steps: [
+      { name: "Baixar o GDLauncher", text: "Baixe e instale o GDLauncher em gdlauncher.com. Grátis, disponível para Windows, macOS e Linux." },
+      { name: "Criar uma nova instância", text: "Abra o GDLauncher e clique no botão + da página Library para começar uma nova instância do Minecraft." },
+      { name: "Escolher NeoForge como loader", text: "Selecione NeoForge no menu de loader e escolha a versão do Minecraft (1.20.1 foi o primeiro lançamento NeoForge; o 1.21.x é onde acontece o modding novo)." },
+      { name: "Aguardar a instalação", text: "O GDLauncher baixa o Minecraft, a versão de Java certa e o loader NeoForge automaticamente. Sem instalador manual." },
+      { name: "Adicionar mods NeoForge", text: "Abra a nova instância, vá na aba Addons e instale mods compatíveis com NeoForge do CurseForge ou Modrinth com um clique. Dependências entram juntas automaticamente." },
+      { name: "Apertar Play", text: "Clique em Play. Sua instância NeoForge inicia já configurada." }
+    ]
+  },
+  it: {
+    title: "Come installare Minecraft NeoForge",
+    description: "Guida passo passo per installare NeoForge con GDLauncher. Il fork moderno di Forge su cui ormai punta la maggior parte delle grandi Mod di contenuto.",
+    steps: [
+      { name: "Scaricare GDLauncher", text: "Scarica e installa GDLauncher da gdlauncher.com. Gratuito, disponibile per Windows, macOS e Linux." },
+      { name: "Creare una nuova istanza", text: "Apri GDLauncher e clicca sul pulsante + nella pagina Library per creare una nuova istanza Minecraft." },
+      { name: "Scegliere NeoForge come loader", text: "Seleziona NeoForge nel menu del loader e scegli la versione di Minecraft (1.20.1 è stata la prima release NeoForge; il 1.21.x è dove si concentra il nuovo modding)." },
+      { name: "Attendere il termine dell'installazione", text: "GDLauncher scarica Minecraft, la versione corretta di Java e il loader NeoForge in automatico. Niente installer manuali." },
+      { name: "Aggiungere Mod NeoForge", text: "Apri la nuova istanza, vai nella scheda Addons e installa le Mod compatibili con NeoForge da CurseForge o Modrinth con un clic. Le dipendenze vengono incluse in automatico." },
+      { name: "Premere Play", text: "Clicca su Play. La tua istanza NeoForge si avvia già pronta." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install neoforge, minecraft neoforge, neoforge mod loader, how to install neoforge minecraft, neoforge mods, gdlauncher neoforge"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT4M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>NeoForge とは?</h2>
+      <p>NeoForge は 2023 年中頃に Forge のガバナンスを巡る分裂から派生したコミュニティ主導の Forge フォークです。Forge 1.20.1 から分岐し、以降は新しい Minecraft バージョンへの対応が速く、コントリビューションプロセスがよりオープンで、メンテナーの裾野も広いという特徴を持っています。</p>
+      <p>大型コンテンツ Mod (Create、Mekanism、Applied Energistics 2、JEI など) の多くは現在、Forge ビルドと並んで、もしくは Forge の代わりに NeoForge ビルドを配布しています。1.21 以降では NeoForge が事実上「Forge 系」モディングの標準です。</p>
+
+      <h2>NeoForge のセットアップ</h2>
+      <p>GDLauncher の <strong>+</strong> ボタンを押し、Minecraft バージョンを選んで <strong>NeoForge</strong> を選択。利用可能な NeoForge ローダーバージョンが表示されるので、通常は最新の安定版を選びます。</p>
+      <p>インスタンスに名前を付けて作成。GDLauncher が Minecraft、対応する Java、NeoForge 本体をバックグラウンドでダウンロードします。手動の JAR 実行や Java パス設定は不要です。</p>
+
+      <h2>Mod の追加</h2>
+      <p>インスタンスを開き、<strong>Addons</strong> タブへ。<strong>Add Addons</strong> で CurseForge と Modrinth を横断ブラウズできます。NeoForge でフィルターして検索、<strong>Download</strong> をクリックすれば依存関係も自動で取り込まれます。</p>
+      <p>古い Forge Mod の中には NeoForge 専用ビルドを持たないものもありますが、API の重なりで多くは問題なく動作します。新しい Mod は NeoForge 専用リリースが増えているため、不明な場合は Mod ページを確認してください。</p>
+
+      <h2>NeoForge と Forge</h2>
+      <p>1.20.1 では両方が並存し、ほとんどの Mod が両対応です。1.21 以降は NeoForge に勢いがあり、新バージョンへの対応が速く、Mod 対応も広く、テックや魔術系の Mod シーンが最も活発です。Forge も動作してリリースは続いていますが、新しいバージョンでは NeoForge のみで配布する作者が増えています。</p>
+      <p>遊びたい特定の Mod が Forge 限定なら Forge を使います。それ以外、モダンなバージョンでは NeoForge が無難な選択です。</p>
+
+      <h2>NeoForge と Fabric</h2>
+      <p>エコシステムが異なります。NeoForge は大型コンテンツ Mod (Create、AE2、Mekanism) の本拠地。Fabric は最先端の軽量化や QoL Mod (Sodium、Lithium、Iris) が最初に登場する場所です。両方に存在する Mod も多いですが、エコシステムごとの味付けは今でも違います。</p>
+
+      <h2>トラブルシューティング</h2>
+      <p>NeoForge が起動しない? RAM が 4GB 以上割り当てられているか確認 (Mod パックではもっと多めに)。特定のバージョンに問題がある場合は別の NeoForge ビルドを試してください。最近追加した Mod を外して切り分けます。</p>
+      <p>「Mod not for this loader」のエラーは、Forge 限定や Fabric の Mod を NeoForge インスタンスに入れた場合に出ます。Addons ブラウザで NeoForge でフィルターすれば回避できます。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>NeoForge란?</h2>
+      <p>NeoForge는 2023년 중반 Forge의 거버넌스 분쟁 이후 갈라져 나온 커뮤니티 주도의 Forge 포크입니다. Forge 1.20.1을 기반으로 분기했고, 이후로는 새 Minecraft 버전 대응이 더 빠르고, 기여 절차가 더 열려 있으며, 메인테이너 풀이 더 넓어졌습니다.</p>
+      <p>대형 콘텐츠 모드(Create, Mekanism, Applied Energistics 2, JEI 등) 대부분이 이제 Forge 빌드와 함께 또는 대신 NeoForge 빌드를 배포합니다. 1.21 이상에서는 NeoForge가 사실상 "Forge 계열" 모딩의 기본입니다.</p>
+
+      <h2>NeoForge 셋업</h2>
+      <p>GDLauncher의 <strong>+</strong> 버튼을 누르고 Minecraft 버전을 고른 뒤 <strong>NeoForge</strong>를 선택하세요. 사용 가능한 NeoForge 로더 버전이 나오는데, 보통은 최신 안정 버전을 고르면 됩니다.</p>
+      <p>인스턴스 이름을 정하고 생성하세요. GDLauncher가 Minecraft, 알맞은 Java, NeoForge 본체를 백그라운드에서 받아 줍니다. 수동 JAR 실행이나 Java 경로 설정은 없습니다.</p>
+
+      <h2>모드 추가</h2>
+      <p>인스턴스를 열고 <strong>Addons</strong> 탭으로 가세요. <strong>Add Addons</strong>로 CurseForge와 Modrinth를 한 번에 둘러볼 수 있습니다. NeoForge로 필터링하고 검색해서 <strong>Download</strong>를 누르면 의존성도 자동으로 받아 줍니다.</p>
+      <p>일부 오래된 Forge 모드는 NeoForge 전용 빌드가 없지만 API가 겹쳐서 그냥 잘 돌아가는 경우가 많습니다. 최신 모드는 NeoForge 전용 릴리스가 점점 늘고 있으니 헷갈리면 모드 페이지를 확인하세요.</p>
+
+      <h2>NeoForge vs Forge</h2>
+      <p>1.20.1에서는 둘 다 살아 있고 대부분의 모드가 양쪽을 지원합니다. 1.21 이후로는 NeoForge가 흐름을 가져갔습니다. 더 빠른 업데이트, 더 폭넓은 모드 지원, 가장 활발한 테크/매직 모드 씬이 있습니다. Forge도 동작하고 릴리스도 계속되지만, 새로운 버전에서는 NeoForge에만 올리는 작가들이 많습니다.</p>
+      <p>꼭 필요한 모드가 Forge 전용이면 Forge를 쓰세요. 그 외 최신 버전에서는 보통 NeoForge가 더 나은 선택입니다.</p>
+
+      <h2>NeoForge vs Fabric</h2>
+      <p>생태계가 다릅니다. NeoForge는 대형 콘텐츠 모드(Create, AE2, Mekanism)의 본거지. Fabric은 최첨단 성능과 QoL 모드(Sodium, Lithium, Iris)가 가장 먼저 등장하는 곳입니다. 양쪽에 다 있는 모드도 많지만, 생태계의 색깔은 여전히 다릅니다.</p>
+
+      <h2>문제 해결</h2>
+      <p>NeoForge가 안 켜져요? RAM이 최소 4GB 할당돼 있는지 확인하세요(모드팩은 더 많이). 특정 버전에 문제가 있으면 다른 NeoForge 빌드를 시도하세요. 최근에 추가한 모드를 빼서 충돌을 가려내 보세요.</p>
+      <p>"Mod not for this loader" 에러는 보통 Forge 전용이나 Fabric 모드를 NeoForge 인스턴스에 넣었을 때 나옵니다. Addons 브라우저에서 NeoForge로 필터링하면 피할 수 있습니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was ist NeoForge?</h2>
+      <p>NeoForge ist ein community-getriebener Fork von Forge, der Mitte 2023 nach einem Streit um Forges Governance entstanden ist. Er ist von Forge 1.20.1 abgezweigt und bewegt sich seitdem schneller: zügigere Updates für neue Minecraft-Versionen, ein offenerer Beitragsprozess, mehr beteiligte Maintainer.</p>
+      <p>Die meisten großen Content-Mods (Create, Mekanism, Applied Energistics 2, JEI und viele mehr) liefern inzwischen einen NeoForge-Build, parallel zu oder statt des Forge-Builds. Auf 1.21 und neuer ist NeoForge faktisch der Standard für "Forge-Style"-Modding.</p>
+
+      <h2>NeoForge einrichten</h2>
+      <p>Klick im GDLauncher auf <strong>+</strong>, wähl deine Minecraft-Version und nimm <strong>NeoForge</strong>. GDLauncher listet die verfügbaren NeoForge-Loader-Versionen; die neueste stabile ist meist die richtige.</p>
+      <p>Gib der Instanz einen Namen und leg sie an. GDLauncher lädt Minecraft, die passende Java-Version und NeoForge im Hintergrund. Kein manuelles JAR-Ausführen, keine Java-Pfad-Konfiguration.</p>
+
+      <h2>Mods hinzufügen</h2>
+      <p>Öffne deine Instanz und geh in den <strong>Addons</strong>-Tab. Mit <strong>Add Addons</strong> öffnet sich der Browser über CurseForge und Modrinth zusammen. Filter nach NeoForge, such, klick <strong>Download</strong>, und Abhängigkeiten kommen automatisch mit.</p>
+      <p>Manche älteren Forge-Mods haben keinen dedizierten NeoForge-Build, laufen aber trotzdem, weil sich die APIs überschneiden. Neuere Mods veröffentlichen zunehmend NeoForge-only-Releases. Bei Unsicherheit auf die Mod-Seite schauen.</p>
+
+      <h2>NeoForge vs Forge</h2>
+      <p>Auf 1.20.1 existieren beide Loader und die meisten Mods unterstützen beides. Ab 1.21 hat NeoForge das Momentum: schnellere Updates, breitere Mod-Unterstützung und die aktivste Tech-/Magie-Mod-Szene. Forge funktioniert weiter und liefert weiter aus, aber viele Autoren veröffentlichen für die neueren Versionen nur noch NeoForge.</p>
+      <p>Wenn ein bestimmter Mod, den du willst, nur auf Forge existiert, nimm Forge. Sonst ist NeoForge auf modernen Versionen meist die bessere Wahl.</p>
+
+      <h2>NeoForge vs Fabric</h2>
+      <p>Unterschiedliche Ökosysteme. NeoForge ist die Heimat der großen Content-Mods (Create, AE2, Mekanism). Fabric ist, wo die cutting-edge Performance- und QoL-Mods zuerst landen (Sodium, Lithium, Iris). Viele Mods gibt es auf beiden, aber die Ökosysteme schmecken weiterhin unterschiedlich.</p>
+
+      <h2>Problembehebung</h2>
+      <p>NeoForge startet nicht? Schau, dass mindestens 4 GB RAM zugewiesen sind (mehr bei Modpacks). Probier einen anderen NeoForge-Build, wenn eine spezielle Version Probleme macht. Nimm kürzlich hinzugefügte Mods raus, um Konflikte einzukreisen.</p>
+      <p>"Mod not for this loader"-Fehler bedeuten meist, dass du einen Forge-only- oder Fabric-Mod in eine NeoForge-Instanz installiert hast. Filter den Addons-Browser nach NeoForge, dann passiert das nicht.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>C'est quoi NeoForge ?</h2>
+      <p>NeoForge est un fork de Forge porté par la communauté, lancé mi-2023 après une scission sur la gouvernance de Forge. Il s'est détaché de Forge 1.20.1 et avance plus vite depuis : mises à jour plus rapides pour les nouvelles versions de Minecraft, processus de contribution plus ouvert, plus de mainteneurs impliqués.</p>
+      <p>La plupart des gros mods de contenu (Create, Mekanism, Applied Energistics 2, JEI, et bien d'autres) livrent désormais un build NeoForge à côté ou à la place d'un build Forge. Sur 1.21 et au-delà, NeoForge est de fait le défaut pour le modding "style Forge".</p>
+
+      <h2>Configurer NeoForge</h2>
+      <p>Clique sur <strong>+</strong> dans GDLauncher, choisis ta version de Minecraft et sélectionne <strong>NeoForge</strong>. GDLauncher liste les versions du loader NeoForge ; la dernière stable est en général le bon choix.</p>
+      <p>Nomme l'instance et crée-la. GDLauncher télécharge Minecraft, la bonne version de Java et NeoForge en arrière-plan. Pas de JAR à lancer à la main, pas de chemin Java à configurer.</p>
+
+      <h2>Ajouter des mods</h2>
+      <p>Ouvre ton instance et va dans l'onglet <strong>Addons</strong>. <strong>Add Addons</strong> ouvre le navigateur sur CurseForge et Modrinth combinés. Filtre par NeoForge, cherche, clique <strong>Download</strong>, les dépendances sont récupérées pour toi.</p>
+      <p>Certains anciens mods Forge n'ont pas de build NeoForge dédié mais se chargent quand même, parce que les API se recoupent. Les nouveaux mods publient de plus en plus en NeoForge-only ; en cas de doute, regarde la page du mod.</p>
+
+      <h2>NeoForge vs Forge</h2>
+      <p>Sur 1.20.1, les deux loaders coexistent et la plupart des mods supportent les deux. À partir de 1.21, c'est NeoForge qui a l'élan : mises à jour plus rapides, support de mods plus large, et la scène de mods tech/magie la plus active. Forge marche toujours et continue de sortir, mais beaucoup d'auteurs ne publient plus que NeoForge sur les nouvelles versions.</p>
+      <p>Si un mod précis que tu veux n'existe que sur Forge, prends Forge. Sinon, sur les versions modernes, NeoForge est en général le meilleur choix.</p>
+
+      <h2>NeoForge vs Fabric</h2>
+      <p>Écosystèmes différents. NeoForge, c'est où vivent les gros mods de contenu (Create, AE2, Mekanism). Fabric, c'est où atterrissent en premier les mods de perf et de QoL de pointe (Sodium, Lithium, Iris). Beaucoup de mods existent sur les deux, mais les écosystèmes ont toujours leur propre saveur.</p>
+
+      <h2>Dépannage</h2>
+      <p>NeoForge refuse de démarrer ? Vérifie que tu as au moins 4 Go de RAM alloués (plus pour les modpacks). Essaie un autre build NeoForge si une version pose problème. Retire les mods récemment ajoutés pour isoler les conflits.</p>
+      <p>Erreurs "Mod not for this loader" ? En général, ça veut dire que tu as installé un mod Forge-only ou Fabric dans une instance NeoForge. Filtre le navigateur d'Addons par NeoForge pour éviter ça.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>¿Qué es NeoForge?</h2>
+      <p>NeoForge es un fork de Forge llevado por la comunidad que nació a mediados de 2023 tras un conflicto en la gobernanza de Forge. Se separó de Forge 1.20.1 y desde entonces se mueve más rápido: actualizaciones más ágiles a nuevas versiones de Minecraft, un proceso de contribución más abierto y más mantenedores implicados.</p>
+      <p>La mayoría de los grandes mods de contenido (Create, Mekanism, Applied Energistics 2, JEI y muchos más) ya publican un build de NeoForge junto al de Forge o en su lugar. En 1.21 y posteriores, NeoForge es de facto el estándar del modding "estilo Forge".</p>
+
+      <h2>Configurar NeoForge</h2>
+      <p>Pulsa <strong>+</strong> en GDLauncher, elige la versión de Minecraft y selecciona <strong>NeoForge</strong>. GDLauncher lista las versiones del loader NeoForge; la última estable suele ser la opción correcta.</p>
+      <p>Dale nombre a la instancia y créala. GDLauncher descarga Minecraft, la versión adecuada de Java y NeoForge en segundo plano. Sin lanzar JARs a mano ni configurar rutas de Java.</p>
+
+      <h2>Añadir mods</h2>
+      <p>Abre tu instancia y ve a la pestaña <strong>Addons</strong>. <strong>Add Addons</strong> abre el navegador a CurseForge y Modrinth juntos. Filtra por NeoForge, busca, pulsa <strong>Download</strong> y las dependencias se traen solas.</p>
+      <p>Algunos mods antiguos de Forge no tienen un build de NeoForge dedicado pero cargan igual porque las APIs se solapan. Los mods nuevos publican cada vez más versiones solo para NeoForge; si dudas, mira la página del mod.</p>
+
+      <h2>NeoForge vs Forge</h2>
+      <p>En 1.20.1 conviven ambos loaders y la mayoría de mods soporta los dos. A partir de 1.21, NeoForge tiene la inercia: actualizaciones más rápidas, mayor soporte de mods y la escena tech/magia más activa. Forge sigue funcionando y sigue lanzando versiones, pero muchos autores solo publican en NeoForge en las versiones nuevas.</p>
+      <p>Si un mod concreto que quieres solo existe en Forge, usa Forge. Si no, en versiones modernas NeoForge suele ser la mejor elección.</p>
+
+      <h2>NeoForge vs Fabric</h2>
+      <p>Ecosistemas distintos. NeoForge es donde viven los grandes mods de contenido (Create, AE2, Mekanism). Fabric es donde aterrizan primero los mods de rendimiento y QoL de vanguardia (Sodium, Lithium, Iris). Hay muchos mods en ambos, pero los ecosistemas siguen con su propio sabor.</p>
+
+      <h2>Solución de problemas</h2>
+      <p>¿NeoForge no arranca? Comprueba que tienes al menos 4GB de RAM asignados (más para modpacks). Prueba otro build de NeoForge si una versión concreta da problemas. Quita los mods añadidos recientemente para aislar conflictos.</p>
+      <p>Errores de "Mod not for this loader" suelen significar que has metido un mod Forge-only o Fabric en una instancia NeoForge. Filtra el navegador de Addons por NeoForge para evitarlo.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que é o NeoForge?</h2>
+      <p>O NeoForge é um fork do Forge tocado pela comunidade que nasceu no meio de 2023 depois de uma divisão na governança do Forge. Partiu do Forge 1.20.1 e desde então se move mais rápido: atualizações mais ágeis pras novas versões do Minecraft, processo de contribuição mais aberto e mais mantenedores envolvidos.</p>
+      <p>A maioria dos grandes mods de conteúdo (Create, Mekanism, Applied Energistics 2, JEI e muitos outros) hoje publica um build de NeoForge junto com ou no lugar do build de Forge. No 1.21 e mais novos, o NeoForge é, na prática, o padrão pro modding "estilo Forge".</p>
+
+      <h2>Configurando o NeoForge</h2>
+      <p>Clique no <strong>+</strong> do GDLauncher, escolha a versão do Minecraft e selecione <strong>NeoForge</strong>. O GDLauncher lista as versões do loader NeoForge disponíveis; a última estável costuma ser a escolha certa.</p>
+      <p>Dê um nome pra instância e crie. O GDLauncher baixa o Minecraft, a versão certa do Java e o NeoForge em segundo plano. Sem rodar JAR na mão, sem configurar caminho do Java.</p>
+
+      <h2>Adicionando mods</h2>
+      <p>Abra sua instância e vá na aba <strong>Addons</strong>. <strong>Add Addons</strong> abre o navegador com CurseForge e Modrinth juntos. Filtre por NeoForge, busque, clique em <strong>Download</strong> e as dependências entram juntas automaticamente.</p>
+      <p>Alguns mods antigos de Forge não têm um build dedicado de NeoForge mas carregam igual porque as APIs se sobrepõem. Mods novos cada vez mais publicam só pra NeoForge; na dúvida, confere na página do mod.</p>
+
+      <h2>NeoForge vs Forge</h2>
+      <p>No 1.20.1, os dois loaders convivem e a maioria dos mods suporta os dois. A partir do 1.21, o NeoForge tem o impulso: atualizações mais rápidas, suporte de mods mais amplo e a cena tech/magia mais ativa. O Forge ainda funciona e ainda lança, mas muitos autores só publicam pra NeoForge nas versões novas.</p>
+      <p>Se um mod específico que você quer só existe no Forge, usa o Forge. Caso contrário, nas versões modernas o NeoForge costuma ser a melhor escolha.</p>
+
+      <h2>NeoForge vs Fabric</h2>
+      <p>Ecossistemas diferentes. O NeoForge é onde moram os grandes mods de conteúdo (Create, AE2, Mekanism). O Fabric é onde aterrissam primeiro os mods de performance e QoL de ponta (Sodium, Lithium, Iris). Muitos mods existem nos dois, mas os ecossistemas seguem com sabor próprio.</p>
+
+      <h2>Solução de problemas</h2>
+      <p>O NeoForge não inicia? Verifique se tem pelo menos 4GB de RAM alocado (mais pra modpacks). Tenta outro build de NeoForge se uma versão específica der problema. Tira os mods adicionados recentemente pra isolar conflitos.</p>
+      <p>Erros de "Mod not for this loader" geralmente significam que você instalou um mod Forge-only ou Fabric numa instância NeoForge. Filtra o navegador de Addons por NeoForge pra evitar isso.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cos'è NeoForge?</h2>
+      <p>NeoForge è un fork di Forge guidato dalla community, nato a metà 2023 dopo una spaccatura sulla governance di Forge. È partito da Forge 1.20.1 e da allora si muove più in fretta: aggiornamenti più rapidi alle nuove versioni di Minecraft, un processo di contributo più aperto, una platea di maintainer più ampia.</p>
+      <p>La maggior parte dei grandi Mod di contenuto (Create, Mekanism, Applied Energistics 2, JEI e molti altri) oggi pubblica una build NeoForge accanto o al posto di quella Forge. Su 1.21 e successivi, NeoForge è di fatto lo standard del modding "stile Forge".</p>
+
+      <h2>Configurare NeoForge</h2>
+      <p>Clicca sul <strong>+</strong> in GDLauncher, scegli la versione di Minecraft e seleziona <strong>NeoForge</strong>. GDLauncher elenca le versioni del loader NeoForge disponibili; di solito l'ultima stabile è la scelta giusta.</p>
+      <p>Dai un nome all'istanza e creala. GDLauncher scarica Minecraft, la versione corretta di Java e NeoForge in background. Niente JAR da lanciare a mano, niente percorso Java da configurare.</p>
+
+      <h2>Aggiungere Mod</h2>
+      <p>Apri l'istanza e vai nella scheda <strong>Addons</strong>. <strong>Add Addons</strong> apre il browser su CurseForge e Modrinth insieme. Filtra per NeoForge, cerca, clicca <strong>Download</strong> e le dipendenze vengono incluse in automatico.</p>
+      <p>Alcune vecchie Mod Forge non hanno una build NeoForge dedicata ma si caricano lo stesso perché le API si sovrappongono. Le Mod nuove pubblicano sempre più spesso release NeoForge-only; nel dubbio, controlla la pagina della Mod.</p>
+
+      <h2>NeoForge contro Forge</h2>
+      <p>Su 1.20.1 entrambi i loader convivono e la maggior parte delle Mod supporta entrambi. Dal 1.21 in poi è NeoForge ad avere lo slancio: aggiornamenti più rapidi, supporto Mod più ampio e la scena tech/magia più attiva. Forge funziona ancora e continua a uscire, ma molti autori pubblicano solo per NeoForge sulle versioni nuove.</p>
+      <p>Se una Mod specifica che vuoi esiste solo su Forge, usa Forge. Altrimenti, sulle versioni moderne, NeoForge è di solito la scelta migliore.</p>
+
+      <h2>NeoForge contro Fabric</h2>
+      <p>Ecosistemi diversi. NeoForge è dove vivono i grandi Mod di contenuto (Create, AE2, Mekanism). Fabric è dove arrivano per primi le Mod di ottimizzazione e QoL all'avanguardia (Sodium, Lithium, Iris). Molte Mod sono presenti in entrambi, ma gli ecosistemi mantengono il loro sapore.</p>
+
+      <h2>Risoluzione dei problemi</h2>
+      <p>NeoForge non parte? Controlla di avere almeno 4 GB di RAM allocati (di più per i modpack). Prova una build NeoForge diversa se una specifica dà problemi. Rimuovi le Mod aggiunte di recente per isolare i conflitti.</p>
+      <p>Errori "Mod not for this loader"? Di solito significa che hai installato una Mod Forge-only o Fabric in un'istanza NeoForge. Filtra il browser degli Addons per NeoForge per evitarlo.</p>
+    </Fragment>
+  )}
+</GuideLayout>

@@ -1,0 +1,188 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher のデータを別のドライブに移す方法",
+    description: "GDLauncher の Runtime Path を変更して、全インスタンス、アセット、ライブラリ、ランチャーデータベースを別のドライブ / フォルダーに移動。マイグレーションは自動。",
+    steps: [
+      { name: "Runtime Path 設定を開く", text: "GDLauncher を開き Settings → Runtime Path。現在の場所が入力欄に表示。対象ドライブを選ぶとシステム情報も表示。" },
+      { name: "新しいパスを入力", text: "新しい場所を入力 (例: Windows なら D:\\gdlauncher-data、Linux なら /mnt/data/gdlauncher)、またはフォルダーアイコンから選択。フォルダーは存在不要、GDLauncher が必要に応じて作成。" },
+      { name: "変更を確定", text: "パスが有効なら Apply ボタンが有効に。クリックしてモーダルで確認。対象フォルダーにすでに GDLauncher データがあれば (以前の移動から) そのまま使用、なければ既存データをマイグレーション。" },
+      { name: "マイグレーション待ち", text: "GDLauncher が再起動して全画面モーダル (スキャン / コピー / 削除フェーズと進行バー) を表示。途中でアプリやマシンを終了しないでください。所要時間はデータサイズ依存、空の場合は数秒、数百 GB なら 30 分程度。" },
+      { name: "確認とクリーンアップ", text: "再起動後、Settings → Runtime Path に新しい場所が表示されているか確認。既存インスタンスを起動して動作確認。古い場所の runtime_path_override マーカーファイルは GDLauncher が移動を追跡するのに使うので、正常起動を 1 回確認するまでは残しておいてください。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher의 데이터를 다른 드라이브로 옮기는 법",
+    description: "GDLauncher의 Runtime Path를 변경해 모든 인스턴스, 에셋, 라이브러리, 런처 데이터베이스를 다른 드라이브나 폴더로 이동. 마이그레이션은 자동.",
+    steps: [
+      { name: "Runtime Path 설정 열기", text: "GDLauncher를 열고 Settings → Runtime Path. 현재 위치가 입력란에 표시; 대상 드라이브를 고르면 시스템 정보도 보입니다." },
+      { name: "새 경로 입력", text: "새 위치를 입력(예: Windows에선 D:\\gdlauncher-data, Linux에선 /mnt/data/gdlauncher), 또는 폴더 아이콘으로 탐색. 폴더가 미리 존재할 필요는 없습니다, GDLauncher가 필요 시 만듭니다." },
+      { name: "변경 확정", text: "경로가 유효해지면 Apply 버튼이 활성. 클릭하고 모달에서 확인. 대상 폴더에 이미 GDLauncher 데이터가 있으면(이전 이동에서) 그대로 사용; 아니면 기존 데이터를 마이그레이션." },
+      { name: "마이그레이션 기다리기", text: "GDLauncher가 재시작되어 스캔/복사/정리 단계와 진행 바를 가진 전체 화면 모달이 뜹니다. 도중에 앱이나 컴퓨터를 종료하지 마세요. 시간은 데이터 크기에 따라, 빈 설치는 몇 초, 수백 GB는 30분." },
+      { name: "확인과 정리", text: "재시작 후 Settings → Runtime Path가 새 위치를 보이는지 확인. 기존 인스턴스를 실행해 동작 확인. 옛 위치의 runtime_path_override 마커 파일은 GDLauncher가 이동을 추적하는 데 씁니다, 한 번 성공적으로 실행할 때까지 남겨 두세요." }
+    ]
+  },
+  de: {
+    title: "GDLauncher-Daten auf ein anderes Laufwerk verschieben",
+    description: "Den Runtime Path von GDLauncher ändern, um alle Instanzen, Assets, Libraries und die Launcher-Datenbank auf ein anderes Laufwerk oder einen anderen Ordner zu verschieben. Migration läuft automatisch.",
+    steps: [
+      { name: "Runtime-Path-Settings öffnen", text: "GDLauncher öffnen, Settings → Runtime Path. Der aktuelle Pfad steht im Eingabefeld; wählst du ein Ziel, zeigt die Seite auch System-Info dazu." },
+      { name: "Neuen Pfad eintragen", text: "Neuen Ort eintippen (z. B. D:\\gdlauncher-data auf Windows oder /mnt/data/gdlauncher auf Linux), oder per Ordner-Icon browsen. Der Ordner muss noch nicht existieren, GDLauncher legt ihn bei Bedarf an." },
+      { name: "Änderung bestätigen", text: "Wenn der Pfad gültig ist, wird der Apply-Button aktiv. Klicken und im Modal bestätigen. Hat der Zielordner schon GDLauncher-Daten (von einem früheren Move), nutzt GDLauncher die direkt; sonst migriert er die bestehenden." },
+      { name: "Auf die Migration warten", text: "GDLauncher startet neu in einen Vollbild-Dialog mit Scan-, Kopier- und Cleanup-Phase plus Fortschrittsbalken. App und PC währenddessen nicht schließen. Dauer hängt an der Datenmenge, von Sekunden bei leerer Installation bis zu einer halben Stunde bei mehreren hundert GB." },
+      { name: "Verifizieren und aufräumen", text: "Nach Neustart in Settings → Runtime Path den neuen Ort prüfen. Eine bestehende Instanz starten, ob alles noch geht. Die runtime_path_override-Marker-Datei am alten Ort hilft GDLauncher, den Umzug zu tracken; lass sie liegen, bis du einmal erfolgreich gestartet hast." }
+    ]
+  },
+  fr: {
+    title: "Comment déplacer les données de GDLauncher sur un autre disque",
+    description: "Change le Runtime Path de GDLauncher pour déplacer toutes les instances, assets, bibliothèques et la base de données du launcher vers un autre disque ou dossier. La migration est gérée automatiquement.",
+    steps: [
+      { name: "Ouvrir les settings Runtime Path", text: "Ouvre GDLauncher et va dans Settings → Runtime Path. L'emplacement actuel est dans le champ ; la page affiche aussi les infos système du disque cible quand tu en choisis un." },
+      { name: "Saisir le nouveau chemin", text: "Tape le nouvel emplacement (par exemple D:\\gdlauncher-data sur Windows ou /mnt/data/gdlauncher sur Linux), ou clique l'icône dossier pour parcourir. Le dossier n'a pas besoin d'exister, GDLauncher le crée si nécessaire." },
+      { name: "Confirmer le changement", text: "Quand le chemin est valide, le bouton Apply s'active. Clique-le et confirme dans le modal. Si le dossier cible contient déjà des données GDLauncher (d'un déplacement précédent), GDLauncher l'utilise tel quel ; sinon il migre les données existantes." },
+      { name: "Attendre la migration", text: "GDLauncher redémarre dans un modal plein écran avec phases scan / copie / nettoyage et barre de progression. Ne ferme ni l'app ni la machine pendant. Le temps dépend de la taille des données, de quelques secondes pour une install vide à une demi-heure pour des centaines de Go." },
+      { name: "Vérifier et nettoyer", text: "Après redémarrage, vérifie que Settings → Runtime Path affiche le nouvel emplacement. Lance une instance existante pour confirmer que tout marche encore. Le fichier marqueur runtime_path_override à l'ancien emplacement aide GDLauncher à tracer le déplacement ; laisse-le jusqu'à avoir lancé avec succès une fois." }
+    ]
+  },
+  es: {
+    title: "Cómo mover los datos de GDLauncher a otro disco",
+    description: "Cambia el Runtime Path de GDLauncher para mover todas las instancias, assets, bibliotecas y la base de datos del launcher a otro disco o carpeta. La migración se hace sola.",
+    steps: [
+      { name: "Abrir ajustes Runtime Path", text: "Abre GDLauncher y ve a Settings → Runtime Path. La ubicación actual aparece en el campo de entrada; la página también muestra info del sistema del disco destino cuando eliges uno." },
+      { name: "Introducir el nuevo path", text: "Escribe la nueva ubicación (por ejemplo D:\\gdlauncher-data en Windows o /mnt/data/gdlauncher en Linux), o pulsa el icono de carpeta para navegar. La carpeta no tiene que existir, GDLauncher la crea si hace falta." },
+      { name: "Confirmar el cambio", text: "Cuando el path es válido se activa el botón Apply. Pulsa y confirma en el modal. Si la carpeta destino ya tiene datos de GDLauncher (de un movimiento previo), GDLauncher la usa tal cual; si no, migra los datos existentes." },
+      { name: "Esperar la migración", text: "GDLauncher reinicia a un modal a pantalla completa con fases escaneo / copia / limpieza y barra de progreso. No cierres la app ni apagues el equipo durante. El tiempo depende del tamaño de datos, desde segundos en una instalación vacía hasta media hora en cientos de GB." },
+      { name: "Verificar y limpiar", text: "Tras reiniciar, comprueba que Settings → Runtime Path muestra la nueva ubicación. Lanza una instancia existente para confirmar que todo sigue funcionando. El archivo marcador runtime_path_override en la ubicación antigua ayuda a GDLauncher a rastrear el movimiento; déjalo hasta haber arrancado con éxito al menos una vez." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como mover os dados do GDLauncher pra outro drive",
+    description: "Mude o Runtime Path do GDLauncher pra mover todas as instâncias, assets, libraries e o banco do launcher pra outro drive ou pasta. A migração é automática.",
+    steps: [
+      { name: "Abrir ajustes Runtime Path", text: "Abra o GDLauncher e vá em Settings → Runtime Path. O local atual aparece no campo; a página também mostra info de sistema do drive de destino quando você escolhe um." },
+      { name: "Digitar o novo caminho", text: "Digite o novo local (por exemplo D:\\gdlauncher-data no Windows ou /mnt/data/gdlauncher no Linux), ou clique no ícone de pasta pra procurar. A pasta não precisa existir, o GDLauncher cria se necessário." },
+      { name: "Confirmar a mudança", text: "Quando o caminho é válido, o botão Apply ativa. Clique e confirme no modal. Se a pasta destino já tem dados do GDLauncher (de um movimento anterior), o GDLauncher usa do jeito que está; senão, migra os dados existentes." },
+      { name: "Esperar a migração", text: "O GDLauncher reinicia num modal de tela cheia com fases scan / cópia / cleanup e barra de progresso. Não feche a app nem desligue o computador durante. O tempo depende do tamanho dos dados, de segundos numa instalação vazia até meia hora pra centenas de GB." },
+      { name: "Verificar e limpar", text: "Após reiniciar, confirme que Settings → Runtime Path mostra o novo local. Lance uma instância existente pra confirmar que tudo ainda funciona. O arquivo marcador runtime_path_override no local antigo ajuda o GDLauncher a rastrear o movimento; deixe até ter lançado com sucesso pelo menos uma vez." }
+    ]
+  },
+  it: {
+    title: "Come spostare i dati di GDLauncher su un altro disco",
+    description: "Cambia il Runtime Path di GDLauncher per spostare tutte le istanze, asset, librerie e il database del launcher su un altro disco o cartella. La migrazione è automatica.",
+    steps: [
+      { name: "Apri le impostazioni Runtime Path", text: "Apri GDLauncher e vai su Settings → Runtime Path. La posizione attuale è nel campo, la pagina mostra anche le info di sistema del disco di destinazione quando ne scegli uno." },
+      { name: "Inserisci il nuovo percorso", text: "Digita la nuova posizione (per esempio D:\\gdlauncher-data su Windows o /mnt/data/gdlauncher su Linux), oppure clicca l'icona della cartella per sfogliare. La cartella non deve preesistere, GDLauncher la crea se serve." },
+      { name: "Conferma la modifica", text: "Quando il percorso è valido, il pulsante Apply si attiva. Cliccalo e conferma nel modal. Se la cartella di destinazione contiene già dati di GDLauncher (da uno spostamento precedente), GDLauncher li usa così come sono, altrimenti migra i dati esistenti." },
+      { name: "Attendi la migrazione", text: "GDLauncher si riavvia in un modal a schermo intero con fasi scan/copia/cleanup e barra di progresso. Non chiudere l'app né il computer durante. La durata dipende dalla quantità di dati, da pochi secondi su un'installazione vuota fino a mezz'ora per centinaia di GB." },
+      { name: "Verifica e pulisci", text: "Dopo il riavvio, controlla che Settings → Runtime Path mostri la nuova posizione. Avvia un'istanza esistente per confermare che funzioni ancora tutto. Il file marker runtime_path_override nella vecchia posizione serve a GDLauncher per tracciare lo spostamento, lascialo lì finché non hai avviato con successo almeno una volta." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["移動されるもの", "予想されるサイズ", "すでに手動で移動済みの場合", "マイグレーション失敗時", "runtime_path_override マーカー", "プレイ中に Runtime Path を同期しない"],
+    paras: [
+      "Runtime Path 内のすべて: インスタンス (Mod、ワールド、設定)、Minecraft 共有アセット、Minecraft 共有ライブラリ、GDLauncher がダウンロードした Java、ランチャーデータベース、アプリ全体ログ。要するに GDLauncher がマシン上で生成した重いものすべて。移動しないもの: App Data Path (ウィンドウ状態、Electron キャッシュ、トップレベル設定)。OS 標準位置に残り、通常触ることはありません。",
+      "インスタンスなしのクリーンインストールは約 1 GB (Minecraft アセットと Java インストールがほぼ)。各 Modpack はおおよそその自身のダウンロードサイズ分追加され、大きな Pack を数個入れれば 50 GB 超に。OS のファイルマネージャーで現在のデータパスのサイズを確認すれば、マイグレーション時間を見積もれます。",
+      "<code>gdlauncher_carbon/data</code> を手動で別の場所にコピーした場合 (Settings を経由せず)、GDLauncher を新しい場所に向けられます。すでに有効な GDLauncher データが入っているパスを入力するとマイグレーションがスキップされ、GDLauncher は設定だけ更新。別マシンへ移動してから新規インストールで移行済みデータを指す場合に便利。",
+      "問題があれば進行モーダルにエラーが表示されます。よくある原因: 対象ドライブの容量不足 (ソースデータと同等以上の空きが必要、エラーには不足バイト数が記載)。権限拒否 (Windows では Program Files や C:\\ ルートに管理者権限必要、Linux/macOS では所有パスでなければならない、ユーザー所有フォルダーを選択)。対象が読み取り専用 (一部のネットワークドライブは読み取り専用でマウント、GDLauncher 外で先にファイル作成可能か確認)。マイグレーション失敗後、GDLauncher は元の場所にフォールバックしエラーを表示。詳細は <code>__gdl_logs__</code> 内のファイルで読めます。",
+      "移動成功後、GDLauncher は <strong>App Data Path</strong> (Runtime Path 内ではない) に <code>runtime_path_override</code> という小さなテキストファイルを書きます。内容は新しい Runtime Path。各起動でこのファイルを読み、データがどこにあるかを判定。誤って削除すると、ランチャーはデフォルト位置にフォールバックし、移動したデータは Settings → Runtime Path で移動先フォルダーを再指定するまで見えません (「すでに使用中」と認識され、コピーなしで切替)。",
+      "OneDrive、iCloud、Dropbox などは GDLauncher とファイルハンドルで競合します。Runtime Path がこれらが積極的に同期するフォルダー内にあると、奇妙な「ファイル使用中」エラーや、たまにセーブ破損が発生。連続同期するドライブではなく、オフラインバックアップされるドライブ (スナップショット、restic、Backblaze など) に Runtime Path を置いてください。"
+    ]
+  },
+  ko: {
+    headings: ["이동되는 것", "예상 크기", "이미 수동으로 이동한 경우", "마이그레이션이 실패하면", "runtime_path_override 마커", "플레이 중 Runtime Path 동기화 금지"],
+    paras: [
+      "Runtime Path 안의 모든 것: 인스턴스(모드, 월드, 설정), Minecraft 공유 에셋, Minecraft 공유 라이브러리, GDLauncher가 다운로드한 Java, 런처 데이터베이스, 앱 전역 로그. 본질적으로 GDLauncher가 머신에 만든 모든 무거운 것. 이동하지 않는 것: App Data Path(창 상태, Electron 캐시, 최상위 설정). OS 표준 위치에 남고 보통 건드리지 않습니다.",
+      "인스턴스 없는 깨끗한 설치는 약 1 GB(주로 Minecraft 에셋과 Java 설치). 각 모드팩은 대략 자신의 다운로드 크기만큼 추가하므로 큰 팩 몇 개면 50 GB를 넘기기 쉽습니다. OS 파일 매니저에서 현재 데이터 경로 크기를 보면 마이그레이션 시간을 짐작할 수 있습니다.",
+      "<code>gdlauncher_carbon/data</code>를 Settings를 거치지 않고 손으로 다른 위치에 복사했다면 GDLauncher를 새 위치로 가리킬 수 있습니다. 유효한 GDLauncher 데이터가 이미 있는 경로를 입력하면 마이그레이션이 건너뛰어지고 GDLauncher는 설정만 갱신. 다른 머신으로 옮긴 뒤 새 설치가 이주된 데이터를 가리키게 할 때 유용.",
+      "도중에 문제가 생기면 진행 모달에 에러가 나타납니다. 흔한 원인: 대상 드라이브 공간 부족(소스 데이터와 같은 정도의 빈 공간이 필요, 에러 메시지에 부족 바이트 표시). 권한 거부(Windows에서 Program Files나 C:\\ 루트는 관리자 권한 필요, Linux/macOS에서는 사용자 소유 경로여야 함; 사용자 소유 폴더 선택). 대상이 읽기 전용(일부 네트워크 드라이브는 기본 읽기 전용으로 마운트; GDLauncher 외부에서 그곳에 파일을 만들 수 있는지 먼저 확인). 마이그레이션 실패 후 GDLauncher는 원래 위치로 폴백하고 에러 메시지를 표시합니다. 자세한 건 <code>__gdl_logs__</code>의 파일에서 볼 수 있습니다.",
+      "성공적인 이동 후 GDLauncher는 <strong>App Data Path</strong>(Runtime Path 안이 아니라) 안에 <code>runtime_path_override</code>라는 작은 텍스트 파일을 씁니다. 내용은 새 Runtime Path. 매 실행마다 이 파일을 읽어 데이터 위치를 파악합니다. 실수로 지우면 런처가 기본 위치로 폴백하고, Settings → Runtime Path에서 옮긴 폴더를 다시 가리킬 때까지 옮긴 데이터를 보지 못합니다('이미 사용 중'으로 인식되어 복사 없이 전환).",
+      "OneDrive, iCloud, Dropbox 등은 파일 핸들을 두고 GDLauncher와 경쟁합니다. Runtime Path가 이런 도구들이 적극적으로 동기화하는 폴더 안에 있으면 이상한 '파일 사용 중' 오류와 가끔의 세이브 손상이 발생합니다. 연속 동기화되는 드라이브가 아니라 오프라인 백업되는 드라이브(스냅샷, restic, Backblaze 등)에 Runtime Path를 두세요."
+    ]
+  },
+  de: {
+    headings: ["Was alles mit umzieht", "Welche Größe zu erwarten ist", "Wenn du Daten schon manuell verschoben hast", "Wenn die Migration scheitert", "Die runtime_path_override-Markerdatei", "Den Runtime Path während des Spielens nicht syncen"],
+    paras: [
+      "Alles, was im Runtime Path liegt: Instanzen (Mods, Welten, Configs), Minecrafts gemeinsame Assets, Minecrafts gemeinsame Libraries, von GDLauncher heruntergeladene Java-Installs, die Launcher-Datenbank und app-weite Logs. Im Grunde alles Schwere, was GDLauncher auf deiner Maschine erzeugt hat. Nicht mit umzieht: der App Data Path (Fensterzustand, Electron-Cache, Top-Level-Config). Bleibt am OS-Standardort und musst du normalerweise nie anfassen.",
+      "Eine saubere Installation ohne Instanzen ist um die 1 GB (vor allem Minecraft-Assets und ein Java-Install). Jedes Modpack legt grob seine eigene Downloadgröße drauf, ein paar große Packs kommen schnell über 50 GB. Schau die Größe deines aktuellen Datenpfads im OS-Dateimanager an, um die Migrationsdauer einzuschätzen.",
+      "Hast du <code>gdlauncher_carbon/data</code> per Hand woanders hingekopiert (ohne den Settings-Weg), kannst du GDLauncher auf den neuen Ort zeigen lassen. Wenn du einen Pfad eingibst, der schon gültige GDLauncher-Daten enthält, wird die Migration übersprungen und GDLauncher passt nur die Config an. Praktisch für den Wechsel auf eine andere Maschine, wo eine frische Installation auf die migrierten Daten zeigen soll.",
+      "Bei Problemen zeigt das Fortschritts-Modal den Fehler. Häufige Ursachen: Nicht genug Plattenplatz am Ziel (auf dem Ziellaufwerk muss mindestens so viel freier Speicher sein wie die Quelle belegt; die Fehlermeldung nennt die fehlenden Bytes). Zugriff verweigert (auf Windows brauchen Program Files oder das Root von C:\\ Admin; auf Linux/macOS muss das Ziel in einem dir gehörenden Pfad liegen, einen User-Ordner wählen). Ziel ist read-only (manche Netzlaufwerke mounten by default schreibgeschützt; vorher außerhalb von GDLauncher prüfen, ob du dort Dateien anlegen kannst). Nach gescheiterter Migration fällt GDLauncher auf den Ursprungsort zurück und zeigt die Fehlermeldung. Für Details die Datei in <code>__gdl_logs__</code> lesen.",
+      "Nach erfolgreichem Move schreibt GDLauncher eine kleine Textdatei namens <code>runtime_path_override</code> in den <strong>App Data Path</strong> (nicht in den Runtime Path). Inhalt ist der neue Runtime Path; jeder Start liest die Datei, um zu wissen, wo die Daten liegen. Löschst du sie versehentlich, fällt der Launcher auf den Default-Ort zurück und sieht deine verschobenen Daten nicht, bis du in Settings → Runtime Path die Zielordner wieder eingibst (wird als 'schon in Benutzung' erkannt und ohne Kopie umgeschaltet).",
+      "OneDrive, iCloud, Dropbox usw. konkurrieren mit GDLauncher um File-Handles. Liegt der Runtime Path in einem Ordner, den diese Tools aktiv syncen, gibt's seltsame 'Datei in Verwendung'-Fehler und gelegentlich Save-Korruption. Pack den Runtime Path lieber auf ein Laufwerk, das nur offline gesichert wird (per Snapshots, restic, Backblaze), nicht eines, das ständig synct."
+    ]
+  },
+  fr: {
+    headings: ["Ce qui est déplacé", "Quelle taille attendre", "Si tu as déjà déplacé les données à la main", "Si la migration échoue", "Le marqueur runtime_path_override", "Ne synchronise pas le Runtime Path en jouant"],
+    paras: [
+      "Tout ce qui est dans le Runtime Path : instances (avec mods, mondes, configs), assets partagés de Minecraft, bibliothèques partagées de Minecraft, installations Java téléchargées par GDLauncher, base de données du launcher et logs globaux. Essentiellement tout le lourd que GDLauncher a créé sur ta machine. Ce qui ne bouge pas : le chemin App Data (état de fenêtre, cache Electron, config top-level). Il reste à son emplacement OS standard ; tu n'y touches jamais d'habitude.",
+      "Une install propre sans instance fait environ 1 Go (surtout les assets Minecraft et une install Java). Chaque modpack ajoute à peu près sa propre taille de téléchargement, donc quelques gros packs peuvent dépasser 50 Go. Regarde la taille de ton chemin de données actuel dans ton explorateur OS avant de migrer pour estimer la durée.",
+      "Si tu as copié <code>gdlauncher_carbon/data</code> ailleurs à la main (sans passer par les Settings), tu peux faire pointer GDLauncher sur le nouvel emplacement. Quand tu tapes un chemin contenant déjà des données GDLauncher valides, la migration est sautée, GDLauncher met juste sa config à jour. Utile pour passer sur une autre machine et y faire pointer une install fraîche sur les données migrées.",
+      "Le modal de progression affiche l'erreur si quelque chose foire en cours. Causes les plus fréquentes : pas assez d'espace disque sur la cible (la cible doit avoir au moins autant de libre que la source occupe ; le message dit combien manquent). Permission refusée (sur Windows certains dossiers comme Program Files ou la racine de C:\\ demandent l'admin ; sur Linux/macOS la cible doit être dans un chemin que tu possèdes ; choisis un dossier user-owned). Cible read-only (certains lecteurs réseau se montent en lecture seule par défaut ; vérifie d'abord que tu peux y créer des fichiers hors de GDLauncher). Après échec, GDLauncher retombe à l'emplacement original et montre l'erreur. Tu peux lire le fichier dans <code>__gdl_logs__</code> pour plus de détail si besoin.",
+      "Après un déplacement réussi, GDLauncher écrit un petit fichier texte nommé <code>runtime_path_override</code> à l'intérieur de l'<strong>App Data Path</strong> (pas du Runtime Path). Le fichier contient le nouveau Runtime Path ; chaque lancement le lit pour savoir où vivent les données. Si tu le supprimes par accident, le launcher retombe à son emplacement par défaut et ne voit pas tes données déplacées jusqu'à ce que tu repointes Settings → Runtime Path vers le dossier où tu as déplacé (il s'enregistrera comme 'déjà utilisé' et basculera dessus sans copier).",
+      "OneDrive, iCloud, Dropbox etc. se battent avec GDLauncher pour les handles de fichiers. Si le Runtime Path est dans un dossier que ces outils synchronisent activement, tu auras des erreurs étranges 'fichier en cours d'utilisation' et parfois de la corruption de sauvegarde. Mets le Runtime Path sur un disque sauvegardé hors ligne (par snapshots, restic, Backblaze), pas un qui synchronise en permanence."
+    ]
+  },
+  es: {
+    headings: ["Qué se mueve", "Qué tamaño esperar", "Si ya moviste datos a mano", "Si la migración falla", "El marcador runtime_path_override", "No sincronices el Runtime Path mientras juegas"],
+    paras: [
+      "Todo lo que hay en el Runtime Path: instancias (con sus mods, mundos, configs), assets compartidos de Minecraft, bibliotecas compartidas de Minecraft, instalaciones Java descargadas por GDLauncher, base de datos del launcher y logs globales. Esencialmente todo lo pesado que GDLauncher creó en tu máquina. Lo que no se mueve: el App Data Path (estado de ventana, caché Electron, config superior). Se queda en su ubicación OS estándar; normalmente ni la tocas.",
+      "Una instalación limpia sin instancias ocupa alrededor de 1 GB (principalmente los assets de Minecraft y una instalación Java). Cada modpack añade aproximadamente su propio tamaño de descarga, así que unos pocos packs grandes pueden superar 50 GB. Mira el tamaño de tu carpeta de datos actual en el gestor de archivos del SO antes de mover para estimar lo que tardará la migración.",
+      "Si copiaste <code>gdlauncher_carbon/data</code> a otra ubicación a mano (sin pasar por Settings), puedes hacer que GDLauncher apunte al nuevo lugar. Cuando escribes un path que ya contiene datos GDLauncher válidos, la migración se salta, GDLauncher solo actualiza su config. Útil para pasar a otra máquina y luego apuntar una instalación nueva a los datos migrados.",
+      "El modal de progreso muestra el error si algo se tuerce en plena migración. Causas más comunes: poco espacio en el destino (el disco destino necesita al menos tanto libre como ocupa el origen; el mensaje incluye los bytes que faltan). Permiso denegado (en Windows, carpetas como Program Files o la raíz de C:\\ piden admin; en Linux/macOS el destino debe estar en un path tuyo; elige una carpeta propia). Destino solo lectura (algunos discos en red se montan de solo lectura por defecto; antes comprueba que puedes crear archivos ahí fuera de GDLauncher). Tras una migración fallida, GDLauncher vuelve a la ubicación original y muestra el error. Para detalle, puedes leer el archivo en <code>__gdl_logs__</code>.",
+      "Tras un movimiento exitoso, GDLauncher escribe un pequeño archivo de texto llamado <code>runtime_path_override</code> dentro del <strong>App Data Path</strong> (no del Runtime Path). El archivo contiene el nuevo Runtime Path; cada arranque lo lee para saber dónde viven los datos. Si lo borras por accidente, el launcher cae a su ubicación por defecto y no ve tus datos movidos hasta que vayas a Settings → Runtime Path y vuelvas a apuntar a la carpeta a la que moviste (se registrará como 'ya en uso' y cambiará sin copiar).",
+      "OneDrive, iCloud, Dropbox, etc. pelean con GDLauncher por handles de archivo. Si el Runtime Path está en una carpeta que estas herramientas sincronizan activamente, tendrás errores extraños de 'archivo en uso' y a veces corrupción de save. Pon el Runtime Path en un disco que se respalde solo offline (con snapshots, restic, Backblaze), no en uno que sincroniza continuamente."
+    ]
+  },
+  "pt-BR": {
+    headings: ["O que é movido", "Que tamanho esperar", "Se você já moveu dados manualmente", "Se a migração falhar", "O marcador runtime_path_override", "Não sincronize o Runtime Path enquanto joga"],
+    paras: [
+      "Tudo dentro do Runtime Path: instâncias (com mods, mundos, configs), assets compartilhados do Minecraft, bibliotecas compartilhadas do Minecraft, instalações de Java baixadas pelo GDLauncher, banco do launcher e logs globais. Essencialmente tudo de pesado que o GDLauncher criou na sua máquina. O que não se move: o App Data Path (estado de janela, cache do Electron, config de topo). Fica no local padrão do SO; normalmente você nem mexe.",
+      "Uma instalação limpa sem instâncias ocupa cerca de 1 GB (sobretudo os assets do Minecraft e uma instalação de Java). Cada modpack adiciona mais ou menos o tamanho do próprio download, então alguns packs grandes já passam de 50 GB. Veja o tamanho do seu caminho de dados atual no gerenciador de arquivos do SO antes de mover pra estimar quanto tempo a migração leva.",
+      "Se você copiou <code>gdlauncher_carbon/data</code> pra outro local na mão (sem passar por Settings), dá pra apontar o GDLauncher pro novo local. Quando você digita um caminho que já contém dados GDLauncher válidos, a migração é pulada, o GDLauncher só atualiza a config. Útil pra mudar pra outra máquina e depois fazer uma instalação fresca apontar pros dados migrados.",
+      "O modal de progresso mostra o erro se algo der errado no meio. Causas mais comuns: pouco espaço no destino (o drive destino precisa pelo menos do mesmo livre que a origem usa; a mensagem inclui quantos bytes faltam). Permissão negada (no Windows, pastas como Program Files ou raiz de C:\\ precisam de admin; em Linux/macOS o destino tem que estar num caminho seu; escolha uma pasta do usuário). Destino somente leitura (alguns drives de rede montam read-only por padrão; antes confira se você consegue criar arquivos ali fora do GDLauncher). Após migração falhar, o GDLauncher volta pro local original e mostra a mensagem de erro. Pra detalhe, dá pra ler o arquivo em <code>__gdl_logs__</code>.",
+      "Depois de um movimento bem-sucedido, o GDLauncher escreve um pequeno arquivo de texto chamado <code>runtime_path_override</code> dentro do <strong>App Data Path</strong> (não do Runtime Path). O arquivo contém o novo Runtime Path; cada inicialização lê pra saber onde os dados vivem. Se você apagar por engano, o launcher cai pro local padrão e não vê seus dados movidos até você ir em Settings → Runtime Path e apontar de novo pra pasta pra onde você moveu (será registrado como 'já em uso' e troca sem copiar).",
+      "OneDrive, iCloud, Dropbox etc. brigam com o GDLauncher por file handles. Se o Runtime Path está numa pasta que essas ferramentas sincronizam ativamente, vai aparecer erro estranho de 'arquivo em uso' e corrupção ocasional de save. Coloque o Runtime Path num drive que é só backup offline (snapshots, restic, Backblaze), não um que sincroniza o tempo todo."
+    ]
+  },
+  it: {
+    headings: ["Cosa viene spostato", "Quale dimensione aspettarsi", "Se hai già spostato i dati a mano", "Se la migrazione fallisce", "Il marker runtime_path_override", "Non sincronizzare il Runtime Path mentre giochi"],
+    paras: [
+      "Tutto quello che sta dentro il Runtime Path: istanze (con i loro mod, mappe, config), asset condivisi di Minecraft, librerie condivise di Minecraft, installazioni Java scaricate da GDLauncher, database del launcher e log globali. In pratica tutto il grosso che GDLauncher ha creato sulla tua macchina. Cosa non si sposta: l'App Data Path (stato della finestra, cache di Electron, config di alto livello). Resta nella posizione standard del sistema, di solito non lo tocchi.",
+      "Un'installazione pulita senza istanze pesa circa 1 GB (soprattutto asset di Minecraft e un'installazione di Java). Ogni Modpack aggiunge più o meno la propria dimensione di download, quindi qualche pack grosso può superare facilmente i 50 GB. Guarda la dimensione del tuo percorso dati attuale nel file manager del sistema prima di spostare, così stimi quanto durerà la migrazione.",
+      "Se hai copiato <code>gdlauncher_carbon/data</code> altrove a mano (senza passare dalle Settings), puoi far puntare GDLauncher alla nuova posizione. Quando inserisci un percorso che contiene già dati GDLauncher validi, la migrazione viene saltata, GDLauncher aggiorna solo la sua config. Comodo per passare a un'altra macchina e poi far puntare un'installazione fresca ai dati migrati.",
+      "Il modal di progresso mostra l'errore se qualcosa va storto a metà. Cause più comuni: spazio non sufficiente sulla destinazione (il disco destinazione deve avere almeno tanto spazio libero quanto la sorgente occupa, il messaggio indica i byte mancanti). Permesso negato (su Windows cartelle come Program Files o la root di C:\\ richiedono privilegi admin, su Linux/macOS la destinazione deve stare in un percorso di cui sei proprietario, scegli una cartella utente). Destinazione in sola lettura (alcuni dischi di rete vengono montati read-only di default, prima verifica di poter creare file lì fuori da GDLauncher). Dopo una migrazione fallita GDLauncher torna alla posizione originale e mostra il messaggio di errore. Per i dettagli puoi leggere il file in <code>__gdl_logs__</code>.",
+      "Dopo uno spostamento andato a buon fine, GDLauncher scrive un piccolo file di testo chiamato <code>runtime_path_override</code> dentro l'<strong>App Data Path</strong> (non il Runtime Path). Il file contiene il nuovo Runtime Path, a ogni avvio viene letto per sapere dove vivono i dati. Se lo cancelli per sbaglio, il launcher torna alla posizione di default e non vede i tuoi dati spostati finché non vai in Settings → Runtime Path e ripunti la cartella in cui li hai spostati (verrà rilevata come 'già in uso' e si farà il passaggio senza copia).",
+      "OneDrive, iCloud, Dropbox e simili si contendono i file handle con GDLauncher. Se il Runtime Path è in una cartella che questi tool sincronizzano attivamente, ti ritrovi strani errori 'file in uso' e ogni tanto corruzione dei salvataggi. Metti il Runtime Path su un disco che viene backuppato offline (snapshot, restic, Backblaze), non su uno che sincronizza in continuazione."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT10M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

@@ -1,0 +1,38 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Switch Mod Loaders on an Existing Instance"
+  description="Change an instance from Forge to NeoForge, Fabric to Quilt, or any other combination, without recreating the instance from scratch."
+  keywords="switch mod loader, change forge to neoforge, fabric to quilt, change mod loader instance, gdlauncher edit modloader"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Open Edit Instance", text: "Right-click the instance and select Edit. The instance creation modal opens in edit mode with all current settings populated." },
+      { name: "Pick a different loader", text: "In the Modloader section, click one of the five buttons: Vanilla, Forge, NeoForge, Fabric, or Quilt. GDLauncher fetches the list of compatible loader versions for the instance's Minecraft version." },
+      { name: "Choose a loader version", text: "The version dropdown updates to show the new loader's versions. Pick one. The recommended/latest version is highlighted at the top." },
+      { name: "Save the change", text: "The Update button at the bottom activates because there's now a diff. Click it. GDLauncher installs the new loader and updates the instance metadata." },
+      { name: "Clean up old loader's mods", text: "GDLauncher doesn't clear the mods folder when you switch loaders. If you go from Forge to Fabric, the Forge mod JARs are still there and will conflict. Remove the incompatible ones manually via the Mods tab or by deleting JARs in instance/mods/." }
+    ]
+  }}
+>
+  <h2>When this works cleanly</h2>
+  <p>The cleanest case is when there are no mods installed yet. You created a Forge instance, never added a mod, want to switch to Fabric, change loader and version, done. Forge's installer is left behind on disk but doesn't interfere.</p>
+  <p>The second-cleanest case is switching between very similar loaders, Forge to NeoForge, or Fabric to Quilt. Many mods are source-compatible across those pairs, and a fair number of Forge mods just work on NeoForge.</p>
+
+  <h2>When this gets messy</h2>
+  <p>Cross-family switches (Forge → Fabric, Fabric → Forge, etc.) need the mods folder cleaned out, because Forge mods literally can't load under Fabric and vice versa. The instance will boot but every mod is silently ignored.</p>
+  <p>Modpack instances that were locked are an extra constraint: the lock blocks Addons tab changes, but the Edit modal still lets you change the loader. That's a footgun, the pack manifest expects a specific loader, switching it leaves the manifest pointing at the wrong loader. If you really want to switch on a modpack instance, open the instance's Settings tab and click <strong>Unpair</strong> in the Modpack Info section first, so the launcher stops trying to track the pack manifest.</p>
+
+  <h2>What stays, what changes</h2>
+  <p>Stays: worlds, screenshots, options.txt, your accounts, the instance name and icon, the Minecraft version. Changes: the mod loader and its version. The mods folder doesn't get touched, you need to clean it up.</p>
+
+  <h2>If the launch fails after switching</h2>
+  <p>Most common cause: old loader's mods are still in <code>instance/mods/</code>. Right-click the instance → Open Folder, go into <code>instance/mods/</code>, delete every JAR. Then add the mods you want for the new loader via the Addons tab.</p>
+  <p>Second most common: the new loader version doesn't actually exist for the Minecraft version. Some loaders skip versions (Fabric rarely does this, Forge sometimes does for older minor versions). Pick the closest available one.</p>
+
+  <h2>An alternative: clone first, switch the clone</h2>
+  <p>If you want to keep your Forge setup and try Fabric on the same Minecraft version, right-click the instance → Duplicate, then switch the loader on the duplicate. Both stay around; you can decide which to keep later.</p>
+</GuideLayout>

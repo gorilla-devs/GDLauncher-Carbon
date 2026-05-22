@@ -388,8 +388,8 @@ impl ManagerRef<'_, SettingsManager> {
     }
 
     /// Returns the per-scope cache footprint that the cleanup modal exposes:
-    /// `gdlauncher` mirrors what the "quick" wipe targets (DB files + temp/
-    /// + __gdl_logs__/); `minecraft` mirrors the "deep" wipe (assets/ +
+    /// `gdlauncher` mirrors what the GDLauncher-cache wipe targets (DB files
+    /// + temp/ + __gdl_logs__/); `minecraft` mirrors the Minecraft-cache wipe (assets/ +
     /// libraries/ + natives/). Both numbers walk their dirs once on a
     /// blocking thread, so callers should treat this as moderately
     /// expensive — the Settings row and the cleanup modal share the same
@@ -419,9 +419,9 @@ impl ManagerRef<'_, SettingsManager> {
 
     /// Two-tier cleanup. Spawns a background task that:
     ///
-    /// 1. If `quick`: clears every cache table, wipes `temp/` and
+    /// 1. If `gdlauncher`: clears every cache table, wipes `temp/` and
     ///    `__gdl_logs__/`, then VACUUMs.
-    /// 2. If `deep`: also wipes `assets/`, `libraries/`, `natives/` —
+    /// 2. If `minecraft`: also wipes `assets/`, `libraries/`, `natives/` —
     ///    these are big, re-downloaded on next launch, opt-in.
     ///
     /// Rejects with an error if another cleanup is already running. The
@@ -462,12 +462,12 @@ impl ManagerRef<'_, SettingsManager> {
         //
         // The single "work" subtask linearizes file deletes and DB
         // row deletes onto the same 0..total_units counter; the
-        // opaque VACUUM subtask (only on `quick`) is weighted at
+        // opaque VACUUM subtask (only on `gdlauncher`) is weighted at
         // 10% so the bar advances 0→90% during deletes and 90→100%
         // during VACUUM. With one subtask the bar is just
         // delete_progress, which is also fine.
         let work = Arc::new(task.subtask(Translation::CacheCleanup));
-        let vacuum_subtask = if selection.quick {
+        let vacuum_subtask = if selection.gdlauncher {
             work.set_weight(0.9);
             let s = task.subtask(Translation::CacheCleanup);
             s.set_weight(0.1);
@@ -500,11 +500,11 @@ impl ManagerRef<'_, SettingsManager> {
             // anything else. This is intentionally NOT routed through the
             // wholesale disk-wipe path: recent logs are useful for
             // debugging the previous few launches, so we keep them
-            // regardless of whether the user picked quick or deep. The
+            // regardless of which caches the user picked. The
             // op is bounded (a handful of small files) so it doesn't
             // need progress reporting.
             const LOGS_KEEP: usize = 10;
-            if selection.quick {
+            if selection.gdlauncher {
                 let logs_path = runtime_path.join("__gdl_logs__");
                 tokio::task::spawn_blocking(move || {
                     crate::logger::cleanup_old_logs(&logs_path, LOGS_KEEP)
@@ -517,10 +517,10 @@ impl ManagerRef<'_, SettingsManager> {
             // log; per-job execution is sequential so progress increments
             // monotonically rather than racing.
             let mut disk_jobs: Vec<(&'static str, PathBuf)> = Vec::new();
-            if selection.quick {
+            if selection.gdlauncher {
                 disk_jobs.push(("temp files", runtime_path.get_temp().to_path()));
             }
-            if selection.deep {
+            if selection.minecraft {
                 disk_jobs.push(("Minecraft assets", runtime_path.get_assets().to_path()));
                 disk_jobs.push((
                     "Minecraft libraries",
@@ -529,7 +529,7 @@ impl ManagerRef<'_, SettingsManager> {
                 disk_jobs.push(("native libraries", runtime_path.join("natives")));
             }
 
-            // Tables to wipe on `quick`. Listed leaf-to-root so cascade-
+            // Tables to wipe on `gdlauncher`. Listed leaf-to-root so cascade-
             // or-not behaves the same regardless of `PRAGMA foreign_keys`.
             // ModMetadata is deliberately NOT here: it backs installed
             // mods and wiping it would break instance state.
@@ -558,7 +558,7 @@ impl ManagerRef<'_, SettingsManager> {
                 disk_total = disk_total.saturating_add(count_files_blocking(path.clone()).await);
             }
             let mut db_total: u64 = 0;
-            if selection.quick {
+            if selection.gdlauncher {
                 for table in TABLES {
                     db_total =
                         db_total.saturating_add(count_table(&app.prisma_client, table).await);
@@ -590,7 +590,7 @@ impl ManagerRef<'_, SettingsManager> {
             }
 
             // ---- DB phase ----
-            if selection.quick {
+            if selection.gdlauncher {
                 // Chunk size picked to balance per-statement overhead
                 // (~1 ms parse/plan + WAL commit) against progress
                 // granularity. 200 rows ≈ 10–20 ms per chunk on heavily

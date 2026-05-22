@@ -1,0 +1,58 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Share a Minecraft Instance with a Friend"
+  description="Generate a GDLauncher share code so a friend can install the same mods, configs, and resource packs you have. Creating a share needs a GDL account with a verified email; redeeming one does not."
+  keywords="share minecraft instance, gdlauncher share code, send modpack to friend, copy mods to friend, gdl share"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Sign in to a GDL account", text: "Sharing requires a GDL account with a verified email. If you don't have one, go to Settings → Accounts and click Sign in / Sign up in the GDL Account section, then verify your email." },
+      { name: "Right-click the instance", text: "In the Library, right-click the instance you want to share and pick Share Instance (share-line icon). The Share Instance modal opens." },
+      { name: "Configure the share", text: "Optionally give it a title (shown in the recipient's preview). Expand Advanced to set expiration (1 day or 7 days) and a max-downloads cap." },
+      { name: "Upload it", text: "Click Share Instance. GDLauncher uploads a snapshot to the GDL service while showing progress, then displays a code (toggle to view as a gdl.gg/i/<code> link) you can copy." },
+      { name: "Send the code", text: "Paste the code or link to your friend on Discord, in a DM, anywhere. They open the Code Share tab in the instance creation modal on their side and paste it." }
+    ]
+  }}
+>
+  <h2>What gets included in a share</h2>
+  <p>By default, the share is a snapshot of your entire instance folder with one exception: the <code>saves</code> directory is skipped, so your worlds and player data don't travel with the share. Everything else does.</p>
+  <p>For mods, resource packs, and shader packs, GDLauncher resolves each file against the CurseForge and Modrinth caches by hash. When a file matches a public project on either platform, the share stores only the hash (no JAR redistribution) and the recipient re-downloads from the original CDN on import. Files that don't match anywhere, typically private mods, removed projects, or hand-built JARs, get bundled into the archive's <code>overrides/</code> directory so the recipient still ends up with the same setup.</p>
+  <p>Everything else in the instance folder is bundled as-is into <code>overrides/</code>. That includes <code>config/</code>, KubeJS scripts, <code>options.txt</code>, server lists, crash reports, logs, and <code>screenshots/</code>. Heads-up: if you don't want your screenshots or logs sent along, clear those folders before sharing.</p>
+  <p>If the instance is paired with a CurseForge or Modrinth modpack, the share also records that pairing so the recipient sees it as the same pack rather than a generic instance.</p>
+
+  <h2>Sharing your worlds too</h2>
+  <p>The Share Instance dialog has an <strong>Include saves</strong> toggle under <strong>Advanced</strong>. Flip it on and the <code>saves</code> directory ships with the share, so the recipient lands in the same world(s) you have. It's off by default for two reasons: most shares are "give me your modpack, I'll start fresh", and saves can be very large, which makes the upload heavy and counts against your share quota faster.</p>
+
+  <h2>Who needs a GDL account</h2>
+  <p>Only the person creating the share. A GDL account with a verified email is required to upload, because share codes are tracked server-side, attribution, quota, expiry, and the optional max-downloads cap all live against the creator's account.</p>
+  <p>The recipient does <strong>not</strong> need a GDL account. They paste the code into the Code Share tab and GDLauncher pulls the instance, no sign-in required. This matters when you're sharing with someone who hasn't set up a GDL account yet (or doesn't want one), they can still install your instance immediately.</p>
+  <p>If you'd rather skip the GDL service entirely, see <a href="/guides/export-an-instance">Export an Instance</a> instead. Export produces a local .zip file you can deliver out of band, no accounts on either side.</p>
+
+  <h2>Expiry and download limits</h2>
+  <p>Expiration defaults to 1 day. Switch to 7 days for share codes you want to remain usable for a week. After expiry, the GDL service returns a "code expired" error and your friend has to ask for a fresh one.</p>
+  <p>Max downloads caps how many times the code can be redeemed. If you set it to 1, the code dies after the first import. Useful for one-on-one sharing where you don't want the link forwarded.</p>
+
+  <h2>Importing a code (the other side)</h2>
+  <p>On the recipient's GDLauncher (no GDL account required):</p>
+  <ol>
+    <li>Open the Library page → click the <strong>+</strong> in the Library toolbar (or right-click empty space → Import Instance).</li>
+    <li>Switch to the <strong>Code Share</strong> tab.</li>
+    <li>Paste any of the following into the input:
+      <ul>
+        <li>the bare code on its own (e.g. <code>abc1234</code>),</li>
+        <li>a <code>gdl.gg/i/&lt;code&gt;</code> short link,</li>
+        <li>a <code>gdlauncher.com/instance-share/&lt;code&gt;</code> link,</li>
+        <li>or a <code>gdlauncher://share/&lt;code&gt;</code> deep link.</li>
+      </ul>
+    </li>
+    <li>GDLauncher fetches a preview from the GDL service. The preview shows the title, the mod list, and the sharer's identifier.</li>
+    <li>Confirm. The mods download fresh from their original CDNs; configs come from the share snapshot.</li>
+  </ol>
+
+  <h2>If a mod has been removed</h2>
+  <p>The share references mods by their platform IDs. If one of those mods has been removed from CurseForge or Modrinth between when you generated the share and when your friend imports it, the import for that specific mod fails. GDLauncher imports what it can and shows an error for the missing one. You can regenerate the share after replacing the missing mod, or your friend can install the rest and find the missing mod manually.</p>
+</GuideLayout>

@@ -3,17 +3,36 @@ import type { CollectionEntry } from "astro:content";
 import PageShell from "../components/PageShell.astro";
 import Breadcrumb from "../components/Breadcrumb.astro";
 import DocsSideNav from "../components/DocsSideNav.astro";
+import { breadcrumbsJsonLd, faqJsonLd } from "../lib/jsonld";
+import { getLocaleFromUrl, localizedPath, useTranslations } from "../lib/i18n";
 import "../styles/DocsStyle.css";
 
 type Props = CollectionEntry<"docs">["data"];
 
-const { title, category } = Astro.props;
+const { title, category, description, faq } = Astro.props;
+
+const locale = getLocaleFromUrl(Astro.url.pathname);
+const t = useTranslations(locale);
+
+const canonicalUrl = new URL(Astro.url.pathname, "https://gdlauncher.com").toString();
+const docsUrl = new URL(localizedPath("/docs", locale), "https://gdlauncher.com").toString();
+const homeUrl = new URL(localizedPath("/", locale), "https://gdlauncher.com").toString();
+
+const jsonLd: Record<string, unknown>[] = [
+  breadcrumbsJsonLd([
+    { name: t("breadcrumb.home"), url: homeUrl },
+    { name: t("nav.docs"), url: docsUrl },
+    { name: title, url: canonicalUrl },
+  ]),
+];
+if (faq?.length) jsonLd.push(faqJsonLd(faq));
 ---
 
 <PageShell
   title={title}
-  description={category}
+  description={description ?? category ?? title}
   particles
+  jsonLd={jsonLd}
 >
     <!-- Mobile overlay -->
     <div id="docs-overlay" class="docs-overlay lg:hidden"></div>
@@ -21,7 +40,7 @@ const { title, category } = Astro.props;
     <div class="docs-container max-w-6xl mx-auto px-4 py-8">
       <Breadcrumb
         items={[
-          { label: "Docs", href: "/docs" },
+          { label: t("nav.docs"), href: localizedPath("/docs", locale) },
           { label: title }
         ]}
         maxWidth="max-w-6xl"
@@ -50,7 +69,7 @@ const { title, category } = Astro.props;
     <button
       id="docs-menu-toggle"
       class="lg:hidden fixed bottom-6 right-6 z-50 p-4 rounded-full bg-primary-500 hover:bg-primary-400 text-lightSlate-50 shadow-lg shadow-primary-500/25 transition-all duration-200 hover:scale-105"
-      aria-label="Toggle documentation menu"
+      aria-label={t("docs.menu.toggle")}
     >
       <div class="i-hugeicons:menu-02 w-6 h-6 menu-icon"></div>
       <div class="i-hugeicons:cancel-01 w-6 h-6 close-icon hidden"></div>

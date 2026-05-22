@@ -1,0 +1,42 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Import an Instance into GDLauncher"
+  description="Import an existing Minecraft instance into GDLauncher from a CurseForge .zip, Modrinth .mrpack, GDL share code, or another launcher (MultiMC, ATLauncher, PrismLauncher, Technic, FTB, legacy GDLauncher)."
+  keywords="import minecraft instance, import modpack zip, import mrpack, modrinth pack import, curseforge zip import, multimc import, prismlauncher import, gdlauncher import"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Open the import flow", text: "Open the Library page in GDLauncher. Right-click empty space and pick Import Instance, or click the + button in the Library toolbar and switch to the Import tab. You'll see two sections: 'Import from Launcher' and 'Import from File'." },
+      { name: "Choose the source", text: "Pick a tile. Launcher sources: legacy GDLauncher, ATLauncher, FTB, MultiMC, Technic, PrismLauncher, plus the Modrinth and CurseForge apps if you have them installed. File sources: CurseForge .zip, Modrinth .mrpack, GDLauncher .gdlpack." },
+      { name: "Point at the file or launcher", text: "For files, browse to the .zip or .mrpack. For launchers, GDLauncher reads the source launcher's instance list directly. Sometimes the source launcher needs to be installed in its default location, otherwise pick the folder manually." },
+      { name: "Pick the instance to import", text: "If the source has multiple instances, you'll see a list. Tick the ones to import. Each becomes a new GDLauncher instance with its own folder." },
+      { name: "Wait for the import to finish", text: "GDLauncher copies the instance folder, resolves the mod loader, and registers it in the database. Big modpacks with hundreds of mods take a few minutes. Watch the Tasks panel for progress." }
+    ]
+  }}
+>
+  <h2>Pack file vs launcher import</h2>
+  <p>The two flows do different things. A pack file (<code>.zip</code> from CurseForge, <code>.mrpack</code> from Modrinth) is a fresh install, GDLauncher reads the manifest and downloads every referenced mod from the corresponding CDN. A launcher import copies an existing instance, including the mods already on disk, the configs, the worlds.</p>
+  <p>If you're migrating off another launcher with worlds you want to keep, use the launcher import. If you're starting fresh with a pack someone gave you, use the file import.</p>
+
+  <h2>What gets imported</h2>
+  <p>From a launcher import, GDLauncher copies the entire instance folder: mods, configs, worlds, screenshots, options.txt, resource packs, shader packs, the lot. It doesn't copy your accounts or your global launcher settings, those live in the source launcher's app data, not in instances.</p>
+  <p>From a pack file import, GDLauncher unpacks the pack's mods and bundled overrides. Worlds and screenshots are blank (the pack ships none), unless the pack author included a starter world in overrides.</p>
+
+  <h2>If the import fails</h2>
+  <p>The most common reasons:</p>
+  <ul>
+    <li><strong>A mod listed in the manifest no longer exists.</strong> Pack authors sometimes pull a version because of bugs; you'll see a "file not found" error for a specific projectID/fileID. Ask the pack author or wait for a manifest update.</li>
+    <li><strong>The source launcher's instance directory isn't where GDLauncher expects.</strong> For MultiMC, ATLauncher, etc., the instances folder is sometimes moved by the user. Pick the folder manually when prompted.</li>
+    <li><strong>The pack format is too new.</strong> Very recent CurseForge or Modrinth pack format revisions occasionally introduce a new manifest field. Update GDLauncher to the latest version.</li>
+  </ul>
+
+  <h2>Importing from a GDLauncher share code</h2>
+  <p>If a friend sent you a GDLauncher share code (or a <code>gdl.gg/i/&lt;code&gt;</code> link), open the instance creation modal and switch to the <strong>Code Share</strong> tab. Paste the code, GDLauncher fetches a preview from the GDL service, and you confirm to import. The share code flow requires a GDL account on your side.</p>
+
+  <h2>After the import</h2>
+  <p>The new instance shows in the Library with a freshly-generated icon. If it was a modpack, it'll be locked by default (Modpack Info shows in instance Settings with a Change Modpack Version button). If it was a custom instance, it's unpaired, you can edit the mod list freely from the Addons tab.</p>
+</GuideLayout>

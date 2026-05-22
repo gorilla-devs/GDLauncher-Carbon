@@ -1,13 +1,40 @@
 ---
 /**
- * AddonInstallLayout - Layout for addon installation pages
- * SEO-optimized with dynamic addon name and platform branding
+ * AddonInstallLayout - Per-addon install page.
+ *
+ * Renders substantively unique content per addon: real metadata badges
+ * (author, downloads, MC versions, supported loaders), per-loader install
+ * instructions, and an auto-generated FAQ section that's also emitted as
+ * FAQPage structured data. Goal: each page is recognizably different from
+ * its ~9k siblings so Google stops treating them as thin/duplicate.
+ *
+ * Pages with no description / no loader / no game-version data are flagged
+ * for `noindex` since they have nothing unique to show. Better to keep them
+ * out of the index than to drag the site's quality score down.
+ *
+ * Localisation: chrome (titles, labels, headings, buttons) and prose
+ * (intro paragraph, numbered install steps, before-you-install body,
+ * need-help body) all flow through t(). Strings containing inline
+ * <strong>/<code>/<a> markup are stored as HTML in the locale JSON and
+ * rendered with set:html after dynamic placeholders are HTML-escaped
+ * via interpHtml. Addon type labels ("Mod", "Shader", "Resource Pack",
+ * etc.) ship English-only in every locale to match the in-app
+ * convention.
  */
 import PageShell from "./PageShell.astro"
 import Breadcrumb from "./Breadcrumb.astro"
+import { DownloadLink } from "./DownloadLink"
+import { APP_URLS } from "../consts"
 
 import type { AddonType, Platform } from "../lib/api/types"
-import { ADDON_TYPE_LABELS, ADDON_TYPE_PLURAL } from "../lib/api/types"
+import { addonTypeLabel, addonTypePlural } from "../lib/api/types"
+import { breadcrumbsJsonLd, faqJsonLd, addonJsonLd } from "../lib/jsonld"
+import {
+  getLocaleFromUrl,
+  useTranslations,
+  getHtmlLang,
+  localizedPath,
+} from "../lib/i18n"
 
 interface Props {
   addonName: string
@@ -20,32 +47,220 @@ interface Props {
   authors?: string[] | null
   author?: string | null
   categories?: string[] | null
+  loaders?: string[] | null
+  gameVersions?: string[] | null
+  downloads?: number | null
+  license?: string | null
+  sourceUrl?: string | null
+  issuesUrl?: string | null
+  wikiUrl?: string | null
   dateModified?: string | null
 }
 
 const {
   addonName, addonSlug, addonType, platform, imageUrl, websiteUrl,
-  description, authors, author, categories, dateModified
+  description, authors, author, categories, loaders, gameVersions,
+  downloads, license, sourceUrl, issuesUrl, wikiUrl, dateModified,
 } = Astro.props
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+const intlLocale = getHtmlLang(locale)
+
+// HTML-escape user-controlled values before they land inside set:html.
+// Addon names and other props come from external APIs, so treat them as
+// untrusted even though we control the JSON shape today.
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+
+const interp = (s: string, vars: Record<string, string | number>) =>
+  Object.entries(vars).reduce(
+    (acc, [k, v]) => acc.replaceAll(`{${k}}`, String(v)),
+    s,
+  )
+
+const interpHtml = (s: string, vars: Record<string, string | number>) =>
+  Object.entries(vars).reduce(
+    (acc, [k, v]) => acc.replaceAll(`{${k}}`, escapeHtml(String(v))),
+    s,
+  )
 
 const authorDisplay = authors?.length ? authors.join(", ") : author || null
 
 function formatDate(dateStr: string): string {
   try {
-    return new Date(dateStr).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+    return new Date(dateStr).toLocaleDateString(intlLocale, { year: "numeric", month: "short", day: "numeric" })
   } catch { return dateStr }
 }
 
-const platformLabel = platform === "curseforge" ? "CurseForge" : "Modrinth"
-const typeLabel = ADDON_TYPE_LABELS[addonType]
-const typePlural = ADDON_TYPE_PLURAL[addonType]
+function formatDownloads(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  try { return n.toLocaleString(intlLocale) } catch { return n.toLocaleString("en-US") }
+}
 
-const seoTitle = `Install ${addonName} ${typeLabel} with GDLauncher`
+const platformLabel = platform === "curseforge" ? "CurseForge" : "Modrinth"
+const platformDisplayName = platform === "curseforge" ? "CurseForge" : "Modrinth"
+const typeLabel = addonTypeLabel(addonType, locale)
+const typeLabelLower = typeLabel.toLowerCase()
+const typePlural = addonTypePlural(addonType, locale)
+
+const seoTitle = interp(t("addon.title.template"), { name: addonName, type: typeLabel })
 const seoDescription = description
-  ? `${description} Install ${addonName} for Minecraft with GDLauncher.`
-  : `Download and install ${addonName} for Minecraft using GDLauncher. One-click installation from ${platformLabel}.`
-const seoKeywords = `${addonName}, minecraft ${addonType}, install ${addonName}, ${platformLabel} ${addonType}, gdlauncher`
-const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlug}`
+  ? interp(t("addon.description.with_summary"), { summary: description, name: addonName })
+  : interp(t("addon.description.template"), { name: addonName, platform: platformLabel })
+const seoKeywords = `${addonName}, minecraft ${addonType}, install ${addonName}, ${platformLabel} ${addonType}, ${(loaders ?? []).join(", ")}, gdlauncher`
+// Self-referential canonical: each locale points to its own URL so Google
+// indexes each language version separately, with hreflang declaring the
+// alternates. A shared canonical pointing to the English version would
+// collapse all 7 locales into one indexed page.
+const addonPath = `/${addonType}/${platform}/${addonSlug}`
+const canonicalUrl = new URL(localizedPath(addonPath, locale), "https://gdlauncher.com").toString()
+const typeIndexUrl = new URL(localizedPath(`/${addonType}`, locale), "https://gdlauncher.com").toString()
+const homeUrl = new URL(localizedPath("/", locale), "https://gdlauncher.com").toString()
+
+// Quality gate: if we have neither a description nor any of the unique
+// metadata fields (loaders, game versions, downloads), the page has nothing
+// to differentiate it from its siblings. Flag for noindex.
+const hasUniqueData =
+  Boolean(description) ||
+  (loaders?.length ?? 0) > 0 ||
+  (gameVersions?.length ?? 0) > 0 ||
+  (downloads ?? 0) > 0
+const shouldNoIndex = !hasUniqueData
+
+// Build the FAQ entries dynamically from the data we have. Skipping items
+// with no usable answer keeps the schema clean and avoids generic filler.
+const faqEntries: Array<{ question: string; answer: string }> = []
+faqEntries.push({
+  question: interp(t("addon.faq.q.free"), { name: addonName }),
+  answer: interp(t("addon.faq.a.free"), { name: addonName }),
+})
+if (gameVersions?.length) {
+  faqEntries.push({
+    question: interp(t("addon.faq.q.versions"), { name: addonName }),
+    answer: interp(t("addon.faq.a.versions"), { name: addonName, versions: gameVersions.join(", ") }),
+  })
+}
+if (loaders?.length === 1) {
+  faqEntries.push({
+    question: interp(t("addon.faq.q.loader"), { name: addonName }),
+    answer: interp(t("addon.faq.a.loader.single"), { name: addonName, loader: loaders[0] }),
+  })
+} else if (loaders && loaders.length > 1) {
+  faqEntries.push({
+    question: interp(t("addon.faq.q.loader"), { name: addonName }),
+    answer: interp(t("addon.faq.a.loader.multi"), { name: addonName, loaders: loaders.join(", ") }),
+  })
+} else {
+  faqEntries.push({
+    question: interp(t("addon.faq.q.loader"), { name: addonName }),
+    answer: interp(t("addon.faq.a.loader.unknown"), { name: addonName, platform: platformLabel }),
+  })
+}
+faqEntries.push({
+  question: interp(t("addon.faq.q.howinstall"), { name: addonName }),
+  answer: interp(t("addon.faq.a.howinstall"), { name: addonName, slug: addonSlug }),
+})
+if (authorDisplay) {
+  faqEntries.push({
+    question: interp(t("addon.faq.q.author"), { name: addonName }),
+    answer: interp(t("addon.faq.a.author"), {
+      name: addonName,
+      author: authorDisplay,
+      platform: platformLabel,
+      url: websiteUrl,
+    }),
+  })
+}
+
+// Pick which loaders to render install-instruction sections for. Only
+// mods/modpacks/shaders use loader-specific steps; resource packs,
+// data packs, and worlds install the same way regardless of loader.
+const showLoaderInstructions =
+  addonType === "mods" || addonType === "modpacks" || addonType === "shaders"
+const installLoaders =
+  loaders?.length && showLoaderInstructions
+    ? loaders.filter((l) => l !== "ModLoader" && l !== "Rift")
+    : []
+
+// Pre-render prose strings so the JSX stays readable.
+const heroFallbackHtml = interpHtml(t("addon.hero.fallbackDescription"), {
+  name: addonName,
+  type: typeLabelLower,
+  platform: platformLabel,
+})
+
+const installIntroHtml = interpHtml(t("addon.install.intro.body"), {
+  name: addonName,
+  loaders: installLoaders.join(", "),
+})
+
+const versionsShort = gameVersions?.slice(0, 3).join(", ") ?? ""
+const step2Key = gameVersions?.length
+  ? "addon.install.steps.loader.2.withVersions"
+  : "addon.install.steps.loader.2"
+
+const loaderStep1 = t("addon.install.steps.loader.1")
+const loaderStep3 = t("addon.install.steps.loader.3")
+const loaderStep5 = t("addon.install.steps.loader.5")
+const buildLoaderStep2 = (loader: string) =>
+  interpHtml(t(step2Key), { loader, name: addonName, versions: versionsShort })
+const loaderStep4Html = interpHtml(t("addon.install.steps.loader.4"), { slug: addonSlug, name: addonName })
+
+const genericStep1Html = interpHtml(t("addon.install.steps.generic.1"), { name: addonName })
+const genericStep2 = t("addon.install.steps.generic.2")
+const genericStep3Html = interpHtml(t("addon.install.steps.generic.3"), { slug: addonSlug, name: addonName })
+const genericStep4 = t("addon.install.steps.generic.4")
+
+const beforeYouInstallParts: string[] = [interpHtml(t("addon.beforeYouInstall.body"), { name: addonName })]
+if (gameVersions?.length) {
+  beforeYouInstallParts.push(interpHtml(t("addon.beforeYouInstall.versionsHint"), { versions: versionsShort }))
+}
+if (loaders?.length === 1) {
+  beforeYouInstallParts.push(interpHtml(t("addon.beforeYouInstall.loaderSingle"), { name: addonName, loader: loaders[0] }))
+} else if (loaders && loaders.length > 1) {
+  beforeYouInstallParts.push(interpHtml(t("addon.beforeYouInstall.loaderMulti"), { name: addonName, loaders: loaders.join(", ") }))
+}
+beforeYouInstallParts.push(t("addon.beforeYouInstall.outro"))
+const beforeYouInstallHtml = beforeYouInstallParts.join(" ")
+
+const needHelpHtml = interpHtml(t("addon.needHelp.body"), {
+  troubleshootingHref: localizedPath("/docs/troubleshooting", locale),
+  guidesHref: localizedPath("/guides", locale),
+  discordHref: APP_URLS.socials.discord,
+})
+
+const breadcrumbItems = [
+  { label: typePlural, href: localizedPath(`/${addonType}`, locale) },
+  { label: addonName }
+]
+
+const jsonLd: Record<string, unknown>[] = [
+  addonJsonLd({
+    name: addonName,
+    description: description || `${addonName}, a ${typeLabelLower} for Minecraft.`,
+    url: canonicalUrl,
+    image: imageUrl ?? undefined,
+    author: authorDisplay,
+    publisher: platformDisplayName as "CurseForge" | "Modrinth",
+    category: typeLabel,
+    downloads,
+    dateModified,
+    gameVersions,
+    license,
+  }),
+  faqJsonLd(faqEntries),
+  breadcrumbsJsonLd([
+    { name: t("breadcrumb.home"), url: homeUrl },
+    { name: typePlural, url: typeIndexUrl },
+    { name: addonName, url: canonicalUrl },
+  ]),
+]
 ---
 
 <PageShell
@@ -53,33 +268,18 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
   description={seoDescription}
   keywords={seoKeywords}
   image={imageUrl || undefined}
+  imageAlt={`${addonName} ${typeLabel}`}
   canonicalUrl={canonicalUrl}
+  noindex={shouldNoIndex}
+  jsonLd={jsonLd}
 >
-  <Fragment slot="head">
-    <!-- Structured data for SEO -->
-    <script type="application/ld+json" set:html={JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": addonName,
-      "applicationCategory": "GameApplication",
-      "operatingSystem": "Windows, macOS, Linux",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      }
-    })} />
-  </Fragment>
 
     <main class="py-8">
-      <Breadcrumb items={[
-        { label: typePlural, href: `/${addonType}` },
-        { label: addonName }
-      ]} />
+      <Breadcrumb items={breadcrumbItems} />
 
       <div class="max-w-4xl mx-auto px-4">
         <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
-        <!-- Hero section with addon image -->
+        <!-- Hero -->
         <header class="mb-10">
           <div class="flex flex-col md:flex-row gap-6 items-start">
             {imageUrl ? (
@@ -110,34 +310,76 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
                   class="w-5 h-5"
                 />
                 <span class="text-sm text-darkSlate-100">{platformLabel}</span>
+                <span class="text-darkSlate-300">·</span>
+                <span class="text-sm text-darkSlate-100">{typeLabel}</span>
               </div>
               <h1 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-3">
-                How to install "{addonName}"
+                {interp(t("addon.h1.template"), { name: addonName })}
               </h1>
               {description ? (
                 <p class="text-lg text-darkSlate-100">{description}</p>
               ) : (
-                <p class="text-lg text-darkSlate-100">
-                  Install this {typeLabel.toLowerCase()} in Minecraft using GDLauncher
-                </p>
+                <p class="text-lg text-darkSlate-100" set:html={heroFallbackHtml} />
               )}
             </div>
           </div>
         </header>
 
-        <!-- Addon metadata -->
-        {(authorDisplay || dateModified) && (
-          <div class="mb-8 grid grid-cols-2 md:grid-cols-3 gap-4">
+        <!-- Stats badges (only render the ones we actually have) -->
+        {(authorDisplay || downloads != null || dateModified || license) && (
+          <div class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
             {authorDisplay && (
               <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg">
-                <p class="text-xs text-darkSlate-300 mb-1">Author</p>
+                <p class="text-xs text-darkSlate-300 mb-1">{t("addon.meta.author")}</p>
                 <p class="text-lightSlate-50 font-semibold truncate">{authorDisplay}</p>
+              </div>
+            )}
+            {downloads != null && downloads > 0 && (
+              <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg">
+                <p class="text-xs text-darkSlate-300 mb-1">{t("addon.meta.downloads")}</p>
+                <p class="text-lightSlate-50 font-semibold">{formatDownloads(downloads)}</p>
               </div>
             )}
             {dateModified && (
               <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg">
-                <p class="text-xs text-darkSlate-300 mb-1">Last Updated</p>
+                <p class="text-xs text-darkSlate-300 mb-1">{t("addon.meta.lastUpdated")}</p>
                 <p class="text-lightSlate-50 font-semibold">{formatDate(dateModified)}</p>
+              </div>
+            )}
+            {license && (
+              <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg">
+                <p class="text-xs text-darkSlate-300 mb-1">{t("addon.meta.license")}</p>
+                <p class="text-lightSlate-50 font-semibold truncate">{license}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <!-- Compatibility matrix -->
+        {((loaders?.length ?? 0) > 0 || (gameVersions?.length ?? 0) > 0) && (
+          <div class="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {loaders && loaders.length > 0 && (
+              <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg border border-darkSlate-600">
+                <p class="text-xs text-darkSlate-300 mb-2">{t("addon.meta.loaders")}</p>
+                <div class="flex flex-wrap gap-2">
+                  {loaders.map((loader) => (
+                    <span class="px-2.5 py-1 bg-primary-500/15 text-primary-300 rounded text-sm font-medium">
+                      {loader}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {gameVersions && gameVersions.length > 0 && (
+              <div class="px-4 py-3 bg-darkSlate-700/50 rounded-lg border border-darkSlate-600">
+                <p class="text-xs text-darkSlate-300 mb-2">{t("addon.meta.mcVersions")}</p>
+                <div class="flex flex-wrap gap-2">
+                  {gameVersions.map((v) => (
+                    <span class="px-2.5 py-1 bg-darkSlate-600 text-lightSlate-100 rounded text-sm font-mono">
+                      {v}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -155,25 +397,79 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
 
         <!-- Quick Install ID -->
         <div class="mb-8 px-4 py-3 bg-darkSlate-700/50 rounded-lg border border-darkSlate-600">
-          <p class="text-xs text-darkSlate-300 mb-2">Quick Install ID</p>
+          <p class="text-xs text-darkSlate-300 mb-2">{t("addon.installId.label")}</p>
           <div class="flex items-center justify-between gap-4">
             <code class="text-primary-400 text-lg font-mono">#{addonSlug}</code>
             <button
               id="copy-slug-btn"
               class="px-3 py-1.5 bg-darkSlate-600 hover:bg-darkSlate-500 rounded text-sm font-medium transition-colors flex items-center gap-2"
               data-slug={`#${addonSlug}`}
+              data-copy-label={t("addon.copy")}
+              data-copied-label={t("addon.copied")}
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-              <span>Copy</span>
+              <span>{t("addon.copy")}</span>
             </button>
           </div>
         </div>
 
-        <!-- Installation content -->
+        <!-- Install instructions: per-loader if known, generic otherwise -->
         <article class="prose prose-invert prose-lg max-w-none">
-          <slot />
+          <h2 id="install" class="text-lightSlate-50">{interp(t("addon.install.heading"), { name: addonName })}</h2>
+
+          {installLoaders.length > 0 ? (
+            <Fragment>
+              <p set:html={installIntroHtml} />
+              {installLoaders.map((loader) => (
+                <Fragment>
+                  <h3 id={`install-${loader.toLowerCase()}`} class="text-lightSlate-50">
+                    {interp(t("addon.install.onLoader"), { loader })}
+                  </h3>
+                  <ol>
+                    <li set:html={loaderStep1} />
+                    <li set:html={buildLoaderStep2(loader)} />
+                    <li set:html={loaderStep3} />
+                    <li set:html={loaderStep4Html} />
+                    <li set:html={loaderStep5} />
+                  </ol>
+                </Fragment>
+              ))}
+            </Fragment>
+          ) : (
+            <ol>
+              <li set:html={genericStep1Html} />
+              <li set:html={genericStep2} />
+              <li set:html={genericStep3Html} />
+              <li set:html={genericStep4} />
+            </ol>
+          )}
+
+          <h2 id="before-you-install" class="text-lightSlate-50">{t("addon.beforeYouInstall.heading")}</h2>
+          <p set:html={beforeYouInstallHtml} />
+
+          <h2 id="faq" class="text-lightSlate-50">{t("addon.faq.heading")}</h2>
+          {faqEntries.map((entry) => (
+            <Fragment>
+              <h3 class="text-lightSlate-50">{entry.question}</h3>
+              <p>{entry.answer}</p>
+            </Fragment>
+          ))}
+
+          {(sourceUrl || issuesUrl || wikiUrl) && (
+            <Fragment>
+              <h2 id="links" class="text-lightSlate-50">{t("addon.projectLinks.heading")}</h2>
+              <ul>
+                {sourceUrl && <li><a href={sourceUrl} target="_blank" rel="noopener noreferrer nofollow ugc">{t("addon.projectLinks.source")}</a></li>}
+                {issuesUrl && <li><a href={issuesUrl} target="_blank" rel="noopener noreferrer nofollow ugc">{t("addon.projectLinks.issues")}</a></li>}
+                {wikiUrl && <li><a href={wikiUrl} target="_blank" rel="noopener noreferrer nofollow ugc">{t("addon.projectLinks.wiki")}</a></li>}
+              </ul>
+            </Fragment>
+          )}
+
+          <h2 id="need-help" class="text-lightSlate-50">{t("addon.needHelp.heading")}</h2>
+          <p set:html={needHelpHtml} />
         </article>
 
         <!-- CTA buttons -->
@@ -189,18 +485,15 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
             alt=""
             class="w-5 h-5"
           />
-          View on {platformLabel}
+          {interp(t("addon.viewOn"), { platform: platformLabel })}
         </a>
-        <a
-          href="/download/windows"
-          data-astro-prefetch="false"
+        <DownloadLink
+          client:idle
           class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors"
-        >
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm17 .25V22l-10-1.91V13.1l10 .15z"/>
-          </svg>
-          Download GDLauncher
-        </a>
+          iconClass="w-5 h-5"
+          label={t("addon.downloadCta")}
+          iconLeft
+        />
         </div>
         </div>
       </div>
@@ -256,6 +549,14 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
     color: rgb(var(--lightSlate-50));
     font-weight: 600;
   }
+
+  .prose code {
+    background-color: rgb(var(--darkSlate-700));
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+    font-size: 0.95em;
+  }
 </style>
 
 <script>
@@ -263,14 +564,15 @@ const canonicalUrl = `https://gdlauncher.com/${addonType}/${platform}/${addonSlu
   if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
       const slug = copyBtn.dataset.slug;
+      const copyLabel = copyBtn.dataset.copyLabel ?? 'Copy';
+      const copiedLabel = copyBtn.dataset.copiedLabel ?? 'Copied!';
       if (slug) {
         await navigator.clipboard.writeText(slug);
         const span = copyBtn.querySelector('span');
         if (span) {
-          const originalText = span.textContent;
-          span.textContent = 'Copied!';
+          span.textContent = copiedLabel;
           setTimeout(() => {
-            span.textContent = originalText;
+            span.textContent = copyLabel;
           }, 2000);
         }
       }

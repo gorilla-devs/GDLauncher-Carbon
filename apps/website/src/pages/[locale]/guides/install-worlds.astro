@@ -1,0 +1,270 @@
+---
+/**
+ * Localized "How to Install Minecraft Worlds" guide. File names + paths
+ * (level.dat, region, data, saves) stay untranslated.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft ワールドの導入方法",
+    description: "Minecraft のワールドダウンロードやアドベンチャーマップの導入方法。コミュニティ製のカスタムマップを楽しもう。",
+    steps: [
+      { name: "適切なインスタンスを選ぶ", text: "アドベンチャーマップは特定の Minecraft バージョン (場合によっては特定のリソースパック) を要求することが多いです。GDLauncher でマップが対応するバージョンに合わせたインスタンスを作成または選択しましょう。" },
+      { name: "GDLauncher でワールドを探す", text: "インスタンス内で Addons → Add Addons をクリックし、Worlds にフィルター。CurseForge にはアドベンチャーマップやショーケースの建築ワールドが大量にあります。" },
+      { name: "インスタンスにダウンロード", text: "Download をクリックすると、GDLauncher がワールドをインスタンスの saves フォルダに自動展開します。" },
+      { name: "ワールドを開く", text: "インスタンスを起動し Singleplayer をクリック。新しいワールドが一覧に出るので、選んでプレイしましょう。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 월드 설치 방법",
+    description: "Minecraft 월드 다운로드와 어드벤처 맵을 설치하는 방법. 커뮤니티가 만든 커스텀 맵을 즐겨 보세요.",
+    steps: [
+      { name: "맞는 인스턴스 선택", text: "어드벤처 맵은 보통 특정 Minecraft 버전(때로는 특정 리소스 팩)을 요구합니다. GDLauncher에서 맵이 지원한다는 버전에 맞는 인스턴스를 만들거나 고르세요." },
+      { name: "GDLauncher에서 월드 둘러보기", text: "인스턴스 안에서 Addons → Add Addons를 누르고 Worlds로 필터링하세요. CurseForge에 가장 큰 어드벤처 맵과 빌드 컬렉션이 있습니다." },
+      { name: "인스턴스로 다운로드", text: "Download를 누르면 GDLauncher가 인스턴스의 saves 폴더에 월드를 자동으로 풀어 줍니다." },
+      { name: "월드 열기", text: "인스턴스를 실행하고 Singleplayer를 클릭하면 새 월드가 목록에 나타납니다. 선택하고 플레이하세요." }
+    ]
+  },
+  de: {
+    title: "So installierst du Minecraft-Welten",
+    description: "Lerne, wie du Welt-Downloads und Adventure Maps in Minecraft installierst. Spiel Custom Maps der Community.",
+    steps: [
+      { name: "Richtige Instanz wählen", text: "Adventure Maps brauchen meist eine bestimmte Minecraft-Version (manchmal auch ein spezifisches Resource Pack). Erstell oder wähl im GDLauncher eine Instanz, die passt zu dem, was die Map angibt." },
+      { name: "Welten im GDLauncher durchsuchen", text: "In der Instanz auf Addons → Add Addons klicken und nach Worlds filtern. CurseForge hostet die größte Sammlung an Adventure Maps und Showcase-Builds." },
+      { name: "In die Instanz herunterladen", text: "Klick auf Download. GDLauncher entpackt die Welt automatisch in den saves-Ordner der Instanz." },
+      { name: "Welt öffnen", text: "Starte die Instanz, klick auf Singleplayer, und die neue Welt taucht in der Liste auf. Wähl sie aus und spiel los." }
+    ]
+  },
+  fr: {
+    title: "Comment installer des mondes Minecraft",
+    description: "Apprends à installer des world downloads et adventure maps dans Minecraft. Joue à des maps custom de la communauté.",
+    steps: [
+      { name: "Choisir la bonne instance", text: "Les adventure maps demandent souvent une version Minecraft précise (et parfois un resource pack spécifique). Crée ou choisis dans GDLauncher une instance qui correspond à ce que la map annonce." },
+      { name: "Parcourir les mondes dans GDLauncher", text: "Dans l'instance, ouvre Addons → Add Addons et filtre par Worlds. CurseForge héberge la plus grosse collection d'adventure maps et de builds vitrines." },
+      { name: "Télécharger dans l'instance", text: "Clique sur Download. GDLauncher dézippe le monde dans le dossier saves de l'instance automatiquement." },
+      { name: "Ouvrir le monde", text: "Lance l'instance, clique sur Singleplayer, et le nouveau monde apparaît dans la liste. Sélectionne-le et joue." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar mundos de Minecraft",
+    description: "Aprende a instalar descargas de mundos y mapas de aventura en Minecraft. Juega mapas personalizados de la comunidad.",
+    steps: [
+      { name: "Elegir la instancia correcta", text: "Los mapas de aventura suelen necesitar una versión específica de Minecraft (a veces un resource pack concreto). Usa GDLauncher para crear o elegir una instancia que encaje con lo que el mapa diga." },
+      { name: "Explorar mundos en GDLauncher", text: "Dentro de la instancia abre Addons → Add Addons y filtra por Worlds. CurseForge tiene la mayor colección de mapas de aventura y builds destacados." },
+      { name: "Descargar a la instancia", text: "Pulsa Download. GDLauncher descomprime el mundo en la carpeta saves de la instancia automáticamente." },
+      { name: "Abrir el mundo", text: "Lanza la instancia, haz clic en Singleplayer y el nuevo mundo aparece en la lista. Selecciónalo y juega." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar mundos do Minecraft",
+    description: "Aprenda a instalar world downloads e adventure maps no Minecraft. Jogue mapas customizados da comunidade.",
+    steps: [
+      { name: "Escolher a instância certa", text: "Adventure maps geralmente exigem uma versão específica do Minecraft (e às vezes um resource pack específico). Use o GDLauncher para criar ou escolher uma instância que combine com o que o mapa diz suportar." },
+      { name: "Procurar mundos no GDLauncher", text: "Dentro da instância, abra Addons → Add Addons e filtre por Worlds. O CurseForge hospeda a maior coleção de adventure maps e builds de vitrine." },
+      { name: "Baixar para a instância", text: "Clique em Download. O GDLauncher descompacta o mundo na pasta saves da instância automaticamente." },
+      { name: "Abrir o mundo", text: "Inicie a instância, clique em Singleplayer e o novo mundo aparece na lista. Selecione e jogue." }
+    ]
+  },
+  it: {
+    title: "Come installare le mappe di Minecraft",
+    description: "Scopri come installare mappe scaricabili e adventure map su Minecraft. Gioca creazioni della community.",
+    steps: [
+      { name: "Scegliere l'istanza giusta", text: "Le mappe avventura richiedono in genere una versione specifica di Minecraft (e a volte un Resource Pack preciso). In GDLauncher crea o seleziona un'istanza che corrisponda a quella indicata dalla mappa." },
+      { name: "Sfogliare le mappe in GDLauncher", text: "Dentro l'istanza, apri Addons → Add Addons e filtra per Worlds. CurseForge ospita la più grande collezione di adventure map e build da esposizione." },
+      { name: "Scaricare nell'istanza", text: "Clicca su Download. GDLauncher scompatta la mappa direttamente nella cartella saves dell'istanza." },
+      { name: "Aprire la mappa", text: "Avvia l'istanza, clicca su Singleplayer e la nuova mappa comparirà nella lista. Selezionala e gioca." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install minecraft world, download minecraft maps, adventure maps, minecraft world download, custom maps"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT3M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>ワールドダウンロードとは</h2>
+      <p>ワールドダウンロードは他のプレイヤーが作ったセーブファイルを自分でプレイできる仕組みです。物語やパズルのアドベンチャーマップ、アスレチック、PvP アリーナ、サバイバル島、見て楽しむ建築、複雑なレッドストーン装置など、長年にわたって共有されています。</p>
+
+      <h2>ワールドのインストール</h2>
+      <p>ワールドファイル (通常は .zip) をダウンロード。GDLauncher でインスタンスを右クリック → <strong>More options</strong> → <strong>Open folder</strong>。<code>instance</code> フォルダ内の <code>saves</code> フォルダに .zip を展開します。</p>
+      <p>展開後、ワールド名のフォルダの中に <code>level.dat</code>、<code>region</code> フォルダ、(必要に応じて) <code>data</code> フォルダがあるはず。<code>level.dat</code> がワールドフォルダ直下に置かれていることを確認してください (もう一段サブフォルダに入っているのはよくあるミスです)。</p>
+      <p>Minecraft を起動し Singleplayer をクリック。新しいワールドが一覧に出てくるはずです。</p>
+
+      <h2>バージョン互換</h2>
+      <p>古いワールドは新しい Minecraft バージョンで開けて、自動でアップグレードされます。逆方向 (新しいワールドを古いバージョンで) は問題やデータ消失の原因になります。</p>
+      <p>ワールドが対応する Minecraft バージョンを確認しましょう。1.19 と書かれているなら 1.19 以降で遊べます。1.18 で起動すると壊れる可能性があります。</p>
+
+      <h2>Mod 入りワールド</h2>
+      <p>特定の Mod を要求するワールドもあります。ダウンロードページに必要 Mod が記載されているのが普通。Mod がそろっていないと Mod ブロックは消えるか空気ブロックになります。読み込む前にすべて入れておきましょう。</p>
+
+      <h2>トラブルシューティング</h2>
+      <p>ワールドが一覧に出ない? zip を本当に展開したか、コピーしただけになっていないかを確認。<code>level.dat</code> が正しい場所にあるかも。最も多いミスは、もう一段フォルダに入った状態 (<code>WorldName/WorldName/level.dat</code> ではなく <code>WorldName/level.dat</code> が正解)。</p>
+      <p>ワールドが読み込まれない? 自分が動かしているより新しい Minecraft 用かも。あるいは持っていない Mod が必要。ファイル破損の場合は再ダウンロードを。</p>
+      <p>ブロックが欠けている? 必要な Mod が抜けています。ダウンロードページで要件を確認しましょう。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>월드 다운로드란</h2>
+      <p>월드 다운로드는 다른 플레이어가 만든 세이브 파일을 직접 플레이할 수 있게 해 주는 것입니다. 이야기와 퍼즐이 있는 어드벤처 맵, 파쿠르 챌린지, PvP 아레나, 서바이벌 섬, 둘러볼 만한 멋진 빌드, 복잡한 레드스톤 장치, 사람들이 수년간 공유해 온 콘텐츠죠.</p>
+
+      <h2>월드 설치</h2>
+      <p>월드 파일(보통 .zip)을 다운로드하세요. GDLauncher에서 인스턴스를 오른쪽 클릭 → <strong>More options</strong> → <strong>Open folder</strong>. <code>instance</code> 폴더 안의 <code>saves</code> 폴더에 .zip을 압축 해제합니다.</p>
+      <p>압축을 풀면 월드 이름의 폴더 안에 <code>level.dat</code>, <code>region</code> 폴더, 필요하면 <code>data</code> 폴더가 들어 있어야 합니다. <code>level.dat</code>이 월드 폴더 바로 안에 있어야지, 한 단계 더 깊은 하위 폴더에 들어 있으면 안 됩니다(흔한 실수).</p>
+      <p>Minecraft를 실행하고 Singleplayer를 클릭하면 새 월드가 목록에 나타날 겁니다.</p>
+
+      <h2>버전 호환</h2>
+      <p>월드는 더 새 Minecraft 버전에서 열 수 있고 자동으로 업그레이드됩니다. 반대(새 월드를 옛 버전에서)는 문제나 데이터 손실을 일으킬 수 있어요.</p>
+      <p>월드가 어떤 버전용인지 확인하세요. 1.19라고 되어 있으면 1.19 이상에서 즐길 수 있습니다. 1.18에서 열면 깨질 수 있어요.</p>
+
+      <h2>모드 적용 월드</h2>
+      <p>특정 모드를 요구하는 월드도 있습니다. 다운로드 페이지에 보통 요구 사항이 적혀 있어요. 모드가 없으면 모드 블록이 사라지거나 공기 블록으로 바뀝니다. 로드 전에 모든 모드가 설치되어 있는지 확인하세요.</p>
+
+      <h2>문제 해결</h2>
+      <p>월드가 목록에 안 나오나요? zip을 실제로 풀었는지(복사만 한 게 아닌지), <code>level.dat</code>이 올바른 위치에 있는지 확인하세요. 가장 흔한 실수는 한 단계 더 깊이 들어간 폴더에 있는 경우(<code>WorldName/WorldName/level.dat</code>이 아니라 <code>WorldName/level.dat</code>이어야 합니다).</p>
+      <p>월드가 안 열리나요? 사용 중인 Minecraft보다 새 버전용일 수 있습니다. 혹은 가지고 있지 않은 모드가 필요할 수 있고, 파일이 손상된 경우 다시 다운로드해 보세요.</p>
+      <p>블록이 누락되어 있나요? 보통 모드가 빠졌습니다. 다운로드 페이지에서 요구 사항을 확인하세요.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was Welt-Downloads sind</h2>
+      <p>Welt-Downloads sind Speicherdateien anderer Spieler, die du selbst spielen kannst. Adventure Maps mit Story und Rätseln, Parkour-Challenges, PvP-Arenen, Survival-Inseln, beeindruckende Bauwerke zum Erkunden, komplexe Redstone-Maschinen. Leute teilen sowas seit Jahren.</p>
+
+      <h2>Eine Welt installieren</h2>
+      <p>Lade die Weltdatei (meist eine .zip). Rechtsklick auf deine Instanz im GDLauncher → <strong>More options</strong> → <strong>Open folder</strong>. Geh in den <code>instance</code>-Ordner, dann <code>saves</code>, und entpack die .zip dort.</p>
+      <p>Nach dem Entpacken sollte ein Ordner mit dem Namen der Welt da sein, der <code>level.dat</code>, einen <code>region</code>-Ordner und ggf. einen <code>data</code>-Ordner enthält. Stell sicher, dass <code>level.dat</code> direkt im Welt-Ordner liegt, nicht in einem extra Unterordner verschachtelt (ein häufiger Fehler bei manchen Downloads).</p>
+      <p>Starte Minecraft, klick auf Singleplayer, und deine neue Welt sollte in der Liste sein.</p>
+
+      <h2>Versionskompatibilität</h2>
+      <p>Welten lassen sich in neueren Minecraft-Versionen öffnen und werden automatisch konvertiert. Andersrum (neuere Welt in älterer Version) kann Probleme oder Datenverlust verursachen.</p>
+      <p>Schau, für welche Version die Welt gemacht ist. Wenn da 1.19 steht, kannst du sie auf 1.19 oder neuer spielen. Auf 1.18 könnte es Probleme geben.</p>
+
+      <h2>Modded Welten</h2>
+      <p>Manche Welten brauchen bestimmte Mods. Die Download-Seite listet die Anforderungen meist auf. Ohne die richtigen Mods verschwinden modded Blöcke oder werden zu Luft. Stell sicher, dass alles installiert ist, bevor du lädst.</p>
+
+      <h2>Problembehebung</h2>
+      <p>Welt taucht nicht in der Liste auf? Stell sicher, dass du die Zip wirklich entpackt hast, nicht nur kopiert. Prüf, dass <code>level.dat</code> am richtigen Ort liegt. Häufiger Fehler: die Welt steckt in einem extra Ordner (<code>WorldName/WorldName/level.dat</code> statt <code>WorldName/level.dat</code>).</p>
+      <p>Welt lädt nicht? Vielleicht ist sie für eine neuere Minecraft-Version als deine. Oder du brauchst Mods, die du nicht hast. Versuch, neu zu laden, wenn die Datei beschädigt scheint.</p>
+      <p>Fehlende Blöcke? Wahrscheinlich braucht die Welt Mods, die du nicht installiert hast. Schau auf die Download-Seite für Anforderungen.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Ce que sont les world downloads</h2>
+      <p>Les world downloads sont des fichiers de save d'autres joueurs que tu peux jouer toi-même. Adventure maps avec histoires et énigmes, défis de parkour, arènes PvP, îles de survie, builds impressionnants à explorer, machines redstone complexes, des gens partagent ça depuis des années.</p>
+
+      <h2>Installer un monde</h2>
+      <p>Télécharge le fichier du monde (en général un .zip). Clic droit sur ton instance dans GDLauncher → <strong>More options</strong> → <strong>Open folder</strong>. Va dans le dossier <code>instance</code>, puis <code>saves</code>, et décompresse le .zip là.</p>
+      <p>Après extraction, tu devrais avoir un dossier au nom du monde contenant <code>level.dat</code>, un dossier <code>region</code> et éventuellement un dossier <code>data</code>. Vérifie que <code>level.dat</code> est directement dans le dossier du monde, pas niché dans un sous-dossier (erreur courante avec certains téléchargements).</p>
+      <p>Lance Minecraft, clique sur Singleplayer, et ton nouveau monde devrait être dans la liste.</p>
+
+      <h2>Compatibilité de version</h2>
+      <p>Les mondes s'ouvrent dans des versions plus récentes de Minecraft et seront mis à jour automatiquement. Dans l'autre sens (monde plus récent en version plus ancienne), ça peut causer des problèmes ou des pertes de données.</p>
+      <p>Vérifie pour quelle version le monde a été créé. Si c'est 1.19, tu peux le jouer en 1.19 ou plus. Le jouer en 1.18 risque de casser des trucs.</p>
+
+      <h2>Mondes moddés</h2>
+      <p>Certains mondes demandent des mods spécifiques. La page de téléchargement liste généralement les prérequis. Sans les bons mods, les blocs moddés disparaissent ou se transforment en air. Assure-toi d'avoir tout d'installé avant de charger.</p>
+
+      <h2>Dépannage</h2>
+      <p>Monde qui n'apparaît pas dans la liste ? Vérifie que tu as bien extrait le zip, pas juste copié. Vérifie que <code>level.dat</code> est au bon endroit. L'erreur la plus courante : le monde est dans un dossier supplémentaire (<code>WorldName/WorldName/level.dat</code> au lieu de <code>WorldName/level.dat</code>).</p>
+      <p>Monde qui ne charge pas ? Il vient peut-être d'une version Minecraft plus récente que la tienne. Ou il a besoin de mods que tu n'as pas. Essaie de retélécharger si le fichier semble corrompu.</p>
+      <p>Blocs manquants ? Le monde a probablement besoin de mods que tu n'as pas installés. Vérifie les prérequis sur la page de téléchargement.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Qué son las descargas de mundos</h2>
+      <p>Las descargas de mundos son archivos de partida de otros jugadores que tú puedes jugar. Mapas de aventura con historia y puzles, retos de parkour, arenas PvP, islas de supervivencia, construcciones increíbles para explorar, máquinas de redstone complejas: la gente lleva años compartiendo este tipo de cosas.</p>
+
+      <h2>Instalar un mundo</h2>
+      <p>Descarga el archivo del mundo (normalmente un .zip). Clic derecho en tu instancia en GDLauncher → <strong>More options</strong> → <strong>Open folder</strong>. Entra en la carpeta <code>instance</code>, luego en <code>saves</code> y extrae el .zip ahí.</p>
+      <p>Tras extraer, deberías tener una carpeta con el nombre del mundo que contiene <code>level.dat</code>, una carpeta <code>region</code> y posiblemente una <code>data</code>. Asegúrate de que <code>level.dat</code> esté directamente dentro de la carpeta del mundo, no anidada en otra subcarpeta (es un error frecuente con algunas descargas).</p>
+      <p>Lanza Minecraft, haz clic en Singleplayer y tu nuevo mundo debería aparecer en la lista.</p>
+
+      <h2>Compatibilidad de versión</h2>
+      <p>Los mundos se pueden abrir en versiones más nuevas de Minecraft y se actualizan automáticamente. Al revés (mundo más nuevo en versión más antigua) puede causar problemas o pérdida de datos.</p>
+      <p>Comprueba para qué versión se hizo el mundo. Si pone 1.19, lo puedes jugar en 1.19 o superior. Jugarlo en 1.18 puede romper cosas.</p>
+
+      <h2>Mundos modeados</h2>
+      <p>Algunos mundos requieren mods concretos. La página de descarga suele indicar los requisitos. Sin los mods correctos, los bloques modeados desaparecen o se convierten en aire. Asegúrate de tener todo instalado antes de cargar.</p>
+
+      <h2>Solución de problemas</h2>
+      <p>¿El mundo no aparece en la lista? Comprueba que de verdad extrajiste el zip, no que solo lo copiaste. Verifica que <code>level.dat</code> esté en el sitio correcto. El fallo más común es tener el mundo metido en una carpeta extra (<code>WorldName/WorldName/level.dat</code> en lugar de <code>WorldName/level.dat</code>).</p>
+      <p>¿El mundo no carga? Puede que sea de una versión de Minecraft más nueva que la tuya. O necesita mods que no tienes. Si parece corrupto, prueba a descargar de nuevo.</p>
+      <p>¿Bloques que faltan? Probablemente el mundo necesita mods que no tienes instalados. Revisa la página de descarga por los requisitos.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que são world downloads</h2>
+      <p>World downloads são arquivos de save de outros jogadores que você mesmo pode jogar. Adventure maps com histórias e puzzles, desafios de parkour, arenas PvP, ilhas de sobrevivência, builds incríveis pra explorar, máquinas de redstone complexas, pessoas compartilham isso há anos.</p>
+
+      <h2>Instalando um mundo</h2>
+      <p>Baixe o arquivo do mundo (geralmente um .zip). Clique direito na sua instância no GDLauncher → <strong>More options</strong> → <strong>Open folder</strong>. Entre na pasta <code>instance</code>, depois <code>saves</code>, e descompacte o .zip ali.</p>
+      <p>Depois de extrair, você deve ter uma pasta com o nome do mundo contendo <code>level.dat</code>, uma pasta <code>region</code> e possivelmente uma <code>data</code>. Confirme que o <code>level.dat</code> está diretamente dentro da pasta do mundo, não aninhado em outra subpasta (erro comum em alguns downloads).</p>
+      <p>Inicie o Minecraft, clique em Singleplayer e seu novo mundo deve aparecer na lista.</p>
+
+      <h2>Compatibilidade de versão</h2>
+      <p>Mundos podem ser abertos em versões mais novas do Minecraft e serão atualizados automaticamente. O caminho oposto (mundo mais novo em versão mais antiga) pode causar problemas ou perda de dados.</p>
+      <p>Veja para qual versão o mundo foi feito. Se diz 1.19, dá pra jogar no 1.19 ou superior. No 1.18 pode quebrar.</p>
+
+      <h2>Mundos modados</h2>
+      <p>Alguns mundos exigem mods específicos. A página de download geralmente lista os requisitos. Sem os mods certos, blocos modados somem ou viram ar. Garanta que tudo esteja instalado antes de carregar.</p>
+
+      <h2>Solução de problemas</h2>
+      <p>Mundo não aparece na lista? Confirme que você realmente extraiu o zip, não só copiou. Veja se o <code>level.dat</code> está no lugar certo. O erro mais comum é ter o mundo dentro de uma pasta extra (<code>WorldName/WorldName/level.dat</code> em vez de <code>WorldName/level.dat</code>).</p>
+      <p>Mundo não carrega? Pode ser de uma versão do Minecraft mais nova que a sua. Ou precisa de mods que você não tem. Tente baixar de novo se o arquivo parecer corrompido.</p>
+      <p>Blocos faltando? Provavelmente o mundo precisa de mods que você não tem instalados. Veja os requisitos na página de download.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cosa sono le mappe scaricabili</h2>
+      <p>Le mappe scaricabili sono file di salvataggio creati da altri giocatori che puoi giocarti tu. Adventure map con storia ed enigmi, sfide a base di parkour, arene PvP, isole di sopravvivenza, costruzioni spettacolari da esplorare, macchine redstone complesse: la community condivide questa roba da anni.</p>
+
+      <h2>Installare una mappa</h2>
+      <p>Scarica il file della mappa (di solito un .zip). Tasto destro sull'istanza in GDLauncher, <strong>More options</strong>, <strong>Open folder</strong>. Entra nella cartella <code>instance</code>, poi in <code>saves</code> ed estrai lì il .zip.</p>
+      <p>Una volta estratto, dovresti avere una cartella con il nome della mappa che contiene <code>level.dat</code>, una cartella <code>region</code> e, se necessario, una cartella <code>data</code>. Assicurati che <code>level.dat</code> sia direttamente dentro la cartella della mappa, non annidato in un'ulteriore sottocartella (è un errore frequente in alcuni download).</p>
+      <p>Avvia Minecraft, clicca su Singleplayer e la nuova mappa dovrebbe comparire nella lista.</p>
+
+      <h2>Compatibilità delle versioni</h2>
+      <p>Le mappe si possono aprire in versioni di Minecraft più recenti e vengono aggiornate automaticamente. Al contrario (mappa più nuova in una versione più vecchia) si rischiano problemi o perdita di dati.</p>
+      <p>Controlla per quale versione è stata fatta la mappa. Se dice 1.19 puoi giocarla dalla 1.19 in poi. Aprirla in 1.18 potrebbe rompere qualcosa.</p>
+
+      <h2>Mappe con Mod</h2>
+      <p>Alcune mappe richiedono Mod specifiche. La pagina di download di solito elenca i requisiti. Senza le Mod giuste, i blocchi aggiunti dalle Mod scompaiono o diventano blocchi d'aria. Assicurati di avere tutto installato prima di caricare.</p>
+
+      <h2>Risoluzione dei problemi</h2>
+      <p>La mappa non compare nella lista? Verifica di aver davvero estratto lo zip e non solo copiato. Controlla che <code>level.dat</code> sia nella posizione giusta. L'errore più comune è avere la mappa dentro a una cartella in più (<code>WorldName/WorldName/level.dat</code> invece di <code>WorldName/level.dat</code>).</p>
+      <p>La mappa non si carica? Potrebbe essere per una versione di Minecraft più recente della tua, oppure richiede Mod che non hai. Se il file sembra danneggiato, prova a riscaricarlo.</p>
+      <p>Blocchi mancanti? Probabilmente la mappa richiede Mod che non hai installato. Controlla i requisiti sulla pagina di download.</p>
+    </Fragment>
+  )}
+</GuideLayout>

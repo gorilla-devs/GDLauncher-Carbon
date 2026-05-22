@@ -12,8 +12,6 @@ interface ICachedResponse {
 const cache = new Map<Path, ICachedResponse>();
 
 export const cacheMiddleware: MiddlewareHandler = async (req, next) => {
-  console.log("[Middleware] onRequest", req.url.pathname);
-
   let ttl: number | undefined;
   // Add a `cache` method to the `req.locals` object
   // that will allow us to set the cache duration for each page.

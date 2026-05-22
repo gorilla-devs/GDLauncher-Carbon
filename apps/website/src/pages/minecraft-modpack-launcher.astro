@@ -1,0 +1,61 @@
+---
+import KeywordLandingLayout from "../components/KeywordLandingLayout.astro"
+
+const faq = [
+  {
+    question: "What's the best modpack launcher for Minecraft?",
+    answer: "GDLauncher is one of the easiest modpack launchers, it installs CurseForge and Modrinth modpacks in one click, handles Java automatically, and allocates the right amount of RAM per pack. The CurseForge App and ATLauncher are alternatives; the CurseForge App is CurseForge-only, ATLauncher has its own pack ecosystem. For most players GDLauncher is the simplest entry point."
+  },
+  {
+    question: "How do I install RLCraft, ATM10, or Better MC?",
+    answer: "Open GDLauncher and click the search bar at the top of the window, Modpacks is the default search type. Type the pack name, open the result, and click Download. GDLauncher creates a new instance and downloads every mod, the right Minecraft version, the right mod loader, and the right Java version automatically. For big packs like ATM10, increase the instance's allocated RAM to 8–12 GB in instance settings."
+  },
+  {
+    question: "How much RAM do I need for modpacks?",
+    answer: "Lightweight packs (50-100 mods) work with 4 GB. Medium packs (100-200 mods) want 6-8 GB. Heavy packs like ATM10 or Vault Hunters want 8-12 GB. GDLauncher allocates a recommended default per pack; you can override it in instance settings. See our guide on allocating more RAM for details."
+  },
+  {
+    question: "Can I install custom modpacks?",
+    answer: "Yes. GDLauncher imports CurseForge .zip and Modrinth .mrpack modpack exports, and you can build custom instances by combining individual mods through the Addons tab. Cloud Instance Sharing lets you bundle a custom setup into a single code that friends paste into their launcher to recreate it."
+  },
+  {
+    question: "Where do I find Minecraft modpacks?",
+    answer: "Inside GDLauncher's modpack browser, which searches CurseForge and Modrinth at once. You can also browse them on our site at gdlauncher.com/modpacks. CurseForge has the largest catalog (RLCraft, ATM, FTB, Vault Hunters); Modrinth has a curated, fast-growing selection."
+  }
+]
+---
+
+<KeywordLandingLayout
+  pageSlug="minecraft-modpack-launcher"
+  title="Minecraft Modpack Launcher: Install Modpacks in One Click"
+  description="Install Minecraft modpacks from CurseForge and Modrinth with one click. GDLauncher handles Java, RAM allocation, and mod loaders automatically. Free for Windows, macOS, Linux."
+  intro="A modpack is dozens of mods, configs, and resource packs bundled into one experience. A good modpack launcher installs all of that in a single click, sets up the right Java version, and gets out of your way. That's GDLauncher."
+  keywords="minecraft modpack launcher, modpack launcher, install modpacks, rlcraft launcher, atm10 launcher, better mc launcher, ftb launcher, free modpack launcher"
+  faq={faq}
+>
+  <h2>What a modpack launcher does</h2>
+  <p>A modpack is more than just a list of mods. It includes specific versions of each mod, configs that make them play nicely, custom recipes, scripted progression, sometimes resource packs and shaders. Installing one by hand means downloading every file, setting up the mod loader, allocating Java memory, and praying nothing conflicts. A modpack launcher does it all in one click.</p>
+
+  <h2>How GDLauncher installs modpacks</h2>
+  <ol>
+    <li>Open GDLauncher, click <strong>+ New Instance</strong></li>
+    <li>Open the modpack browser. Search for the pack you want. RLCraft, All The Mods 10, Better MC, FTB Skies, anything on CurseForge or Modrinth.</li>
+    <li>Click Install. GDLauncher downloads every mod, the matching Minecraft version, the correct mod loader, the right Java runtime, and applies the configs.</li>
+    <li>Wait a minute or two for downloads. Hit Play.</li>
+  </ol>
+  <p>If the pack needs more RAM than the default, bump it in instance settings → Java. <a href="/guides/allocate-more-ram">See the RAM guide</a>.</p>
+
+  <h2>Popular modpacks GDLauncher supports out of the box</h2>
+  <ul>
+    <li><strong>All The Mods 10 (ATM10)</strong>: kitchen sink with hundreds of mods, NeoForge, 8-12 GB RAM</li>
+    <li><strong>RLCraft</strong>: hardcore survival overhaul, Forge, 6-8 GB RAM</li>
+    <li><strong>Better Minecraft</strong>: vanilla-plus exploration, Forge or Fabric versions, 8 GB RAM</li>
+    <li><strong>FTB packs</strong>: the classic Feed The Beast lineup, all flavors</li>
+    <li><strong>Cobblemon</strong>: Pokémon-style modpack, Fabric, 4-6 GB RAM</li>
+    <li><strong>Create-based packs</strong>: Above and Beyond, Astral, Arcane Engineering, etc.</li>
+  </ul>
+  <p><a href="/modpacks">Browse all Minecraft modpacks</a> · <a href="/guides/install-modpack">How to install a modpack</a> · <a href="/blog/best-modpacks-2026">Best Minecraft modpacks</a></p>
+
+  <h2>What's the difference vs the CurseForge App?</h2>
+  <p>The CurseForge App is the official launcher for CurseForge content and works well there, but it doesn't browse Modrinth and doesn't include built-in server management. GDLauncher integrates both CurseForge and Modrinth in the same browser, adds Cloud Instance Sharing across both, and works natively on Windows, macOS, and Linux. <a href="/vs/curseforge-app">Full comparison →</a></p>
+</KeywordLandingLayout>

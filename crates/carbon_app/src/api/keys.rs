@@ -105,6 +105,7 @@ keys! {
         DELETE_GROUP_WITH_INSTANCES                 = "deleteGroupWithInstances";
         RENAME_GROUP                                = "renameGroup";
         DELETE_INSTANCE                             = "deleteInstance";
+        DELETE_INSTANCE_FAILED                      = "deleteInstanceFailed";
         MOVE_GROUP                                  = "moveGroup";
         MOVE_INSTANCE                               = "moveInstance";
         CREATE_FOLDER_FROM_INSTANCES                = "createFolderFromInstances";

@@ -1,0 +1,285 @@
+---
+/**
+ * Localized "How to Install Minecraft Shaders" guide. Brand names left
+ * untranslated (Iris, Sodium, OptiFine, SEUS, BSL, Complementary, Sildur's,
+ * Continuum, Forge, Fabric, Quilt, GDLauncher, CurseForge, Modrinth).
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft シェーダーの導入方法",
+    description: "美しいシェーダーパックで Minecraft の見た目を一新。GDLauncher を使ったシェーダー導入の完全ガイド。",
+    steps: [
+      { name: "シェーダーローダーを選ぶ", text: "シェーダーには Iris (Sodium と組み合わせて Fabric / Quilt で動作) か OptiFine (Forge またはスタンドアロン) のいずれかが必要。Iris の方が高速かつ現代的、OptiFine は従来の定番。GDLauncher はどちらも自動でインストールできます。" },
+      { name: "Fabric / Iris インスタンスを作成または使用", text: "まだない場合は Fabric インスタンスを作成し、Addons ブラウザから Iris + Sodium を導入。OptiFine 派ならランチャーから OptiFine をローダーとして選択できます。" },
+      { name: "シェーダーパックをブラウズ", text: "インスタンスの Addons タブで Add Addons をクリックし、Shaders にフィルター。SEUS、BSL、Complementary、Sildur's あたりが安定した入口です。" },
+      { name: "ダウンロードして適用", text: "Download をクリックすると、シェーダーが正しいフォルダに保存されます。ゲームを起動し、Video Settings → Shader Packs で先ほど入れたパックを選択。" },
+      { name: "パフォーマンス調整", text: "FPS が下がる場合は描画距離を下げる、ボリュメトリックライティングを切る、軽めのパックに切り替えるなどを試しましょう。GDLauncher のインスタンス設定から RAM を増やすことも可能です。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 셰이더 설치 방법",
+    description: "아름다운 셰이더 팩으로 Minecraft 그래픽을 완전히 바꿔 보세요. GDLauncher로 셰이더를 설치하는 완전 가이드.",
+    steps: [
+      { name: "셰이더 로더 선택", text: "셰이더는 Iris(Sodium과 함께 Fabric/Quilt에서 동작) 또는 OptiFine(Forge 또는 단독)이 필요합니다. Iris가 더 빠르고 현대적이며, OptiFine은 전통적인 기본 옵션입니다. GDLauncher가 둘 다 자동으로 설치할 수 있습니다." },
+      { name: "Fabric/Iris 인스턴스 만들거나 사용", text: "없다면 새 Fabric 인스턴스를 만들고 Addons 브라우저에서 Iris + Sodium을 설치하세요. OptiFine을 쓰려면 런처에서 OptiFine을 로더 옵션으로 직접 선택할 수 있습니다." },
+      { name: "셰이더 팩 둘러보기", text: "인스턴스의 Addons 탭에서 Add Addons를 누르고 Shaders로 필터링하세요. SEUS, BSL, Complementary, Sildur's가 안정적인 시작점입니다." },
+      { name: "다운로드하고 적용", text: "Download를 누르면 셰이더가 올바른 폴더에 저장됩니다. 게임을 실행하고 Video Settings → Shader Packs에서 방금 설치한 팩을 선택하세요." },
+      { name: "성능 튜닝", text: "FPS가 떨어진다면 렌더 거리를 낮추고, 볼류메트릭 라이팅을 끄거나, 더 가벼운 팩으로 바꾸세요. 필요하면 GDLauncher 인스턴스 설정에서 RAM을 더 할당할 수 있습니다." }
+    ]
+  },
+  de: {
+    title: "So installierst du Minecraft-Shader",
+    description: "Verwandle deine Minecraft-Optik mit beeindruckenden Shaderpacks. Komplett-Guide zum Installieren von Shadern mit GDLauncher.",
+    steps: [
+      { name: "Shader-Loader wählen", text: "Shader brauchen entweder Iris (zusammen mit Sodium, läuft auf Fabric/Quilt) oder OptiFine (Forge oder eigenständig). Iris ist schneller und moderner; OptiFine der klassische Standard. GDLauncher installiert beide automatisch." },
+      { name: "Fabric/Iris-Instanz erstellen oder öffnen", text: "Falls noch nicht vorhanden, erstelle eine neue Fabric-Instanz und installiere Iris + Sodium über den Addons-Browser. Für OptiFine bietet der Launcher OptiFine direkt als Loader-Option an." },
+      { name: "Shaderpacks durchstöbern", text: "Im Addons-Tab der Instanz auf Add Addons und nach Shaders filtern. SEUS, BSL, Complementary und Sildur's sind solide Startpunkte." },
+      { name: "Herunterladen und aktivieren", text: "Klick auf Download. Der Shader landet automatisch im richtigen Ordner. Starte das Spiel, geh in Video Settings → Shader Packs, und wähl den Shader aus, den du gerade installiert hast." },
+      { name: "Auf Performance tunen", text: "Wenn die FPS leiden: Render-Distanz senken, Volumetric Lighting deaktivieren oder zu einem leichteren Pack wechseln. In den Instanz-Einstellungen vom GDLauncher kannst du bei Bedarf den RAM erhöhen." }
+    ]
+  },
+  fr: {
+    title: "Comment installer des shaders Minecraft",
+    description: "Transforme tes graphismes Minecraft avec de superbes shader packs. Guide complet pour installer des shaders avec GDLauncher.",
+    steps: [
+      { name: "Choisir un shader loader", text: "Les shaders ont besoin soit d'Iris (couplé à Sodium, tourne sur Fabric/Quilt), soit d'OptiFine (Forge ou autonome). Iris est plus rapide et moderne ; OptiFine est l'option historique. GDLauncher installe les deux automatiquement." },
+      { name: "Créer ou ouvrir une instance Fabric/Iris", text: "Si tu n'en as pas, crée une nouvelle instance Fabric et installe Iris + Sodium via le navigateur d'Addons. Pour OptiFine, le launcher propose OptiFine directement comme option de loader." },
+      { name: "Parcourir les shader packs", text: "Dans l'onglet Addons de l'instance, clique sur Add Addons et filtre par Shaders. SEUS, BSL, Complementary et Sildur's sont de bons points de départ." },
+      { name: "Télécharger et appliquer", text: "Clique sur Download. Le shader est sauvegardé dans le bon dossier pour toi. Lance le jeu, ouvre Video Settings → Shader Packs et sélectionne celui que tu viens d'installer." },
+      { name: "Tuner pour la performance", text: "Si les FPS baissent, réduis la distance de rendu, désactive l'éclairage volumétrique ou passe à un pack plus léger. Les paramètres d'instance de GDLauncher te laissent augmenter la RAM si besoin." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar shaders de Minecraft",
+    description: "Transforma los gráficos de Minecraft con shader packs increíbles. Guía completa para instalar shaders con GDLauncher.",
+    steps: [
+      { name: "Elegir un shader loader", text: "Los shaders necesitan Iris (junto con Sodium, corre en Fabric/Quilt) u OptiFine (Forge o independiente). Iris es más rápido y moderno; OptiFine es el clásico. GDLauncher instala cualquiera automáticamente." },
+      { name: "Crear o abrir una instancia Fabric/Iris", text: "Si no tienes una, crea una nueva instancia Fabric e instala Iris + Sodium desde el navegador de Addons. Para OptiFine, el launcher ofrece OptiFine como opción de loader directamente." },
+      { name: "Explorar shader packs", text: "En la pestaña Addons de la instancia, pulsa Add Addons y filtra por Shaders. SEUS, BSL, Complementary y Sildur's son puntos de partida sólidos." },
+      { name: "Descargar y aplicar", text: "Haz clic en Download. El shader se guarda en la carpeta correcta. Lanza el juego, abre Video Settings → Shader Packs y elige el que acabas de instalar." },
+      { name: "Ajustar para rendimiento", text: "Si los FPS sufren, baja la distancia de renderizado, desactiva la iluminación volumétrica o cambia a un pack más ligero. Los ajustes de instancia de GDLauncher te dejan subir la RAM si hace falta." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar shaders do Minecraft",
+    description: "Transforme os gráficos do Minecraft com shader packs incríveis. Guia completo para instalar shaders com o GDLauncher.",
+    steps: [
+      { name: "Escolher um shader loader", text: "Shaders precisam de Iris (junto com Sodium, roda em Fabric/Quilt) ou OptiFine (Forge ou independente). O Iris é mais rápido e moderno; o OptiFine é o padrão clássico. O GDLauncher instala qualquer um automaticamente." },
+      { name: "Criar ou abrir uma instância Fabric/Iris", text: "Se ainda não tem, crie uma nova instância Fabric e instale Iris + Sodium pelo navegador de Addons. Para OptiFine, o launcher oferece OptiFine como opção de loader direto." },
+      { name: "Procurar shader packs", text: "Na aba Addons da instância, clique em Add Addons e filtre por Shaders. SEUS, BSL, Complementary e Sildur's são bons pontos de partida." },
+      { name: "Baixar e aplicar", text: "Clique em Download. O shader é salvo na pasta certa pra você. Inicie o jogo, vá em Video Settings → Shader Packs e escolha o que acabou de instalar." },
+      { name: "Ajustar para performance", text: "Se o FPS sofrer, diminua a distância de renderização, desligue a iluminação volumétrica ou troque por um pack mais leve. Nas configurações da instância no GDLauncher dá pra aumentar a RAM se precisar." }
+    ]
+  },
+  it: {
+    title: "Come installare Shader di Minecraft",
+    description: "Trasforma la grafica di Minecraft con Shader Pack spettacolari. Guida completa per installare Shader con GDLauncher.",
+    steps: [
+      { name: "Scegliere uno Shader loader", text: "Le Shader richiedono Iris (insieme a Sodium, gira su Fabric/Quilt) oppure OptiFine (Forge o autonomo). Iris è più veloce e moderno, OptiFine è la scelta tradizionale. GDLauncher installa entrambi automaticamente." },
+      { name: "Creare o aprire un'istanza Fabric/Iris", text: "Se non ne hai una, crea una nuova istanza Fabric e installa Iris + Sodium dal browser degli Addons. Per OptiFine il launcher offre OptiFine direttamente come opzione di loader." },
+      { name: "Sfogliare gli Shader Pack", text: "Nella scheda Addons dell'istanza, clicca su Add Addons e filtra per Shaders. SEUS, BSL, Complementary e Sildur's sono ottimi punti di partenza." },
+      { name: "Scaricare e applicare", text: "Clicca su Download. La Shader viene salvata nella cartella corretta automaticamente. Avvia il gioco, vai in Video Settings → Shader Packs e seleziona quello appena installato." },
+      { name: "Ottimizzare per le prestazioni", text: "Se gli FPS soffrono, riduci la distanza di rendering, disattiva l'illuminazione volumetrica o passa a un pack più leggero. Dalle impostazioni dell'istanza di GDLauncher puoi anche aumentare la RAM se serve." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install shaders minecraft, minecraft shaders, how to install shaders, shader pack, iris shaders, optifine shaders, gdlauncher shaders"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT4M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>シェーダーで何ができる?</h2>
+      <p>シェーダーは Minecraft の見た目を一変させます。太陽の動きに追従するダイナミックシャドウ、本物のような反射の水面、木々の隙間から差す光線、より美しい雲や霧。"ブロックゲーム" が "結構きれい" に変わるレベルの違いです。</p>
+      <p>注意点はシェーダーが GPU を要求すること。中堅クラスの専用 GPU ならほとんどのシェーダーは余裕で動きます。SEUS PTGI のような重いパックはさらにスペックが必要。バニラの Minecraft でもギリギリな PC では、シェーダーは正直難しいです。</p>
+
+      <h2>Iris (推奨アプローチ)</h2>
+      <p>Iris は Fabric 用の現代的なシェーダー Mod で、Sodium と一緒に使えるため、見栄えと性能の両方を確保できます。今では多くのプレイヤーがこちらを使っています。</p>
+      <p>Mod ローダーに Fabric を選んでインスタンスを作成。インスタンスを開き、<strong>Addons</strong> タブから <strong>Add Addons</strong> をクリック。Iris Shaders を検索してダウンロード (Sodium も同梱されることが多い)。次に検索バー左のドロップダウンで <strong>Shaders</strong> を選び、好きなシェーダーパックを見つけて <strong>Download</strong>。</p>
+      <p>ゲーム内では Options → Video Settings → Shader Packs で選択して適用すれば完了。</p>
+
+      <h2>OptiFine (従来の方法)</h2>
+      <p>OptiFine は古くからある方法で、主に Forge ユーザー向け。<a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a> から自分の Minecraft バージョン用をダウンロードし、.jar をインスタンスの mods フォルダに入れて起動。シェーダーは Video Settings → Shaders から指定できます。</p>
+      <p>注意: OptiFine は多くの Mod と競合します。Modpack を遊ぶ場合は、シェーダー対応がすでに含まれているか、推奨される方法があるかをまず確認しましょう。</p>
+
+      <h2>おすすめのシェーダー</h2>
+      <p>Complementary Reimagined は見た目と動作のバランスが優秀。BSL と Sildur's Vibrant は設定項目が豊富な定番。性能控えめな PC なら Complementary の Potato プリセットや Sildur's Enhanced Default を試してみてください。</p>
+      <p>ハイエンド GPU なら? SEUS PTGI はパストレース GI 搭載 (圧倒的な見栄えと負荷)。Continuum はフォトリアル路線。これらは本気のスペックが必要。</p>
+
+      <h2>パフォーマンスのコツ</h2>
+      <p>多くのシェーダーには品質プリセットがあります。Medium か Low から始めて徐々に上げるのが基本。シェーダー使用時は描画距離も大きく影響するので、32 ではなく 8〜12 チャンクを試しましょう。負荷が高いのはボリュメトリックライティング (光線) と影, きつい場合はまずここを切ります。</p>
+      <p>シェーダーパックがそもそも読み込まれない場合は、お使いのシェーダー Mod に対応しているか確認を。Iris 専用、OptiFine 専用、両対応など色々あります。シェーダー Mod 自体も最新版にアップデートしておきましょう。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>셰이더가 하는 일</h2>
+      <p>셰이더는 Minecraft의 외형을 완전히 바꿉니다. 태양을 따라 움직이는 동적 그림자, 실제로 반사되는 물, 나무 사이를 비추는 광선, 더 좋은 구름과 안개. "블록 게임"과 "와, 진짜 예쁘다" 사이의 차이입니다.</p>
+      <p>다만 셰이더는 GPU를 많이 씁니다. 중급 전용 GPU면 대부분의 셰이더가 잘 돌아갑니다. SEUS PTGI 같은 무거운 팩은 더 강력한 게 필요합니다. 바닐라 Minecraft도 버거운 PC라면 셰이더는 좀 힘들 수 있습니다.</p>
+
+      <h2>Iris (권장 방식)</h2>
+      <p>Iris는 Fabric용 현대적 셰이더 모드로 Sodium과 함께 작동해서 좋은 그래픽과 좋은 성능을 모두 얻을 수 있습니다. 요즘 가장 많이 쓰이는 방식입니다.</p>
+      <p>모드 로더로 Fabric을 선택해 인스턴스를 만드세요. 인스턴스를 열고 <strong>Addons</strong> 탭에서 <strong>Add Addons</strong>를 누른 다음 Iris Shaders를 검색해 다운로드(Sodium은 보통 함께 묶여 옵니다). 검색창 왼쪽 드롭다운에서 <strong>Shaders</strong>를 선택해 원하는 셰이더 팩을 찾아 <strong>Download</strong>를 누르세요.</p>
+      <p>게임 안에서 Options → Video Settings → Shader Packs로 가서 셰이더를 선택해 적용하면 끝.</p>
+
+      <h2>OptiFine (전통적인 방법)</h2>
+      <p>OptiFine은 오래된 방식으로 주로 Forge 유저들이 씁니다. <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a>에서 자신의 Minecraft 버전용 OptiFine을 받아 인스턴스의 mods 폴더에 .jar를 넣고 실행하세요. 셰이더는 Video Settings → Shaders에서 설정합니다.</p>
+      <p>참고로 OptiFine은 많은 모드와 충돌합니다. 모드팩을 플레이 중이라면 이미 셰이더 지원이 있는지 또는 추천 방식이 무엇인지 먼저 확인하세요.</p>
+
+      <h2>셰이더 추천</h2>
+      <p>Complementary Reimagined은 외관과 성능의 균형이 좋습니다. BSL과 Sildur's Vibrant는 설정 옵션이 많은 클래식. 사양이 낮은 하드웨어라면 Complementary의 Potato 프리셋이나 Sildur's Enhanced Default를 시도해 보세요.</p>
+      <p>고사양 GPU? SEUS PTGI는 패스 트레이스 글로벌 일루미네이션이 들어 있습니다(굉장히 예쁘고 무겁습니다). Continuum은 사실주의 노선. 이런 건 진짜 좋은 하드웨어가 필요합니다.</p>
+
+      <h2>성능 팁</h2>
+      <p>대부분의 셰이더에는 품질 프리셋이 있습니다. Medium이나 Low부터 시작해서 올리세요. 셰이더 사용 시에는 렌더 거리가 큰 영향을 줍니다. 32 대신 8~12 청크를 시도해 보세요. 가장 무거운 기능은 볼류메트릭 라이팅(광선)과 그림자입니다, 버거우면 먼저 이걸 끄세요.</p>
+      <p>셰이더 팩이 아예 안 불러와진다면 사용 중인 셰이더 모드와 호환되는지 확인하세요. Iris 전용, OptiFine 전용, 양쪽 호환 등 다양합니다. 셰이더 모드 자체도 최신 버전으로 업데이트하세요.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was Shader machen</h2>
+      <p>Shader ändern komplett, wie Minecraft aussieht. Dynamische Schatten, die der Sonne folgen, Wasser mit echten Reflexionen, Lichtstrahlen durch Bäume, bessere Wolken und Nebel. Es ist der Unterschied zwischen "klotziges Spiel" und "Moment, das ist echt hübsch".</p>
+      <p>Der Haken: Shader brauchen GPU-Power. Eine Mittelklasse-Grafikkarte schafft die meisten Shader. Schwere Packs wie SEUS PTGI brauchen mehr. Wenn dein Rechner schon mit Vanilla-Minecraft kämpft, sind Shader wahrscheinlich nichts für dich.</p>
+
+      <h2>Iris (der empfohlene Weg)</h2>
+      <p>Iris ist ein moderner Shader-Mod für Fabric, der mit Sodium funktioniert, du bekommst also schöne Grafik und gute Performance gleichzeitig. So machen es heute die meisten.</p>
+      <p>Erstell eine Instanz mit Fabric als Mod-Loader. Öffne sie, geh in den <strong>Addons</strong>-Tab und klick auf <strong>Add Addons</strong>. Such nach Iris Shaders und lade es herunter (Sodium kommt meist gleich mit). Wähl dann <strong>Shaders</strong> aus dem Dropdown links neben der Suchleiste, such dir ein Shaderpack und klick <strong>Download</strong>.</p>
+      <p>Im Spiel geh in Options → Video Settings → Shader Packs, wähl deinen Shader und übernimm. Fertig.</p>
+
+      <h2>OptiFine (der klassische Weg)</h2>
+      <p>OptiFine ist die ältere Methode, hauptsächlich für Forge-Nutzer. Lade OptiFine für deine Minecraft-Version von <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a>, leg die .jar in den mods-Ordner deiner Instanz und start das Spiel. Shader gehen unter Video Settings → Shaders.</p>
+      <p>Beachte: OptiFine kollidiert mit vielen Mods. Wenn du ein Modpack spielst, prüf, ob es schon Shader-Unterstützung hat oder eine bestimmte Methode empfiehlt.</p>
+
+      <h2>Shader-Empfehlungen</h2>
+      <p>Complementary Reimagined trifft eine gute Balance zwischen Optik und Performance. BSL und Sildur's Vibrant sind solide Klassiker mit vielen Einstellungen. Auf älterer Hardware probier Complementarys "Potato"-Preset oder Sildur's Enhanced Default.</p>
+      <p>High-End-GPU? SEUS PTGI bringt path-traced Global Illumination (umwerfend und sehr fordernd). Continuum geht in Richtung Photorealismus. Solche brauchen ernsthafte Hardware.</p>
+
+      <h2>Performance-Tipps</h2>
+      <p>Die meisten Shader haben Qualitäts-Presets. Fang mit Medium oder Low an und arbeite dich hoch. Render-Distanz wirkt sich mit Shadern stark aus, also probier 8–12 Chunks statt 32. Volumetric Lighting (Lichtkegel) und Schatten sind die teuersten Features zum Abschalten, wenn's hakt.</p>
+      <p>Wenn ein Shaderpack gar nicht lädt, prüf, ob er mit deinem Shader-Mod kompatibel ist. Manche laufen nur auf Iris, manche nur auf OptiFine, manche auf beidem. Update deinen Shader-Mod auf die aktuellste Version.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Ce que font les shaders</h2>
+      <p>Les shaders changent complètement le rendu de Minecraft. Ombres dynamiques qui suivent le soleil, eau avec de vraies réflexions, rayons de lumière entre les arbres, meilleurs nuages et brouillard. C'est la différence entre "jeu de blocs" et "attends, c'est vraiment joli".</p>
+      <p>Le hic, c'est que les shaders demandent du GPU. Une carte dédiée milieu de gamme gère la plupart des shaders sans souci. Les packs lourds comme SEUS PTGI veulent plus costaud. Si ton PC galère déjà sur Minecraft vanilla, les shaders ne sont sans doute pas pour toi.</p>
+
+      <h2>Iris (la voie recommandée)</h2>
+      <p>Iris est un mod de shaders moderne pour Fabric qui fonctionne avec Sodium, donc tu as à la fois de jolis graphismes et de bonnes perfs. C'est ce que la plupart des gens utilisent aujourd'hui.</p>
+      <p>Crée une instance avec Fabric comme mod loader. Ouvre l'instance, va dans <strong>Addons</strong> et clique sur <strong>Add Addons</strong>. Cherche Iris Shaders et télécharge (Sodium arrive souvent dans le bundle). Puis sélectionne <strong>Shaders</strong> dans le menu déroulant à gauche de la barre de recherche, trouve un shader pack qui te plaît et clique sur <strong>Download</strong>.</p>
+      <p>Dans le jeu, va dans Options → Video Settings → Shader Packs, sélectionne ton shader et applique. Voilà.</p>
+
+      <h2>OptiFine (la méthode classique)</h2>
+      <p>OptiFine est l'ancienne méthode, surtout pour les utilisateurs Forge. Télécharge OptiFine pour ta version de Minecraft sur <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a>, dépose le .jar dans le dossier mods de ton instance, et lance le jeu. Les shaders se mettent dans Video Settings → Shaders.</p>
+      <p>Note qu'OptiFine est en conflit avec pas mal de mods. Si tu joues à un modpack, regarde s'il a déjà un support shader ou s'il recommande une méthode spécifique.</p>
+
+      <h2>Shaders recommandés</h2>
+      <p>Complementary Reimagined trouve un bon équilibre entre look et perfs. BSL et Sildur's Vibrant sont des classiques solides avec plein de réglages. Pour du matos plus ancien, essaie le preset Potato de Complementary ou Sildur's Enhanced Default.</p>
+      <p>GPU haut de gamme ? SEUS PTGI a de la path-traced global illumination (magnifique et gourmand). Continuum vise le photoréalisme. Ces shaders demandent du gros matos.</p>
+
+      <h2>Conseils performance</h2>
+      <p>La plupart des shaders ont des presets de qualité. Commence en Medium ou Low et monte. La distance de rendu pèse beaucoup avec des shaders : essaie 8–12 chunks au lieu de 32. L'éclairage volumétrique (rayons de lumière) et les ombres sont les features les plus lourdes à désactiver si tu galères.</p>
+      <p>Si un shader pack ne charge pas du tout, vérifie qu'il est compatible avec ton mod shader. Certains marchent seulement avec Iris, d'autres seulement avec OptiFine, certains avec les deux. Mets à jour ton mod shader à la dernière version.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Qué hacen los shaders</h2>
+      <p>Los shaders cambian por completo el aspecto de Minecraft. Sombras dinámicas que siguen al sol, agua con reflejos reales, rayos de luz entre los árboles, mejores nubes y niebla. Es la diferencia entre "juego de bloques" y "espera, esto es realmente bonito".</p>
+      <p>El truco es que los shaders piden GPU. Una gráfica dedicada de gama media maneja la mayoría sin problema. Packs pesados como SEUS PTGI necesitan algo más potente. Si tu equipo ya sufre con Minecraft vanilla, los shaders probablemente no sean lo tuyo.</p>
+
+      <h2>Iris (el enfoque recomendado)</h2>
+      <p>Iris es un mod de shaders moderno para Fabric que funciona con Sodium, así que consigues buenos gráficos y buen rendimiento a la vez. Es lo que usa la mayoría hoy en día.</p>
+      <p>Crea una instancia con Fabric como mod loader. Abre la instancia, ve a la pestaña <strong>Addons</strong> y pulsa <strong>Add Addons</strong>. Busca Iris Shaders y descárgalo (Sodium suele venir incluido). Después selecciona <strong>Shaders</strong> en el desplegable a la izquierda de la barra de búsqueda, encuentra un shader pack que te guste y pulsa <strong>Download</strong>.</p>
+      <p>En el juego, ve a Options → Video Settings → Shader Packs, selecciona tu shader y aplica. Listo.</p>
+
+      <h2>OptiFine (el método clásico)</h2>
+      <p>OptiFine es el método más antiguo, sobre todo para usuarios de Forge. Descarga OptiFine para tu versión de Minecraft desde <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a>, deja el .jar en la carpeta mods de tu instancia y arranca el juego. Los shaders se ponen en Video Settings → Shaders.</p>
+      <p>Ten en cuenta que OptiFine entra en conflicto con muchos mods. Si juegas un modpack, revisa si ya soporta shaders o recomienda algún método.</p>
+
+      <h2>Shaders recomendados</h2>
+      <p>Complementary Reimagined da un buen equilibrio entre look y rendimiento. BSL y Sildur's Vibrant son clásicos sólidos con muchos ajustes. En hardware más antiguo, prueba el preset Potato de Complementary o Sildur's Enhanced Default.</p>
+      <p>¿GPU de gama alta? SEUS PTGI tiene iluminación global con path tracing (es precioso y exigente). Continuum apunta al fotorrealismo. Estos necesitan hardware serio.</p>
+
+      <h2>Consejos de rendimiento</h2>
+      <p>La mayoría de shaders tienen presets de calidad. Empieza en Medium o Low y sube. La distancia de renderizado importa mucho con shaders, así que prueba 8–12 chunks en lugar de 32. La iluminación volumétrica (rayos de luz) y las sombras son las más pesadas para desactivar si vas justo.</p>
+      <p>Si un shader pack ni siquiera carga, asegúrate de que sea compatible con tu mod shader. Algunos solo funcionan con Iris, otros solo con OptiFine, algunos con ambos. Actualiza tu mod shader a la última versión.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que os shaders fazem</h2>
+      <p>Shaders mudam completamente como o Minecraft parece. Sombras dinâmicas que seguem o sol, água com reflexos de verdade, raios de luz entre as árvores, nuvens e neblina melhores. É a diferença entre "jogo de bloquinhos" e "peraí, isso aqui é bonito de verdade".</p>
+      <p>A pegadinha é que shaders pedem GPU. Uma placa dedicada intermediária roda a maioria dos shaders bem. Packs pesados como SEUS PTGI precisam de algo mais potente. Se seu PC já sofre com o Minecraft vanilla, shaders provavelmente não são pra você.</p>
+
+      <h2>Iris (abordagem recomendada)</h2>
+      <p>O Iris é um mod de shaders moderno para Fabric que funciona com o Sodium, então você tem gráficos legais e boa performance ao mesmo tempo. É o que a maior parte das pessoas usa hoje.</p>
+      <p>Crie uma instância com Fabric como mod loader. Abra a instância, vá na aba <strong>Addons</strong> e clique em <strong>Add Addons</strong>. Procure por Iris Shaders e baixe (o Sodium geralmente vem junto). Depois selecione <strong>Shaders</strong> no dropdown à esquerda da barra de busca, ache um shader pack que goste e clique em <strong>Download</strong>.</p>
+      <p>No jogo, vá em Options → Video Settings → Shader Packs, selecione seu shader e aplique. Pronto.</p>
+
+      <h2>OptiFine (jeito clássico)</h2>
+      <p>O OptiFine é o método antigo, principalmente para quem usa Forge. Baixe o OptiFine para sua versão do Minecraft em <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a>, jogue o .jar na pasta mods da sua instância e inicie o jogo. Os shaders ficam em Video Settings → Shaders.</p>
+      <p>Lembre que o OptiFine conflita com muitos mods. Se você joga modpack, veja se ele já tem suporte a shaders ou recomenda alguma abordagem específica.</p>
+
+      <h2>Shaders recomendados</h2>
+      <p>Complementary Reimagined acerta um bom equilíbrio entre visual e desempenho. BSL e Sildur's Vibrant são clássicos sólidos com muitas opções. Em hardware mais antigo, tente o preset Potato do Complementary ou o Sildur's Enhanced Default.</p>
+      <p>GPU top? SEUS PTGI tem path-traced global illumination (lindo e pesado). Continuum vai pra fotorrealismo. Esses precisam de máquina parruda.</p>
+
+      <h2>Dicas de performance</h2>
+      <p>A maioria dos shaders tem presets de qualidade. Comece em Medium ou Low e suba. A render distance pesa bastante com shaders, então tente 8–12 chunks em vez de 32. Iluminação volumétrica (raios de luz) e sombras são as mais pesadas pra desligar se estiver apertado.</p>
+      <p>Se um shader pack nem carrega, confira se ele é compatível com seu mod de shader. Alguns só funcionam com Iris, outros só com OptiFine, alguns com os dois. Atualize seu mod de shader para a versão mais recente.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cosa fanno le Shader</h2>
+      <p>Le Shader cambiano completamente l'aspetto di Minecraft. Ombre dinamiche che seguono il sole, acqua con riflessi veri, raggi di luce tra gli alberi, nuvole e nebbia migliori. È la differenza tra "gioco di cubetti" e "aspetta, è davvero bello".</p>
+      <p>Il rovescio della medaglia è che le Shader chiedono GPU. Una scheda dedicata di fascia media gestisce la maggior parte delle Shader senza problemi. Pack pesanti come SEUS PTGI vogliono qualcosa di più tosto. Se il tuo PC fatica già con Minecraft Vanilla, le Shader probabilmente non fanno per te.</p>
+
+      <h2>Iris (l'approccio consigliato)</h2>
+      <p>Iris è un Mod di Shader moderno per Fabric che funziona insieme a Sodium, così ottieni grafica bella e buone prestazioni allo stesso tempo. Oggi è quello che usa la maggior parte delle persone.</p>
+      <p>Crea un'istanza con Fabric come Mod loader. Aprila, vai nella scheda <strong>Addons</strong> e clicca su <strong>Add Addons</strong>. Cerca Iris Shaders e scaricalo (Sodium di solito viene incluso). Poi seleziona <strong>Shaders</strong> dal menu a tendina a sinistra della barra di ricerca, trova uno Shader Pack che ti piace e clicca su <strong>Download</strong>.</p>
+      <p>Nel gioco vai in Options → Video Settings → Shader Packs, seleziona il tuo Shader e applica. Fatto.</p>
+
+      <h2>OptiFine (il metodo classico)</h2>
+      <p>OptiFine è il metodo più vecchio, soprattutto per gli utenti Forge. Scarica OptiFine per la tua versione di Minecraft da <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a>, metti il .jar nella cartella mods della tua istanza e avvia il gioco. Gli Shader si impostano da Video Settings → Shaders.</p>
+      <p>Tieni presente che OptiFine va in conflitto con molti Mod. Se stai giocando un Modpack, controlla se ha già il supporto agli Shader o se consiglia un metodo specifico.</p>
+
+      <h2>Shader consigliati</h2>
+      <p>Complementary Reimagined trova un buon equilibrio tra estetica e prestazioni. BSL e Sildur's Vibrant sono classici solidi con tantissime opzioni. Su hardware più datato, prova il preset Potato di Complementary o Sildur's Enhanced Default.</p>
+      <p>Hai una GPU di fascia alta? SEUS PTGI offre global illumination con path tracing (stupendo e impegnativo). Continuum punta al fotorealismo. Questi richiedono hardware serio.</p>
+
+      <h2>Consigli sulle prestazioni</h2>
+      <p>La maggior parte degli Shader ha dei preset di qualità. Parti da Medium o Low e sali. Con gli Shader la distanza di rendering pesa parecchio, prova 8–12 chunk invece di 32. Illuminazione volumetrica (raggi di luce) e ombre sono le funzioni più costose: se sei al limite, sono le prime da disattivare.</p>
+      <p>Se uno Shader Pack non si carica proprio, verifica che sia compatibile col tuo Mod Shader. Alcuni funzionano solo con Iris, altri solo con OptiFine, altri ancora con entrambi. Aggiorna sempre il Mod Shader all'ultima versione.</p>
+    </Fragment>
+  )}
+</GuideLayout>

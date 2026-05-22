@@ -3,6 +3,10 @@
  * FeaturesShowcase - Alternating feature sections with images
  * Each feature has an image on one side and description on the other
  */
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
 
 const brandColors: Record<string, string> = {
   "CurseForge": "#F16436",
@@ -12,46 +16,30 @@ const brandColors: Record<string, string> = {
 const features = [
   {
     id: "one-click-install",
-    title: "One-Click Modpack Install",
-    description: "Pick a modpack from CurseForge or Modrinth and click install. GDLauncher downloads everything, sets up the mod loader, and configures Java. You just hit play.",
-    bullets: [
-      "Search both platforms at once",
-      "Dependencies handled automatically",
-      "Downloads in parallel for speed"
-    ],
+    titleKey: "features.oneClick.title",
+    descKey: "features.oneClick.desc",
+    bulletKeys: ["features.oneClick.b1", "features.oneClick.b2", "features.oneClick.b3"],
     video: "https://cdn.gdl.gg/assets/one_click_install.h264.mp4"
   },
   {
     id: "instance-sharing",
-    title: "Instance Sharing",
-    description: "Got your instance set up perfectly? Share it with friends using a code. They paste the code, GDLauncher recreates your exact setup, and everyone's playing the same thing.",
-    bullets: [
-      "Works with custom configs and mod tweaks",
-      "One code, one click",
-      "No manual file sharing"
-    ],
+    titleKey: "features.sharing.title",
+    descKey: "features.sharing.desc",
+    bulletKeys: ["features.sharing.b1", "features.sharing.b2", "features.sharing.b3"],
     video: "https://cdn.gdl.gg/assets/instance_sharing.h264.mp4"
   },
   {
     id: "multi-instance",
-    title: "As Many Instances as You Want",
-    description: "Play different modpacks, different Minecraft versions, different mods. Each instance is separate. Organize them in groups.",
-    bullets: [
-      "Group instances however you like",
-      "Duplicate to experiment",
-      "Import from other launchers"
-    ],
+    titleKey: "features.multi.title",
+    descKey: "features.multi.desc",
+    bulletKeys: ["features.multi.b1", "features.multi.b2", "features.multi.b3"],
     video: "https://cdn.gdl.gg/assets/drag_drop.h264.mp4"
   },
   {
     id: "server-management",
-    title: "Run Your Own Server",
-    description: "Create and manage Minecraft servers right from GDLauncher. Pick Vanilla, Forge, Fabric, NeoForge, or Quilt, and you're up and running. Monitor performance, manage players, and install mods — all in one place.",
-    bullets: [
-      "Live console, CPU and memory monitoring",
-      "Whitelist, ops, and bans built in",
-      "Install server mods from CurseForge and Modrinth"
-    ],
+    titleKey: "features.server.title",
+    descKey: "features.server.desc",
+    bulletKeys: ["features.server.b1", "features.server.b2", "features.server.b3"],
     video: "https://cdn.gdl.gg/assets/servers.h264.mp4"
   }
 ]
@@ -62,80 +50,86 @@ const features = [
     <!-- Section header -->
     <div class="text-center mb-20" data-scroll="fade-up">
       <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
-        What
+        {t("features.heading")}{" "}
         <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
-          GDLauncher
-        </span>
-        Does
+          {t("features.heading.gdl")}
+        </span>{" "}
+        {t("features.heading.does")}
       </h2>
       <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
-        The boring stuff is automated. You focus on playing.
+        {t("features.tagline")}
       </p>
     </div>
 
     <!-- Feature rows -->
     <div class="space-y-24">
-      {features.map((feature, index) => (
-        <div
-          class={`grid grid-cols-1 lg:grid-cols-2 gap-12 items-center ${
-            index % 2 === 1 ? "lg:flex-row-reverse" : ""
-          }`}
-        >
-          <!-- Feature image -->
+      {features.map((feature, index) => {
+        const title = t(feature.titleKey)
+        const description = t(feature.descKey)
+        return (
           <div
-            class={index % 2 === 1 ? "lg:order-2" : ""}
-            data-scroll={index % 2 === 0 ? "slide-left" : "slide-right"}
+            class={`grid grid-cols-1 lg:grid-cols-2 gap-12 items-center ${
+              index % 2 === 1 ? "lg:flex-row-reverse" : ""
+            }`}
           >
-            <div class="relative aspect-video rounded-xl overflow-hidden bg-darkSlate-700/50 border border-darkSlate-600 shadow-xl shadow-black/20">
-              <video
-                data-lazy-src={feature.video}
-                class="w-full h-full object-cover"
-                muted
-                loop
-                playsinline
-                preload="none"
-                aria-label={feature.title}
-              />
+            <!-- Feature image -->
+            <div
+              class={index % 2 === 1 ? "lg:order-2" : ""}
+              data-scroll={index % 2 === 0 ? "slide-left" : "slide-right"}
+            >
+              <div class="relative aspect-video rounded-xl overflow-hidden bg-darkSlate-700/50 border border-darkSlate-600 shadow-xl shadow-black/20">
+                <video
+                  data-lazy-src={feature.video}
+                  class="w-full h-full object-cover"
+                  muted
+                  loop
+                  playsinline
+                  preload="none"
+                  aria-label={title}
+                />
+              </div>
+            </div>
+
+            {/* Text content */}
+            <div
+              class={index % 2 === 1 ? "lg:order-1" : ""}
+              data-scroll={index % 2 === 0 ? "slide-right" : "slide-left"}
+              data-scroll-delay="100"
+            >
+              <h3 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">
+                {title}
+              </h3>
+              <p class="text-darkSlate-100 text-lg mb-6">
+                {description.split(/(CurseForge|Modrinth)/).map((part) =>
+                  brandColors[part]
+                    ? <span style={`color: ${brandColors[part]}`}>{part}</span>
+                    : part
+                )}
+              </p>
+              <ul class="flex flex-col gap-3">
+                {feature.bulletKeys.map((key) => (
+                  <li class="flex items-start gap-3 text-darkSlate-50">
+                    <svg class="w-5 h-5 text-primary-400 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12l5 5L20 7"/>
+                    </svg>
+                    <span>{t(key)}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
-
-          {/* Text content */}
-          <div
-            class={index % 2 === 1 ? "lg:order-1" : ""}
-            data-scroll={index % 2 === 0 ? "slide-right" : "slide-left"}
-            data-scroll-delay="100"
-          >
-            <h3 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">
-              {feature.title}
-            </h3>
-            <p class="text-darkSlate-100 text-lg mb-6">
-              {feature.description.split(/(CurseForge|Modrinth)/).map((part) =>
-                brandColors[part]
-                  ? <span style={`color: ${brandColors[part]}`}>{part}</span>
-                  : part
-              )}
-            </p>
-            <ul class="flex flex-col gap-3">
-              {feature.bullets.map((bullet) => (
-                <li class="flex items-start gap-3 text-darkSlate-50">
-                  <svg class="w-5 h-5 text-primary-400 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12l5 5L20 7"/>
-                  </svg>
-                  <span>{bullet}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   </div>
 </section>
 
 <script>
-  const videos = document.querySelectorAll<HTMLVideoElement>(
-    "video[data-lazy-src]"
-  )
+  // Track the live observer + its videos at module scope so the lifecycle
+  // hooks can tear them down. Without this, every view-transition swap
+  // would create a fresh observer while the previous one kept referencing
+  // detached <video> elements (memory leak + duplicated work).
+  let observer: IntersectionObserver | null = null
 
   const loadVideo = (video: HTMLVideoElement) => {
     const src = video.dataset.lazySrc
@@ -144,29 +138,45 @@ const features = [
     video.load()
   }
 
-  if (videos.length > 0 && "IntersectionObserver" in window) {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const video = entry.target as HTMLVideoElement
-          if (entry.isIntersecting) {
-            loadVideo(video)
-            video.play().catch(() => {
-              // autoplay can be blocked (e.g., power saver); safe to ignore
-            })
-          } else if (!video.paused) {
-            video.pause()
-          }
-        }
-      },
-      { rootMargin: "200px 0px" }
+  function setup() {
+    const videos = document.querySelectorAll<HTMLVideoElement>(
+      "video[data-lazy-src]"
     )
-    videos.forEach((v) => observer.observe(v))
-  } else {
-    // No IntersectionObserver: load all eagerly as a fallback
-    videos.forEach((v) => {
-      loadVideo(v)
-      v.play().catch(() => {})
-    })
+    if (videos.length === 0) return
+
+    if ("IntersectionObserver" in window) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const video = entry.target as HTMLVideoElement
+            if (entry.isIntersecting) {
+              loadVideo(video)
+              video.play().catch(() => {
+                // autoplay can be blocked (e.g., power saver); safe to ignore
+              })
+            } else if (!video.paused) {
+              video.pause()
+            }
+          }
+        },
+        { rootMargin: "200px 0px" }
+      )
+      videos.forEach((v) => observer!.observe(v))
+    } else {
+      // No IntersectionObserver: load all eagerly as a fallback
+      videos.forEach((v) => {
+        loadVideo(v)
+        v.play().catch(() => {})
+      })
+    }
   }
+
+  function teardown() {
+    observer?.disconnect()
+    observer = null
+  }
+
+  setup()
+  document.addEventListener("astro:page-load", setup)
+  document.addEventListener("astro:before-swap", teardown)
 </script>

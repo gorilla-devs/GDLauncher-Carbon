@@ -1,15 +1,21 @@
 ---
 import { Image } from "astro:assets"
 import HeroDownload from "./HeroDownload"
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { LAUNCHER_VERSION } from "../../lib/launcherManifests"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
 ---
 
-<section class="relative h-[calc(100vh-4rem)] flex flex-col items-center overflow-hidden">
-  <!-- Background -->
+<section class="relative min-h-[640px] lg:h-[calc(100vh-4rem)] flex flex-col items-center overflow-hidden">
+  <!-- Background. Heavy effects (radial glow, grid pattern) only render on
+       lg+ screens; they tank LCP on phones with very little visual payoff. -->
   <div class="absolute inset-0 bg-darkSlate-900">
-    <!-- Subtle radial glow at top -->
-    <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
-    <!-- Grid pattern -->
-    <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+    <!-- Subtle radial glow at top (desktop only) -->
+    <div class="hidden lg:block absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(43,107,177,0.12),transparent)]"></div>
+    <!-- Grid pattern (desktop only) -->
+    <div class="hidden lg:block absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
     <!-- Bottom fade -->
     <div class="absolute inset-x-0 bottom-0 h-48" style="background: linear-gradient(to top, rgb(21,24,30), transparent);"></div>
   </div>
@@ -26,10 +32,11 @@ import HeroDownload from "./HeroDownload"
           class="text-4xl sm:text-5xl lg:text-6xl font-bold text-lightSlate-50 leading-tight mb-6"
           data-scroll="fade-up"
         >
-          A Better Way to Play
+          {t("hero.h1.line1")}
           <span class="bg-gradient-to-r from-primary-300 via-primary-400 to-primary-500 bg-clip-text text-transparent">
-            Modded Minecraft
+            {" "}{t("hero.h1.line2")}{" "}
           </span>
+          {t("hero.h1.line3")}
         </h1>
 
         <!-- Subheadline -->
@@ -38,19 +45,28 @@ import HeroDownload from "./HeroDownload"
           data-scroll="fade-up"
           data-scroll-delay="100"
         >
-          Browse CurseForge and Modrinth in one place. Install modpacks with a click.
-          GDLauncher handles Java, dependencies, and updates so you don't have to.
+          {t("hero.subtitle")}
         </p>
 
         <!-- Download Section -->
         <div class="mb-8" data-scroll="fade-up" data-scroll-delay="200">
-          <HeroDownload client:only="solid-js" />
+          <HeroDownload
+            client:only="solid-js"
+            version={LAUNCHER_VERSION}
+            labels={{
+              windows: t("download.button.windows"),
+              macos: t("download.button.macos"),
+              linux: t("download.button.linux"),
+              alsoAvailable: t("download.alsoAvailable"),
+            }}
+          />
         </div>
 
 
       </div>
 
-      <!-- Right side: App screenshot -->
+      <!-- Right side: App screenshot. Sized responsively so we don't ship a
+           1280×720 image to every phone. -->
       <div class="relative lg:pl-8" data-scroll="scale" data-scroll-delay="150">
         <div class="parallax relative rounded-xl overflow-hidden bg-darkSlate-700/50 border border-darkSlate-600 shadow-2xl shadow-primary-500/10">
           <Image
@@ -58,14 +74,16 @@ import HeroDownload from "./HeroDownload"
             alt="GDLauncher interface showing modpack management"
             width={1280}
             height={720}
+            widths={[480, 768, 1024, 1280]}
+            sizes="(min-width: 1024px) 50vw, 100vw"
             class="w-full h-auto"
             loading="eager"
             fetchpriority="high"
           />
         </div>
 
-        <!-- Decorative elements -->
-        <div class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary-500/5 rounded-full blur-3xl"></div>
+        <!-- Decorative blur (desktop only, pure cosmetic; paints expensive on mobile) -->
+        <div class="hidden lg:block absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary-500/5 rounded-full blur-3xl"></div>
       </div>
     </div>
   </div>
@@ -75,20 +93,26 @@ import HeroDownload from "./HeroDownload"
 </section>
 
 <script>
-  import vanilla from "vanilla-tilt"
+  // vanilla-tilt is a desktop-only effect. Skip the JS payload entirely on
+  // small screens (where there's no hover anyway). This saves a parse/eval on
+  // phones, which is exactly where mobile Lighthouse hurts.
+  document.addEventListener("astro:page-load", async () => {
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches
+      && window.matchMedia("(hover: hover)").matches
+    if (!isDesktop) return
 
-  document.addEventListener("astro:page-load", () => {
     const parallaxEl = document.querySelector(".parallax") as HTMLElement & {
       vanillaTilt?: { destroy: () => void }
     } | null
-    if (parallaxEl) {
-      parallaxEl.vanillaTilt?.destroy()
-      vanilla.init(parallaxEl, {
-        max: 5,
-        speed: 400,
-        glare: true,
-        "max-glare": 0.08
-      })
-    }
+    if (!parallaxEl) return
+
+    const { default: vanilla } = await import("vanilla-tilt")
+    parallaxEl.vanillaTilt?.destroy()
+    vanilla.init(parallaxEl, {
+      max: 5,
+      speed: 400,
+      glare: true,
+      "max-glare": 0.08
+    })
   })
 </script>

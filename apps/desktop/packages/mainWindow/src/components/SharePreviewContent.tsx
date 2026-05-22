@@ -12,6 +12,7 @@ import { VList } from "@/components/VirtuaWrapper"
 import { Trans, useTransContext } from "@gd/i18n"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
+import DefaultImg from "/assets/images/default-instance-img.png"
 import { useModal } from "@/managers/ModalsManager"
 import type { ReportModalData } from "@/managers/ModalsManager/modals/Report"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
@@ -333,10 +334,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
             {/* Hero header with background image */}
             <div class="relative shrink-0 overflow-hidden rounded-lg">
               <img
-                src={
-                  preview()?.backgroundUrl ||
-                  "/assets/images/default-instance-img.png"
-                }
+                src={preview()?.backgroundUrl || DefaultImg}
                 alt={preview()?.title || "Instance preview"}
                 class="h-40 w-full object-cover"
               />

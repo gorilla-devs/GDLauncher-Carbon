@@ -1,0 +1,181 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher でインスタンスをグループ化し、お気に入りにマーク",
+    description: "インスタンスをグループ (フォルダー) に整理し、よく遊ぶものをお気に入りにマークして大量の Library を扱う。",
+    steps: [
+      { name: "インスタンスをグループにドラッグ", text: "Library でインスタンスをグループヘッダー上、または別のインスタンス上にドラッグして新グループ作成。既存グループにドロップすればそこに追加。" },
+      { name: "グループのリネーム / 折りたたみ", text: "グループヘッダーをクリックして展開 / 折りたたみ。ヘッダーを右クリックしてリネーム、アイコン変更、削除 (グループ削除でインスタンスはトップレベルに戻ります)。" },
+      { name: "インスタンスをお気に入り", text: "インスタンスを右クリックして Add Favorite を切替。タイルに黄色い星が表示され、Library 上部の Favorites バーに登場。" },
+      { name: "ドラッグで並べ替え", text: "グループ内でインスタンスをドラッグして並べ替え。順序は保持されるので、よく遊ぶものを上に。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 인스턴스 그룹화하고 즐겨찾기 표시",
+    description: "인스턴스를 그룹(폴더)으로 분류하고 자주 플레이하는 것을 즐겨찾기로 표시해 큰 Library를 정리.",
+    steps: [
+      { name: "인스턴스를 그룹으로 드래그", text: "Library에서 인스턴스를 그룹 헤더 위 또는 다른 인스턴스 위로 드래그해 새 그룹 만들기. 기존 그룹에 떨구면 거기에 추가." },
+      { name: "그룹 이름 변경/접기", text: "그룹 헤더를 클릭해 펼치거나 접기. 헤더 오른쪽 클릭으로 이름 변경, 아이콘 변경, 삭제(그룹 삭제 시 인스턴스는 최상위로 돌아감)." },
+      { name: "인스턴스 즐겨찾기", text: "인스턴스 오른쪽 클릭해 Add Favorite 토글. 타일에 노란 별이 나타나고 Library 상단의 Favorites 바에도 표시." },
+      { name: "드래그로 정렬", text: "그룹 안에서 인스턴스를 드래그해 순서 변경. 순서가 유지되니 자주 플레이하는 걸 위로." }
+    ]
+  },
+  de: {
+    title: "Instanzen in GDLauncher gruppieren und Favoriten markieren",
+    description: "Eine große Minecraft-Bibliothek ordnen, indem du Instanzen in Gruppen (Ordner) sortierst und die meistgespielten als Favoriten markierst.",
+    steps: [
+      { name: "Instanzen in Gruppen ziehen", text: "In der Library eine Instanz auf einen Gruppenkopf oder eine andere Instanz ziehen, um eine neue Gruppe zu bilden. Auf eine existierende Gruppe droppen, um die Instanz dazuzulegen." },
+      { name: "Gruppe umbenennen oder einklappen", text: "Klick auf den Gruppenkopf zum Auf-/Zuklappen. Rechtsklick auf den Kopf für Umbenennen, Icon ändern oder löschen (Löschen verschiebt die Instanzen zurück nach oben)." },
+      { name: "Instanz favorisieren", text: "Rechtsklick auf eine Instanz, Add Favorite togglen. Auf der Kachel erscheint ein gelber Stern und die Instanz taucht in der Favorites-Leiste oben in der Library auf." },
+      { name: "Per Drag sortieren", text: "Innerhalb einer Gruppe Instanzen per Drag umordnen. Die Reihenfolge bleibt erhalten, leg deine meistgespielten nach oben." }
+    ]
+  },
+  fr: {
+    title: "Comment grouper des instances et marquer des favoris dans GDLauncher",
+    description: "Organise une grande bibliothèque Minecraft en triant les instances en groupes (dossiers) et en marquant celles que tu joues le plus en favoris.",
+    steps: [
+      { name: "Glisser des instances dans des groupes", text: "Dans la Library, glisse une instance sur un en-tête de groupe ou sur une autre instance pour faire un nouveau groupe. Dépose sur un groupe existant pour y ajouter l'instance." },
+      { name: "Renommer ou plier un groupe", text: "Clique sur l'en-tête d'un groupe pour le déplier ou le plier. Clic droit sur l'en-tête pour renommer, changer l'icône, ou supprimer le groupe (la suppression remet ses instances au niveau racine)." },
+      { name: "Mettre une instance en favori", text: "Clic droit sur une instance et toggle Add Favorite. Une étoile jaune apparaît sur la tuile et l'instance apparaît dans la barre Favorites en haut de la Library." },
+      { name: "Trier par glisser", text: "Au sein d'un groupe, glisse les instances pour les réordonner. L'ordre est conservé, mets celles que tu joues le plus en haut." }
+    ]
+  },
+  es: {
+    title: "Cómo agrupar instancias y marcar favoritas en GDLauncher",
+    description: "Organiza una Library grande de Minecraft clasificando instancias en grupos (carpetas) y marcando las que más juegas como favoritas.",
+    steps: [
+      { name: "Arrastrar instancias a grupos", text: "En la Library, arrastra una instancia sobre la cabecera de un grupo o sobre otra instancia para crear un grupo. Suelta sobre un grupo existente para añadir la instancia ahí." },
+      { name: "Renombrar o plegar un grupo", text: "Pulsa la cabecera del grupo para expandir o plegar. Clic derecho en la cabecera para renombrar, cambiar icono o eliminar (eliminar el grupo devuelve sus instancias al nivel raíz)." },
+      { name: "Favorita una instancia", text: "Clic derecho en una instancia y toggle Add Favorite. Aparece una estrella amarilla en la tile y la instancia aparece en la barra Favorites en la parte alta de la Library." },
+      { name: "Ordenar arrastrando", text: "Dentro de un grupo, arrastra instancias para reordenarlas. El orden se conserva, pon las que más juegues arriba." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como agrupar instâncias e marcar favoritas no GDLauncher",
+    description: "Organize uma Library grande de Minecraft separando instâncias em grupos (pastas) e marcando as que você mais joga como favoritas.",
+    steps: [
+      { name: "Arraste instâncias pra grupos", text: "Na Library, arraste uma instância pra cima do cabeçalho de um grupo ou pra cima de outra instância pra criar um grupo. Solte num grupo existente pra adicionar lá." },
+      { name: "Renomeie ou recolha um grupo", text: "Clique no cabeçalho do grupo pra expandir ou recolher. Botão direito no cabeçalho pra renomear, mudar ícone ou apagar (apagar o grupo devolve as instâncias pro topo)." },
+      { name: "Favorite uma instância", text: "Botão direito numa instância e toggle Add Favorite. Aparece uma estrela amarela no tile e a instância aparece na barra Favorites no topo da Library." },
+      { name: "Ordene arrastando", text: "Dentro de um grupo, arraste instâncias pra reordenar. A ordem fica salva, coloque as que mais joga no topo." }
+    ]
+  },
+  it: {
+    title: "Come raggruppare istanze e segnare i preferiti in GDLauncher",
+    description: "Organizza una Library grande di Minecraft ordinando le istanze in gruppi (cartelle) e segnando come preferite quelle a cui giochi di più.",
+    steps: [
+      { name: "Trascina le istanze nei gruppi", text: "Nella Library, trascina un'istanza sopra l'intestazione di un gruppo o sopra un'altra istanza per creare un nuovo gruppo. Rilascia su un gruppo esistente per aggiungere l'istanza lì." },
+      { name: "Rinomina o richiudi un gruppo", text: "Clicca sull'intestazione del gruppo per espandere o richiudere. Clic destro sull'intestazione per rinominare, cambiare icona o eliminare (eliminare il gruppo riporta le sue istanze al livello principale)." },
+      { name: "Segna come preferita un'istanza", text: "Clic destro su un'istanza e attiva Add Favorite. Appare una stella gialla sulla tile e l'istanza compare anche nella barra Favorites in alto nella Library." },
+      { name: "Riordina trascinando", text: "Dentro un gruppo, trascina le istanze per riordinarle. L'ordine viene conservato, metti in alto quelle a cui giochi di più." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["なぜグループか", "グループを作る", "インスタンスを別グループへ移す", "お気に入り", "フォルダーでグループ化 vs 自動グループ化", "できないこと"],
+    paras: [
+      "数個以上のインスタンスがあるとすぐに Library が散らかります。グループは関連インスタンスを名前付きフォルダーにまとめられ、「1.21 Forge servers」「Vault Hunters playthroughs」「保存したい古い Pack」など、必要なものだけ展開できます。グループは純粋に整理用。動作には影響せず、グループ内インスタンスはトップレベルのものと同様に起動。",
+      "最も簡単な方法: インスタンスを別のインスタンス上にドラッグ。GDLauncher が両方を含む新グループを作成し、ターゲットの名前を付けます。グループ名はヘッダーのコンテキストメニューからリネーム。1 グループ内に好きなだけインスタンスをネスト可能。各グループは折りたためるので Library を短く保てます。",
+      "ドラッグアンドドロップ。グループから空エリアにドロップしてトップレベルに戻すこともできます。グループヘッダー上のドロップはそのグループの末尾に配置。グループ内の特定位置へのドロップで厳密な位置に配置可能。",
+      "任意のインスタンスを右クリック → Add Favorite を切替。タイルに黄色い星が付き、所属グループに関係なく Library 上部の Floating Favorites Bar に表示されます。「現在プレイ中」のインスタンスがグループの 3 階層奥に埋もれていても、お気に入りにすればバーから直接起動でき、掘り下げ不要。お気に入り解除も同じ: 右クリック → Remove Favorite を切替。",
+      "上の説明はすべて「Group by」が <strong>Folders</strong> (自分でインスタンスをフォルダーにドラッグする手動モード) のときの Library の動作です。同じ Group-by ドロップダウンには <strong>Game Version</strong>、<strong>Modloader</strong>、<strong>Modpack Platform</strong> もあります。それらを選ぶと GDLauncher はフォルダーを隠して、すべてのインスタンスを折りたたみ可能なセクション (1.21.1、1.20.4、Forge、Fabric、CurseForge、Modrinth など) に自動で振り分けます。この自動グルーピングのレイアウトは読み取り専用: ドラッグ、並べ替え、フォルダー作成はできません。フォルダー自体は残っていて、いつでも Group by Folders に戻せば再表示されます。",
+      "ネストグループ (グループ内のグループ) はサポートされず、ロードマップにもありません。各インスタンスは正確に 1 つのグループ (またはトップレベルでなし) に属します。深いネスト整理が欲しい場合は、グループ名を上手く付けるほうが (「MC 1.21 Forge」「MC 1.21 Fabric」など) フラット構造と戦うより機能します。"
+    ]
+  },
+  ko: {
+    headings: ["왜 그룹인가", "그룹 만들기", "그룹 사이로 인스턴스 이동", "즐겨찾기", "폴더로 그룹화 vs 자동 그룹화", "할 수 없는 것"],
+    paras: [
+      "인스턴스가 몇 개 이상이 되면 Library가 금세 어수선해집니다. 그룹은 관련 인스턴스를 명명된 폴더에 묶을 수 있게 합니다, '1.21 Forge servers', 'Vault Hunters playthroughs', '보관할 옛 팩들' 같은 식으로, 필요한 것만 펼치면 됩니다. 그룹은 순전히 정리 목적. 인스턴스 동작에 영향을 주지 않으며, 그룹 안의 인스턴스는 최상위의 것과 동일하게 실행됩니다.",
+      "가장 단순한 방법: 한 인스턴스를 다른 인스턴스 위로 드래그. GDLauncher가 둘을 담은 새 그룹을 만들고 대상의 이름을 따 명명합니다. 그룹 이름은 헤더 컨텍스트 메뉴에서 변경. 한 그룹에 원하는 만큼 인스턴스를 넣을 수 있습니다. 각 그룹을 접을 수 있어 라이브러리를 짧게 유지할 수 있습니다.",
+      "드래그 앤 드롭. 그룹 밖 빈 영역에 떨어뜨려 최상위로 되돌릴 수도 있습니다. 그룹 헤더 위에 드롭은 그 그룹의 끝에 배치. 그룹 내 특정 위치 드롭은 정확한 위치에 배치.",
+      "아무 인스턴스나 오른쪽 클릭 → Add Favorite 토글. 타일에 노란 별이 붙고 어느 그룹에 있든 Library 상단의 Floating Favorites Bar에 표시됩니다. '지금 플레이 중'인 인스턴스가 그룹 세 단계 깊이에 묻혀 있어도, 즐겨찾기로 두면 파헤치지 않고 바에서 바로 실행 가능. 즐겨찾기 해제는 같은 식: 오른쪽 클릭 → Remove Favorite 토글.",
+      "위 설명은 모두 「Group by」가 <strong>Folders</strong>(직접 인스턴스를 폴더로 드래그하는 수동 모드)로 설정되었을 때의 Library 동작입니다. 같은 Group-by 드롭다운에는 <strong>Game Version</strong>, <strong>Modloader</strong>, <strong>Modpack Platform</strong>도 있습니다. 그중 하나를 고르면 GDLauncher는 폴더를 숨기고 모든 인스턴스를 접을 수 있는 섹션(1.21.1, 1.20.4, Forge, Fabric, CurseForge, Modrinth 등)으로 자동 분류합니다. 이 자동 그루핑 레이아웃은 읽기 전용: 드래그, 순서 변경, 폴더 생성이 불가능합니다. 폴더 자체는 그대로 남아 있으니 언제든 Group by Folders로 돌아가면 다시 보입니다.",
+      "중첩 그룹(그룹 안의 그룹)은 지원하지 않으며, 로드맵에도 없습니다. 각 인스턴스는 정확히 한 그룹(또는 최상위에서 그룹 없음)에 속합니다. 깊은 중첩 정리가 필요해진다면 'MC 1.21 Forge', 'MC 1.21 Fabric'처럼 그룹 이름을 잘 짓는 게 평면 구조와 싸우는 것보다 더 잘 작동합니다."
+    ]
+  },
+  de: {
+    headings: ["Warum Gruppen", "Eine Gruppe anlegen", "Instanzen zwischen Gruppen verschieben", "Favoriten", "Nach Ordnern gruppieren vs automatische Gruppierung", "Was nicht geht"],
+    paras: [
+      "Sobald du mehr als eine Handvoll Instanzen hast, wird die Library schnell unübersichtlich. Mit Gruppen kannst du verwandte Instanzen in benannte Ordner falten, 'Forge-1.21-Server', 'Vault-Hunters-Playthroughs', 'Alte Packs zum Aufheben', und immer nur das ausklappen, was du gerade brauchst. Gruppen sind rein organisatorisch. Sie ändern nichts am Verhalten der Instanzen; eine Instanz in einer Gruppe startet genauso wie eine auf der Top-Ebene.",
+      "Am einfachsten: eine Instanz auf eine andere ziehen. GDLauncher erzeugt eine neue Gruppe mit beiden drin, benennt sie nach dem Ziel. Über das Kontextmenü des Gruppen-Headers umbenennen. So viele Instanzen pro Gruppe wie du willst. Jede Gruppe lässt sich einklappen, hält die Library kurz.",
+      "Drag and Drop. Du kannst eine Instanz auch aus einer Gruppe rausziehen, zurück auf die Top-Ebene, indem du sie auf eine leere Stelle droppst. Auf den Gruppen-Header droppen heißt: ans Ende der Gruppe. An eine bestimmte Position innerhalb der Gruppe droppen platziert sie exakt da.",
+      "Rechtsklick auf eine beliebige Instanz, Add Favorite togglen. Sie kriegt einen gelben Stern auf der Kachel und taucht zusätzlich in der Floating-Favorites-Bar oben in der Library auf, egal in welcher Gruppe sie liegt. Praktisch, wenn deine aktuell gespielte Instanz drei Gruppen tief vergraben ist, favorisieren und aus der Bar starten statt zu graben. Entfavorisieren genauso: Rechtsklick, Remove Favorite togglen.",
+      "Alles oben beschreibt die Library, wenn 'Group by' auf <strong>Folders</strong> steht, dem manuellen Modus, in dem du Instanzen selbst in Ordner ziehst. Dasselbe Group-by-Dropdown bietet auch <strong>Game Version</strong>, <strong>Modloader</strong> und <strong>Modpack Platform</strong>. Wähl eins davon, und GDLauncher blendet deine Ordner aus und sortiert jede Instanz automatisch in einklappbare Sektionen (1.21.1, 1.20.4, Forge, Fabric, CurseForge, Modrinth usw.). Dieses automatische Layout ist read-only: kein Drag, kein Umsortieren, keine Ordner darin anlegen. Deine Ordner existieren weiter; jederzeit zurück auf Group by Folders schalten, sie sind wieder da.",
+      "Verschachtelte Gruppen (eine Gruppe in einer Gruppe) sind nicht unterstützt und auch nicht in Planung. Jede Instanz ist in genau einer Gruppe (oder keiner, auf Top-Ebene). Wer tief verschachtelt sortieren will, kommt mit guten Gruppennamen ('MC 1.21 Forge', 'MC 1.21 Fabric') in der Regel weiter als gegen die flache Struktur zu kämpfen."
+    ]
+  },
+  fr: {
+    headings: ["Pourquoi les groupes", "Créer un groupe", "Déplacer des instances entre groupes", "Favoris", "Grouper par dossier vs groupement automatique", "Ce que tu ne peux pas faire"],
+    paras: [
+      "Dès que tu as plus d'une poignée d'instances, la Library devient vite encombrée. Les groupes te laissent plier des instances liées dans des dossiers nommés, 'Serveurs Forge 1.21', 'Playthroughs Vault Hunters', 'Vieux packs que je veux garder', et n'élargir que ce dont tu as besoin. Les groupes sont purement organisationnels. Ils n'affectent pas le comportement des instances ; une instance dans un groupe se lance pareil qu'une au niveau racine.",
+      "Le plus simple : glisse une instance sur une autre. GDLauncher crée un nouveau groupe contenant les deux, le nomme d'après la cible. Renomme via le menu contextuel de l'en-tête du groupe. Tu peux mettre autant d'instances que tu veux dans un groupe. Chaque groupe se replie pour garder la library courte.",
+      "Drag and drop. Tu peux aussi glisser une instance hors d'un groupe, vers la Library racine, en la déposant sur la zone vide. Déposer sur un en-tête de groupe la place à la fin du groupe. Déposer à une position précise dans un groupe la place exactement là.",
+      "Clic droit sur n'importe quelle instance et toggle Add Favorite. Elle reçoit une étoile jaune sur sa tuile et apparaît aussi dans la barre Floating Favorites en haut de la Library, peu importe le groupe où elle est. Utile quand ton instance 'en cours' est enterrée à trois niveaux dans un groupe ; tu peux la favoriter et la lancer depuis la barre sans creuser. Pour retirer le favori, même chose : clic droit, toggle Remove Favorite.",
+      "Tout ce qui précède décrit la Library quand 'Group by' est réglé sur <strong>Folders</strong>, le mode manuel où tu glisses toi-même les instances dans des dossiers. Le même dropdown Group-by propose aussi <strong>Game Version</strong>, <strong>Modloader</strong> et <strong>Modpack Platform</strong>. Choisis-en un et GDLauncher cache tes dossiers et range chaque instance automatiquement dans des sections repliables (1.21.1, 1.20.4, Forge, Fabric, CurseForge, Modrinth, etc.). Cette disposition auto-groupée est en lecture seule : pas de drag, pas de réordonnancement, pas de dossiers à créer dedans. Tes dossiers existent toujours ; rebascule sur Group by Folders quand tu veux pour les revoir.",
+      "Les groupes imbriqués (un groupe dans un autre groupe) ne sont pas supportés et ne sont pas dans la roadmap. Chaque instance est dans exactement un groupe (ou aucun, au niveau racine). Si tu veux de l'organisation profondément imbriquée, bien nommer les groupes ('MC 1.21 Forge', 'MC 1.21 Fabric') marche mieux que de se battre contre la structure plate."
+    ]
+  },
+  es: {
+    headings: ["Por qué grupos", "Crear un grupo", "Mover instancias entre grupos", "Favoritos", "Agrupar por carpeta vs agrupación automática", "Lo que no puedes hacer"],
+    paras: [
+      "En cuanto tienes más de unas pocas instancias, la Library se llena rápido. Los grupos te dejan plegar instancias relacionadas en carpetas con nombre, 'Servidores Forge 1.21', 'Playthroughs Vault Hunters', 'Packs viejos que quiero conservar', y expandir solo lo que necesitas. Los grupos son puramente organizativos. No afectan al funcionamiento de las instancias; una instancia en un grupo se lanza igual que una al nivel raíz.",
+      "Lo más sencillo: arrastra una instancia sobre otra. GDLauncher crea un nuevo grupo que contiene ambas y lo llama como la de destino. Renombra desde el menú contextual de la cabecera del grupo. Puedes meter tantas instancias como quieras en un grupo. Cada grupo se puede plegar para mantener la librería corta.",
+      "Arrastrar y soltar. También puedes arrastrar una instancia fuera de un grupo, hasta la Library raíz, soltándola en zona vacía. Soltar sobre la cabecera de un grupo la pone al final del grupo. Soltar en una posición concreta dentro del grupo la coloca ahí exacto.",
+      "Clic derecho en cualquier instancia y toggle Add Favorite. Recibe una estrella amarilla en la tile y aparece también en la barra Floating Favorites en lo alto de la Library, sin importar en qué grupo esté. Útil cuando tu instancia 'en juego' está enterrada tres carpetas más adentro, marcas favorita y lanzas desde la barra sin escarbar. Quitar favorito igual: clic derecho, toggle Remove Favorite.",
+      "Todo lo de arriba describe la Library cuando 'Group by' está en <strong>Folders</strong>, el modo manual donde tú arrastras instancias a carpetas. El mismo desplegable Group-by también ofrece <strong>Game Version</strong>, <strong>Modloader</strong> y <strong>Modpack Platform</strong>. Elige uno y GDLauncher esconde tus carpetas y reorganiza cada instancia automáticamente en secciones plegables (1.21.1, 1.20.4, Forge, Fabric, CurseForge, Modrinth, etc.). Esa vista auto-agrupada es de solo lectura: no puedes arrastrar, reordenar ni crear carpetas dentro. Tus carpetas siguen existiendo; vuelve a Group by Folders cuando quieras y ahí están.",
+      "Los grupos anidados (un grupo dentro de otro) no están soportados y no están en la roadmap. Cada instancia está en exactamente un grupo (o ninguno, en el nivel raíz). Si te encuentras queriendo organización profundamente anidada, nombrar bien los grupos ('MC 1.21 Forge', 'MC 1.21 Fabric') suele ir mejor que pelearte con la estructura plana."
+    ]
+  },
+  "pt-BR": {
+    headings: ["Por que grupos", "Criar um grupo", "Mover instâncias entre grupos", "Favoritos", "Agrupar por pasta vs agrupamento automático", "O que você não pode fazer"],
+    paras: [
+      "Assim que você tem mais que algumas poucas instâncias, a Library fica bagunçada rápido. Grupos deixam você dobrar instâncias relacionadas em pastas nomeadas, 'Servidores Forge 1.21', 'Playthroughs Vault Hunters', 'Packs antigos pra guardar', e só expandir o que precisa. Grupos são puramente organizacionais. Não afetam como instâncias funcionam; uma instância num grupo lança igual a uma no nível raiz.",
+      "Mais simples: arraste uma instância pra cima de outra. O GDLauncher cria um novo grupo com as duas dentro, nomeando pelo alvo. Renomeie pelo menu de contexto do cabeçalho. Pode botar quantas instâncias quiser num grupo. Cada grupo pode ser recolhido pra manter a library curta.",
+      "Drag and drop. Também dá pra arrastar uma instância pra fora de um grupo, de volta pro topo da Library, soltando na área vazia. Soltar no cabeçalho do grupo coloca no fim do grupo. Soltar em uma posição específica dentro do grupo coloca exatamente ali.",
+      "Botão direito em qualquer instância e toggle Add Favorite. Aparece uma estrela amarela no tile e a instância também aparece na barra Floating Favorites no topo da Library, não importa o grupo. Útil quando sua instância 'que tá jogando' está enterrada três níveis dentro de um grupo, favorite e lance pela barra sem precisar cavar. Pra tirar favorito, mesma coisa: botão direito, toggle Remove Favorite.",
+      "Tudo acima descreve a Library quando 'Group by' está em <strong>Folders</strong>, o modo manual em que você arrasta instâncias pra pastas. O mesmo dropdown Group-by também tem <strong>Game Version</strong>, <strong>Modloader</strong> e <strong>Modpack Platform</strong>. Escolhe um e o GDLauncher esconde suas pastas e separa cada instância automaticamente em seções recolhíveis (1.21.1, 1.20.4, Forge, Fabric, CurseForge, Modrinth, etc.). Esse layout auto-agrupado é só leitura: não dá pra arrastar, reordenar ou criar pastas ali dentro. Suas pastas continuam existindo; volta pra Group by Folders quando quiser e elas reaparecem.",
+      "Grupos aninhados (grupo dentro de grupo) não são suportados e não estão no roadmap. Cada instância está exatamente num grupo (ou em nenhum, no topo). Se você se vê querendo organização profundamente aninhada, dar bons nomes aos grupos ('MC 1.21 Forge', 'MC 1.21 Fabric') costuma funcionar melhor que brigar com a estrutura plana."
+    ]
+  },
+  it: {
+    headings: ["Perché i gruppi", "Creare un gruppo", "Spostare istanze tra gruppi", "Preferiti", "Raggruppa per cartella vs raggruppamento automatico", "Cosa non puoi fare"],
+    paras: [
+      "Appena hai più di una manciata di istanze, la Library si affolla in fretta. I gruppi ti permettono di piegare istanze affini in cartelle nominate ('Server Forge 1.21', 'Playthrough di Vault Hunters', 'Pack vecchi da tenere') ed espandere solo quello che ti serve. I gruppi sono puramente organizzativi. Non influenzano il funzionamento delle istanze: un'istanza dentro un gruppo si avvia esattamente come una al livello principale.",
+      "Il modo più semplice: trascina un'istanza sopra un'altra. GDLauncher crea un nuovo gruppo che contiene entrambe e lo nomina come il bersaglio. Rinominalo dal menu contestuale dell'intestazione del gruppo. Puoi mettere quante istanze vuoi in un gruppo. Ogni gruppo si può richiudere per tenere la library compatta.",
+      "Drag and drop. Puoi anche trascinare un'istanza fuori da un gruppo, fino al livello principale della Library, rilasciandola nell'area vuota. Rilasciare sull'intestazione di un gruppo la mette in fondo al gruppo. Rilasciare in una posizione specifica all'interno del gruppo la mette esattamente lì.",
+      "Clic destro su una qualsiasi istanza e attiva Add Favorite. Riceve una stella gialla sulla tile e appare anche nella Floating Favorites Bar in alto nella Library, indipendentemente dal gruppo in cui si trova. Comodo quando l'istanza a cui stai giocando è sepolta tre livelli dentro un gruppo: la metti tra i preferiti e la avvii dalla barra senza dover scavare. Per togliere il preferito vale lo stesso: clic destro, attiva Remove Favorite.",
+      "Tutto quello descritto sopra vale quando 'Group by' è impostato su <strong>Folders</strong>, la modalità manuale in cui sei tu a trascinare le istanze nelle cartelle. Lo stesso menu Group-by offre anche <strong>Game Version</strong>, <strong>Modloader</strong> e <strong>Modpack Platform</strong>. Selezionandone una, GDLauncher nasconde le tue cartelle e ridistribuisce ogni istanza automaticamente in sezioni richiudibili (1.21.1, 1.20.4, Forge, Fabric, CurseForge, Modrinth, ecc.). Questo layout auto-raggruppato è in sola lettura: niente drag, niente riordino, niente cartelle al suo interno. Le tue cartelle restano: torna a Group by Folders quando vuoi e le ritrovi tutte.",
+      "I gruppi annidati (un gruppo dentro un gruppo) non sono supportati e non sono in roadmap. Ogni istanza sta esattamente in un gruppo (o in nessuno, al livello principale). Se ti accorgi di volere un'organizzazione profondamente annidata, dare buoni nomi ai gruppi ('MC 1.21 Forge', 'MC 1.21 Fabric') in genere funziona meglio che combattere con la struttura piatta."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

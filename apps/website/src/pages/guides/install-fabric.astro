@@ -7,13 +7,42 @@ import GuideLayout from "../../components/GuideLayout.astro"
   description="Learn how to install Fabric mod loader for Minecraft using GDLauncher. Quick and easy setup guide."
   keywords="install fabric, minecraft fabric, fabric mod loader, how to install fabric minecraft, fabric mods, gdlauncher fabric"
   lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      {
+        name: "Download GDLauncher",
+        text: "Download and install GDLauncher from gdlauncher.com, it's free and works on Windows, macOS, and Linux."
+      },
+      {
+        name: "Create a new instance",
+        text: "Open GDLauncher and click the + button on the Library page to create a new Minecraft instance."
+      },
+      {
+        name: "Pick Fabric as the loader",
+        text: "When choosing the modloader, select Fabric. GDLauncher will list every Minecraft version Fabric supports, pick the one you want to play."
+      },
+      {
+        name: "Wait for the install to finish",
+        text: "GDLauncher downloads Minecraft, the matching Java version, and the Fabric loader automatically. No manual setup."
+      },
+      {
+        name: "Add Fabric mods",
+        text: "Open your new instance, go to the Addons tab, and use the built-in browser to install any Fabric-compatible mod from CurseForge or Modrinth in one click."
+      },
+      {
+        name: "Hit Play",
+        text: "Click Play. Your modded Fabric instance is ready."
+      }
+    ]
+  }}
 >
   <h2>What's Fabric?</h2>
   <p>
     Fabric is a lightweight mod loader that's become the go-to for performance mods and newer content. It updates faster than Forge when new Minecraft versions drop (sometimes within hours), which is why it's popular with players who want the latest features.
   </p>
   <p>
-    The big performance mods (Sodium, Lithium, FerriteCore) all started on Fabric. If you want your game to run better, Fabric is usually the way to go.
+    Most of the modern performance scene grew up on Fabric. Sodium, Lithium, Phosphor, and Iris all shipped Fabric-first, and new optimization mods still tend to land there before getting Forge or NeoForge ports. If raw FPS is your priority, Fabric (or its fork Quilt) is usually the safest bet.
   </p>
 
   <h2>Setting up Fabric</h2>
@@ -21,12 +50,12 @@ import GuideLayout from "../../components/GuideLayout.astro"
     Click the <strong>+</strong> button in GDLauncher, pick your Minecraft version, and choose <strong>Fabric</strong>. Use the latest stable Fabric loader version and create the instance.
   </p>
   <p>
-    One important thing: most Fabric mods need the <strong>Fabric API</strong> library to work. Open your instance, go to the <strong>Addons</strong> tab, search for "Fabric API", and click <strong>Download</strong>. Do this before adding other mods.
+    Most Fabric mods depend on the <strong>Fabric API</strong> library. GDLauncher resolves mod dependencies automatically: when you install a mod that needs Fabric API (or any other library), the launcher pulls it in for you. No separate step required.
   </p>
 
   <h2>Essential mods</h2>
   <p>
-    Once you have Fabric API, consider adding these performance mods right away:
+    Open your instance, go to the <strong>Addons</strong> tab, and grab these performance mods:
   </p>
   <p>
     Sodium massively improves rendering. Lithium optimizes game logic and physics. FerriteCore reduces memory usage. Together they can double or triple your FPS with zero gameplay changes.
@@ -48,12 +77,12 @@ import GuideLayout from "../../components/GuideLayout.astro"
     OptiFine doesn't work with Fabric. Instead, use:
   </p>
   <p>
-    Sodium for performance. Iris for shaders. Continuity for connected textures. LambDynamicLights for dynamic lighting. These usually outperform OptiFine anyway.
+    Sodium for performance. Iris for shaders. Continuity for connected textures (so adjacent glass, bookshelves, sandstone, etc. visually merge into one surface instead of showing per-block borders). LambDynamicLights for dynamic lighting (held torches actually light the area around you). These usually outperform OptiFine anyway.
   </p>
 
   <h2>Troubleshooting</h2>
   <p>
-    Getting "missing Fabric API" errors? Install Fabric API from the mods browser. It's separate from the Fabric loader and required by almost everything.
+    Seeing "missing Fabric API" errors? Open your instance's <strong>Addons</strong> tab and check Fabric API is in the list. If it isn't, search for "Fabric API" and install it manually.
   </p>
   <p>
     Crashes on startup usually mean a mod is for the wrong version, the wrong loader (not actually a Fabric mod), or missing dependencies. Check the mod's page for requirements.

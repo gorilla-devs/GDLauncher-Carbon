@@ -3,7 +3,13 @@
 // Grid laser animation - lasers travel along the 64px grid lines
 ---
 
-<canvas id="laser-canvas" class="fixed inset-0 pointer-events-none" style="z-index: -5;"></canvas>
+<canvas
+  id="laser-canvas"
+  class="fixed inset-0 pointer-events-none"
+  style="z-index: -5;"
+  aria-hidden="true"
+  role="presentation"
+></canvas>
 
 <script>
   type Direction = 'up' | 'down' | 'left' | 'right';
@@ -19,6 +25,12 @@
   }
 
   function initLasers() {
+    // Skip on small screens. Particles are pure decoration and run a 60fps
+    // canvas loop that pegs phone GPUs. Mobile CTR was already half desktop;
+    // not feeding battery into eye candy.
+    const isSmallScreen = window.matchMedia('(max-width: 1023px)').matches;
+    if (isSmallScreen) return;
+
     const maybeBgContainer = document.querySelector('.fixed.inset-0.-z-10');
     if (!maybeBgContainer) return;
     const bgContainer: Element = maybeBgContainer;

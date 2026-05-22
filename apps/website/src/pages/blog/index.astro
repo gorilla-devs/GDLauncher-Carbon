@@ -1,16 +1,18 @@
 ---
 import PageShell from "../../components/PageShell.astro";
 import Breadcrumb from "../../components/Breadcrumb.astro";
-import { SITE_TITLE, SITE_DESCRIPTION } from "../../consts";
 import { getCollection } from "astro:content";
 import ArticleCard from "../../components/ArticleCard.astro";
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n";
 
 const posts = (await getCollection("blog")).sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
+const locale = getLocaleFromUrl(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
-<PageShell title={SITE_TITLE} description={SITE_DESCRIPTION}>
+<PageShell title={t("blog.index.title")} description={t("blog.index.description")}>
   <Fragment slot="head">
     <style>
       .blog-content {
@@ -71,8 +73,16 @@ const posts = (await getCollection("blog")).sort(
   </Fragment>
 
     <main class="py-8">
-      <Breadcrumb items={[{ label: "Blog" }]} maxWidth="max-w-6xl" />
-      <div class="blog-content">
+      <Breadcrumb items={[{ label: t("blog.breadcrumb") }]} maxWidth="max-w-6xl" />
+      <div class="blog-content flex-col">
+        <header class="text-center mb-8 px-4">
+          <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
+            {t("blog.index.h1")}
+          </h1>
+          <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+            {t("blog.index.intro")}
+          </p>
+        </header>
         <section class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
           <ul>
             {posts.map((post) => <ArticleCard post={post} />)}

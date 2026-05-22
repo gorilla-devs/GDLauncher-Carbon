@@ -1,0 +1,174 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher からインスタンスをエクスポートする方法",
+    description: "GDLauncher の Minecraft インスタンスを CurseForge .zip、Modrinth .mrpack、または GDLauncher .gdlpack としてエクスポート。共有・アーカイブ・ホスティングアップロード用。",
+    steps: [
+      { name: "Export アクションを開く", text: "Library で対象インスタンスを右クリックし、Export Instance (file-export アイコン) を選択。" },
+      { name: "形式を選択", text: "GDLauncher .gdlpack (受け側も GDLauncher なら最高の互換性)、CurseForge .zip (ほとんどのランチャーで動作)、Modrinth .mrpack (Modrinth 対応ランチャーで動作) のいずれかを選択。" },
+      { name: "バンドルを設定", text: "「Bundle Addons」トグルで Mod JAR 自体を含めるか選択 (有効: ファイルは大きくなりオフラインインストール可能。無効: マニフェストのみで小さく、受け側はランチャーが CDN から再ダウンロードするためネット接続が必要)。" },
+      { name: "含める内容をフィルタ", text: "ファイルツリーを歩いて含めるものをチェック。デフォルトでは Mod と設定が含まれ、saves、スクリーンショット、自分の options.txt は除外。必要に応じて調整。" },
+      { name: "保存先を指定", text: "ファイルの出力先を選択。進行バー付きで実行され、大型 Modpack では 1~2 分かかります。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 인스턴스 내보내기",
+    description: "GDLauncher의 Minecraft 인스턴스를 CurseForge .zip, Modrinth .mrpack, 또는 GDLauncher .gdlpack으로 내보내기. 공유, 보관, 호스팅 업로드용.",
+    steps: [
+      { name: "Export 액션 열기", text: "Library에서 내보낼 인스턴스를 오른쪽 클릭하고 Export Instance(file-export 아이콘)를 선택." },
+      { name: "포맷 선택", text: "GDLauncher .gdlpack(받는 쪽도 GDLauncher라면 최고 호환), CurseForge .zip(대부분의 런처에서 동작), Modrinth .mrpack(Modrinth 지원 런처에서 동작) 중 하나 선택." },
+      { name: "번들 구성", text: "'Bundle Addons' 토글로 모드 JAR 자체 포함 여부 선택(켜면: 파일 크고 오프라인 설치 가능. 끄면: 매니페스트만으로 작지만 받는 쪽은 런처가 CDN에서 재다운로드하므로 인터넷 필요)." },
+      { name: "포함 항목 필터", text: "파일 트리를 둘러 포함할 것을 체크. 기본은 모드와 설정 포함, saves/스크린샷/내 options.txt는 제외. 필요 시 조정." },
+      { name: "저장 위치 선택", text: "파일을 쓸 위치 선택. 진행 바와 함께 실행, 큰 모드팩은 1~2분." }
+    ]
+  },
+  de: {
+    title: "Eine Instanz aus GDLauncher exportieren",
+    description: "Eine GDLauncher-Minecraft-Instanz als CurseForge .zip, Modrinth .mrpack oder GDLauncher .gdlpack exportieren, zum Teilen, Archivieren oder Hochladen.",
+    steps: [
+      { name: "Export-Action öffnen", text: "Library, Rechtsklick auf die Instanz und Export Instance wählen (file-export-Icon)." },
+      { name: "Format wählen", text: "Wähle eins: GDLauncher .gdlpack (beste Treue, wenn der Empfänger auch GDLauncher nutzt), CurseForge .zip (läuft in den meisten Launchern) oder Modrinth .mrpack (läuft in Launchern mit Modrinth-Support)." },
+      { name: "Bundle konfigurieren", text: "'Bundle Addons' aktivieren, wenn die Mod-JARs mit ins Archiv sollen (größere Datei, offline installierbar). Aus für eine Manifest-only-Datei (kleiner, der Empfänger braucht Internet, damit der Launcher die Mods vom Original-CDN nachlädt)." },
+      { name: "Inhalt filtern", text: "Den Dateibaum durchgehen und das Gewünschte anhaken. Standardmäßig sind Mods und Configs dabei; Saves, Screenshots und deine options.txt nicht. Nach Bedarf anpassen." },
+      { name: "Speicherort wählen", text: "Auswählen, wohin die Datei geschrieben wird. Export läuft mit Fortschrittsbalken; bei großen Modpacks ein bis zwei Minuten." }
+    ]
+  },
+  fr: {
+    title: "Comment exporter une instance depuis GDLauncher",
+    description: "Exporte une instance Minecraft GDLauncher en CurseForge .zip, Modrinth .mrpack ou GDLauncher .gdlpack à partager, archiver ou uploader.",
+    steps: [
+      { name: "Ouvrir l'action d'export", text: "Dans la Library, clic droit sur l'instance et choisis Export Instance (icône file-export)." },
+      { name: "Choisir le format", text: "Choisis-en un : GDLauncher .gdlpack (meilleure fidélité si le destinataire utilise aussi GDLauncher), CurseForge .zip (marche dans la plupart des launchers) ou Modrinth .mrpack (marche dans les launchers avec support Modrinth)." },
+      { name: "Configurer le bundle", text: "Active 'Bundle Addons' si tu veux que l'export inclue les JARs de mods eux-mêmes (fichier plus gros, installable hors ligne). Laisse-le off pour expédier un fichier manifest seul (plus petit, mais le destinataire a besoin d'internet pour que le launcher retélécharge les mods depuis le CDN)." },
+      { name: "Filtrer ce qui est inclus", text: "Parcours l'arbre de fichiers et coche ce qui est inclus. Par défaut, mods et configs sont dedans ; saves, screenshots, ton options.txt sont dehors. Ajuste selon besoin." },
+      { name: "Choisir un emplacement", text: "Choisis où écrire le fichier. L'export tourne avec une barre de progression ; pour les gros modpacks, ça prend une minute ou deux." }
+    ]
+  },
+  es: {
+    title: "Cómo exportar una instancia desde GDLauncher",
+    description: "Exporta una instancia Minecraft de GDLauncher como CurseForge .zip, Modrinth .mrpack o GDLauncher .gdlpack para compartir, archivar o subir a hosting.",
+    steps: [
+      { name: "Abrir la acción de export", text: "En la Library, clic derecho en la instancia y elige Export Instance (icono file-export)." },
+      { name: "Elegir formato", text: "Elige uno: GDLauncher .gdlpack (mejor fidelidad si el destinatario también usa GDLauncher), CurseForge .zip (funciona en la mayoría de launchers) o Modrinth .mrpack (funciona en launchers con soporte Modrinth)." },
+      { name: "Configurar el bundle", text: "Activa 'Bundle Addons' si quieres que el export incluya los JAR de mod (archivo más grande, instalable offline). Déjalo off para mandar un archivo solo-manifest (más pequeño, pero el destinatario necesita internet para que el launcher re-descargue los mods del CDN)." },
+      { name: "Filtrar qué incluir", text: "Recorre el árbol de archivos y marca lo que incluir. Por defecto mods y configs sí; saves, capturas y tu options.txt no. Ajusta a tu gusto." },
+      { name: "Elegir ubicación", text: "Elige dónde escribir el archivo. El export corre con barra de progreso; modpacks grandes tardan un par de minutos." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como exportar uma instância do GDLauncher",
+    description: "Exporte uma instância Minecraft do GDLauncher como CurseForge .zip, Modrinth .mrpack ou GDLauncher .gdlpack pra compartilhar, arquivar ou enviar pra hosting.",
+    steps: [
+      { name: "Abrir a ação de export", text: "Na Library, botão direito na instância e escolha Export Instance (ícone file-export)." },
+      { name: "Escolher o formato", text: "Escolha um: GDLauncher .gdlpack (melhor fidelidade se quem recebe também usa GDLauncher), CurseForge .zip (funciona na maioria dos launchers) ou Modrinth .mrpack (funciona em launchers com suporte a Modrinth)." },
+      { name: "Configurar o bundle", text: "Ligue 'Bundle Addons' se quiser que o export inclua os JARs de mod (arquivo maior, instalável offline). Deixe desligado pra um arquivo só de manifest (menor, mas quem recebe precisa de internet pro launcher rebaixar os mods do CDN)." },
+      { name: "Filtrar o que incluir", text: "Caminhe pela árvore de arquivos e marque o que incluir. Por padrão mods e configs estão dentro; saves, prints, seu options.txt estão fora. Ajuste como precisar." },
+      { name: "Escolher local de salvamento", text: "Escolha onde o arquivo vai ser gravado. O export roda com barra de progresso; modpacks grandes levam um ou dois minutos." }
+    ]
+  },
+  it: {
+    title: "Come esportare un'istanza da GDLauncher",
+    description: "Esporta un'istanza Minecraft di GDLauncher come CurseForge .zip, Modrinth .mrpack o GDLauncher .gdlpack per condividerla, archiviarla o caricarla su un hosting.",
+    steps: [
+      { name: "Apri l'azione di Export", text: "Nella Library, clic destro sull'istanza e scegli Export Instance (icona file-export)." },
+      { name: "Scegli il formato", text: "Scegline uno: GDLauncher .gdlpack (massima fedeltà se chi riceve usa anch'esso GDLauncher), CurseForge .zip (funziona nella maggior parte dei launcher) o Modrinth .mrpack (funziona nei launcher con supporto a Modrinth)." },
+      { name: "Configura il bundle", text: "Attiva 'Bundle Addons' se vuoi includere i JAR delle mod nell'export (file più grande, installabile offline). Lascialo disattivato per spedire un file con solo il manifest (più piccolo, ma chi riceve serve di internet per far riscaricare le mod dal CDN al suo launcher)." },
+      { name: "Filtra cosa includere", text: "Sfoglia l'albero dei file e spunta cosa includere. Di default mod e config sono dentro, save, screenshot e il tuo options.txt sono fuori. Aggiusta come ti serve." },
+      { name: "Scegli la destinazione", text: "Scegli dove salvare il file. L'export procede con una barra di progresso, per i modpack grandi richiede uno o due minuti." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["バンドル vs マニフェストのみ", "形式の選び方", "エクスポートされないもの", "他の GDLauncher ユーザーに送るなら"],
+    paras: [
+      "Bundle Addons トグルがここで最も影響の大きい選択。<strong>マニフェストのみ</strong>のエクスポートは Mod を CurseForge / Modrinth の ID とバージョンでリスト化、インストール時に受け側ランチャーが CDN から Mod を取得します。ファイルは小さく数 MB、受け側はインストールにネット接続が必要。<strong>バンドル</strong>エクスポートは実際の Mod JAR をアーカイブに含めます。オフラインインストール可能 (Minecraft アセットが既にキャッシュ済みの前提)。トレードオフ: アーカイブが遥かに大きくなり (数百 MB ~ 数 GB)、実質的に Mod 自体を再配布するため、公開共有前にライセンスを確認。",
+      "<strong>GDLauncher .gdlpack</strong>: 受け側も GDLauncher の場合に最高の互換性。GDLauncher が追跡するすべてを含むインスタンス形状を保持。<strong>CurseForge .zip</strong>: ほとんどのランチャーで動作 (CurseForge App、PrismLauncher、MultiMC、ATLauncher、Technic)。Mod は CurseForge プロジェクト ID で参照、Modrinth 限定の Mod を含めるにはバンドルトグルが必要。<strong>Modrinth .mrpack</strong>: Modrinth 対応ランチャー向け。Mod は直接ダウンロード URL とハッシュで参照されます。",
+      "アカウント、ランチャー設定、スキン、フィルタステップで除外したものは含まれません。エクスポートはインスタンス、ランチャーではありません。",
+      "受け取り側も GDLauncher で 1 クリックフローが欲しいなら、Cloud Instance Sharingコード機能の方が向いています、<a href=\"/guides/share-an-instance\">インスタンスを共有する方法</a>を参照。Export はアーカイブと他ランチャーユーザーへの送付向け。"
+    ]
+  },
+  ko: {
+    headings: ["번들 vs 매니페스트만", "포맷 선택", "내보내지 않는 항목", "다른 GDLauncher 사용자에게 보낼 때"],
+    paras: [
+      "Bundle Addons 토글이 여기서 가장 영향이 큰 선택. <strong>매니페스트만</strong>은 모드를 CurseForge/Modrinth ID와 버전으로 나열, 설치 시 받는 쪽 런처가 CDN에서 모드를 가져옵니다. 파일이 작음(몇 MB), 받는 쪽이 설치에 인터넷 필요. <strong>번들</strong>은 실제 모드 JAR을 아카이브에 포함. 오프라인 설치 가능(Minecraft 에셋이 이미 캐시되어 있다는 전제). 트레이드오프: 아카이브가 훨씬 큼(수백 MB부터 수 GB), 사실상 모드 자체를 재배포하는 것이므로 공개 공유 전 라이선스 확인.",
+      "<strong>GDLauncher .gdlpack</strong>: 받는 쪽도 GDLauncher라면 최고 호환성. GDLauncher가 추적하는 모든 것을 포함한 인스턴스 형태 보존. <strong>CurseForge .zip</strong>: 대부분의 런처에서 이식 가능(CurseForge App, PrismLauncher, MultiMC, ATLauncher, Technic). 모드는 CurseForge 프로젝트 ID로 참조; Modrinth 전용 모드는 번들 토글이 있어야 포함. <strong>Modrinth .mrpack</strong>: Modrinth 지원 런처용. 모드는 직접 다운로드 URL과 해시로 참조.",
+      "계정, 런처 설정, 스킨, 필터 단계에서 체크하지 않은 것은 포함되지 않습니다. 내보내기는 인스턴스이지 런처가 아닙니다.",
+      "받는 사람도 GDLauncher이고 원클릭 플로우를 원하면 Cloud Instance Sharing 코드 기능이 더 적합합니다, <a href=\"/guides/share-an-instance\">인스턴스 공유하는 방법</a>을 보세요. Export는 보관과 다른 런처 사용자에게 보내기 위함."
+    ]
+  },
+  de: {
+    headings: ["Bundle vs Manifest-only", "Format wählen", "Was nicht exportiert wird", "An andere GDLauncher-Nutzer schicken"],
+    paras: [
+      "Der Bundle-Addons-Toggle ist hier die folgenreichste Entscheidung. <strong>Manifest-only</strong>-Exports listen die Mods per CurseForge- oder Modrinth-IDs und Versionen; wer den Pack installiert, lässt seinen Launcher die Mods vom CDN holen. Die Datei bleibt klein (paar MB), der Empfänger braucht Internet zum Install. <strong>Bundle</strong>-Exports inkludieren die echten Mod-JARs im Archiv. Die Datei lässt sich offline installieren (vorausgesetzt, Minecraft-Assets sind schon gecached). Tradeoff: Das Archiv ist deutlich größer (hunderte MB bis ein paar GB), und du verteilst die Mods faktisch weiter, vor öffentlichem Sharing die Lizenzen checken.",
+      "<strong>GDLauncher .gdlpack</strong>: beste Treue für Empfänger, die auch GDLauncher nutzen. Erhält die volle Instanz-Form inkl. allem, was GDLauncher trackt. <strong>CurseForge .zip</strong>: portabel zu den meisten Launchern (CurseForge App, PrismLauncher, MultiMC, ATLauncher, Technic). Mods werden per CurseForge-Project-IDs referenziert; Modrinth-only Mods brauchen den Bundle-Toggle, um eingeschlossen zu werden. <strong>Modrinth .mrpack</strong>: portabel zu Modrinth-unterstützenden Launchern. Mods werden per direkten Download-URLs und Hashes referenziert.",
+      "Deine Accounts, deine Launcher-Settings, dein Skin und alles, was du im Filter-Schritt nicht angehakt hast. Der Export ist die Instanz, nicht der Launcher.",
+      "Wenn der Empfänger auch GDLauncher nutzt und du einen One-Click-Flow willst, ist die Cloud-Instanz-Share-Code-Funktion besser, siehe <a href=\"/guides/share-an-instance\">Eine Instanz teilen</a>. Export ist fürs Archivieren und fürs Schicken an User auf anderen Launchern."
+    ]
+  },
+  fr: {
+    headings: ["Bundle vs manifest seul", "Choisir le format", "Ce qui n'est pas exporté", "Pour partager avec un autre utilisateur GDLauncher"],
+    paras: [
+      "Le toggle Bundle Addons est le choix le plus important ici. Les exports en <strong>manifest seul</strong> listent les mods par leurs IDs et versions CurseForge/Modrinth ; celui qui installe le pack laisse son launcher récupérer les mods depuis le CDN. Le fichier reste petit (quelques Mo), le destinataire a besoin d'internet pour installer. Les exports <strong>bundle</strong> incluent les vrais JARs de mods dans l'archive. Le fichier s'installe hors ligne (à condition que les assets Minecraft soient déjà cachés). Compromis : l'archive est beaucoup plus grosse (des centaines de Mo à plusieurs Go) et tu redistribues effectivement les mods eux-mêmes, vérifie les licences avant un partage public.",
+      "<strong>GDLauncher .gdlpack</strong> : meilleure fidélité pour des destinataires qui utilisent aussi GDLauncher. Préserve la forme complète de l'instance, y compris tout ce que GDLauncher trace. <strong>CurseForge .zip</strong> : portable vers la plupart des launchers (CurseForge App, PrismLauncher, MultiMC, ATLauncher, Technic). Les mods sont référencés par IDs de projet CurseForge ; les mods uniquement sur Modrinth ont besoin du toggle bundle pour être inclus. <strong>Modrinth .mrpack</strong> : portable vers les launchers compatibles Modrinth. Les mods sont référencés par URLs de téléchargement directes et hashes.",
+      "Tes comptes, tes settings de launcher, ton skin et tout ce que tu n'as pas coché dans l'étape de filtre. L'export, c'est l'instance, pas le launcher.",
+      "Si ton destinataire utilise aussi GDLauncher et que tu veux un flow en un clic, la fonctionnalité de code de partage cloud d'instance est plus adaptée, voir <a href=\"/guides/share-an-instance\">Comment partager une instance</a>. Export, c'est pour archiver et pour envoyer à des gens sur d'autres launchers."
+    ]
+  },
+  es: {
+    headings: ["Bundle vs manifest solo", "Elegir formato", "Qué no se exporta", "Para compartir con otro usuario GDLauncher"],
+    paras: [
+      "El toggle Bundle Addons es la elección más importante aquí. Los exports <strong>solo-manifest</strong> listan los mods por IDs y versiones de CurseForge/Modrinth; quien instale el pack hace que su launcher traiga los mods del CDN. El archivo queda pequeño (pocos MB), el destinatario necesita internet para instalar. Los exports <strong>bundle</strong> incluyen los JAR reales en el archivo. Se puede instalar offline (asumiendo que los assets de Minecraft ya están cacheados). Compromiso: el archivo es mucho más grande (cientos de MB a varios GB), y estás efectivamente redistribuyendo los mods, revisa licencias antes de compartir públicamente.",
+      "<strong>GDLauncher .gdlpack</strong>: mejor fidelidad para destinatarios que también usan GDLauncher. Preserva la forma completa de la instancia, incluido todo lo que GDLauncher rastrea. <strong>CurseForge .zip</strong>: portable a la mayoría de launchers (CurseForge App, PrismLauncher, MultiMC, ATLauncher, Technic). Los mods se referencian por IDs de proyecto CurseForge; los mods solo de Modrinth necesitan el toggle bundle para incluirse. <strong>Modrinth .mrpack</strong>: portable a launchers con soporte Modrinth. Los mods se referencian por URLs de descarga directas y hashes.",
+      "Tus cuentas, tus settings del launcher, tu skin y todo lo que no marcaste en el paso de filtro. El export es la instancia, no el launcher.",
+      "Si tu destinatario también usa GDLauncher y quieres un flow de un clic, la funcionalidad de código de compartición de instancia en la nube encaja mejor, ver <a href=\"/guides/share-an-instance\">Cómo compartir una instancia</a>. Export es para archivar y para enviar a gente en otros launchers."
+    ]
+  },
+  "pt-BR": {
+    headings: ["Bundle vs só manifest", "Escolher o formato", "O que não é exportado", "Pra compartilhar com outro usuário GDLauncher"],
+    paras: [
+      "O toggle Bundle Addons é a escolha mais importante aqui. Exports <strong>só manifest</strong> listam os mods por IDs e versões do CurseForge/Modrinth; quem instala o pack deixa o launcher buscar os mods no CDN. O arquivo fica pequeno (poucos MB), quem recebe precisa de internet pra instalar. Exports <strong>bundle</strong> incluem os JARs reais no arquivo. O arquivo pode ser instalado offline (assumindo que os assets do Minecraft já estão cacheados). Troca: o arquivo é muito maior (centenas de MB a alguns GB), e você está efetivamente redistribuindo os mods, confira as licenças antes de compartilhar publicamente.",
+      "<strong>GDLauncher .gdlpack</strong>: melhor fidelidade pra quem também usa GDLauncher. Preserva a forma completa da instância incluindo tudo que o GDLauncher rastreia. <strong>CurseForge .zip</strong>: portável pra maioria dos launchers (CurseForge App, PrismLauncher, MultiMC, ATLauncher, Technic). Mods são referenciados por IDs de projeto CurseForge; mods só do Modrinth precisam do toggle bundle pra serem incluídos. <strong>Modrinth .mrpack</strong>: portável pra launchers com suporte a Modrinth. Mods são referenciados por URLs de download diretas e hashes.",
+      "Suas contas, seus settings do launcher, sua skin e tudo que você não marcou no passo de filtro. O export é a instância, não o launcher.",
+      "Se quem recebe também usa GDLauncher e você quer um fluxo de um clique, a funcionalidade de share code de instância na nuvem encaixa melhor, veja <a href=\"/guides/share-an-instance\">Como compartilhar uma instância</a>. Export é pra arquivar e pra enviar pra gente em outros launchers."
+    ]
+  },
+  it: {
+    headings: ["Bundle vs solo manifest", "Scegliere il formato", "Cosa non viene esportato", "Per condividere con un altro utente GDLauncher"],
+    paras: [
+      "Il toggle Bundle Addons è la scelta più importante qui. Gli export <strong>solo manifest</strong> elencano le mod tramite gli ID e le versioni CurseForge/Modrinth: chi installa il pack lascia che il suo launcher recuperi le mod dal CDN. Il file resta piccolo (pochi MB), chi riceve ha bisogno di internet per installarlo. Gli export <strong>bundle</strong> includono i JAR delle mod veri e propri nell'archivio. Il file è installabile offline (a patto che gli asset di Minecraft siano già in cache). Compromesso: l'archivio è molto più grande (centinaia di MB fino a qualche GB) e di fatto stai ridistribuendo le mod, controlla le licenze prima di condividere pubblicamente.",
+      "<strong>GDLauncher .gdlpack</strong>: massima fedeltà per chi riceve e usa anch'esso GDLauncher. Conserva la forma completa dell'istanza, inclusi tutti i metadati che GDLauncher traccia. <strong>CurseForge .zip</strong>: portabile alla maggior parte dei launcher (CurseForge App, PrismLauncher, MultiMC, ATLauncher, Technic). Le mod sono referenziati tramite gli ID di progetto CurseForge, le mod presenti solo su Modrinth richiedono il toggle bundle per essere inclusi. <strong>Modrinth .mrpack</strong>: portabile ai launcher con supporto Modrinth. Le mod sono referenziati tramite URL di download diretti e hash.",
+      "I tuoi account, le impostazioni del launcher, la skin e tutto quello che non hai spuntato nel passo di filtro. L'export è l'istanza, non il launcher.",
+      "Se chi riceve usa anch'esso GDLauncher e vuoi un flusso a un solo clic, la funzione di codice di condivisione cloud è più adatta: vedi <a href=\"/guides/share-an-instance\">Come condividere un'istanza</a>. Export serve per archiviare e per spedire a utenti su altri launcher."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

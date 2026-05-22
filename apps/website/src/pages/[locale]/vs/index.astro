@@ -1,0 +1,73 @@
+---
+import type { GetStaticPaths } from "astro"
+import PageShell from "../../../components/PageShell.astro"
+import Breadcrumb from "../../../components/Breadcrumb.astro"
+import { breadcrumbsJsonLd } from "../../../lib/jsonld"
+import {
+  COMPARISON_SLUGS,
+  COMPETITOR_NAMES,
+  getComparisonHub,
+  getComparisonChrome,
+} from "../../../lib/vsData"
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  getLocaleFromUrl,
+  localizedPath,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const hub = getComparisonHub(locale)
+const chrome = getComparisonChrome(locale)
+
+const canonicalUrl = `https://gdlauncher.com/${locale}/vs`
+
+const jsonLd = [
+  breadcrumbsJsonLd([
+    { name: "Home", url: `https://gdlauncher.com${localizedPath("/", locale)}` },
+    { name: chrome.compareBreadcrumb, url: canonicalUrl },
+  ]),
+]
+---
+
+<PageShell
+  title={`${hub.pageTitle} | GDLauncher`}
+  description={hub.pageDescription}
+  canonicalUrl={canonicalUrl}
+  keywords="minecraft launcher comparison, gdlauncher vs prism, gdlauncher vs curseforge, best minecraft launcher, minecraft launcher alternative"
+  jsonLd={jsonLd}
+>
+  <main class="py-8">
+    <Breadcrumb items={[{ label: chrome.compareBreadcrumb }]} maxWidth="max-w-5xl" />
+
+    <div class="max-w-5xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-12">
+        <h1 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
+          {hub.h1}
+        </h1>
+        <p class="text-lg text-darkSlate-100 mb-6">
+          {hub.intro}
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {COMPARISON_SLUGS.map((slug) => (
+          <a
+            href={localizedPath(`/vs/${slug}`, locale)}
+            class="block bg-darkSlate-800 rounded-xl p-6 hover:bg-darkSlate-700/50 transition-colors border border-darkSlate-700 hover:border-primary-500/30"
+          >
+            <h2 class="text-xl font-semibold text-lightSlate-50 mb-2">
+              GDLauncher vs {COMPETITOR_NAMES[slug]}
+            </h2>
+            <p class="text-darkSlate-100 text-sm">{hub.competitors[slug].blurb}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </main>
+</PageShell>

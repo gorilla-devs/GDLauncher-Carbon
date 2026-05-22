@@ -1,0 +1,189 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher にインスタンスをインポートする方法",
+    description: "CurseForge .zip、Modrinth .mrpack、GDL Share コード、または他のランチャー (MultiMC、ATLauncher、PrismLauncher、Technic、FTB、旧 GDLauncher) から、既存の Minecraft インスタンスを GDLauncher に取り込む方法。",
+    steps: [
+      { name: "インポートフローを開く", text: "Library ページを開き、空きスペースを右クリックして Import Instance を選択、もしくは Library ツールバーの + ボタンを押してから Import タブに切り替えます。「Import from Launcher」と「Import from File」の 2 セクションが表示されます。" },
+      { name: "ソースを選ぶ", text: "タイルを 1 つ選択。ランチャー系: 旧 GDLauncher、ATLauncher、FTB、MultiMC、Technic、PrismLauncher、Modrinth / CurseForge の公式アプリ (インストール済みなら)。ファイル系: CurseForge .zip、Modrinth .mrpack、GDLauncher .gdlpack。" },
+      { name: "ファイルまたはランチャーを指定", text: "ファイルなら .zip / .mrpack を選択。ランチャーなら GDLauncher がそのインスタンスリストを直接読みます。デフォルト位置にインストールされている必要がある場合があり、それ以外は手動でフォルダーを指定。" },
+      { name: "インポートするインスタンスを選択", text: "ソースに複数インスタンスがあればリストが表示。インポート対象にチェック。各々が独自フォルダー付きの新しい GDLauncher インスタンスになります。" },
+      { name: "インポート完了を待つ", text: "GDLauncher がインスタンスフォルダーをコピーし、Mod ローダーを解決し、データベースに登録。数百 Mod の大型 Modpack は数分かかります。Tasks パネルで進行状況を確認。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에 인스턴스 가져오기",
+    description: "CurseForge .zip, Modrinth .mrpack, GDL Share 코드 또는 다른 런처(MultiMC, ATLauncher, PrismLauncher, Technic, FTB, 옛 GDLauncher)에서 기존 Minecraft 인스턴스를 GDLauncher로 가져오는 방법.",
+    steps: [
+      { name: "가져오기 흐름 열기", text: "Library 페이지를 열고 빈 공간을 오른쪽 클릭해 Import Instance를 고르거나, Library 툴바의 + 버튼을 누르고 Import 탭으로 전환합니다. 'Import from Launcher'와 'Import from File' 두 섹션이 보입니다." },
+      { name: "소스 선택", text: "타일 하나를 선택. 런처 기반: 옛 GDLauncher, ATLauncher, FTB, MultiMC, Technic, PrismLauncher, 그리고 설치돼 있다면 Modrinth/CurseForge 공식 앱. 파일 기반: CurseForge .zip, Modrinth .mrpack, GDLauncher .gdlpack." },
+      { name: "파일이나 런처 가리키기", text: "파일이면 .zip 또는 .mrpack을 탐색. 런처면 GDLauncher가 해당 런처의 인스턴스 목록을 직접 읽습니다. 기본 위치에 설치돼 있어야 하는 경우가 있고, 아니면 수동으로 폴더 선택." },
+      { name: "가져올 인스턴스 선택", text: "소스에 여러 인스턴스가 있으면 목록이 표시됩니다. 가져올 것에 체크. 각각이 독립 폴더를 가진 새 GDLauncher 인스턴스가 됩니다." },
+      { name: "가져오기 완료 대기", text: "GDLauncher가 인스턴스 폴더를 복사하고, 모드 로더를 해결하고, DB에 등록. 수백 모드 대형 모드팩은 몇 분 걸립니다. Tasks 패널에서 진행 확인." }
+    ]
+  },
+  de: {
+    title: "Eine Instanz in GDLauncher importieren",
+    description: "Eine bestehende Minecraft-Instanz aus einer CurseForge-.zip, Modrinth-.mrpack, einem GDL-Share-Code oder einem anderen Launcher (MultiMC, ATLauncher, PrismLauncher, Technic, FTB, altes GDLauncher) in GDLauncher importieren.",
+    steps: [
+      { name: "Import-Flow öffnen", text: "Öffne die Library-Seite und mach Rechtsklick auf leeren Bereich → Import Instance, oder klick den +-Button in der Library-Toolbar und wechsle auf den Import-Tab. Zwei Sektionen: 'Import from Launcher' und 'Import from File'." },
+      { name: "Quelle wählen", text: "Eine Kachel anklicken. Launcher-basiert: altes GDLauncher, ATLauncher, FTB, MultiMC, Technic, PrismLauncher sowie die Modrinth-/CurseForge-App, falls installiert. Dateibasiert: CurseForge .zip, Modrinth .mrpack, GDLauncher .gdlpack." },
+      { name: "Datei oder Launcher angeben", text: "Bei Dateien zur .zip oder .mrpack browsen. Bei Launchern liest GDLauncher die Instanz-Liste des Quell-Launchers direkt. Manchmal muss der Quell-Launcher in seinem Default-Pfad installiert sein, sonst wähle den Ordner manuell." },
+      { name: "Zu importierende Instanzen auswählen", text: "Hat die Quelle mehrere Instanzen, siehst du eine Liste. Hak die zu importierenden an. Jede wird zu einer neuen GDLauncher-Instanz mit eigenem Ordner." },
+      { name: "Auf den Import warten", text: "GDLauncher kopiert den Instanz-Ordner, löst den Mod-Loader auf und trägt's in die DB ein. Große Modpacks mit hunderten Mods brauchen ein paar Minuten. Im Tasks-Panel den Fortschritt anschauen." }
+    ]
+  },
+  fr: {
+    title: "Comment importer une instance dans GDLauncher",
+    description: "Importe une instance Minecraft existante dans GDLauncher depuis un .zip CurseForge, un .mrpack Modrinth, un code de partage GDL, ou un autre launcher (MultiMC, ATLauncher, PrismLauncher, Technic, FTB, ancien GDLauncher).",
+    steps: [
+      { name: "Ouvrir le flow d'import", text: "Ouvre la page Library, fais clic droit sur un espace vide et choisis Import Instance, ou clique le + dans la barre d'outils de la Library puis bascule vers l'onglet Import. Deux sections : 'Import from Launcher' et 'Import from File'." },
+      { name: "Choisir la source", text: "Choisis une tuile. Sources launcher : ancien GDLauncher, ATLauncher, FTB, MultiMC, Technic, PrismLauncher, plus les apps Modrinth et CurseForge si elles sont installées. Sources fichier : CurseForge .zip, Modrinth .mrpack, GDLauncher .gdlpack." },
+      { name: "Pointer vers le fichier ou le launcher", text: "Pour les fichiers, parcours jusqu'au .zip ou .mrpack. Pour les launchers, GDLauncher lit directement la liste d'instances du launcher source. Parfois il faut que le launcher source soit installé à son emplacement par défaut, sinon choisis le dossier manuellement." },
+      { name: "Choisir les instances à importer", text: "Si la source a plusieurs instances, tu verras une liste. Coche celles à importer. Chacune devient une nouvelle instance GDLauncher avec son propre dossier." },
+      { name: "Attendre la fin de l'import", text: "GDLauncher copie le dossier d'instance, résout le mod loader et l'enregistre en base. Les gros modpacks avec des centaines de mods prennent quelques minutes. Regarde le panneau Tasks pour suivre." }
+    ]
+  },
+  es: {
+    title: "Cómo importar una instancia a GDLauncher",
+    description: "Importa una instancia de Minecraft existente a GDLauncher desde un .zip de CurseForge, un .mrpack de Modrinth, un código de compartición GDL u otro launcher (MultiMC, ATLauncher, PrismLauncher, Technic, FTB, GDLauncher antiguo).",
+    steps: [
+      { name: "Abrir el flujo de importación", text: "Abre la página Library, clic derecho en zona vacía y elige Import Instance, o pulsa el + de la barra de la Library y cambia a la pestaña Import. Dos secciones: 'Import from Launcher' e 'Import from File'." },
+      { name: "Elegir la fuente", text: "Selecciona un mosaico. Fuentes de launcher: GDLauncher antiguo, ATLauncher, FTB, MultiMC, Technic, PrismLauncher, además de las apps Modrinth y CurseForge si están instaladas. Fuentes de archivo: CurseForge .zip, Modrinth .mrpack, GDLauncher .gdlpack." },
+      { name: "Apuntar al archivo o al launcher", text: "Para archivos, navega hasta el .zip o .mrpack. Para launchers, GDLauncher lee directamente la lista de instancias del launcher origen. A veces el launcher origen tiene que estar en su ubicación por defecto; si no, elige la carpeta manualmente." },
+      { name: "Elegir las instancias a importar", text: "Si la fuente tiene varias instancias verás una lista. Marca las que importar. Cada una se vuelve una nueva instancia GDLauncher con su propia carpeta." },
+      { name: "Esperar a que termine", text: "GDLauncher copia la carpeta de la instancia, resuelve el mod loader y la registra en la base de datos. Modpacks grandes con cientos de mods tardan unos minutos. Mira el panel Tasks para el progreso." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como importar uma instância pro GDLauncher",
+    description: "Importe uma instância de Minecraft existente pro GDLauncher a partir de um .zip do CurseForge, um .mrpack do Modrinth, um código de compartilhamento GDL ou outro launcher (MultiMC, ATLauncher, PrismLauncher, Technic, FTB, GDLauncher antigo).",
+    steps: [
+      { name: "Abra o fluxo de importação", text: "Abra a página Library, clique com o botão direito num espaço vazio e escolha Import Instance, ou clique no + da barra da Library e mude pra aba Import. Duas seções: 'Import from Launcher' e 'Import from File'." },
+      { name: "Escolha a origem", text: "Selecione um tile. Fontes de launcher: GDLauncher antigo, ATLauncher, FTB, MultiMC, Technic, PrismLauncher, mais os apps Modrinth e CurseForge se instalados. Fontes de arquivo: CurseForge .zip, Modrinth .mrpack, GDLauncher .gdlpack." },
+      { name: "Aponte pro arquivo ou launcher", text: "Pra arquivos, navegue até o .zip ou .mrpack. Pra launchers, o GDLauncher lê direto a lista de instâncias do launcher de origem. Às vezes o launcher de origem precisa estar no local default; senão, escolha a pasta manual." },
+      { name: "Escolha as instâncias pra importar", text: "Se a origem tem múltiplas instâncias, vai aparecer uma lista. Marque as que vai importar. Cada uma vira uma nova instância GDLauncher com pasta própria." },
+      { name: "Espere a importação terminar", text: "O GDLauncher copia a pasta da instância, resolve o mod loader e registra no banco. Modpacks grandes com centenas de mods levam alguns minutos. Olhe o painel Tasks pra ver o progresso." }
+    ]
+  },
+  it: {
+    title: "Come importare un'istanza in GDLauncher",
+    description: "Importa un'istanza Minecraft esistente in GDLauncher da uno .zip CurseForge, un .mrpack Modrinth, un codice di condivisione GDL o un altro launcher (MultiMC, ATLauncher, PrismLauncher, Technic, FTB, vecchio GDLauncher).",
+    steps: [
+      { name: "Apri il flusso di importazione", text: "Apri la pagina Library, fai clic destro su uno spazio vuoto e scegli Import Instance, oppure clicca il pulsante + nella toolbar della Library e passa alla scheda Import. Si vedono due sezioni: 'Import from Launcher' e 'Import from File'." },
+      { name: "Scegli la sorgente", text: "Seleziona una tile. Sorgenti basate su launcher: vecchio GDLauncher, ATLauncher, FTB, MultiMC, Technic, PrismLauncher, oltre alle app Modrinth e CurseForge se installate. Sorgenti basate su file: CurseForge .zip, Modrinth .mrpack, GDLauncher .gdlpack." },
+      { name: "Indica il file o il launcher", text: "Per i file, sfoglia fino allo .zip o al .mrpack. Per i launcher, GDLauncher legge direttamente la lista di istanze del launcher di origine. A volte serve che il launcher di origine sia installato nel percorso di default, altrimenti scegli la cartella a mano." },
+      { name: "Scegli quali istanze importare", text: "Se la sorgente ha più istanze vedrai un elenco. Spunta quelle da importare. Ognuna diventa una nuova istanza GDLauncher con la propria cartella." },
+      { name: "Attendi la fine dell'import", text: "GDLauncher copia la cartella dell'istanza, risolve il mod loader e la registra nel database. I modpack grandi con centinaia di mod richiedono qualche minuto. Controlla il pannello Tasks per vedere il progresso." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["Pack ファイル vs ランチャーインポート", "インポートされるもの", "失敗した場合", "GDLauncher Share コードからのインポート", "インポート後"],
+    paras: [
+      "2 つのフローは別物。Pack ファイル (CurseForge の <code>.zip</code>、Modrinth の <code>.mrpack</code>) は新規インストール、GDLauncher がマニフェストを読み参照する全 Mod を CDN からダウンロード。ランチャーインポートは既存インスタンスをコピー、すでにディスク上の Mod、設定、ワールドを含む。ワールドを残したい場合はランチャーインポート、誰かに渡された Pack で新規に始める場合はファイルインポート。",
+      "ランチャーインポートでは GDLauncher がインスタンスフォルダー全体をコピーします: Mod、設定、ワールド、スクリーンショット、options.txt、リソースパック、シェーダーパックすべて。アカウントやグローバル設定は対象外 (これらは元ランチャーのアプリデータにあり、インスタンス外)。Pack ファイルインポートでは Pack の Mod と同梱オーバーライドを展開。ワールドとスクリーンショットは空 (Pack 作者が overrides にスタートワールドを入れていない限り)。",
+      "よくある原因: マニフェスト記載の Mod がもう存在しない (Pack 作者がバージョンを取り下げた → 特定 projectID/fileID で「file not found」エラー、作者に問い合わせるかマニフェスト更新を待つ)。元ランチャーのインスタンスディレクトリが想定外の場所にある (MultiMC や ATLauncher などはユーザーが場所を変更している場合あり、プロンプトで手動指定)。Pack 形式が新しすぎる (まれにマニフェストフィールドが追加される、GDLauncher を最新に更新)。",
+      "友達が GDLauncher Share コード (または <code>gdl.gg/i/&lt;code&gt;</code> リンク) を送ってきた場合は、インスタンス作成モーダルを開いて <strong>Code Share</strong> タブに切り替えます。コードを貼り付けると GDLauncher が GDL サービスからプレビューを取得、確認してインポート。Share コードフローは受信側に GDL アカウントが必要。",
+      "新インスタンスが Library に新規生成アイコンで表示。Modpack ならデフォルトでロック (インスタンス Settings に Modpack Info セクションと Change Modpack Version ボタン)。Custom インスタンスなら未ペア状態で、Addons タブから Mod リストを自由に編集可能。"
+    ]
+  },
+  ko: {
+    headings: ["팩 파일 vs 런처 임포트", "무엇이 가져와지나", "실패하는 경우", "GDLauncher 공유 코드로 가져오기", "가져온 후"],
+    paras: [
+      "두 흐름은 서로 다른 일을 합니다. 팩 파일(CurseForge의 <code>.zip</code>, Modrinth의 <code>.mrpack</code>)은 새로운 설치, GDLauncher가 매니페스트를 읽고 참조하는 모든 모드를 해당 CDN에서 받습니다. 런처 임포트는 기존 인스턴스를 복사, 이미 디스크에 있는 모드, 설정, 월드를 포함. 월드를 유지하고 싶다면 런처 임포트, 누가 준 팩으로 새로 시작이라면 파일 임포트.",
+      "런처 임포트에서는 GDLauncher가 인스턴스 폴더 전체를 복사합니다: 모드, 설정, 월드, 스크린샷, options.txt, 리소스 팩, 셰이더 팩 전부. 계정과 글로벌 설정은 복사 안 함(그건 원본 런처의 앱 데이터에 있고 인스턴스에 없음). 팩 파일 임포트에서는 GDLauncher가 팩의 모드와 번들 오버라이드를 풉니다. 월드와 스크린샷은 비어 있음(팩 저자가 overrides에 스타터 월드를 넣지 않은 한).",
+      "흔한 원인: 매니페스트에 적힌 모드가 더는 존재하지 않음(팩 저자가 버그로 버전을 내림 → 특정 projectID/fileID에 대해 'file not found'; 저자에게 문의하거나 매니페스트 업데이트 대기). 원본 런처 인스턴스 디렉터리가 GDLauncher가 기대하는 곳이 아님(MultiMC, ATLauncher 등은 사용자가 위치를 옮기는 경우가 있음; 안내가 뜨면 폴더 수동 선택). 팩 포맷이 너무 새로움(매니페스트 필드가 추가될 때가 있음; GDLauncher를 최신으로 업데이트).",
+      "친구가 GDLauncher 공유 코드(또는 <code>gdl.gg/i/&lt;code&gt;</code> 링크)를 보낸 경우, 인스턴스 생성 모달을 열고 <strong>Code Share</strong> 탭으로 전환하세요. 코드를 붙여넣으면 GDLauncher가 GDL 서비스에서 미리보기를 가져오고, 확인 후 가져옵니다. 공유 코드 흐름은 수신 측에 GDL 계정이 필요.",
+      "새 인스턴스가 새로 생성된 아이콘으로 Library에 나타납니다. 모드팩이면 기본적으로 잠김(인스턴스 Settings에 Modpack Info 섹션과 Change Modpack Version 버튼). 커스텀 인스턴스면 페어 해제 상태로, Addons 탭에서 모드 목록을 자유롭게 편집 가능."
+    ]
+  },
+  de: {
+    headings: ["Pack-Datei vs. Launcher-Import", "Was importiert wird", "Wenn der Import fehlschlägt", "Aus einem GDLauncher-Share-Code importieren", "Nach dem Import"],
+    paras: [
+      "Die zwei Flows tun Unterschiedliches. Eine Pack-Datei (<code>.zip</code> von CurseForge, <code>.mrpack</code> von Modrinth) ist eine frische Installation, GDLauncher liest das Manifest und lädt jeden referenzierten Mod aus dem passenden CDN. Ein Launcher-Import kopiert eine bestehende Instanz, inklusive der Mods auf der Platte, der Configs und der Welten. Wer Welten behalten will: Launcher-Import. Wer mit einem geteilten Pack frisch startet: Datei-Import.",
+      "Beim Launcher-Import kopiert GDLauncher den kompletten Instanz-Ordner: Mods, Configs, Welten, Screenshots, options.txt, Resource Packs, Shader Packs, alles. Accounts und globale Launcher-Settings werden nicht mitgenommen, die liegen in den App-Daten des Quell-Launchers, nicht in den Instanzen. Beim Pack-Datei-Import entpackt GDLauncher die Mods und die mitgelieferten Overrides. Welten und Screenshots sind leer (außer der Pack-Autor hat eine Start-Welt in Overrides gelegt).",
+      "Häufige Ursachen: Ein im Manifest gelisteter Mod existiert nicht mehr (Pack-Autor zog eine Version wegen Bugs zurück; 'file not found' für eine bestimmte projectID/fileID, Autor fragen oder auf Manifest-Update warten). Das Instanz-Verzeichnis des Quell-Launchers liegt nicht da, wo GDLauncher es erwartet (bei MultiMC, ATLauncher etc. wurde es manchmal verschoben, manuell wählen). Das Pack-Format ist zu neu (selten kommt ein neues Manifest-Feld; GDLauncher auf neueste Version bringen).",
+      "Hat dir jemand einen GDLauncher-Share-Code geschickt (oder einen <code>gdl.gg/i/&lt;code&gt;</code>-Link)? Öffne das Instanz-Erstellungsmodal und wechsle auf den <strong>Code Share</strong>-Tab. Code einfügen, GDLauncher holt eine Vorschau vom GDL-Dienst, du bestätigst, fertig. Der Share-Code-Flow setzt auf deiner Seite einen GDL-Account voraus.",
+      "Die neue Instanz erscheint in der Library mit frisch generiertem Icon. Wenn's ein Modpack war, ist sie default-locked (Settings zeigen Modpack-Info mit Change-Modpack-Version-Button). Custom-Instanz: unpaired, Mod-Liste frei im Addons-Tab bearbeitbar."
+    ]
+  },
+  fr: {
+    headings: ["Fichier de pack vs import depuis launcher", "Ce qui est importé", "Si l'import échoue", "Importer depuis un code de partage GDLauncher", "Après l'import"],
+    paras: [
+      "Les deux flows font des choses différentes. Un fichier de pack (<code>.zip</code> CurseForge, <code>.mrpack</code> Modrinth) est une install fraîche, GDLauncher lit le manifest et télécharge chaque mod référencé depuis le CDN correspondant. Un import depuis launcher copie une instance existante, mods déjà sur le disque, configs et mondes inclus. Pour migrer depuis un autre launcher en gardant les mondes, utilise l'import launcher. Pour démarrer frais avec un pack qu'on t'a donné, utilise l'import fichier.",
+      "À l'import launcher, GDLauncher copie tout le dossier de l'instance : mods, configs, mondes, screenshots, options.txt, resource packs, shader packs, tout. Il ne copie pas tes comptes ni tes settings globaux, ceux-là vivent dans l'app data du launcher source, pas dans les instances. À l'import fichier, GDLauncher décompresse les mods et les overrides bundlés. Mondes et screenshots sont vides (sauf si l'auteur a mis un monde de départ dans overrides).",
+      "Causes courantes : un mod listé dans le manifest n'existe plus (l'auteur a retiré une version à cause de bugs ; tu vois 'file not found' pour un projectID/fileID précis ; demande à l'auteur ou attends une mise à jour). Le répertoire d'instances du launcher source n'est pas là où GDLauncher l'attend (chez MultiMC, ATLauncher etc., l'utilisateur l'a parfois déplacé ; choisis le dossier à la main). Le format de pack est trop récent (de temps en temps un nouveau champ de manifest est ajouté ; mets GDLauncher à jour).",
+      "Si un ami t'envoie un code de partage GDLauncher (ou un lien <code>gdl.gg/i/&lt;code&gt;</code>), ouvre la modale de création d'instance et bascule sur l'onglet <strong>Code Share</strong>. Colle le code, GDLauncher récupère un preview depuis le service GDL, et tu confirmes pour importer. Le flow de code de partage demande un compte GDL côté réception.",
+      "La nouvelle instance apparaît dans la Library avec une icône fraîchement générée. Si c'était un modpack, elle est verrouillée par défaut (Modpack Info en haut des Settings avec un bouton Change Modpack Version). Si c'était une instance custom, elle est non appairée, tu peux éditer la liste des mods librement depuis l'onglet Addons."
+    ]
+  },
+  es: {
+    headings: ["Archivo de pack vs import de launcher", "Qué se importa", "Si la importación falla", "Importar desde un código de compartición GDLauncher", "Después de la importación"],
+    paras: [
+      "Los dos flujos hacen cosas distintas. Un archivo de pack (<code>.zip</code> de CurseForge, <code>.mrpack</code> de Modrinth) es una instalación fresca, GDLauncher lee el manifest y descarga cada mod referenciado desde el CDN correspondiente. Un import desde launcher copia una instancia existente, mods ya en disco, configs y mundos incluidos. Para migrar de otro launcher manteniendo mundos, usa import launcher. Para empezar fresco con un pack que te dieron, usa import archivo.",
+      "Con import launcher, GDLauncher copia toda la carpeta de instancia: mods, configs, mundos, capturas, options.txt, resource packs, shader packs, todo. No copia tus cuentas ni tus settings globales, esos viven en la app data del launcher origen, no en las instancias. Con import archivo, GDLauncher desempaca los mods y los overrides bundleados. Mundos y capturas están vacíos (a menos que el autor del pack haya incluido un mundo inicial en overrides).",
+      "Razones comunes: un mod listado en el manifest ya no existe (el autor del pack retiró una versión por bugs; verás 'file not found' para un projectID/fileID concreto; pregúntale al autor o espera a una actualización del manifest). El directorio de instancias del launcher origen no está donde GDLauncher espera (en MultiMC, ATLauncher etc. a veces el usuario lo movió; elige la carpeta a mano cuando se pida). El formato del pack es demasiado nuevo (de vez en cuando se añade un campo de manifest; actualiza GDLauncher a la última).",
+      "Si un amigo te envía un código de compartición GDLauncher (o un enlace <code>gdl.gg/i/&lt;code&gt;</code>), abre el modal de creación de instancia y cambia a la pestaña <strong>Code Share</strong>. Pega el código, GDLauncher trae una previsualización del servicio GDL y tú confirmas para importar. El flujo de código de compartición requiere cuenta GDL en tu lado.",
+      "La nueva instancia aparece en la Library con un icono recién generado. Si era un modpack, viene bloqueada por defecto (Modpack Info arriba en Settings con un botón Change Modpack Version). Si era una instancia custom, queda no pareada, puedes editar la lista de mods libremente desde la pestaña Addons."
+    ]
+  },
+  "pt-BR": {
+    headings: ["Arquivo de pack vs import de launcher", "O que é importado", "Se a importação falhar", "Importando de um código de compartilhamento GDLauncher", "Depois da importação"],
+    paras: [
+      "Os dois fluxos fazem coisas diferentes. Um arquivo de pack (<code>.zip</code> do CurseForge, <code>.mrpack</code> do Modrinth) é uma instalação fresca, o GDLauncher lê o manifest e baixa todo mod referenciado do CDN correspondente. Um import de launcher copia uma instância existente, incluindo mods já no disco, configs e mundos. Pra migrar de outro launcher mantendo os mundos, use import de launcher. Pra começar do zero com um pack que alguém te deu, use import de arquivo.",
+      "No import de launcher, o GDLauncher copia a pasta inteira da instância: mods, configs, mundos, prints, options.txt, resource packs, shader packs, tudo. Não copia suas contas nem seus settings globais, esses vivem no app data do launcher de origem, não nas instâncias. No import de arquivo, o GDLauncher desempacota os mods e os overrides bundleados. Mundos e prints ficam vazios (a não ser que o autor do pack tenha colocado um mundo inicial em overrides).",
+      "Causas comuns: um mod listado no manifest não existe mais (o autor do pack tirou uma versão por causa de bug; aparece 'file not found' pra um projectID/fileID específico; pergunte ao autor ou espere uma atualização do manifest). O diretório de instâncias do launcher de origem não está onde o GDLauncher espera (em MultiMC, ATLauncher etc. às vezes o usuário moveu; escolha a pasta na mão quando pedir). Formato do pack muito novo (de vez em quando um campo de manifest novo aparece; atualize o GDLauncher).",
+      "Se um amigo te mandou um código de compartilhamento GDLauncher (ou link <code>gdl.gg/i/&lt;code&gt;</code>), abra o modal de criação de instância e mude pra aba <strong>Code Share</strong>. Cole o código, o GDLauncher busca um preview do serviço GDL, e você confirma pra importar. O fluxo de share code exige conta GDL do seu lado.",
+      "A nova instância aparece na Library com um ícone gerado na hora. Se era modpack, vem bloqueada por padrão (Modpack Info no topo das Settings com botão Change Modpack Version). Se era instância custom, fica desemparelhada, dá pra editar a lista de mods livremente pela aba Addons."
+    ]
+  },
+  it: {
+    headings: ["File di pack vs import da launcher", "Cosa viene importato", "Se l'import fallisce", "Importare da un codice di condivisione GDLauncher", "Dopo l'import"],
+    paras: [
+      "I due flussi fanno cose diverse. Un file di pack (<code>.zip</code> CurseForge, <code>.mrpack</code> Modrinth) è un'installazione da zero: GDLauncher legge il manifest e scarica ogni mod referenziata dal CDN corrispondente. Un import da launcher copia un'istanza esistente, incluse mod già sul disco, config e mappe. Per migrare da un altro launcher mantenendo le mappe usa l'import da launcher. Per partire da zero con un pack che ti hanno passato usa l'import da file.",
+      "Con l'import da launcher, GDLauncher copia l'intera cartella dell'istanza: mod, config, mappe, screenshot, options.txt, resource pack, shader pack, tutto. Non copia gli account né le impostazioni globali, quelle vivono nell'app data del launcher di origine e non nelle istanze. Con l'import da file, GDLauncher estrae le mod e gli override inclusi. Mappe e screenshot rimangono vuoti (a meno che l'autore del pack non abbia incluso una mappa iniziale negli overrides).",
+      "Cause comuni: una mod elencata nel manifest non esiste più (l'autore del pack ha ritirato una versione per un bug, vedi 'file not found' per uno specifico projectID/fileID, chiedi all'autore o aspetta un aggiornamento del manifest). La directory delle istanze del launcher di origine non è dove GDLauncher se la aspetta (in MultiMC, ATLauncher ecc. a volte l'utente l'ha spostata, scegli la cartella a mano quando viene richiesto). Formato del pack troppo nuovo (ogni tanto viene aggiunto un campo nel manifest, aggiorna GDLauncher all'ultima versione).",
+      "Se un amico ti ha mandato un codice di condivisione GDLauncher (o un link <code>gdl.gg/i/&lt;code&gt;</code>), apri il modal di creazione istanza e passa alla scheda <strong>Code Share</strong>. Incolla il codice, GDLauncher recupera un'anteprima dal servizio GDL e tu confermi per importare. Il flusso del codice di condivisione richiede un account GDL dal tuo lato.",
+      "La nuova istanza appare nella Library con un'icona generata al volo. Se era un modpack arriva bloccata di default (in cima a Settings c'è la sezione Modpack Info con il pulsante Change Modpack Version). Se era un'istanza custom resta sganciata, puoi modificare liberamente la lista delle mod dalla scheda Addons."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT3M", steps: m.steps }}>
+  <h2>{b.headings[0]}</h2>
+  <p set:html={localizeInternalLinks(b.paras[0], locale)}></p>
+
+  <h2>{b.headings[1]}</h2>
+  <p set:html={localizeInternalLinks(b.paras[1], locale)}></p>
+
+  <h2>{b.headings[2]}</h2>
+  <p set:html={localizeInternalLinks(b.paras[2], locale)}></p>
+
+  <h2>{b.headings[3]}</h2>
+  <p set:html={localizeInternalLinks(b.paras[3], locale)}></p>
+
+  <h2>{b.headings[4]}</h2>
+  <p set:html={localizeInternalLinks(b.paras[4], locale)}></p>
+</GuideLayout>

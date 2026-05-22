@@ -1,0 +1,181 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher でインスタンスを複製する方法",
+    description: "既存のインスタンスを丸ごとコピー。Mod 変更を安全にテストしたり、プレイスルーを分岐したりするのに便利。",
+    steps: [
+      { name: "インスタンスを右クリック", text: "Library で複製したいインスタンスを右クリック。" },
+      { name: "More Options を開く", text: "More Options にホバーしてサブメニューを表示。" },
+      { name: "Duplicate をクリック", text: "Duplicate (コピーアイコン) を選択。GDLauncher がインスタンスフォルダーを新しい名前でコピーし、別インスタンスとして登録。" },
+      { name: "コピー完了を待つ", text: "小さなインスタンスなら数秒、数百 Mod の大型 Modpack は 1~2 分。その間ランチャーはファイルシステムコピーでブロックします。完了すると新しいインスタンスが元の隣に表示。" },
+      { name: "好みでリネーム", text: "複製は元の名前にサフィックスが付きます。右クリック → Edit でわかりやすい名前に変更。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 인스턴스 복제하는 법",
+    description: "기존 인스턴스의 전체 복사본을 만들기. 모드 변경을 안전하게 테스트하거나 플레이를 분기할 때 유용.",
+    steps: [
+      { name: "인스턴스 오른쪽 클릭", text: "Library에서 복제할 인스턴스를 오른쪽 클릭." },
+      { name: "More Options 열기", text: "More Options 위에 마우스를 올려 서브메뉴 표시." },
+      { name: "Duplicate 클릭", text: "Duplicate(복사 아이콘) 선택. GDLauncher가 인스턴스 폴더를 새 이름으로 복사하고 별도 인스턴스로 등록." },
+      { name: "복사 완료 대기", text: "작은 인스턴스는 몇 초, 수백 모드 대형 모드팩은 1~2분. 그 동안 런처는 파일시스템 복사로 블록됩니다. 끝나면 새 인스턴스가 원본 옆에 나타납니다." },
+      { name: "원하면 이름 변경", text: "복제본은 원본 이름에 접미사가 붙음. 오른쪽 클릭 → Edit으로 의미 있는 이름으로 변경." }
+    ]
+  },
+  de: {
+    title: "Eine Instanz in GDLauncher duplizieren",
+    description: "Eine vollständige Kopie einer Instanz erstellen, praktisch zum sicheren Testen von Mod-Änderungen oder zum Verzweigen eines Spielstands.",
+    steps: [
+      { name: "Rechtsklick auf die Instanz", text: "In der Library Rechtsklick auf die zu duplizierende Instanz." },
+      { name: "More Options öffnen", text: "Über More Options hovern, um das Untermenü zu öffnen." },
+      { name: "Duplicate klicken", text: "Duplicate wählen (Copy-Icon). GDLauncher kopiert den Instanz-Ordner unter einem neuen Namen und registriert ihn als eigene Instanz." },
+      { name: "Auf die Kopie warten", text: "Bei kleinen Instanzen Sekunden, große Modpacks mit hunderten Mods brauchen ein bis zwei Minuten; währenddessen blockiert der Launcher auf der Filesystem-Kopie. Fertig: die neue Instanz erscheint neben dem Original." },
+      { name: "Bei Bedarf umbenennen", text: "Das Duplikat bekommt den Originalnamen plus Suffix. Rechtsklick → Edit zum Umbenennen." }
+    ]
+  },
+  fr: {
+    title: "Comment dupliquer une instance dans GDLauncher",
+    description: "Fais une copie complète d'une instance existante, utile pour tester des changements de mods en sécurité ou pour brancher une partie.",
+    steps: [
+      { name: "Clic droit sur l'instance", text: "Dans la Library, clic droit sur l'instance à dupliquer." },
+      { name: "Ouvrir More Options", text: "Survole More Options pour faire apparaître le sous-menu." },
+      { name: "Cliquer Duplicate", text: "Choisis Duplicate (icône copie). GDLauncher copie le dossier de l'instance sous un nouveau nom et l'enregistre comme une instance séparée." },
+      { name: "Attendre la copie", text: "Pour les petites instances, copie en quelques secondes. Les gros modpacks avec des centaines de mods prennent une minute ou deux ; pendant ce temps le launcher est bloqué sur une copie filesystem. À la fin, la nouvelle instance apparaît à côté de l'originale." },
+      { name: "Renommer si tu veux", text: "Le duplicat reçoit le nom original plus un suffixe. Clic droit → Edit pour le renommer en quelque chose de plus parlant." }
+    ]
+  },
+  es: {
+    title: "Cómo duplicar una instancia en GDLauncher",
+    description: "Haz una copia completa de una instancia existente, útil para probar cambios de mods con seguridad o para bifurcar una partida.",
+    steps: [
+      { name: "Clic derecho en la instancia", text: "En la Library, clic derecho en la instancia a duplicar." },
+      { name: "Abrir More Options", text: "Pasa el ratón por More Options para revelar el submenú." },
+      { name: "Pulsar Duplicate", text: "Elige Duplicate (icono de copia). GDLauncher copia la carpeta de la instancia con un nombre nuevo y la registra como instancia aparte." },
+      { name: "Esperar la copia", text: "Instancias pequeñas se copian en segundos. Modpacks grandes con cientos de mods tardan uno o dos minutos; durante ese tiempo el launcher está bloqueado en una copia de filesystem. Al terminar, la nueva instancia aparece junto a la original." },
+      { name: "Renombrar si quieres", text: "El duplicado recibe el nombre original más un sufijo. Clic derecho → Edit para renombrarlo a algo significativo." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como duplicar uma instância no GDLauncher",
+    description: "Faça uma cópia completa de uma instância existente, útil pra testar mudanças de mod com segurança ou bifurcar uma campanha.",
+    steps: [
+      { name: "Botão direito na instância", text: "Na Library, botão direito na instância que vai duplicar." },
+      { name: "Abra More Options", text: "Passe o mouse por More Options pra revelar o submenu." },
+      { name: "Clique Duplicate", text: "Escolha Duplicate (ícone de cópia). O GDLauncher copia a pasta da instância com um novo nome e registra como instância separada." },
+      { name: "Espere a cópia", text: "Instâncias pequenas copiam em segundos. Modpacks grandes com centenas de mods levam um ou dois minutos; durante esse tempo o launcher bloqueia numa cópia do filesystem. Quando terminar, a nova instância aparece ao lado da original." },
+      { name: "Renomeie se quiser", text: "O duplicado pega o nome original mais um sufixo. Botão direito → Edit pra renomear pra algo significativo." }
+    ]
+  },
+  it: {
+    title: "Come duplicare un'istanza in GDLauncher",
+    description: "Fai una copia completa di un'istanza esistente, utile per testare modifiche alle mod in sicurezza o per ramificare una partita.",
+    steps: [
+      { name: "Clic destro sull'istanza", text: "Nella Library, fai clic destro sull'istanza da duplicare." },
+      { name: "Apri More Options", text: "Passa il mouse su More Options per rivelare il sottomenu." },
+      { name: "Clicca Duplicate", text: "Scegli Duplicate (icona di copia). GDLauncher copia la cartella dell'istanza con un nuovo nome e la registra come istanza separata." },
+      { name: "Attendi la copia", text: "Le istanze piccole si copiano in pochi secondi. I modpack grandi con centinaia di mod richiedono uno o due minuti, durante i quali il launcher si blocca sulla copia del filesystem. Quando finisce, la nuova istanza appare accanto all'originale." },
+      { name: "Rinomina se vuoi", text: "Il duplicato eredita il nome originale con un suffisso. Clic destro → Edit per rinominarlo con qualcosa di più chiaro." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["コピーされるもの", "Duplicate を使う場面", "コピーされないもの", "Locked / Unlocked、Paired / Unpaired", "ディスク容量の注意"],
+    paras: [
+      "インスタンスフォルダー全体: Mod、設定、ワールド、スクリーンショット、options.txt、リソースパック、シェーダーパック、インスタンス別 GDLauncher メタデータを含む。複製は元から独立、片方の変更がもう片方に影響しません。",
+      "<strong>Mod 変更の安全テスト</strong>: 新しい Mod を試したいけど壊れるか不安? 先に複製、コピーで試し、安定を確認してから元を更新。<strong>プレイスルー分岐</strong>: ワールドの分岐点で両方向を試したい? 複製して各分岐を別々に遊ぶ。<strong>同じベースで別 Mod ローダーを試す</strong>: 複製、複製側のローダーを切替 (<a href=\"/guides/switch-mod-loader\">Mod ローダー切替方法</a>参照)。<strong>リスキーな変更前の安価なバックアップ</strong>: プレイ中の Modpack バージョン更新が一例、先に複製、コピーで更新実行。",
+      "インスタンスフォルダー外のものは複製されません。アカウントとランチャーレベルの設定は同じまま (どっちみちインスタンス別ではない)。一部 Modpack は App Data Path や別の場所にコンテンツを持ち、それらも複製されませんが、実用上問題になることは稀。",
+      "複製はロック状態と Modpack ペアリングを保持。ロックされた Modpack インスタンスはロックされた Modpack 複製を作り、同じ Modpack を指したまま。両方ともインスタンスの Settings タブの Change Modpack Version で独立に更新可能。複製にソースパックを追跡させたくないなら、複製後に Settings タブを開いて Modpack Info セクションの <strong>Unpair</strong> をクリック。",
+      "複製はファイルシステム完全コピー、シンボリックリンクや copy-on-write ではありません。各複製は元のディスク使用量を倍にします。50 GB の Modpack ならすぐ膨らみます、長期保持の必要を検討してください。"
+    ]
+  },
+  ko: {
+    headings: ["복사되는 것", "Duplicate를 쓸 때", "복사되지 않는 것", "Locked vs Unlocked, Paired vs Unpaired", "디스크 공간 주의"],
+    paras: [
+      "인스턴스 폴더 전체: 모드, 설정, 월드, 스크린샷, options.txt, 리소스 팩, 셰이더 팩, 인스턴스별 GDLauncher 메타데이터 포함. 복제는 원본과 독립적, 한쪽 변경이 다른 쪽에 영향 없음.",
+      "<strong>모드 변경 안전 테스트</strong>: 새 모드 추가가 망가뜨릴까 봐 걱정? 먼저 복제, 사본에서 테스트, 안정 확인 후에만 원본 업데이트. <strong>플레이 분기</strong>: 월드의 전환점에서 양쪽 모두 시도? 복제하고 각 분기를 따로 플레이. <strong>같은 베이스에 다른 모드 로더 시도</strong>: 복제, 복제본의 로더 전환(<a href=\"/guides/switch-mod-loader\">모드 로더 전환</a> 참고). <strong>위험한 변경 전 저렴한 백업</strong>: 플레이 도중 모드팩 버전 업데이트가 한 예; 먼저 복제, 사본에서 업데이트 수행.",
+      "인스턴스 폴더 밖의 것은 복제되지 않습니다. 계정과 런처 레벨 설정은 같이 유지(어차피 인스턴스별이 아님). 일부 모드팩은 App Data Path나 다른 곳에 콘텐츠를 가지는데 그것들도 복제 안 됨, 하지만 실무에선 거의 문제 안 됨.",
+      "복제는 잠금 상태와 모드팩 페어링을 유지. 잠긴 모드팩 인스턴스는 같은 모드팩을 가리키는 잠긴 모드팩 복제본을 만듭니다. 둘 다 인스턴스의 Settings 탭의 Change Modpack Version으로 독립 업데이트 가능. 복제본이 소스 팩을 더 추적하지 않게 하려면, 복제 후 Settings 탭을 열고 Modpack Info 섹션의 <strong>Unpair</strong>를 누르세요.",
+      "복제는 파일시스템 전체 복사, 심볼릭 링크나 copy-on-write가 아닙니다. 각 복제본은 원본의 디스크 사용량을 두 배로 만듭니다. 50 GB 모드팩이면 빠르게 누적되니, 장기 보유 필요성을 고려하세요."
+    ]
+  },
+  de: {
+    headings: ["Was kopiert wird", "Wann Duplicate sinnvoll ist", "Was nicht kopiert wird", "Locked vs unlocked, paired vs unpaired", "Plattenplatz beachten"],
+    paras: [
+      "Der gesamte Instanz-Ordner: Mods, Configs, Welten, Screenshots, options.txt, Resource Packs, Shader Packs und die Per-Instanz-Metadaten von GDLauncher. Das Duplikat ist unabhängig vom Original; Änderungen am einen wirken nicht aufs andere.",
+      "<strong>Mod-Änderungen sicher testen.</strong> Du willst einen neuen Mod ausprobieren, aber Angst vor Brüchen? Erst duplizieren, am Klon testen, das Original nur updaten, wenn's stabil ist. <strong>Spielstand verzweigen.</strong> An einem Wendepunkt in der Welt und du willst beide Wege ausprobieren? Duplizieren und beide Zweige getrennt spielen. <strong>Anderen Mod-Loader auf gleicher Basis testen.</strong> Duplizieren, am Duplikat den Loader wechseln (siehe <a href=\"/guides/switch-mod-loader\">Mod-Loader wechseln</a>). <strong>Billiges Backup vor riskanten Änderungen.</strong> Mitten im Playthrough ein Modpack-Update? Erst duplizieren, am Klon updaten.",
+      "Was außerhalb des Instanz-Ordners liegt, wird nicht dupliziert. Accounts und Launcher-Settings bleiben identisch (sind eh nicht per-Instanz). Manche Modpacks haben Content unter App Data oder anderswo; das wird auch nicht mit kopiert, kommt aber selten vor.",
+      "Duplicate erhält den Lock-Status und das Modpack-Pairing. Eine gesperrte Modpack-Instanz produziert ein gesperrtes Modpack-Duplikat, das auf dasselbe Pack zeigt. Beide lassen sich per Change Modpack Version im Settings-Tab der Instanz unabhängig updaten. Soll das Duplikat den Quell-Pack nicht mehr tracken, nach dem Duplizieren im Settings-Tab unter Modpack Info auf <strong>Unpair</strong> klicken.",
+      "Duplikate sind komplette Filesystem-Kopien, keine Symlinks oder Copy-on-Write. Jede Kopie verdoppelt die Plattennutzung der Originale. Bei 50-GB-Modpacks summiert sich das schnell, überleg, was du wirklich langfristig brauchst."
+    ]
+  },
+  fr: {
+    headings: ["Ce qui est copié", "Quand utiliser Duplicate", "Ce qui n'est pas copié", "Locked vs unlocked, paired vs unpaired", "Attention à l'espace disque"],
+    paras: [
+      "Tout le dossier de l'instance, mods, configs, mondes, screenshots, options.txt, resource packs, shader packs et la métadonnée GDLauncher par instance. Le duplicat est indépendant de l'original ; les changements sur l'un n'affectent pas l'autre.",
+      "<strong>Tester des changements de mods en sécurité.</strong> Tu veux essayer un nouveau mod mais tu crains que ça casse ? Duplique d'abord, teste sur la copie, ne mets à jour l'original qu'une fois que tu sais que c'est stable. <strong>Brancher une partie.</strong> Tu as atteint un tournant dans un monde et tu veux essayer les deux voies ? Duplique, puis joue chaque branche séparément. <strong>Essayer un autre mod loader sur la même base.</strong> Duplique, change le loader du duplicat (voir <a href=\"/guides/switch-mod-loader\">Comment changer de mod loader</a>). <strong>Backup pas cher avant changements risqués.</strong> Une mise à jour de modpack en pleine partie en est un exemple ; duplique d'abord, fais la mise à jour sur la copie.",
+      "Ce qui est hors du dossier d'instance n'est pas dupliqué. Tes comptes et settings au niveau launcher restent les mêmes (ils ne sont pas per-instance de toute façon). Certains modpacks ont du contenu sous le chemin App Data ou ailleurs ; ceux-là ne sont pas dupliqués non plus, mais c'est assez rare pour ne pas compter.",
+      "Dupliquer préserve l'état de verrouillage et le pairing modpack. Une instance modpack verrouillée produit un duplicat verrouillé, pointant toujours sur le même modpack. Les deux peuvent être mis à jour indépendamment via Change Modpack Version dans l'onglet Settings de l'instance. Si tu veux que le duplicat ne suive plus le pack source, ouvre son onglet Settings et clique <strong>Unpair</strong> dans la section Modpack Info après duplication.",
+      "Les duplicats sont des copies filesystem complètes, pas des symlinks ni du copy-on-write. Chaque duplicat double l'utilisation disque de l'original. Pour des modpacks de 50 Go, ça s'additionne vite ; pense à ce que tu dois vraiment garder à long terme."
+    ]
+  },
+  es: {
+    headings: ["Qué se copia", "Cuándo usar Duplicate", "Qué no se copia", "Locked vs unlocked, paired vs unpaired", "Aviso de espacio en disco"],
+    paras: [
+      "Toda la carpeta de la instancia, incluyendo mods, configs, mundos, capturas, options.txt, resource packs, shader packs y la metadata por instancia de GDLauncher. El duplicado es independiente del original; los cambios en uno no afectan al otro.",
+      "<strong>Probar cambios de mods con seguridad.</strong> ¿Quieres añadir un mod nuevo pero te preocupa que rompa cosas? Duplica primero, prueba en la copia, actualiza el original solo cuando sepas que es estable. <strong>Bifurcar una partida.</strong> Llegaste a un punto de inflexión en un mundo y quieres probar las dos vías? Duplica y juega cada rama por separado. <strong>Probar otro mod loader en la misma base.</strong> Duplica, cambia el loader del duplicado (ver <a href=\"/guides/switch-mod-loader\">Cómo cambiar de mod loader</a>). <strong>Backup barato antes de cambios arriesgados.</strong> Una actualización de modpack a mitad de partida es un ejemplo; duplica primero, haz la actualización sobre la copia.",
+      "Lo que está fuera de la carpeta de instancia no se duplica. Tus cuentas y ajustes a nivel launcher se quedan igual (no son por instancia de todas formas). Algunos modpacks tienen contenido en el App Data Path o en otros sitios; eso tampoco se duplica, pero es lo bastante raro para no importar.",
+      "Duplicar preserva el estado de bloqueo y el pareo del modpack. Una instancia modpack bloqueada produce un duplicado modpack bloqueado, que sigue apuntando al mismo modpack. Las dos se pueden actualizar de forma independiente vía Change Modpack Version en la pestaña Settings de la instancia. Si quieres que el duplicado deje de seguir el pack origen, abre su pestaña Settings y pulsa <strong>Unpair</strong> en la sección Modpack Info tras duplicar.",
+      "Los duplicados son copias completas del filesystem, no enlaces simbólicos ni copy-on-write. Cada duplicado dobla el uso de disco del original. Para modpacks de 50 GB, se acumula rápido; piensa qué necesitas mantener a largo plazo."
+    ]
+  },
+  "pt-BR": {
+    headings: ["O que é copiado", "Quando usar Duplicate", "O que não é copiado", "Locked vs unlocked, paired vs unpaired", "Cuidado com espaço em disco"],
+    paras: [
+      "A pasta inteira da instância, incluindo mods, configs, mundos, prints, options.txt, resource packs, shader packs e a metadata por instância do GDLauncher. O duplicado é independente do original; mudanças em um não afetam o outro.",
+      "<strong>Testar mudanças de mod com segurança.</strong> Quer testar um mod novo mas tem medo que quebre? Duplique primeiro, teste na cópia, atualize o original só quando souber que tá estável. <strong>Bifurcar uma campanha.</strong> Chegou num ponto crucial num mundo e quer tentar os dois lados? Duplique e jogue cada ramo separadamente. <strong>Testar outro mod loader na mesma base.</strong> Duplique, troque o loader do duplicado (veja <a href=\"/guides/switch-mod-loader\">Como trocar mod loader</a>). <strong>Backup barato antes de mudanças arriscadas.</strong> Atualização de modpack no meio da campanha é um exemplo; duplique primeiro, faça o update na cópia.",
+      "O que está fora da pasta da instância não é duplicado. Suas contas e configurações em nível de launcher continuam iguais (não são por instância de qualquer jeito). Alguns modpacks têm conteúdo no App Data Path ou em outro lugar; esses também não são duplicados, mas é raro o suficiente pra não importar.",
+      "Duplicar preserva o estado de bloqueio e o pareamento do modpack. Uma instância de modpack bloqueada produz um duplicado bloqueado, que ainda aponta pro mesmo modpack. As duas podem ser atualizadas independentemente via Change Modpack Version na aba Settings da instância. Se quiser que o duplicado pare de rastrear o pack de origem, abra a aba Settings dele e clique em <strong>Unpair</strong> na seção Modpack Info depois de duplicar.",
+      "Duplicados são cópias completas do filesystem, não symlinks nem copy-on-write. Cada duplicado dobra o uso de disco do original. Pra modpacks de 50 GB, isso soma rápido; pense no que você precisa manter a longo prazo."
+    ]
+  },
+  it: {
+    headings: ["Cosa viene copiato", "Quando usare Duplicate", "Cosa non viene copiato", "Locked vs unlocked, paired vs unpaired", "Attenzione allo spazio su disco"],
+    paras: [
+      "L'intera cartella dell'istanza, inclusi mod, config, mappe, screenshot, options.txt, resource pack, shader pack e i metadati per-istanza di GDLauncher. Il duplicato è indipendente dall'originale: le modifiche su uno non si ripercuotono sull'altro.",
+      "<strong>Testare modifiche alle mod in sicurezza.</strong> Vuoi provare una nuova mod ma temi che rompa qualcosa? Duplica prima, testa sulla copia, aggiorna l'originale solo quando sai che è stabile. <strong>Ramificare una partita.</strong> Sei a un punto di svolta in una mappa e vuoi tentare entrambe le strade? Duplica e gioca ogni ramo separatamente. <strong>Provare un altro mod loader sulla stessa base.</strong> Duplica, cambia il loader sul duplicato (vedi <a href=\"/guides/switch-mod-loader\">Come cambiare mod loader</a>). <strong>Backup economico prima di modifiche rischiose.</strong> Un aggiornamento di modpack a metà partita è un esempio: duplica prima, fai l'update sulla copia.",
+      "Quello che sta fuori dalla cartella dell'istanza non viene duplicato. Account e impostazioni a livello di launcher restano gli stessi (non sono per-istanza comunque). Alcuni modpack hanno contenuti nell'App Data Path o altrove: anche quelli non vengono duplicati, ma è abbastanza raro da non contare.",
+      "Duplicate preserva lo stato di lock e il pairing del modpack. Un'istanza modpack bloccata produce un duplicato bloccato che punta ancora allo stesso modpack. Entrambe possono essere aggiornate indipendentemente via Change Modpack Version nella scheda Settings dell'istanza. Se vuoi che il duplicato smetta di tracciare il pack di origine, apri la sua scheda Settings e clicca <strong>Unpair</strong> nella sezione Modpack Info dopo aver duplicato.",
+      "I duplicati sono copie complete del filesystem, non symlink né copy-on-write. Ogni duplicato raddoppia l'uso di disco dell'originale. Per modpack da 50 GB l'occupazione sale in fretta, pensa a cosa ti serve davvero tenere a lungo termine."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

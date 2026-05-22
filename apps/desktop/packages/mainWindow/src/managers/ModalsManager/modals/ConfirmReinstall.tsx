@@ -54,24 +54,42 @@ const ConfirmReinstall = (props: ModalProps) => {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} width="w-110">
-      <div class="flex flex-col gap-6">
-        <div>
+      <div class="flex flex-col gap-5">
+        <div class="text-lightSlate-50">
           <Trans
-            key="instances:_trn_reinstall_confirmation_text"
-            options={{
-              name: props.data?.name,
-              worlds_kept: isServer()
-                ? t("instances:_trn_reinstall_worlds_kept_server")
-                : t("instances:_trn_reinstall_worlds_kept_instance")
-            }}
+            key="instances:_trn_reinstall_question"
+            options={{ name: props.data?.name }}
           >
             {""}
             <span class="font-bold" />
             {""}
-            <span class="text-lightSlate-400 block pt-2 text-sm" />
-            {""}
           </Trans>
         </div>
+
+        <p class="text-lightSlate-300 m-0 text-sm leading-relaxed">
+          {t(
+            isServer()
+              ? "instances:_trn_reinstall_intro_server"
+              : "instances:_trn_reinstall_intro_instance"
+          )}
+        </p>
+
+        <p class="text-lightSlate-300 m-0 text-sm leading-relaxed">
+          {t(
+            isServer()
+              ? "instances:_trn_reinstall_replaced_server"
+              : "instances:_trn_reinstall_replaced_instance"
+          )}
+        </p>
+
+        <p class="text-lightSlate-300 m-0 text-sm leading-relaxed">
+          {t(
+            isServer()
+              ? "instances:_trn_reinstall_kept_server"
+              : "instances:_trn_reinstall_kept_instance"
+          )}
+        </p>
+
         <div class="flex w-full justify-between">
           <Button
             onClick={() => {

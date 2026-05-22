@@ -1,0 +1,194 @@
+---
+/**
+ * Localized "How to Allocate More RAM to a Minecraft Server" guide.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizedPath,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft サーバーへの RAM 割り当てを増やす方法",
+    description: "GDLauncher の Minecraft サーバーに割り当てるメモリを増やし、プレイヤー数や Mod、チャンク負荷に対応できるようにします。",
+    steps: [
+      { name: "Library でサーバーを開く", text: "GDLauncher の Servers (または Library) からサーバーを選んで開きます。" },
+      { name: "サーバーの Settings を開く", text: "上部の歯車アイコンをクリック (またはサーバーを右クリック → Settings)。" },
+      { name: "Maximum RAM スライダーを調整", text: "メモリセクションで Maximum RAM スライダーを目的の値に。上限はシステム RAM の 80% または 32 GB の小さい方です。" },
+      { name: "保存", text: "確定するとサーバーの起動引数に書き込まれます。" },
+      { name: "サーバーを再起動", text: "実行中なら停止してから再起動。RAM の変更は次回起動時に反映されます。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 서버에 RAM을 더 할당하는 방법",
+    description: "GDLauncher의 Minecraft 서버에 할당할 메모리를 늘려 더 많은 플레이어, 모드, 청크 부하를 처리할 수 있게 합니다.",
+    steps: [
+      { name: "Library에서 서버 열기", text: "GDLauncher의 Servers(또는 Library)에서 서버를 골라 엽니다." },
+      { name: "서버 Settings 열기", text: "상단의 톱니 아이콘 클릭(또는 서버 오른쪽 클릭 → Settings)." },
+      { name: "Maximum RAM 슬라이더 조정", text: "메모리 섹션에서 Maximum RAM 슬라이더를 원하는 값으로. 시스템 RAM의 80% 또는 32 GB 중 작은 쪽이 상한입니다." },
+      { name: "저장", text: "확인을 누르면 서버의 실행 인수에 적용됩니다." },
+      { name: "서버 재시작", text: "실행 중이면 중지하고 다시 실행하세요. RAM 변경은 다음 시작 때 적용됩니다." }
+    ]
+  },
+  de: {
+    title: "Mehr RAM für einen Minecraft-Server zuweisen",
+    description: "Erhöh den Speicher, der einem Minecraft-Server im GDLauncher zur Verfügung steht, für mehr Spieler, mehr Mods und schwerere Chunk-Last.",
+    steps: [
+      { name: "Server in der Library öffnen", text: "Im GDLauncher unter Servers (oder Library) den Server auswählen und öffnen." },
+      { name: "Server-Settings öffnen", text: "Oben auf das Zahnrad-Icon klicken (oder rechtsklick auf den Server → Settings)." },
+      { name: "Maximum-RAM-Regler anpassen", text: "Im Memory-Bereich den Maximum-RAM-Regler auf den gewünschten Wert ziehen. Das Limit liegt bei 80% deines System-RAMs oder 32 GB, was zuerst greift." },
+      { name: "Speichern", text: "Bestätigen. Der neue Wert landet in den Startparametern des Servers." },
+      { name: "Server neu starten", text: "Wenn er läuft, stoppen und neu starten. RAM-Änderungen greifen erst beim nächsten Start." }
+    ]
+  },
+  fr: {
+    title: "Comment allouer plus de RAM à un serveur Minecraft",
+    description: "Augmente la mémoire dispo pour un serveur Minecraft dans GDLauncher pour gérer plus de joueurs, plus de mods et plus de chunks.",
+    steps: [
+      { name: "Ouvrir le serveur dans la Library", text: "Dans GDLauncher, va dans Servers (ou Library), sélectionne le serveur et ouvre-le." },
+      { name: "Ouvrir les Settings du serveur", text: "Clique sur la roue dentée en haut (ou clic droit sur le serveur → Settings)." },
+      { name: "Régler le slider Maximum RAM", text: "Dans la section mémoire, ajuste Maximum RAM. Le plafond est 80% de ta RAM système ou 32 Go, selon le plus bas." },
+      { name: "Sauvegarder", text: "Confirme. La nouvelle valeur est écrite dans les arguments de lancement du serveur." },
+      { name: "Redémarrer le serveur", text: "S'il tourne, stoppe-le puis relance. Le changement de RAM s'applique au prochain démarrage." }
+    ]
+  },
+  es: {
+    title: "Cómo asignar más RAM a un servidor de Minecraft",
+    description: "Aumenta la memoria disponible para un servidor de Minecraft en GDLauncher para soportar más jugadores, más mods y mayor carga de chunks.",
+    steps: [
+      { name: "Abrir el servidor en la Library", text: "En GDLauncher, ve a Servers (o Library), selecciona el servidor y ábrelo." },
+      { name: "Abrir Settings del servidor", text: "Pulsa el icono del engranaje arriba (o clic derecho en el servidor → Settings)." },
+      { name: "Ajustar el slider Maximum RAM", text: "En la sección de memoria, mueve el slider de Maximum RAM al valor que quieras. El tope es el 80% de tu RAM o 32 GB, lo que sea menor." },
+      { name: "Guardar", text: "Confirma. El valor nuevo se escribe en los argumentos de arranque del servidor." },
+      { name: "Reiniciar el servidor", text: "Si está corriendo, detenlo y arráncalo de nuevo. Los cambios de RAM se aplican al siguiente arranque." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como alocar mais RAM a um servidor de Minecraft",
+    description: "Aumente a memória disponível para um servidor de Minecraft no GDLauncher para aguentar mais jogadores, mods e carga de chunks.",
+    steps: [
+      { name: "Abrir o servidor na Library", text: "No GDLauncher, vá em Servers (ou Library), selecione o servidor e abra-o." },
+      { name: "Abrir Settings do servidor", text: "Clique no ícone de engrenagem no topo (ou clique com o botão direito no servidor → Settings)." },
+      { name: "Ajustar o slider Maximum RAM", text: "Na seção de memória, mova o slider Maximum RAM para o valor desejado. O teto é 80% da sua RAM ou 32 GB, o que for menor." },
+      { name: "Salvar", text: "Confirme. O novo valor é gravado nos argumentos de inicialização do servidor." },
+      { name: "Reiniciar o servidor", text: "Se estiver rodando, pare e inicie de novo. Mudanças de RAM só valem no próximo arranque." }
+    ]
+  },
+  it: {
+    title: "Come allocare più RAM a un server Minecraft",
+    description: "Aumenta la memoria disponibile per un server Minecraft in GDLauncher per sostenere più giocatori, mod e carico di chunk.",
+    steps: [
+      { name: "Apri il server nella Library", text: "In GDLauncher, vai su Servers (o Library), seleziona il server e aprilo." },
+      { name: "Apri Settings del server", text: "Clicca l'icona dell'ingranaggio in alto (oppure clic destro sul server, Settings)." },
+      { name: "Regola lo slider Maximum RAM", text: "Nella sezione memoria, sposta lo slider Maximum RAM al valore desiderato. Il tetto è l'80% della tua RAM di sistema o 32 GB, qualunque sia il minore." },
+      { name: "Salva", text: "Conferma. Il nuovo valore viene scritto negli argomenti di avvio del server." },
+      { name: "Riavvia il server", text: "Se è in esecuzione, fermalo e riavvialo. Le modifiche di RAM hanno effetto dal prossimo avvio." }
+    ]
+  }
+}
+const m = meta[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>サーバーに必要な RAM の目安</h2>
+      <p>バニラで 1〜4 人なら 2GB、5〜20 人なら 4GB が目安。Mod 入りはぐっと増え、軽め (50 Mod) なら 4〜6GB、中規模 (100 Mod) で 6〜8GB、All The Mods や GregTech のような重量級は 8〜12GB 以上必要です。</p>
+
+      <h2>システム RAM を全部割り当てない</h2>
+      <p>GDLauncher のスライダーが 80% で止まるのは理由があります。OS や他のアプリにも RAM が必要で、超えるとスワップでフリーズします。16GB 機なら 8〜10GB をサーバーに割くのが現実的。</p>
+
+      <h2>サーバーとインスタンスのメモリは別</h2>
+      <p>サーバーの RAM 設定はクライアント (インスタンス) と独立しています。同じマシンで両方走らせる場合は合計が OS の取り分を残せるか確認しましょう。プレイヤー側のメモリ調整は <a href={localizedPath("/guides/allocate-more-ram", locale)}>インスタンスの RAM ガイド</a> を参照。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>서버에 필요한 RAM 가이드</h2>
+      <p>바닐라에 1~4인이면 2GB, 5~20인이면 4GB 정도가 무난합니다. 모드를 넣으면 늘어나서 가벼운 팩(50 모드)은 4~6GB, 중간(100 모드)은 6~8GB, All The Mods나 GregTech 같은 대형은 8~12GB 이상 필요합니다.</p>
+
+      <h2>시스템 RAM 전부를 주지 마세요</h2>
+      <p>GDLauncher 슬라이더가 80%에서 멈추는 데는 이유가 있습니다. OS와 다른 앱도 메모리가 필요하고, 초과하면 스왑으로 멈춤이 발생합니다. 16GB 머신이라면 서버에 8~10GB가 적당합니다.</p>
+
+      <h2>서버와 인스턴스 메모리는 별개</h2>
+      <p>서버의 RAM 설정은 클라이언트(인스턴스)와 독립입니다. 같은 머신에서 둘 다 실행한다면 합계가 OS 몫을 남기도록 확인하세요. 플레이어 쪽 메모리는 <a href={localizedPath("/guides/allocate-more-ram", locale)}>인스턴스 RAM 가이드</a>를 참고.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Wie viel RAM braucht ein Server</h2>
+      <p>Vanilla mit 1–4 Spielern: 2 GB. 5–20 Spieler: 4 GB. Modded steigt deutlich: leichter Pack (50 Mods) 4–6 GB, mittlerer (100 Mods) 6–8 GB, große wie All The Mods oder GregTech 8–12 GB und mehr.</p>
+
+      <h2>Nicht den ganzen System-RAM zuweisen</h2>
+      <p>Der Slider stoppt bei 80% aus gutem Grund. OS und andere Programme brauchen auch RAM, drüber kommt Swap-Thrashing und der Server stockt. Auf einem 16-GB-Rechner sind 8–10 GB für den Server der Sweetspot.</p>
+
+      <h2>Server- vs Instanz-Speicher</h2>
+      <p>Die RAM-Einstellung des Servers ist unabhängig von einer Client-Instanz für dasselbe Modpack. Wenn du beides auf demselben Rechner laufen lässt, achte darauf, dass die Summe noch Luft fürs OS lässt. Für die Spieler-Seite siehe den <a href={localizedPath("/guides/allocate-more-ram", locale)}>RAM-Guide für Instanzen</a>.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Combien de RAM pour le serveur</h2>
+      <p>Vanilla, 1–4 joueurs : 2 Go. 5–20 joueurs : 4 Go. Avec mods ça grimpe : pack léger (50 mods) 4–6 Go, moyen (100 mods) 6–8 Go, gros comme All The Mods ou GregTech 8–12 Go et plus.</p>
+
+      <h2>Ne donne pas toute ta RAM</h2>
+      <p>Le slider plafonne à 80% pour une raison. L'OS et les autres apps ont aussi besoin de mémoire, au-delà, c'est du swap thrashing et le serveur fige par à-coups. Sur 16 Go de RAM, 8–10 Go pour le serveur, c'est le sweet spot.</p>
+
+      <h2>Mémoire serveur vs instance</h2>
+      <p>Le réglage RAM du serveur est indépendant d'une instance client pour le même modpack. Si tu fais tourner les deux sur la même machine, vérifie que le total laisse de la marge à l'OS. Pour le côté joueur, voir le <a href={localizedPath("/guides/allocate-more-ram", locale)}>guide RAM pour instance</a>.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Cuánta RAM necesita el servidor</h2>
+      <p>Vanilla con 1–4 jugadores: 2 GB. 5–20 jugadores: 4 GB. Modeado sube mucho: pack ligero (50 mods) 4–6 GB, medio (100 mods) 6–8 GB, grandes como All The Mods o GregTech 8–12 GB o más.</p>
+
+      <h2>No asignes toda la RAM del sistema</h2>
+      <p>El slider se topa al 80% por algo. El SO y las demás apps también necesitan memoria, por encima entra swap thrashing y el servidor se congela. En una máquina de 16 GB, 8–10 GB para el servidor es el sweet spot.</p>
+
+      <h2>Memoria del servidor vs de la instancia</h2>
+      <p>El ajuste de RAM del servidor es independiente de una instancia cliente del mismo modpack. Si vas a correr ambos en la misma máquina, asegúrate de que la suma deje aire al SO. Para el lado del jugador, mira la <a href={localizedPath("/guides/allocate-more-ram", locale)}>guía de RAM para instancias</a>.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>Quanta RAM o servidor precisa</h2>
+      <p>Vanilla com 1–4 jogadores: 2 GB. 5–20 jogadores: 4 GB. Modado sobe bastante: pack leve (50 mods) 4–6 GB, médio (100 mods) 6–8 GB, grandes como All The Mods ou GregTech 8–12 GB ou mais.</p>
+
+      <h2>Não aloque toda a RAM do sistema</h2>
+      <p>O slider para em 80% por um motivo. O SO e os outros apps também precisam de memória, acima disso entra swap thrashing e o servidor trava. Em uma máquina de 16 GB, 8–10 GB para o servidor é o ideal.</p>
+
+      <h2>Memória do servidor vs da instância</h2>
+      <p>A RAM do servidor é independente de uma instância cliente do mesmo modpack. Se for rodar os dois na mesma máquina, garanta que a soma deixe folga para o SO. Para o lado do jogador, veja o <a href={localizedPath("/guides/allocate-more-ram", locale)}>guia de RAM para instâncias</a>.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Quanta RAM serve al server</h2>
+      <p>Vanilla con 1-4 giocatori: 2 GB. 5-20 giocatori: 4 GB. Con le mod sale parecchio: pack leggero (50 mod) 4-6 GB, medio (100 mod) 6-8 GB, grandi come All The Mods o GregTech 8-12 GB o più.</p>
+
+      <h2>Non assegnare tutta la RAM di sistema</h2>
+      <p>Lo slider si ferma all'80% per un motivo. Anche il sistema operativo e le altre app hanno bisogno di memoria, oltre quel limite parte lo swap thrashing e il server va a scatti. Su una macchina da 16 GB, 8-10 GB per il server sono il punto ideale.</p>
+
+      <h2>Memoria del server vs dell'istanza</h2>
+      <p>L'impostazione RAM del server è indipendente da un'istanza client per lo stesso Modpack. Se li fai girare entrambi sulla stessa macchina, assicurati che la somma lasci aria al sistema operativo. Per il lato giocatore, vedi la <a href={localizedPath("/guides/allocate-more-ram", locale)}>guida RAM per le istanze</a>.</p>
+    </Fragment>
+  )}
+</GuideLayout>

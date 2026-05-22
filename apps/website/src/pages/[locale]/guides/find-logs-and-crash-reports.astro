@@ -1,0 +1,157 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher で Minecraft のログとクラッシュレポートを見つける方法",
+    description: "GDLauncher がログとクラッシュレポートを保存する場所、アプリ内での表示方法、サポート依頼への添付方法。",
+    steps: [
+      { name: "インスタンスを右クリック", text: "GDLauncher の Library で対象インスタンスを右クリックし、More Options → View Logs を選択。" },
+      { name: "起動セッションを選ぶ", text: "Logs サイドバーに日付ごと (Today、Yesterday、X 日前) のすべての起動が並びます。最新は上部にハイライト。任意のセッションをクリックすると本体パネルにロード。" },
+      { name: "ログを検索", text: "検索バーで行を絞り込みます。横のトグルで正規表現、大文字小文字区別、完全一致を切替。クラッシュなら 'caused by'、'Exception'、疑わしい Mod 名を検索。" },
+      { name: "Minecraft 側のログを見る", text: "View Logs はランチャーのインスタンス別ログを表示。Minecraft 自体のログ (latest.log) やクラッシュダンプは、インスタンス右クリック → Open Folder → instance/logs/ または instance/crash-reports/。" },
+      { name: "サポート用に共有", text: "インスタンスフォルダーを開き、latest.log (または該当クラッシュレポート) を Discord メッセージや GitHub Issue に添付できる場所にコピー。チャットに直接貼り付けないでください。ログは通常大きすぎます。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 Minecraft 로그와 크래시 리포트 찾는 법",
+    description: "GDLauncher가 로그와 크래시 리포트를 저장하는 위치, 앱에서 보는 법, 지원 요청에 첨부하는 법.",
+    steps: [
+      { name: "인스턴스 오른쪽 클릭", text: "GDLauncher Library에서 대상 인스턴스를 오른쪽 클릭하고 More Options → View Logs를 선택." },
+      { name: "실행 세션 선택", text: "Logs 사이드바에 날짜별(Today, Yesterday, X일 전)로 모든 실행이 나열됩니다. 최신이 상단에 강조. 아무 세션이나 클릭해 메인 패널에 로드." },
+      { name: "로그 검색", text: "검색바로 줄을 필터링. 옆 토글로 정규식, 대소문자 구분, 단어 단위 매칭 전환. 크래시라면 'caused by', 'Exception', 의심 모드 이름을 검색." },
+      { name: "Minecraft 쪽 로그 보기", text: "View Logs는 런처의 인스턴스별 로그를 보여줍니다. Minecraft 자체 로그(latest.log)와 크래시 덤프는 인스턴스 오른쪽 클릭 → Open Folder → instance/logs/ 또는 instance/crash-reports/." },
+      { name: "지원용 공유", text: "인스턴스 폴더를 열고 latest.log(또는 해당 크래시 리포트)를 Discord 메시지나 GitHub 이슈에 첨부할 위치로 복사. 채팅에 바로 붙여 넣지 마세요. 로그 파일은 보통 너무 큽니다." }
+    ]
+  },
+  de: {
+    title: "Minecraft-Logs und Crash-Reports in GDLauncher finden",
+    description: "Wo GDLauncher Logs und Crash-Reports speichert, wie du sie in der App siehst und wie du sie an einen Support-Request anhängst.",
+    steps: [
+      { name: "Rechtsklick auf die Instanz", text: "Im GDLauncher-Library rechts auf die betroffene Instanz klicken, More Options → View Logs wählen." },
+      { name: "Launch-Session aussuchen", text: "Die Logs-Seitenleiste listet alle Starts nach Datum (Heute, Gestern, vor X Tagen). Der aktuellste ist oben hervorgehoben. Klick auf eine Session lädt sie ins Hauptfenster." },
+      { name: "Im Log suchen", text: "Über die Suchleiste Zeilen filtern. Toggles daneben für Regex, Groß-/Kleinschreibung und Whole-Word. Bei Crashes nach 'caused by', 'Exception' oder dem Namen eines verdächtigen Mods suchen." },
+      { name: "Minecraft-Seite finden", text: "View Logs zeigt das per-Instanz-Log des Launchers. Minecrafts eigenes Log (latest.log) und Crash-Dumps liegen in instance/logs/ bzw. instance/crash-reports/, erreichbar über Rechtsklick → Open Folder." },
+      { name: "Für Support teilen", text: "Den Instanz-Ordner öffnen, latest.log (oder die passende Crash-Report-Datei) kopieren und an Discord oder GitHub anhängen. Nicht direkt in den Chat pasten, Logs sind meist zu groß." }
+    ]
+  },
+  fr: {
+    title: "Comment trouver les logs et crash reports de Minecraft dans GDLauncher",
+    description: "Où GDLauncher stocke logs et crash reports, comment les consulter dans l'app, et comment les joindre à une demande de support.",
+    steps: [
+      { name: "Clic droit sur l'instance", text: "Dans la Library GDLauncher, clic droit sur l'instance concernée, More Options → View Logs." },
+      { name: "Choisir la session de lancement", text: "La sidebar Logs liste tous les lancements groupés par date (Today, Yesterday, X jours). Le plus récent est mis en évidence en haut. Clique sur une session pour la charger dans le panneau principal." },
+      { name: "Chercher dans le log", text: "La barre de recherche filtre les lignes. Toggles à côté pour regex, sensibilité à la casse, mot entier. Pour un crash, cherche 'caused by', 'Exception' ou le nom d'un mod suspect." },
+      { name: "Voir le côté Minecraft", text: "View Logs montre le log du launcher par instance. Les logs de Minecraft lui-même (latest.log) et les crash dumps sont dans instance/logs/ ou instance/crash-reports/, accessibles via clic droit → Open Folder." },
+      { name: "Partager pour le support", text: "Ouvre le dossier de l'instance et copie latest.log (ou le crash report concerné) là où tu peux l'attacher à un message Discord ou une issue GitHub. Ne le colle pas directement dans le chat, les fichiers de log sont en général trop gros." }
+    ]
+  },
+  es: {
+    title: "Cómo encontrar los logs y crash reports de Minecraft en GDLauncher",
+    description: "Dónde guarda GDLauncher logs y crash reports, cómo verlos en la app y cómo adjuntarlos a una solicitud de soporte.",
+    steps: [
+      { name: "Clic derecho en la instancia", text: "En la Library de GDLauncher, clic derecho en la instancia, More Options → View Logs." },
+      { name: "Elegir la sesión de lanzamiento", text: "La barra lateral de Logs lista cada lanzamiento agrupado por fecha (Today, Yesterday, hace X días). El más reciente está resaltado arriba. Pulsa cualquier sesión para cargarla en el panel principal." },
+      { name: "Buscar en el log", text: "La barra de búsqueda filtra líneas. Los toggles al lado activan regex, mayúsculas/minúsculas, palabra completa. Para un crash, busca 'caused by', 'Exception' o el nombre del mod sospechoso." },
+      { name: "Ver el lado de Minecraft", text: "View Logs muestra el log del launcher por instancia. Los logs propios de Minecraft (latest.log) y los crash dumps están en instance/logs/ o instance/crash-reports/, accesibles vía clic derecho → Open Folder." },
+      { name: "Compartir para soporte", text: "Abre la carpeta de la instancia y copia latest.log (o el crash report relevante) donde puedas adjuntarlo a un mensaje de Discord o un issue de GitHub. No lo pegues directo en el chat, los logs suelen ser demasiado grandes." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como achar logs e crash reports do Minecraft no GDLauncher",
+    description: "Onde o GDLauncher guarda logs e crash reports, como ver pela app, e como anexar a um pedido de suporte.",
+    steps: [
+      { name: "Botão direito na instância", text: "Na Library do GDLauncher, botão direito na instância, More Options → View Logs." },
+      { name: "Escolha a sessão de lançamento", text: "A sidebar Logs lista cada lançamento agrupado por data (Today, Yesterday, X dias atrás). O mais recente fica destacado no topo. Clique qualquer sessão pra carregar no painel principal." },
+      { name: "Pesquise no log", text: "A barra de busca filtra linhas. Toggles ao lado pra regex, sensibilidade a maiúsculas, palavra inteira. Pra crash, procure 'caused by', 'Exception' ou o nome de um mod suspeito." },
+      { name: "Veja o lado Minecraft", text: "View Logs mostra o log do launcher por instância. Os logs do próprio Minecraft (latest.log) e os crash dumps ficam em instance/logs/ ou instance/crash-reports/, acessíveis via botão direito → Open Folder." },
+      { name: "Compartilhe pro suporte", text: "Abra a pasta da instância e copie latest.log (ou o crash report relevante) pra onde dê pra anexar em mensagem do Discord ou issue do GitHub. Não cole direto no chat, arquivos de log costumam ser grandes demais." }
+    ]
+  },
+  it: {
+    title: "Come trovare log e crash report di Minecraft in GDLauncher",
+    description: "Dove GDLauncher salva log e crash report, come consultarli dall'app, e come allegarli a una richiesta di supporto.",
+    steps: [
+      { name: "Clic destro sull'istanza", text: "Nella Library di GDLauncher, fai clic destro sull'istanza interessata e scegli More Options → View Logs." },
+      { name: "Scegli la sessione di avvio", text: "La sidebar Logs elenca ogni avvio raggruppato per data (Today, Yesterday, X giorni fa). Il più recente è evidenziato in alto. Clicca una sessione qualsiasi per caricarla nel pannello principale." },
+      { name: "Cerca nel log", text: "La barra di ricerca filtra le righe. I toggle accanto permettono regex, distinzione maiuscole/minuscole, parola intera. Per un crash, cerca 'caused by', 'Exception' o il nome di una mod sospetta." },
+      { name: "Guarda il lato Minecraft", text: "View Logs mostra il log del launcher per-istanza. I log di Minecraft stesso (latest.log) e i crash dump si trovano in instance/logs/ o instance/crash-reports/, raggiungibili via clic destro → Open Folder." },
+      { name: "Condividi per il supporto", text: "Apri la cartella dell'istanza e copia latest.log (o il crash report pertinente) dove puoi allegarlo a un messaggio Discord o a una issue GitHub. Non incollarlo direttamente in chat, i file di log sono di solito troppo grandi." }
+    ]
+  }
+}
+const m = meta[locale]
+const body: Record<Exclude<Locale, "en">, { paths: string; reading: string; share: string; clear: string }> = {
+  ja: {
+    paths: "GDLauncher と Minecraft はそれぞれ別の場所にログを書きます: ランチャーのインスタンス別ログは <code>&lt;instance&gt;/logs/</code>、Minecraft 自身のゲームログは <code>&lt;instance&gt;/instance/logs/latest.log</code>、クラッシュレポートは <code>&lt;instance&gt;/instance/crash-reports/</code>、アプリ全体のログは <code>&lt;runtime_path&gt;/__gdl_logs__/</code> (最新 10 件保持)。",
+    reading: "クラッシュレポートは形が決まっています。最初の有用な行は通常数段落あとで、<code>Caused by:</code> や <code>java.lang.…Exception</code> から始まります。直後のスタックトレース上部が実際の失敗点。Mod のクラス名 (<code>com.example.modid.…</code>) が見えればその Mod が容疑者。",
+    share: "サポート依頼の際はログ全体を添付してください。一行だけだと文脈が失われます。大きいファイルは Minecraft 向けの <code>mclo.gs</code> などのペーストサイト、または Discord にファイルとして添付。",
+    clear: "ログとクラッシュレポートは追記専用で削除安全。容量回収はインスタンスフォルダーを開いて <code>logs/</code>、<code>instance/logs/</code>、<code>instance/crash-reports/</code> の中身を削除。次回起動時に再作成。"
+  },
+  ko: {
+    paths: "GDLauncher와 Minecraft는 각자 다른 위치에 로그를 씁니다: 런처의 인스턴스별 로그는 <code>&lt;instance&gt;/logs/</code>, Minecraft 자체 게임 로그는 <code>&lt;instance&gt;/instance/logs/latest.log</code>, 크래시 리포트는 <code>&lt;instance&gt;/instance/crash-reports/</code>, 앱 전역 로그는 <code>&lt;runtime_path&gt;/__gdl_logs__/</code> (최근 10개 유지).",
+    reading: "크래시 리포트는 일정한 형식이 있습니다. 첫 번째 유용한 줄은 보통 몇 문단 뒤에 <code>Caused by:</code>나 <code>java.lang.…Exception</code>으로 시작합니다. 바로 다음 스택 트레이스의 맨 위가 실제 실패 지점. 모드 클래스 이름(<code>com.example.modid.…</code>)이 보이면 그 모드가 용의자.",
+    share: "지원 요청 시 로그 전체를 첨부하세요. 한 줄만은 맥락을 잃습니다. 큰 파일은 Minecraft용 <code>mclo.gs</code> 같은 페이스트 사이트나 Discord에 파일로 첨부.",
+    clear: "로그와 크래시 리포트는 추가만 되고 삭제해도 안전합니다. 공간 회수는 인스턴스 폴더를 열고 <code>logs/</code>, <code>instance/logs/</code>, <code>instance/crash-reports/</code> 내용을 삭제. 다음 실행 시 재생성."
+  },
+  de: {
+    paths: "GDLauncher und Minecraft schreiben Logs an verschiedene Stellen: per-Instanz-Launcher-Log unter <code>&lt;instance&gt;/logs/</code>, Minecrafts eigenes Game-Log in <code>&lt;instance&gt;/instance/logs/latest.log</code>, Crash-Reports in <code>&lt;instance&gt;/instance/crash-reports/</code>, app-weites Log in <code>&lt;runtime_path&gt;/__gdl_logs__/</code> (10 jüngste bleiben).",
+    reading: "Crash-Reports haben eine vorhersehbare Struktur. Die erste nützliche Zeile kommt meist ein paar Absätze rein und beginnt mit <code>Caused by:</code> oder <code>java.lang.…Exception</code>. Direkt danach steht der Stacktrace, oben steht der eigentliche Fehlerpunkt. Erscheint ein Mod-Klassenname (<code>com.example.modid.…</code>), ist dieser Mod der Verdächtige.",
+    share: "Beim Support immer das komplette Log anhängen, nicht nur die vermutete Fehlerzeile. Für große Dateien einen Paste-Dienst wie <code>mclo.gs</code> (für Minecraft-Logs gemacht) nutzen oder als Datei in Discord anhängen.",
+    clear: "Logs und Crash-Reports sind append-only und gefahrlos löschbar. Zum Platz freigeben den Instanz-Ordner öffnen und Inhalte von <code>logs/</code>, <code>instance/logs/</code> und <code>instance/crash-reports/</code> löschen. Beim nächsten Start werden sie neu angelegt."
+  },
+  fr: {
+    paths: "GDLauncher et Minecraft écrivent leurs logs à des endroits différents : log launcher par instance dans <code>&lt;instance&gt;/logs/</code>, log de jeu Minecraft dans <code>&lt;instance&gt;/instance/logs/latest.log</code>, crash reports dans <code>&lt;instance&gt;/instance/crash-reports/</code>, log global dans <code>&lt;runtime_path&gt;/__gdl_logs__/</code> (les 10 plus récents).",
+    reading: "Les crash reports ont une forme prévisible. La première ligne utile arrive quelques paragraphes après, préfixée par <code>Caused by:</code> ou <code>java.lang.…Exception</code>. Juste après vient la stack trace ; le haut de la pile est le vrai point de panne. Si une classe de mod apparaît (<code>com.example.modid.…</code>), ce mod est suspect.",
+    share: "Pour le support, attache le log entier, pas seulement la ligne que tu penses être l'erreur. Pour les gros fichiers, un site de paste comme <code>mclo.gs</code> (fait pour les logs Minecraft), ou en fichier dans Discord.",
+    clear: "Logs et crash reports sont append-only et leur suppression est sûre. Pour libérer de la place, ouvre le dossier d'instance et supprime le contenu de <code>logs/</code>, <code>instance/logs/</code> et <code>instance/crash-reports/</code>. Le launcher les recrée au prochain lancement."
+  },
+  es: {
+    paths: "GDLauncher y Minecraft escriben logs en lugares distintos: log del launcher por instancia en <code>&lt;instance&gt;/logs/</code>, log del juego Minecraft en <code>&lt;instance&gt;/instance/logs/latest.log</code>, crash reports en <code>&lt;instance&gt;/instance/crash-reports/</code>, log global en <code>&lt;runtime_path&gt;/__gdl_logs__/</code> (se conservan los 10 más recientes).",
+    reading: "Los crash reports tienen forma predecible. La primera línea útil suele estar unos párrafos abajo, con prefijo <code>Caused by:</code> o <code>java.lang.…Exception</code>. Justo después viene el stack trace; lo de arriba es el punto real de fallo. Si aparece una clase de mod (<code>com.example.modid.…</code>), ese mod es sospechoso.",
+    share: "Para soporte, adjunta el log entero, no solo la línea que crees que es el error. Para archivos grandes, un sitio de paste como <code>mclo.gs</code> (hecho para logs de Minecraft), o como archivo en Discord.",
+    clear: "Logs y crash reports son append-only y se borran sin riesgo. Para liberar disco, abre la carpeta de instancia y borra el contenido de <code>logs/</code>, <code>instance/logs/</code> y <code>instance/crash-reports/</code>. El launcher los recrea en el próximo arranque."
+  },
+  "pt-BR": {
+    paths: "GDLauncher e Minecraft escrevem logs em locais diferentes: log do launcher por instância em <code>&lt;instance&gt;/logs/</code>, log do jogo Minecraft em <code>&lt;instance&gt;/instance/logs/latest.log</code>, crash reports em <code>&lt;instance&gt;/instance/crash-reports/</code>, log global em <code>&lt;runtime_path&gt;/__gdl_logs__/</code> (10 mais recentes ficam).",
+    reading: "Crash reports têm formato previsível. A primeira linha útil costuma vir uns parágrafos abaixo, com prefixo <code>Caused by:</code> ou <code>java.lang.…Exception</code>. Logo depois vem o stack trace; o topo da pilha é o ponto real de falha. Se aparecer classe de mod (<code>com.example.modid.…</code>), esse mod é suspeito.",
+    share: "Pra suporte, anexe o log inteiro, não só a linha que você acha que é o erro. Pra arquivos grandes, site de paste tipo <code>mclo.gs</code> (feito pra logs do Minecraft), ou como arquivo no Discord.",
+    clear: "Logs e crash reports são append-only e podem ser apagados sem problema. Pra liberar disco, abra a pasta da instância e apague o conteúdo de <code>logs/</code>, <code>instance/logs/</code> e <code>instance/crash-reports/</code>. O launcher recria na próxima execução."
+  },
+  it: {
+    paths: "GDLauncher e Minecraft scrivono i log in posti diversi: log del launcher per-istanza in <code>&lt;instance&gt;/logs/</code>, log del gioco Minecraft in <code>&lt;instance&gt;/instance/logs/latest.log</code>, crash report in <code>&lt;instance&gt;/instance/crash-reports/</code>, log globale dell'app in <code>&lt;runtime_path&gt;/__gdl_logs__/</code> (vengono mantenuti i 10 più recenti).",
+    reading: "I crash report hanno una forma prevedibile. La prima riga utile arriva di solito qualche paragrafo dopo, con prefisso <code>Caused by:</code> o <code>java.lang.…Exception</code>. Subito dopo c'è lo stack trace, in cima trovi il vero punto di rottura. Se appare una classe di mod (<code>com.example.modid.…</code>), quella mod è il sospettato.",
+    share: "Per il supporto, allega il log intero, non solo la riga che pensi sia l'errore. Per i file grandi usa un servizio di paste come <code>mclo.gs</code> (pensato per i log di Minecraft), oppure allegalo come file su Discord.",
+    clear: "Log e crash report sono append-only e si possono cancellare in sicurezza. Per recuperare spazio, apri la cartella dell'istanza e svuota il contenuto di <code>logs/</code>, <code>instance/logs/</code> e <code>instance/crash-reports/</code>. Il launcher li ricrea al prossimo avvio."
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+  <h2>{locale === "ja" ? "ディスク上の保存場所" : locale === "ko" ? "디스크의 저장 위치" : locale === "de" ? "Wo Logs auf der Platte liegen" : locale === "fr" ? "Où vivent réellement les logs sur le disque" : locale === "es" ? "Dónde viven realmente los logs en disco" : locale === "it" ? "Dove vivono davvero i log sul disco" : "Onde os logs ficam no disco de verdade"}</h2>
+  <p set:html={localizeInternalLinks(b.paths, locale)}></p>
+
+  <h2>{locale === "ja" ? "クラッシュレポートの読み方" : locale === "ko" ? "크래시 리포트 읽기" : locale === "de" ? "Crash-Report lesen" : locale === "fr" ? "Lire un crash report" : locale === "es" ? "Leer un crash report" : locale === "it" ? "Leggere un crash report" : "Lendo um crash report"}</h2>
+  <p set:html={localizeInternalLinks(b.reading, locale)}></p>
+
+  <h2>{locale === "ja" ? "サポート依頼への添付" : locale === "ko" ? "지원 요청에 첨부" : locale === "de" ? "An Support-Request anhängen" : locale === "fr" ? "Attacher des logs à une demande de support" : locale === "es" ? "Adjuntar logs a una solicitud de soporte" : locale === "it" ? "Allegare i log a una richiesta di supporto" : "Anexando logs a um pedido de suporte"}</h2>
+  <p set:html={localizeInternalLinks(b.share, locale)}></p>
+
+  <h2>{locale === "ja" ? "古いログのクリア" : locale === "ko" ? "옛 로그 정리" : locale === "de" ? "Alte Logs aufräumen" : locale === "fr" ? "Nettoyer les vieux logs" : locale === "es" ? "Limpiar logs antiguos" : locale === "it" ? "Pulire i vecchi log" : "Limpando logs antigos"}</h2>
+  <p set:html={localizeInternalLinks(b.clear, locale)}></p>
+</GuideLayout>

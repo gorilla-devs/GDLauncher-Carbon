@@ -7,48 +7,52 @@ import GuideLayout from "../../components/GuideLayout.astro"
   description="Transform your Minecraft graphics with beautiful shader packs. Complete guide to installing shaders with GDLauncher."
   keywords="install shaders minecraft, minecraft shaders, how to install shaders, shader pack, iris shaders, optifine shaders, gdlauncher shaders"
   lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT4M",
+    steps: [
+      { name: "Pick a shader loader", text: "Shaders need either Iris (paired with Sodium, runs on Fabric/Quilt/NeoForge) or OptiFine (Forge or standalone). Iris is faster and more modern; OptiFine is the legacy default." },
+      { name: "Create or open a compatible instance", text: "For Iris, create a Fabric (or Quilt/NeoForge) instance and install Iris + Sodium from the Addons browser. For OptiFine, create a Forge instance and drop the OptiFine .jar into the instance's mods folder." },
+      { name: "Browse shader packs", text: "In the instance's Addons tab, click Add Addons and switch the addon type to Shaders. Complementary Reimagined, BSL, and Sildur's are reliable starting points." },
+      { name: "Download and apply", text: "Click Download. The shader is saved to the instance's shaderpacks folder. Launch the game, open Options → Video Settings → Shader Packs, and pick the one you installed." },
+      { name: "Tune for performance", text: "If FPS suffers, lower render distance, disable volumetric lighting, or swap to a lighter pack. Instance settings let you bump RAM if needed." }
+    ]
+  }}
 >
   <h2>What shaders do</h2>
   <p>
-    Shaders completely change how Minecraft looks. Dynamic shadows that follow the sun, water with actual reflections, light rays through trees, better clouds and fog. It's the difference between "blocky game" and "wait, that's actually pretty."
-  </p>
-  <p>
-    The catch is that shaders need GPU power. A mid-range dedicated GPU handles most shaders fine. Heavier packs like SEUS PTGI need something beefier. If your computer struggles with vanilla Minecraft, shaders probably aren't for you.
+    Shaders change how Minecraft renders: dynamic shadows, water reflections, light scattering through fog, and better clouds. They run on top of the game's existing renderer, so they need GPU power. A mid-range dedicated GPU handles most packs; heavier ones like SEUS PTGI need something faster. Integrated graphics can run lightweight packs but won't enjoy realistic ones.
   </p>
 
-  <h2>Iris (the recommended approach)</h2>
+  <h2>Iris (recommended)</h2>
   <p>
-    Iris is a modern shader mod for Fabric that works with Sodium, so you get both nice graphics and good performance. It's what most people use these days.
+    Iris is a shader mod for Fabric, Quilt, and NeoForge. It pairs with Sodium, so you get shaders and the performance improvements at once. Most modern shader packs are made for Iris.
   </p>
   <p>
-    Create an instance with Fabric as the mod loader. Open the instance, go to the <strong>Addons</strong> tab, and click <strong>Add Addons</strong>. Search for Iris Shaders and download it (Sodium usually comes bundled). Then select <strong>Shaders</strong> from the dropdown on the left of the search bar, find a shader pack you like, and click <strong>Download</strong>.
+    Create or open a Fabric instance. Go to the <strong>Addons</strong> tab, click <strong>Add Addons</strong>, and search for <em>Iris Shaders</em>. Sodium is usually pulled in as a dependency. Then switch the addon type to <strong>Shaders</strong>, find a pack you like, and click <strong>Download</strong>.
   </p>
   <p>
-    In-game, go to Options → Video Settings → Shader Packs, select your shader, and apply. Done.
-  </p>
-
-  <h2>OptiFine (the classic way)</h2>
-  <p>
-    OptiFine is the older method, mainly for Forge users. Download OptiFine from <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a> for your Minecraft version, drop the .jar into your instance's mods folder, and launch the game. Shaders go in Video Settings → Shaders.
-  </p>
-  <p>
-    Note that OptiFine conflicts with a lot of mods. If you're playing a modpack, check if it already has shader support or recommends a specific approach.
+    In-game: Options → Video Settings → Shader Packs → pick your shader.
   </p>
 
-  <h2>Shader recommendations</h2>
+  <h2>OptiFine</h2>
   <p>
-    Complementary Reimagined hits a nice balance between looking good and running well. BSL and Sildur's Vibrant are solid classics with lots of settings to tweak. For older hardware, try Complementary's Potato preset or Sildur's Enhanced Default.
+    OptiFine is the older method and still common in Forge modpacks. GDLauncher doesn't list OptiFine as a mod loader, so the install is manual: create a Forge instance, download the OptiFine .jar from <a href="https://optifine.net" target="_blank" rel="noopener">optifine.net</a> for your Minecraft version, and drop it into the instance's <code>mods</code> folder. Shaders then go in Options → Video Settings → Shaders.
   </p>
   <p>
-    High-end GPU? SEUS PTGI has path-traced global illumination (it's gorgeous and demanding). Continuum goes for photorealism. These need serious hardware.
+    OptiFine conflicts with a lot of modern mods. If you're playing a modpack, check what the pack itself recommends before adding OptiFine on top.
+  </p>
+
+  <h2>Recommended shaders</h2>
+  <p>
+    For a solid default, try Complementary Reimagined, it has presets from Potato to Ultra so the same pack scales across hardware. BSL is the warm, vibrant option. Sildur's Enhanced Default keeps the vanilla look with minor improvements. SEUS PTGI offers path-traced lighting on capable NVIDIA GPUs (released through the developer's Patreon).
   </p>
 
   <h2>Performance tips</h2>
   <p>
-    Most shaders have quality presets. Start with Medium or Low and work up. Render distance matters a lot with shaders, so try 8-12 chunks instead of 32. Volumetric lighting (god rays) and shadows are the heaviest features to disable if you're struggling.
+    Most shader packs have quality presets, start with Medium or Low and step up if you have headroom. Render distance is the biggest single FPS lever; 8–12 chunks is reasonable with shaders. Volumetric lighting and shadow quality are usually the next things to drop.
   </p>
   <p>
-    If a shader pack won't load at all, make sure it's compatible with your shader mod. Some work with Iris only, some with OptiFine only, some with both. Update your shader mod to the latest version.
+    If a shader pack won't load, check compatibility: some are Iris-only, some are OptiFine-only. Make sure your shader mod and the pack are both on a version compatible with your Minecraft version.
   </p>
 
 </GuideLayout>

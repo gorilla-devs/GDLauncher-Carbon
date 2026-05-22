@@ -1,0 +1,68 @@
+---
+import GuideLayout from "./GuideLayout.astro"
+import { getLocaleFromUrl, localizedPath } from "../lib/i18n"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const findLogsHref = localizedPath("/guides/find-logs-and-crash-reports", locale)
+---
+
+<GuideLayout
+  title="How to Share GDLauncher App Logs When Reporting an Issue"
+  description="Where GDLauncher writes its app-wide logs on Windows, macOS, and Linux, how to open the folder quickly, and what to attach to a Discord or GitHub issue."
+  keywords="gdlauncher logs, app logs location, share gdlauncher logs, gdlauncher support, electron log, runtime path logs"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Reproduce the issue", text: "Trigger the bug one more time so the relevant log is the most recent. The launcher rotates logs on every start, so a fresh run gives you a clean, easy-to-spot file." },
+      { name: "Open the app data folder", text: "On Windows press Win+R, paste %APPDATA%\\gdlauncher_carbon, then Enter. On macOS open Finder, press Cmd+Shift+G, paste ~/Library/Application Support/gdlauncher_carbon. On Linux open your file manager and go to ~/.local/share/gdlauncher_carbon (or $XDG_DATA_HOME/gdlauncher_carbon if you set it)." },
+      { name: "Grab main.log", text: "main.log in that folder is the Electron / launcher-process log. It captures startup, window state, IPC, and crashes that happen before the Rust core comes up. Copy it out." },
+      { name: "Grab the latest Rust core log", text: "Open data/__gdl_logs__/ (or your custom runtime path if you moved it) and grab the newest <timestamp>.log file. That's the Rust core log: account sign-in, downloads, instance launches, settings changes." },
+      { name: "Attach both", text: "Drag both files into a GDLauncher Discord ticket or a new GitHub issue. Don't paste them as text, they're usually too long. If you have to use chat, use a paste site like mclo.gs or gist.github.com." }
+    ]
+  }}
+>
+  <h2>Which log to share</h2>
+  <p>GDLauncher writes two app-level logs to different files. Most support requests need both:</p>
+  <ul>
+    <li><strong><code>main.log</code></strong>, the Electron main-process log. Covers everything the launcher does before and around the Rust core: window creation, IPC, auto-update, native dialogs, hard crashes of the desktop shell.</li>
+    <li><strong><code>__gdl_logs__/&lt;timestamp&gt;.log</code></strong>, the Rust core log. Covers what the launcher actually does once it's running: account sign-in, asset downloads, mod loader installs, instance launches, settings changes. Up to ten files are kept, the newest is the one you want.</li>
+  </ul>
+  <p>In practice we almost always need both. Grab both files before you open a ticket, even if you're sure only one is relevant. The two halves of the launcher hand work off to each other constantly, and the cause of a failure on one side often shows up in the other side's log.</p>
+
+  <h2>Where to find them</h2>
+  <h3>Windows</h3>
+  <p>App data folder: <code>%APPDATA%\gdlauncher_carbon\</code></p>
+  <p>The fastest way in: press <strong>Win+R</strong>, paste <code>%APPDATA%\gdlauncher_carbon</code>, hit Enter. Explorer opens directly in the folder.</p>
+  <p>Inside you'll see:</p>
+  <ul>
+    <li><code>main.log</code>, the Electron log.</li>
+    <li><code>data\__gdl_logs__\</code>, the Rust core logs.</li>
+    <li><code>runtime_path_override</code> (only if you moved your data to another drive), a single-line text file with the path to your custom runtime folder. If it's there, look in that custom folder for <code>__gdl_logs__\</code> instead of the default <code>data\</code> subfolder.</li>
+  </ul>
+
+  <h3>macOS</h3>
+  <p>App data folder: <code>~/Library/Application Support/gdlauncher_carbon/</code></p>
+  <p>In Finder, press <strong>Cmd+Shift+G</strong>, paste <code>~/Library/Application Support/gdlauncher_carbon</code>, hit Enter. <code>~/Library</code> is hidden by default, the Go-to-folder shortcut is the easiest way in.</p>
+  <p>Structure is the same as Windows: <code>main.log</code> in this folder, Rust core logs under <code>data/__gdl_logs__/</code>, optional <code>runtime_path_override</code> file if you moved your data.</p>
+
+  <h3>Linux</h3>
+  <p>App data folder: <code>~/.local/share/gdlauncher_carbon/</code> (or <code>$XDG_DATA_HOME/gdlauncher_carbon/</code> if you've set <code>XDG_DATA_HOME</code>).</p>
+  <p>Most file managers hide dot-folders by default; toggle hidden files with <strong>Ctrl+H</strong> (Nautilus, Nemo, Dolphin), or just paste the path into the location bar.</p>
+  <p>Same structure: <code>main.log</code> at the root, <code>data/__gdl_logs__/</code> for the Rust core logs, optional <code>runtime_path_override</code>.</p>
+
+  <h3>If you moved your runtime path</h3>
+  <p>The Rust core writes its logs to <code>&lt;runtime_path&gt;/__gdl_logs__/</code>. If you used <strong>Settings → Runtime Path</strong> to relocate your data (e.g. to a different drive), look there instead of <code>data/</code>. The exact path is the value inside the <code>runtime_path_override</code> file in the app data folder, or just check Settings → Runtime Path in the launcher.</p>
+
+  <h2>How to attach them</h2>
+  <p>For Discord, drag both files into the ticket channel. The 25 MB attachment limit is plenty, app logs are usually well under 1 MB each. For GitHub, open a new issue and drag the files into the comment, GitHub uploads them as attachments. For Reddit, paste into <a href="https://gist.github.com">gist.github.com</a> first, then link the gist.</p>
+  <p>Don't paste the contents into chat as a wall of text. Long pastes get truncated, lose newlines, and are unreadable on mobile. File attachments keep the original formatting and let whoever's helping search through the file.</p>
+  <p><a href="https://mclo.gs">mclo.gs</a> is designed for Minecraft <em>game</em> logs (the ones inside an instance), it isn't a great fit for app-level logs because it strips timestamps and merges multi-line stack traces. Use Discord, GitHub, or a gist for app logs.</p>
+
+  <h2>What's safe to share</h2>
+  <p>The logs contain your operating system, GPU, the launcher version, your Minecraft username and UUID (both already public), and absolute file paths. The home-directory portion of those paths includes your OS user name. If that happens to be your real name and you'd rather not share it, run a quick find-and-replace on the file before attaching, replace <code>C:\Users\YourName</code> (or <code>/home/yourname</code>, or <code>/Users/yourname</code>) with something neutral like <code>C:\Users\user</code>.</p>
+  <p>Credentials are <strong>not</strong> written to either log file. Microsoft access and refresh tokens, the GDL backend token, the local API token, and your email address are all withheld from the file output. The launcher logs that a refresh or sign-in happened, but never the token value. The launch command for Minecraft is logged with <code>--accessToken</code> replaced by <code>&lt;REDACTED&gt;</code>. You don't need to scrub the file before sharing it.</p>
+
+  <h2>Looking for game logs or crash reports?</h2>
+  <p>App logs cover the launcher. If Minecraft itself crashes or misbehaves, you want the per-instance game log or crash report instead, see the <a href={findLogsHref}>Find Logs and Crash Reports</a> guide for that.</p>
+</GuideLayout>
