@@ -2121,18 +2121,19 @@ impl From<FullAccount> for AccountWithStatus {
                 },
             },
             status: match value.type_ {
+                // An account is invalid only when it lacks the tokens needed to refresh
+                // and launch. `email` is optional display metadata extracted from the
+                // id_token (not all MSA id_tokens carry the claim) and never gates validity.
                 FullAccountType::Microsoft {
                     refresh_token: None,
                     ..
                 }
-                | FullAccountType::Microsoft { id_token: None, .. }
-                | FullAccountType::Microsoft { email: None, .. } => AccountStatus::Invalid,
+                | FullAccountType::Microsoft { id_token: None, .. } => AccountStatus::Invalid,
                 FullAccountType::Microsoft {
                     access_token,
                     token_expires,
                     refresh_token: Some(_),
                     id_token: Some(_),
-                    email: Some(_),
                     ..
                 } => match Utc::now() > DateTime::<Utc>::from(token_expires) {
                     true => AccountStatus::Expired,
