@@ -177,6 +177,9 @@ pub async fn prepare_modpack_from_gdlpack(
     let total_files = platform_files.len() as u64;
     let mut downloadables: Vec<(Downloadable, Option<String>)> = Vec::new();
     let mut unresolved_platform_files: Vec<FileHashes> = Vec::new();
+    // Tracks a platform API call that errored (as opposed to a successful "not found"), so a
+    // transient outage is surfaced as retryable instead of being misreported as a missing file.
+    let mut platform_error: Option<anyhow::Error> = None;
 
     if platform_files.is_empty() {
         debug!("No platform files to resolve");
@@ -195,6 +198,7 @@ pub async fn prepare_modpack_from_gdlpack(
             }
             Err(e) => {
                 warn!("Modrinth batch resolution failed: {}", e);
+                platform_error = Some(e.context("Modrinth file resolution failed"));
                 HashMap::new()
             }
         };
@@ -224,6 +228,9 @@ pub async fn prepare_modpack_from_gdlpack(
                 }
                 Err(e) => {
                     warn!("CurseForge batch resolution failed: {}", e);
+                    if platform_error.is_none() {
+                        platform_error = Some(e.context("CurseForge file resolution failed"));
+                    }
                     HashMap::new()
                 }
             }
@@ -284,6 +291,15 @@ pub async fn prepare_modpack_from_gdlpack(
 
     // Verify that unresolved platform files exist in overrides
     if !unresolved_platform_files.is_empty() {
+        // A file is only genuinely "not on the platforms" when the platform calls succeeded.
+        // If one errored, the unresolved set is unreliable, so surface the real retryable
+        // cause instead of demanding the files exist in overrides.
+        if let Some(err) = platform_error {
+            return Err(err.context(
+                "A platform API was temporarily unavailable while resolving modpack files; please retry",
+            ));
+        }
+
         let found_in_overrides = tokio::task::spawn_blocking({
             let gdlpack_path = gdlpack_path.to_path_buf();
             let overrides_dir = manifest.overrides.clone();
