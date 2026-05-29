@@ -355,34 +355,47 @@ impl ManagerRef<'_, InstanceManager> {
             None => None,
         };
 
-        let result = app.instance_manager().list_mods(instance_id, None).await?;
-        let msg = format!(
-            "Mods ({} enabled / {} disabled): {}",
-            result.iter().filter(|mod_| mod_.enabled).count(),
-            result.iter().filter(|mod_| !mod_.enabled).count(),
-            result.into_iter().fold(String::new(), |mut acc, mod_| {
-                acc.push_str("\n\t [");
-                if mod_.enabled {
-                    acc.push_str("x]");
-                } else {
-                    acc.push_str(" ]");
+        // Logging the mod list is best-effort: a failure to read the mod list or write the log
+        // line must not abort the launch and leave the instance stuck in Queued with no task to
+        // drive it out. The installation task spawned below is what actually drives the state.
+        match app.instance_manager().list_mods(instance_id, None).await {
+            Ok(result) => {
+                let msg = format!(
+                    "Mods ({} enabled / {} disabled): {}",
+                    result.iter().filter(|mod_| mod_.enabled).count(),
+                    result.iter().filter(|mod_| !mod_.enabled).count(),
+                    result.into_iter().fold(String::new(), |mut acc, mod_| {
+                        acc.push_str("\n\t [");
+                        if mod_.enabled {
+                            acc.push_str("x]");
+                        } else {
+                            acc.push_str(" ]");
+                        }
+
+                        acc.push(' ');
+                        acc.push_str(&mod_.filename);
+
+                        acc
+                    })
+                );
+
+                if let Some(file) = file.as_mut() {
+                    if let Some(log) = log.as_ref() {
+                        log.send_modify(|log| {
+                            log.add_entry(LogEntry::system_message(msg.clone()));
+                        });
+                    }
+                    if let Err(e) = file
+                        .write_all(format_message_as_log4j_event(&msg).as_bytes())
+                        .await
+                    {
+                        tracing::warn!({ error = ?e }, "Failed to write mod list to log file");
+                    }
                 }
-
-                acc.push(' ');
-                acc.push_str(&mod_.filename);
-
-                acc
-            })
-        );
-
-        if let Some(file) = file.as_mut() {
-            if let Some(log) = log.as_ref() {
-                log.send_modify(|log| {
-                    log.add_entry(LogEntry::system_message(msg.clone()));
-                });
             }
-            file.write_all(format_message_as_log4j_event(&msg).as_bytes())
-                .await?;
+            Err(e) => {
+                tracing::warn!({ error = ?e }, "Failed to list mods for the launch log");
+            }
         }
 
         let installation_task = tokio::spawn(async move {
