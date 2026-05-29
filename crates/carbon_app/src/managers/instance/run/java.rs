@@ -86,6 +86,16 @@ pub async fn check_and_install(
     let mut required_java_system_profile = SystemJavaProfileName::try_from(java_profile)
         .with_context(|| anyhow!("System java version unsupported"))?;
 
+    // Forge 1.16.5 requires an older Java 8 build, so it uses the legacy-fixed-1 profile.
+    if &version.release == "1.16.5"
+        && version
+            .modloaders
+            .iter()
+            .any(|v| v.type_ == ModLoaderType::Forge)
+    {
+        required_java_system_profile = SystemJavaProfileName::LegacyFixed1;
+    }
+
     tracing::debug!(
         "This instance requires system profile: {:?}",
         required_java_system_profile
@@ -177,17 +187,6 @@ pub async fn check_and_install(
         if let Some(java_component_override) = java_component_override {
             java_component_override?
         } else {
-            // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
-            if &version.release == "1.16.5"
-                && *&version
-                    .modloaders
-                    .iter()
-                    .find(|v| v.type_ == ModLoaderType::Forge)
-                    .is_some()
-            {
-                required_java_system_profile = SystemJavaProfileName::LegacyFixed1;
-            }
-
             let instance_manager = app.instance_manager();
             let _guard = instance_manager
                 .persistence_manager
@@ -271,6 +270,34 @@ pub async fn check_and_install(
             }
         }
     };
+
+    // A user-set or imported override is used verbatim. Warn (without blocking, since the
+    // override is a deliberate escape hatch) when its major version does not match the
+    // profile this instance expects, so the user has a clear reason if the game fails to
+    // start. The auto-managed path already only selects a compatible Java, so this is a
+    // no-op there.
+    if !required_java_system_profile.is_java_version_compatible(&java.version) {
+        let warn_msg = format!(
+            "Warning: the selected Java (major {}) does not match the {:?} profile this \
+             instance expects. Minecraft may fail to start; if it does, select a matching \
+             Java or enable automatic Java management.",
+            java.version.major, required_java_system_profile
+        );
+        tracing::warn!("{warn_msg}");
+        if let Some(ref mut file) = file {
+            if let Some(log) = log {
+                log.send_modify(|log| log.add_entry(LogEntry::system_message(warn_msg.clone())));
+            }
+            // Best-effort: this warning must not block the launch (the override is a deliberate
+            // escape hatch), so a failure to write it to the log is logged, not propagated.
+            if let Err(e) = file
+                .write_all(format_message_as_log4j_event(&warn_msg).as_bytes())
+                .await
+            {
+                tracing::warn!({ error = ?e }, "Failed to write Java mismatch warning to instance log");
+            }
+        }
+    }
 
     let msg = format!("Using Java: {java:#?}");
 
