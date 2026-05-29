@@ -20,7 +20,7 @@ use daedalus::minecraft::{
 use regex::{Captures, Regex};
 use reqwest::Url;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -485,9 +485,9 @@ pub async fn generate_startup_command(
         true,
     );
 
-    let tmp_set: HashSet<_> = libraries.drain(..).collect();
-    libraries.extend(tmp_set.into_iter());
-
+    // chain_lwjgl_libs_with_base_libs already deduplicates by computed library name and
+    // preserves a deterministic order; a HashSet pass here would re-randomize that order,
+    // which can non-deterministically change which shaded class wins on the classpath.
     let libraries = libraries
         .into_iter()
         .reduce(|a, b| format!("{a}{CLASSPATH_SEPARATOR}{b}"))

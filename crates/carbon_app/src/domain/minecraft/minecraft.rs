@@ -193,9 +193,12 @@ pub fn chain_lwjgl_libs_with_base_libs(
             library_is_allowed(lib, java_component_arch)
                 && (!only_classpath_visible || lib.include_in_classpath)
         })
+        // IndexMap (not HashMap) so the merged libraries keep a deterministic insertion
+        // order: HashMap iteration is randomized per process, which can change which shaded
+        // class wins on the classpath from one launch to the next.
         .fold(
-            HashMap::new(),
-            |mut set: HashMap<String, &daedalus::minecraft::Library>, lib| {
+            indexmap::IndexMap::new(),
+            |mut set: indexmap::IndexMap<String, &daedalus::minecraft::Library>, lib| {
                 if let Some(other) = set.get(&lib.name.get_computed_name()) {
                     // is this version newer?
                     let Ok(comp) = lib.name.compare_versions(&other.name) else {
