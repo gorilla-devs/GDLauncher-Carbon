@@ -416,6 +416,43 @@ fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
     arg.to_string()
 }
 
+/// Split a user-provided extra-Java-args string into individual arguments.
+///
+/// Arguments are separated by whitespace, except whitespace inside a
+/// double-quoted span is preserved. Quotes may appear anywhere in an
+/// argument (so both `"-javaagent:C:\With Spaces\a.jar"` and the more
+/// natural `-javaagent:"C:\With Spaces\a.jar"` work, joining the quoted and
+/// unquoted runs into one token). Within an argument, `\"` is a literal quote
+/// and `\\` a literal backslash; every other character — including lone
+/// backslashes in Windows paths — is taken verbatim. Empty tokens are dropped.
+fn parse_extra_java_args(input: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' if matches!(chars.peek(), Some(&('"' | '\\'))) => {
+                current.push(chars.next().expect("peeked char is present"));
+            }
+            '"' => in_quotes = !in_quotes,
+            c if c.is_whitespace() && !in_quotes => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            c => current.push(c),
+        }
+    }
+
+    if !current.is_empty() {
+        args.push(current);
+    }
+
+    args
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn generate_startup_command(
     java_component: JavaComponent,
@@ -449,8 +486,6 @@ pub async fn generate_startup_command(
     let regex =
         Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
             .unwrap();
-
-    let extra_args_regex = Regex::new(r#"("(?P<quoted>(\\"|[^"])*)"|(?P<raw>([^ ]+)))"#).unwrap();
 
     let player_token = match full_account.type_ {
         FullAccountType::Offline => "offline".to_owned(),
@@ -631,30 +666,15 @@ pub async fn generate_startup_command(
         substitute_arguments(&mut command, jvm_arguments);
     }
 
-    // Block JVM args that load arbitrary native code at launch. A malicious
-    // imported instance / modpack can carry these in `extra_java_args` and
-    // would otherwise gain RCE the moment the user clicks Play.
-    const BLOCKED_JVM_PREFIXES: &[&str] = &[
-        "-agentpath:",
-        "-agentlib:",
-        "-javaagent:",
-        "-Xbootclasspath/",
-    ];
-
-    for cap in extra_args_regex.captures_iter(extra_java_args) {
-        let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else {
-            continue;
-        };
-        let value = arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\");
-        if BLOCKED_JVM_PREFIXES.iter().any(|p| value.starts_with(p)) {
-            tracing::warn!(
-                "Blocked unsafe JVM argument from extra_java_args: {}",
-                value
-            );
-            continue;
-        }
-        command.push(value);
-    }
+    // `extra_java_args` is user-authored: it only ever comes from the instance's
+    // own settings or the global Java-args setting. No import path — gdlpack,
+    // legacy GDL, or the CurseForge/Modrinth archive importers — populates it, so
+    // it is trusted and passed through verbatim, including `-javaagent`/`-agentpath`/
+    // `-agentlib`, which legitimate tooling needs (profilers, hot-swap agents,
+    // authlib-injector). If a future import path ever ingests third-party JVM args,
+    // sanitize them at THAT boundary; a blanket launch-time filter here cannot tell
+    // user input from imported input and would only break real agents.
+    command.extend(parse_extra_java_args(extra_java_args));
 
     if Os::native() == Os::Osx {
         let lwjgl_3 = version
@@ -935,6 +955,51 @@ mod tests {
                 .unwrap();
 
         file.write_all(command.as_bytes()).await.unwrap();
+    }
+
+    #[test]
+    fn extra_java_args_pass_agents_through_unmodified() {
+        // `-javaagent`/`-agentlib`/`-agentpath` are user-authored JVM args and
+        // must be passed through unmodified, never filtered out.
+        assert_eq!(
+            parse_extra_java_args("-javaagent:/opt/unlim/agent.jar -Xss8m -agentlib:hprof"),
+            vec![
+                "-javaagent:/opt/unlim/agent.jar".to_string(),
+                "-Xss8m".to_string(),
+                "-agentlib:hprof".to_string(),
+            ],
+        );
+    }
+
+    #[test]
+    fn extra_java_args_support_quoted_paths_with_spaces() {
+        // A quoted path containing spaces must stay a single argument. If it
+        // split at the space, the JVM would treat the fragment after the space
+        // as the main class instead of part of the -javaagent value.
+        assert_eq!(
+            parse_extra_java_args(r#"-javaagent:"C:\Program Files\Unlim\agent.jar" -Dx=1"#),
+            vec![
+                r"-javaagent:C:\Program Files\Unlim\agent.jar".to_string(),
+                "-Dx=1".to_string(),
+            ],
+        );
+        // Wrapping the entire argument in quotes is also accepted.
+        assert_eq!(
+            parse_extra_java_args(r#""-javaagent:C:\Program Files\Unlim\agent.jar""#),
+            vec![r"-javaagent:C:\Program Files\Unlim\agent.jar".to_string()],
+        );
+    }
+
+    #[test]
+    fn extra_java_args_handle_escapes_and_blanks() {
+        assert_eq!(parse_extra_java_args(""), Vec::<String>::new());
+        // The global + per-instance args are joined with a space, so an empty
+        // config yields a blank string that must produce no arguments.
+        assert_eq!(parse_extra_java_args("   "), Vec::<String>::new());
+        assert_eq!(
+            parse_extra_java_args(r#"-Dmsg="a\"b" -Dpath=C:\\tmp"#),
+            vec![r#"-Dmsg=a"b"#.to_string(), r"-Dpath=C:\tmp".to_string()],
+        );
     }
 
     #[tokio::test]

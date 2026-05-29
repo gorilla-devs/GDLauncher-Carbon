@@ -220,7 +220,7 @@ const Java = () => {
           </RightHandSide>
         </Row>
         <Row class="flex-col items-stretch">
-          <Title>
+          <Title description={<Trans key="java:_trn_java_arguments_hint" />}>
             <Trans key="java:_trn_java_arguments_title" />
           </Title>
           <div class="flex items-center justify-center gap-4">

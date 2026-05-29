@@ -13,6 +13,7 @@
   "_trn_setup": "セットアップ",
   "_trn_java_memory_title": "Javaメモリ",
   "_trn_java_arguments_title": "Javaの引数",
+  "_trn_java_arguments_hint": "引数はスペースで区切り、スペースを含むパスは二重引用符で囲んでください。例: -javaagent:\"C:\\Program Files\\agent.jar\"",
   "_trn_reset_java_args": "リセット",
   "_trn_java": "Java",
   "_trn_all_versions": "全バージョン",
