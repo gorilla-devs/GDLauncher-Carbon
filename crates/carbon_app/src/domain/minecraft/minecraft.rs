@@ -1,7 +1,11 @@
 use daedalus::minecraft::{
     Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule, RuleAction,
 };
-use std::{cmp::Ordering, collections::HashMap, path::PathBuf};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::domain::java::JavaArch;
 use carbon_rt_path::{AssetsPath, LibrariesPath, RuntimePath};
@@ -248,6 +252,14 @@ pub fn chain_lwjgl_libs_with_base_libs(
     libraries
 }
 
+/// Resolve an asset object's two-character shard prefix and on-disk path
+/// (`<objects>/<prefix>/<hash>`). Returns None for a malformed hash (too short or not split on
+/// a char boundary), which could never resolve to a valid object anyway.
+pub fn asset_object_location<'a>(objects_path: &Path, hash: &'a str) -> Option<(&'a str, PathBuf)> {
+    let prefix = hash.get(0..2)?;
+    Some((prefix, objects_path.join(prefix).join(hash)))
+}
+
 pub fn assets_index_into_vec_downloadable(
     assets_index: AssetsIndex,
     assets_path: &AssetsPath,
@@ -255,17 +267,20 @@ pub fn assets_index_into_vec_downloadable(
     let mut files: Vec<carbon_net::Downloadable> = vec![];
 
     for (_, object) in assets_index.objects.iter() {
-        let asset_path = assets_path
-            .get_objects_path()
-            .join(&object.hash[0..2])
-            .join(&object.hash);
+        // Skip any object whose hash is malformed (too short or not split on a char boundary)
+        // instead of panicking on the slice; such a hash could never resolve to a valid object.
+        let Some((prefix, asset_path)) =
+            asset_object_location(&assets_path.get_objects_path(), &object.hash)
+        else {
+            tracing::warn!("Skipping asset with malformed hash {:?}", object.hash);
+            continue;
+        };
 
         files.push(
             carbon_net::Downloadable::new(
                 format!(
                     "https://resources.download.minecraft.net/{}/{}",
-                    &object.hash[0..2],
-                    &object.hash
+                    prefix, &object.hash
                 ),
                 asset_path,
             )

@@ -1,3 +1,4 @@
+use crate::domain::minecraft::minecraft::asset_object_location;
 use anyhow::Context;
 use carbon_repos::db::PrismaClient;
 use carbon_repos::pcr::QueryError;
@@ -216,7 +217,10 @@ pub async fn reconstruct_assets(
         let objects_path = assets_path.get_objects_path();
 
         for (path, object) in assets_index.objects.iter() {
-            let object_path = objects_path.join(&object.hash[0..2]).join(&object.hash);
+            let Some((_, object_path)) = asset_object_location(&objects_path, &object.hash) else {
+                tracing::warn!("Skipping asset with malformed hash {:?}", object.hash);
+                continue;
+            };
             let asset_path = target_path.join(path);
 
             existing_files.remove(&asset_path);
