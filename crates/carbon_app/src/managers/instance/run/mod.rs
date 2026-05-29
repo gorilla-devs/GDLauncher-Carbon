@@ -96,6 +96,11 @@ impl PersistenceManager {
         }
     }
 }
+/// Maximum time a user-configured pre/post-launch hook may run before it is killed. Generous
+/// enough for real setup scripts, but bounds a hook that never exits so it cannot wedge the
+/// launch (or, for a pre-launch hook, the whole launch queue) until the app is restarted.
+const HOOK_TIMEOUT: Duration = Duration::from_secs(300);
+
 type InstanceCallback = Box<
     dyn FnOnce(&Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
 >;
@@ -496,14 +501,23 @@ impl ManagerRef<'_, InstanceManager> {
                                 .next()
                                 .ok_or_else(|| anyhow::anyhow!("Pre-launch hook is empty"))?;
 
-                            let pre_launch_command = tokio::process::Command::new(main_command)
-                                .args(split)
-                                .current_dir(instance_path.get_data_path())
-                                .output()
-                                .await
-                                .map_err(|e| {
-                                    anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
-                                })?;
+                            let pre_launch_command = tokio::time::timeout(
+                                HOOK_TIMEOUT,
+                                tokio::process::Command::new(main_command)
+                                    .args(split)
+                                    .current_dir(instance_path.get_data_path())
+                                    .kill_on_drop(true)
+                                    .output(),
+                            )
+                            .await
+                            .map_err(|_| {
+                                anyhow::anyhow!(
+                                    "Pre-launch hook did not finish within {HOOK_TIMEOUT:?}"
+                                )
+                            })?
+                            .map_err(|e| {
+                                anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
+                            })?;
 
                             if !pre_launch_command.status.success() {
                                 return Err(anyhow::anyhow!(
@@ -742,15 +756,23 @@ impl ManagerRef<'_, InstanceManager> {
                         {
                             Ok(mut split) => match split.next() {
                                 Some(main_command) => {
-                                    let post_exit_command =
+                                    let post_exit_command = tokio::time::timeout(
+                                        HOOK_TIMEOUT,
                                         tokio::process::Command::new(main_command)
                                             .args(split)
                                             .current_dir(instance_path.get_data_path())
-                                            .output()
-                                            .await;
+                                            .kill_on_drop(true)
+                                            .output(),
+                                    )
+                                    .await;
 
                                     match post_exit_command {
-                                        Ok(post_exit_command) => {
+                                        Err(_) => {
+                                            tracing::warn!(
+                                                "Post-exit hook did not finish within {HOOK_TIMEOUT:?}; killed it"
+                                            );
+                                        }
+                                        Ok(Ok(post_exit_command)) => {
                                             if !post_exit_command.status.success() {
                                                 tracing::error!(
                                                     "Post-exit hook failed with status: {:?} \n{}",
@@ -766,7 +788,7 @@ impl ManagerRef<'_, InstanceManager> {
                                                 );
                                             }
                                         }
-                                        Err(e) => {
+                                        Ok(Err(e)) => {
                                             tracing::error!(
                                                 "Post-exit hook failed to start: {:?}",
                                                 e
