@@ -23,6 +23,11 @@ use tracing::{error, info, instrument, warn};
 
 const PART_POSTFIX: &str = ".__gdl_part~";
 
+/// Maximum time to wait for the next chunk of a response body before treating the connection
+/// as stalled. Generous so a slow-but-progressing download is never killed, while a half-open
+/// connection that delivers no bytes errors out instead of hanging forever.
+const READ_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
 #[derive(Error, Debug)]
 pub enum DownloadError {
     #[error("Failed to download {0}")]
@@ -328,7 +333,13 @@ pub async fn download_multiple(
 
 fn create_client(options: &DownloadOptions) -> ClientWithMiddleware {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(options.max_retries);
-    ClientBuilder::new(Client::new())
+    let client = Client::builder()
+        // Bound connection establishment so a route that never completes the handshake
+        // (captive portal, dropped route) errors out instead of hanging forever.
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .build()
+        .expect("Failed to build HTTP client");
+    ClientBuilder::new(client)
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build()
 }
@@ -862,7 +873,17 @@ async fn download_content(
     current_files_count: &AtomicU64,
     total_count: u64,
 ) -> Result<(), DownloadError> {
-    while let Some(chunk) = response.chunk().await? {
+    loop {
+        let chunk = match tokio::time::timeout(READ_STALL_TIMEOUT, response.chunk()).await {
+            Ok(result) => result?,
+            Err(_) => {
+                return Err(DownloadError::GenericDownload(
+                    "download stalled: no data received before the read timeout".to_string(),
+                ));
+            }
+        };
+        let Some(chunk) = chunk else { break };
+
         if options.cancel_token.is_cancelled() {
             warn!("Download cancelled");
             return Err(DownloadError::Cancelled);
