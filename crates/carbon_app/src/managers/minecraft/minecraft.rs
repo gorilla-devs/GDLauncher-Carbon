@@ -739,7 +739,7 @@ pub async fn launch_minecraft(
         _ => None,
     };
 
-    let mut startup_command = generate_startup_command(
+    let startup_command = generate_startup_command(
         java_component.clone(),
         full_account,
         xmx_memory,
@@ -754,34 +754,44 @@ pub async fn launch_minecraft(
     )
     .await?;
 
-    let main_command = wrapper_command
-        .as_ref()
-        .filter(|v| !v.is_empty())
-        .map(|s| s.as_str())
-        .unwrap_or_else(|| java_component.path.as_str());
+    // A wrapper command (e.g. "mangohud gamemoderun") is a full command line, so split it
+    // into a program plus arguments and run the java invocation through it. An empty or
+    // whitespace-only wrapper is treated as no wrapper.
+    let wrapper_tokens = match wrapper_command.as_deref().map(str::trim) {
+        Some(wrapper) if !wrapper.is_empty() => {
+            let tokens = shlex::split(wrapper)
+                .with_context(|| format!("Invalid wrapper command: `{wrapper}`"))?;
+            (!tokens.is_empty()).then_some(tokens)
+        }
+        _ => None,
+    };
 
-    if wrapper_command.is_some() {
-        startup_command.insert(0, java_component.path.clone());
-    }
+    let (main_command, command_args) = match wrapper_tokens {
+        Some(mut tokens) => {
+            let program = tokens.remove(0);
+            tokens.push(java_component.path.clone());
+            tokens.extend(startup_command);
+            (program, tokens)
+        }
+        None => (java_component.path.clone(), startup_command),
+    };
 
     let logged_command = match &secret_to_redact {
-        Some(token) => startup_command
-            .join(" ")
-            .replace(token.as_str(), "<REDACTED>"),
-        None => startup_command.join(" "),
+        Some(token) => command_args.join(" ").replace(token.as_str(), "<REDACTED>"),
+        None => command_args.join(" "),
     };
     info!(
         "Starting Minecraft with command: {} {}",
         main_command, logged_command
     );
 
-    let mut command_exec = tokio::process::Command::new(main_command);
+    let mut command_exec = tokio::process::Command::new(&main_command);
     command_exec.current_dir(instance_path.get_data_path());
 
     command_exec.stdout(std::process::Stdio::piped());
     command_exec.stderr(std::process::Stdio::piped());
 
-    let child = command_exec.args(startup_command);
+    let child = command_exec.args(command_args);
 
     Ok(child.spawn()?)
 }
