@@ -2429,6 +2429,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             return Err(anyhow!("Instance {instance_id} is not in a valid state"));
         };
 
+        // Refuse to delete an instance that is in use: tearing down a running or preparing
+        // instance would kill the game and remove its directory mid-session. It must be
+        // stopped first.
+        if !matches!(data.state, LaunchState::Inactive { .. }) {
+            return Err(anyhow!(
+                "Instance {instance_id} cannot be deleted while it is preparing or running; stop it first"
+            ));
+        }
+
         data.state = LaunchState::Deleting;
 
         let instance_shortpath = instance.shortpath.clone();
