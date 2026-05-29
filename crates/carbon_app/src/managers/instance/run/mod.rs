@@ -100,6 +100,16 @@ type InstanceCallback = Box<
     dyn FnOnce(&Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
 >;
 
+/// Clamp the stored i32 heap settings (MB) into the u16 the JVM args use, saturating instead of
+/// wrapping: a raw `as u16` cast would turn e.g. 66000 MB into 464 MB and silently hand the JVM
+/// a tiny heap.
+fn clamp_heap_mb(xms: i32, xmx: i32) -> (u16, u16) {
+    (
+        xms.clamp(0, u16::MAX as i32) as u16,
+        xmx.clamp(0, u16::MAX as i32) as u16,
+    )
+}
+
 impl ManagerRef<'_, InstanceManager> {
     /// Resolve the effective memory (xms, xmx) for an instance.
     /// Uses instance-level override if set, otherwise falls back to global settings.
@@ -120,7 +130,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .settings_manager()
                 .get_settings()
                 .await
-                .map(|c| (c.xms as u16, c.xmx as u16)),
+                .map(|c| clamp_heap_mb(c.xms, c.xmx)),
         }
     }
 
@@ -179,7 +189,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .settings_manager()
                 .get_settings()
                 .await
-                .map(|c| (c.xms as u16, c.xmx as u16))?,
+                .map(|c| clamp_heap_mb(c.xms, c.xmx))?,
         };
 
         let global_java_args = match config.game_configuration.global_java_args {
