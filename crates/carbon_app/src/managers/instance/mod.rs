@@ -2596,7 +2596,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceIcon::RelativePath(_) => Some(1),
         };
 
-        tokio::fs::write(&tmpdir.join("instance.json"), json).await?;
+        // Write the new config inside the copied directory so the rename below carries it.
+        // Writing to `tmpdir` would place it beside the directory, where it is discarded,
+        // leaving the duplicate with the source's instance.json (its old name and metadata).
+        tokio::fs::write(&tmppath.join("instance.json"), json).await?;
 
         tokio::fs::rename(&tmppath, new_path).await?;
         let id = self
