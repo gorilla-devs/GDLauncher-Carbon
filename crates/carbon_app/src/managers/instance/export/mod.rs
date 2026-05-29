@@ -319,8 +319,6 @@ impl ManagerRef<'_, InstanceExportManager> {
     )> {
         let app = self.app.clone();
         let title = title.clone();
-        let expiration_days = expiration_days;
-        let max_downloads = max_downloads;
 
         let tmpdir = app
             .settings_manager()

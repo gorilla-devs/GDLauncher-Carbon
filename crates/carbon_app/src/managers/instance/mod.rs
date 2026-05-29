@@ -3502,7 +3502,11 @@ mod test {
             get_ordered_instances(&app.prisma_client, group1).await?[..],
         );
 
-        // move 0:0 to end of group 1
+        // move 0:0 to end of group 1. group0 is then left with a single
+        // instance, which auto-dissolves: the last instance returns to the
+        // default group and the now-empty group0 is deleted.
+        let surviving_instance = group0_instances[1];
+
         app.instance_manager()
             .move_instance(group0_instances[0], InstanceMoveTarget::EndOfGroup(group1))
             .await?;
@@ -3514,7 +3518,7 @@ mod test {
             group0_instances[0],
         ];
 
-        let group0_instances = [group0_instances[1]];
+        let group0_instances: [InstanceId; 0] = [];
 
         assert_eq!(
             group0_instances[..],
@@ -3524,6 +3528,14 @@ mod test {
         assert_eq!(
             group1_instances[..],
             get_ordered_instances(&app.prisma_client, group1).await?[..],
+        );
+
+        // the dissolved group's last instance returns to the default group
+        let default_group = app.instance_manager().get_default_group().await?;
+        assert!(
+            get_ordered_instances(&app.prisma_client, default_group)
+                .await?
+                .contains(&surviving_instance)
         );
 
         Ok(())
