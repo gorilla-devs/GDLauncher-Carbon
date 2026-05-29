@@ -575,7 +575,13 @@ pub async fn process_modpack(
             }));
 
             let json = make_instance_config(config.clone())?;
-            tokio::fs::write(path.join("instance.json"), json).await?;
+            // Atomically replace the live config (matching update_instance/update_playtime) so a
+            // crash mid-write cannot leave a partial instance.json that fails to parse on startup.
+            app.settings_manager()
+                .runtime_path
+                .get_temp()
+                .write_file_atomic(path.join("instance.json"), json)
+                .await?;
 
             app.instance_manager()
                 .instances
