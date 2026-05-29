@@ -34,7 +34,14 @@ pub fn libraries_into_vec_downloadable(
 
         // Forge special case where downloads is not present but `url` defines the base url
         if let Some(base_url) = &library.url {
-            let checksum = None;
+            // Attach the Sha1 from the library's `checksums` (Forge libraries carry it here)
+            // when present, so the download is integrity-checked instead of being accepted on
+            // mere existence.
+            let checksum = library
+                .checksums
+                .as_ref()
+                .and_then(|checksums| checksums.first())
+                .map(|sha1| carbon_net::Checksum::Sha1(sha1.clone()));
 
             let maven_path = library.name.into_path();
             let Ok(maven_url) = library.name.into_url(base_url) else {
@@ -110,10 +117,15 @@ pub fn library_into_lib_downloadable(
             });
         }
     } else if let Some(base_url) = &library.url {
+        let checksum = library
+            .checksums
+            .as_ref()
+            .and_then(|checksums| checksums.first())
+            .map(|sha1| carbon_net::Checksum::Sha1(sha1.clone()));
         return Some(carbon_net::Downloadable {
             url: format!("{}{}", base_url, library.name.path()),
             path: base_path.join(library.name.path()),
-            checksum: None,
+            checksum,
             size: None,
         });
     }
