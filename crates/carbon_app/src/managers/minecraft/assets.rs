@@ -46,6 +46,15 @@ pub async fn get_meta(
             )
         })?;
 
+        // Validate the freshly fetched body before caching it: a 200 response with an
+        // unparseable body must not overwrite a previously-good cached asset index.
+        let parsed = serde_json::from_slice::<AssetsIndex>(&asset_index).with_context(|| {
+            format!(
+                "Failed to parse asset index from `{}`",
+                version_asset_index.url
+            )
+        })?;
+
         db_client
             .assets_meta_cache()
             .upsert(
@@ -62,13 +71,11 @@ pub async fn get_meta(
             .exec()
             .await?;
 
-        Ok(asset_index)
+        Ok((parsed, asset_index.to_vec()))
     };
 
-    let asset_index = update_cache().await;
-
-    let asset_index = match asset_index {
-        Ok(asset_index) => Ok((serde_json::from_slice(&asset_index)?, asset_index.to_vec())),
+    let asset_index = match update_cache().await {
+        Ok(result) => Ok(result),
         Err(err) => {
             let db_cache = db_client
                 .assets_meta_cache()

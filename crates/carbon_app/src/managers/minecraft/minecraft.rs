@@ -104,6 +104,11 @@ pub async fn get_version(
             )
         })?;
 
+        // Validate the freshly fetched body before caching it: a 200 response with an
+        // unparseable body must not overwrite a previously-good cached version.
+        let parsed = serde_json::from_slice::<VersionInfo>(&version_meta)
+            .with_context(|| format!("Failed to parse minecraft version from `{}`", url.clone()))?;
+
         db_client
             .version_info_cache()
             .upsert(
@@ -120,11 +125,11 @@ pub async fn get_version(
             .exec()
             .await?;
 
-        Ok(version_meta)
+        Ok(parsed)
     };
 
-    let version_meta = match update_cache().await {
-        Ok(version_meta) => version_meta,
+    match update_cache().await {
+        Ok(parsed) => Ok(parsed),
         Err(err) => {
             let db_cache = db_client
                 .version_info_cache()
@@ -155,9 +160,7 @@ pub async fn get_version(
                 err
             );
         }
-    };
-
-    Ok(serde_json::from_slice(&version_meta)?)
+    }
 }
 
 pub async fn get_lwjgl_meta(
@@ -214,6 +217,15 @@ pub async fn get_lwjgl_meta(
             )
         })?;
 
+        // Validate the freshly fetched body before caching it: a 200 response with an
+        // unparseable body must not overwrite a previously-good cached LWJGL group.
+        let parsed = serde_json::from_slice::<LibraryGroup>(&lwjgl).with_context(|| {
+            format!(
+                "Failed to parse LWJGL metadata from `{}`",
+                lwjgl_json_url.clone()
+            )
+        })?;
+
         let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
         db_client
@@ -232,11 +244,11 @@ pub async fn get_lwjgl_meta(
             .exec()
             .await?;
 
-        Ok(lwjgl)
+        Ok(parsed)
     };
 
-    let lwjgl = match update_cache().await {
-        Ok(lwjgl) => lwjgl,
+    match update_cache().await {
+        Ok(parsed) => Ok(parsed),
         Err(err) => {
             let db_cache = db_client
                 .lwjgl_meta_cache()
@@ -264,9 +276,7 @@ pub async fn get_lwjgl_meta(
 
             anyhow::bail!("Failed to fetch lwjgl from `{}`: {}", lwjgl_suggest, err);
         }
-    };
-
-    Ok(serde_json::from_slice(&lwjgl)?)
+    }
 }
 
 #[cfg(target_os = "windows")]
