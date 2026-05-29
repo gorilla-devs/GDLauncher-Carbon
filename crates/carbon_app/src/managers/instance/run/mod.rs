@@ -380,7 +380,7 @@ impl ManagerRef<'_, InstanceManager> {
             // Acquire semaphore FIRST - this is where queuing happens
             // Instance stays in Queued state until we get the lock
             let instance_manager = app.instance_manager();
-            let _download_guard = instance_manager
+            let download_guard = instance_manager
                 .persistence_manager
                 .instance_download_lock
                 .acquire()
@@ -551,6 +551,11 @@ impl ManagerRef<'_, InstanceManager> {
                 }
             }
             .await;
+
+            // Downloading, installing and spawning the process are done; release the global
+            // download permit before the game-session wait so other instances can be prepared
+            // and launched concurrently instead of queuing behind an already-running game.
+            drop(download_guard);
 
             match try_result {
                 Err(e) => {
