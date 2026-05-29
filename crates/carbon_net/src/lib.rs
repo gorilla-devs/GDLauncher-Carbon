@@ -638,9 +638,37 @@ async fn _download_file(
     total_files_size: u64,
     total_files_count: u64,
 ) -> Result<(), DownloadError> {
+    let resume_requested = headers.contains_key(reqwest::header::RANGE);
+
     let mut response = client.get(url).headers(headers).send().await?;
 
     check_response_status(&response, &downloadable)?;
+
+    // If we asked to resume with a Range header but the server returned the full body
+    // (200 instead of 206 Partial Content), the bytes already on disk must be discarded:
+    // appending the full response would corrupt the file, and with no size/checksum the
+    // corruption would go undetected. Discard the partial bytes and restart from scratch.
+    if resume_requested && response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+        warn!(
+            "Server ignored range request for `{}` (status {}); restarting download from scratch",
+            url,
+            response.status()
+        );
+
+        let resumed_bytes = file_processed_bytes.swap(0, Ordering::SeqCst);
+        total_downloaded_size.fetch_sub(resumed_bytes, Ordering::SeqCst);
+
+        *file = File::options()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(part_file_path)
+            .await?;
+
+        // Reset the running hash for the restarted download, mirroring the initial hasher
+        // (`From<&Checksum> for HashDigest`).
+        *hasher = downloadable.checksum.as_ref().map(HashDigest::from);
+    }
 
     download_content(
         &mut response,
@@ -1708,6 +1736,59 @@ mod tests {
         }
 
         assert_eq!(std::fs::read_to_string(file_path).unwrap(), "Hello, World!");
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_download_resume_full_response_restarts() {
+        // A leftover .part file exists, but the server ignores our Range request and
+        // replies 200 with the full body. The partial bytes must be discarded and the
+        // file restarted; otherwise the full body would be appended after them and, with
+        // no size or checksum to validate against, the corruption would go undetected.
+        let mut server = mockito::Server::new_async().await;
+        let mock_url = server.url();
+
+        let mock = server
+            .mock("GET", "/test.txt")
+            .with_status(200)
+            .with_body("Hello, World!")
+            .create_async()
+            .await;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let part_path = temp_dir.path().join(format!("test.txt{}", PART_POSTFIX));
+
+        // Leftover partial download from a previous interrupted attempt.
+        {
+            let mut file = File::create(&part_path).await.unwrap();
+            file.write_all(b"Hello, ").await.unwrap();
+            file.flush().await.unwrap();
+        }
+
+        let downloadable = Downloadable {
+            url: format!("{}/test.txt", mock_url),
+            path: file_path.clone(),
+            checksum: None,
+            size: None,
+        };
+
+        let (progress_tx, _progress_rx) = watch::channel(Progress::default());
+        let options = DownloadOptions::builder()
+            .concurrency(1)
+            .progress_sender(progress_tx)
+            .build();
+
+        download_multiple(&[downloadable], options).await.unwrap();
+
+        // Restarted from scratch: exactly the server body, not the partial bytes followed
+        // by the full body.
+        assert_eq!(
+            std::fs::read_to_string(&file_path).unwrap(),
+            "Hello, World!"
+        );
 
         mock.assert();
     }
