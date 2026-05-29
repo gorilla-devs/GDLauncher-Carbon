@@ -789,19 +789,24 @@ pub async fn extract_natives(
         native_name: &str,
     ) -> anyhow::Result<()> {
         let native_name = native_name.replace("${arch}", ARCH_WIDTH);
-        let path = runtime_path.get_libraries().get_library_path({
-            library
-                .downloads
-                .as_ref()
-                .unwrap()
-                .classifiers
-                .as_ref()
-                .unwrap()
-                .get(&native_name)
-                .unwrap()
-                .path
-                .clone()
-        });
+        // A native may be declared for this OS without a matching download classifier
+        // (legacy/url-style or third-party libraries). The download phase skips those, so
+        // there is nothing on disk to extract; skip instead of panicking on the missing entry.
+        let Some(classifier) = library
+            .downloads
+            .as_ref()
+            .and_then(|downloads| downloads.classifiers.as_ref())
+            .and_then(|classifiers| classifiers.get(&native_name))
+        else {
+            warn!(
+                "Library `{}` declares a native for this OS but has no matching download classifier `{native_name}`; skipping native extraction",
+                library.name
+            );
+            return Ok(());
+        };
+        let path = runtime_path
+            .get_libraries()
+            .get_library_path(classifier.path.clone());
 
         info!("Extracting natives from {}", path.display());
 
