@@ -2371,7 +2371,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     let mut instances = instance_manager.instances.write().await;
                     instances.get_mut(&instance_id).and_then(|instance| {
                         if let InstanceType::Valid(data) = &mut instance.type_ {
-                            data.state = LaunchState::Inactive { failed_task: None };
+                            // Only the mid-delete failure path leaves the instance in Deleting.
+                            // A refusal to delete a running/preparing instance returns Err while
+                            // that live state is still set, so it must not be clobbered here (that
+                            // would drop the kill channel and orphan the running game).
+                            if matches!(data.state, LaunchState::Deleting) {
+                                data.state = LaunchState::Inactive { failed_task: None };
+                            }
                             Some(data.config.name.clone())
                         } else {
                             None
