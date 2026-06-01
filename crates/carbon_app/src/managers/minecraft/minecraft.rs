@@ -758,7 +758,17 @@ pub async fn launch_minecraft(
     // into a program plus arguments and run the java invocation through it. An empty or
     // whitespace-only wrapper is treated as no wrapper.
     let wrapper_tokens = match wrapper_command.as_deref().map(str::trim) {
-        Some(wrapper) if !wrapper.is_empty() => {
+        Some(raw) if !raw.is_empty() => {
+            // shlex uses POSIX backslash escaping, so on Windows a path like `C:\tools\wrap.exe`
+            // would be mangled (backslashes dropped) or rejected (a trailing one aborts the
+            // split). Escape backslashes first on Windows so they survive the split intact.
+            #[cfg(target_os = "windows")]
+            let escaped = raw.replace('\\', "\\\\");
+            #[cfg(target_os = "windows")]
+            let wrapper: &str = &escaped;
+            #[cfg(not(target_os = "windows"))]
+            let wrapper: &str = raw;
+
             let tokens = shlex::split(wrapper)
                 .with_context(|| format!("Invalid wrapper command: `{wrapper}`"))?;
             (!tokens.is_empty()).then_some(tokens)
