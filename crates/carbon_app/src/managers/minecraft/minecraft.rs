@@ -846,6 +846,28 @@ pub async fn extract_natives(
     info!("Start natives extraction for id {}", version.id);
 
     let dest = runtime_path.get_natives().get_versioned(&version.id);
+
+    // Natives are immutable per Minecraft version and live in a directory shared by every
+    // instance on that version. Re-extracting on each launch would truncate native libraries
+    // that another instance running the same version has already loaded (a Windows sharing
+    // violation), so skip when a prior run already finished extraction here. The marker records
+    // the Java architecture the natives were extracted for: the shared directory holds only one
+    // arch's libraries, so a launch with a different-arch Java must re-extract rather than reuse
+    // mismatched natives.
+    let extraction_marker = dest.join(".gdl_natives_extracted");
+    let arch_tag = format!("{java_arch:?}");
+    if tokio::fs::read_to_string(&extraction_marker)
+        .await
+        .map(|marker| marker == arch_tag)
+        .unwrap_or(false)
+    {
+        info!(
+            "Natives for {} ({arch_tag}) already extracted; skipping",
+            version.id
+        );
+        return Ok(());
+    }
+
     tokio::fs::create_dir_all(&dest).await?;
 
     for library in version
@@ -869,6 +891,16 @@ pub async fn extract_natives(
             }
             None => continue,
         };
+    }
+
+    // Record completion (and the arch we extracted for) so subsequent same-arch launches skip
+    // re-extraction. Best-effort: a failed marker write must not fail an otherwise successful
+    // extraction; it only costs a redundant re-extraction next launch.
+    if let Err(e) = tokio::fs::write(&extraction_marker, arch_tag.as_bytes()).await {
+        warn!(
+            "Failed to write natives extraction marker for {}: {e:?}",
+            version.id
+        );
     }
 
     Ok(())
