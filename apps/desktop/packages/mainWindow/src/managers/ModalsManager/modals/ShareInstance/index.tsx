@@ -174,7 +174,10 @@ function ShareInstance(props: ModalProps) {
     enabled: !!fileKey()
   }))
 
-  const handleShareError = (code: string | null, details?: ShareErrorDetails) => {
+  const handleShareError = (
+    code: string | null,
+    details?: ShareErrorDetails
+  ) => {
     toast.error(t(getShareErrorKey(code)))
     setShareError({ code, details })
     setFileKey(undefined)

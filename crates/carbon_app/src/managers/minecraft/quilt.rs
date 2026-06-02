@@ -72,12 +72,13 @@ pub async fn get_version(
 
         // Validate the freshly fetched body before caching it: a 200 response with an
         // unparseable body must not overwrite a previously-good cached version.
-        let parsed = serde_json::from_slice::<PartialVersionInfo>(&version_bytes).with_context(|| {
-            format!(
-                "Failed to parse quilt version from `{}`",
-                version_url.clone()
-            )
-        })?;
+        let parsed =
+            serde_json::from_slice::<PartialVersionInfo>(&version_bytes).with_context(|| {
+                format!(
+                    "Failed to parse quilt version from `{}`",
+                    version_url.clone()
+                )
+            })?;
 
         db_client
             .partial_version_info_cache()
