@@ -115,6 +115,18 @@ fn clamp_heap_mb(xms: i32, xmx: i32) -> (u16, u16) {
     )
 }
 
+/// Split a user-configured hook command line into program + arguments. shlex uses POSIX
+/// backslash escaping, so on Windows a path like `C:\tools\setup.bat` would lose its separators
+/// (or fail to parse on a trailing one); escape backslashes first there so they survive the
+/// split, mirroring how the wrapper command is handled in `launch_minecraft`.
+fn split_hook_command(raw: &str) -> Option<Vec<String>> {
+    #[cfg(target_os = "windows")]
+    let escaped = raw.replace('\\', "\\\\");
+    #[cfg(target_os = "windows")]
+    let raw: &str = &escaped;
+    shlex::split(raw)
+}
+
 impl ManagerRef<'_, InstanceManager> {
     /// Resolve the effective memory (xms, xmx) for an instance.
     /// Uses instance-level override if set, otherwise falls back to global settings.
@@ -506,7 +518,7 @@ impl ManagerRef<'_, InstanceManager> {
                 match launch_account {
                     Some(account) => {
                         if let Some(pre_launch_hook) = pre_launch_hook.filter(|v| !v.is_empty()) {
-                            let mut split = shlex::split(&pre_launch_hook)
+                            let mut split = split_hook_command(&pre_launch_hook)
                                 .ok_or_else(|| anyhow::anyhow!("Failed to parse pre-launch hook"))?
                                 .into_iter();
 
@@ -763,7 +775,7 @@ impl ManagerRef<'_, InstanceManager> {
                     let _ = app.rich_presence_manager().stop_activity().await;
 
                     if let Some(post_exit_hook) = post_exit_hook.filter(|v| !v.is_empty()) {
-                        match shlex::split(&post_exit_hook)
+                        match split_hook_command(&post_exit_hook)
                             .ok_or_else(|| anyhow::anyhow!("Failed to parse post-exit hook"))
                             .map(|v| v.into_iter())
                         {
