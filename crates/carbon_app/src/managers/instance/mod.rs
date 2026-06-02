@@ -2772,27 +2772,66 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .exec()
             .await?;
 
-        // Delete all instances in the group (spawn async tasks for each)
-        let app = self.app.clone();
-        for instance in instances_in_group {
-            let instance_id = InstanceId(instance.id);
-            let app_clone = app.clone();
-            tokio::spawn(async move {
-                if let Err(e) = app_clone
-                    .instance_manager()
-                    ._delete_instance(instance_id)
-                    .await
+        // Refuse the whole operation if any contained instance is preparing or running, before
+        // deleting anything. Otherwise the per-instance delete below returns an error for the
+        // running instance (which the old code only logged) while the group row is removed
+        // anyway, orphaning that instance: it keeps running with a dangling group id and vanishes
+        // from list_groups (SQLite foreign keys are not enforced on this connection, so the group
+        // row deletes regardless of the referencing row). Mirror the single-instance guard.
+        {
+            let instances = self.instances.read().await;
+            for instance in &instances_in_group {
+                let instance_id = InstanceId(instance.id);
+                if let Some(InstanceType::Valid(data)) =
+                    instances.get(&instance_id).map(|i| &i.type_)
                 {
-                    tracing::error!("Failed to delete instance {:?}: {:?}", instance_id, e);
+                    if !matches!(data.state, LaunchState::Inactive { .. }) {
+                        bail!(
+                            "Instance group cannot be deleted while instance {instance_id} is preparing or running; stop it first"
+                        );
+                    }
                 }
-            });
+            }
         }
 
-        // Delete the group record
+        // Every instance is inactive; delete each one, awaiting so a failure aborts before the
+        // group row is removed rather than being spawned and ignored.
+        for instance in instances_in_group {
+            let instance_id = InstanceId(instance.id);
+            if let Err(e) = self
+                .app
+                .instance_manager()
+                ._delete_instance(instance_id)
+                .await
+            {
+                // _delete_instance set the instance to Deleting before it failed. Unlike the
+                // single-instance path (delete_instance), nothing here restores it, so reset it
+                // to Inactive — otherwise the UI leaves it stuck on the deleting spinner and it
+                // can be neither deleted nor played until the app restarts.
+                {
+                    let mut instances = self.instances.write().await;
+                    if let Some(instance) = instances.get_mut(&instance_id) {
+                        if let InstanceType::Valid(data) = &mut instance.type_ {
+                            if matches!(data.state, LaunchState::Deleting) {
+                                data.state = LaunchState::Inactive { failed_task: None };
+                            }
+                        }
+                    }
+                }
+                self.app.invalidate(GET_GROUPS, None);
+                self.app.invalidate(GET_ALL_INSTANCES, None);
+                return Err(e);
+            }
+        }
+
+        // Delete the group record. _delete_instance auto-removes an emptied non-default group
+        // after deleting its last instance, so the row may already be gone here; delete_many is
+        // idempotent (no error on zero rows), whereas delete() would fail with RecordNotFound on
+        // the happy path and surface a spurious error toast on a successful deletion.
         self.app
             .prisma_client
             .instance_group()
-            .delete(instance_group::UniqueWhereParam::IdEquals(*group))
+            .delete_many(vec![instance_group::id::equals(*group)])
             .exec()
             .await?;
 
