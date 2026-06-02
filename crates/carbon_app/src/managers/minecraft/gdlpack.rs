@@ -291,15 +291,10 @@ pub async fn prepare_modpack_from_gdlpack(
 
     // Verify that unresolved platform files exist in overrides
     if !unresolved_platform_files.is_empty() {
-        // A file is only genuinely "not on the platforms" when the platform calls succeeded.
-        // If one errored, the unresolved set is unreliable, so surface the real retryable
-        // cause instead of demanding the files exist in overrides.
-        if let Some(err) = platform_error {
-            return Err(err.context(
-                "A platform API was temporarily unavailable while resolving modpack files; please retry",
-            ));
-        }
-
+        // Scan the overrides first: a file bundled in overrides must install even when a
+        // platform API errored, since it never needed the platform. Only a file that is on
+        // neither platform AND missing from the overrides is a real failure (handled per-file
+        // below, where a platform error is surfaced as retryable).
         let found_in_overrides = tokio::task::spawn_blocking({
             let gdlpack_path = gdlpack_path.to_path_buf();
             let overrides_dir = manifest.overrides.clone();
@@ -369,6 +364,14 @@ pub async fn prepare_modpack_from_gdlpack(
         // Check if any unresolved files were NOT found in overrides
         for (i, found) in found_in_overrides.iter().enumerate() {
             if !found {
+                // On neither platform and not in the overrides. If a platform API errored, the
+                // file may resolve once it recovers, so surface the retryable cause; otherwise
+                // it is genuinely missing from the pack.
+                if let Some(err) = platform_error.take() {
+                    return Err(err.context(
+                        "A platform API was temporarily unavailable while resolving modpack files; please retry",
+                    ));
+                }
                 return Err(anyhow!(
                     "Required file could not be resolved from platforms or found in overrides. SHA512: {}",
                     unresolved_platform_files[i].sha512
