@@ -22,7 +22,7 @@ export const useAddonMutations = (
       | ((prev: Record<string, boolean>) => Record<string, boolean>)
   ) => void
 ) => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
   const modalsContext = useModal()
 

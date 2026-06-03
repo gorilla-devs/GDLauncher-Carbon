@@ -1,0 +1,137 @@
+---
+/**
+ * Data Packs Hub Page
+ */
+import PageShell from "../../components/PageShell.astro"
+import { DownloadLink } from "../../components/DownloadLink"
+import Breadcrumb from "../../components/Breadcrumb.astro"
+import TopAddonsList from "../../components/TopAddonsList.astro"
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { ADDON_TYPE_PLURAL } from "../../lib/api/types"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+
+Astro.locals.cache(300)
+---
+
+<PageShell
+  title={t("datapacks.title")}
+  description={t("datapacks.description")}
+  keywords="minecraft data packs, curseforge datapacks, modrinth datapacks, vanilla tweaks, gdlauncher"
+>
+    <main class="py-8">
+      <Breadcrumb items={[{ label: ADDON_TYPE_PLURAL.datapacks }]} maxWidth="max-w-6xl" />
+
+      <div class="max-w-6xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-12">
+        <div class="text-center mb-12">
+          <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
+            {t("datapacks.h1.line1")}{" "}
+            <span class="text-primary-300">{t("datapacks.h1.line2")}</span>
+          </h1>
+          <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+            {t("datapacks.intro")}
+          </p>
+        </div>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">{t("datapacks.section.what.heading")}</h2>
+          <p class="text-darkSlate-100">{t("datapacks.section.what.p1")}</p>
+          <p class="text-darkSlate-100">{t("datapacks.section.what.p2")}</p>
+          <ul class="text-darkSlate-100">
+            <li>{t("datapacks.section.what.li.recipes")}</li>
+            <li>{t("datapacks.section.what.li.loot")}</li>
+            <li>{t("datapacks.section.what.li.advancements")}</li>
+            <li>{t("datapacks.section.what.li.worldgen")}</li>
+            <li>{t("datapacks.section.what.li.functions")}</li>
+          </ul>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto mb-12">
+          <h2 class="text-lightSlate-50">{t("datapacks.section.vsmods.heading")}</h2>
+          <p class="text-darkSlate-100">{t("datapacks.section.vsmods.intro")}</p>
+          <p class="text-darkSlate-100"><strong class="text-lightSlate-50">{t("datapacks.section.vsmods.dpHeading")}</strong></p>
+          <ul class="text-darkSlate-100">
+            <li>{t("datapacks.section.vsmods.dp.li.drop")}</li>
+            <li>{t("datapacks.section.vsmods.dp.li.vanilla")}</li>
+            <li>{t("datapacks.section.vsmods.dp.li.server")}</li>
+            <li>{t("datapacks.section.vsmods.dp.li.survive")}</li>
+            <li>{t("datapacks.section.vsmods.dp.li.perf")}</li>
+          </ul>
+          <p class="text-darkSlate-100"><strong class="text-lightSlate-50">{t("datapacks.section.vsmods.modsHeading")}</strong></p>
+          <ul class="text-darkSlate-100">
+            <li>{t("datapacks.section.vsmods.mods.li.loader")}</li>
+            <li>{t("datapacks.section.vsmods.mods.li.content")}</li>
+            <li>{t("datapacks.section.vsmods.mods.li.both")}</li>
+            <li>{t("datapacks.section.vsmods.mods.li.break")}</li>
+            <li>{t("datapacks.section.vsmods.mods.li.perf")}</li>
+          </ul>
+          <p class="text-darkSlate-100">{t("datapacks.section.vsmods.outro")}</p>
+        </section>
+
+        <section class="prose prose-invert prose-lg max-w-3xl mx-auto">
+          <h2 class="text-lightSlate-50">{t("datapacks.section.capabilities.heading")}</h2>
+          <p class="text-darkSlate-100">{t("datapacks.section.capabilities.intro")}</p>
+          <ul class="text-darkSlate-100">
+            <li>{t("datapacks.section.capabilities.li.recipes")}</li>
+            <li>{t("datapacks.section.capabilities.li.loot")}</li>
+            <li>{t("datapacks.section.capabilities.li.advancements")}</li>
+            <li>{t("datapacks.section.capabilities.li.worldgen")}</li>
+            <li>{t("datapacks.section.capabilities.li.functions")}</li>
+            <li>{t("datapacks.section.capabilities.li.predicates")}</li>
+            <li>{t("datapacks.section.capabilities.li.tags")}</li>
+          </ul>
+        </section>
+      </div>
+
+      <TopAddonsList type="datapacks" />
+
+      <section class="mb-12">
+        <div class="bg-darkSlate-800 rounded-xl overflow-hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div class="p-8 lg:p-12">
+              <h2 class="text-2xl md:text-3xl font-bold text-lightSlate-50 mb-4">{t("datapacks.browse.heading")}</h2>
+              <p class="text-darkSlate-100 mb-6">{t("datapacks.browse.intro")}</p>
+              <ul class="flex flex-col gap-3 mb-8">
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>{t("datapacks.browse.li.both")}</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>{t("datapacks.browse.li.vanilla")}</span>
+                </li>
+                <li class="flex items-center gap-3 text-darkSlate-50">
+                  <svg class="w-5 h-5 text-primary-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+                  <span>{t("datapacks.browse.li.easy")}</span>
+                </li>
+              </ul>
+              <DownloadLink client:idle class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95" iconClass="w-5 h-5" label={t("addon.downloadCta")} iconLeft />
+            </div>
+            <div class="relative">
+              <img
+                src="https://cdn.gdl.gg/assets/website-browse-datapacks.jpg"
+                alt="GDLauncher data pack browser interface"
+                class="w-full h-auto"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-8 bg-darkSlate-800 rounded-xl p-8 md:p-12">
+        <h2 class="text-2xl font-bold text-lightSlate-50 mb-6 text-center">{t("datapacks.learnmore.heading")}</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <a href="/guides/install-datapacks" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">{t("datapacks.learnmore.installdatapacks")}</span>
+          </a>
+          <a href="/guides/install-mods" class="p-4 rounded-lg bg-darkSlate-700/50 hover:bg-darkSlate-700 transition-colors transition-transform duration-100 ease-spring active:scale-98">
+            <span class="text-lightSlate-50 font-medium">{t("datapacks.learnmore.installmods")}</span>
+          </a>
+        </div>
+      </section>
+      </div>
+    </main>
+</PageShell>

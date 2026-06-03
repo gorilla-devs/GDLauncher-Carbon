@@ -1,6 +1,9 @@
 import { rspc } from "@/utils/rspcClient"
+import { useParams } from "@solidjs/router"
 
-const fetchData = ({ params }: { params: any }) => {
+const useChangelogData = () => {
+  const params = useParams<{ id: string; platform: string }>()
+
   const isCurseforge = params.platform === "curseforge"
   const isModrinth = params.platform === "Modrinth"
   if (isCurseforge) {
@@ -41,4 +44,4 @@ const fetchData = ({ params }: { params: any }) => {
   }
 }
 
-export default fetchData
+export default useChangelogData

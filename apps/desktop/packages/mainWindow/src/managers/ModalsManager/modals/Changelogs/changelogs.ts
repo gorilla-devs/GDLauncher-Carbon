@@ -5,315 +5,183 @@ export interface ChangelogEntry {
 }
 
 export interface Changelog {
+  highlights: ChangelogEntry[] // Main features showcased with alternating layout
   new: ChangelogEntry[]
   fixed: ChangelogEntry[]
   improved: ChangelogEntry[]
 }
 
 const changelogs: Changelog = {
+  highlights: [
+    {
+      title: "Instance Sharing",
+      description:
+        "Share your modpack instances with anyone via a simple link. Recipients can preview what they're importing before adding it to their library, and importing a shared instance takes you straight to your library. Requires a GDL account with verified email.",
+      media:
+        "https://cdn.gdl.gg/launcher/changelog/2.0.31/instance_sharing.h264.mp4"
+    },
+    {
+      title: "Instance Folders & Drag and Drop",
+      description:
+        "Organize your library with folders. Drag and drop instances freely with autoscroll while dragging, use multi-select for batch operations, and pin your favorites for quick access. Tile animations have been unified for a smoother library experience.",
+      media: "https://cdn.gdl.gg/launcher/changelog/2.0.31/drag_drop.h264.mp4"
+    },
+    {
+      title: "Server Management",
+      description:
+        "Add and manage Minecraft servers directly from GDLauncher. View the live console, manage server properties, track connected players, install addons, and follow detailed progress while install and launch tasks run.",
+      media: "https://cdn.gdl.gg/launcher/changelog/2.0.31/servers.h264.mp4"
+    }
+  ],
   new: [
     {
-      title: "Redesigned Addons Browser",
+      title: "Modpack Reinstall",
       description:
-        "Completely rethought and redesigned addons browser with support for mods, resource packs, shaders, modpacks, data packs, and worlds. Features a unified search experience, enhanced filtering, type-aware installation, and a modern interface that replaces the old separate mod and modpack pages.",
-      media:
-        "https://cdn.gdl.gg/launcher/changelog/2.0.26/addons-browser-overhaul.mp4"
+        "Reinstall instances and servers from their original modpack with one click. Mods, libraries, and the modloader are wiped and redownloaded, while worlds, save data, dimension folders, and key config files (server.properties, ops, whitelist, eula, banned-player lists) are preserved end-to-end, even when a modpack is malformed."
     },
     {
-      title: "Custom Profile Avatar",
+      title: "Shader Installation Wizard",
       description:
-        "Upload and customize your GDL account profile picture. Your avatar is displayed throughout the launcher and to other users."
+        "Installing a shader pack now walks you through any setup the instance needs. The wizard auto-installs Fabric plus Iris (or Oculus on Forge) when missing, then adds the shader."
     },
     {
-      title: "Nickname Change",
+      title: "Post-Mortem Server Logs",
       description:
-        "Change your GDL account nickname from the account settings. A 7-day cooldown applies between changes."
+        "View the last server session's logs after the server crashes or is stopped, instead of the console going blank as soon as the process exits."
     },
     {
-      title: "Nickname History",
+      title: "Collapsible Search Filter Sidebar",
       description:
-        "View your past nicknames Steam-style. Your nickname history is public, but you can clear it anytime from the account settings."
+        "A new collapsible sidebar replaces the old filters dropdown, making it easier to filter by platform, game version, modloader, categories, and environment."
     },
     {
-      title: "Japanese Language Support",
+      title: "Pre-launch Memory Check",
       description:
-        "Added Japanese translations for the entire interface, making GDLauncher accessible to Japanese-speaking users."
+        "A warning modal now appears before launching if your system doesn't have enough available memory. If you'd rather not see it, it can be permanently dismissed from Java settings."
     },
     {
-      title: "Addons Grid View Mode",
+      title: "Cache Cleanup",
       description:
-        "New grid view mode for browsing addons with a visual card-based layout as an alternative to the list view."
+        "A new cache cleanup tool lets you reclaim disk space on demand. It's organized into two clear options, GDLauncher cache and Minecraft cache, with progress reporting while it runs."
     },
     {
-      title: "'New' Badge for Recently Installed Instances",
+      title: "Cancel Account Deletion",
       description:
-        "Newly installed instances now display a 'New' badge, making it easier to identify your latest additions."
+        "Scheduled GDL account deletions can now be cancelled from the account settings before they complete."
     },
     {
-      title: "Log File Rotation & Cleanup",
+      title: "GDL Account Status Display",
       description:
-        "Automatic log file rotation and cleanup to prevent log files from growing too large, along with temporary file cleanup on startup."
+        "Ban and unavailable account states are now clearly shown in the UI."
     },
     {
-      title: "Release Channel Branding",
+      title: "Email Verification Required",
       description:
-        "Alpha and beta versions now display distinct logos to clearly indicate which release channel you're using."
+        "Features requiring a verified email now show a clear placeholder instead of silently failing."
     },
     {
-      title: "Redesigned Authentication Flow",
+      title: "Switch to an Existing Data Folder",
       description:
-        "Completely redesigned authentication experience with a new welcome screen, separate terms and privacy step, QR code support for device code authentication, and clearer step-by-step progression through the sign-in process."
+        "When you point GDLauncher at a folder that already contains a runtime data set, you can now switch to it as-is, with no files copied or removed."
     },
     {
-      title: "Duplicated Mods Resolution Wizard",
+      title: "Third-Party Licenses",
       description:
-        "New multi-step wizard automatically detects and helps resolve duplicate mods in your instances. Choose to disable or delete duplicate versions with a comprehensive summary before applying changes."
-    },
-    {
-      title: "New Themes",
-      description:
-        "Added three new themes: Inferno (fiery crimson theme), Aether (ethereal void theme with purples), and Frost (icy arctic theme with cool blues)."
-    },
-    {
-      title: "Advanced Search Filters",
-      description:
-        "Enhanced filtering system with visual filter badges, platform-specific filters, game version filtering, modloader filtering, category filtering, and environment filtering."
-    },
-    {
-      title: "Logs Finder",
-      description:
-        "New logs finder functionality for easier log file navigation and analysis with search and filtering capabilities."
-    },
-    {
-      title: "News & Updates System",
-      description:
-        "Dedicated news page with latest Minecraft updates and patch notes."
-    },
-    {
-      title: "Author Avatars",
-      description: "now displayed throughout the interface."
-    },
-    {
-      title: "Enhanced Addon Details",
-      description:
-        "Improved addon detail pages with better metadata display, author information, version tracking, and platform integration."
-    },
-    {
-      title: "Bulk Addon Operations",
-      description:
-        "Multi-select support in addon tables with bulk update, enable, disable, and delete operations."
-    },
-    {
-      title: "Version Type Filtering in Patch Notes",
-      description:
-        "Filter patch notes by release type (release, snapshot, etc.) to easily find the updates you're looking for."
+        "Added third-party license attribution for all open-source dependencies."
     }
   ],
   fixed: [
     {
-      title: "Fixed mod installation path",
+      title:
+        "Fixed deep-link URLs (gdlauncher://, curseforge://, modrinth://) not opening on cold start",
       description:
-        "Resolved an issue where mods could be installed to incorrect paths."
-    },
-    {
-      title: "Fixed navbar crash",
-      description:
-        "Resolved a crash that could occur in the navigation bar under certain conditions."
-    },
-    {
-      title: "Fixed instance export modal",
-      description:
-        "Instance export now properly receives and uses the correct instance ID."
-    },
-    {
-      title: "Fixed modpack version changes",
-      description:
-        "Resolved issues with empty versions when navigating from instance to modpack and improved Modrinth modpack latest version selection."
-    },
-    {
-      title: "Fixed authentication issues with GDL accounts",
-      description: "The token is now refreshed before opening the app window."
-    },
-    {
-      title: "Removed LWJGL debug mode",
-      description:
-        "It was causing issues with some mods (e.g. CustomLoadingScreen)."
-    },
-    {
-      title: "Fixed macOS Sequoia (15.0) display crashes",
-      description:
-        "Resolved display-info crashes that were occurring on macOS Sequoia (version 15.0)."
-    },
-    {
-      title: "Fixed expired account detection"
-    },
-    {
-      title: "Enhanced mod metadata parsing",
-      description:
-        "Fixed edge cases in Fabric and NeoForge mod metadata parsing with control character sanitization."
-    },
-    {
-      title: "Fixed search navigation loops",
-      description:
-        "Prevented duplicate search page navigation and improved search flow."
-    },
-    {
-      title: "Fixed virtual scrolling in addon lists",
-      description: "Resolved issues with virtual items in addon list displays."
-    },
-    {
-      title: "Fixed loading states for mod installations",
-      description:
-        "Improved loading state handling during mod installation processes."
+        "Links arriving while the launcher wasn't already running used to be dropped on Windows and Linux."
     },
     {
       title:
-        "Fixed caching errors that were causing the cache subroutine to hang/crash"
-    },
-    {
-      title: "Fixed GDL account verification sometimes hanging"
-    },
-    {
-      title: "Fixed mods deletion on version/modloader update",
+        "Fixed the search tab not tracking the active project type when arriving from an instance or server",
       description:
-        "Resolved an issue where mods could be incorrectly deleted when changing the game version or modloader."
+        "Clicking 'Add addons' would sometimes leave the tab unselected or stuck on the previous session's modpack tab."
     },
     {
-      title: "Fixed account state synchronization",
-      description:
-        "Account state now properly syncs after enrollment, ensuring your account status is always up to date."
+      title: "Fixed an i18n runtime warning about html-parse-string"
     },
     {
-      title: "Fixed game log active state updates",
+      title: "Fixed GDL account creation from Settings"
+    },
+    {
+      title: "Fixed library not updating correctly in some cases"
+    },
+    {
+      title: "Fixed GDL account error messages not showing properly"
+    },
+    {
+      title: "Fixed a deadlock when rearranging library groups"
+    },
+    {
+      title: "Fixed view transition artifacts when switching library modes"
+    },
+    {
+      title:
+        "Fixed runtime path migration leaving copied files in the target folder if it failed partway through",
       description:
-        "Game logs now correctly update their active state before cache invalidation."
+        "If migration aborts now, only files actually created by the migration are rolled back, leaving pre-existing files in the target folder untouched."
+    },
+    {
+      title:
+        "Fixed timers and listeners not being cleaned up in some dropdowns and search components",
+      description:
+        "Several search inputs, multi-selects, and instance dropdowns held onto pending timers or socket connections after closing or navigating away."
+    },
+    {
+      title:
+        "Fixed browser-style back/forward navigation losing modal state when closing a non-topmost modal"
+    },
+    {
+      title:
+        "Fixed instance deletion errors silently accumulating internal state over a long session"
     }
   ],
   improved: [
     {
-      title: "Fallback Font Support",
+      title: "Smarter addon search defaults",
       description:
-        "Added fallback font support for better text rendering across different languages and character sets."
+        "When you click 'Add addons', the search now defaults to mods or shaders based on whether your instance has a modloader."
     },
     {
-      title: "Improved Toast Animations",
+      title: "Sortable addon columns",
       description:
-        "Enhanced toast notification animations for smoother visual feedback during updates and notifications."
+        "Platform and update-available columns in the addon table are now sortable."
     },
     {
-      title: "Backwards Database Migration Support",
+      title: "Smoother search experience",
       description:
-        "Added support for backwards database migration, improving compatibility when switching between launcher versions."
+        "Search is now debounced with skeleton loading placeholders for a more responsive feel."
     },
     {
-      title: "Enhanced UI Clickable Feedback",
+      title: "Better slider controls",
       description:
-        "Improved visual feedback for interactive elements throughout the interface for a more responsive feel."
+        "Sliders now show formatted tooltips and have improved drag behavior."
     },
     {
-      title: "Redesigned Instance Creation Modal",
+      title: "More reliable GDL session",
       description:
-        "Improved interface for creating new instances with a cleaner, more intuitive design and better user experience."
+        "GDL tokens are now refreshed on every startup to keep your session valid."
     },
     {
-      title: "Fully Internationalized Authentication",
+      title: "Updated dependencies",
       description:
-        "All authentication flow text is now fully translatable, including welcome messages, terms and privacy notices, error messages, and helper text, making the sign-in experience accessible to users worldwide."
+        "Updated Node.js and all project dependencies for better performance and security."
     },
     {
-      title: "Instance Addons Management Overhaul",
+      title: "Improved internal communication",
       description:
-        "Complete redesign of the instance addons management system. New unified Addons tab replaces the old Mods tab, featuring a comprehensive addon table with bulk operations, multi-select support, powerful search and filtering within your installed addons, sortable columns, right-click context menus, and enhanced addon information display with better version tracking."
+        "Switched to a more reliable transport layer between the frontend and backend."
     },
     {
-      title: "Easier addon version changes",
+      title: "Security hardening",
       description:
-        "Changing versions of installed addons is now much simpler, especially for mods available on multiple platforms."
-    },
-    {
-      title: "Refreshed icon set",
-      description:
-        "Updated all icons across the interface for better consistency and visual clarity."
-    },
-    {
-      title: "Enhanced addon filters",
-      description:
-        "Improved addon type filtering that intelligently shows only compatible types based on your instance configuration (e.g., mods only show when modloaders are present)."
-    },
-    {
-      title: "Better error messages",
-      description:
-        "Error messages throughout the application are now clearer and more helpful for troubleshooting issues."
-    },
-    {
-      title: "Complete UI Component System Overhaul",
-      description:
-        "Redesigned notification system, enhanced select components, new progress indicators, improved skeleton loading patterns, and better popover positioning."
-    },
-    {
-      title: "Better Platform Integration",
-      description:
-        "Improved integration between CurseForge and Modrinth with unified addon linking and cross-platform compatibility."
-    },
-    {
-      title: "Improved Addon Table Experience",
-      description:
-        "Enhanced addon tables with sortable columns, better information display, right-click context menus, and improved selection handling."
-    },
-    {
-      title: "Enhanced NeoForge Support",
-      description:
-        "Improved support for NeoForge mods with better metadata detection and parsing."
-    },
-    {
-      title: "Better Installation Flow",
-      description:
-        "Streamlined addon installation process with improved instance selection and better progress tracking."
-    },
-    {
-      title: "Updated Electron and dependencies",
-      description:
-        "Updated to Electron 37.7.0 and Node.js 22.12.0 for better performance and security."
-    },
-    {
-      title: "Improved auto update system",
-      description:
-        "Enhanced update installation flow with better error handling, improved download UI, and reliable update installation on quit."
-    },
-    {
-      title: "Better loading indicators",
-      description:
-        "Improved loading animations throughout the app with more consistent and informative skeleton screens that show the structure of content before it loads."
-    },
-    {
-      title: "Smoother animations",
-      description:
-        "Enhanced transitions with spring easing physics for more natural-feeling animations throughout the app, including searchbar and page transitions."
-    },
-    {
-      title: "Enhanced Addon View & Install Experience",
-      description:
-        "Improved addon detail pages with better instance selection and clearer mod installation workflow."
-    },
-    {
-      title: "Better Default Instance Sorting",
-      description:
-        "Instances now sort by creation date (newest first) by default, making your latest instances easier to find."
-    },
-    {
-      title: "Improved Logs Tab Sidebar",
-      description:
-        "Reorganized logs tab with better component organization for easier log file navigation."
-    },
-    {
-      title: "Clearer Update Instructions for Package Manager Users",
-      description:
-        "Manual update messages now mention package manager as an update option for users who installed via package managers."
-    },
-    {
-      title: "Redesigned Tabs Component",
-      description:
-        "Tabs throughout the app have been redesigned with improved styling and better accessibility using modern UI primitives."
+        "The local API now requires per-session authentication so other applications on your machine can no longer issue commands to GDLauncher. Microsoft sign-in uses PKCE and state validation per RFC 8252. Mod downloads verify stronger checksums (SHA-512 from Modrinth, SHA-1 from CurseForge). Modpack archive extraction blocks path-traversal attacks, including malicious symlinks and absolute paths. External link handling is restricted to http, https, and mailto schemes. OAuth codes and API tokens are redacted in logs. Local database files and the API token file are created with restricted permissions on Linux and macOS. DevTools is disabled on packaged builds."
     }
   ]
 }

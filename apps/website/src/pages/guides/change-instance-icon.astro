@@ -1,0 +1,49 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Change an Instance's Icon"
+  description="Customize each Minecraft instance with your own icon in GDLauncher. Pick a PNG or JPG from your computer and replace the default thumbnail."
+  keywords="change instance icon, gdlauncher icon, custom minecraft icon, instance thumbnail, minecraft instance image"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT1M",
+    steps: [
+      { name: "Right-click the instance", text: "In GDLauncher's Library, right-click the instance whose icon you want to change and pick Edit." },
+      { name: "Click the icon thumbnail", text: "In the Edit Instance dialog, click the square image preview next to the instance name. A file picker opens." },
+      { name: "Select an image file", text: "Pick a PNG or JPG from your computer. Square images look best. GDLauncher doesn't crop, so non-square images will display letterboxed." },
+      { name: "Save", text: "Confirm in the Edit Instance dialog. The icon shows up immediately on the library tile." },
+      { name: "(Optional) Remove the custom icon", text: "Open Edit Instance again, click the trash button on the icon picker, and save. The instance falls back to the default icon (or the modpack's icon for modpack instances)." }
+    ]
+  }}
+>
+  <h2>Where the icon comes from</h2>
+  <p>
+    For instances installed from a CurseForge or Modrinth modpack, the default icon is the pack's logo. For custom instances you created yourself, the default is a generic placeholder. You can override either one.
+  </p>
+  <p>
+    The custom icon you pick is copied into the instance's data folder, so you can move or rename the original file afterwards without affecting the icon.
+  </p>
+
+  <h2>Recommended sizes and formats</h2>
+  <p>
+    GDLauncher displays the instance icon at roughly 80×80 pixels in the Library grid view, scaled up for the larger instance detail views. A square image at 256×256 or 512×512 looks crisp at every zoom level without bloating the data folder.
+  </p>
+  <p>
+    PNG is the safest choice for screenshots and pixel art (Minecraft-style icons benefit from PNG's lossless compression). JPG is fine for photographic images.
+  </p>
+
+  <h2>Quick tips</h2>
+  <ul>
+    <li>For modpack icons that come down at low resolution, replace them with a higher-resolution version from the pack's CurseForge or Modrinth page.</li>
+    <li>Keep file sizes reasonable (under ~1 MB). Large PNGs slow down library rendering when you have many instances.</li>
+    <li>If you have a lot of similar-looking modpacks, use distinct icons or add a coloured border in your image editor to tell them apart at a glance.</li>
+  </ul>
+
+  <h2>Reverting to the default</h2>
+  <p>
+    Open the Edit Instance dialog, click the trash button on the icon picker, then save. The instance icon resets to whatever GDLauncher had before, the modpack's logo for modpack instances, or the generic icon for custom ones.
+  </p>
+
+</GuideLayout>

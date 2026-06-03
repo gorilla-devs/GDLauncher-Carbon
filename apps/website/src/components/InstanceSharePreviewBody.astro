@@ -1,0 +1,438 @@
+---
+import type { SharePreview } from "../lib/api/share"
+import { getLocaleFromUrl, localizedPath } from "../lib/i18n"
+
+interface Props {
+  preview: SharePreview | null
+  title: string
+  modloader: string | null
+  fileSize: string | null
+  expiresAt: Date | null
+  isExpired: boolean
+  deepLinkUrl: string
+}
+
+const { preview, title, modloader, fileSize, expiresAt, isExpired, deepLinkUrl } = Astro.props
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const homeHref = localizedPath("/", locale)
+const modCount = preview?.mods?.length || 0
+---
+
+<main class="px-4 py-8 md:py-16">
+  {!preview ? (
+    <div class="not-found">
+      <h1 class="text-3xl font-bold mb-4">Share Not Found</h1>
+      <p class="text-lightSlate-400 mb-8">
+        This share link may have expired or doesn't exist.
+      </p>
+      <a href={homeHref} class="btn-cta-secondary">
+        Go to Homepage
+      </a>
+    </div>
+  ) : (
+    <div class="preview-card">
+      {isExpired && (
+        <div class="expired-banner">
+          <strong>This share has expired</strong>
+          <p class="text-sm mt-1">
+            The instance is no longer available for download.
+          </p>
+        </div>
+      )}
+
+      <div class="hero-section">
+        {preview.background_url ? (
+          <img src={preview.background_url} alt={title} class="hero-image" />
+        ) : (
+          <div class="hero-fallback" />
+        )}
+        <div class="hero-overlay" />
+        <div class="hero-content">
+          <h1 class="hero-title">{title}</h1>
+          <p class="text-sm text-lightSlate-400 mt-1">
+            Shared by <span class="text-lightSlate-200 font-medium">{preview.sharer_display_name}</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="metadata-grid">
+          {preview.minecraft_version && (
+            <div class="metadata-item">
+              <div class="metadata-label">Minecraft</div>
+              <div class="metadata-value">{preview.minecraft_version}</div>
+            </div>
+          )}
+
+          {modloader && (
+            <div class="metadata-item">
+              <div class="metadata-label">Modloader</div>
+              <div class="metadata-value">{modloader}</div>
+            </div>
+          )}
+
+          <div class="metadata-item">
+            <div class="metadata-label">Mods</div>
+            <div class="metadata-value">{modCount}</div>
+          </div>
+
+          {fileSize && (
+            <div class="metadata-item">
+              <div class="metadata-label">Size</div>
+              <div class="metadata-value">{fileSize}</div>
+            </div>
+          )}
+        </div>
+
+        {preview.mods && preview.mods.length > 0 && (
+          <div class="mods-section">
+            <div class="mods-header">
+              Included Mods ({preview.mods.length})
+            </div>
+            <div class="mods-list">
+              {preview.mods.map((mod) => (
+                <div class="mod-item">
+                  <span class="mod-name">{mod.name}</span>
+                  <div class="mod-links">
+                    {mod.curseforge_slug && (
+                      <a
+                        href={`https://www.curseforge.com/minecraft/mc-mods/${mod.curseforge_slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="mod-link"
+                        title="View on CurseForge"
+                      >
+                        <img
+                          src="/assets/icons/curseforge_logo.svg"
+                          alt="CurseForge"
+                          class="mod-platform-icon"
+                        />
+                      </a>
+                    )}
+                    {mod.modrinth_slug && (
+                      <a
+                        href={`https://modrinth.com/mod/${mod.modrinth_slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="mod-link"
+                        title="View on Modrinth"
+                      >
+                        <img
+                          src="/assets/icons/modrinth_logo.svg"
+                          alt="Modrinth"
+                          class="mod-platform-icon"
+                        />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isExpired && (
+          <div class="disclaimer">
+            <svg class="disclaimer-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+            </svg>
+            <span>
+              This content is shared by a user and is not reviewed by
+              GDLauncher. The actual contents may differ from the preview.
+              Import at your own risk.
+            </span>
+          </div>
+        )}
+
+        {!isExpired && (
+          <div class="cta-buttons">
+            <a href={deepLinkUrl} class="btn-cta-primary">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Open in GDLauncher
+            </a>
+            <a href={homeHref} class="btn-cta-secondary">
+              Download GDLauncher
+            </a>
+          </div>
+        )}
+
+        {expiresAt && !isExpired && (
+          <p class="text-sm text-lightSlate-500 text-center mt-6">
+            Expires{" "}
+            {expiresAt.toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
+        )}
+      </div>
+    </div>
+  )}
+</main>
+
+<script define:vars={{ deepLinkUrl }}>
+  function tryOpenApp() {
+    const iframe = document.createElement("iframe")
+    iframe.style.display = "none"
+    iframe.src = deepLinkUrl
+    document.body.appendChild(iframe)
+    setTimeout(() => {
+      document.body.removeChild(iframe)
+    }, 2000)
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    if (window.location.hash === "#open") {
+      tryOpenApp()
+    }
+  })
+</script>
+
+<style is:global>
+  .preview-card {
+    max-width: 650px;
+    margin: 0 auto;
+  }
+
+  .hero-section {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px 12px 0 0;
+    background: rgb(var(--darkSlate-700));
+  }
+
+  .hero-image {
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    width: 100%;
+    max-height: 240px;
+    display: block;
+  }
+
+  .hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top,
+      rgb(var(--darkSlate-800)) 0%,
+      rgb(var(--darkSlate-800) / 0.7) 40%,
+      transparent 100%
+    );
+  }
+
+  .hero-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.5rem;
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  .hero-fallback {
+    height: 120px;
+  }
+
+  .card-body {
+    padding: 1.5rem;
+    background: rgb(var(--darkSlate-800));
+    border-radius: 0 0 12px 12px;
+  }
+
+  .metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .metadata-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .metadata-item {
+    text-align: center;
+    padding: 0.875rem;
+    background: rgb(var(--darkSlate-700));
+    border-radius: 10px;
+    border: 1px solid rgb(var(--darkSlate-600) / 0.5);
+  }
+
+  .metadata-label {
+    font-size: 0.75rem;
+    color: rgb(var(--lightSlate-500));
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .metadata-value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+    color: rgb(var(--lightSlate-50));
+  }
+
+  .cta-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  @media (min-width: 640px) {
+    .cta-buttons {
+      flex-direction: row;
+      justify-content: center;
+    }
+  }
+
+  .btn-cta-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgb(var(--primary-300)) 0%, rgb(var(--primary-500)) 100%);
+    color: rgb(var(--lightSlate-50));
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .btn-cta-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgb(var(--primary-400) / 0.4);
+  }
+
+  .btn-cta-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    background: rgb(var(--darkSlate-600));
+    color: rgb(var(--lightSlate-50));
+    text-decoration: none;
+    border: 1px solid rgb(var(--darkSlate-500));
+    transition: all 0.2s ease;
+  }
+
+  .btn-cta-secondary:hover {
+    background: rgb(var(--darkSlate-500));
+  }
+
+  .expired-banner {
+    background: rgb(var(--red-500) / 0.15);
+    border: 1px solid rgb(var(--red-500) / 0.3);
+    color: rgb(var(--red-100));
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .not-found {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .mods-section {
+    margin-top: 1.75rem;
+  }
+
+  .mods-header {
+    font-size: 0.75rem;
+    color: rgb(var(--lightSlate-500));
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .mods-list {
+    max-height: 280px;
+    overflow-y: auto;
+    background: rgb(var(--darkSlate-700));
+    border-radius: 10px;
+    border: 1px solid rgb(var(--darkSlate-600) / 0.5);
+  }
+
+  .mod-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid rgb(var(--darkSlate-600) / 0.5);
+  }
+
+  .mod-item:last-child {
+    border-bottom: none;
+  }
+
+  .mod-name {
+    font-size: 0.875rem;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mod-links {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: 0.5rem;
+  }
+
+  .mod-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .mod-link:hover {
+    background: rgb(var(--darkSlate-500));
+  }
+
+  .mod-platform-icon {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+
+  .disclaimer {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-top: 1.75rem;
+    padding: 0.75rem;
+    background: rgb(var(--yellow-500) / 0.1);
+    border: 1px solid rgb(var(--yellow-500) / 0.3);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    color: rgb(var(--yellow-300));
+  }
+
+  .disclaimer-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+  }
+</style>

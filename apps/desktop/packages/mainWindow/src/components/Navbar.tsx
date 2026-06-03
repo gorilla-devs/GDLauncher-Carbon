@@ -1,12 +1,12 @@
 import { useLocation, useMatch } from "@solidjs/router"
 import { Show, createMemo } from "solid-js"
 import { wideLogoUrl } from "@/utils/logos"
-import { Tabs, TabsList, TabsTrigger, TabsIndicator, Button } from "@gd/ui"
+import { Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
-import { port } from "@/utils/rspcClient"
-import { useModal } from "@/managers/ModalsManager"
+import { apiUrl } from "@/utils/rspcClient"
+
 import { useGlobalStore } from "./GlobalStoreContext"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
 import { getAccountImageUuid } from "@/utils/showcaseHelpers"
@@ -28,7 +28,7 @@ const AppNavbar = () => {
   const location = useLocation()
   const navigator = useGDNavigate()
   const globalStore = useGlobalStore()
-  const modalsContext = useModal()
+
   const [t] = useTransContext()
 
   const isLogin = useMatch(() => "/")
@@ -49,7 +49,9 @@ const AppNavbar = () => {
         return {
           label: {
             name: account?.username,
-            icon: `http://127.0.0.1:${port}/account/headImage?uuid=${getAccountImageUuid(account)}`,
+            icon: apiUrl(
+              `/account/headImage?uuid=${getAccountImageUuid(account)}`
+            ),
             uuid: account.uuid,
             type: account.type,
             status: accountStatusQuery.data
@@ -102,18 +104,6 @@ const AppNavbar = () => {
         </div>
         <div class="flex w-full items-center justify-center gap-4">
           <EnhancedSearchBar />
-          <Button
-            class="w-max"
-            size="small"
-            type="primary"
-            onClick={() => {
-              modalsContext?.openModal({
-                name: "instanceCreation"
-              })
-            }}
-          >
-            <div class="i-hugeicons:add-01 flex h-5 w-5" />
-          </Button>
         </div>
         <div class="text-lightSlate-50 flex h-full list-none items-center gap-6">
           <Show when={hasPendingUpdate()}>

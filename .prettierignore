@@ -1,5 +1,6 @@
 # Ignore artifacts:
 dist
 node_modules
+*.hbs
 # Generated files:
 packages/ui/showcase/src/routeTree.gen.ts

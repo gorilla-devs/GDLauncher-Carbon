@@ -1,0 +1,85 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Install Minecraft NeoForge"
+  description="Step-by-step guide to installing Minecraft NeoForge with GDLauncher. The modern Forge fork most big content mods now target."
+  keywords="install neoforge, minecraft neoforge, neoforge mod loader, how to install neoforge minecraft, neoforge mods, gdlauncher neoforge"
+  lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT4M",
+    steps: [
+      {
+        name: "Download GDLauncher",
+        text: "Download and install GDLauncher from gdlauncher.com. Free, available for Windows, macOS, and Linux."
+      },
+      {
+        name: "Create a new instance",
+        text: "Open GDLauncher and click the + button on the Library page to start a new Minecraft instance."
+      },
+      {
+        name: "Pick NeoForge as the loader",
+        text: "Select NeoForge in the loader dropdown, then pick the Minecraft version (1.20.1 was the first NeoForge release; 1.21.x is where most new modding happens)."
+      },
+      {
+        name: "Let GDLauncher install everything",
+        text: "GDLauncher downloads Minecraft, the right Java version, and the NeoForge loader automatically. No manual installer to run."
+      },
+      {
+        name: "Add NeoForge mods",
+        text: "Open the new instance, go to the Addons tab, and install NeoForge-compatible mods from CurseForge or Modrinth in one click. Dependencies are pulled in automatically."
+      },
+      {
+        name: "Hit Play",
+        text: "Click Play. Your NeoForge instance launches with everything wired up."
+      }
+    ]
+  }}
+>
+  <h2>What's NeoForge?</h2>
+  <p>
+    NeoForge is a community-led fork of Forge that started in mid-2023 after a split in Forge's governance. It branched off Forge 1.20.1 and has been moving faster ever since: quicker updates to new Minecraft versions, a more open contribution process, and broader maintainer involvement.
+  </p>
+  <p>
+    Most of the big content mods (Create, Mekanism, Applied Energistics 2, JEI, and many more) now ship a NeoForge build alongside or instead of a Forge build. On 1.21 and newer, NeoForge is effectively the default for "Forge-style" modding.
+  </p>
+
+  <h2>Setting up NeoForge</h2>
+  <p>
+    Click the <strong>+</strong> in GDLauncher, pick your Minecraft version, and choose <strong>NeoForge</strong>. GDLauncher lists the available NeoForge loader versions for that MC version; the latest stable one is usually the right pick.
+  </p>
+  <p>
+    Give the instance a name and create it. GDLauncher downloads Minecraft, the matching Java version, and NeoForge itself in the background. No manual JAR running, no Java path configuration.
+  </p>
+
+  <h2>Adding mods</h2>
+  <p>
+    Open your instance and head to the <strong>Addons</strong> tab. <strong>Add Addons</strong> opens the browser across CurseForge and Modrinth combined. Filter by NeoForge, search, click <strong>Download</strong>, and dependencies get pulled in for you.
+  </p>
+  <p>
+    Some older Forge mods don't have a dedicated NeoForge build but still load fine because the APIs overlap. Newer mods increasingly publish NeoForge-only releases; check the mod page if you're unsure.
+  </p>
+
+  <h2>NeoForge vs Forge</h2>
+  <p>
+    On 1.20.1, both loaders exist and most mods support both. From 1.21 onwards, NeoForge has the momentum: faster updates, broader mod support, and the most active "tech and magic" mod scene. Forge still works and still ships, but a lot of authors only publish for NeoForge on the newer versions.
+  </p>
+  <p>
+    If a specific mod you want only exists on Forge, use Forge. Otherwise, on modern versions NeoForge is usually the better pick.
+  </p>
+
+  <h2>NeoForge vs Fabric</h2>
+  <p>
+    Different ecosystems. NeoForge is where the big content mods live (Create, AE2, Mekanism). Fabric is where the cutting-edge performance and QoL mods land first (Sodium, Lithium, Iris). Many mods exist on both, but the ecosystems still differ in flavor.
+  </p>
+
+  <h2>Troubleshooting</h2>
+  <p>
+    NeoForge not starting? Check you have at least 4GB of RAM allocated (more for modpacks). Try a different NeoForge build if one specific version has issues. Remove any recently added mods to isolate conflicts.
+  </p>
+  <p>
+    "Mod not for this loader" errors usually mean you've installed a Forge-only or Fabric mod into a NeoForge instance. Filter the Addons browser by NeoForge to avoid this.
+  </p>
+
+</GuideLayout>

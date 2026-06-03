@@ -1,0 +1,312 @@
+---
+/**
+ * Localized "How to Allocate More RAM to Minecraft" guide. Code blocks
+ * (Java args, file paths, commands) stay untranslated.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft への RAM 割り当てを増やす方法",
+    description: "Minecraft のメモリを増やしてパフォーマンスを改善。GDLauncher ユーザー向けの手順ガイド。",
+    steps: [
+      { name: "インスタンス設定を開く", text: "GDLauncher で調整したいインスタンスを右クリック (またはインスタンスを開いて歯車アイコン) → Settings を選択。" },
+      { name: "Java タブを開く", text: "インスタンス設定で Java タブに切り替えます。このインスタンス専用のメモリ設定や JVM 引数はここに入っています。" },
+      { name: "最大 RAM を設定", text: "Maximum RAM スライダーで調整。バニラなら 4GB、中規模 Modpack なら 6〜8GB、ATM10 のような大型 Modpack は 8〜12GB が目安。システム RAM の半分を超えないようにしましょう。" },
+      { name: "保存して再起動", text: "設定を保存してインスタンスを再起動。ゲーム内 F3 デバッグ画面で新しいメモリ上限が反映されているか確認できます。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft에 더 많은 RAM 할당하는 방법",
+    description: "메모리를 늘려 Minecraft 성능을 개선하세요. GDLauncher 사용자를 위한 단계별 가이드.",
+    steps: [
+      { name: "인스턴스 설정 열기", text: "GDLauncher에서 조정할 인스턴스를 오른쪽 클릭(또는 인스턴스를 열고 톱니 아이콘) → Settings를 선택." },
+      { name: "Java 탭으로 이동", text: "인스턴스 설정에서 Java 탭으로 전환하세요. 해당 인스턴스의 메모리와 JVM 인수가 여기에 있습니다." },
+      { name: "최대 RAM 설정", text: "Maximum RAM 슬라이더를 조정하세요. 바닐라는 4GB, 중간 모드팩은 6~8GB, ATM10 같은 대형 모드팩은 8~12GB가 적당합니다. 시스템 RAM의 절반 이상은 할당하지 마세요." },
+      { name: "저장하고 재실행", text: "설정을 저장하고 인스턴스를 다시 실행하세요. 인게임 F3 디버그 화면에서 새 메모리 상한이 적용되었는지 확인할 수 있습니다." }
+    ]
+  },
+  de: {
+    title: "So weist du Minecraft mehr RAM zu",
+    description: "Verbesser die Performance, indem du mehr Speicher zuweist. Schritt-für-Schritt-Guide für GDLauncher-User.",
+    steps: [
+      { name: "Instanz-Einstellungen öffnen", text: "Im GDLauncher rechtsklick auf die Instanz, die du tunen willst (oder die Instanz öffnen und auf das Zahnrad-Icon klicken) und Settings wählen." },
+      { name: "Zum Java-Tab gehen", text: "In den Instanz-Einstellungen auf den Java-Tab wechseln. Hier sitzen Speicher und JVM-Argumente speziell für diese Instanz." },
+      { name: "Maximum RAM einstellen", text: "Den Maximum-RAM-Regler anpassen. 4 GB sind ein vernünftiger Default für Vanilla, 6–8 GB für mittlere Modpacks, 8–12 GB für große Modpacks wie ATM10. Weise nicht mehr als die Hälfte deines System-RAMs zu." },
+      { name: "Speichern und neu starten", text: "Einstellungen speichern und die Instanz neu starten. Im F3-Debug-Bildschirm im Spiel kannst du sehen, ob die neue Speicherobergrenze greift." }
+    ]
+  },
+  fr: {
+    title: "Comment allouer plus de RAM à Minecraft",
+    description: "Améliore les performances de Minecraft en augmentant la mémoire allouée. Guide étape par étape pour les utilisateurs de GDLauncher.",
+    steps: [
+      { name: "Ouvrir les paramètres de l'instance", text: "Dans GDLauncher, clic droit sur l'instance que tu veux régler (ou ouvre-la et clique sur la roue dentée) et sélectionne Settings." },
+      { name: "Aller dans l'onglet Java", text: "Dans les paramètres de l'instance, va dans l'onglet Java. C'est là que se trouvent la mémoire et les arguments JVM pour cette instance précise." },
+      { name: "Régler Maximum RAM", text: "Ajuste le slider Maximum RAM. 4 Go par défaut pour vanilla, 6–8 Go pour les modpacks moyens, 8–12 Go pour les gros modpacks comme ATM10. N'alloue pas plus que la moitié de ta RAM système." },
+      { name: "Sauvegarder et relancer", text: "Sauvegarde les paramètres et relance l'instance. L'écran de debug F3 en jeu montre si le nouveau plafond mémoire est bien appliqué." }
+    ]
+  },
+  es: {
+    title: "Cómo asignar más RAM a Minecraft",
+    description: "Mejora el rendimiento de Minecraft asignando más memoria. Guía paso a paso para usuarios de GDLauncher.",
+    steps: [
+      { name: "Abrir ajustes de la instancia", text: "En GDLauncher, clic derecho en la instancia que quieres ajustar (o ábrela y pulsa el icono de engranaje) y elige Settings." },
+      { name: "Ir a la pestaña Java", text: "En los ajustes de la instancia, ve a la pestaña Java. Ahí están la memoria y los argumentos JVM específicos de esa instancia." },
+      { name: "Ajustar Maximum RAM", text: "Mueve el slider de Maximum RAM. 4 GB es un valor sensato para vanilla, 6–8 GB para modpacks medianos, 8–12 GB para modpacks grandes como ATM10. No asignes más de la mitad de tu RAM total del sistema." },
+      { name: "Guardar y relanzar", text: "Guarda los ajustes y relanza la instancia. La pantalla de debug F3 en el juego confirma si el nuevo techo de memoria se aplica." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como alocar mais RAM para o Minecraft",
+    description: "Melhore o desempenho do Minecraft alocando mais memória. Guia passo a passo para usuários do GDLauncher.",
+    steps: [
+      { name: "Abrir as configurações da instância", text: "No GDLauncher, clique direito na instância que quer ajustar (ou abra e clique no ícone de engrenagem) e selecione Settings." },
+      { name: "Ir para a aba Java", text: "Nas configurações da instância, vá na aba Java. É onde ficam a memória e os argumentos JVM específicos daquela instância." },
+      { name: "Definir Maximum RAM", text: "Ajuste o slider de Maximum RAM. 4 GB é um padrão razoável para vanilla, 6–8 GB para modpacks médios, 8–12 GB para modpacks grandes como o ATM10. Não aloque mais que metade do RAM do sistema." },
+      { name: "Salvar e relançar", text: "Salve as configurações e relance a instância. A tela de debug F3 no jogo confirma se o novo teto de memória está em vigor." }
+    ]
+  },
+  it: {
+    title: "Come allocare più RAM a Minecraft",
+    description: "Migliora le prestazioni di Minecraft assegnando più memoria. Guida passo passo per gli utenti di GDLauncher.",
+    steps: [
+      { name: "Apri le impostazioni dell'istanza", text: "In GDLauncher, clic destro sull'istanza che vuoi modificare (oppure aprila e clicca l'icona dell'ingranaggio) e seleziona Settings." },
+      { name: "Vai alla scheda Java", text: "Nelle impostazioni dell'istanza, passa alla scheda Java. È dove vivono memoria e argomenti JVM specifici per quell'istanza." },
+      { name: "Imposta Maximum RAM", text: "Regola lo slider Maximum RAM. 4 GB è un default sensato per Vanilla, 6-8 GB per Modpack medi, 8-12 GB per Modpack grandi come ATM10. Non assegnare più della metà della RAM di sistema." },
+      { name: "Salva e riavvia", text: "Salva le impostazioni e riavvia l'istanza. La schermata di debug F3 in gioco conferma che il nuovo limite di memoria è attivo." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="allocate more ram minecraft, minecraft ram, increase minecraft memory, minecraft lag fix, gdlauncher ram settings, minecraft performance"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT2M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>RAM を増やす必要があるとき</h2>
+      <p>バニラ Minecraft なら 2〜4GB で十分です。Mod を入れ始めると話は別。50 個程度の軽量 Modpack は 4〜6GB を要求し、100 個以上の中規模なら 6〜8GB が必要。All The Mods や GregTech: New Horizons のような大型 Modpack は 10〜16GB が必要なこともあります。</p>
+      <p>RAM 不足のサイン: 周期的にカクつく、フリーズする、out-of-memory クラッシュが出る、ロード画面が異常に長い。</p>
+
+      <h2>どれくらい割り当てるか</h2>
+      <p>まずは Modpack の推奨値を確認。記載がない場合は、中規模なら 6GB、大型なら 8GB から始めましょう。必要以上に割り当てないこと。RAM が多すぎるとガベージコレクションに時間がかかってかえって遅くなることがあります。</p>
+      <p>システム RAM のすべてを割り当ててはいけません。OS や他のアプリのために最低 4GB は残しましょう。16GB 搭載の PC なら、Minecraft に割り当てる実用上限は 8〜10GB です。</p>
+
+      <h2>GDLauncher での RAM 変更</h2>
+      <p>全インスタンス共通: 設定 (歯車アイコン) → Java → Maximum Memory スライダーを調整。これが新規インスタンスのデフォルト値になります。</p>
+      <p>個別インスタンス: インスタンスを右クリックして Settings → Java タブ → "Override Global Settings" を有効化してメモリを設定。特定の Modpack だけ多くのメモリが必要な場合に便利です。</p>
+
+      <h2>システム確認</h2>
+      <p>Windows: Ctrl + Shift + Esc でタスクマネージャーを開き、Performance → Memory。Mac: Apple メニュー → このマックについて。Linux: ターミナルで <code>free -h</code>。</p>
+      <p>1.5GB 以上を割り当てるには 64-bit Java が必要です。32-bit は制限があります。GDLauncher が Java を管理してくれるので普通は気にしなくて大丈夫ですが、手動で設定を変えている場合は確認を。</p>
+
+      <h2>RAM を増やしても改善しない場合</h2>
+      <p>たっぷり RAM を割り当てたのにまだ重い場合、ゲーム内 F3 デバッグ画面で実際のメモリ使用量を確認しましょう。上限近くに達していなければ RAM がボトルネックではありません。</p>
+      <p>原因は GPU (Sodium のような軽量化 Mod を試す)、CPU (Lithium を試す)、あるいはハードウェアに対して Mod が多すぎるだけかもしれません。すべての PC ですべての Modpack を快適に動かせるわけではありません。</p>
+
+      <h2>ガベージコレクションによる定期的な引っかかり</h2>
+      <p>0.5 秒〜数秒の周期的なフリーズはガベージコレクションが原因。皮肉にも、RAM を減らした方が改善することがあります (片付ける対象が少なくなるため)。FerriteCore Mod もメモリ使用量を減らしてくれます。</p>
+      <p>より細かい制御が必要なら、最適化された Java 引数を使えます。Minecraft でうまく動くセット:</p>
+      <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+      <p>これを GDLauncher の設定の Java arguments に貼り付けます。Java の Minecraft 向けメモリ管理を最適化する内容です。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>RAM을 더 늘려야 할 때</h2>
+      <p>바닐라 Minecraft는 2~4GB로 잘 돌아갑니다. 모드를 추가하면 얘기가 달라집니다. 50개 정도의 가벼운 모드팩은 4~6GB를 원하고, 100개 이상의 중간 팩은 6~8GB가 필요합니다. All The Mods나 GregTech: New Horizons 같은 대형 팩은 10~16GB까지도 필요할 수 있습니다.</p>
+      <p>RAM이 부족한 신호: 주기적으로 끊기거나 멈춤, 메모리 부족 크래시, 로딩 화면이 너무 오래 걸리는 경우.</p>
+
+      <h2>얼마나 할당해야 할까</h2>
+      <p>먼저 모드팩이 권장하는 값을 보세요. 권장이 없으면 중간 팩은 6GB, 큰 팩은 8GB로 시작하세요. 필요 이상은 할당하지 마세요. RAM이 너무 많으면 가비지 컬렉션에 시간이 더 걸려 오히려 성능이 떨어질 수 있습니다.</p>
+      <p>시스템 RAM 전부를 할당하면 안 됩니다. OS와 다른 프로그램용으로 최소 4GB는 남기세요. 총 RAM이 16GB라면 Minecraft에는 실용적으로 8~10GB가 최대입니다.</p>
+
+      <h2>GDLauncher에서 RAM 바꾸기</h2>
+      <p>모든 인스턴스 공용: 설정(톱니 아이콘) → Java → Maximum Memory 슬라이더 조정. 이게 새 인스턴스의 기본값이 됩니다.</p>
+      <p>특정 인스턴스만: 인스턴스 우클릭 → Settings → Java 탭 → "Override Global Settings" 활성화 후 메모리 설정. 특정 모드팩만 더 많이 필요할 때 유용합니다.</p>
+
+      <h2>시스템 확인</h2>
+      <p>Windows: Ctrl + Shift + Esc로 작업 관리자 열기 → Performance → Memory. Mac: Apple 메뉴 → 이 Mac에 관하여. Linux: 터미널에서 <code>free -h</code> 실행.</p>
+      <p>약 1.5GB 이상을 할당하려면 64비트 Java가 필요합니다. 32비트는 제한됩니다. GDLauncher가 Java를 관리하니 보통은 신경 쓸 필요가 없지만, 수동으로 뭔가 설정했다면 확인하세요.</p>
+
+      <h2>RAM을 늘려도 안 되는 경우</h2>
+      <p>RAM을 충분히 할당했는데도 느리다면, 게임 내 F3 디버그 화면에서 실제 메모리 사용량을 확인하세요. 상한 근처가 아니라면 RAM이 병목이 아닙니다.</p>
+      <p>문제는 GPU(Sodium 같은 성능 모드 시도), CPU(Lithium 시도), 혹은 단순히 하드웨어에 비해 모드가 너무 많은 것일 수 있습니다. 모든 컴퓨터가 모든 모드팩을 잘 돌릴 수 있는 건 아닙니다.</p>
+
+      <h2>가비지 컬렉션 끊김</h2>
+      <p>주기적인 멈춤(보통 0.5초~몇 초)은 가비지 컬렉션 때문입니다. 역설적으로 RAM을 줄이면 도움이 되기도 합니다(Java가 청소할 게 적어지니까). FerriteCore 모드도 메모리 사용량을 줄여 줍니다.</p>
+      <p>더 세밀한 제어가 필요하면 최적화된 Java 인수를 쓸 수 있습니다. Minecraft에서 잘 동작하는 세트:</p>
+      <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+      <p>GDLauncher 설정의 Java arguments 칸에 붙여 넣으세요. Minecraft에 맞춰 Java가 메모리를 관리하는 방식을 최적화합니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Wann du mehr RAM brauchst</h2>
+      <p>Vanilla-Minecraft läuft mit 2–4 GB problemlos. Aber sobald Mods dazukommen, ändert sich alles. Ein leichtes Modpack mit 50 Mods will 4–6 GB. Mittlere Packs mit 100+ Mods brauchen 6–8 GB. Große Packs wie All The Mods oder GregTech: New Horizons können 10–16 GB brauchen.</p>
+      <p>Anzeichen, dass du mehr RAM brauchst: das Spiel ruckelt oder friert periodisch ein, du bekommst Out-of-Memory-Crashes, oder der Ladescreen dauert ewig.</p>
+
+      <h2>Wie viel zuweisen</h2>
+      <p>Schau, was das Modpack empfiehlt. Ohne Empfehlung fang mit 6 GB für mittlere Packs und 8 GB für große an. Weise nicht mehr zu als nötig. Zu viel RAM kann sogar schlechtere Performance bringen, weil Java länger fürs Garbage Collection braucht.</p>
+      <p>Weise nie deinen kompletten System-RAM zu. Lass mindestens 4 GB für Betriebssystem und andere Programme. Bei 16 GB Gesamt-RAM ist 8–10 GB für Minecraft das praktische Maximum.</p>
+
+      <h2>RAM im GDLauncher ändern</h2>
+      <p>Für alle Instanzen: Öffne Settings (Zahnrad), geh zu Java und stell den Maximum-Memory-Regler ein. Das wird der Default für neue Instanzen.</p>
+      <p>Für eine bestimmte Instanz: Rechtsklick auf die Instanz, Settings, Java-Tab, aktiviere "Override Global Settings" und stell den Speicher hier ein. Praktisch, wenn ein Modpack mehr braucht als dein Default.</p>
+
+      <h2>System checken</h2>
+      <p>Windows: Strg + Shift + Esc öffnet den Task-Manager. Klick auf Performance, dann Memory. Mac: Apple-Menü → Über diesen Mac. Linux: <code>free -h</code> im Terminal.</p>
+      <p>Du brauchst 64-bit-Java, um mehr als ungefähr 1,5 GB zuzuweisen. 32-bit-Java ist limitiert. GDLauncher kümmert sich um Java für dich, also normalerweise kein Thema, außer du hast was manuell konfiguriert.</p>
+
+      <h2>Wenn mehr RAM nicht hilft</h2>
+      <p>Wenn das Spiel trotz reichlich RAM noch ruckelt, schau dir den F3-Debug-Bildschirm in-game an. Er zeigt, wie viel Speicher Minecraft tatsächlich nutzt. Wenn er nicht nahe am Limit ist, ist RAM nicht der Flaschenhals.</p>
+      <p>Das Problem könnte deine GPU sein (probier Performance-Mods wie Sodium), deine CPU (probier Lithium), oder einfach zu viele Mods für deine Hardware. Nicht jeder Rechner schafft jedes Modpack.</p>
+
+      <h2>Garbage-Collection-Ruckler</h2>
+      <p>Periodische Freezes (meist eine halbe bis mehrere Sekunden) kommen vom Garbage Collector. Ironischerweise hilft manchmal weniger RAM, weil Java weniger aufräumen muss. Probier auch den FerriteCore-Mod, der den Speicherverbrauch senkt.</p>
+      <p>Für mehr Kontrolle kannst du optimierte Java-Argumente nutzen. Hier ist ein Set, das für Minecraft gut funktioniert:</p>
+      <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+      <p>Füg das in die Java-Arguments-Zeile in den GDLauncher-Einstellungen ein. Sie optimieren, wie Java Speicher speziell für Minecraft verwaltet.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Quand t'as besoin de plus de RAM</h2>
+      <p>Minecraft vanilla tourne très bien avec 2–4 Go. Mais ajoute des mods et tout change. Un modpack léger avec 50 mods veut 4–6 Go. Les moyens à 100+ mods veulent 6–8 Go. Les gros comme All The Mods ou GregTech: New Horizons peuvent demander 10–16 Go.</p>
+      <p>Les signes qu'il te faut plus de RAM : le jeu sacade ou freeze périodiquement, tu as des crashes out-of-memory, ou l'écran de chargement prend une éternité.</p>
+
+      <h2>Combien allouer</h2>
+      <p>Regarde ce que recommande le modpack. S'il n'y a pas de recommandation, commence par 6 Go pour les packs moyens et 8 Go pour les gros. N'alloue pas plus que nécessaire. Trop de RAM peut en fait dégrader les performances parce que Java passe plus de temps en garbage collection.</p>
+      <p>N'alloue jamais toute la RAM de ton système. Laisse au moins 4 Go pour l'OS et les autres programmes. Si t'as 16 Go au total, 8–10 Go pour Minecraft est le max pratique.</p>
+
+      <h2>Changer la RAM dans GDLauncher</h2>
+      <p>Pour toutes les instances : ouvre Settings (icône d'engrenage), va dans Java, et règle le slider Maximum Memory. Ça devient le défaut pour les nouvelles instances.</p>
+      <p>Pour une instance précise : clic droit sur l'instance, ouvre Settings, va dans Java, active "Override Global Settings" et règle la mémoire ici. Utile quand un modpack a besoin de plus que ton défaut.</p>
+
+      <h2>Vérifier ton système</h2>
+      <p>Sur Windows : Ctrl + Shift + Échap ouvre le Gestionnaire des tâches. Clique sur Performances, puis Mémoire. Sur Mac : menu Pomme → À propos de ce Mac. Sur Linux : <code>free -h</code> dans un terminal.</p>
+      <p>Il te faut Java 64-bit pour allouer plus d'environ 1,5 Go. Java 32-bit est limité. GDLauncher gère Java pour toi, donc c'est rarement un souci sauf si t'as configuré un truc à la main.</p>
+
+      <h2>Quand plus de RAM ne suffit pas</h2>
+      <p>Si le jeu rame encore après avoir alloué plein de RAM, regarde l'écran de debug F3 en jeu. Il affiche combien de mémoire Minecraft utilise vraiment. Si c'est loin de la limite, la RAM n'est pas ton goulot d'étranglement.</p>
+      <p>Le souci peut venir du GPU (essaie des mods de perf comme Sodium), du CPU (essaie Lithium), ou simplement trop de mods pour ton matos. Tous les ordis ne peuvent pas faire tourner tous les modpacks.</p>
+
+      <h2>Saccades de garbage collection</h2>
+      <p>Si tu as des freezes périodiques (généralement d'une demi-seconde à plusieurs secondes), c'est le garbage collector. Ironie : allouer moins de RAM aide parfois, parce que Java a moins à nettoyer. Essaie aussi le mod FerriteCore qui réduit l'usage mémoire.</p>
+      <p>Pour plus de contrôle, tu peux utiliser des arguments Java optimisés. Voici un set qui marche bien pour Minecraft :</p>
+      <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+      <p>Colle-les dans le champ Java arguments des paramètres de GDLauncher. Ils optimisent la façon dont Java gère la mémoire spécifiquement pour Minecraft.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Cuándo necesitas más RAM</h2>
+      <p>Minecraft vanilla va bien con 2–4 GB. Pero al añadir mods cambia todo. Un modpack ligero con 50 mods quiere 4–6 GB. Los medianos con 100+ mods piden 6–8 GB. Los grandes como All The Mods o GregTech: New Horizons pueden necesitar 10–16 GB.</p>
+      <p>Señales de que te falta RAM: el juego se entrecorta o congela periódicamente, te dan crashes por falta de memoria, o la pantalla de carga tarda una eternidad.</p>
+
+      <h2>Cuánto asignar</h2>
+      <p>Mira lo que recomienda el modpack. Si no hay recomendación, empieza con 6 GB para packs medianos y 8 GB para grandes. No asignes más de lo necesario. Demasiada RAM puede empeorar el rendimiento porque Java pasa más tiempo en garbage collection.</p>
+      <p>Nunca asignes toda la RAM del sistema. Deja al menos 4 GB para el sistema operativo y otros programas. Si tienes 16 GB en total, 8–10 GB para Minecraft es el máximo práctico.</p>
+
+      <h2>Cambiar la RAM en GDLauncher</h2>
+      <p>Para todas las instancias: abre Settings (icono de engranaje), ve a Java y ajusta el slider Maximum Memory. Esto pasa a ser el valor por defecto para nuevas instancias.</p>
+      <p>Para una instancia concreta: clic derecho en la instancia, abre Settings, ve a la pestaña Java, activa "Override Global Settings" y configura la memoria ahí. Útil cuando un modpack necesita más que tu valor por defecto.</p>
+
+      <h2>Comprobar tu sistema</h2>
+      <p>En Windows: Ctrl + Shift + Esc abre el Administrador de Tareas. Pulsa Rendimiento y luego Memoria. En Mac: menú Apple → Acerca de este Mac. En Linux: <code>free -h</code> en una terminal.</p>
+      <p>Necesitas Java de 64 bits para asignar más de aproximadamente 1,5 GB. Java de 32 bits está limitado. GDLauncher gestiona Java por ti, así que normalmente no es problema a menos que hayas configurado algo a mano.</p>
+
+      <h2>Cuando más RAM no ayuda</h2>
+      <p>Si el juego sigue lento tras asignar bastante RAM, revisa la pantalla de debug F3 dentro del juego. Muestra cuánta memoria está usando realmente Minecraft. Si no está cerca del límite, la RAM no es el cuello de botella.</p>
+      <p>El problema puede ser tu GPU (prueba mods de rendimiento como Sodium), tu CPU (prueba Lithium), o simplemente demasiados mods para tu hardware. No todos los equipos pueden mover todos los modpacks.</p>
+
+      <h2>Tirones por garbage collection</h2>
+      <p>Si tienes freezes periódicos (de medio segundo a varios segundos), es el garbage collector. Irónicamente, a veces ayuda asignar menos RAM porque Java tiene menos que limpiar. Prueba también el mod FerriteCore, que reduce el uso de memoria.</p>
+      <p>Para más control, puedes usar argumentos Java optimizados. Aquí va un conjunto que funciona bien para Minecraft:</p>
+      <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+      <p>Pégalos en el campo Java arguments en los ajustes de GDLauncher. Optimizan cómo gestiona Java la memoria específicamente para Minecraft.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>Quando você precisa de mais RAM</h2>
+      <p>O Minecraft vanilla roda bem com 2–4 GB. Mas com mods, tudo muda. Um modpack leve com 50 mods quer 4–6 GB. Os médios com 100+ mods precisam de 6–8 GB. Os grandes como All The Mods ou GregTech: New Horizons podem precisar de 10–16 GB.</p>
+      <p>Sinais de que falta RAM: o jogo trava ou congela periodicamente, dá crash por falta de memória, ou a tela de carregamento demora uma eternidade.</p>
+
+      <h2>Quanto alocar</h2>
+      <p>Veja o que o modpack recomenda. Sem recomendação, comece com 6 GB para packs médios e 8 GB para grandes. Não aloque mais do que precisa. RAM demais pode até piorar a performance porque o Java gasta mais tempo em garbage collection.</p>
+      <p>Nunca aloque toda a RAM do sistema. Deixe pelo menos 4 GB para o sistema operacional e outros programas. Se você tem 16 GB no total, 8–10 GB para Minecraft é o máximo prático.</p>
+
+      <h2>Mudando a RAM no GDLauncher</h2>
+      <p>Para todas as instâncias: abra Settings (ícone de engrenagem), vá em Java e ajuste o slider Maximum Memory. Esse vira o padrão para novas instâncias.</p>
+      <p>Para uma instância específica: clique direito na instância, abra Settings, vá na aba Java, ative "Override Global Settings" e ajuste a memória ali. Útil quando um modpack precisa mais que o seu padrão.</p>
+
+      <h2>Verificando seu sistema</h2>
+      <p>No Windows: Ctrl + Shift + Esc abre o Gerenciador de Tarefas. Clique em Desempenho, depois Memória. No Mac: menu Apple → Sobre Este Mac. No Linux: <code>free -h</code> no terminal.</p>
+      <p>Você precisa de Java 64-bit para alocar mais que cerca de 1,5 GB. Java 32-bit é limitado. O GDLauncher cuida do Java pra você, então normalmente não é problema, a menos que tenha configurado algo manualmente.</p>
+
+      <h2>Quando mais RAM não resolve</h2>
+      <p>Se o jogo continua travado mesmo com bastante RAM alocada, veja a tela de debug F3 in-game. Ela mostra quanto de memória o Minecraft está realmente usando. Se não está perto do limite, RAM não é o gargalo.</p>
+      <p>O problema pode ser sua GPU (tente mods de performance como Sodium), sua CPU (tente Lithium), ou simplesmente mods demais para seu hardware. Nem todo PC consegue rodar todo modpack.</p>
+
+      <h2>Travadas de garbage collection</h2>
+      <p>Se você tem freezes periódicos (geralmente de meio segundo a vários segundos), é o garbage collector. Ironia: às vezes alocar menos RAM ajuda, porque o Java tem menos coisa pra limpar. Tente também o mod FerriteCore, que reduz o uso de memória.</p>
+      <p>Pra mais controle, dá pra usar argumentos Java otimizados. Esse conjunto funciona bem para Minecraft:</p>
+      <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+      <p>Cole no campo Java arguments dentro das configurações do GDLauncher. Eles otimizam como o Java gerencia memória especificamente para Minecraft.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Quando ti serve più RAM</h2>
+      <p>Minecraft Vanilla gira bene con 2-4 GB. Ma con i mod cambia tutto. Un Modpack leggero da 50 mod vuole 4-6 GB. Quelli medi da 100+ mod chiedono 6-8 GB. I grandi come All The Mods o GregTech: New Horizons possono richiedere 10-16 GB.</p>
+      <p>Segnali che ti serve più RAM: il gioco scatta o si blocca periodicamente, vai in crash per memoria esaurita, oppure la schermata di caricamento dura un'eternità.</p>
+
+      <h2>Quanta assegnarne</h2>
+      <p>Guarda quanto consiglia il Modpack. Se non c'è una raccomandazione, parti da 6 GB per i pack medi e 8 GB per quelli grandi. Non assegnare più del necessario. Troppa RAM può perfino peggiorare le prestazioni perché Java passa più tempo in garbage collection.</p>
+      <p>Non assegnare mai tutta la RAM di sistema. Lascia almeno 4 GB per il sistema operativo e gli altri programmi. Se hai 16 GB in totale, 8-10 GB per Minecraft sono il massimo pratico.</p>
+
+      <h2>Cambiare la RAM in GDLauncher</h2>
+      <p>Per tutte le istanze: apri Settings (icona ingranaggio), vai su Java e regola lo slider Maximum Memory. Questo diventa il default per le nuove istanze.</p>
+      <p>Per un'istanza specifica: clic destro sull'istanza, apri Settings, vai alla scheda Java, attiva "Override Global Settings" e imposta la memoria lì. Comodo quando un Modpack richiede più del tuo default.</p>
+
+      <h2>Controllare il tuo sistema</h2>
+      <p>Su Windows: Ctrl + Shift + Esc apre il Task Manager. Clicca Prestazioni, poi Memoria. Su Mac: menu Apple, Informazioni su questo Mac. Su Linux: <code>free -h</code> nel terminale.</p>
+      <p>Ti serve Java a 64 bit per assegnare più di circa 1,5 GB. Java a 32 bit è limitato. GDLauncher gestisce Java al posto tuo, quindi di solito non è un problema, a meno che tu non abbia configurato qualcosa a mano.</p>
+
+      <h2>Quando aumentare la RAM non basta</h2>
+      <p>Se il gioco resta lento anche con tanta RAM assegnata, guarda la schermata di debug F3 in gioco. Mostra quanta memoria sta usando davvero Minecraft. Se non è vicino al limite, la RAM non è il collo di bottiglia.</p>
+      <p>Il problema potrebbe essere la GPU (prova mod di performance come Sodium), la CPU (prova Lithium), oppure semplicemente troppi mod per il tuo hardware. Non tutti i PC riescono a far girare tutti i Modpack.</p>
+
+      <h2>Scatti da garbage collection</h2>
+      <p>Se hai freeze periodici (di solito da mezzo secondo a vari secondi), è il garbage collector. Paradossalmente, a volte assegnare meno RAM aiuta, perché Java ha meno roba da ripulire. Prova anche la mod FerriteCore, che riduce l'uso di memoria.</p>
+      <p>Per più controllo, puoi usare argomenti Java ottimizzati. Ecco un set che funziona bene per Minecraft:</p>
+      <pre><code>-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1</code></pre>
+      <p>Incollali nel campo Java arguments nelle impostazioni di GDLauncher. Ottimizzano il modo in cui Java gestisce la memoria specificamente per Minecraft.</p>
+    </Fragment>
+  )}
+</GuideLayout>

@@ -1,0 +1,364 @@
+---
+/**
+ * Localized "Minecraft Performance Mods Guide". Brand names left
+ * untranslated (Sodium, Lithium, FerriteCore, Iris, ModernFix, Entity
+ * Culling, ImmediatelyFast, Krypton, More Culling, Embeddium, Radium,
+ * OptiFine, Fabulously Optimized, Simply Optimized, Forge, Fabric, Quilt,
+ * Discord, Steam).
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft 軽量化 Mod ガイド",
+    description: "必須の軽量化 Mod で FPS を底上げ。Minecraft 最適化 Mod の包括ガイド。",
+    steps: [
+      { name: "Fabric か Quilt インスタンスを使う", text: "最強の軽量化 Mod (Sodium、Lithium、FerriteCore、Iris) は Fabric / Quilt 専用です。GDLauncher で目的の Minecraft バージョン用の Fabric インスタンスを作成しましょう。" },
+      { name: "Sodium + Lithium + FerriteCore を導入", text: "Addons タブから Sodium (描画)、Lithium (サーバー側最適化)、FerriteCore (メモリ) を導入。3 つ揃えるとほとんどの環境で FPS が約 2 倍になります。" },
+      { name: "シェーダーが欲しいなら Iris を追加", text: "Iris は Sodium 互換のシェーダーローダー。同じく Addons ブラウザから導入できます。OptiFine 用シェーダーパックの多くにも対応。" },
+      { name: "ゲーム内設定を調整", text: "描画距離を下げる (8〜12 チャンク)、Sodium の最適化パネルを有効化、不要なパーティクルを切る。F3 で現在の FPS を確認。" },
+      { name: "RAM を十分に割り当てる", text: "Mod を入れているなら、GDLauncher の設定で Java RAM を 6〜8 GB に。詳細は『RAM を増やす』ガイドへ。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 성능 모드 가이드",
+    description: "필수 성능 모드로 FPS를 끌어올리세요. Minecraft 최적화 모드에 대한 포괄적인 가이드.",
+    steps: [
+      { name: "Fabric 또는 Quilt 인스턴스 사용", text: "최고의 성능 모드(Sodium, Lithium, FerriteCore, Iris)는 Fabric/Quilt 전용입니다. GDLauncher에서 원하는 Minecraft 버전용 Fabric 인스턴스를 만드세요." },
+      { name: "Sodium + Lithium + FerriteCore 설치", text: "Addons 탭에서 Sodium(렌더링), Lithium(서버 측 최적화), FerriteCore(메모리)를 설치하세요. 함께 쓰면 대부분 환경에서 FPS가 약 두 배가 됩니다." },
+      { name: "셰이더를 쓰려면 Iris 추가", text: "Iris는 Sodium과 호환되는 셰이더 로더입니다. Addons 브라우저에서 같은 방식으로 설치하세요. 대부분의 OptiFine용 셰이더 팩과도 잘 동작합니다." },
+      { name: "인게임 설정 조정", text: "렌더 거리 낮추기(8~12 청크), Sodium 최적화 패널 활성화, 불필요한 파티클 끄기. F3로 현재 FPS를 확인할 수 있습니다." },
+      { name: "충분한 RAM 할당", text: "모드가 있다면 GDLauncher 설정에서 Java RAM을 6~8GB로 올리세요. 자세한 건 '더 많은 RAM 할당' 가이드에 있습니다." }
+    ]
+  },
+  de: {
+    title: "Minecraft-Performance-Mods-Guide",
+    description: "Zieh deine FPS mit diesen unverzichtbaren Performance-Mods hoch. Umfassender Guide zu Optimierungs-Mods.",
+    steps: [
+      { name: "Eine Fabric- oder Quilt-Instanz nutzen", text: "Die besten Performance-Mods (Sodium, Lithium, FerriteCore, Iris) sind Fabric/Quilt-only. Erstell im GDLauncher eine neue Instanz mit Fabric-Loader für deine gewünschte Minecraft-Version." },
+      { name: "Sodium + Lithium + FerriteCore installieren", text: "Im Addons-Tab installierst du Sodium (Renderer), Lithium (server-seitige Optimierung) und FerriteCore (Speicher). Zusammen verdoppeln sie auf den meisten Setups grob die FPS." },
+      { name: "Iris dazu, wenn du Shader willst", text: "Iris ist der Sodium-kompatible Shader-Loader. Installier ihn genauso über den Addons-Browser. Funktioniert mit den meisten OptiFine-Shaderpacks." },
+      { name: "Ingame-Einstellungen tunen", text: "Render-Distanz senken (8–12 Chunks), Sodium-Optimierungs-Panel aktivieren, unnötige Partikel deaktivieren. F3 zeigt dir die aktuellen FPS." },
+      { name: "Genug RAM zuweisen", text: "Mit Mods solltest du den Java-RAM der Instanz in den GDLauncher-Settings auf 6–8 GB setzen. Details siehe 'Mehr RAM zuweisen'-Guide." }
+    ]
+  },
+  fr: {
+    title: "Guide des mods de performance Minecraft",
+    description: "Booste tes FPS avec ces mods de performance essentiels. Guide complet des mods d'optimisation pour Minecraft.",
+    steps: [
+      { name: "Utiliser une instance Fabric ou Quilt", text: "Les meilleurs mods de performance (Sodium, Lithium, FerriteCore, Iris) sont Fabric/Quilt only. Dans GDLauncher, crée une nouvelle instance avec le loader Fabric pour la version Minecraft que tu veux." },
+      { name: "Installer Sodium + Lithium + FerriteCore", text: "Va dans l'onglet Addons et installe Sodium (rendu), Lithium (optimisations côté serveur) et FerriteCore (mémoire). Ensemble ils peuvent à peu près doubler les FPS sur la plupart des configs." },
+      { name: "Ajouter Iris si tu veux des shaders", text: "Iris est le shader loader compatible Sodium. Installe-le de la même manière via le navigateur Addons. Il fonctionne avec la plupart des shader packs OptiFine." },
+      { name: "Régler les paramètres en jeu", text: "Réduis la distance de rendu (8–12 chunks), active le panneau d'optimisation de Sodium, désactive les particules dont tu te fous. F3 affiche tes FPS en direct." },
+      { name: "Allouer assez de RAM", text: "Si t'es modé, monte la RAM Java de ton instance dans les settings GDLauncher à 6–8 Go. Détails dans le guide 'Augmenter la RAM'." }
+    ]
+  },
+  es: {
+    title: "Guía de mods de rendimiento de Minecraft",
+    description: "Sube tus FPS con estos mods de rendimiento esenciales. Guía completa de mods de optimización para Minecraft.",
+    steps: [
+      { name: "Usar una instancia Fabric o Quilt", text: "Los mejores mods de rendimiento (Sodium, Lithium, FerriteCore, Iris) son solo de Fabric/Quilt. En GDLauncher, crea una nueva instancia con el loader Fabric para la versión de Minecraft que quieras." },
+      { name: "Instalar Sodium + Lithium + FerriteCore", text: "Abre la pestaña Addons e instala Sodium (renderizado), Lithium (optimización del lado del servidor) y FerriteCore (memoria). Juntos suelen duplicar los FPS en la mayoría de equipos." },
+      { name: "Añadir Iris si quieres shaders", text: "Iris es el shader loader compatible con Sodium. Instálalo igual desde el navegador Addons. Funciona con la mayoría de shader packs de OptiFine." },
+      { name: "Ajustar los settings del juego", text: "Baja la distancia de renderizado (8–12 chunks), activa el panel de optimizaciones de Sodium y desactiva partículas que no te interesen. F3 muestra los FPS en tiempo real." },
+      { name: "Asignar RAM suficiente", text: "Si tienes mods, sube la RAM Java de la instancia en los ajustes de GDLauncher a 6–8 GB. Detalles en la guía 'Asignar más RAM'." }
+    ]
+  },
+  "pt-BR": {
+    title: "Guia de mods de performance do Minecraft",
+    description: "Aumente seus FPS com esses mods de performance essenciais. Guia completo dos mods de otimização para Minecraft.",
+    steps: [
+      { name: "Usar uma instância Fabric ou Quilt", text: "Os melhores mods de performance (Sodium, Lithium, FerriteCore, Iris) são exclusivos do Fabric/Quilt. No GDLauncher, crie uma nova instância com o loader Fabric para a versão do Minecraft que quer." },
+      { name: "Instalar Sodium + Lithium + FerriteCore", text: "Abra a aba Addons e instale Sodium (renderização), Lithium (otimização do lado do servidor) e FerriteCore (memória). Juntos costumam dobrar os FPS na maioria dos setups." },
+      { name: "Adicionar Iris se quiser shaders", text: "O Iris é o shader loader compatível com Sodium. Instale do mesmo jeito pelo navegador de Addons. Funciona com a maioria dos shader packs do OptiFine." },
+      { name: "Ajustar configurações in-game", text: "Diminua a render distance (8–12 chunks), ative o painel de otimizações do Sodium e desligue partículas que você não liga. F3 mostra seus FPS em tempo real." },
+      { name: "Alocar RAM o suficiente", text: "Se está modado, aumente a RAM Java da sua instância nas configurações do GDLauncher para 6–8 GB. Detalhes no guia 'Alocar mais RAM'." }
+    ]
+  },
+  it: {
+    title: "Guida alle Mod di performance per Minecraft",
+    description: "Aumenta gli FPS con queste Mod di performance essenziali. Guida completa alle Mod di ottimizzazione per Minecraft.",
+    steps: [
+      { name: "Usa un'istanza Fabric o Quilt", text: "I migliori Mod di performance (Sodium, Lithium, FerriteCore, Iris) sono solo per Fabric/Quilt. In GDLauncher, crea una nuova istanza col loader Fabric per la versione di Minecraft che vuoi." },
+      { name: "Installa Sodium + Lithium + FerriteCore", text: "Apri la scheda Addons e installa Sodium (rendering), Lithium (ottimizzazioni lato server) e FerriteCore (memoria). Insieme tendono a raddoppiare gli FPS sulla maggior parte dei setup." },
+      { name: "Aggiungi Iris se vuoi le shader", text: "Iris è lo shader loader compatibile con Sodium. Installalo allo stesso modo dal browser Addons. Funziona con la maggior parte degli shader pack di OptiFine." },
+      { name: "Sistema le impostazioni in gioco", text: "Abbassa la render distance (8-12 chunk), attiva il pannello delle ottimizzazioni di Sodium e disattiva le particelle che non ti interessano. F3 mostra gli FPS in tempo reale." },
+      { name: "Assegna abbastanza RAM", text: "Se hai mod, alza la RAM Java dell'istanza nelle impostazioni di GDLauncher a 6-8 GB. Dettagli nella guida 'Allocare più RAM'." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="minecraft performance mods, fps mods, minecraft optimization, sodium, optifine alternative, boost minecraft fps, lag fix minecraft"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT5M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>軽量化 Mod が重要な理由</h2>
+      <p>バニラ Minecraft の描画は最適化が甘めです。軽量化 Mod を入れれば現実的に FPS を 2〜3 倍にできます。プレイがなめらかになり、描画距離を上げてもラグらず、より多くの Mod を載せても PC が悲鳴を上げにくくなります。</p>
+
+      <h2>Fabric スタック</h2>
+      <p>Fabric は最高水準の軽量化 Mod が揃っていて、しかも互いに連携します。次の Mod をすべて入れるのがおすすめ:</p>
+
+      <h3>Sodium</h3>
+      <p>最も重要な Mod。Minecraft の描画エンジンを丸ごと書き換えるレベルで、システム次第ですが FPS が 2〜5 倍になることも。グラフィック設定の UI も改善されます。</p>
+
+      <h3>Lithium</h3>
+      <p>ゲーム物理、Mob AI、ワールド生成などを最適化。ゲームプレイには影響を与えず、裏で静かに効きます。サーバー側のラグも軽減します。</p>
+
+      <h3>FerriteCore</h3>
+      <p>メモリ使用量を大幅に削減。Modpack を遊ぶなら必須級。RAM 使用量が下がるとガベージコレクションのフリーズも減ります。</p>
+
+      <h2>追加の最適化</h2>
+      <p>ModernFix は各種メモリリークやロード問題を修正。Entity Culling は見えない Mob のレンダリングを停止。ImmediatelyFast は GUI とテキスト描画を高速化。Krypton はマルチプレイのネットワーク最適化。More Culling はパーティクルとブロックエンティティにもカリングを拡張。</p>
+      <p>すべて入れる必要はありませんが、もう一段階のパフォーマンスが欲しいなら有効です。</p>
+
+      <h2>Forge での選択肢</h2>
+      <p>主要な Fabric 系軽量化 Mod の多くは Forge ポートが存在します。Embeddium は Forge 版 Sodium。Radium は Forge 版 Lithium。FerriteCore は両対応。OptiFine は伝統的なオールインワンですが、現在は多くの Mod と競合し、性能でも Sodium 系に劣ることが多くなっています。</p>
+
+      <h2>Mod を自分で選びたくない?</h2>
+      <p>軽量化 Modpack を導入しましょう。Fabulously Optimized は OptiFine ライクな機能を含む全部入り、Simply Optimized はミニマルで純粋に最適化重視。これらを使えば、自分で組まなくても軽量化スタック全体が手に入ります。</p>
+
+      <h2>役立つ設定</h2>
+      <p>Mod 以外でも、動画設定をいじりましょう。描画距離は 8〜12 チャンクで多くのプレイには十分。Fancy ではなく Fast Graphics を選ぶ、パーティクルを Minimal に、雲は Off か Fast に、画面のティアリングが気にならないなら VSync をオフ。</p>
+      <p>システム面: グラフィックドライバーを更新、プレイ中は他のアプリを閉じる、フルスクリーンモードを使う、Discord や Steam などのオーバーレイを無効化。</p>
+
+      <h2>互換性メモ</h2>
+      <p>Sodium と OptiFine は同時に使えません。どちらかを選ぶこと。それ以外の軽量化 Mod は基本的に互いに仲良く動作します。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>왜 성능 모드가 중요한가</h2>
+      <p>바닐라 Minecraft의 렌더링은 최적화가 잘 되어 있지 않습니다. 성능 모드는 현실적으로 FPS를 두 배에서 세 배까지 끌어올릴 수 있습니다. 게임이 부드러워지고, 렌더 거리를 늘려도 렉이 줄고, 더 많은 모드를 돌려도 컴퓨터가 비명을 덜 지릅니다.</p>
+
+      <h2>Fabric 스택</h2>
+      <p>Fabric에는 최고의 성능 모드가 있고, 서로 잘 어울려 작동합니다. 아래를 모두 설치하세요:</p>
+
+      <h3>Sodium</h3>
+      <p>가장 중요한 모드. Minecraft의 렌더링 엔진을 통째로 다시 작성한 수준으로, 시스템에 따라 FPS가 2~5배까지 향상됩니다. 그래픽 설정 메뉴도 개선됩니다.</p>
+
+      <h3>Lithium</h3>
+      <p>게임 물리, 몹 AI, 월드 생성을 최적화합니다. 게임플레이는 그대로, 백그라운드에서 조용히 동작합니다. 서버 측 렉도 줄여 줍니다.</p>
+
+      <h3>FerriteCore</h3>
+      <p>메모리 사용량을 크게 줄입니다. 모드팩을 즐긴다면 필수. RAM 사용이 줄면 가비지 컬렉션 정지(짜증 나는 끊김)도 줄어듭니다.</p>
+
+      <h2>추가 최적화</h2>
+      <p>ModernFix는 다양한 메모리 누수와 로딩 문제를 패치합니다. Entity Culling은 보이지 않는 몹의 렌더링을 멈춥니다. ImmediatelyFast는 GUI와 텍스트 렌더링을 가속합니다. Krypton은 멀티플레이의 네트워킹을 최적화합니다. More Culling은 파티클과 블록 엔티티까지 컬링을 확장합니다.</p>
+      <p>모두 필요한 건 아니지만, 한 단계 더 짜내고 싶다면 도움이 됩니다.</p>
+
+      <h2>Forge 옵션</h2>
+      <p>대부분의 Fabric 성능 모드에는 Forge 포팅이 있습니다. Embeddium은 Forge용 Sodium, Radium은 Forge용 Lithium, FerriteCore는 양쪽 다 지원. OptiFine은 클래식한 올인원이지만 요즘은 많은 모드와 충돌하며, Sodium 기반 대안보다 성능이 떨어지는 경우가 많습니다.</p>
+
+      <h2>모드를 직접 고르기 싫다면?</h2>
+      <p>성능 모드팩을 설치하세요. Fabulously Optimized는 OptiFine 같은 기능까지 포함한 풀세트, Simply Optimized는 미니멀하고 순수하게 최적화에 집중합니다. 수동 셋업 없이도 풀 성능 스택을 얻을 수 있습니다.</p>
+
+      <h2>도움 되는 설정</h2>
+      <p>모드 외에도, 비디오 설정을 만지세요. 렌더 거리 8~12 청크면 대부분의 플레이에 충분합니다. Fancy 대신 Fast Graphics를 쓰고, Particles를 Minimal로, 구름을 끄거나 Fast로, 화면 찢어짐이 신경 쓰이지 않으면 VSync를 끄세요.</p>
+      <p>시스템 측: 그래픽 드라이버를 업데이트하고, 플레이 중 다른 앱을 닫고, 전체 화면 모드를 쓰고, Discord와 Steam 등의 오버레이를 비활성화하세요.</p>
+
+      <h2>호환 노트</h2>
+      <p>Sodium과 OptiFine은 함께 동작하지 않습니다. 하나만 고르세요. 그 외 대부분의 성능 모드는 서로 잘 어울립니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Warum Performance-Mods wichtig sind</h2>
+      <p>Vanilla-Minecrafts Rendering ist nicht besonders gut optimiert. Performance-Mods können deine FPS realistisch verdoppeln oder verdreifachen. Das heißt flüssigeres Gameplay, mehr Render-Distanz ohne Lag und die Möglichkeit, mehr Mods laufen zu lassen, ohne dass dein Rechner kollabiert.</p>
+
+      <h2>Der Fabric-Stack</h2>
+      <p>Fabric hat die besten Performance-Mods, und sie funktionieren alle zusammen. Installier all das:</p>
+
+      <h3>Sodium</h3>
+      <p>Der wichtigste Mod überhaupt. Er schreibt die ganze Rendering-Engine von Minecraft neu. Erwartet 2–5× FPS-Steigerung, je nach System. Bringt auch bessere Grafik-Einstellungs-Menüs.</p>
+
+      <h3>Lithium</h3>
+      <p>Optimiert Spielphysik, Mob-KI und Welt-Generierung. Läuft still im Hintergrund, ohne das Gameplay zu verändern. Reduziert auch serverseitige Lags.</p>
+
+      <h3>FerriteCore</h3>
+      <p>Senkt den Speicherverbrauch deutlich. Wenn du Modpacks spielst, ist er essentiell. Weniger RAM-Verbrauch heißt weniger Garbage-Collection-Pausen (diese nervigen Ruckler).</p>
+
+      <h2>Zusatz-Optimierungen</h2>
+      <p>ModernFix patcht diverse Memory-Leaks und Lade-Probleme. Entity Culling stoppt das Rendern von Mobs, die du nicht sehen kannst. ImmediatelyFast beschleunigt GUI- und Text-Rendering. Krypton optimiert das Networking für Multiplayer. More Culling erweitert das Culling auf Partikel und Block-Entities.</p>
+      <p>Du brauchst nicht alle, aber sie helfen. Pack sie dazu, wenn du jedes Quäntchen Performance willst.</p>
+
+      <h2>Forge-Alternativen</h2>
+      <p>Die meisten Fabric-Performance-Mods haben Forge-Ports. Embeddium ist Sodium für Forge. Radium ist Lithium für Forge. FerriteCore funktioniert auf beiden. OptiFine ist die klassische All-in-one-Lösung, kollidiert aber mit vielen Mods und schneidet performance-mäßig heute meist schlechter ab als Sodium-basierte Alternativen.</p>
+
+      <h2>Keine Lust, Mods selbst auszuwählen?</h2>
+      <p>Installier ein Performance-Modpack. Fabulously Optimized bündelt alles inklusive OptiFine-ähnlicher Features. Simply Optimized ist minimal und fokussiert. So bekommst du den vollen Performance-Stack ohne manuelle Einrichtung.</p>
+
+      <h2>Einstellungen, die helfen</h2>
+      <p>Neben Mods kannst du deine Video-Einstellungen anpassen. Eine Render-Distanz von 8–12 Chunks reicht für die meisten Situationen. Fast statt Fancy. Partikel auf Minimal. Wolken aus oder auf Fast. VSync aus, außer du hast Bildschirm-Tearing.</p>
+      <p>System-mäßig: Grafiktreiber aktualisieren, andere Apps beim Spielen schließen, Vollbildmodus nutzen, Overlays von Discord, Steam etc. deaktivieren.</p>
+
+      <h2>Kompatibilitäts-Hinweise</h2>
+      <p>Sodium und OptiFine vertragen sich nicht. Wähl eines. Die meisten anderen Performance-Mods spielen sich gegenseitig schön zu.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Pourquoi les mods de performance comptent</h2>
+      <p>Le rendu de Minecraft vanilla n'est pas super bien optimisé. Les mods de performance peuvent réellement doubler ou tripler tes FPS. Ça veut dire un gameplay plus fluide, une distance de rendu plus haute sans lag, et la possibilité de faire tourner plus de mods sans que ta machine s'étouffe.</p>
+
+      <h2>Le stack Fabric</h2>
+      <p>Fabric a les meilleurs mods de performance, et ils marchent tous ensemble. Installe tout ça :</p>
+
+      <h3>Sodium</h3>
+      <p>Le mod le plus important. Il réécrit tout le moteur de rendu de Minecraft. Compte sur 2–5× plus de FPS selon ton système. Il ajoute aussi de meilleurs menus de paramètres graphiques.</p>
+
+      <h3>Lithium</h3>
+      <p>Optimise la physique du jeu, l'IA des mobs et la génération de monde. Tourne discrètement en arrière-plan sans changer le gameplay. Réduit aussi le lag côté serveur.</p>
+
+      <h3>FerriteCore</h3>
+      <p>Réduit fortement l'usage mémoire. Si tu joues à des modpacks, c'est essentiel. Moins de RAM utilisée = moins de pauses de garbage collection (ces saccades pénibles).</p>
+
+      <h2>Optimisations en plus</h2>
+      <p>ModernFix patche plusieurs fuites mémoire et soucis de chargement. Entity Culling arrête de rendre les mobs invisibles. ImmediatelyFast accélère le rendu de GUI et de texte. Krypton optimise le réseau pour le multi. More Culling étend le culling aux particules et block entities.</p>
+      <p>Pas besoin de tous, mais ils aident. Ajoute-les si tu veux le moindre bout de perf.</p>
+
+      <h2>Options Forge</h2>
+      <p>La plupart des mods de performance Fabric ont un port Forge. Embeddium, c'est Sodium pour Forge. Radium, c'est Lithium pour Forge. FerriteCore marche sur les deux. OptiFine est l'historique tout-en-un mais il entre en conflit avec beaucoup de mods et fait souvent moins bien que les alternatives basées sur Sodium aujourd'hui.</p>
+
+      <h2>Pas envie de choisir les mods toi-même ?</h2>
+      <p>Installe plutôt un modpack de performance. Fabulously Optimized regroupe tout avec des features de type OptiFine. Simply Optimized est minimal et focalisé. Ça te donne le stack de perf complet sans configuration manuelle.</p>
+
+      <h2>Paramètres qui aident</h2>
+      <p>Au-delà des mods, joue avec tes paramètres vidéo. Une distance de rendu de 8–12 chunks suffit pour la plupart des situations. Utilise Fast au lieu de Fancy. Particules au minimum. Coupe les nuages ou mets-les en Fast. Désactive le VSync sauf si t'as du screen tearing.</p>
+      <p>Côté système : mets à jour tes drivers graphiques, ferme les autres apps en jouant, utilise le mode plein écran et désactive les overlays de Discord, Steam, etc.</p>
+
+      <h2>Notes de compatibilité</h2>
+      <p>Sodium et OptiFine ne marchent pas ensemble. Choisis l'un. La plupart des autres mods de performance s'entendent bien entre eux.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Por qué importan los mods de rendimiento</h2>
+      <p>El renderizado de Minecraft vanilla no está demasiado bien optimizado. Los mods de rendimiento pueden duplicar o triplicar de verdad tus FPS. Eso significa juego más fluido, mayor distancia de renderizado sin lag y poder cargar más mods sin que el equipo se ahogue.</p>
+
+      <h2>El stack de Fabric</h2>
+      <p>Fabric tiene los mejores mods de rendimiento, y todos funcionan entre sí. Instálalos todos:</p>
+
+      <h3>Sodium</h3>
+      <p>El mod más importante. Reescribe entero el motor de renderizado de Minecraft. Espera entre 2 y 5× más FPS según tu sistema. También añade mejores menús de ajustes gráficos.</p>
+
+      <h3>Lithium</h3>
+      <p>Optimiza la física del juego, la IA de los mobs y la generación del mundo. Trabaja en silencio en segundo plano sin cambiar nada del gameplay. Reduce también el lag del lado del servidor.</p>
+
+      <h3>FerriteCore</h3>
+      <p>Reduce significativamente el uso de memoria. Si juegas modpacks es esencial. Menos RAM usada significa menos pausas de garbage collection (esos tirones molestos).</p>
+
+      <h2>Optimizaciones extra</h2>
+      <p>ModernFix parchea varias fugas de memoria y problemas de carga. Entity Culling deja de renderizar mobs que no ves. ImmediatelyFast acelera el renderizado de GUI y texto. Krypton optimiza el networking para multijugador. More Culling extiende el culling a partículas y block entities.</p>
+      <p>No necesitas todos, pero ayudan. Añádelos si quieres exprimir cada gota de rendimiento.</p>
+
+      <h2>Opciones para Forge</h2>
+      <p>La mayoría de mods de rendimiento de Fabric tienen ports a Forge. Embeddium es Sodium para Forge. Radium es Lithium para Forge. FerriteCore funciona en ambos. OptiFine es el clásico todo en uno, pero entra en conflicto con muchos mods y hoy en día suele rendir peor que las alternativas basadas en Sodium.</p>
+
+      <h2>¿No quieres elegir mods tú?</h2>
+      <p>Instala un modpack de rendimiento. Fabulously Optimized junta todo con features tipo OptiFine. Simply Optimized es minimalista y enfocado. Te dan el stack de rendimiento completo sin configurarlo a mano.</p>
+
+      <h2>Ajustes que ayudan</h2>
+      <p>Más allá de los mods, ajusta los settings de vídeo. Distancia de renderizado de 8–12 chunks suele bastar. Usa Fast en vez de Fancy. Partículas en Minimal. Apaga las nubes o ponlas en Fast. Quita VSync salvo que veas screen tearing.</p>
+      <p>A nivel sistema: actualiza los drivers gráficos, cierra otras apps mientras juegas, usa modo pantalla completa y desactiva los overlays de Discord, Steam, etc.</p>
+
+      <h2>Notas de compatibilidad</h2>
+      <p>Sodium y OptiFine no funcionan juntos. Elige uno. La mayoría de los demás mods de rendimiento se llevan bien entre sí.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>Por que mods de performance importam</h2>
+      <p>A renderização do Minecraft vanilla não é lá muito otimizada. Mods de performance podem dobrar ou triplicar seus FPS de verdade. Isso significa jogo mais suave, render distance maior sem lag e a capacidade de rodar mais mods sem o PC sufocar.</p>
+
+      <h2>O stack do Fabric</h2>
+      <p>O Fabric tem os melhores mods de performance, e todos funcionam entre si. Instale tudo:</p>
+
+      <h3>Sodium</h3>
+      <p>O mod mais importante. Reescreve todo o motor de renderização do Minecraft. Espere de 2 a 5× mais FPS dependendo do sistema. Também adiciona menus de configurações gráficas melhores.</p>
+
+      <h3>Lithium</h3>
+      <p>Otimiza física do jogo, IA dos mobs e geração de mundo. Trabalha em silêncio no fundo sem mudar o gameplay. Também reduz lag do lado do servidor.</p>
+
+      <h3>FerriteCore</h3>
+      <p>Diminui bastante o uso de memória. Se você joga modpacks, é essencial. Menos RAM usada significa menos pausas de garbage collection (aqueles travadinhos chatos).</p>
+
+      <h2>Otimizações extras</h2>
+      <p>ModernFix corrige vários memory leaks e problemas de carregamento. Entity Culling para de renderizar mobs que você não vê. ImmediatelyFast acelera renderização de GUI e texto. Krypton otimiza networking pra multiplayer. More Culling estende o culling pra partículas e block entities.</p>
+      <p>Você não precisa de todos, mas eles ajudam. Adicione se quiser arrancar cada pedacinho de performance.</p>
+
+      <h2>Opções no Forge</h2>
+      <p>A maioria dos mods de performance do Fabric tem ports pro Forge. Embeddium é o Sodium pra Forge. Radium é o Lithium pra Forge. FerriteCore roda nos dois. O OptiFine é o clássico tudo-em-um, mas conflita com muitos mods e geralmente performa pior que as alternativas baseadas em Sodium hoje.</p>
+
+      <h2>Não quer escolher mods sozinho?</h2>
+      <p>Instale um modpack de performance. O Fabulously Optimized junta tudo com features estilo OptiFine. O Simply Optimized é minimalista e focado. Você ganha o stack completo de performance sem configurar nada manualmente.</p>
+
+      <h2>Configurações que ajudam</h2>
+      <p>Além dos mods, mexa nas configurações de vídeo. Render distance de 8–12 chunks já é o suficiente pra maioria das situações. Use Fast em vez de Fancy. Partículas em Minimal. Desligue nuvens ou coloque em Fast. Desative VSync a não ser que você esteja vendo screen tearing.</p>
+      <p>No sistema: atualize drivers gráficos, feche outros apps enquanto joga, use modo tela cheia e desative overlays do Discord, Steam etc.</p>
+
+      <h2>Notas de compatibilidade</h2>
+      <p>Sodium e OptiFine não rodam juntos. Escolha um. A maioria dos outros mods de performance se dão bem entre si.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Perché i Mod di performance contano</h2>
+      <p>Il rendering di Minecraft Vanilla non è particolarmente ottimizzato. I Mod di performance possono davvero raddoppiare o triplicare gli FPS. Significa gameplay più fluido, render distance più alta senza lag e la possibilità di far girare più mod senza che il PC vada in crisi.</p>
+
+      <h2>Lo stack di Fabric</h2>
+      <p>Fabric ha i migliori Mod di performance, e tutti lavorano bene insieme. Installa tutto:</p>
+
+      <h3>Sodium</h3>
+      <p>Il Mod più importante. Riscrive completamente il motore di rendering di Minecraft. Aspettati da 2 a 5 volte gli FPS a seconda del sistema. Aggiunge anche menu di impostazioni grafiche migliori.</p>
+
+      <h3>Lithium</h3>
+      <p>Ottimizza la fisica del gioco, l'IA dei mob e la generazione della mappa. Lavora silenziosamente in background senza cambiare il gameplay. Riduce anche il lag lato server.</p>
+
+      <h3>FerriteCore</h3>
+      <p>Riduce notevolmente l'uso di memoria. Se giochi ai Modpack è essenziale. Meno RAM usata significa meno pause di garbage collection (quegli scatti fastidiosi).</p>
+
+      <h2>Ottimizzazioni extra</h2>
+      <p>ModernFix risolve vari memory leak e problemi di caricamento. Entity Culling smette di renderizzare i mob che non vedi. ImmediatelyFast velocizza il rendering di GUI e testo. Krypton ottimizza la rete per il multigiocatore. More Culling estende il culling a particelle e block entity.</p>
+      <p>Non ti servono tutti, ma aiutano. Aggiungili se vuoi spremere ogni goccia di prestazioni.</p>
+
+      <h2>Opzioni per Forge</h2>
+      <p>La maggior parte dei Mod di performance di Fabric ha un port per Forge. Embeddium è Sodium per Forge. Radium è Lithium per Forge. FerriteCore funziona su entrambi. OptiFine è lo storico tutto-in-uno, ma oggi entra in conflitto con molte mod e in termini di prestazioni spesso fa peggio delle alternative basate su Sodium.</p>
+
+      <h2>Non hai voglia di scegliere i Mod a mano?</h2>
+      <p>Installa un Modpack di performance. Fabulously Optimized mette insieme tutto, incluse funzioni in stile OptiFine. Simply Optimized è minimale e mirato. Ti danno lo stack completo di performance senza configurare niente a mano.</p>
+
+      <h2>Impostazioni che aiutano</h2>
+      <p>Oltre ai Mod, sistema le impostazioni video. Una render distance di 8-12 chunk basta per la maggior parte delle situazioni. Usa Fast invece di Fancy. Particelle al minimo. Spegni le nuvole o mettile su Fast. Disattiva il VSync, a meno che tu non veda screen tearing.</p>
+      <p>Lato sistema: aggiorna i driver grafici, chiudi le altre app mentre giochi, usa la modalità schermo intero e disattiva gli overlay di Discord, Steam ecc.</p>
+
+      <h2>Note di compatibilità</h2>
+      <p>Sodium e OptiFine non funzionano insieme. Scegline uno. La maggior parte degli altri Mod di performance va d'accordo tra loro.</p>
+    </Fragment>
+  )}
+</GuideLayout>

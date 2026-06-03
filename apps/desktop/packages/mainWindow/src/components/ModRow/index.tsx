@@ -57,10 +57,6 @@ const ModRow = (props: ModRowProps) => {
 
   const instanceId = () => props?.instanceId
 
-  const loadIconMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.loadIconUrl"]
-  }))
-
   const createInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.createInstance"],
     onSuccess(instanceId) {
@@ -212,7 +208,7 @@ const ModRow = (props: ModRowProps) => {
                     <div class="flex items-center gap-3">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
-                        type="outline"
+                        type="secondary"
                         onClick={() => handleExplore()}
                       >
                         <Trans key="instances:_trn_explore_modpack" />
@@ -232,9 +228,6 @@ const ModRow = (props: ModRowProps) => {
 
                               setLoading(true)
 
-                              const imgUrl = props.data.imageUrl
-                              if (imgUrl) loadIconMutation.mutate(imgUrl)
-
                               let fileVersion = undefined
                               if (props.data.platform !== "curseforge") {
                                 const mrVersions =
@@ -250,7 +243,8 @@ const ModRow = (props: ModRowProps) => {
 
                               createInstanceMutation.mutate({
                                 group: 1,
-                                use_loaded_icon: true,
+                                use_loaded_icon: false,
+                                icon_url: props.data.imageUrl ?? null,
                                 notes: "",
                                 name: props.data.title,
                                 version: {
@@ -278,7 +272,7 @@ const ModRow = (props: ModRowProps) => {
                     <div class="flex gap-3">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
-                        type="outline"
+                        type="secondary"
                         onClick={() => handleExplore()}
                       >
                         <Trans key="instances:_trn_explore_modpack" />

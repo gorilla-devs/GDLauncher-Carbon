@@ -1,0 +1,63 @@
+---
+/**
+ * CTABanner - Final call to action section
+ */
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+---
+
+<section class="py-20 bg-darkSlate-900 relative overflow-hidden">
+  <!-- Background decoration -->
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary-700/10 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="relative z-10 max-w-4xl mx-auto px-4 text-center">
+    <div data-scroll="fade-up">
+      <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
+        {t("cta.title.line1")}{" "}
+        <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
+          {t("cta.title.line2")}
+        </span>
+      </h2>
+      <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto mb-10">
+        {t("cta.tagline")}
+      </p>
+    </div>
+
+    <!-- Download buttons -->
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a
+        href="/download/windows"
+        data-astro-prefetch="false"
+        class="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors shadow-lg shadow-primary-500/25 transition-transform duration-100 ease-spring active:!scale-95"
+        data-scroll="scale"
+      >
+        <div class="i-simple-icons:windows11 w-6 h-6"></div>
+        {t("cta.windows")}
+      </a>
+
+      <div class="flex items-center gap-3" data-scroll="scale" data-scroll-delay="100">
+        <a
+          href="/download/mac"
+          data-astro-prefetch="false"
+          class="inline-flex items-center gap-2 px-5 py-4 rounded-xl bg-darkSlate-700 hover:bg-darkSlate-600 text-lightSlate-100 transition-colors transition-transform duration-100 ease-spring active:scale-95"
+        >
+          <div class="i-simple-icons:apple w-5 h-5"></div>
+          {t("cta.macos")}
+        </a>
+        <a
+          href="/download/linux"
+          data-astro-prefetch="false"
+          class="inline-flex items-center gap-2 px-5 py-4 rounded-xl bg-darkSlate-700 hover:bg-darkSlate-600 text-lightSlate-100 transition-colors transition-transform duration-100 ease-spring active:scale-95"
+        >
+          <div class="i-simple-icons:linux w-5 h-5"></div>
+          {t("cta.linux")}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

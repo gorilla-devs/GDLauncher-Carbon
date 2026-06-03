@@ -1,4 +1,8 @@
 #articleContainer a {
-  color: rgba(40, 101, 164, 1);
-  text-decoration: underline;
+  color: rgb(var(--primary-400));
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+#articleContainer a:hover {
+  color: rgb(var(--primary-300));
 }

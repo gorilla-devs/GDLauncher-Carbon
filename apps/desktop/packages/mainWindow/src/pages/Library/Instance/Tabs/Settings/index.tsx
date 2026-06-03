@@ -1,5 +1,5 @@
 import { generateSequence } from "@/utils/helpers"
-import { port, queryClient, rspc } from "@/utils/rspcClient"
+import { apiUrl, queryClient, rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
   Button,
@@ -13,8 +13,8 @@ import {
   Slider,
   Switch
 } from "@gd/ui"
-import { useParams, useRouteData } from "@solidjs/router"
-import fetchData from "../../instance.data"
+import { useParams } from "@solidjs/router"
+import useInstanceData from "../../instance.data"
 import { Match, Show, createMemo, Switch as SolidSwitch } from "solid-js"
 import { InstanceDetails } from "@gd/core_module/bindings"
 import Title from "@/pages/Settings/components/Title"
@@ -29,7 +29,7 @@ const Settings = () => {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const searchContext = useSearchContext()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const updateInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.updateInstance"],
     onMutate: async (variables) => {
@@ -120,7 +120,7 @@ const Settings = () => {
     queryKey: ["java.getJavaProfiles"]
   }))
 
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
 
   const initialJavaArgs = createMemo((prev: string | null) => {
     if (prev) return prev
@@ -196,7 +196,7 @@ const Settings = () => {
           <div class="flex items-center gap-4">
             <img
               class="h-13 w-13 rounded-lg"
-              src={`http://127.0.0.1:${port}/instance/modpackIcon?instance_id=${params.id}`}
+              src={apiUrl(`/instance/modpackIcon?instance_id=${params.id}`)}
             />
             <div>
               <div class="text-lg font-bold">
@@ -208,7 +208,7 @@ const Settings = () => {
           <div class="flex gap-4">
             <Show when={routeData.instanceDetails.data?.modpack?.locked}>
               <Button
-                type="outline"
+                type="secondary"
                 onClick={() => {
                   searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                   // modalsContext?.openModal(
@@ -239,7 +239,7 @@ const Settings = () => {
               </div>
             </Show>
             <Button
-              type="outline"
+              type="secondary"
               onClick={() => {
                 searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                 modalsContext?.openModal(
@@ -257,7 +257,7 @@ const Settings = () => {
               <Trans key="instances:_trn_instance_settings.unpair" />
             </Button>
             <Button
-              type="outline"
+              type="secondary"
               onClick={() => {
                 modalsContext?.openModal(
                   {
@@ -275,6 +275,32 @@ const Settings = () => {
           </div>
         </div>
       </Show>
+      <Row>
+        <Title>
+          <Trans key="instances:_trn_instance_settings.reinstall" />
+        </Title>
+        <RightHandSide>
+          <Button
+            type="secondary"
+            disabled={!routeData?.instanceDetails?.data?.modpack}
+            onClick={() => {
+              modalsContext?.openModal(
+                {
+                  name: "confirmReinstall"
+                },
+                {
+                  id: parseInt(params.id, 10),
+                  name: routeData.instanceDetails.data?.name,
+                  isServer: false
+                }
+              )
+            }}
+          >
+            <i class="i-hugeicons:refresh h-5 w-5" />
+            <Trans key="instances:_trn_instance_settings.reinstall" />
+          </Button>
+        </RightHandSide>
+      </Row>
       <Row>
         <Title>
           <Trans key="java:_trn_instance_settings.java_path_profile" />
@@ -440,6 +466,11 @@ const Settings = () => {
             steps={1000}
             value={routeData?.instanceDetails.data?.memory?.max_mb}
             marks={generateSequence(2048, mbTotalRAM())}
+            tooltipFormat={(val) =>
+              val >= 1024
+                ? `${(val / 1024).toFixed(1).replace(/\.0$/, "")} GB`
+                : `${val} MB`
+            }
             onChange={(val) => {
               if (
                 !val ||
@@ -474,10 +505,21 @@ const Settings = () => {
             }}
           />
         </div>
+        <Show
+          when={
+            routeData?.instanceDetails.data?.memory?.max_mb &&
+            routeData.instanceDetails.data.memory.max_mb > mbTotalRAM() * 0.8
+          }
+        >
+          <div class="mt-2 flex items-center gap-2 px-2 text-sm text-yellow-500">
+            <div class="i-hugeicons:alert-02 h-4 w-4 shrink-0" />
+            <Trans key="java:_trn_ram_warning_high_allocation" />
+          </div>
+        </Show>
       </Show>
 
       <Row>
-        <Title>
+        <Title description={<Trans key="java:_trn_java_arguments_hint" />}>
           <Trans key="java:_trn_instance_settings.java_arguments_title" />
         </Title>
         <Switch

@@ -20,7 +20,7 @@ use daedalus::minecraft::{
 use regex::{Captures, Regex};
 use reqwest::Url;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -104,6 +104,11 @@ pub async fn get_version(
             )
         })?;
 
+        // Validate the freshly fetched body before caching it: a 200 response with an
+        // unparseable body must not overwrite a previously-good cached version.
+        let parsed = serde_json::from_slice::<VersionInfo>(&version_meta)
+            .with_context(|| format!("Failed to parse minecraft version from `{}`", url.clone()))?;
+
         db_client
             .version_info_cache()
             .upsert(
@@ -120,11 +125,11 @@ pub async fn get_version(
             .exec()
             .await?;
 
-        Ok(version_meta)
+        Ok(parsed)
     };
 
-    let version_meta = match update_cache().await {
-        Ok(version_meta) => version_meta,
+    match update_cache().await {
+        Ok(parsed) => Ok(parsed),
         Err(err) => {
             let db_cache = db_client
                 .version_info_cache()
@@ -155,9 +160,7 @@ pub async fn get_version(
                 err
             );
         }
-    };
-
-    Ok(serde_json::from_slice(&version_meta)?)
+    }
 }
 
 pub async fn get_lwjgl_meta(
@@ -214,6 +217,15 @@ pub async fn get_lwjgl_meta(
             )
         })?;
 
+        // Validate the freshly fetched body before caching it: a 200 response with an
+        // unparseable body must not overwrite a previously-good cached LWJGL group.
+        let parsed = serde_json::from_slice::<LibraryGroup>(&lwjgl).with_context(|| {
+            format!(
+                "Failed to parse LWJGL metadata from `{}`",
+                lwjgl_json_url.clone()
+            )
+        })?;
+
         let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
         db_client
@@ -232,11 +244,11 @@ pub async fn get_lwjgl_meta(
             .exec()
             .await?;
 
-        Ok(lwjgl)
+        Ok(parsed)
     };
 
-    let lwjgl = match update_cache().await {
-        Ok(lwjgl) => lwjgl,
+    match update_cache().await {
+        Ok(parsed) => Ok(parsed),
         Err(err) => {
             let db_cache = db_client
                 .lwjgl_meta_cache()
@@ -264,9 +276,7 @@ pub async fn get_lwjgl_meta(
 
             anyhow::bail!("Failed to fetch lwjgl from `{}`: {}", lwjgl_suggest, err);
         }
-    };
-
-    Ok(serde_json::from_slice(&lwjgl)?)
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -416,6 +426,43 @@ fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
     arg.to_string()
 }
 
+/// Split a user-provided extra-Java-args string into individual arguments.
+///
+/// Arguments are separated by whitespace, except whitespace inside a
+/// double-quoted span is preserved. Quotes may appear anywhere in an
+/// argument (so both `"-javaagent:C:\With Spaces\a.jar"` and the more
+/// natural `-javaagent:"C:\With Spaces\a.jar"` work, joining the quoted and
+/// unquoted runs into one token). Within an argument, `\"` is a literal quote
+/// and `\\` a literal backslash; every other character — including lone
+/// backslashes in Windows paths — is taken verbatim. Empty tokens are dropped.
+fn parse_extra_java_args(input: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' if matches!(chars.peek(), Some(&('"' | '\\'))) => {
+                current.push(chars.next().expect("peeked char is present"));
+            }
+            '"' => in_quotes = !in_quotes,
+            c if c.is_whitespace() && !in_quotes => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            c => current.push(c),
+        }
+    }
+
+    if !current.is_empty() {
+        args.push(current);
+    }
+
+    args
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn generate_startup_command(
     java_component: JavaComponent,
@@ -438,9 +485,9 @@ pub async fn generate_startup_command(
         true,
     );
 
-    let tmp_set: HashSet<_> = libraries.drain(..).collect();
-    libraries.extend(tmp_set.into_iter());
-
+    // chain_lwjgl_libs_with_base_libs already deduplicates by computed library name and
+    // preserves a deterministic order; a HashSet pass here would re-randomize that order,
+    // which can non-deterministically change which shaded class wins on the classpath.
     let libraries = libraries
         .into_iter()
         .reduce(|a, b| format!("{a}{CLASSPATH_SEPARATOR}{b}"))
@@ -449,8 +496,6 @@ pub async fn generate_startup_command(
     let regex =
         Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
             .unwrap();
-
-    let extra_args_regex = Regex::new(r#"("(?P<quoted>(\\"|[^"])*)"|(?P<raw>([^ ]+)))"#).unwrap();
 
     let player_token = match full_account.type_ {
         FullAccountType::Offline => "offline".to_owned(),
@@ -631,12 +676,15 @@ pub async fn generate_startup_command(
         substitute_arguments(&mut command, jvm_arguments);
     }
 
-    for cap in extra_args_regex.captures_iter(extra_java_args) {
-        let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else {
-            continue;
-        };
-        command.push(arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\"));
-    }
+    // `extra_java_args` is user-authored: it only ever comes from the instance's
+    // own settings or the global Java-args setting. No import path — gdlpack,
+    // legacy GDL, or the CurseForge/Modrinth archive importers — populates it, so
+    // it is trusted and passed through verbatim, including `-javaagent`/`-agentpath`/
+    // `-agentlib`, which legitimate tooling needs (profilers, hot-swap agents,
+    // authlib-injector). If a future import path ever ingests third-party JVM args,
+    // sanitize them at THAT boundary; a blanket launch-time filter here cannot tell
+    // user input from imported input and would only break real agents.
+    command.extend(parse_extra_java_args(extra_java_args));
 
     if Os::native() == Os::Osx {
         let lwjgl_3 = version
@@ -680,7 +728,18 @@ pub async fn launch_minecraft(
     assets_dir: super::assets::AssetsDir,
     wrapper_command: Option<String>,
 ) -> anyhow::Result<Child> {
-    let mut startup_command = generate_startup_command(
+    // Mojang/Forge/Fabric version manifests embed the live MS access token as
+    // `--accessToken <token>` (and `--session token:<token>:<uuid>` for legacy
+    // versions). Capture the token before moving `full_account` so we can
+    // scrub it from the launch-command log line below.
+    let secret_to_redact = match &full_account.type_ {
+        FullAccountType::Microsoft { access_token, .. } if !access_token.is_empty() => {
+            Some(access_token.clone())
+        }
+        _ => None,
+    };
+
+    let startup_command = generate_startup_command(
         java_component.clone(),
         full_account,
         xmx_memory,
@@ -695,29 +754,54 @@ pub async fn launch_minecraft(
     )
     .await?;
 
-    let main_command = wrapper_command
-        .as_ref()
-        .filter(|v| !v.is_empty())
-        .map(|s| s.as_str())
-        .unwrap_or_else(|| java_component.path.as_str());
+    // A wrapper command (e.g. "mangohud gamemoderun") is a full command line, so split it
+    // into a program plus arguments and run the java invocation through it. An empty or
+    // whitespace-only wrapper is treated as no wrapper.
+    let wrapper_tokens = match wrapper_command.as_deref().map(str::trim) {
+        Some(raw) if !raw.is_empty() => {
+            // shlex uses POSIX backslash escaping, so on Windows a path like `C:\tools\wrap.exe`
+            // would be mangled (backslashes dropped) or rejected (a trailing one aborts the
+            // split). Escape backslashes first on Windows so they survive the split intact.
+            #[cfg(target_os = "windows")]
+            let escaped = raw.replace('\\', "\\\\");
+            #[cfg(target_os = "windows")]
+            let wrapper: &str = &escaped;
+            #[cfg(not(target_os = "windows"))]
+            let wrapper: &str = raw;
 
-    if wrapper_command.is_some() {
-        startup_command.insert(0, java_component.path.clone());
-    }
+            let tokens = shlex::split(wrapper)
+                .with_context(|| format!("Invalid wrapper command: `{wrapper}`"))?;
+            (!tokens.is_empty()).then_some(tokens)
+        }
+        _ => None,
+    };
 
+    let (main_command, command_args) = match wrapper_tokens {
+        Some(mut tokens) => {
+            let program = tokens.remove(0);
+            tokens.push(java_component.path.clone());
+            tokens.extend(startup_command);
+            (program, tokens)
+        }
+        None => (java_component.path.clone(), startup_command),
+    };
+
+    let logged_command = match &secret_to_redact {
+        Some(token) => command_args.join(" ").replace(token.as_str(), "<REDACTED>"),
+        None => command_args.join(" "),
+    };
     info!(
         "Starting Minecraft with command: {} {}",
-        main_command,
-        startup_command.join(" ")
+        main_command, logged_command
     );
 
-    let mut command_exec = tokio::process::Command::new(main_command);
+    let mut command_exec = tokio::process::Command::new(&main_command);
     command_exec.current_dir(instance_path.get_data_path());
 
     command_exec.stdout(std::process::Stdio::piped());
     command_exec.stderr(std::process::Stdio::piped());
 
-    let child = command_exec.args(startup_command);
+    let child = command_exec.args(command_args);
 
     Ok(child.spawn()?)
 }
@@ -735,19 +819,24 @@ pub async fn extract_natives(
         native_name: &str,
     ) -> anyhow::Result<()> {
         let native_name = native_name.replace("${arch}", ARCH_WIDTH);
-        let path = runtime_path.get_libraries().get_library_path({
-            library
-                .downloads
-                .as_ref()
-                .unwrap()
-                .classifiers
-                .as_ref()
-                .unwrap()
-                .get(&native_name)
-                .unwrap()
-                .path
-                .clone()
-        });
+        // A native may be declared for this OS without a matching download classifier
+        // (legacy/url-style or third-party libraries). The download phase skips those, so
+        // there is nothing on disk to extract; skip instead of panicking on the missing entry.
+        let Some(classifier) = library
+            .downloads
+            .as_ref()
+            .and_then(|downloads| downloads.classifiers.as_ref())
+            .and_then(|classifiers| classifiers.get(&native_name))
+        else {
+            warn!(
+                "Library `{}` declares a native for this OS but has no matching download classifier `{native_name}`; skipping native extraction",
+                library.name
+            );
+            return Ok(());
+        };
+        let path = runtime_path
+            .get_libraries()
+            .get_library_path(classifier.path.clone());
 
         info!("Extracting natives from {}", path.display());
 
@@ -767,6 +856,28 @@ pub async fn extract_natives(
     info!("Start natives extraction for id {}", version.id);
 
     let dest = runtime_path.get_natives().get_versioned(&version.id);
+
+    // Natives are immutable per Minecraft version and live in a directory shared by every
+    // instance on that version. Re-extracting on each launch would truncate native libraries
+    // that another instance running the same version has already loaded (a Windows sharing
+    // violation), so skip when a prior run already finished extraction here. The marker records
+    // the Java architecture the natives were extracted for: the shared directory holds only one
+    // arch's libraries, so a launch with a different-arch Java must re-extract rather than reuse
+    // mismatched natives.
+    let extraction_marker = dest.join(".gdl_natives_extracted");
+    let arch_tag = format!("{java_arch:?}");
+    if tokio::fs::read_to_string(&extraction_marker)
+        .await
+        .map(|marker| marker == arch_tag)
+        .unwrap_or(false)
+    {
+        info!(
+            "Natives for {} ({arch_tag}) already extracted; skipping",
+            version.id
+        );
+        return Ok(());
+    }
+
     tokio::fs::create_dir_all(&dest).await?;
 
     for library in version
@@ -790,6 +901,16 @@ pub async fn extract_natives(
             }
             None => continue,
         };
+    }
+
+    // Record completion (and the arch we extracted for) so subsequent same-arch launches skip
+    // re-extraction. Best-effort: a failed marker write must not fail an otherwise successful
+    // extraction; it only costs a redundant re-extraction next launch.
+    if let Err(e) = tokio::fs::write(&extraction_marker, arch_tag.as_bytes()).await {
+        warn!(
+            "Failed to write natives extraction marker for {}: {e:?}",
+            version.id
+        );
     }
 
     Ok(())
@@ -901,6 +1022,51 @@ mod tests {
                 .unwrap();
 
         file.write_all(command.as_bytes()).await.unwrap();
+    }
+
+    #[test]
+    fn extra_java_args_pass_agents_through_unmodified() {
+        // `-javaagent`/`-agentlib`/`-agentpath` are user-authored JVM args and
+        // must be passed through unmodified, never filtered out.
+        assert_eq!(
+            parse_extra_java_args("-javaagent:/opt/unlim/agent.jar -Xss8m -agentlib:hprof"),
+            vec![
+                "-javaagent:/opt/unlim/agent.jar".to_string(),
+                "-Xss8m".to_string(),
+                "-agentlib:hprof".to_string(),
+            ],
+        );
+    }
+
+    #[test]
+    fn extra_java_args_support_quoted_paths_with_spaces() {
+        // A quoted path containing spaces must stay a single argument. If it
+        // split at the space, the JVM would treat the fragment after the space
+        // as the main class instead of part of the -javaagent value.
+        assert_eq!(
+            parse_extra_java_args(r#"-javaagent:"C:\Program Files\Unlim\agent.jar" -Dx=1"#),
+            vec![
+                r"-javaagent:C:\Program Files\Unlim\agent.jar".to_string(),
+                "-Dx=1".to_string(),
+            ],
+        );
+        // Wrapping the entire argument in quotes is also accepted.
+        assert_eq!(
+            parse_extra_java_args(r#""-javaagent:C:\Program Files\Unlim\agent.jar""#),
+            vec![r"-javaagent:C:\Program Files\Unlim\agent.jar".to_string()],
+        );
+    }
+
+    #[test]
+    fn extra_java_args_handle_escapes_and_blanks() {
+        assert_eq!(parse_extra_java_args(""), Vec::<String>::new());
+        // The global + per-instance args are joined with a space, so an empty
+        // config yields a blank string that must produce no arguments.
+        assert_eq!(parse_extra_java_args("   "), Vec::<String>::new());
+        assert_eq!(
+            parse_extra_java_args(r#"-Dmsg="a\"b" -Dpath=C:\\tmp"#),
+            vec![r#"-Dmsg=a"b"#.to_string(), r"-Dpath=C:\tmp".to_string()],
+        );
     }
 
     #[tokio::test]

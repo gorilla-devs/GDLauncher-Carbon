@@ -1,6 +1,6 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 
-import { port, rspc } from "@/utils/rspcClient"
+import { apiUrl, rspc } from "@/utils/rspcClient"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
@@ -49,6 +49,9 @@ export const AccountsDropdown = (props: Props) => {
     globalStore.gdlAccount.data?.status === "valid"
       ? globalStore.gdlAccount.data?.value
       : undefined
+
+  const gdlAccountUnavailable = () =>
+    globalStore.gdlAccount.isError && !!globalStore.settings.data?.gdlAccountId
 
   let gdlAccountRef: HTMLDivElement | undefined
   let mcAccountsRef: HTMLDivElement | undefined
@@ -131,14 +134,16 @@ export const AccountsDropdown = (props: Props) => {
 
           <div class="flex items-center gap-4">
             <img
-              src={`http://127.0.0.1:${port}/account/headImage?uuid=${(() => {
-                const account = globalStore.accounts.data?.find(
-                  (account) =>
-                    account.uuid ===
-                    globalStore.currentlySelectedAccountUuid.data
-                )
-                return account ? getAccountImageUuid(account) : ""
-              })()}`}
+              src={apiUrl(
+                `/account/headImage?uuid=${(() => {
+                  const account = globalStore.accounts.data?.find(
+                    (account) =>
+                      account.uuid ===
+                      globalStore.currentlySelectedAccountUuid.data
+                  )
+                  return account ? getAccountImageUuid(account) : ""
+                })()}`
+              )}
               class="h-6 w-6 rounded-md"
             />
             <div class="max-w-30 truncate">
@@ -187,7 +192,15 @@ export const AccountsDropdown = (props: Props) => {
                     class="h-6 w-6 rounded-md"
                   />
                   <div class="max-w-50 truncate">
-                    {validGDLUser()?.nickname}
+                    {validGDLUser()?.displayName}
+                  </div>
+                </div>
+              </Match>
+              <Match when={gdlAccountUnavailable()}>
+                <div class="flex items-center gap-4 rounded-lg px-4 py-2">
+                  <div class="i-hugeicons:alert-01 text-yellow-500 h-6 w-6" />
+                  <div class="text-yellow-400">
+                    <Trans key="accounts:_trn_gdl_account_unavailable" />
                   </div>
                 </div>
               </Match>
@@ -219,7 +232,9 @@ export const AccountsDropdown = (props: Props) => {
                 >
                   <div class="flex items-center gap-4">
                     <img
-                      src={`http://127.0.0.1:${port}/account/headImage?uuid=${getAccountImageUuid(account)}`}
+                      src={apiUrl(
+                        `/account/headImage?uuid=${getAccountImageUuid(account)}`
+                      )}
                       class="h-6 w-6 rounded-md"
                     />
                     <div class="max-w-30 truncate">{account.username}</div>
@@ -257,7 +272,7 @@ export const AccountsDropdown = (props: Props) => {
             ref={settingsButtonRef}
           >
             <Button
-              type="outline"
+              type="secondary"
               class="flex items-center justify-center gap-4"
               fullWidth
               onClick={() => {

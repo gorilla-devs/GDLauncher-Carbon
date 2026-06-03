@@ -42,7 +42,6 @@ import {
 
 console.log("Modules imported successfully")
 
-// Overwolf ready state and pending email
 let overwolfReady = false
 let pendingEmail: string | null | undefined = null
 
@@ -98,6 +97,7 @@ let isGameRunning = false
 let showAppCloseWarning = true
 
 app.enableSandbox()
+app.commandLine.appendSwitch("proxy-bypass-list", "127.0.0.1,localhost")
 
 export function initRTPath(override: string | null | undefined) {
   console.log("Initializing runtime path...")
@@ -287,6 +287,7 @@ export type CoreModule = () => Promise<
       type: "success"
       result: {
         port: number
+        apiToken: string
         kill: () => void
       }
     }
@@ -299,6 +300,11 @@ export type CoreModule = () => Promise<
     }
 >
 
+// Must match DEV_API_TOKEN in crates/carbon_app/src/main.rs.
+// Debug builds of the rust core accept this fixed token; release builds
+// rotate randomly per launch.
+const DEV_API_TOKEN = "dev-mode-only-do-not-use-in-production"
+
 const loadCoreModule: CoreModule = () =>
   new Promise((resolve, _) => {
     console.log("Loading core module...")
@@ -307,6 +313,7 @@ const loadCoreModule: CoreModule = () =>
         type: "success",
         result: {
           port: 4650,
+          apiToken: DEV_API_TOKEN,
           kill: () => {}
         }
       })
@@ -378,28 +385,59 @@ const loadCoreModule: CoreModule = () =>
     coreModule.stdout.on("data", (data) => {
       const dataString = data.toString()
 
-      console.log(`[CORE] Message: ${dataString}`)
+      // Strip sensitive payloads before lines reach the user-facing buffer
+      // or main.log:
+      //   - `_STATUS_:READY|<port>|<api-token>` — the core API token. The
+      //     user can already read it from disk, but log dumps shared via
+      //     Discord / GitHub should not leak it.
+      //   - `_GDL_ACCOUNT_EMAIL_:<email>` — the signed-in user's email,
+      //     forwarded to Overwolf for ad personalisation. PII; must not
+      //     end up in shared support logs.
+      // IPC parsing below uses the raw `dataString`, so redaction here only
+      // affects what gets persisted/displayed.
+      const sanitized = dataString
+        .replace(/(_STATUS_:READY\|\d+\|)[^\s|]+/g, "$1<redacted>")
+        .replace(/(_GDL_ACCOUNT_EMAIL_:)[^\s\r\n]+/g, "$1<redacted>")
+
+      console.log(`[CORE] Message: ${sanitized}`)
 
       const rows = dataString.split(/\r?\n|\r|\n/g)
 
       logs.push({
         type: "info",
-        message: dataString
+        message: sanitized
       })
 
       for (const row of rows) {
         if (row.startsWith("_STATUS_:")) {
           const rightPart = row.split(":")[1]
-          const event = rightPart.split("|")[0]
-          const port: number = rightPart.split("|")[1]
+          const parts = rightPart.split("|")
+          const event = parts[0]
+          const port: number = parts[1] as unknown as number
+          const apiToken: string | undefined = parts[2]
           console.log(`[CORE] Event: ${event}, Port: ${port}`)
 
           if (event === "READY") {
+            if (!apiToken) {
+              console.error("[CORE] _STATUS_:READY missing api token")
+              resolve({
+                type: "error",
+                logs: [
+                  ...logs,
+                  {
+                    type: "error",
+                    message: "Core module did not provide an api token"
+                  }
+                ]
+              })
+              return
+            }
             started = true
             resolve({
               type: "success",
               result: {
                 port,
+                apiToken,
                 kill: () => coreModule?.kill()
               }
             })
@@ -441,7 +479,10 @@ const loadCoreModule: CoreModule = () =>
             }
 
             lastCoreModuleProgress = progress
-            getWin()?.webContents.send("coreModuleProgress", progress)
+            const w = getWin()
+            if (w && !w.isDestroyed()) {
+              w.webContents.send("coreModuleProgress", progress)
+            }
           }
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
           const rightPart = row.split(":")[1]
@@ -453,14 +494,20 @@ const loadCoreModule: CoreModule = () =>
             console.log("Game launched, action:", action)
             switch (action) {
               case "closeWindow":
-                win?.close()
+                if (win && !win.isDestroyed()) {
+                  win.close()
+                }
                 win = null
                 break
               case "hideWindow":
-                win?.hide()
+                if (win && !win.isDestroyed()) {
+                  win.hide()
+                }
                 break
               case "minimizeWindow":
-                win?.minimize()
+                if (win && !win.isDestroyed()) {
+                  win.minimize()
+                }
                 break
               case "none":
                 break
@@ -520,19 +567,21 @@ const loadCoreModule: CoreModule = () =>
     coreModule.on("exit", (code) => {
       console.log(`[CORE] Exit with code: ${code}`)
 
-      if (code !== 0) {
-        resolve({
-          type: "error",
-          logs
-        })
+      // If we get here without `started` being true, the core module exited
+      // before emitting `_STATUS_:READY`. That's always an error condition,
+      // even if the exit code is 0.
+      if (started) {
+        return
       }
-
       resolve({
-        type: "success",
-        result: {
-          port: 0,
-          kill: () => coreModule?.kill()
-        }
+        type: "error",
+        logs: [
+          ...logs,
+          {
+            type: "error",
+            message: `Core module exited unexpectedly with code ${code} before READY`
+          }
+        ]
       })
     })
 
@@ -566,16 +615,16 @@ if ((app as any).overwolf) {
 if (process.platform === "win32") app.setAppUserModelId(app.getName())
 
 // Register protocol handlers for gdlauncher, curseforge, and modrinth
-const protocols = ["gdlauncher", "curseforge", "modrinth"]
-for (const protocol of protocols) {
+const deepLinkProtocols = ["gdlauncher", "curseforge", "modrinth"]
+for (const deepLinkProtocol of deepLinkProtocols) {
   if (process.defaultApp) {
     if (process.argv.length >= 2) {
-      app.setAsDefaultProtocolClient(protocol, process.execPath, [
+      app.setAsDefaultProtocolClient(deepLinkProtocol, process.execPath, [
         resolve(process.argv[1])
       ])
     }
   } else {
-    app.setAsDefaultProtocolClient(protocol)
+    app.setAsDefaultProtocolClient(deepLinkProtocol)
   }
 }
 
@@ -591,6 +640,14 @@ const isSupportedProtocol = (url: string) =>
   url.startsWith("gdlauncher://") ||
   url.startsWith("curseforge://") ||
   url.startsWith("modrinth://")
+
+// On Windows/Linux cold-start, the protocol URL arrives in process.argv.
+// macOS uses `open-url` instead; `second-instance` covers already-running launches.
+const initialProtocolUrl = process.argv.find(isSupportedProtocol)
+if (initialProtocolUrl) {
+  console.log("Protocol URL received via process.argv:", initialProtocolUrl)
+  pendingProtocolUrl = initialProtocolUrl
+}
 
 async function createWindow(): Promise<BrowserWindow> {
   console.log("Creating window...")
@@ -631,6 +688,10 @@ async function createWindow(): Promise<BrowserWindow> {
     }
   })
 
+  win.on("closed", () => {
+    win = null
+  })
+
   win.on("move", () => {
     const bounds = win?.getBounds()
 
@@ -669,7 +730,23 @@ async function createWindow(): Promise<BrowserWindow> {
   win.webContents.on("will-navigate", (e, url) => {
     if (win && !win.isDestroyed() && url !== win.webContents.getURL()) {
       e.preventDefault()
-      shell.openExternal(url)
+      try {
+        const parsed = new URL(url)
+        if (
+          parsed.protocol === "http:" ||
+          parsed.protocol === "https:" ||
+          parsed.protocol === "mailto:"
+        ) {
+          shell.openExternal(url)
+        } else {
+          console.warn(
+            "[will-navigate] blocked navigation to unsafe scheme:",
+            url
+          )
+        }
+      } catch {
+        console.warn("[will-navigate] blocked invalid URL:", url)
+      }
     }
   })
 
@@ -688,7 +765,6 @@ async function createWindow(): Promise<BrowserWindow> {
   win.webContents.on("before-input-event", (event, input) => {
     if (input.alt && input.shift && input.code === "KeyI") {
       event.preventDefault()
-      console.log("dev tools open:", win?.webContents.isDevToolsOpened())
       win?.webContents.toggleDevTools()
     }
   })
@@ -869,82 +945,207 @@ ipcMain.handle("getRuntimePath", async () => {
   return CURRENT_RUNTIME_PATH
 })
 
-ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
-  interface Progress {
-    action: "copy" | "remove"
-    currentName: string
-    current: number
-    total: number
-  }
-
-  if (newPath === CURRENT_RUNTIME_PATH) {
-    return
-  }
-
-  const runtimeOverridePath = path.join(
-    app.getPath("userData"),
-    RUNTIME_PATH_OVERRIDE_NAME
-  )
-
-  await fs.mkdir(newPath, { recursive: true })
-
-  try {
-    const cm = await coreModule
-    if (cm.type === "success") {
-      cm.result.kill()
+ipcMain.handle(
+  "changeRuntimePath",
+  async (_, newPath: string, switchOnly = false) => {
+    interface Progress {
+      action: "scan" | "copy" | "remove"
+      currentName: string
+      current: number
+      total: number
     }
-  } catch {
-    // No op
-  }
 
-  const files = await fg("**/*", {
-    cwd: CURRENT_RUNTIME_PATH!,
-    onlyFiles: true,
-    dot: true,
-    ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
-  })
-
-  const total = files.length
-
-  for (let i = 0; i < total; i++) {
-    const file = files[i]
-
-    win?.webContents.send("changeRuntimePathProgress", {
-      action: "copy",
-      currentName: path.basename(file),
-      current: i,
-      total: total * 2
-    } satisfies Progress)
-
-    await fse.copy(
-      path.join(CURRENT_RUNTIME_PATH!, file),
-      path.join(newPath, file),
-      {
-        overwrite: true,
-        errorOnExist: false,
-        recursive: true
-      }
+    console.log(
+      `[RTP] Migration request: ${CURRENT_RUNTIME_PATH} -> ${newPath} (switchOnly=${switchOnly})`
     )
-  }
 
-  await fse.writeFile(runtimeOverridePath, newPath)
+    if (newPath === CURRENT_RUNTIME_PATH) {
+      console.log(`[RTP] No-op: same path`)
+      return
+    }
 
-  for (let i = 0; i < total; i++) {
-    const file = files[i]
+    const runtimeOverridePath = path.join(
+      app.getPath("userData"),
+      RUNTIME_PATH_OVERRIDE_NAME
+    )
 
+    if (switchOnly) {
+      // Switch-only mode: the renderer already detected the dir exists with
+      // user data via validateRuntimePath. Don't mkdir — that would silently
+      // recreate the dir empty if it was deleted between confirm and now,
+      // resulting in a successful "switch" to an empty runtime.
+      if (!(await fse.pathExists(newPath))) {
+        console.error(`[RTP] Switch-only: target no longer exists: ${newPath}`)
+        throw new Error(
+          `Target directory no longer exists: ${newPath}. Aborting switch.`
+        )
+      }
+    } else {
+      try {
+        await fs.mkdir(newPath, { recursive: true })
+        console.log(`[RTP] Destination ready`)
+      } catch (e) {
+        console.error(`[RTP] Failed to create destination:`, e)
+        throw e
+      }
+    }
+
+    try {
+      const cm = await coreModule
+      if (cm.type === "success") {
+        console.log(`[RTP] Killing core module`)
+        cm.result.kill()
+        // Give the OS a moment to release file handles (SQLite WAL, logs)
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+    } catch {
+      // No op
+    }
+
+    // Switch-only path: the target dir already contains the user's data and
+    // they want to use it as-is. Don't touch any files in either dir; just
+    // update the override pointer and relaunch. The previous runtime data
+    // remains as orphan disk space the user can delete manually.
+    if (switchOnly) {
+      console.log(`[RTP] Switch-only: writing override to point at ${newPath}`)
+      await fse.writeFile(runtimeOverridePath, newPath)
+      console.log(`[RTP] Switch complete, relaunching`)
+      app.relaunch()
+      app.exit()
+      return
+    }
+
+    // Surface activity to the renderer immediately so the user doesn't
+    // see only the spinner during the (potentially slow) glob scan.
     win?.webContents.send("changeRuntimePathProgress", {
-      action: "remove",
-      currentName: path.basename(file),
-      current: total + i,
-      total: total * 2
+      action: "scan",
+      currentName: "",
+      current: 0,
+      total: 0
     } satisfies Progress)
 
-    await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file))
-  }
+    console.log(`[RTP] Scanning source files...`)
+    const t0 = Date.now()
+    const files = await fg("**/*", {
+      cwd: CURRENT_RUNTIME_PATH!,
+      onlyFiles: true,
+      dot: true,
+      followSymbolicLinks: false,
+      suppressErrors: true,
+      ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
+    })
+    console.log(`[RTP] Scan: ${files.length} files in ${Date.now() - t0}ms`)
 
-  app.relaunch()
-  app.exit()
-})
+    const total = files.length
+
+    // Drop a marker so a future startup can detect an interrupted migration if
+    // the host process crashes (we still won't have written the override file
+    // in that case).
+    const migrationMarker = path.join(newPath, ".gdl_migration_in_progress")
+    try {
+      await fse.writeFile(migrationMarker, "")
+    } catch (e) {
+      console.warn(`[RTP] Failed to write migration marker:`, e)
+    }
+
+    // Track which files we successfully copied, so a rollback only removes
+    // files we created — not pre-existing content the user had in newPath.
+    const copiedFiles: string[] = []
+    const cleanupPartial = async () => {
+      console.log(
+        `[RTP] Rolling back ${copiedFiles.length} files copied to ${newPath}`
+      )
+      for (const f of copiedFiles) {
+        try {
+          await fse.remove(path.join(newPath, f))
+        } catch {
+          // best-effort
+        }
+      }
+      try {
+        await fse.remove(migrationMarker)
+      } catch {
+        // best-effort
+      }
+    }
+
+    for (let i = 0; i < total; i++) {
+      const file = files[i]
+      const dest = path.join(newPath, file)
+
+      win?.webContents.send("changeRuntimePathProgress", {
+        action: "copy",
+        currentName: path.basename(file),
+        current: i,
+        total: total * 2
+      } satisfies Progress)
+
+      // Skip files that already exist with the same content — we don't want to
+      // touch (and later potentially roll back) files the user already had.
+      const destExisted = await fse.pathExists(dest)
+
+      try {
+        await fse.copy(path.join(CURRENT_RUNTIME_PATH!, file), dest, {
+          overwrite: true,
+          errorOnExist: false,
+          recursive: true
+        })
+        // Only track for rollback if we actually created the destination —
+        // overwriting a pre-existing file is destructive and we don't try to
+        // recover those.
+        if (!destExisted) {
+          copiedFiles.push(file)
+        }
+      } catch (e) {
+        console.error(`[RTP] Failed to copy ${file}:`, e)
+        await cleanupPartial()
+        throw new Error(`Failed to copy ${file}: ${(e as Error).message}`)
+      }
+    }
+    console.log(`[RTP] Copy complete, writing override`)
+
+    try {
+      await fse.writeFile(runtimeOverridePath, newPath)
+    } catch (e) {
+      // Override write failed *after* we copied everything — old path is still
+      // authoritative; new path is duplicated data. Clean up the new path.
+      console.error(`[RTP] Failed to write override file, rolling back:`, e)
+      await cleanupPartial()
+      throw e
+    }
+
+    // Clear marker — past this point, newPath is the authoritative location.
+    try {
+      await fse.remove(migrationMarker)
+    } catch {
+      // best-effort
+    }
+
+    console.log(`[RTP] Removing source files`)
+    for (let i = 0; i < total; i++) {
+      const file = files[i]
+
+      win?.webContents.send("changeRuntimePathProgress", {
+        action: "remove",
+        currentName: path.basename(file),
+        current: total + i,
+        total: total * 2
+      } satisfies Progress)
+
+      // Don't fail the migration if a single remove fails — data is already
+      // safely in the new path and the override file points at it.
+      try {
+        await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file))
+      } catch (e) {
+        console.error(`[RTP] Failed to remove ${file}:`, e)
+      }
+    }
+
+    console.log(`[RTP] Migration complete, relaunching`)
+    app.relaunch()
+    app.exit()
+  }
+)
 
 ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
   if (!newPath || newPath === CURRENT_RUNTIME_PATH) {
@@ -976,7 +1177,8 @@ ipcMain.handle("getCoreModule", async () => {
   return {
     type: cm.type,
     logs: cm.type === "error" ? cm.logs : undefined,
-    port: cm.type === "success" ? cm.result.port : undefined
+    port: cm.type === "success" ? cm.result.port : undefined,
+    apiToken: cm.type === "success" ? cm.result.apiToken : undefined
   }
 })
 
@@ -1020,6 +1222,40 @@ app.whenReady().then(async () => {
 
       delete details.responseHeaders!["access-control-allow-origin"]
       details.responseHeaders!["Access-Control-Allow-Origin"] = ["*"]
+
+      // Remove X-Frame-Options and CSP frame-ancestors for iframe-embeddable content
+      // This allows YouTube and other embeds to work when loaded from file:// origin
+      const url = details.url.toLowerCase()
+      const isEmbeddableContent =
+        url.includes("youtube.com") ||
+        url.includes("youtube-nocookie.com") ||
+        url.includes("googlevideo.com") || // YouTube video CDN
+        url.includes("i.imgur.com") ||
+        url.includes("cdn.ko-fi.com")
+
+      if (isEmbeddableContent) {
+        // Remove X-Frame-Options header (case-insensitive)
+        delete details.responseHeaders!["X-Frame-Options"]
+        delete details.responseHeaders!["x-frame-options"]
+
+        // Remove or modify Content-Security-Policy frame-ancestors
+        // Note: CSP can have multiple header names
+        const cspKeys = Object.keys(details.responseHeaders!).filter(
+          (key) =>
+            key.toLowerCase() === "content-security-policy" ||
+            key.toLowerCase() === "content-security-policy-report-only"
+        )
+        for (const key of cspKeys) {
+          const values = details.responseHeaders![key]
+          if (values) {
+            // Remove frame-ancestors directive from CSP
+            details.responseHeaders![key] = values.map((value) =>
+              value.replace(/frame-ancestors\s+[^;]+;?/gi, "")
+            )
+          }
+        }
+      }
+
       callback({
         cancel: false,
         responseHeaders: details.responseHeaders

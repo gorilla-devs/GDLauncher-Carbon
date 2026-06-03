@@ -1,14 +1,12 @@
+/* DocsStyle.css - Additional docs styling */
+
+/* Sidebar list styling */
 aside ul {
   list-style: none;
+  padding: 0;
+  margin: 0;
 }
-li {
-  color: white;
-}
-main a {
-  color: rgba(40, 101, 164, 1);
-  text-decoration: underline;
-}
-main ul {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
+
+aside li {
+  color: rgb(var(--lightSlate-100));
 }

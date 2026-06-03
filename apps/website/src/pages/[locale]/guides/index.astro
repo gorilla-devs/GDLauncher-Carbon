@@ -1,0 +1,71 @@
+---
+/**
+ * Localized Guides Hub Page
+ */
+import PageShell from "../../../components/PageShell.astro"
+import Breadcrumb from "../../../components/Breadcrumb.astro"
+import type { GetStaticPaths } from "astro"
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  getLocaleFromUrl,
+  localizedPath,
+} from "../../../lib/i18n"
+import { getGuidesHubData } from "../../../lib/guidesData"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const { chrome, guides, categoryOrder } = getGuidesHubData(locale)
+---
+
+<PageShell
+  title={chrome.pageTitle}
+  description={chrome.pageDescription}
+  keywords="minecraft guides, how to install mods, minecraft modding tutorial, minecraft modpack guide, forge tutorial, fabric tutorial"
+>
+    <main class="py-8">
+      <Breadcrumb items={[{ label: chrome.breadcrumb }]} maxWidth="max-w-6xl" />
+      <div class="max-w-6xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12">
+        <!-- Header -->
+        <div class="text-center mb-16">
+          <h1 class="text-4xl md:text-5xl font-bold text-lightSlate-50 mb-4">
+            {chrome.h1Main}
+            <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
+              {chrome.h1Highlight}
+            </span>
+          </h1>
+          <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+            {chrome.intro}
+          </p>
+        </div>
+
+        <!-- Guides by category -->
+        {categoryOrder.map((category) => (
+          <section class="mb-12">
+            <h2 class="text-2xl font-bold text-lightSlate-50 mb-6">{category}</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {guides.filter(g => g.category === category).map((guide) => (
+                <a
+                  href={guide.href ?? localizedPath(`/guides/${guide.slug}`, locale)}
+                  class="group block p-6 rounded-xl bg-darkSlate-700/50 border border-darkSlate-600 hover:border-primary-500/50 transition-all duration-300 hover:transform hover:-translate-y-1 active:scale-98 ease-spring"
+                >
+                  <h3 class="text-lg font-semibold text-lightSlate-50 group-hover:text-primary-300 transition-colors mb-2">
+                    {guide.title}
+                  </h3>
+                  <p class="text-sm text-darkSlate-100">
+                    {guide.description}
+                  </p>
+                </a>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+      </div>
+    </main>
+</PageShell>

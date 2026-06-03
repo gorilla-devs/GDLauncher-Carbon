@@ -20,18 +20,20 @@ use self::download::DownloadManager;
 use self::instance::InstanceManager;
 use self::minecraft::MinecraftManager;
 use self::rich_presence::RichPresenceManager;
+use self::server::ServerManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
 pub mod download;
 pub mod instance;
 pub mod java;
-mod metadata;
+pub(crate) mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;
 pub(crate) mod prisma_client;
 pub mod rich_presence;
+pub mod server;
 mod settings;
 pub mod system_info;
 pub mod vtask;
@@ -47,7 +49,7 @@ pub enum AppError {
 mod app {
     use metrics::MetricsManager;
     use sentry::capture_error;
-    use tracing::{error, info};
+    use tracing::{debug, error, info};
 
     use crate::{
         api::{CoreModuleStatus, update_core_module_status},
@@ -74,6 +76,7 @@ mod app {
         pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
         pub(crate) instance_manager: InstanceManager,
+        pub(crate) server_manager: ServerManager,
         meta_cache_manager: MetaCacheManager,
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
@@ -154,6 +157,7 @@ mod app {
                     modplatforms_manager: ModplatformsManager::new(unsaferef, gdl_base_api.clone()),
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
+                    server_manager: ServerManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
                     metrics_manager: MetricsManager::new(
                         Arc::clone(&db_client),
@@ -180,12 +184,39 @@ mod app {
 
             let _app = app.clone();
             tokio::spawn(async move {
+                let bg_total = std::time::Instant::now();
+
+                let t = std::time::Instant::now();
                 _app.clone()
                     .instance_manager()
                     .launch_background_tasks()
                     .await;
-                _app.meta_cache_manager().launch_background_tasks().await;
+                debug!(
+                    "[startup-timing] instance_manager.launch_background_tasks (scan_instances) completed in {:.2}s",
+                    t.elapsed().as_secs_f64()
+                );
 
+                let t = std::time::Instant::now();
+                _app.clone()
+                    .server_manager()
+                    .launch_background_tasks()
+                    .await;
+                debug!(
+                    "[startup-timing] server_manager.launch_background_tasks completed in {:.2}s",
+                    t.elapsed().as_secs_f64()
+                );
+
+                let t = std::time::Instant::now();
+                _app.meta_cache_manager().launch_background_tasks().await;
+                debug!(
+                    "[startup-timing] meta_cache_manager.launch_background_tasks completed in {:.2}s",
+                    t.elapsed().as_secs_f64()
+                );
+
+                debug!(
+                    "[startup-timing] all background tasks ready, emitting LaunchBackgroundTasks status (took {:.2}s)",
+                    bg_total.elapsed().as_secs_f64()
+                );
                 update_core_module_status(CoreModuleStatus::LaunchBackgroundTasks);
             });
 
@@ -212,17 +243,13 @@ mod app {
             tokio::spawn(async move {
                 match _app.account_manager().get_gdl_account().await {
                     Ok(account::gdl_account::GDLAccountStatus::Valid(user)) => {
-                        info!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
                         println!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
                     }
                     Ok(_) => {
-                        // No valid GDL account, send empty
-                        info!("_GDL_ACCOUNT_EMAIL_:");
                         println!("_GDL_ACCOUNT_EMAIL_:");
                     }
                     Err(e) => {
                         error!("Error getting GDL account: {e}");
-                        // Send empty on error
                         println!("_GDL_ACCOUNT_EMAIL_:");
                     }
                 }
@@ -259,6 +286,7 @@ mod app {
         manager_getter!(download_manager: DownloadManager);
         manager_getter!(task_manager: VisualTaskManager);
         manager_getter!(instance_manager: InstanceManager);
+        manager_getter!(server_manager: ServerManager);
         manager_getter!(meta_cache_manager: MetaCacheManager);
         manager_getter!(system_info_manager: SystemInfoManager);
         manager_getter!(rich_presence_manager: RichPresenceManager);

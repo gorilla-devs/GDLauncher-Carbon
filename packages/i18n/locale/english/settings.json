@@ -76,5 +76,10 @@
   "_trn_change_email": "Change Email",
   "_trn_custom_commands": "Custom Commands",
   "_trn_runtime_path": "Runtime Path",
-  "_trn_expert_user_mod": "Expert user mod"
+  "_trn_expert_user_mod": "Expert user mod",
+  "_trn_cache_storage_title": "Cache size",
+  "_trn_cache_storage_text": "GDLauncher caches responses from mod platforms and Minecraft metadata to speed up browsing and launches. If the cache grows unexpectedly large, cleaning it up will reclaim disk space; cached content is rebuilt automatically as needed.",
+  "_trn_cache_storage_clean_up": "Clean up",
+  "_trn_cache_storage_bloat_banner_title": "Your launcher database is using {{size}}",
+  "_trn_cache_storage_bloat_banner_desc": "That's well above normal. Cleaning up will free disk space without affecting your installed instances."
 }

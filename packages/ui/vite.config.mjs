@@ -13,7 +13,7 @@ export default defineConfig({
   plugins: [
     dts({
       insertTypesEntry: false,
-      tsConfigFilePath: resolve(__dirname, "tsconfig.build.json"),
+      tsconfigPath: resolve(__dirname, "tsconfig.build.json"),
       exclude: ["showcase/**/*"]
     }),
     solidPlugin(),
@@ -22,16 +22,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    transformMode: {
-      web: [/\.[t|s]sx?$/]
-    },
     setupFiles: "./setupVitest.js",
     // solid needs to be inline to work around
     // a resolution issue in vitest
     // And solid-testing-library needs to be here so that the 'hydrate'
     // method will be provided
-    deps: {
-      inline: [/solid-js/]
+    server: {
+      deps: {
+        inline: [/solid-js/]
+      }
     }
   },
   build: {

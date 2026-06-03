@@ -1,0 +1,37 @@
+---
+/**
+ * Localized blog routes: /ja/blog/<slug>, etc.
+ *
+ * Same approach as the localized docs routes, reuse English content with
+ * translated chrome for now. Per-locale post translations can be added by
+ * placing them under src/content/blog/<locale>/ and switching the lookup
+ * below.
+ */
+import { type CollectionEntry, getCollection } from "astro:content"
+import BlogPost from "../../../layouts/BlogPost.astro"
+import { LOCALES, DEFAULT_LOCALE } from "../../../lib/i18n"
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog")
+  const out: Array<{ params: { locale: string; slug: string }; props: CollectionEntry<"blog"> }> = []
+  for (const loc of LOCALES) {
+    if (loc === DEFAULT_LOCALE) continue
+    for (const post of posts) {
+      out.push({
+        params: { locale: loc, slug: post.slug },
+        props: post
+      })
+    }
+  }
+  return out
+}
+
+type Props = CollectionEntry<"blog">
+
+const post = Astro.props
+const { Content } = await post.render()
+---
+
+<BlogPost {...post.data}>
+  <Content />
+</BlogPost>

@@ -1,0 +1,324 @@
+---
+/**
+ * Localized "How to Install Minecraft Fabric" guide.
+ *
+ * One file, six locales. The locale comes from the route param; we look up
+ * translated metadata + steps and render the matching body block. Brand
+ * names (Fabric, Forge, NeoForge, Quilt, GDLauncher, CurseForge, Modrinth,
+ * Sodium, Lithium, FerriteCore, Mod Menu, OptiFine, Iris, Continuity,
+ * LambDynamicLights, Sodium Extra) stay untranslated.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft Fabric の導入方法",
+    description: "GDLauncher で Fabric Mod ローダーを Minecraft に導入する方法を解説。簡単・素早いセットアップガイド。",
+    steps: [
+      { name: "GDLauncher をダウンロード", text: "gdlauncher.com から GDLauncher をダウンロードしてインストール。無料で、Windows / macOS / Linux に対応しています。" },
+      { name: "新しいインスタンスを作成", text: "GDLauncher を開き、Library ページの + ボタンから新しい Minecraft インスタンスを作成します。" },
+      { name: "ローダーで Fabric を選択", text: "Mod ローダーの選択で Fabric を選びます。Fabric が対応する Minecraft バージョンが一覧表示されるので、遊びたいバージョンを選択。" },
+      { name: "インストールが終わるまで待つ", text: "GDLauncher が Minecraft、対応する Java、Fabric ローダーをすべて自動でダウンロードします。手動設定は不要です。" },
+      { name: "Fabric Mod を追加", text: "新しいインスタンスを開き、Addons タブから組み込みブラウザを使って、CurseForge や Modrinth の Fabric 対応 Mod をワンクリックで導入できます。" },
+      { name: "Play を押す", text: "Play をクリック。Mod 入りの Fabric インスタンスが起動します。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft Fabric 설치 방법",
+    description: "GDLauncher로 Minecraft에 Fabric 모드 로더를 설치하는 방법. 빠르고 쉬운 셋업 가이드.",
+    steps: [
+      { name: "GDLauncher 다운로드", text: "gdlauncher.com에서 GDLauncher를 받아 설치하세요. 무료이며 Windows, macOS, Linux를 지원합니다." },
+      { name: "새 인스턴스 만들기", text: "GDLauncher를 열고 Library 페이지의 + 버튼을 눌러 새 Minecraft 인스턴스를 만드세요." },
+      { name: "로더로 Fabric 선택", text: "모드 로더 선택 시 Fabric을 고릅니다. GDLauncher가 Fabric이 지원하는 Minecraft 버전을 나열하므로 원하는 버전을 선택하세요." },
+      { name: "설치가 끝날 때까지 대기", text: "GDLauncher가 Minecraft, 알맞은 Java 버전, Fabric 로더를 자동으로 다운로드합니다. 수동 설정은 없습니다." },
+      { name: "Fabric 모드 추가", text: "새 인스턴스를 열고 Addons 탭의 내장 브라우저로 CurseForge와 Modrinth의 Fabric 호환 모드를 원클릭으로 설치할 수 있습니다." },
+      { name: "Play 누르기", text: "Play를 클릭하면 모드가 적용된 Fabric 인스턴스가 실행됩니다." }
+    ]
+  },
+  de: {
+    title: "So installierst du Minecraft Fabric",
+    description: "Lerne, wie du den Fabric-Mod-Loader für Minecraft mit GDLauncher installierst. Schnelle, einfache Anleitung.",
+    steps: [
+      { name: "GDLauncher herunterladen", text: "Lade GDLauncher von gdlauncher.com herunter und installiere es. Kostenlos und für Windows, macOS und Linux verfügbar." },
+      { name: "Neue Instanz erstellen", text: "Öffne GDLauncher und klick auf der Library-Seite auf das +, um eine neue Minecraft-Instanz anzulegen." },
+      { name: "Fabric als Loader wählen", text: "Wähl bei der Loader-Auswahl Fabric. GDLauncher listet jede Minecraft-Version, die Fabric unterstützt, pick die aus, die du spielen willst." },
+      { name: "Installation abwarten", text: "GDLauncher lädt Minecraft, die passende Java-Version und den Fabric-Loader automatisch. Keine manuelle Konfiguration nötig." },
+      { name: "Fabric-Mods hinzufügen", text: "Öffne deine neue Instanz, geh in den Addons-Tab und installiere mit dem eingebauten Browser jeden Fabric-kompatiblen Mod aus CurseForge oder Modrinth per Klick." },
+      { name: "Auf Play drücken", text: "Klick auf Play. Deine modifizierte Fabric-Instanz ist startklar." }
+    ]
+  },
+  fr: {
+    title: "Comment installer Minecraft Fabric",
+    description: "Apprends à installer le mod loader Fabric pour Minecraft avec GDLauncher. Guide rapide et simple.",
+    steps: [
+      { name: "Télécharger GDLauncher", text: "Télécharge et installe GDLauncher depuis gdlauncher.com. C'est gratuit et ça marche sur Windows, macOS et Linux." },
+      { name: "Créer une nouvelle instance", text: "Ouvre GDLauncher et clique sur le bouton + de la page Library pour créer une nouvelle instance Minecraft." },
+      { name: "Choisir Fabric comme loader", text: "Au moment de choisir le mod loader, sélectionne Fabric. GDLauncher liste toutes les versions de Minecraft que Fabric supporte, choisis celle que tu veux jouer." },
+      { name: "Attendre la fin de l'installation", text: "GDLauncher télécharge Minecraft, la bonne version de Java et le loader Fabric automatiquement. Pas de config manuelle." },
+      { name: "Ajouter des mods Fabric", text: "Ouvre ton instance, va dans l'onglet Addons et utilise le navigateur intégré pour installer en un clic n'importe quel mod compatible Fabric depuis CurseForge ou Modrinth." },
+      { name: "Appuyer sur Play", text: "Clique sur Play. Ton instance Fabric moddée est prête." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar Minecraft Fabric",
+    description: "Aprende a instalar el mod loader Fabric en Minecraft con GDLauncher. Guía rápida y sencilla.",
+    steps: [
+      { name: "Descargar GDLauncher", text: "Descarga e instala GDLauncher desde gdlauncher.com. Es gratis y funciona en Windows, macOS y Linux." },
+      { name: "Crear una nueva instancia", text: "Abre GDLauncher y haz clic en el botón + de la página Library para crear una nueva instancia de Minecraft." },
+      { name: "Elegir Fabric como loader", text: "Al escoger el mod loader, selecciona Fabric. GDLauncher mostrará todas las versiones de Minecraft que Fabric soporta, elige la que quieras jugar." },
+      { name: "Esperar a que termine la instalación", text: "GDLauncher descarga Minecraft, la versión de Java correcta y el loader Fabric automáticamente. Sin configuración manual." },
+      { name: "Añadir mods de Fabric", text: "Abre tu nueva instancia, ve a la pestaña Addons y usa el navegador integrado para instalar con un clic cualquier mod compatible con Fabric desde CurseForge o Modrinth." },
+      { name: "Pulsar Play", text: "Haz clic en Play. Tu instancia Fabric con mods está lista." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar o Minecraft Fabric",
+    description: "Aprenda a instalar o mod loader Fabric para o Minecraft usando o GDLauncher. Guia de configuração rápido e fácil.",
+    steps: [
+      { name: "Baixar o GDLauncher", text: "Baixe e instale o GDLauncher em gdlauncher.com, é grátis e funciona no Windows, macOS e Linux." },
+      { name: "Criar uma nova instância", text: "Abra o GDLauncher e clique no botão + da página Library para criar uma nova instância do Minecraft." },
+      { name: "Escolher Fabric como loader", text: "Ao escolher o mod loader, selecione Fabric. O GDLauncher lista todas as versões de Minecraft que o Fabric suporta, escolha a que você quer jogar." },
+      { name: "Aguardar a instalação", text: "O GDLauncher baixa Minecraft, a versão correta do Java e o loader Fabric automaticamente. Sem configuração manual." },
+      { name: "Adicionar mods Fabric", text: "Abra a nova instância, vá na aba Addons e use o navegador embutido para instalar qualquer mod compatível com Fabric do CurseForge ou Modrinth com um clique." },
+      { name: "Apertar Play", text: "Clique em Play. Sua instância Fabric com mods está pronta." }
+    ]
+  },
+  it: {
+    title: "Come installare Minecraft Fabric",
+    description: "Scopri come installare il Mod loader Fabric per Minecraft usando GDLauncher. Guida rapida e semplice alla configurazione.",
+    steps: [
+      { name: "Scaricare GDLauncher", text: "Scarica e installa GDLauncher da gdlauncher.com, è gratuito e funziona su Windows, macOS e Linux." },
+      { name: "Creare una nuova istanza", text: "Apri GDLauncher e clicca sul pulsante + nella pagina Library per creare una nuova istanza Minecraft." },
+      { name: "Scegliere Fabric come loader", text: "Quando devi scegliere il Mod loader, seleziona Fabric. GDLauncher elenca tutte le versioni di Minecraft supportate da Fabric, scegli quella a cui vuoi giocare." },
+      { name: "Attendere il termine dell'installazione", text: "GDLauncher scarica Minecraft, la versione corretta di Java e il loader Fabric in automatico. Niente configurazione manuale." },
+      { name: "Aggiungere Mod Fabric", text: "Apri la nuova istanza, vai nella scheda Addons e usa il browser integrato per installare con un clic qualsiasi Mod compatibile con Fabric da CurseForge o Modrinth." },
+      { name: "Premere Play", text: "Clicca su Play. La tua istanza Fabric con Mod è pronta." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install fabric, minecraft fabric, fabric mod loader, how to install fabric minecraft, fabric mods, gdlauncher fabric"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT3M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>Fabric とは?</h2>
+      <p>Fabric は軽量な Mod ローダーで、軽量化 Mod や新しいバージョン向けコンテンツの定番になっています。新しい Minecraft バージョンへの対応が Forge より速く (時には数時間以内)、最新の機能を求めるプレイヤーに人気です。</p>
+      <p>現代の軽量化 Mod シーンは Fabric を中心に発展してきました。Sodium、Lithium、Phosphor、Iris はいずれも Fabric を最初の対応先としてリリースされ、新しい最適化 Mod も今でも Fabric に先に登場してから Forge や NeoForge にポートされる傾向があります。生 FPS を最優先するなら、Fabric (またはそのフォーク Quilt) が無難な選択です。</p>
+
+      <h2>Fabric のセットアップ</h2>
+      <p>GDLauncher で <strong>+</strong> ボタンを押し、Minecraft のバージョンを選び、<strong>Fabric</strong> を選択。最新の安定版 Fabric ローダーを使ってインスタンスを作成します。</p>
+      <p>ほとんどの Fabric Mod は <strong>Fabric API</strong> ライブラリに依存しています。GDLauncher は依存関係を自動で解決するので、Fabric API (やその他のライブラリ) が必要な Mod を導入すると、ランチャーが代わりに取り込みます。別途インストールする必要はありません。</p>
+
+      <h2>必須 Mod</h2>
+      <p>インスタンスを開いて <strong>Addons</strong> タブから次の軽量化 Mod を導入しましょう:</p>
+      <p>Sodium はレンダリングを大幅に高速化します。Lithium はゲームロジックや物理の処理を最適化。FerriteCore はメモリ使用量を削減。組み合わせるとゲームプレイは変わらずに FPS が 2〜3 倍になることもあります。</p>
+      <p>QoL 系: Mod Menu はゲーム内から Mod 設定を開けるようにします。Sodium Extra でグラフィック設定が増え、Iris を使えば Sodium の性能を活かしたままシェーダーが使えます。</p>
+
+      <h2>Fabric と Forge</h2>
+      <p>Fabric は更新が速く、軽量化 Mod が充実。Forge は Mod ライブラリが大きく、定番の大型コンテンツ Mod が豊富です。両方に対応する人気 Mod も増えていますが、すべてではありません。</p>
+      <p>どちらを選ぶかは遊びたい Mod 次第。最新コンテンツや最適化重視なら Fabric。Forge 限定 Mod を遊びたいなら Forge を選びましょう。</p>
+
+      <h2>OptiFine の代替</h2>
+      <p>OptiFine は Fabric では動きません。代わりに以下を使います:</p>
+      <p>軽量化に Sodium、シェーダーに Iris、コネクテッドテクスチャに Continuity (隣り合うガラスや本棚、砂岩などのブロック境界を消して一枚の面のように繋げて見せる機能)、動的光源に LambDynamicLights (持っているたいまつが周囲を実際に照らす)。これらは多くの場合 OptiFine を上回るパフォーマンスを発揮します。</p>
+
+      <h2>トラブルシューティング</h2>
+      <p>"missing Fabric API" のエラー? インスタンスの <strong>Addons</strong> タブを開き、Fabric API がリストにあるか確認してください。なければ "Fabric API" を検索して手動で導入します。</p>
+      <p>起動時のクラッシュは、Mod のバージョン違い、ローダー違い (実は Fabric Mod ではない)、依存関係不足が原因のほとんどです。Mod ページで対応条件を確認しましょう。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>Fabric이란?</h2>
+      <p>Fabric은 가벼운 모드 로더로, 성능 모드와 최신 콘텐츠의 표준이 되었습니다. 새 Minecraft 버전이 나올 때 Forge보다 빠르게 (때로는 몇 시간 만에) 대응하기 때문에, 최신 기능을 원하는 플레이어에게 인기가 많습니다.</p>
+      <p>요즘 성능 모드 생태계는 대부분 Fabric을 중심으로 자라났습니다. Sodium, Lithium, Phosphor, Iris 모두 Fabric에 가장 먼저 출시됐고, 새로운 최적화 모드들도 보통 Fabric에 먼저 등장한 뒤 Forge나 NeoForge로 포팅되는 흐름입니다. 순수 FPS가 최우선이라면 Fabric(또는 그 포크인 Quilt)이 가장 안전한 선택입니다.</p>
+
+      <h2>Fabric 셋업</h2>
+      <p>GDLauncher에서 <strong>+</strong> 버튼을 눌러 Minecraft 버전을 고르고 <strong>Fabric</strong>을 선택하세요. 최신 안정 버전의 Fabric 로더를 사용해 인스턴스를 만듭니다.</p>
+      <p>대부분의 Fabric 모드는 <strong>Fabric API</strong> 라이브러리에 의존합니다. GDLauncher는 모드 의존성을 자동으로 해결하므로, Fabric API(또는 다른 라이브러리)가 필요한 모드를 설치하면 런처가 알아서 가져옵니다. 따로 설치할 필요가 없습니다.</p>
+
+      <h2>필수 모드</h2>
+      <p>인스턴스를 열고 <strong>Addons</strong> 탭에서 다음 성능 모드들을 받으세요:</p>
+      <p>Sodium은 렌더링을 대폭 향상시킵니다. Lithium은 게임 로직과 물리를 최적화합니다. FerriteCore는 메모리 사용량을 줄여 줍니다. 함께 쓰면 게임플레이를 바꾸지 않고도 FPS가 2~3배까지 늘 수 있습니다.</p>
+      <p>편의성 모드: Mod Menu는 인게임 메뉴에서 모드 설정을 열어 줍니다. Sodium Extra는 그래픽 옵션을 더 추가합니다. Iris는 Sodium의 성능을 살린 채 셰이더를 쓸 수 있게 해 줍니다.</p>
+
+      <h2>Fabric vs Forge</h2>
+      <p>Fabric은 업데이트가 빠르고 성능 모드 생태계가 더 좋습니다. Forge는 모드 라이브러리가 더 크고 대형 클래식 콘텐츠 모드가 많죠. 양쪽 다 지원하는 인기 모드도 많지만, 전부는 아닙니다.</p>
+      <p>플레이할 모드에 따라 고르세요. 최적화나 최신 콘텐츠가 우선이면 Fabric, 특정 Forge 전용 모드가 필요하면 Forge.</p>
+
+      <h2>OptiFine 대체재</h2>
+      <p>OptiFine은 Fabric과 호환되지 않습니다. 대신 다음을 쓰세요:</p>
+      <p>성능은 Sodium, 셰이더는 Iris, 연결 텍스처는 Continuity(인접한 유리/책장/사암 같은 블록들의 경계를 없애 하나의 면처럼 이어 보이게 해 줌), 동적 조명은 LambDynamicLights(들고 있는 횃불이 실제로 주변을 비춰 줌). 보통 OptiFine보다 더 좋은 성능을 냅니다.</p>
+
+      <h2>문제 해결</h2>
+      <p>"missing Fabric API" 에러? 인스턴스의 <strong>Addons</strong> 탭을 열어 Fabric API가 목록에 있는지 확인하세요. 없다면 "Fabric API"를 검색해 수동으로 설치하면 됩니다.</p>
+      <p>실행 시 크래시는 보통 모드의 버전이 잘못됐거나, 로더가 다르거나(실제로는 Fabric 모드가 아닌 경우), 의존성이 빠졌을 때 발생합니다. 모드 페이지에서 요구사항을 확인하세요.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was ist Fabric?</h2>
+      <p>Fabric ist ein leichtgewichtiger Mod-Loader, der zur ersten Wahl für Performance-Mods und neuere Inhalte geworden ist. Er aktualisiert sich schneller als Forge, wenn neue Minecraft-Versionen erscheinen (manchmal innerhalb von Stunden), darum ist er bei Spielern beliebt, die die neuesten Features wollen.</p>
+      <p>Die moderne Performance-Mod-Szene ist größtenteils auf Fabric gewachsen. Sodium, Lithium, Phosphor und Iris sind alle Fabric-first erschienen, und neue Optimierungs-Mods landen meist erst dort, bevor sie auf Forge oder NeoForge portiert werden. Wenn dir rohe FPS am wichtigsten sind, ist Fabric (oder sein Fork Quilt) meist die sicherste Wahl.</p>
+
+      <h2>Fabric einrichten</h2>
+      <p>Klick im GDLauncher auf <strong>+</strong>, wähl deine Minecraft-Version und nimm <strong>Fabric</strong>. Verwende die neueste stabile Fabric-Loader-Version und erstelle die Instanz.</p>
+      <p>Die meisten Fabric-Mods hängen von der Bibliothek <strong>Fabric API</strong> ab. GDLauncher löst Mod-Abhängigkeiten automatisch auf: Wenn du einen Mod installierst, der Fabric API (oder eine andere Library) braucht, zieht der Launcher sie für dich nach. Kein separater Schritt nötig.</p>
+
+      <h2>Essentielle Mods</h2>
+      <p>Öffne deine Instanz, geh in den <strong>Addons</strong>-Tab und schnapp dir diese Performance-Mods:</p>
+      <p>Sodium beschleunigt das Rendering massiv. Lithium optimiert Spielelogik und Physik. FerriteCore senkt den Speicherverbrauch. Zusammen können sie deine FPS verdoppeln oder verdreifachen, ohne dass sich am Gameplay etwas ändert.</p>
+      <p>Für Komfort: Mod Menu gibt dir ein In-Game-Menü zur Konfiguration von Mods. Sodium Extra bringt mehr Grafikoptionen. Iris erlaubt Shader, ohne die Sodium-Performance zu opfern.</p>
+
+      <h2>Fabric vs Forge</h2>
+      <p>Fabric aktualisiert schneller und hat die besseren Performance-Mods. Forge bietet die größere Mod-Bibliothek und die meisten klassischen Content-Mods. Viele beliebte Mods existieren mittlerweile für beides, aber nicht alle.</p>
+      <p>Entscheide nach den Mods, die du spielen willst. Wenn dir Optimierung oder neue Inhalte wichtig sind, ist Fabric die Wahl. Wenn du bestimmte Forge-only-Mods brauchst, nimm Forge.</p>
+
+      <h2>OptiFine-Ersatz</h2>
+      <p>OptiFine läuft nicht auf Fabric. Stattdessen:</p>
+      <p>Sodium für Performance. Iris für Shader. Continuity für verbundene Texturen (sodass aneinanderliegendes Glas, Bücherregale, Sandstein etc. visuell zu einer durchgehenden Fläche werden statt jeweils einen eigenen Rand zu zeigen). LambDynamicLights für dynamische Beleuchtung (eine Fackel in der Hand leuchtet die Umgebung tatsächlich aus). Diese schlagen OptiFine performance-mäßig meist sowieso.</p>
+
+      <h2>Problembehebung</h2>
+      <p>"missing Fabric API"-Fehler? Öffne den <strong>Addons</strong>-Tab deiner Instanz und prüf, ob Fabric API in der Liste steht. Wenn nicht, such nach "Fabric API" und installier es von Hand.</p>
+      <p>Crashes beim Start liegen meist an einer falschen Mod-Version, am falschen Loader (kein echter Fabric-Mod) oder fehlenden Abhängigkeiten. Schau auf der Mod-Seite nach den Voraussetzungen.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>C'est quoi Fabric ?</h2>
+      <p>Fabric est un mod loader léger devenu la référence pour les mods de performance et les nouveaux contenus. Il se met à jour plus vite que Forge quand une nouvelle version de Minecraft sort (parfois en quelques heures), d'où sa popularité chez les joueurs qui veulent les dernières features.</p>
+      <p>La scène moderne des mods de performance s'est construite autour de Fabric. Sodium, Lithium, Phosphor et Iris sont tous sortis Fabric-first, et les nouveaux mods d'optimisation atterrissent encore là en premier avant d'être portés sur Forge ou NeoForge. Si tu cherches du FPS pur, Fabric (ou son fork Quilt) est en général le pari le plus sûr.</p>
+
+      <h2>Configurer Fabric</h2>
+      <p>Clique sur <strong>+</strong> dans GDLauncher, choisis ta version de Minecraft et sélectionne <strong>Fabric</strong>. Utilise la dernière version stable du loader Fabric et crée l'instance.</p>
+      <p>La plupart des mods Fabric dépendent de la bibliothèque <strong>Fabric API</strong>. GDLauncher résout les dépendances automatiquement : quand tu installes un mod qui a besoin de Fabric API (ou d'une autre bibliothèque), le launcher l'ajoute pour toi. Pas d'étape séparée.</p>
+
+      <h2>Mods essentiels</h2>
+      <p>Ouvre ton instance, va dans l'onglet <strong>Addons</strong> et récupère ces mods de performance :</p>
+      <p>Sodium améliore massivement le rendu. Lithium optimise la logique du jeu et la physique. FerriteCore réduit l'usage mémoire. Ensemble ils peuvent doubler ou tripler tes FPS sans changer le gameplay.</p>
+      <p>Pour le confort : Mod Menu te donne un menu in-game pour configurer les mods. Sodium Extra ajoute des options graphiques. Iris te laisse utiliser des shaders sans sacrifier la perf de Sodium.</p>
+
+      <h2>Fabric vs Forge</h2>
+      <p>Fabric se met à jour plus vite et a les meilleurs mods de performance. Forge a la plus grosse bibliothèque et la plupart des gros mods contenu classiques. Beaucoup de mods populaires sont sur les deux maintenant, mais pas tous.</p>
+      <p>Choisis selon les mods que tu veux jouer. Si tu cherches l'optimisation et le contenu récent, prends Fabric. Si tu veux des mods Forge-only, prends Forge.</p>
+
+      <h2>Remplacer OptiFine</h2>
+      <p>OptiFine ne marche pas avec Fabric. À la place :</p>
+      <p>Sodium pour la perf. Iris pour les shaders. Continuity pour les textures connectées (les blocs adjacents type verre, bibliothèques, grès, etc. fusionnent visuellement en une seule surface au lieu d'afficher des bords par bloc). LambDynamicLights pour l'éclairage dynamique (une torche tenue en main éclaire vraiment autour de toi). Ces mods font généralement mieux qu'OptiFine de toute façon.</p>
+
+      <h2>Dépannage</h2>
+      <p>Erreurs "missing Fabric API" ? Ouvre l'onglet <strong>Addons</strong> de ton instance et vérifie que Fabric API est bien dans la liste. Sinon, cherche "Fabric API" et installe-le à la main.</p>
+      <p>Crash au démarrage ? Il s'agit en général d'un mod pour la mauvaise version, le mauvais loader (pas un vrai mod Fabric), ou des dépendances manquantes. Vérifie les prérequis sur la page du mod.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>¿Qué es Fabric?</h2>
+      <p>Fabric es un mod loader ligero que se ha convertido en la referencia para mods de rendimiento y contenido nuevo. Se actualiza más rápido que Forge cuando salen versiones nuevas de Minecraft (a veces en horas), por eso es popular entre quienes quieren las últimas funciones.</p>
+      <p>La escena moderna de mods de rendimiento se crio alrededor de Fabric. Sodium, Lithium, Phosphor e Iris salieron primero para Fabric, y los nuevos mods de optimización siguen aterrizando ahí antes de portarse a Forge o NeoForge. Si lo que te importa son los FPS puros, Fabric (o su fork Quilt) suele ser la apuesta más segura.</p>
+
+      <h2>Configurar Fabric</h2>
+      <p>Pulsa <strong>+</strong> en GDLauncher, elige la versión de Minecraft y selecciona <strong>Fabric</strong>. Usa la versión estable más reciente del loader Fabric y crea la instancia.</p>
+      <p>La mayoría de mods Fabric dependen de la librería <strong>Fabric API</strong>. GDLauncher resuelve las dependencias de mods automáticamente: cuando instalas un mod que necesita Fabric API (u otra librería), el launcher la trae por ti. No hay un paso aparte.</p>
+
+      <h2>Mods esenciales</h2>
+      <p>Abre tu instancia, ve a la pestaña <strong>Addons</strong> y pilla estos mods de rendimiento:</p>
+      <p>Sodium mejora muchísimo el renderizado. Lithium optimiza la lógica del juego y la física. FerriteCore reduce el uso de memoria. Juntos pueden duplicar o triplicar los FPS sin cambiar nada del gameplay.</p>
+      <p>Para comodidad: Mod Menu te da un menú en juego para configurar mods. Sodium Extra añade más opciones gráficas. Iris te permite usar shaders sin sacrificar el rendimiento de Sodium.</p>
+
+      <h2>Fabric vs Forge</h2>
+      <p>Fabric se actualiza más rápido y tiene mejores mods de rendimiento. Forge tiene la mayor librería de mods y la mayoría de los grandes mods clásicos de contenido. Muchos mods populares están en ambos, pero no todos.</p>
+      <p>Elige según los mods que quieras jugar. Si te importa la optimización o el contenido reciente, ve a Fabric. Si quieres mods que solo existen en Forge, ve a Forge.</p>
+
+      <h2>Reemplazo de OptiFine</h2>
+      <p>OptiFine no funciona con Fabric. En su lugar:</p>
+      <p>Sodium para rendimiento. Iris para shaders. Continuity para texturas conectadas (los bloques contiguos de cristal, librerías, arenisca, etc. se funden visualmente en una sola superficie en vez de mostrar bordes por bloque). LambDynamicLights para iluminación dinámica (una antorcha en la mano ilumina de verdad lo que te rodea). Estos suelen rendir mejor que OptiFine de todos modos.</p>
+
+      <h2>Solución de problemas</h2>
+      <p>¿Errores de "missing Fabric API"? Abre la pestaña <strong>Addons</strong> de tu instancia y comprueba que Fabric API esté en la lista. Si no, busca "Fabric API" e instálalo a mano.</p>
+      <p>Los crashes al iniciar suelen deberse a una versión equivocada del mod, al loader incorrecto (no es un mod Fabric en realidad) o a dependencias que faltan. Revisa la página del mod para ver los requisitos.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que é o Fabric?</h2>
+      <p>O Fabric é um mod loader leve que virou referência para mods de performance e conteúdos mais novos. Ele se atualiza mais rápido que o Forge quando saem novas versões do Minecraft (às vezes em poucas horas), por isso é popular entre quem quer as features mais recentes.</p>
+      <p>A cena moderna de mods de performance cresceu em volta do Fabric. Sodium, Lithium, Phosphor e Iris saíram primeiro no Fabric, e novos mods de otimização ainda costumam aparecer lá antes de serem portados pro Forge ou NeoForge. Se o que importa é FPS puro, o Fabric (ou o fork Quilt) costuma ser a aposta mais segura.</p>
+
+      <h2>Configurando o Fabric</h2>
+      <p>Clique no <strong>+</strong> do GDLauncher, escolha a versão do Minecraft e selecione <strong>Fabric</strong>. Use a versão estável mais recente do loader Fabric e crie a instância.</p>
+      <p>A maioria dos mods Fabric depende da biblioteca <strong>Fabric API</strong>. O GDLauncher resolve as dependências de mods automaticamente: quando você instala um mod que precisa do Fabric API (ou de outra library), o launcher já traz junto. Não tem passo separado.</p>
+
+      <h2>Mods essenciais</h2>
+      <p>Abra sua instância, vá na aba <strong>Addons</strong> e pegue estes mods de performance:</p>
+      <p>O Sodium melhora muito a renderização. O Lithium otimiza a lógica do jogo e a física. O FerriteCore reduz o uso de memória. Juntos podem dobrar ou triplicar o FPS sem mudar nada do gameplay.</p>
+      <p>Para conforto: o Mod Menu dá um menu no jogo para configurar mods. O Sodium Extra adiciona mais opções gráficas. O Iris permite rodar shaders sem perder a performance do Sodium.</p>
+
+      <h2>Fabric vs Forge</h2>
+      <p>O Fabric se atualiza mais rápido e tem os melhores mods de performance. O Forge tem a maior biblioteca de mods e a maioria dos grandes mods de conteúdo clássicos. Muitos mods populares já estão nos dois, mas nem todos.</p>
+      <p>Escolha pelos mods que você quer jogar. Se você quer otimização e conteúdo novo, vai de Fabric. Se quer mods que só existem no Forge, vai de Forge.</p>
+
+      <h2>Substituindo o OptiFine</h2>
+      <p>O OptiFine não funciona com o Fabric. Em vez dele:</p>
+      <p>Sodium para performance. Iris para shaders. Continuity para texturas conectadas (blocos vizinhos de vidro, estantes, arenito, etc. se fundem visualmente em uma superfície só em vez de mostrar bordas por bloco). LambDynamicLights para iluminação dinâmica (uma tocha na mão ilumina de verdade o que está em volta). Em geral, eles rodam melhor que o OptiFine.</p>
+
+      <h2>Solução de problemas</h2>
+      <p>Erros de "missing Fabric API"? Abra a aba <strong>Addons</strong> da sua instância e confirme que o Fabric API está na lista. Se não estiver, procure por "Fabric API" e instale na mão.</p>
+      <p>Crash na inicialização geralmente significa que o mod é da versão errada, do loader errado (não é um mod Fabric mesmo) ou tem dependências faltando. Verifique os requisitos na página do mod.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cos'è Fabric?</h2>
+      <p>Fabric è un Mod loader leggero diventato il punto di riferimento per le Mod di ottimizzazione e per i contenuti più recenti. Si aggiorna più in fretta di Forge quando escono nuove versioni di Minecraft (a volte nel giro di qualche ora), per questo è popolare tra chi vuole subito le ultime novità.</p>
+      <p>La scena moderna delle Mod di ottimizzazione è cresciuta attorno a Fabric. Sodium, Lithium, Phosphor e Iris sono usciti prima su Fabric, e le nuove Mod di ottimizzazione tendono ancora ad arrivare lì per primi, prima di essere portati su Forge o NeoForge. Se quello che conta sono gli FPS puri, Fabric (o il suo fork Quilt) è di solito la scelta più sicura.</p>
+
+      <h2>Configurare Fabric</h2>
+      <p>Clicca sul <strong>+</strong> in GDLauncher, scegli la versione di Minecraft e seleziona <strong>Fabric</strong>. Usa la versione stabile più recente del loader Fabric e crea l'istanza.</p>
+      <p>La maggior parte delle Mod Fabric dipende dalla libreria <strong>Fabric API</strong>. GDLauncher risolve le dipendenze delle Mod in automatico: quando installi una Mod che richiede Fabric API (o un'altra libreria), il launcher se la tira dietro da solo. Non serve un passaggio a parte.</p>
+
+      <h2>Mod essenziali</h2>
+      <p>Apri l'istanza, vai nella scheda <strong>Addons</strong> e prendi queste Mod di ottimizzazione:</p>
+      <p>Sodium velocizza moltissimo il rendering. Lithium ottimizza la logica di gioco e la fisica. FerriteCore riduce l'uso della memoria. Messi insieme, possono raddoppiare o triplicare gli FPS senza cambiare nulla del gameplay.</p>
+      <p>Per comodità: Mod Menu ti dà un menu in-game per configurare le Mod. Sodium Extra aggiunge altre opzioni grafiche. Iris ti permette di usare le Shader senza sacrificare le prestazioni di Sodium.</p>
+
+      <h2>Fabric contro Forge</h2>
+      <p>Fabric si aggiorna più in fretta e ha le Mod di ottimizzazione migliori. Forge ha la libreria di Mod più ampia e la maggior parte delle grandi Mod di contenuto classiche. Molte Mod popolari oggi sono disponibili su entrambi, ma non tutte.</p>
+      <p>Scegli in base alle Mod che vuoi giocare. Se ti interessano ottimizzazione e contenuti recenti, vai di Fabric. Se cerchi Mod che esistono solo su Forge, scegli Forge.</p>
+
+      <h2>Sostituire OptiFine</h2>
+      <p>OptiFine non funziona con Fabric. Al suo posto:</p>
+      <p>Sodium per le prestazioni. Iris per le Shader. Continuity per le texture connesse (i blocchi adiacenti tipo vetro, librerie, arenaria, ecc. si fondono visivamente in un'unica superficie invece di mostrare un bordo per blocco). LambDynamicLights per l'illuminazione dinamica (una torcia in mano illumina davvero quello che ti sta intorno). Di solito vanno comunque meglio di OptiFine.</p>
+
+      <h2>Risoluzione dei problemi</h2>
+      <p>Errori del tipo "missing Fabric API"? Apri la scheda <strong>Addons</strong> dell'istanza e controlla che Fabric API sia nella lista. Se non c'è, cerca "Fabric API" e installalo a mano.</p>
+      <p>Crash all'avvio? Di solito significa che la Mod è per la versione sbagliata, per il loader sbagliato (in realtà non è una Mod Fabric) o che mancano delle dipendenze. Controlla i requisiti nella pagina della Mod.</p>
+    </Fragment>
+  )}
+</GuideLayout>

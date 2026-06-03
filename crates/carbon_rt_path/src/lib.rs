@@ -84,6 +84,91 @@ impl LoggingConfigsPath {
     }
 }
 
+pub struct ServersPath(PathBuf);
+
+impl ServersPath {
+    pub fn subpath() -> ServersPath {
+        Self(PathBuf::from("servers"))
+    }
+
+    pub fn to_path(&self) -> PathBuf {
+        self.0.clone()
+    }
+
+    pub fn get_server_path(&self, server_shortpath: &str) -> ServerPath {
+        ServerPath(self.0.join(server_shortpath))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ServerPath(PathBuf);
+
+impl ServerPath {
+    pub fn new(path: PathBuf) -> Self {
+        Self(path)
+    }
+
+    pub fn get_root(&self) -> PathBuf {
+        self.0.clone()
+    }
+
+    pub fn get_data_path(&self) -> PathBuf {
+        self.0.join("server")
+    }
+
+    pub fn get_logs_path(&self) -> PathBuf {
+        self.get_data_path().join("logs")
+    }
+
+    pub fn get_world_path(&self) -> PathBuf {
+        self.get_data_path().join("world")
+    }
+
+    pub fn get_plugins_path(&self) -> PathBuf {
+        self.get_data_path().join("plugins")
+    }
+
+    pub fn get_server_properties_path(&self) -> PathBuf {
+        self.get_data_path().join("server.properties")
+    }
+
+    pub fn get_server_jar_path(&self) -> PathBuf {
+        self.get_data_path().join("server.jar")
+    }
+
+    pub fn get_eula_path(&self) -> PathBuf {
+        self.get_data_path().join("eula.txt")
+    }
+
+    pub fn get_mods_path(&self) -> PathBuf {
+        self.get_data_path().join("mods")
+    }
+
+    pub fn get_datapacks_path(&self) -> PathBuf {
+        self.get_data_path().join("world").join("datapacks")
+    }
+
+    pub fn get_whitelist_path(&self) -> PathBuf {
+        self.get_data_path().join("whitelist.json")
+    }
+
+    pub fn get_ops_path(&self) -> PathBuf {
+        self.get_data_path().join("ops.json")
+    }
+
+    pub fn get_banned_players_path(&self) -> PathBuf {
+        self.get_data_path().join("banned-players.json")
+    }
+
+    pub fn get_banned_ips_path(&self) -> PathBuf {
+        self.get_data_path().join("banned-ips.json")
+    }
+
+    pub fn get_modloader_config_path(&self) -> PathBuf {
+        self.0.join("modloader_config.json")
+    }
+}
+
 // TODO: WIP
 pub struct InstancesPath(PathBuf);
 
@@ -246,19 +331,29 @@ impl TempPath {
     }
 
     /// Clean up all temp files/folders. Should be called on startup.
-    pub fn cleanup_all(&self) {
-        let Ok(read_dir) = std::fs::read_dir(&self.0) else {
-            return;
-        };
+    /// Runs the (potentially slow) tree walk on a blocking thread so it
+    /// doesn't stall the tokio runtime if temp accumulated GBs across
+    /// interrupted modpack installs.
+    pub async fn cleanup_all(&self) {
+        let root = self.0.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            let Ok(read_dir) = std::fs::read_dir(&root) else {
+                return;
+            };
 
-        for entry in read_dir.filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if path.is_dir() {
-                let _ = std::fs::remove_dir_all(&path);
-            } else {
-                let _ = std::fs::remove_file(&path);
+            for entry in read_dir.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                let res = if path.is_dir() {
+                    std::fs::remove_dir_all(&path)
+                } else {
+                    std::fs::remove_file(&path)
+                };
+                if let Err(e) = res {
+                    tracing::warn!("Failed to clean up temp entry {}: {}", path.display(), e);
+                }
             }
-        }
+        })
+        .await;
     }
 }
 
@@ -314,22 +409,40 @@ impl<T: tempentry::TempEntryType> TempEntry<T> {
     }
 
     pub async fn try_rename_or_move(self, path: impl AsRef<Path>) -> anyhow::Result<()> {
-        let res = tokio::fs::rename(&*self, &path).await;
+        let dest = path.as_ref();
 
-        if let Err(err) = &res {
-            tokio::fs::copy(&*self, &path).await.with_context(|| {
-                format!(
-                    "failed to copy {} to {}",
-                    (&*self).display(),
-                    path.as_ref().display(),
-                )
-            })?;
+        if tokio::fs::rename(&*self, dest).await.is_ok() {
+            return Ok(());
+        }
 
-            if self.is_dir() {
-                tokio::fs::remove_dir_all(&*self).await?;
-            } else {
-                tokio::fs::remove_file(&*self).await?;
+        // rename failed (typically EXDEV: the temp source and the destination live on different
+        // filesystems). Stage the copy as a sibling temp file in the destination directory and
+        // rename it into place, so the publish stays atomic — a crash mid-copy cannot leave a
+        // partially written destination. (Only files reach here; tokio::fs::copy is file-only.)
+        let staging = match dest.file_name() {
+            Some(name) => {
+                let mut staged = name.to_os_string();
+                staged.push(".__gdl_xdev~");
+                dest.with_file_name(staged)
             }
+            None => anyhow::bail!("destination path has no file name: {}", dest.display()),
+        };
+
+        tokio::fs::copy(&*self, &staging).await.with_context(|| {
+            format!(
+                "failed to copy {} to {}",
+                (&*self).display(),
+                staging.display(),
+            )
+        })?;
+        tokio::fs::rename(&staging, dest).await.with_context(|| {
+            format!("failed to move {} to {}", staging.display(), dest.display())
+        })?;
+
+        if self.is_dir() {
+            tokio::fs::remove_dir_all(&*self).await?;
+        } else {
+            tokio::fs::remove_file(&*self).await?;
         }
 
         Ok(())
@@ -387,6 +500,10 @@ impl RuntimePath {
         InstancesPath(self.0.join("instances"))
     }
 
+    pub fn get_servers(&self) -> ServersPath {
+        ServersPath(self.0.join("servers"))
+    }
+
     pub fn get_logging_configs(&self) -> LoggingConfigsPath {
         LoggingConfigsPath(self.0.join("logging_configs"))
     }
@@ -414,37 +531,43 @@ pub async fn copy_dir_filter<F>(from: &Path, to: &Path, filter: F) -> anyhow::Re
 where
     F: for<'a> Fn(&'a Path) -> bool,
 {
-    let entries = walkdir::WalkDir::new(from).into_iter().filter_map(|entry| {
-        let Ok(entry) = entry else { return None };
+    // Don't follow symlinks during recursive copy: a symlink in the source
+    // pointing outside `from` would otherwise leak files into `to` (or hang
+    // on cycles). The runtime-path migration in particular needs this safety.
+    let entries = walkdir::WalkDir::new(from)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|entry| {
+            let Ok(entry) = entry else { return None };
 
-        let srcpath = entry.path().to_path_buf();
-        let relpath = match srcpath.strip_prefix(from) {
-            Ok(rel) => rel,
-            Err(_) => {
-                // Path is not relative to source directory, skip it
+            let srcpath = entry.path().to_path_buf();
+            let relpath = match srcpath.strip_prefix(from) {
+                Ok(rel) => rel,
+                Err(_) => {
+                    // Path is not relative to source directory, skip it
+                    return None;
+                }
+            };
+
+            if !filter(&relpath) {
                 return None;
             }
-        };
 
-        if !filter(&relpath) {
-            return None;
-        }
+            let destpath = to.join(relpath);
 
-        let destpath = to.join(relpath);
-
-        Some(async move {
-            if entry.metadata()?.is_dir() {
-                tokio::fs::create_dir_all(destpath).await?;
-            } else {
-                if let Some(parent) = destpath.parent() {
-                    tokio::fs::create_dir_all(parent).await?;
+            Some(async move {
+                if entry.metadata()?.is_dir() {
+                    tokio::fs::create_dir_all(destpath).await?;
+                } else {
+                    if let Some(parent) = destpath.parent() {
+                        tokio::fs::create_dir_all(parent).await?;
+                    }
+                    tokio::fs::copy(srcpath, destpath).await?;
                 }
-                tokio::fs::copy(srcpath, destpath).await?;
-            }
 
-            Ok::<_, anyhow::Error>(())
-        })
-    });
+                Ok::<_, anyhow::Error>(())
+            })
+        });
 
     futures::future::join_all(entries)
         .await

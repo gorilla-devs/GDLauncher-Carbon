@@ -10,7 +10,7 @@ import {
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { Switch, Match, createSignal } from "solid-js"
-import { port } from "./rspcClient"
+import { apiUrl } from "./rspcClient"
 
 export const isListInstanceInvalid = (status: ListInstanceStatus) => {
   return "Invalid" in status
@@ -19,10 +19,22 @@ export const isListInstanceInvalid = (status: ListInstanceStatus) => {
 export const getLaunchState = (launchState: LaunchState | undefined) => {
   if (!launchState) return undefined
 
-  if (launchState.state === "preparing" || launchState.state === "running") {
+  if (
+    launchState.state === "queued" ||
+    launchState.state === "preparing" ||
+    launchState.state === "running"
+  ) {
     return launchState.value
   }
   return undefined
+}
+
+export const getQueuedState = (status: LaunchState | undefined) => {
+  if (!status) return undefined
+
+  if (status.state === "queued") {
+    return status.value
+  }
 }
 
 export const getPreparingState = (status: LaunchState | undefined) => {
@@ -63,6 +75,10 @@ export const isInstanceDeleting = (status: LaunchState | undefined) => {
   return status.state === "deleting"
 }
 
+export const isInstanceQueued = (launchState: LaunchState) => {
+  return launchState.state === "queued"
+}
+
 export const isInstancePreparing = (launchState: LaunchState) => {
   return launchState.state === "preparing"
 }
@@ -75,7 +91,14 @@ export const getInstanceImageUrl = (
   instanceId: string | number,
   rev: string | number
 ) => {
-  return `http://127.0.0.1:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`
+  return apiUrl(`/instance/instanceIcon?id=${instanceId}&rev=${rev}`)
+}
+
+export const getServerImageUrl = (
+  serverId: string | number,
+  rev: string | number
+) => {
+  return apiUrl(`/server/serverIcon?id=${serverId}&rev=${rev}`)
 }
 
 export const getModImageUrl = (
@@ -83,7 +106,19 @@ export const getModImageUrl = (
   modId: string,
   platform: string | null
 ) => {
-  return `http://127.0.0.1:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`
+  return apiUrl(
+    `/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`
+  )
+}
+
+export const getServerModImageUrl = (
+  serverId: string,
+  modId: string,
+  platform: string
+) => {
+  return apiUrl(
+    `/server/serverModIcon?server_id=${serverId}&mod_id=${modId}&platform=${platform}`
+  )
 }
 
 export const getUrlType = (url: string) => {

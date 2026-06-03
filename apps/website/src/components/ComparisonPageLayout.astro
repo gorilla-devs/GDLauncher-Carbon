@@ -1,0 +1,182 @@
+---
+/**
+ * ComparisonPageLayout - reusable scaffold for /vs/<launcher> pages.
+ *
+ * Looks up its content by (locale, pageSlug) in vsData, and renders the
+ * shared chrome: SEO, breadcrumb, table, prose sections, verdict, and CTA.
+ */
+import PageShell from "./PageShell.astro"
+import Breadcrumb from "./Breadcrumb.astro"
+import { DownloadLink } from "./DownloadLink"
+import { breadcrumbsJsonLd } from "../lib/jsonld"
+import {
+  getComparison,
+  getComparisonChrome,
+  COMPETITOR_NAMES,
+  COMPETITOR_SHORT,
+  type ComparisonSlug,
+} from "../lib/vsData"
+import { getLocaleFromUrl, localizedPath, DEFAULT_LOCALE } from "../lib/i18n"
+
+interface Props {
+  pageSlug: ComparisonSlug
+}
+
+const { pageSlug } = Astro.props
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const data = getComparison(locale, pageSlug)
+const chrome = getComparisonChrome(locale)
+const competitorName = COMPETITOR_NAMES[pageSlug]
+const competitorShort = COMPETITOR_SHORT[pageSlug]
+
+const canonicalSlugPath = `/vs/${pageSlug}`
+const canonicalUrl =
+  locale === DEFAULT_LOCALE
+    ? `https://gdlauncher.com${canonicalSlugPath}`
+    : `https://gdlauncher.com/${locale}${canonicalSlugPath}`
+
+const jsonLd = [
+  breadcrumbsJsonLd([
+    { name: "Home", url: `https://gdlauncher.com${localizedPath("/", locale)}` },
+    {
+      name: chrome.compareBreadcrumb,
+      url: `https://gdlauncher.com${localizedPath("/vs", locale)}`,
+    },
+    { name: data.title, url: canonicalUrl },
+  ]),
+]
+
+function classFor(value: string): { color: string } {
+  const v = value.toLowerCase()
+  if (
+    v === "yes" ||
+    v === "true" ||
+    v === "✓" ||
+    v.startsWith("yes") ||
+    v.startsWith("sí") ||
+    v.startsWith("si ") ||
+    v.startsWith("oui") ||
+    v.startsWith("ja") ||
+    v.startsWith("sim") ||
+    v.startsWith("예") ||
+    v.startsWith("あり")
+  )
+    return { color: "text-green-400" }
+  if (
+    v === "no" ||
+    v === "false" ||
+    v === "✗" ||
+    v.startsWith("no ") ||
+    v === "nein" ||
+    v.startsWith("nein") ||
+    v === "non" ||
+    v.startsWith("non ") ||
+    v === "não" ||
+    v.startsWith("não") ||
+    v === "なし" ||
+    v.startsWith("なし") ||
+    v === "아니요" ||
+    v.startsWith("아니요")
+  )
+    return { color: "text-darkSlate-400" }
+  return { color: "text-yellow-400" }
+}
+---
+
+<PageShell
+  title={`${data.title} | GDLauncher`}
+  description={data.description}
+  canonicalUrl={canonicalUrl}
+  keywords={`${competitorName} vs gdlauncher, ${competitorShort} alternative, minecraft launcher comparison, best minecraft launcher`}
+  jsonLd={jsonLd}
+>
+  <main class="py-8">
+    <Breadcrumb items={[
+      { label: chrome.compareBreadcrumb, href: localizedPath("/vs", locale) },
+      { label: data.title }
+    ]} />
+
+    <div class="max-w-4xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-8">
+        <header class="mb-10">
+          <h1 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
+            {data.title}
+          </h1>
+          <p class="text-lg text-darkSlate-100">{data.intro}</p>
+        </header>
+
+        <div class="overflow-x-auto mb-10">
+          <table class="w-full border-collapse text-sm md:text-base">
+            <thead>
+              <tr>
+                <th scope="col" class="p-4 text-left text-darkSlate-100 font-medium border-b border-darkSlate-700">{chrome.feature}</th>
+                <th scope="col" class="p-4 text-center text-primary-300 font-semibold bg-primary-500/5 border-b border-darkSlate-700">GDLauncher</th>
+                <th scope="col" class="p-4 text-center text-lightSlate-100 font-semibold border-b border-darkSlate-700">{competitorShort}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((row, idx) => {
+                const gdl = classFor(row.gdl)
+                const comp = classFor(row.competitor)
+                return (
+                  <tr class={idx % 2 === 0 ? "bg-darkSlate-700/20" : ""}>
+                    <th scope="row" class="p-4 text-left text-lightSlate-100 font-normal border-b border-darkSlate-700/50">
+                      {row.feature}
+                      {row.note && <span class="block text-xs text-darkSlate-200 mt-1">{row.note}</span>}
+                    </th>
+                    <td class="p-4 text-center bg-primary-500/5 border-b border-darkSlate-700/50">
+                      <span class={`font-medium ${gdl.color}`}>{row.gdl}</span>
+                    </td>
+                    <td class="p-4 text-center border-b border-darkSlate-700/50">
+                      <span class={`font-medium ${comp.color}`}>{row.competitor}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <article class="prose prose-invert prose-lg max-w-none">
+          {data.sections.map((section) => (
+            <>
+              <h2 class="text-lightSlate-50">{section.heading}</h2>
+              {section.paragraphs.map((p) => <p>{p}</p>)}
+            </>
+          ))}
+          <h2 class="text-lightSlate-50">{chrome.theVerdict}</h2>
+          <p>{data.verdict}</p>
+        </article>
+
+        <div class="mt-10 flex flex-col sm:flex-row gap-4">
+          <DownloadLink
+            client:idle
+            class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors"
+            iconClass="w-5 h-5"
+            label={chrome.tryGdl}
+            iconLeft
+          />
+          <a
+            href={localizedPath("/vs", locale)}
+            class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-darkSlate-600 hover:bg-darkSlate-500 text-lightSlate-50 font-semibold transition-colors"
+          >
+            {chrome.seeAllComparisons}
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+</PageShell>
+
+<style is:global>
+  .prose { color: rgb(var(--lightSlate-100)); }
+  .prose h2 { color: rgb(var(--lightSlate-50)); font-size: 1.6rem; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; }
+  .prose h3 { color: rgb(var(--lightSlate-50)); font-size: 1.3rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+  .prose p { margin-bottom: 1rem; line-height: 1.75; }
+  .prose ul, .prose ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+  .prose li { margin-bottom: 0.5rem; }
+  .prose strong { color: rgb(var(--lightSlate-50)); font-weight: 600; }
+  .prose a { color: rgb(var(--primary-400)); text-decoration: underline; }
+  .prose a:hover { color: rgb(var(--primary-300)); }
+</style>

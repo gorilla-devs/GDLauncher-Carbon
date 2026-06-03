@@ -58,28 +58,36 @@ const Instance = () => {
 
 Skeleton.instance = Instance
 
-Skeleton.instances = () => {
+Skeleton.instances = (props: {
+  tileWidthPx?: number
+  rowGapPx?: number
+  count?: number
+}) => {
+  const width = () => props.tileWidthPx ?? 184
+  const rowGap = () => props.rowGapPx ?? 24
+  const count = () => props.count ?? 18
   return (
-    <div class="flex flex-col gap-4">
-      <div class="bg-darkSlate-500 skeleton-shimmer h-10 w-full rounded-lg skeleton-shimmer" />
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
-      <div class="flex gap-4">
-        <For each={new Array(10)}>{() => <Instance />}</For>
-      </div>
+    <div
+      style={{
+        display: "grid",
+        "align-content": "start",
+        "grid-template-columns": `repeat(auto-fill, ${width()}px)`,
+        "justify-content": "space-evenly",
+        "column-gap": "16px",
+        "row-gap": `${rowGap()}px`
+      }}
+    >
+      <For each={new Array(count())}>
+        {() => (
+          <div
+            class="bg-darkSlate-500 skeleton-shimmer rounded-2xl"
+            style={{
+              width: `${width()}px`,
+              height: `${width()}px`
+            }}
+          />
+        )}
+      </For>
     </div>
   )
 }
@@ -286,8 +294,8 @@ Skeleton.featuredHomeTile = () => {
 
 const SearchListItem = () => {
   return (
-    <div class="my-2 overflow-hidden rounded-md">
-      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent px-8 py-2">
+    <div class="my-1 overflow-hidden rounded-md">
+      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent px-8 py-4">
         <div class="relative z-10 flex w-full items-center gap-4">
           <div class="bg-darkSlate-500 skeleton-shimmer h-16 w-16 rounded-md" />
           <div class="w-7/10 flex flex-col gap-2">
@@ -297,9 +305,9 @@ const SearchListItem = () => {
             <div class="text-lightSlate-700 truncate text-left text-sm">
               <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-full rounded-md" />
             </div>
-            <div class="flex gap-2">
-              <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-16 rounded-md" />
-              <div class="bg-darkSlate-500 skeleton-shimmer h-5.5 w-20 rounded-md" />
+            <div class="flex items-center gap-2 py-1">
+              <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-16 rounded-md" />
+              <div class="bg-darkSlate-500 skeleton-shimmer h-5 w-20 rounded-md" />
             </div>
           </div>
           <div class="ml-auto flex items-center">

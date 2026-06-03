@@ -8,7 +8,7 @@ import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
 import { createQuery } from "@tanstack/solid-query"
 
 const PageView = () => {
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
   const news = useNews()
   const patchNotes = usePatchNotes()

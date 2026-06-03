@@ -57,11 +57,16 @@ pub async fn upsert_java_component_to_db(
                 .await?;
 
             return Ok(id);
-        } else if component.version.major == java_component.version.major {
+        } else {
+            // Same path, changed Java: update the existing row in place (for example a JDK
+            // upgraded at a fixed install path). `path` is unique and the row id is preserved,
+            // so this replaces the stored metadata, including a changed major version, instead
+            // of failing the scan.
             db.java()
                 .update(
                     carbon_repos::db::java::id::equals(id.clone()),
                     vec![
+                        carbon_repos::db::java::major::set(java_component.version.major as i32),
                         carbon_repos::db::java::full_version::set(
                             java_component.version.to_string(),
                         ),
@@ -75,10 +80,6 @@ pub async fn upsert_java_component_to_db(
                 .await?;
 
             return Ok(id);
-        } else {
-            anyhow::bail!(
-                "Java component with same path but different major version already exists"
-            );
         }
     } else {
         let res = db
@@ -126,7 +127,14 @@ where
     T: Discovery,
     G: JavaChecker,
 {
+    let t_discover = std::time::Instant::now();
     let local_javas = discovery.find_java_paths().await;
+    tracing::debug!(
+        "[startup-timing] discovery.find_java_paths found {} candidate(s) in {:.2}s",
+        local_javas.len(),
+        t_discover.elapsed().as_secs_f64()
+    );
+
     let java_profiles = db
         .java_profile()
         .find_many(vec![])
@@ -136,6 +144,7 @@ where
 
     for local_java in &local_javas {
         trace!("Analyzing local java: {:?}", local_java);
+        let t_probe = std::time::Instant::now();
 
         let resolved_java_path = match dunce::canonicalize(local_java) {
             Ok(canonical_path) => canonical_path,
@@ -149,6 +158,11 @@ where
         let java_bin_info = java_checker
             .get_bin_info(&resolved_java_path, JavaComponentType::Local)
             .await;
+        tracing::debug!(
+            "[startup-timing] probed java {} in {:.2}s",
+            resolved_java_path.display(),
+            t_probe.elapsed().as_secs_f64()
+        );
 
         let db_entry =
             get_java_component_from_db(db, resolved_java_path.to_string_lossy().to_string())
@@ -532,7 +546,15 @@ mod test {
 
         let result = upsert_java_component_to_db(db, almost_equal_java_component).await;
 
-        assert!(result.is_err());
+        // A changed major version at the same (unique) path updates the existing row in
+        // place rather than failing, so an in-place JDK upgrade does not break the scan.
+        assert!(result.is_ok());
+
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        assert_eq!(java_components.len(), 1);
+        assert_eq!(java_components[0].path, java_path);
+        assert_eq!(java_components[0].major, 9);
+        assert!(java_components[0].is_valid);
     }
 
     #[tokio::test]

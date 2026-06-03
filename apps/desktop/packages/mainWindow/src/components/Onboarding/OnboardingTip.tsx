@@ -51,9 +51,8 @@ export const OnboardingTip = (props: OnboardingTipProps) => {
   }
 
   const triggerTip = () => {
-    // TODO: Remove bypass after testing
-    // if (!onboarding.isEnabled()) return
-    // if (onboarding.isTipSeen(config.id)) return
+    if (!onboarding.isEnabled()) return
+    if (onboarding.isTipSeen(config.id)) return
 
     const rect = getTargetRect()
     if (rect) {

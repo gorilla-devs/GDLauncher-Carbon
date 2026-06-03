@@ -106,12 +106,34 @@ impl JavaManager {
         T: Discovery,
         G: JavaChecker,
     {
+        let t = std::time::Instant::now();
         scan_and_sync::scan_and_sync_local(db, discovery, java_checker).await?;
+        tracing::debug!(
+            "[startup-timing] scan_and_sync_local completed in {:.2}s",
+            t.elapsed().as_secs_f64()
+        );
+
+        let t = std::time::Instant::now();
         scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
+        tracing::debug!(
+            "[startup-timing] scan_and_sync_custom completed in {:.2}s",
+            t.elapsed().as_secs_f64()
+        );
+
+        let t = std::time::Instant::now();
         scan_and_sync::scan_and_sync_managed(db, discovery, java_checker).await?;
+        tracing::debug!(
+            "[startup-timing] scan_and_sync_managed completed in {:.2}s",
+            t.elapsed().as_secs_f64()
+        );
 
         if auto_manage_java_system_profiles {
+            let t = std::time::Instant::now();
             scan_and_sync::sync_system_java_profiles(db).await?;
+            tracing::debug!(
+                "[startup-timing] sync_system_java_profiles completed in {:.2}s",
+                t.elapsed().as_secs_f64()
+            );
         }
 
         Ok(())
@@ -593,6 +615,34 @@ impl ManagerRef<'_, JavaManager> {
         }
 
         Ok(Some(java))
+    }
+
+    /// Find the best available Java for running a Minecraft server.
+    /// Prefers the highest major version available. Returns the path to the java binary.
+    pub async fn find_best_java_for_server(self) -> anyhow::Result<PathBuf> {
+        let javas = self.get_available_javas().await?;
+
+        // Get highest major version java that is valid
+        let mut best: Option<(u8, PathBuf)> = None;
+        for (major, versions) in &javas {
+            for java in versions {
+                if java.is_valid {
+                    match &best {
+                        Some((best_major, _)) if major > best_major => {
+                            best = Some((*major, PathBuf::from(&java.component.path)));
+                        }
+                        None => {
+                            best = Some((*major, PathBuf::from(&java.component.path)));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        best.map(|(_, path)| path).ok_or_else(|| {
+            anyhow::anyhow!("No Java installation found. Please install Java first.")
+        })
     }
 }
 

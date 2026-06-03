@@ -58,6 +58,28 @@ mod java;
 mod minecraft;
 mod modpack;
 
+#[derive(thiserror::Error, Debug)]
+#[error("Minecraft needs {requested_mb} MB but only {available_mb} MB is available")]
+pub struct InsufficientMemoryError {
+    pub instance_id: i32,
+    pub requested_mb: u64,
+    pub available_mb: u64,
+}
+
+impl crate::error::FeErrorCode for InsufficientMemoryError {
+    fn error_code(&self) -> &'static str {
+        "INSUFFICIENT_MEMORY"
+    }
+
+    fn error_data(&self) -> Option<serde_json::Value> {
+        Some(serde_json::json!({
+            "instance_id": self.instance_id,
+            "requested_mb": self.requested_mb,
+            "available_mb": self.available_mb
+        }))
+    }
+}
+
 #[derive(Debug)]
 pub struct PersistenceManager {
     instance_download_lock: Semaphore,
@@ -74,11 +96,61 @@ impl PersistenceManager {
         }
     }
 }
+/// Maximum time a user-configured pre/post-launch hook may run before it is killed. Generous
+/// enough for real setup scripts, but bounds a hook that never exits so it cannot wedge the
+/// launch (or, for a pre-launch hook, the whole launch queue) until the app is restarted.
+const HOOK_TIMEOUT: Duration = Duration::from_secs(300);
+
 type InstanceCallback = Box<
     dyn FnOnce(&Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
 >;
 
+/// Clamp the stored i32 heap settings (MB) into the u16 the JVM args use, saturating instead of
+/// wrapping: a raw `as u16` cast would turn e.g. 66000 MB into 464 MB and silently hand the JVM
+/// a tiny heap.
+fn clamp_heap_mb(xms: i32, xmx: i32) -> (u16, u16) {
+    (
+        xms.clamp(0, u16::MAX as i32) as u16,
+        xmx.clamp(0, u16::MAX as i32) as u16,
+    )
+}
+
+/// Split a user-configured hook command line into program + arguments. shlex uses POSIX
+/// backslash escaping, so on Windows a path like `C:\tools\setup.bat` would lose its separators
+/// (or fail to parse on a trailing one); escape backslashes first there so they survive the
+/// split, mirroring how the wrapper command is handled in `launch_minecraft`.
+fn split_hook_command(raw: &str) -> Option<Vec<String>> {
+    #[cfg(target_os = "windows")]
+    let escaped = raw.replace('\\', "\\\\");
+    #[cfg(target_os = "windows")]
+    let raw: &str = &escaped;
+    shlex::split(raw)
+}
+
 impl ManagerRef<'_, InstanceManager> {
+    /// Resolve the effective memory (xms, xmx) for an instance.
+    /// Uses instance-level override if set, otherwise falls back to global settings.
+    pub async fn get_effective_memory(self, instance_id: InstanceId) -> anyhow::Result<(u16, u16)> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let InstanceType::Valid(data) = &instance.type_ else {
+            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
+        };
+
+        match data.config.game_configuration.memory {
+            Some(memory) => Ok(memory),
+            None => self
+                .app
+                .settings_manager()
+                .get_settings()
+                .await
+                .map(|c| clamp_heap_mb(c.xms, c.xmx)),
+        }
+    }
+
     #[tracing::instrument(skip(self, callback_task))]
     pub async fn prepare_game(
         self,
@@ -103,7 +175,7 @@ impl ManagerRef<'_, InstanceManager> {
             LaunchState::Deleting => {
                 bail!("cannot prepare an instance that is being deleted");
             }
-            LaunchState::Preparing(task_id) => {
+            LaunchState::Queued(task_id) | LaunchState::Preparing(task_id) => {
                 // dismiss the existing task if its a failure, return if its still in progress.
                 let r = self.app.task_manager().dismiss_task(*task_id).await;
 
@@ -134,7 +206,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .settings_manager()
                 .get_settings()
                 .await
-                .map(|c| (c.xms as u16, c.xmx as u16))?,
+                .map(|c| clamp_heap_mb(c.xms, c.xmx))?,
         };
 
         let global_java_args = match config.game_configuration.global_java_args {
@@ -233,7 +305,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let id = self.app.task_manager().spawn_task(&task).await;
 
-        data.state = LaunchState::Preparing(id);
+        data.state = LaunchState::Queued(id);
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -247,16 +319,20 @@ impl ManagerRef<'_, InstanceManager> {
         drop(instance);
         drop(instances);
 
+        // Capture datetime once to ensure log entry and file name match exactly
+        let now = Local::now();
+
         let (log_id, log) = if launch_account.is_some() {
-            let (id, sender) = app.instance_manager().create_log(instance_id, None).await;
+            let (id, sender) = app
+                .instance_manager()
+                .create_log(instance_id, Some(now))
+                .await;
             (Some(id), Some(sender))
         } else {
             (None, None)
         };
 
-        let now = Utc::now();
-
-        let log_file_name = format!("{}_{}", now.format("%Y-%m-%d"), now.format("%H-%M-%S"));
+        let log_file_name = format!("{}", now.format("%Y-%m-%d_%H-%M-%S"));
 
         let logs_file_path = if launch_account.is_some() {
             Some(
@@ -291,34 +367,47 @@ impl ManagerRef<'_, InstanceManager> {
             None => None,
         };
 
-        let result = app.instance_manager().list_mods(instance_id, None).await?;
-        let msg = format!(
-            "Mods ({} enabled / {} disabled): {}",
-            result.iter().filter(|mod_| mod_.enabled).count(),
-            result.iter().filter(|mod_| !mod_.enabled).count(),
-            result.into_iter().fold(String::new(), |mut acc, mod_| {
-                acc.push_str("\n\t [");
-                if mod_.enabled {
-                    acc.push_str("x]");
-                } else {
-                    acc.push_str(" ]");
+        // Logging the mod list is best-effort: a failure to read the mod list or write the log
+        // line must not abort the launch and leave the instance stuck in Queued with no task to
+        // drive it out. The installation task spawned below is what actually drives the state.
+        match app.instance_manager().list_mods(instance_id, None).await {
+            Ok(result) => {
+                let msg = format!(
+                    "Mods ({} enabled / {} disabled): {}",
+                    result.iter().filter(|mod_| mod_.enabled).count(),
+                    result.iter().filter(|mod_| !mod_.enabled).count(),
+                    result.into_iter().fold(String::new(), |mut acc, mod_| {
+                        acc.push_str("\n\t [");
+                        if mod_.enabled {
+                            acc.push_str("x]");
+                        } else {
+                            acc.push_str(" ]");
+                        }
+
+                        acc.push(' ');
+                        acc.push_str(&mod_.filename);
+
+                        acc
+                    })
+                );
+
+                if let Some(file) = file.as_mut() {
+                    if let Some(log) = log.as_ref() {
+                        log.send_modify(|log| {
+                            log.add_entry(LogEntry::system_message(msg.clone()));
+                        });
+                    }
+                    if let Err(e) = file
+                        .write_all(format_message_as_log4j_event(&msg).as_bytes())
+                        .await
+                    {
+                        tracing::warn!({ error = ?e }, "Failed to write mod list to log file");
+                    }
                 }
-
-                acc.push(' ');
-                acc.push_str(&mod_.filename);
-
-                acc
-            })
-        );
-
-        if let Some(file) = file.as_mut() {
-            if let Some(log) = log.as_ref() {
-                log.send_modify(|log| {
-                    log.add_entry(LogEntry::system_message(msg.clone()));
-                });
             }
-            file.write_all(format_message_as_log4j_event(&msg).as_bytes())
-                .await?;
+            Err(e) => {
+                tracing::warn!({ error = ?e }, "Failed to list mods for the launch log");
+            }
         }
 
         let installation_task = tokio::spawn(async move {
@@ -327,6 +416,30 @@ impl ManagerRef<'_, InstanceManager> {
             let instance_root = instance_path.get_root();
             let setup_path = instance_root.join(".setup");
             let is_setup = setup_path.is_dir();
+
+            // Acquire semaphore FIRST - this is where queuing happens
+            // Instance stays in Queued state until we get the lock
+            let instance_manager = app.instance_manager();
+            let download_guard = instance_manager
+                .persistence_manager
+                .instance_download_lock
+                .acquire()
+                .await
+                .expect("Semaphore should not be closed");
+
+            // Now that we have the lock, transition from Queued to Preparing
+            {
+                let instance_manager_ref = app.instance_manager();
+                let mut instances = instance_manager_ref.instances.write().await;
+                if let Some(instance) = instances.get_mut(&instance_id) {
+                    if let InstanceType::Valid(data) = &mut instance.type_ {
+                        data.state = LaunchState::Preparing(id);
+                    }
+                }
+            }
+            app.invalidate(GET_GROUPS, None);
+            app.invalidate(GET_ALL_INSTANCES, None);
+            app.invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
             let try_result: anyhow::Result<_> = async {
                 let mut downloads = Vec::new();
@@ -405,7 +518,7 @@ impl ManagerRef<'_, InstanceManager> {
                 match launch_account {
                     Some(account) => {
                         if let Some(pre_launch_hook) = pre_launch_hook.filter(|v| !v.is_empty()) {
-                            let mut split = shlex::split(&pre_launch_hook)
+                            let mut split = split_hook_command(&pre_launch_hook)
                                 .ok_or_else(|| anyhow::anyhow!("Failed to parse pre-launch hook"))?
                                 .into_iter();
 
@@ -413,14 +526,23 @@ impl ManagerRef<'_, InstanceManager> {
                                 .next()
                                 .ok_or_else(|| anyhow::anyhow!("Pre-launch hook is empty"))?;
 
-                            let pre_launch_command = tokio::process::Command::new(main_command)
-                                .args(split)
-                                .current_dir(instance_path.get_data_path())
-                                .output()
-                                .await
-                                .map_err(|e| {
-                                    anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
-                                })?;
+                            let pre_launch_command = tokio::time::timeout(
+                                HOOK_TIMEOUT,
+                                tokio::process::Command::new(main_command)
+                                    .args(split)
+                                    .current_dir(instance_path.get_data_path())
+                                    .kill_on_drop(true)
+                                    .output(),
+                            )
+                            .await
+                            .map_err(|_| {
+                                anyhow::anyhow!(
+                                    "Pre-launch hook did not finish within {HOOK_TIMEOUT:?}"
+                                )
+                            })?
+                            .map_err(|e| {
+                                anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
+                            })?;
 
                             if !pre_launch_command.status.success() {
                                 return Err(anyhow::anyhow!(
@@ -479,6 +601,11 @@ impl ManagerRef<'_, InstanceManager> {
             }
             .await;
 
+            // Downloading, installing and spawning the process are done; release the global
+            // download permit before the game-session wait so other instances can be prepared
+            // and launched concurrently instead of queuing behind an already-running game.
+            drop(download_guard);
+
             match try_result {
                 Err(e) => {
                     task.fail(e).await;
@@ -508,7 +635,40 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let start_time = Utc::now();
 
-                    let process_id = child.id().expect("Failed to get process ID for child process. The process may have already exited.");
+                    let Some(process_id) = child.id() else {
+                        // Process exited before we could capture its PID.
+                        // Surface as a launch error rather than panicking the
+                        // task (which would leave the instance stuck in
+                        // Preparing).
+                        tracing::error!(
+                            "Process exited before PID could be captured (instance {})",
+                            *instance_id
+                        );
+                        let _ = app
+                            .instance_manager()
+                            .change_launch_state(
+                                instance_id,
+                                LaunchState::Inactive {
+                                    failed_task: Some(id),
+                                },
+                            )
+                            .await;
+                        return;
+                    };
+
+                    let Some(running_log_id) = log_id else {
+                        tracing::error!("log_id missing when launching instance {}", *instance_id);
+                        let _ = app
+                            .instance_manager()
+                            .change_launch_state(
+                                instance_id,
+                                LaunchState::Inactive {
+                                    failed_task: Some(id),
+                                },
+                            )
+                            .await;
+                        return;
+                    };
 
                     let _ = app
                         .instance_manager()
@@ -518,16 +678,27 @@ impl ManagerRef<'_, InstanceManager> {
                                 process_id,
                                 kill_tx,
                                 start_time,
-                                log: log_id.expect("log_id must exist when launching game"),
+                                log: running_log_id,
                             }),
                         )
                         .await;
 
                     let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take())
                     else {
-                        panic!(
-                            "Failed to capture stdout and stderr from child process. The process was created with piped stdio, but the streams are not available. This may indicate a system-level issue with process creation."
+                        tracing::error!(
+                            "Failed to capture stdout/stderr from child process for instance {}",
+                            *instance_id
                         );
+                        let _ = app
+                            .instance_manager()
+                            .change_launch_state(
+                                instance_id,
+                                LaunchState::Inactive {
+                                    failed_task: Some(id),
+                                },
+                            )
+                            .await;
+                        return;
                     };
 
                     let mut last_stored_time = start_time;
@@ -555,7 +726,13 @@ impl ManagerRef<'_, InstanceManager> {
                         },
                         _ = kill_rx.recv() => {
                             tracing::debug!("Instance killed");
-                            drop(child.kill().await);
+                            if let Err(e) = child.kill().await {
+                                tracing::warn!(
+                                    "Failed to kill child process for instance {}: {}",
+                                    *instance_id,
+                                    e
+                                );
+                            }
                         },
                         _ = read_logs(log.as_ref().expect("log must exist when launching game"), stdout, stderr, file.as_mut()) => {
                             tracing::debug!("Instance read logs");
@@ -598,21 +775,29 @@ impl ManagerRef<'_, InstanceManager> {
                     let _ = app.rich_presence_manager().stop_activity().await;
 
                     if let Some(post_exit_hook) = post_exit_hook.filter(|v| !v.is_empty()) {
-                        match shlex::split(&post_exit_hook)
+                        match split_hook_command(&post_exit_hook)
                             .ok_or_else(|| anyhow::anyhow!("Failed to parse post-exit hook"))
                             .map(|v| v.into_iter())
                         {
                             Ok(mut split) => match split.next() {
                                 Some(main_command) => {
-                                    let post_exit_command =
+                                    let post_exit_command = tokio::time::timeout(
+                                        HOOK_TIMEOUT,
                                         tokio::process::Command::new(main_command)
                                             .args(split)
                                             .current_dir(instance_path.get_data_path())
-                                            .output()
-                                            .await;
+                                            .kill_on_drop(true)
+                                            .output(),
+                                    )
+                                    .await;
 
                                     match post_exit_command {
-                                        Ok(post_exit_command) => {
+                                        Err(_) => {
+                                            tracing::warn!(
+                                                "Post-exit hook did not finish within {HOOK_TIMEOUT:?}; killed it"
+                                            );
+                                        }
+                                        Ok(Ok(post_exit_command)) => {
                                             if !post_exit_command.status.success() {
                                                 tracing::error!(
                                                     "Post-exit hook failed with status: {:?} \n{}",
@@ -628,7 +813,7 @@ impl ManagerRef<'_, InstanceManager> {
                                                 );
                                             }
                                         }
-                                        Err(e) => {
+                                        Ok(Err(e)) => {
                                             tracing::error!(
                                                 "Post-exit hook failed to start: {:?}",
                                                 e
@@ -659,6 +844,12 @@ impl ManagerRef<'_, InstanceManager> {
             // Drop the log sender so the receiver sees the channel as closed
             // This must happen BEFORE invalidation so the frontend sees active: false
             drop(log);
+
+            // Flush and close the log file before invalidation so file size is accurate
+            if let Some(mut f) = file.take() {
+                let _ = f.flush().await;
+                drop(f);
+            }
 
             app.invalidate(GET_LOGS, Some(instance_id.0.into()));
 
@@ -769,7 +960,7 @@ impl ManagerRef<'_, InstanceManager> {
                 info!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
                 println!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
             }
-            LaunchState::Preparing(_) | LaunchState::Deleting => (),
+            LaunchState::Queued(_) | LaunchState::Preparing(_) | LaunchState::Deleting => (),
         };
 
         debug!("changing state of instance {instance_id} to {state:?}");
@@ -812,6 +1003,7 @@ impl ManagerRef<'_, InstanceManager> {
 
 pub enum LaunchState {
     Inactive { failed_task: Option<VisualTaskId> },
+    Queued(VisualTaskId),
     Preparing(VisualTaskId),
     Running(RunningInstance),
     Deleting,
@@ -824,6 +1016,7 @@ impl Debug for LaunchState {
             "{}",
             match self {
                 Self::Inactive { .. } => "Inactive",
+                Self::Queued(_) => "Queued",
                 Self::Preparing(_) => "Preparing",
                 Self::Running(_) => "Running",
                 Self::Deleting => "Deleting",
@@ -845,6 +1038,7 @@ impl From<&LaunchState> for domain::LaunchState {
             LaunchState::Inactive { failed_task } => Self::Inactive {
                 failed_task: failed_task.clone(),
             },
+            LaunchState::Queued(t) => Self::Queued(*t),
             LaunchState::Preparing(t) => Self::Preparing(*t),
             LaunchState::Running(RunningInstance {
                 start_time, log, ..

@@ -1,114 +1,327 @@
 ---
 import type { CollectionEntry } from "astro:content";
-import BaseHead from "../components/BaseHead.astro";
-import "@fontsource/ubuntu";
-import Header from "../components/Header.astro";
-import Footer from "../components/Footer.astro";
+import PageShell from "../components/PageShell.astro";
 import FormattedDate from "../components/FormattedDate.astro";
 import ArticleInteractiveMarkdown from "../components/ArticleInteractiveMarkdown";
-import "../styles/blogPostStyle.css";
-import Ellipse from "../assets/ellipse10.svg";
-import { Image } from "astro:assets";
+import Breadcrumb from "../components/Breadcrumb.astro";
+import { DownloadLink } from "../components/DownloadLink";
+import { articleJsonLd, breadcrumbsJsonLd } from "../lib/jsonld";
+import {
+  getLocaleFromUrl,
+  localizedPath,
+  useTranslations,
+} from "../lib/i18n";
 
 type Props = CollectionEntry<"blog">["data"];
 
-const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, author } =
+  Astro.props;
+const locale = getLocaleFromUrl(Astro.url.pathname);
+const t = useTranslations(locale);
+
+const canonicalUrl = new URL(
+  Astro.url.pathname,
+  "https://gdlauncher.com",
+).toString();
+const publishedIso = pubDate ? new Date(pubDate).toISOString() : undefined;
+const modifiedIso = updatedDate
+  ? new Date(updatedDate).toISOString()
+  : publishedIso;
+
+const jsonLd = [
+  breadcrumbsJsonLd([
+    { name: t("breadcrumb.home"), url: "https://gdlauncher.com/" },
+    {
+      name: t("blog.breadcrumb"),
+      url: new URL(localizedPath("/blog", locale), "https://gdlauncher.com").toString(),
+    },
+    { name: title, url: canonicalUrl },
+  ]),
+  articleJsonLd({
+    title,
+    description,
+    url: canonicalUrl,
+    image: heroImage,
+    publishedTime: publishedIso,
+    modifiedTime: modifiedIso,
+    author,
+  }),
+];
 ---
 
-<html lang="en">
-  <head>
-    <BaseHead title={title} description={description} image={heroImage} />
-    <style>
-      body {
-        font-family: "Ubuntu", sans-serif;
-        /* background-color: rgba(29, 32, 40, 1); */
-        background-image: linear-gradient(
-            rgba(23, 29, 39, 0.3),
-            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
-          ),
-          url("../assets/patern.svg");
+<PageShell
+  title={`${title} | GDLauncher Blog`}
+  description={description}
+  image={heroImage}
+  imageAlt={title}
+  ogType="article"
+  publishedTime={publishedIso}
+  modifiedTime={modifiedIso}
+  author={author}
+  jsonLd={jsonLd}
+  particles
+>
+    <ArticleInteractiveMarkdown client:idle />
 
-        background-color: rgba(29, 32, 40, 1);
-        color: white;
-        position: relative;
-      }
-      /* main {
-        width: calc(100% - 2em);
-        max-width: 100%;
-        margin: 0;
-      } */
-      .hero-image {
-        width: 100%;
-      }
-      .hero-image img {
-        display: block;
-        margin: 0 auto;
-        border-radius: 12px;
-        box-shadow: var(--box-shadow);
-      }
-      .prose {
-        width: 720px;
-        max-width: calc(100% - 2em);
-        margin: auto;
-        padding: 1em;
-        color: rgb(var(--gray-dark));
-      }
-      .title {
-        margin-bottom: 1em;
-        padding: 1em 0;
-        text-align: center;
-        line-height: 1;
-      }
-      .title h1 {
-        margin: 0 0 0.5em 0;
-      }
-      .date {
-        margin-bottom: 0.5em;
-        color: rgb(var(--gray));
-      }
-      .last-updated-on {
-        font-style: italic;
-      }
-      a {
-        color: #2865a4;
-      }
-    </style>
-  </head>
+    <main class="py-8">
+      <Breadcrumb items={[
+        { label: t("blog.breadcrumb"), href: localizedPath("/blog", locale) },
+        { label: title }
+      ]} />
 
-  <body>
-    <Header />
-
-    <main>
       <article>
-        <div class="hero-image">
-          {
-            heroImage && (
-              <img width={1020} height={510} src={heroImage} alt="" />
-            )
-          }
-        </div>
-        <ArticleInteractiveMarkdown client:idle />
-        <div class="prose">
-          <div class="title">
-            <div class="date">
-              <FormattedDate date={pubDate} />
-              {
-                updatedDate && (
-                  <div class="last-updated-on">
-                    Last updated on <FormattedDate date={updatedDate} />
-                  </div>
-                )
-              }
-            </div>
-            <h1>{title}</h1>
-            <hr />
+        <!-- Hero Image -->
+        {heroImage && (
+          <div class="max-w-4xl mx-auto px-4 mb-8">
+            <img
+              src={heroImage}
+              alt={title}
+              width="1200"
+              height="630"
+              fetchpriority="high"
+              loading="eager"
+              decoding="async"
+              class="w-full h-auto rounded-xl shadow-2xl shadow-black/20"
+            />
           </div>
-          <div id="articleContainer">
-            <slot />
+        )}
+
+        <!-- Article Container with solid background -->
+        <div class="max-w-4xl mx-auto px-4">
+          <div class="bg-darkSlate-800 rounded-xl p-8 md:p-10">
+            <!-- Article Header -->
+            <header class="mb-10">
+              <!-- Title -->
+              <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold text-lightSlate-50 leading-tight mb-6">
+                {title}
+              </h1>
+
+              <!-- Description -->
+              {description && (
+                <p class="text-xl text-darkSlate-100 mb-6 leading-relaxed">
+                  {description}
+                </p>
+              )}
+
+              <!-- Meta info -->
+              <div class="flex flex-wrap items-center gap-4 text-sm text-darkSlate-200">
+                <div class="flex items-center gap-2">
+                  <div class="i-hugeicons:calendar-03 w-4 h-4"></div>
+                  <time datetime={pubDate.toISOString()}>
+                    <FormattedDate date={pubDate} />
+                  </time>
+                </div>
+                {updatedDate && (
+                  <div class="flex items-center gap-2">
+                    <div class="i-hugeicons:refresh w-4 h-4"></div>
+                    <span>{t("blog.updated")} <FormattedDate date={updatedDate} /></span>
+                  </div>
+                )}
+              </div>
+            </header>
+
+            <!-- Article Content -->
+            <div id="articleContainer" class="prose prose-invert prose-lg">
+              <slot />
+            </div>
+          </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="max-w-4xl mx-auto px-4 mt-16">
+          <!-- Download CTA -->
+          <div class="bg-gradient-to-r from-primary-600/20 to-primary-800/20 border border-primary-500/30 rounded-xl p-8 text-center">
+            <h2 class="text-2xl font-bold text-lightSlate-50 mb-3">
+              {t("blog.cta.heading")}
+            </h2>
+            <p class="text-darkSlate-100 mb-6 max-w-xl mx-auto">
+              {t("blog.cta.body")}
+            </p>
+            <DownloadLink
+              client:idle
+              class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors"
+              iconClass="w-5 h-5"
+              label={t("blog.cta.button")}
+              iconLeft
+            />
+          </div>
+
+          <!-- Back to blog -->
+          <div class="mt-12 text-center">
+            <a
+              href={localizedPath("/blog", locale)}
+              class="inline-flex items-center gap-2 text-darkSlate-100 hover:text-lightSlate-50 transition-colors"
+            >
+              <div class="i-hugeicons:arrow-left-01 w-5 h-5"></div>
+              {t("blog.backToList")}
+            </a>
           </div>
         </div>
       </article>
     </main>
-    <Footer />
-  </body>
-</html>
+</PageShell>
+
+<style is:global>
+  .prose {
+    color: rgb(var(--lightSlate-100));
+  }
+
+  .prose h2 {
+    color: rgb(var(--lightSlate-50));
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .prose h3 {
+    color: rgb(var(--lightSlate-50));
+    font-size: 1.375rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .prose h4 {
+    color: rgb(var(--lightSlate-50));
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose p {
+    margin-bottom: 1.25rem;
+    line-height: 1.8;
+  }
+
+  .prose ul, .prose ol {
+    margin-bottom: 1.25rem;
+    padding-left: 1.5rem;
+  }
+
+  .prose ul {
+    list-style-type: disc;
+  }
+
+  .prose ol {
+    list-style-type: decimal;
+  }
+
+  .prose li {
+    margin-bottom: 0.5rem;
+    line-height: 1.7;
+  }
+
+  .prose code {
+    background-color: rgb(var(--darkSlate-600));
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: ui-monospace, monospace;
+  }
+
+  .prose pre {
+    background-color: rgb(var(--darkSlate-700));
+    border: 1px solid rgb(var(--darkSlate-600));
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+  }
+
+  .prose pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.875rem;
+  }
+
+  .prose a {
+    color: rgb(var(--primary-400));
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .prose a:hover {
+    color: rgb(var(--primary-300));
+  }
+
+  .prose strong {
+    color: rgb(var(--lightSlate-50));
+    font-weight: 600;
+  }
+
+  .prose blockquote {
+    border-left: 4px solid rgb(var(--primary-500));
+    padding-left: 1.25rem;
+    margin: 1.5rem 0;
+    color: rgb(var(--darkSlate-100));
+    font-style: italic;
+  }
+
+  .prose img {
+    border-radius: 0.75rem;
+    margin: 2rem 0;
+  }
+
+  .prose hr {
+    border: none;
+    border-top: 1px solid rgb(var(--darkSlate-600));
+    margin: 2.5rem 0;
+  }
+
+  .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+  }
+
+  .prose th, .prose td {
+    border: 1px solid rgb(var(--darkSlate-600));
+    padding: 0.75rem;
+    text-align: left;
+  }
+
+  .prose th {
+    background-color: rgb(var(--darkSlate-700));
+    color: rgb(var(--lightSlate-50));
+    font-weight: 600;
+  }
+
+  .prose details {
+    background-color: rgba(var(--darkSlate-700), 0.5);
+    border: 1px solid rgb(var(--darkSlate-600));
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .prose details summary {
+    color: rgb(var(--lightSlate-50));
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .prose details ul {
+    margin-top: 1rem;
+    margin-bottom: 0;
+  }
+
+  .prose details ul li {
+    margin-bottom: 0.25rem;
+  }
+
+  .prose details ul li a,
+  .prose details ul li a:hover {
+    color: rgb(var(--darkSlate-100));
+    transition: color 0.15s ease;
+  }
+
+  .prose details ul li a:hover {
+    color: rgb(var(--primary-400)) !important;
+  }
+</style>

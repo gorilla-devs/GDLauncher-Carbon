@@ -1,0 +1,37 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Export an Instance from GDLauncher"
+  description="Export a GDLauncher Minecraft instance as a CurseForge .zip, Modrinth .mrpack, or GDLauncher .gdlpack you can share, archive, or upload to a hosting service."
+  keywords="export minecraft instance, export modpack, gdlauncher export zip, share modpack, curseforge zip export, mrpack export"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Open the export action", text: "In the Library, right-click the instance you want to export and select Export Instance (the file-export icon)." },
+      { name: "Pick the format", text: "Pick one: GDLauncher .gdlpack (best fidelity if the recipient also uses GDLauncher), CurseForge .zip (works in most launchers), or Modrinth .mrpack (works in launchers with Modrinth support)." },
+      { name: "Configure the bundle", text: "Toggle 'Bundle Addons' if you want the export to include the mod JARs themselves (bigger file, installable offline). Leave it off to ship a manifest-only file (smaller, but the recipient needs internet so the launcher can re-download the mods from the source CDN)." },
+      { name: "Filter what to include", text: "Walk the file tree and tick what to include. By default mods and configs are in; saves, screenshots, your options.txt are out. Tweak as needed." },
+      { name: "Pick a save location", text: "Choose where the file should be written. The export runs with a progress bar; for big modpacks it can take a minute or two." }
+    ]
+  }}
+>
+  <h2>Bundled vs manifest-only</h2>
+  <p>The Bundle Addons toggle is the most consequential choice. <strong>Manifest-only</strong> exports list the mods by their CurseForge or Modrinth IDs (and versions); whoever installs the pack has the launcher fetch the mods from the CDN. The file stays small (a few MB), the recipient needs internet to install.</p>
+  <p><strong>Bundled</strong> exports include the actual mod JARs in the archive. The file can be installed offline (assuming Minecraft assets are already cached). Trade-off: the archive is much larger (hundreds of MB to a few GB), and you're effectively redistributing the mods themselves, so check the licenses before sharing publicly.</p>
+
+  <h2>Picking a format</h2>
+  <ul>
+    <li><strong>GDLauncher .gdlpack</strong>: best fidelity for recipients who also use GDLauncher. Preserves the full instance shape including everything GDLauncher tracks.</li>
+    <li><strong>CurseForge .zip</strong>: portable to most launchers (CurseForge App, PrismLauncher, MultiMC, ATLauncher, Technic). Mods are referenced by CurseForge project IDs; mods only on Modrinth need the bundle toggle for inclusion.</li>
+    <li><strong>Modrinth .mrpack</strong>: portable to Modrinth-supporting launchers. Mods are referenced by direct download URLs and hashes.</li>
+  </ul>
+
+  <h2>What doesn't get exported</h2>
+  <p>Your accounts, your launcher settings, your skin, and anything you didn't tick during the filter step. The export is the instance, not the launcher.</p>
+
+  <h2>For sharing with another GDLauncher user</h2>
+  <p>If your recipient also uses GDLauncher and you want a one-click flow, the Cloud Instance Sharing code feature is the better fit, see <a href="/guides/share-an-instance">How to Share an Instance</a>. Export is for archiving and for sending to people on other launchers.</p>
+</GuideLayout>

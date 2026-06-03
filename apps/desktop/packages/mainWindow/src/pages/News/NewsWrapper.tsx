@@ -1,13 +1,11 @@
 import ContentWrapper from "@/components/ContentWrapper"
-import { Outlet } from "@solidjs/router"
 import { NewsProvider } from "@/components/NewsContext"
+import { JSX } from "solid-js"
 
-export function NewsWrapper() {
+export function NewsWrapper(props: { children?: JSX.Element }) {
   return (
     <NewsProvider>
-      <ContentWrapper zeroPadding>
-        <Outlet />
-      </ContentWrapper>
+      <ContentWrapper zeroPadding>{props.children}</ContentWrapper>
     </NewsProvider>
   )
 }

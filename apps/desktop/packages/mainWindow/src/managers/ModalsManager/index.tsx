@@ -5,12 +5,19 @@ import {
   For,
   JSX,
   lazy,
+  onCleanup,
+  onMount,
   useContext
 } from "solid-js"
 import { Dynamic, Portal } from "solid-js/web"
 import { useTransContext, TypedTFunction } from "@gd/i18n"
 import { useGDNavigate } from "../NavigationManager"
 import adSize from "@/utils/adhelper"
+import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
+import { listenServerEula } from "@/utils/serverEulaBridge"
+import { cleanupRunning } from "./modals/CacheCleanup/state"
+import { shaderInstallRunning } from "./modals/ShaderLoaderSetup/state"
+import { isChangingRuntimePath } from "./modals/ConfirmChangeRuntimePath/state"
 
 export interface ModalProps {
   title: string
@@ -24,7 +31,12 @@ type Hash = Record<
     component: ((_props: ModalProps) => JSX.Element) & {
       preload: () => Promise<{ default: (_props: ModalProps) => JSX.Element }>
     }
-    preventClose?: boolean
+    /**
+     * When `true` (or the function returns `true`), the backdrop click and
+     * side panel will not close the modal. Pass a function for modals whose
+     * closability depends on internal state (e.g. "running" vs "idle" phase).
+     */
+    preventClose?: boolean | (() => boolean)
     title?: string
     noHeader?: boolean
   }
@@ -50,6 +62,14 @@ const getDefaultModals = (t: TypedTFunction) => ({
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
     title: t("modals:_trn_java_setup")
+  },
+  shaderLoaderSetup: {
+    component: lazy(() => import("./modals/ShaderLoaderSetup")),
+    title: t("modals:_trn_shader_loader_setup"),
+    // Block backdrop close while the wizard is mid-install. Closing then
+    // would tear down the polling loop driving sequential steps and leave
+    // a half-installed loader/shader pair.
+    preventClose: () => shaderInstallRunning()
   },
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),
@@ -79,9 +99,37 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
     title: t("modals:_trn_confirm_instance_deletion")
   },
+  confirmReinstall: {
+    component: lazy(() => import("./modals/ConfirmReinstall")),
+    title: t("modals:_trn_confirm_reinstall")
+  },
+  confirmBatchInstanceDeletion: {
+    component: lazy(() => import("./modals/ConfirmBatchInstanceDeletion")),
+    title: t("modals:_trn_confirm_batch_instance_deletion")
+  },
+  confirmBatchServerDeletion: {
+    component: lazy(() => import("./modals/ConfirmBatchServerDeletion")),
+    title: t("modals:_trn_confirm_batch_server_deletion")
+  },
+  serverEulaAcceptance: {
+    component: lazy(() => import("./modals/ServerEulaAcceptance")),
+    title: t("modals:_trn_server_eula_acceptance")
+  },
+  confirmBatchFolderDeletion: {
+    component: lazy(() => import("./modals/ConfirmBatchFolderDeletion")),
+    title: t("modals:_trn_confirm_batch_folder_deletion")
+  },
+  confirmBatchMixedDeletion: {
+    component: lazy(() => import("./modals/ConfirmBatchMixedDeletion")),
+    title: t("modals:_trn_confirm_batch_deletion")
+  },
   ConfirmChangeRuntimePath: {
     component: lazy(() => import("./modals/ConfirmChangeRuntimePath")),
-    title: t("modals:_trn_confirm_change_runtime_path")
+    title: t("modals:_trn_confirm_change_runtime_path"),
+    // Backdrop and side-panel close are blocked while the migration is
+    // running. Closing mid-flight would orphan files between old and new
+    // runtime paths.
+    preventClose: () => isChangingRuntimePath()
   },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
@@ -123,9 +171,13 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ChangeGDLAccountRecoveryEmail")),
     title: t("modals:_trn_change_recovery_email")
   },
-  changeGDLAccountNickname: {
-    component: lazy(() => import("./modals/ChangeGDLAccountNickname")),
-    title: t("modals:_trn_change_nickname")
+  editGDLProfile: {
+    component: lazy(() => import("./modals/EditGDLProfile")),
+    title: t("modals:_trn_edit_profile")
+  },
+  changeGDLAccountDisplayName: {
+    component: lazy(() => import("./modals/ChangeGDLAccountDisplayName")),
+    title: t("modals:_trn_change_display_name")
   },
   modDetails: {
     component: lazy(() => import("./modals/ModDetails")),
@@ -142,6 +194,56 @@ const getDefaultModals = (t: TypedTFunction) => ({
   betaPrompt: {
     component: lazy(() => import("./modals/BetaPrompt")),
     title: t("modals:_trn_beta_prompt_title")
+  },
+  shareInstance: {
+    component: lazy(() => import("./modals/ShareInstance")),
+    title: t("instances:_trn_instance_share.title")
+  },
+  myShares: {
+    component: lazy(() => import("./modals/MyShares")),
+    title: t("instances:_trn_my_shares.title")
+  },
+  editShare: {
+    component: lazy(() => import("./modals/EditShare")),
+    title: t("instances:_trn_my_shares.edit")
+  },
+  sharePreview: {
+    component: lazy(() => import("./modals/SharePreview")),
+    title: t("instances:_trn_share_preview.title")
+  },
+  report: {
+    component: lazy(() => import("./modals/Report")),
+    title: t("instances:_trn_report.title")
+  },
+  accountBanned: {
+    component: lazy(() => import("./modals/AccountBanned")),
+    preventClose: true,
+    noHeader: true
+  },
+  requiresGdlAccount: {
+    component: lazy(() => import("./modals/RequiresGdlAccountModal")),
+    title: t("accounts:_trn_requires_gdl_account")
+  },
+  insufficientMemory: {
+    component: lazy(() => import("./modals/InsufficientMemory")),
+    title: t("java:_trn_insufficient_memory_title")
+  },
+  serverCreation: {
+    component: lazy(() => import("./modals/ServerCreation")),
+    title: "New Server"
+  },
+  serverRename: {
+    component: lazy(() => import("./modals/ServerRename")),
+    title: t("modals:_trn_server_rename")
+  },
+  cacheCleanup: {
+    component: lazy(() => import("./modals/CacheCleanup")),
+    // Block backdrop/side-panel close only while a cleanup is actively
+    // running; closing mid-VACUUM reveals a frozen UI (connection_limit=1
+    // serializes every other DB query) and the modal can't be reopened onto
+    // the in-flight task. All other phases close normally.
+    preventClose: () => cleanupRunning(),
+    title: t("modals:_trn_cache_cleanup_title")
   }
 })
 
@@ -155,6 +257,7 @@ interface Modal {
 interface Context {
   openModal: (_modal: Modal, _data?: any) => void
   closeModal: () => void
+  hasOpenModals: () => boolean
 }
 
 type Stack = { name: ModalName; data: any }[]
@@ -169,6 +272,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const queryParams = () => location.search as ModalName
   const urlSearchParams = () => new URLSearchParams(queryParams())
   const [modalStack, setModalStack] = createSignal<Stack>([])
+  let modalPortalRef: HTMLDivElement | undefined
 
   const [_searchParams, setSearchParams] = useSearchParams()
 
@@ -186,13 +290,19 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
       if (indexToRemove >= 0) {
         newStack.splice(indexToRemove, 1)
-        const newParams: Record<string, string | null> =
-          Object.fromEntries(urlSearchParams())
 
-        for (const key in Object.fromEntries(urlSearchParams())) {
-          if (key !== `m[${indexToRemove + 1}]`) {
-            newParams[`m[${indexToRemove + 1}]`] = null
+        // The URL stores the modal stack as `m[1]=name1`, `m[2]=name2`, ...
+        // (1-indexed). After mutating the stack we must rebuild every `m[k]`
+        // so positions reflect the new stack — closing a non-top modal would
+        // otherwise leave stale values pointing at the removed modal.
+        const newParams: Record<string, string | null> = {}
+        for (const key of Object.keys(Object.fromEntries(urlSearchParams()))) {
+          if (/^m\[\d+\]$/.test(key)) {
+            newParams[key] = null
           }
+        }
+        for (let i = 0; i < newStack.length; i++) {
+          newParams[`m[${i + 1}]`] = newStack[i].name
         }
 
         setSearchParams(newParams)
@@ -203,12 +313,35 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
     if (modalStack().length === 0) {
       const overlay = document.getElementById("overlay")!
-      overlay.style.opacity = "0"
-      setTimeout(() => {
-        overlay.style.display = "none"
-      }, 100) // Wait for transition to complete
+      // Only hide the overlay if nothing else (e.g. an expanded folder) is
+      // using it. The folder portal also renders into #overlay, so hiding it
+      // here would close the folder too.
+      const hasOtherContent = Array.from(overlay.children).some(
+        (child) =>
+          !(modalPortalRef && child.contains(modalPortalRef)) &&
+          child.childNodes.length > 0
+      )
+      if (!hasOtherContent) {
+        overlay.style.opacity = "0"
+        setTimeout(() => {
+          overlay.style.display = "none"
+        }, 100) // Wait for transition to complete
+      }
     }
   }
+
+  onMount(() => {
+    const cleanupMemory = listenMemoryWarning((data) => {
+      manager.openModal({ name: "insufficientMemory" }, data)
+    })
+    const cleanupEula = listenServerEula((data) => {
+      manager.openModal({ name: "serverEulaAcceptance" }, data)
+    })
+    onCleanup(() => {
+      cleanupMemory()
+      cleanupEula()
+    })
+  })
 
   const manager = {
     openModal: (modal: Modal, data: any) => {
@@ -236,29 +369,36 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         })
       }
     },
-    closeModal
+    closeModal,
+    hasOpenModals: () => modalStack().length > 0
   }
 
   return (
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay")!}>
-        <div class="h-screen w-screen">
+        <div ref={modalPortalRef} class="h-screen w-screen">
           <For each={modalStack()}>
             {(modal, index) => {
               const ModalComponent = defaultModals[modal.name].component
               const noHeader =
                 (defaultModals as Hash)[modal.name].noHeader || false
               const title = (defaultModals as Hash)[modal.name].title || ""
-              const preventClose = (defaultModals as Hash)[modal.name]
+              const preventCloseRaw = (defaultModals as Hash)[modal.name]
                 .preventClose
+              // Evaluate at click time so function-based preventClose stays
+              // reactive across phase changes inside the modal.
+              const shouldPreventClose = () =>
+                typeof preventCloseRaw === "function"
+                  ? preventCloseRaw()
+                  : preventCloseRaw === true
 
               return (
                 <div class="absolute inset-0 flex h-screen w-screen">
                   <div
                     class="z-999 relative flex h-full grow items-center justify-center"
                     onMouseDown={() => {
-                      if (!preventClose) {
+                      if (!shouldPreventClose()) {
                         closeModal()
                       }
                     }}
@@ -284,7 +424,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                       width: `${adSize.width}px`
                     }}
                     onMouseDown={() => {
-                      if (!preventClose) {
+                      if (!shouldPreventClose()) {
                         closeModal()
                       }
                     }}

@@ -1,17 +1,16 @@
 import getRouteIndex from "@/route/getRouteIndex"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsIndicator,
   Button,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem
+  DropdownMenuItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
 } from "@gd/ui"
-import { Outlet, useLocation, useParams, useRouteData } from "@solidjs/router"
+import { useLocation, useParams } from "@solidjs/router"
 import {
   For,
   JSX,
@@ -20,22 +19,21 @@ import {
   Switch,
   createEffect,
   createSignal,
-  onCleanup,
-  onMount,
-  createMemo
+  createMemo,
+  onMount
 } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { queryClient, rspc } from "@/utils/rspcClient"
-import fetchData from "./instance.data"
+import useInstanceData from "./instance.data"
 import { detectDuplicatedMods } from "@/utils/duplicateMods"
 import { InstanceDetails, ListInstance } from "@gd/core_module/bindings"
 import {
   getInstanceImageUrl,
   getPreparingState,
+  getQueuedState,
   getRunningState
 } from "@/utils/instances"
 import DefaultImg from "/assets/images/default-instance-img.png"
-// import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager"
 import { convertSecondsToHumanTime } from "@/utils/helpers"
 import Authors from "./Info/Authors"
@@ -49,24 +47,27 @@ import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/
 import { isFullScreen } from "./Tabs/Log"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import DetailPageLayout, {
+  type DetailPageTab
+} from "@/pages/Library/shared/DetailPageLayout"
 
 interface InstancePage {
   label: string | JSX.Element
   path: string
+  noPadding?: boolean
 }
 
-const Instance = () => {
+const Instance = (props: { children?: any }) => {
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ id: string }>()
   const location = useLocation()
+  const instanceId = () => parseInt(params.id, 10)
   const [editableName, setEditableName] = createSignal(false)
   const [isFavorite, setIsFavorite] = createSignal(false)
-  const [isSticky, setIsSticky] = createSignal(false)
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useInstanceData()
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
   )
-  const [scrollTop, setScrollTop] = createSignal(0)
 
   const [t] = useTransContext()
   const modalsContext = useModal()
@@ -77,67 +78,33 @@ const Instance = () => {
     return detectDuplicatedMods(routeData.instanceMods)
   })
 
-  let headerRef: HTMLElement
-  let innerContainerRef: HTMLDivElement | undefined
-  let refStickyTabs: HTMLDivElement
   let nameRef: HTMLHeadingElement | undefined
-
-  const handleScroll = () => {
-    if (!headerRef?.parentElement) return
-
-    // Use requestAnimationFrame for smooth updates
-    requestAnimationFrame(() => {
-      setScrollTop(headerRef.parentElement?.scrollTop || 0)
-
-      // Handle sticky tabs
-      const rect = refStickyTabs.getBoundingClientRect()
-      setIsSticky(rect.top <= 104)
-    })
-  }
-
-  onMount(() => {
-    headerRef.parentElement?.addEventListener("scroll", handleScroll)
-
-    // Mark instance as seen when navigating directly to instance page
-    const instanceId = parseInt(params.id, 10)
-    if (!isNaN(instanceId)) {
-      globalStore.markInstanceAsSeen(instanceId)
-    }
-  })
-
-  onCleanup(() => {
-    headerRef.parentElement?.removeEventListener("scroll", handleScroll)
-  })
 
   const setFavoriteMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.setFavorite"],
     onMutate: async (
       obj
-    ): Promise<
-      | {
-          instancesUngrouped: ListInstance[]
-          instanceDetails: InstanceDetails
-        }
-      | undefined
-    > => {
+    ): Promise<{
+      instancesUngrouped: ListInstance[]
+      instanceDetails: InstanceDetails
+    }> => {
       await queryClient.cancelQueries({
-        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
+        queryKey: ["instance.getInstanceDetails", instanceId()]
       })
       await queryClient.cancelQueries({
         queryKey: ["instance.getAllInstances"]
       })
 
-      const instancesUngrouped: ListInstance[] | undefined =
-        queryClient.getQueryData(["instance.getAllInstances"])
+      const instancesUngrouped: ListInstance[] =
+        queryClient.getQueryData(["instance.getAllInstances"]) ?? []
 
-      const instanceDetails: InstanceDetails | undefined =
-        queryClient.getQueryData([
-          "instance.getInstanceDetails",
-          parseInt(params.id, 10)
-        ])
+      const instanceDetails = queryClient.getQueryData<InstanceDetails>([
+        "instance.getInstanceDetails",
+        instanceId()
+      ])
 
       queryClient.setQueryData(
-        ["instance.getInstanceDetails", parseInt(params.id, 10)],
+        ["instance.getInstanceDetails", instanceId()],
         (old: InstanceDetails | undefined) => {
           const newDetails = old
           if (newDetails) newDetails.favorite = obj.favorite
@@ -146,12 +113,14 @@ const Instance = () => {
         }
       )
 
-      if (instancesUngrouped && instanceDetails)
-        return { instancesUngrouped, instanceDetails }
+      return {
+        instancesUngrouped,
+        instanceDetails: instanceDetails ?? ({} as InstanceDetails)
+      }
     },
     onSettled() {
       queryClient.invalidateQueries({
-        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
+        queryKey: ["instance.getInstanceDetails", instanceId()]
       })
       queryClient.invalidateQueries({
         queryKey: ["instance.getAllInstances"]
@@ -183,7 +152,7 @@ const Instance = () => {
       setIsFavorite(routeData.instanceDetails.data?.favorite)
   })
 
-  const instancePages = () => [
+  const instancePages = (): InstancePage[] => [
     {
       label: (
         <div class="flex items-center gap-2">
@@ -222,14 +191,6 @@ const Instance = () => {
       ),
       path: `/library/${params.id}/logs`
     }
-    // {
-    //   label: "Screenshots",
-    //   path: `/library/${params.id}/screenshots`,
-    // },
-    // {
-    //   label: "Versions",
-    //   path: `/library/${params.id}/versions`,
-    // },
   ]
 
   const selectedValue = () => {
@@ -250,10 +211,24 @@ const Instance = () => {
   }))
 
   const globalStore = useGlobalStore()
+
+  onMount(() => {
+    const id = instanceId()
+    if (!isNaN(id)) {
+      globalStore.markInstanceAsSeen(id)
+    }
+  })
+
   const handlePlay = () => {
-    const parsedInstanceId = parseInt(params.id, 10)
+    const parsedInstanceId = instanceId()
     if (isRunning()) {
       killInstanceMutation.mutate(parsedInstanceId)
+      return
+    }
+    // Already queued or preparing: ignore the click. A second launch would be rejected by the
+    // backend with a confusing "already being prepared" error toast (matches the guard used by
+    // the instance tile and the favorites bar).
+    if (isQueued() !== undefined || isPreparing() !== undefined) {
       return
     }
     if (
@@ -270,7 +245,10 @@ const Instance = () => {
       )
       return
     }
-    launchInstanceMutation.mutate(parsedInstanceId)
+    launchInstanceMutation.mutate({
+      id: parsedInstanceId,
+      skipMemoryCheck: false
+    })
   }
 
   const isRunning = () =>
@@ -280,6 +258,10 @@ const Instance = () => {
   const isPreparing = () =>
     routeData.instanceDetails.data?.state &&
     getPreparingState(routeData.instanceDetails.data?.state)
+
+  const isQueued = () =>
+    routeData.instanceDetails.data?.state &&
+    getQueuedState(routeData.instanceDetails.data?.state)
 
   const curseforgeProjectId = () => {
     const modpack = routeData.instanceDetails.data?.modpack
@@ -297,7 +279,6 @@ const Instance = () => {
     return null
   }
 
-  // Use rspc query hooks for automatic caching and deduplication
   const curseforgeModpack = rspc.createQuery(() => ({
     queryKey: [
       "modplatforms.curseforge.getMod",
@@ -311,7 +292,6 @@ const Instance = () => {
     enabled: modrinthProjectId() !== null
   }))
 
-  // Combine both queries into a single computed value
   const modpackDetails = () => {
     if (curseforgeProjectId()) {
       return curseforgeModpack.data
@@ -328,7 +308,7 @@ const Instance = () => {
         useLoadedIcon: null,
         memory: null,
         notes: null,
-        instance: parseInt(params.id, 10)
+        instance: instanceId()
       })
     }
     setEditableName(false)
@@ -362,7 +342,7 @@ const Instance = () => {
 
   const handleOpenFolder = () => {
     openFolderMutation.mutate({
-      instance_id: parseInt(params.id, 10),
+      instance_id: instanceId(),
       folder: "Root"
     })
   }
@@ -373,13 +353,41 @@ const Instance = () => {
         name: "confirmInstanceDeletion"
       },
       {
-        id: parseInt(params.id, 10),
+        id: instanceId(),
         name: routeData.instanceDetails.data?.name
       }
     )
   }
 
-  const menuItems = () => [
+  const hasValidGdlAccount = () =>
+    globalStore.gdlAccount.data?.status === "valid"
+
+  const handleShare = () => {
+    if (!hasValidGdlAccount()) {
+      modalsContext?.openModal(
+        { name: "requiresGdlAccount" },
+        { returnPath: `${location.pathname}${location.search}` }
+      )
+      return
+    }
+    modalsContext?.openModal(
+      { name: "shareInstance" },
+      { instanceId: instanceId() }
+    )
+  }
+
+  const hasModpack = () => {
+    const status = routeData.instanceDetails.data
+    if (!status) return false
+    return !!status.modpack
+  }
+
+  const menuItems = (): {
+    icon: string
+    label: string | JSX.Element
+    action: () => void
+    disabled?: boolean
+  }[] => [
     {
       icon: "i-hugeicons:pencil-edit-01",
       label: t("instances:_trn_action_edit"),
@@ -394,14 +402,14 @@ const Instance = () => {
       icon: "i-hugeicons:file-export",
       label: t("instances:_trn_export_instance"),
       action: () => {
-        const instanceId = getInstanceIdFromPath(location.pathname)
+        const exportInstanceId = getInstanceIdFromPath(location.pathname)
 
         setPayload({
           target: "Curseforge",
           save_path: undefined,
           self_contained_addons_bundling: false,
           filter: { entries: {} },
-          instance_id: parseInt(instanceId!, 10)
+          instance_id: parseInt(exportInstanceId!, 10)
         })
         setCheckedFiles([])
         setExportStep(0)
@@ -411,7 +419,22 @@ const Instance = () => {
             name: "exportInstance"
           },
           {
-            instanceId: parseInt(instanceId!, 10)
+            instanceId: parseInt(exportInstanceId!, 10)
+          }
+        )
+      }
+    },
+    {
+      icon: "i-hugeicons:refresh",
+      label: t("instances:_trn_instance_settings.reinstall"),
+      disabled: !hasModpack(),
+      action: () => {
+        modalsContext?.openModal(
+          { name: "confirmReinstall" },
+          {
+            id: instanceId(),
+            name: routeData.instanceDetails.data?.name,
+            isServer: false
           }
         )
       }
@@ -427,416 +450,339 @@ const Instance = () => {
     if (
       routeData.instancesUngrouped.data &&
       !routeData.instancesUngrouped.data?.find(
-        (instance) => instance.id === parseInt(params.id, 10)
+        (instance: { id: number }) => instance.id === instanceId()
       )
     ) {
       navigator.navigate("/library")
     }
   })
 
+  const iconUrl = () =>
+    routeData.instanceDetails.data?.iconRevision
+      ? getInstanceImageUrl(
+          params.id,
+          routeData.instanceDetails.data?.iconRevision
+        )
+      : DefaultImg
+
+  const tabs = (): DetailPageTab[] =>
+    instancePages().map((page) => ({
+      id: page.path,
+      label: page.label as JSX.Element
+    }))
+
   return (
-    <main
-      id="main-container-instance-details"
-      class="bg-darkSlate-800 relative flex h-full flex-col overflow-x-hidden"
-      classList={{
-        "overflow-hidden": isFullScreen(),
-        "overflow-y-auto overflow-x-hidden": !isFullScreen()
-      }}
-      style={{
-        "scrollbar-gutter": "stable"
-      }}
-    >
-      <header
-        ref={(el) => {
-          headerRef = el
-        }}
-        class="transition-100 relative flex min-h-60 flex-col items-stretch justify-between overflow-hidden transition-all ease-spring"
-      >
-        <img
-          src={
-            routeData.instanceDetails.data?.iconRevision
-              ? getInstanceImageUrl(
-                  params.id,
-                  routeData.instanceDetails.data?.iconRevision
-                )
-              : DefaultImg
-          }
-          alt="Instance cover"
-          class="absolute h-full w-full object-cover"
-          style={{
-            transform: `translate3d(0, ${scrollTop() * 0.4}px, 0)`,
-            "will-change": "transform"
-          }}
-        />
-        <div class="from-darkSlate-800 relative z-10 h-full bg-gradient-to-t">
-          <div class="sticky left-5 top-5 z-50 w-fit">
-            <Button
-              rounded
-              onClick={() => navigator.navigate("/library")}
-              size="small"
-              type="transparent"
-            >
-              <div class="i-hugeicons:arrow-left-01 text-xl" />
-            </Button>
-          </div>
-          <div class="absolute right-5 top-5 z-50 flex w-fit gap-2">
-            <DropdownMenu placement="bottom-end">
-              <DropdownMenuTrigger class="b-0 bg-transparent p-0">
-                <Button
-                  as="div"
-                  rounded
-                  class="h-full w-full"
-                  size="small"
-                  type="transparent"
-                >
-                  <div class="i-hugeicons:more-horizontal text-xl" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <For each={menuItems()}>
-                  {(item) => (
-                    <DropdownMenuItem onSelect={item.action}>
-                      <div class="flex items-center gap-2">
-                        <div class={item.icon} />
-                        <span>{item.label}</span>
-                      </div>
-                    </DropdownMenuItem>
-                  )}
-                </For>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              onClick={() =>
-                setFavoriteMutation.mutate({
-                  instance: parseInt(params.id, 10),
-                  favorite: !routeData.instanceDetails.data?.favorite
-                })
-              }
-              rounded
-              size="small"
-              type="transparent"
+    <DetailPageLayout
+      containerId="main-container-instance-details"
+      headerImage={iconUrl()}
+      icon={iconUrl()}
+      iconViewTransitionName="instance-tile-image"
+      headerInfoContent={
+        <>
+          <div
+            class="flex w-fit items-center gap-4 pl-1"
+            classList={{
+              "border-2 border-darkSlate-800 border-solid rounded-lg bg-darkSlate-700":
+                editableName(),
+              "border-2 border-transparent border-solid rounded-lg":
+                !editableName()
+            }}
+          >
+            <span class="flex cursor-pointer gap-2">
+              <h1
+                ref={nameRef}
+                onInput={(e) => {
+                  setNewName(e.target.innerHTML)
+                }}
+                class="border-box z-10 m-0 min-h-10 cursor-text focus:outline-none focus-visible:border-0 focus-visible:outline-none"
+                contentEditable={editableName()}
+                onFocusIn={() => {
+                  setEditableName(true)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    handleNameChange()
+                  }
+                }}
+                style={{
+                  "view-transition-name": `instance-tile-title`,
+                  contain: "layout"
+                }}
+              >
+                {routeData.instanceDetails.data?.name}
+              </h1>
+              <Show when={!editableName()}>
+                <div
+                  class="i-hugeicons:pencil-edit-01 transition-color hover:text-lightSlate-700 ease-spring duration-100"
+                  onClick={() => setEditableName(true)}
+                />
+              </Show>
+            </span>
+            <div
+              class="relative flex h-full items-center gap-2 pr-2"
+              classList={{ "bg-darkSlate-800 pl-2": editableName() }}
             >
               <div
-                class="i-hugeicons:star text-xl"
+                class="text-lightSlate-50 duration-50 ease-spring i-hugeicons:tick-02 z-10 cursor-pointer text-3xl transition hover:text-green-500"
                 classList={{
-                  "text-yellow-500": isFavorite()
+                  hidden: !editableName()
+                }}
+                onClick={() => handleNameChange()}
+              />
+              <div
+                class="text-lightSlate-50 duration-50 ease-spring i-hugeicons:cancel-01 z-10 cursor-pointer text-3xl transition hover:text-red-500"
+                classList={{
+                  hidden: !editableName()
+                }}
+                onClick={() => {
+                  if (routeData.instanceDetails.data?.name && nameRef) {
+                    setNewName(routeData.instanceDetails.data?.name)
+                    nameRef.innerHTML = routeData.instanceDetails.data?.name
+                  }
+                  setEditableName(false)
                 }}
               />
-            </Button>
-          </div>
-          <div class="from-darkSlate-800 sticky top-52 z-20 box-border flex h-24 w-full justify-center bg-gradient-to-t px-6 pb-2">
-            <div class="flex w-full justify-start">
-              <div class="flex w-full items-end justify-between">
-                <div class="flex flex-1 flex-row justify-end gap-4">
-                  <img
-                    src={
-                      routeData.instanceDetails.data?.iconRevision
-                        ? getInstanceImageUrl(
-                            params.id,
-                            routeData.instanceDetails.data?.iconRevision
-                          )
-                        : DefaultImg
-                    }
-                    alt="Instance icon"
-                    class="h-16 w-16 rounded-xl object-cover"
-                    style={{
-                      "view-transition-name": `instance-tile-image`,
-                      contain: "layout"
-                    }}
-                  />
-
-                  <div class="flex flex-1 flex-col">
-                    <div
-                      class="flex w-fit items-center gap-4 pl-1"
-                      classList={{
-                        "border-2 border-darkSlate-800 border-solid rounded-lg bg-darkSlate-700":
-                          editableName(),
-                        "border-2 border-transparent border-solid rounded-lg":
-                          !editableName()
-                      }}
-                    >
-                      <span class="flex cursor-pointer gap-2">
-                        <h1
-                          ref={nameRef}
-                          onInput={(e) => {
-                            setNewName(e.target.innerHTML)
-                          }}
-                          class="border-box z-10 m-0 min-h-10 cursor-text focus:outline-none focus-visible:border-0 focus-visible:outline-none"
-                          contentEditable={editableName()}
-                          onFocusIn={() => {
-                            setEditableName(true)
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault()
-                              handleNameChange()
-                            }
-                          }}
-                          style={{
-                            "view-transition-name": `instance-tile-title`,
-                            contain: "layout"
-                          }}
-                        >
-                          {routeData.instanceDetails.data?.name}
-                        </h1>
-                        <Show when={!editableName()}>
-                          <div
-                            class="i-hugeicons:pencil-edit-01 transition-color hover:text-lightSlate-700 duration-100 ease-spring"
-                            onClick={() => setEditableName(true)}
-                          />
-                        </Show>
-                      </span>
-                      <div
-                        class="relative flex h-full items-center gap-2 pr-2"
-                        classList={{ "bg-darkSlate-800 pl-2": editableName() }}
-                      >
-                        <div
-                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-spring hover:text-green-500 i-hugeicons:tick-02"
-                          classList={{
-                            hidden: !editableName()
-                          }}
-                          onClick={() => handleNameChange()}
-                        />
-                        <div
-                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-spring hover:text-red-500 i-hugeicons:cancel-01"
-                          classList={{
-                            hidden: !editableName()
-                          }}
-                          onClick={() => {
-                            if (
-                              routeData.instanceDetails.data?.name &&
-                              nameRef
-                            ) {
-                              setNewName(routeData.instanceDetails.data?.name)
-                              nameRef.innerHTML =
-                                routeData.instanceDetails.data?.name
-                            }
-                            setEditableName(false)
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div
-                      ref={innerContainerRef}
-                      class="flex cursor-default flex-row justify-between"
-                    >
-                      <div class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4">
-                        <div
-                          class="m-0 flex min-h-6 items-center gap-2"
-                          style={{
-                            "view-transition-name": `instance-tile-modloader`,
-                            contain: "layout"
-                          }}
-                        >
-                          <For
-                            each={routeData.instanceDetails.data?.modloaders}
-                          >
-                            {(modloader) => (
-                              <>
-                                <Show when={modloader.type_}>
-                                  <img
-                                    class="h-5 w-5"
-                                    src={getModloaderIcon(modloader.type_)}
-                                    alt="Modloader icon"
-                                  />
-                                </Show>
-                                <span>{modloader.type_}</span>
-                              </>
-                            )}
-                          </For>
-                          <span>{routeData.instanceDetails.data?.version}</span>
-                        </div>
-                        <Show
-                          when={
-                            routeData.instanceDetails.data?.secondsPlayed !==
-                            undefined
-                          }
-                        >
-                          <div class="flex items-center gap-2">
-                            <div class="i-hugeicons:clock-01 text-lg" />
-                            <span class="whitespace-nowrap">
-                              {convertSecondsToHumanTime(
-                                routeData.instanceDetails.data!.secondsPlayed
-                              )}
-                            </span>
-                          </div>
-                        </Show>
-                        <Authors
-                          modpackDetails={modpackDetails()}
-                          isCurseforge={curseforgeProjectId() !== null}
-                          isModrinth={modrinthProjectId() !== null}
-                        />
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <Button
-                          uppercase
-                          size="large"
-                          variant={isRunning() && "red"}
-                          loading={isPreparing() !== undefined}
-                          style={{
-                            "view-transition-name": `instance-tile-play-button`,
-                            contain: "layout"
-                          }}
-                          onClick={handlePlay}
-                        >
-                          <Switch>
-                            <Match when={!isRunning()}>
-                              <div class="i-hugeicons:play text-xl" />
-                              <Trans key="instances:_trn_play" />
-                            </Match>
-                            <Match when={isRunning()}>
-                              <div class="i-hugeicons:stop text-xl" />
-                              <Trans key="instances:_trn_stop" />
-                            </Match>
-                          </Switch>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
-        </div>
-      </header>
-      <div class="bg-darkSlate-800 sticky">
-        <div
-          class="flex justify-center py-0"
-          classList={{
-            "px-6": !instancePages().find((p) => p.path === selectedValue())
-              ?.noPadding
-          }}
-        >
-          <div class="bg-darkSlate-800 w-full">
-            <div
-              class="bg-darkSlate-800 sticky top-0 z-30 flex h-14 items-center justify-between py-10"
-              classList={{
-                "px-6": instancePages().find((p) => p.path === selectedValue())
-                  ?.noPadding
-              }}
-              ref={(el) => {
-                refStickyTabs = el
-              }}
-            >
-              <div class="flex h-full items-center">
-                <div
-                  class="overflow-hidden transition-all duration-150 ease-spring flex items-center"
-                  classList={{
-                    "w-14 mr-4 opacity-100": isSticky(),
-                    "w-0 mr-0 opacity-0": !isSticky()
-                  }}
-                >
-                  <Button
-                    onClick={() => navigator.navigate("/library")}
-                    size="small"
-                    type="secondary"
-                  >
-                    <div class="i-hugeicons:arrow-left-01 text-xl" />
-                  </Button>
-                </div>
-                <div class="flex items-center">
-                  <Tabs value={selectedValue()} class="h-auto">
-                    <TabsList class="w-fit gap-0">
-                      <TabsIndicator />
-                      <For each={instancePages()}>
-                        {(page: InstancePage) => (
-                          <TabsTrigger
-                            value={page.path}
-                            onClick={() => navigator.navigate(page.path)}
-                          >
-                            {page.label}
-                          </TabsTrigger>
-                        )}
-                      </For>
-                    </TabsList>
-                  </Tabs>
-                </div>
-              </div>
+          <div class="flex cursor-default flex-row justify-between">
+            <div class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4">
               <div
-                class="overflow-hidden transition-all duration-150 ease-spring flex items-center justify-end"
-                classList={{
-                  "w-14 ml-4 opacity-100": isSticky(),
-                  "w-0 ml-0 opacity-0": !isSticky()
+                class="m-0 flex min-h-6 items-center gap-2"
+                style={{
+                  "view-transition-name": `instance-tile-modloader`,
+                  contain: "layout"
                 }}
               >
-                <Button
-                  size="small"
-                  variant={isRunning() && "red"}
-                  loading={isPreparing() !== undefined}
-                  onClick={handlePlay}
-                >
-                  <Switch>
-                    <Match when={!isRunning()}>
-                      <div class="i-hugeicons:play text-xl" />
-                    </Match>
-                    <Match when={isRunning()}>
-                      <div class="i-hugeicons:stop text-xl" />
-                    </Match>
-                  </Switch>
-                </Button>
+                <For each={routeData.instanceDetails.data?.modloaders}>
+                  {(modloader) => (
+                    <>
+                      <Show when={modloader.type_}>
+                        <img
+                          class="h-5 w-5"
+                          src={getModloaderIcon(modloader.type_)}
+                          alt="Modloader icon"
+                        />
+                      </Show>
+                      <span>{modloader.type_}</span>
+                    </>
+                  )}
+                </For>
+                <span>{routeData.instanceDetails.data?.version}</span>
               </div>
-            </div>
-            <div
-              class="px-0"
-              classList={{
-                "pt-14": isFullScreen(),
-                "pt-0":
-                  !isFullScreen() &&
-                  (location.pathname.includes("/addons") ||
-                    location.pathname.includes("/logs")),
-                "pt-4 px-4":
-                  !isFullScreen() &&
-                  !location.pathname.includes("/addons") &&
-                  !location.pathname.includes("/logs")
-              }}
-            >
               <Show
                 when={
-                  duplicatedMods().length > 0 &&
-                  !routeData.instanceDetails.data?.modpack?.locked
+                  routeData.instanceDetails.data?.secondsPlayed !== undefined
                 }
               >
-                <div
-                  class="mb-4 flex items-center justify-between rounded-xl border border-yellow-600/30 bg-yellow-900/20 p-4"
-                  classList={{
-                    "mx-6 mt-4": location.pathname.includes("/addons")
-                  }}
-                >
-                  <div class="flex items-center gap-3">
-                    <div class="i-hugeicons:alert-01 text-2xl text-yellow-500" />
-                    <div>
-                      <h3 class="m-0 mb-1 font-semibold text-yellow-200">
-                        <Trans key="content:_trn_duplicated_mods_detected" />
-                      </h3>
-                      <p class="m-0 text-sm text-yellow-300/70">
-                        <Trans key="content:_trn_duplicated_mods_message" />
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="primary"
-                    size="small"
-                    onClick={() => {
-                      modalsContext?.openModal(
-                        { name: "duplicatedModsResolution" },
-                        {
-                          duplicatedMods: duplicatedMods().map((g) => g.mods),
-                          instanceId: parseInt(params.id, 10)
-                        }
-                      )
-                    }}
-                  >
-                    <div class="i-hugeicons:magic-wand-01" />
-                    <Trans key="instances:_trn_fix_now" />
-                  </Button>
+                <div class="flex items-center gap-2">
+                  <div class="i-hugeicons:clock-01 text-lg" />
+                  <span class="whitespace-nowrap">
+                    {convertSecondsToHumanTime(
+                      routeData.instanceDetails.data!.secondsPlayed
+                    )}
+                  </span>
                 </div>
               </Show>
-              <Outlet />
+              <Authors
+                modpackDetails={modpackDetails()}
+                isCurseforge={curseforgeProjectId() !== null}
+                isModrinth={modrinthProjectId() !== null}
+              />
             </div>
           </div>
+        </>
+      }
+      headerActions={
+        <Button
+          uppercase
+          size="large"
+          variant={isRunning() && "red"}
+          loading={isPreparing() !== undefined || isQueued() !== undefined}
+          style={{
+            "view-transition-name": `instance-tile-play-button`,
+            contain: "layout"
+          }}
+          onClick={handlePlay}
+        >
+          <Switch>
+            <Match when={!isRunning()}>
+              <div class="i-hugeicons:play text-xl" />
+              <Trans key="instances:_trn_play" />
+            </Match>
+            <Match when={isRunning()}>
+              <div class="i-hugeicons:stop text-xl" />
+              <Trans key="instances:_trn_stop" />
+            </Match>
+          </Switch>
+        </Button>
+      }
+      headerTopRight={
+        <>
+          <DropdownMenu placement="bottom-end">
+            <Tooltip placement="bottom">
+              <TooltipTrigger as="div">
+                <DropdownMenuTrigger class="b-0 bg-transparent p-0">
+                  <Button
+                    as="div"
+                    rounded
+                    class="h-full w-full"
+                    size="small"
+                    type="transparent"
+                  >
+                    <div class="i-hugeicons:more-horizontal text-xl" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="instances:_trn_more_actions" />
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent>
+              <For each={menuItems()}>
+                {(item) => (
+                  <DropdownMenuItem
+                    onSelect={item.action}
+                    disabled={item.disabled}
+                  >
+                    <div class="flex items-center gap-2">
+                      <div class={item.icon} />
+                      <span>{item.label}</span>
+                    </div>
+                  </DropdownMenuItem>
+                )}
+              </For>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Tooltip placement="bottom">
+            <TooltipTrigger as="div">
+              <Button
+                onClick={handleShare}
+                rounded
+                size="small"
+                type="transparent"
+              >
+                <div
+                  class="i-ri:share-line text-xl"
+                  classList={{
+                    "text-primary-500": !hasValidGdlAccount()
+                  }}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans key="instances:_trn_instance_share.title" />
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger as="div">
+              <Button
+                onClick={() =>
+                  setFavoriteMutation.mutate({
+                    instance: instanceId(),
+                    favorite: !routeData.instanceDetails.data?.favorite
+                  })
+                }
+                rounded
+                size="small"
+                type="transparent"
+              >
+                <div
+                  class="i-hugeicons:star text-xl"
+                  classList={{
+                    "text-yellow-500": isFavorite()
+                  }}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans
+                key={
+                  isFavorite()
+                    ? "instances:_trn_remove_favorite"
+                    : "instances:_trn_add_favorite"
+                }
+              />
+            </TooltipContent>
+          </Tooltip>
+        </>
+      }
+      tabs={tabs()}
+      activeTabId={selectedValue()}
+      onTabClick={(tab) => navigator.navigate(tab.id)}
+      onBackClick={() => navigator.navigate("/library")}
+      stickyRightButton={
+        <Tooltip placement="bottom">
+          <TooltipTrigger as="div">
+            <Button
+              size="small"
+              variant={isRunning() && "red"}
+              loading={isPreparing() !== undefined || isQueued() !== undefined}
+              onClick={handlePlay}
+            >
+              <Switch>
+                <Match when={!isRunning()}>
+                  <div class="i-hugeicons:play text-xl" />
+                </Match>
+                <Match when={isRunning()}>
+                  <div class="i-hugeicons:stop text-xl" />
+                </Match>
+              </Switch>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <Trans
+              key={isRunning() ? "instances:_trn_stop" : "instances:_trn_play"}
+            />
+          </TooltipContent>
+        </Tooltip>
+      }
+      noPaddingPaths={["/addons", "/logs"]}
+      isFullScreen={isFullScreen}
+    >
+      <Show
+        when={
+          duplicatedMods().length > 0 &&
+          !routeData.instanceDetails.data?.modpack?.locked
+        }
+      >
+        <div
+          class="mb-4 flex items-center justify-between rounded-xl border border-yellow-600/30 bg-yellow-900/20 p-4"
+          classList={{
+            "mx-6 mt-4": location.pathname.includes("/addons")
+          }}
+        >
+          <div class="flex items-center gap-3">
+            <div class="i-hugeicons:alert-01 text-2xl text-yellow-500" />
+            <div>
+              <h3 class="m-0 mb-1 font-semibold text-yellow-200">
+                <Trans key="content:_trn_duplicated_mods_detected" />
+              </h3>
+              <p class="m-0 text-sm text-yellow-300/70">
+                <Trans key="content:_trn_duplicated_mods_message" />
+              </p>
+            </div>
+          </div>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => {
+              modalsContext?.openModal(
+                { name: "duplicatedModsResolution" },
+                {
+                  duplicatedMods: duplicatedMods().map((g) => g.mods),
+                  instanceId: instanceId()
+                }
+              )
+            }}
+          >
+            <div class="i-hugeicons:magic-wand-01" />
+            <Trans key="instances:_trn_fix_now" />
+          </Button>
         </div>
-      </div>
-    </main>
+      </Show>
+      {props.children}
+    </DetailPageLayout>
   )
 }
 

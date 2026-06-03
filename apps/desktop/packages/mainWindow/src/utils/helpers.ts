@@ -1,4 +1,4 @@
-import { RSPCError } from "@rspc/client"
+import { RSPCError } from "@/utils/rspcClient"
 
 export const parseTwoDigitNumber = (number: number) => {
   return number.toString().length === 1 ? `0${number}` : number

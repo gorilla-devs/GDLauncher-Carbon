@@ -350,6 +350,7 @@ impl ManagerRef<'_, DownloadManager> {
             match r {
                 Ok(()) => {}
                 Err(e) => {
+                    tracing::warn!("Download failed for {}: {}", url, e);
                     let _ = status_send.send(Some(DownloadStatus::Failed(OnceSend::new(e))));
                 }
             }

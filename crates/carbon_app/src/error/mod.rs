@@ -17,18 +17,67 @@ pub struct FeError {
 pub struct CauseSegment {
     pub display: String,
     pub debug: String,
+    /// Optional error code for structured error handling (e.g., "QUOTA_EXCEEDED")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    /// Optional structured data for frontend consumption
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
+}
+
+/// Trait for errors that carry a structured error code (and optional data) for the frontend.
+pub trait FeErrorCode {
+    fn error_code(&self) -> &'static str;
+    fn error_data(&self) -> Option<serde_json::Value> {
+        None
+    }
 }
 
 pub type AxumError = (axum::http::StatusCode, String);
+
+/// Try to extract an error code and data from an entry in the anyhow error chain.
+fn extract_fe_error(
+    entry: &(dyn std::error::Error + 'static),
+) -> (Option<String>, Option<serde_json::Value>) {
+    use crate::managers::account::gdl_account::{AvatarUploadError, InstanceShareError};
+    use crate::managers::instance::run::InsufficientMemoryError;
+    use crate::managers::server::EulaNotAcceptedError;
+
+    macro_rules! try_downcast {
+        ($entry:expr, $($ty:ty),+ $(,)?) => {
+            $(
+                if let Some(e) = $entry.downcast_ref::<$ty>() {
+                    return (Some(e.error_code().to_string()), e.error_data());
+                }
+            )+
+        };
+    }
+
+    try_downcast!(
+        entry,
+        InstanceShareError,
+        AvatarUploadError,
+        InsufficientMemoryError,
+        EulaNotAcceptedError
+    );
+
+    (None, None)
+}
 
 impl FeError {
     pub fn from_anyhow(error: &anyhow::Error) -> Self {
         Self {
             cause: error
                 .chain()
-                .map(|entry| CauseSegment {
-                    display: format!("{entry}"),
-                    debug: format!("{entry:#?}"),
+                .map(|entry| {
+                    let (code, data) = extract_fe_error(entry);
+
+                    CauseSegment {
+                        display: format!("{entry}"),
+                        debug: format!("{entry:#?}"),
+                        code,
+                        data,
+                    }
                 })
                 .collect(),
             backtrace: format!("{}", error.backtrace()),
@@ -59,6 +108,8 @@ impl CauseSegment {
         Self {
             display: format!("{v}"),
             debug: String::new(),
+            code: None,
+            data: None,
         }
     }
 
@@ -66,6 +117,8 @@ impl CauseSegment {
         Self {
             display: format!("{v}"),
             debug: format!("{v:#?}"),
+            code: None,
+            data: None,
         }
     }
 }

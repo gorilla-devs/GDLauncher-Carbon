@@ -1,17 +1,21 @@
 ---
+import { getLocaleFromUrl, getHtmlLang } from "../lib/i18n";
+
 interface Props {
-	date: Date;
+  date: Date;
 }
 
 const { date } = Astro.props;
+const locale = getLocaleFromUrl(Astro.url.pathname);
+
+// Format the date in the active locale so /es/blog shows Spanish dates,
+// /ja/blog shows Japanese dates, etc. Falls back gracefully if the browser
+// doesn't ship that locale's CLDR data.
+const formatted = new Intl.DateTimeFormat(getHtmlLang(locale), {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+}).format(date);
 ---
 
-<time datetime={date.toISOString()}>
-	{
-		date.toLocaleDateString('en-us', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-		})
-	}
-</time>
+<time datetime={date.toISOString()}>{formatted}</time>

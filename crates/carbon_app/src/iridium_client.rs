@@ -82,5 +82,6 @@ pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
         ))
         .build()
         .expect("Failed to build HTTP client");
+
     reqwest_middleware::ClientBuilder::new(client).with(AddHeaderMiddleware { gdl_api_base_host })
 }

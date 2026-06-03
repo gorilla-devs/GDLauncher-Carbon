@@ -1,6 +1,7 @@
 /**
  * Parser for addon browser search queries.
- * Supports direct ID/slug lookup with # prefix, URL auto-detection, and custom protocols.
+ * Supports direct ID/slug lookup with # prefix, shared-instance codes with $ prefix,
+ * URL auto-detection, and custom protocols.
  */
 
 // Parsed item types
@@ -15,6 +16,8 @@ export type ParsedItem =
       kind: "mod" | "modpack" | "version"
       id: string
     }
+  | { type: "gdlauncher_share"; shareCode: string }
+  | { type: "gdlauncher_share_link"; shareCode: string }
 
 export interface ParsedQuery {
   mode: "direct" | "search"
@@ -35,6 +38,13 @@ const CURSEFORGE_PROTOCOL_REGEX =
 
 const MODRINTH_PROTOCOL_REGEX =
   /^modrinth:\/\/(mod|modpack|version)\/([a-zA-Z0-9-]+)/
+
+// GDLauncher share protocol: gdlauncher://share/ABC123
+const GDLAUNCHER_SHARE_PROTOCOL_REGEX = /^gdlauncher:\/\/share\/([a-zA-Z0-9]+)/
+
+// GDLauncher share link: gdl.gg/i/ABC123 or gdlauncher.com/instance-share/ABC123
+const GDLAUNCHER_SHARE_LINK_REGEX =
+  /(?:https?:\/\/)?(?:gdl\.gg\/i\/|gdlauncher\.com\/instance-share\/)([a-zA-Z0-9]+)/i
 
 // Numeric ID pattern (4+ digits = likely CurseForge ID)
 const NUMERIC_ID_REGEX = /^\d{4,}$/
@@ -88,10 +98,19 @@ function cleanUrl(url: string): string {
 }
 
 /**
- * Try to parse input as a URL (CurseForge or Modrinth)
+ * Try to parse input as a URL (CurseForge, Modrinth, or GDLauncher share link)
  */
 function tryParseUrl(input: string): ParsedItem | null {
   const cleaned = cleanUrl(input)
+
+  // Try GDLauncher share link (gdl.gg/iXXX or gdlauncher.com/i/XXX)
+  const gdlMatch = GDLAUNCHER_SHARE_LINK_REGEX.exec(cleaned)
+  if (gdlMatch) {
+    return {
+      type: "gdlauncher_share_link",
+      shareCode: gdlMatch[1]
+    }
+  }
 
   // Try CurseForge URL
   const cfMatch = CURSEFORGE_URL_REGEX.exec(cleaned)
@@ -117,9 +136,18 @@ function tryParseUrl(input: string): ParsedItem | null {
 }
 
 /**
- * Try to parse input as a custom protocol (curseforge:// or modrinth://)
+ * Try to parse input as a custom protocol (curseforge://, modrinth://, or gdlauncher://)
  */
 function tryParseProtocol(input: string): ParsedItem | null {
+  // Try GDLauncher share protocol
+  const gdlMatch = GDLAUNCHER_SHARE_PROTOCOL_REGEX.exec(input)
+  if (gdlMatch) {
+    return {
+      type: "gdlauncher_share",
+      shareCode: gdlMatch[1]
+    }
+  }
+
   // Try CurseForge protocol
   const cfMatch = CURSEFORGE_PROTOCOL_REGEX.exec(input)
   if (cfMatch) {
@@ -176,6 +204,18 @@ export function parseSearchQuery(input: string): ParsedQuery {
       mode: "search",
       items: [],
       originalQuery: input
+    }
+  }
+
+  // Check for $ prefix (direct shared-instance code lookup)
+  if (trimmed.startsWith("$")) {
+    const rest = trimmed.substring(1).trim()
+    if (/^[a-zA-Z0-9]{7,10}$/.test(rest)) {
+      return {
+        mode: "direct",
+        items: [{ type: "gdlauncher_share", shareCode: rest }],
+        originalQuery: input
+      }
     }
   }
 
@@ -268,4 +308,37 @@ export function buildBatchRequest(parsed: ParsedQuery): {
   }
 
   return request
+}
+
+/**
+ * Parse a share input string (raw code or link) and extract the share code.
+ * Accepts:
+ * - Raw share codes (10 alphanumeric characters)
+ * - gdl.gg/iXXX links
+ * - gdlauncher.com/i/XXX links
+ * - gdlauncher://share/XXX protocol URLs
+ * Returns null if the input is not a valid share format.
+ */
+export function parseShareInput(input: string): string | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+
+  // Try protocol first
+  const protocolMatch = GDLAUNCHER_SHARE_PROTOCOL_REGEX.exec(trimmed)
+  if (protocolMatch) {
+    return protocolMatch[1]
+  }
+
+  // Try share link
+  const linkMatch = GDLAUNCHER_SHARE_LINK_REGEX.exec(trimmed)
+  if (linkMatch) {
+    return linkMatch[1]
+  }
+
+  // Try raw share code (7-10 alphanumeric characters, 7 for new codes, 10 for legacy)
+  if (/^[a-zA-Z0-9]{7,10}$/.test(trimmed)) {
+    return trimmed
+  }
+
+  return null
 }

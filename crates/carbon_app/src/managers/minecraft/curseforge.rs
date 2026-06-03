@@ -85,7 +85,10 @@ pub async fn download_modpack_zip(
 
     carbon_net::download_multiple(
         &[file_downloadable],
-        DownloadOptions::builder().concurrency(1).build(),
+        DownloadOptions::builder()
+            .concurrency(1)
+            .progress_sender(download_progress_sender)
+            .build(),
     )
     .await
     .with_context(|| {
@@ -157,23 +160,29 @@ pub async fn prepare_modpack_from_zip(
                 .collect::<HashMap<_, _>>(),
         );
 
-        let all_addons = app
-            .modplatforms_manager()
-            .curseforge
-            .get_files(curseforge::filters::FilesParameters {
-                body: curseforge::filters::FilesParametersBody {
-                    file_ids: manifest
-                        .files
-                        .iter()
-                        .map(|file| file.file_id)
-                        .collect::<Vec<_>>(),
-                },
-            })
-            .await?
-            .data
-            .into_iter()
-            .map(|file| (file.id, file))
-            .collect::<HashMap<_, _>>();
+        let manifest_files = manifest
+            .files
+            .iter()
+            .map(|file| file.file_id)
+            .collect::<Vec<_>>();
+
+        let all_addons = if manifest_files.len() > 0 {
+            // curseforge returns 400 bad response if file_ids is empty
+            app.modplatforms_manager()
+                .curseforge
+                .get_files(curseforge::filters::FilesParameters {
+                    body: curseforge::filters::FilesParametersBody {
+                        file_ids: manifest_files,
+                    },
+                })
+                .await?
+                .data
+                .into_iter()
+                .map(|file| (file.id, file))
+                .collect::<HashMap<_, _>>()
+        } else {
+            HashMap::new()
+        };
 
         for file in &manifest.files {
             let mod_id = file.project_id;
@@ -223,6 +232,22 @@ pub async fn prepare_modpack_from_zip(
                 })
                 .flatten();
 
+            // CurseForge manifest exposes sha1/md5 per file — verify
+            // downloads against them to defend against MITM / CDN poisoning.
+            let checksum = mod_file
+                .hashes
+                .iter()
+                .find_map(|h| match h.algo {
+                    HashAlgo::Sha1 => Some(carbon_net::Checksum::Sha1(h.value.clone())),
+                    _ => None,
+                })
+                .or_else(|| {
+                    mod_file.hashes.iter().find_map(|h| match h.algo {
+                        HashAlgo::Md5 => Some(carbon_net::Checksum::Md5(h.value.clone())),
+                        _ => None,
+                    })
+                });
+
             let downloadable = Downloadable::new(
                 mod_file
                     .download_url
@@ -230,7 +255,8 @@ pub async fn prepare_modpack_from_zip(
                     .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?,
                 instance_path.join(&mod_file.file_name),
             )
-            .with_size(mod_file.file_length as u64);
+            .with_size(mod_file.file_length as u64)
+            .with_checksum(checksum);
 
             downloadables.push((downloadable, existing_path));
         }
@@ -254,8 +280,13 @@ pub async fn prepare_modpack_from_zip(
                 }
 
                 let outpath = match file.enclosed_name() {
-                    Some(path) => Path::new(&override_full_path)
-                        .join(path.strip_prefix(&override_folder_name).unwrap()),
+                    Some(path) => match path.strip_prefix(&override_folder_name) {
+                        Ok(stripped) => Path::new(&override_full_path).join(stripped),
+                        // The name begins with the prefix string but is not inside the
+                        // overrides directory (e.g. "overrides-extra/..."); skip it instead
+                        // of panicking on the non-matching path component.
+                        Err(_) => continue,
+                    },
                     None => continue,
                 };
 

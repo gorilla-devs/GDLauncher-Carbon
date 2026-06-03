@@ -49,12 +49,12 @@ Below, you can see GDLauncher's design evolution over the years.
 
 GDLauncher is currently just a simple launcher, but it can be much more!
 
-We are thrilled to announce that we have partnered up with Curseforge and Overwolf!
-Curseforge is going through a profound internal change after being acquired by Overwolf, and we believe this partnership will benefit all parties, especially the community.
+We are thrilled to announce that we have partnered up with CurseForge and Overwolf!
+CurseForge is going through a profound internal change after being acquired by Overwolf, and we believe this partnership will benefit all parties, especially the community.
 
 After the decision to allow mods to opt out from third parties due to them not contributing to the content creators' payments, the Minecraft community took a hit.
 
-Playing modded Minecraft became very stressful and cumbersome, especially for Linux users and anyone who didn't like the Curseforge app; it shouldn't be like this. We believe we can make modded Minecraft more convenient and fun while delivering exciting and useful features that don't exist anywhere else. By using GDLauncher Carbon, you'll also be contributing to paying authors of mods and modpacks on Curseforge, as well as the team behind GDLauncher!
+Playing modded Minecraft became very stressful and cumbersome, especially for Linux users and anyone who didn't like the CurseForge app; it shouldn't be like this. We believe we can make modded Minecraft more convenient and fun while delivering exciting and useful features that don't exist anywhere else. By using GDLauncher Carbon, you'll also be contributing to paying authors of mods and modpacks on CurseForge, as well as the team behind GDLauncher!
 
 We also got invited into Overwolf's funding program, allowing us to take the next big step and create a fantastic product!
 
@@ -78,11 +78,11 @@ We are dedicating all of our resources towards developing a brand new version of
 This partnership will not impact the current launcher too much. Over time its support will be discontinued in favor of GDLauncher Carbon.
 
 All the resources will go towards developing GDLauncher Carbon. We don't have an ETA yet, and we will publish updates in the next few months on our [Discord](https://discord.gdlauncher.com).
-After GDLauncher Carbon will be ready to go to production, the current release of GDLauncher will be completely archived.
+Once GDLauncher Carbon is ready for production, the current release of GDLauncher will be completely archived.
 
 ## Will GDLauncher Carbon be part of the Overwolf platform?
 
-Not really. GDLauncher will remain a standalone installable/portable executable that does not depend on any Overwolf apps, yet it will partially supported by the Overwolf platform.
+Not really. GDLauncher will remain a standalone installable/portable executable that does not depend on any Overwolf apps, yet it will be partially supported by the Overwolf platform.
 
 ## Will GDLauncher Carbon become a paid product?
 
@@ -247,7 +247,7 @@ Moreover, in order to be able to make informed decisions about GDLauncher's feat
 ## Modrinth support
 
 We were recently able to find an agreement with their team and GDLauncher will have first-class support for Modrinth!
-You'll be able to install and browse mods and modpacks from both Curseforge and Modrinth in a seamless way.
+You'll be able to install and browse mods and modpacks from both CurseForge and Modrinth in a seamless way.
 
 ## Other collabs / integrations
 
@@ -265,7 +265,7 @@ Moreover, if you feel like you have the skills, you could come work with us.
 Yes, you heard that right! If you want to join the team, you can either:
 
 - Contribute in your spare time
-- Apply to our hiring selection at [here](https://gdlauncher.com/en/careers) to work with us! We are hiring Rust and JavaScript engineers
+- Reach out on our [Discord](https://discord.gdlauncher.com) if you'd like to work with us, we sometimes hire Rust and TypeScript engineers
 
 ## I have more questions!
 

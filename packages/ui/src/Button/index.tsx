@@ -12,17 +12,12 @@ import { Dynamic } from "solid-js/web"
 import { getPressEffectClasses } from "../Clickable"
 
 type Size = "small" | "medium" | "large"
-type Type =
-  | "primary"
-  | "secondary"
-  | "glow"
-  | "outline"
-  | "transparent"
-  | "glass"
-  | "text"
+type Type = "primary" | "secondary" | "glow" | "transparent" | "glass" | "text"
 
-interface Props
-  extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
+interface Props extends Omit<
+  JSX.ButtonHTMLAttributes<HTMLButtonElement>,
+  "type"
+> {
   as?: "button" | "a" | "span" | "div"
   children: HTMLElement | string | JSX.Element
   style?: JSX.CSSProperties
@@ -50,12 +45,13 @@ const getVariant = (
   uppercase: boolean,
   iconRight: boolean,
   isLoading: boolean,
-  variant: string,
+  variant: string | undefined,
   cursor: string | undefined,
   textColor?: string,
   backgroundColor?: string,
   fullWidth?: boolean
 ) => {
+  const v = variant || "primary"
   const isLarge = size === "large"
   const isMedium = size === "medium"
   const isSmall = size === "small"
@@ -101,13 +97,10 @@ const getVariant = (
   const variants = {
     primary: {
       ...commonStyle,
-      [`${
-        !isDisabled && !backgroundColor ? `bg-${variant}-500` : "bg-[#1D2028]"
-      }`]: true,
-      [`${!isDisabled && !backgroundColor ? `hover:bg-${variant}-700` : ""}`]:
-        true,
-      // "filter brightness-75": isDisabled,
+      [`${!isDisabled && !backgroundColor ? `bg-${v}-500` : "bg-[#1D2028]"}`]: true,
+      [`${!isDisabled && !backgroundColor ? `hover:bg-${v}-700` : ""}`]: true,
       "text-[#404759]": isDisabled,
+      "disabled-stripes": isDisabled,
       "border-0": true
     },
     secondary: {
@@ -118,44 +111,50 @@ const getVariant = (
       "border-darkSlate-700": isDisabled,
       "bg-darkSlate-700": true,
       "text-lightSlate-700": isDisabled,
+      "disabled-stripes": isDisabled,
       "cursor-not-allowed": isDisabled
-    },
-    outline: {
-      ...commonStyle,
-      "border-1": true,
-      "text-lightSlate-50": !isDisabled,
-      "text-lightSlate-700": isDisabled,
-      "border-white": !isDisabled,
-      "border-darkSlate-500": isDisabled,
-      "hover:border-primary-300": !isDisabled,
-      "hover:text-primary-300": !isDisabled,
-      "bg-transparent": !isDisabled,
-      "bg-darkSlate-700": isDisabled
     },
     glow: {
       ...commonStyle,
-      [`bg-${variant}-500`]: !isDisabled,
-      [`drop-shadow-[0_0px_12px_rgb(var(--${variant}-500))]`]: !isDisabled,
+      [`bg-${v}-500`]: !isDisabled,
+      [`drop-shadow-[0_0px_12px_rgb(var(--${v}-500))]`]: !isDisabled,
       "bg-[#404759]": isDisabled,
       "text-[#8A8B8F]": isDisabled,
+      "disabled-stripes": isDisabled,
       "border-0": true
     },
     transparent: {
       ...commonStyle,
-      // "backdrop-blur-md": true,
       "bg-darkSlate-800": true,
       "text-lightSlate-700": isDisabled,
+      "disabled-stripes": isDisabled,
       "border-1": true,
       "border-transparent": true,
       "hover:border-1": !isDisabled,
       "hover:border-white": !isDisabled
     },
     text: {
-      ...commonStyle,
+      ...getPressEffectClasses(isDisabled),
+      "font-main": true,
+      "font-medium": true,
+      "text-sm": true,
+      flex: true,
+      "items-center": true,
+      "gap-2": true,
+      "py-1": true,
+      "px-2": true,
+      "rounded-md": true,
       "bg-transparent": true,
-      "text-lightSlate-50": true,
-      "hover:bg-darkSlate-900": true,
-      "border-0": true
+      "hover:bg-darkSlate-700": !isDisabled,
+      [`text-${variant}-400`]: !isDisabled && !!variant,
+      [`hover:text-${variant}-300`]: !isDisabled && !!variant,
+      "text-lightSlate-400": !isDisabled && !variant,
+      "hover:text-lightSlate-100": !isDisabled && !variant,
+      "text-lightSlate-700": isDisabled,
+      "disabled-stripes": isDisabled,
+      "border-0": true,
+      "cursor-pointer": !isDisabled,
+      "cursor-not-allowed": isDisabled
     },
     glass: {
       ...commonStyle,
@@ -170,6 +169,7 @@ const getVariant = (
       "text-lightSlate-700": isDisabled,
       "bg-darkSlate-700": isDisabled,
       "border-darkSlate-500": isDisabled,
+      "disabled-stripes": isDisabled,
       "transition-all": true,
       "duration-200": true,
       "ease-out": true
@@ -246,7 +246,7 @@ function Button(props: Props) {
           mergedProps.uppercase,
           !!props.iconRight,
           !!props.loading,
-          props.variant || "primary",
+          props.variant,
           props.cursor,
           props.textColor,
           props.backgroundColor,

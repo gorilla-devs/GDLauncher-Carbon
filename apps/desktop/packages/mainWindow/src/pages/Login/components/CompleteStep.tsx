@@ -19,7 +19,7 @@ interface CompleteStepProps {
   /** GDL account data if found */
   foundGDLAccountData?: {
     profileIconUrl: string
-    nickname: string
+    displayName: string
     email: string
   } | null
   /** Callback to navigate to library (with animation) - saves "" if skipping */
@@ -86,7 +86,7 @@ export function CompleteStep(props: CompleteStepProps) {
                     <Trans
                       key="auth:_trn_login.welcome_back_name"
                       options={{
-                        name: props.foundGDLAccountData?.nickname || "User"
+                        name: props.foundGDLAccountData?.displayName || "User"
                       }}
                     />
                   </h3>

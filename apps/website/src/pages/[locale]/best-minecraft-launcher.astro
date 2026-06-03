@@ -1,0 +1,474 @@
+---
+/**
+ * Localized "best Minecraft launcher" landing page. Brand names left
+ * untranslated (GDLauncher, CurseForge App, Prism Launcher, MultiMC,
+ * ATLauncher, Modrinth App, Overwolf, Mojang). Modpack names stay in
+ * English (RLCraft, All The Mods, Better MC, FTB). UI labels stay English.
+ */
+import KeywordLandingLayout from "../../components/KeywordLandingLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, localizedPath, type Locale } from "../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface FaqEntry { question: string; answer: string }
+interface Meta {
+  title: string
+  description: string
+  intro: string
+  faq: FaqEntry[]
+}
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "2026 年版: ベストな Minecraft ランチャー",
+    description: "Minecraft の最良のランチャーは? GDLauncher を CurseForge App、Prism、MultiMC、ATLauncher、Modrinth App と Mod、性能、機能で比較します。",
+    intro: "適した Minecraft ランチャーは、実際に何を遊ぶかで変わります。2026 年の主要ランチャーを実用本位で整理、それぞれの強みを見ていきます。",
+    faq: [
+      {
+        question: "2026 年にいちばんのランチャーは?",
+        answer: "用途次第です。Mod 入り Minecraft が中心で、CurseForge と Modrinth からワンクリックで導入したい、Java の設定を自分でしたくないなら GDLauncher がもっとも手軽です。素朴で柔軟な作りを好む上級者は Prism Launcher や MultiMC を好む傾向。Mojang 公式ランチャーは Vanilla には十分ですが Mod の手助けはしません。"
+      },
+      {
+        question: "無料でいちばんの Minecraft ランチャーは?",
+        answer: "GDLauncher は無料で Windows / macOS / Linux に対応。CurseForge と Modrinth の両方をサポートし、Java、Mod ローダー、更新を自動で処理します。プレミアム階層はなく、ランチャー内バナー広告 1 枠だけで運営され、その収益は CurseForge のレベニューシェアを通じて Mod 作者にも還元されます。"
+      },
+      {
+        question: "公式ランチャーはサードパーティより良い?",
+        answer: "純粋な Vanilla Minecraft なら公式で十分。Mod 入り Minecraft なら、GDLauncher のようなサードパーティのほうが圧倒的に楽です。Modpack ごとの Java バージョン管理、Mod ローダーの自動導入、CurseForge と Modrinth との統合があり、Mod を手動で集める必要がありません。"
+      },
+      {
+        question: "サードパーティの Minecraft ランチャーは安全?",
+        answer: "GDLauncher、Prism Launcher、CurseForge App など評判の良いランチャーは安全です。実際の Microsoft アカウントを Mojang 公式の認証 API 経由で使うため、パスワードを共有・保存しません。直接パスワードを要求するもの、出所不明のサイトで配布されるものは避けてください。"
+      },
+      {
+        question: "配信者はどの Minecraft ランチャーを使う?",
+        answer: "人によります。Mod 入り Minecraft 配信者は Modpack ワンクリック導入のために GDLauncher や CurseForge App を選ぶことが多いです。Prism Launcher を軽さから使う人もいます。Vanilla 中心の配信では公式ランチャーが一般的です。"
+      }
+    ]
+  },
+  ko: {
+    title: "2026년 최고의 Minecraft 런처",
+    description: "Minecraft 최고의 런처를 찾고 계신가요? GDLauncher를 CurseForge App, Prism, MultiMC, ATLauncher, Modrinth App과 모드, 성능, 기능 면에서 비교합니다.",
+    intro: "어떤 Minecraft 런처가 맞는지는 실제로 무엇을 플레이하느냐에 달려 있습니다. 2026년 주요 런처들을 거품 없이 정리해서 각자 어디서 빛을 보는지 보여 드립니다.",
+    faq: [
+      {
+        question: "2026년 가장 좋은 런처는?",
+        answer: "용도에 따라 다릅니다. 주로 모드 적용 Minecraft를 즐기고 CurseForge와 Modrinth에서 원클릭으로 설치하고 싶다, Java 설정을 직접 하기 싫다면 GDLauncher가 가장 편합니다. 미니멀하고 자유도 높은 런처를 선호하는 파워 유저는 Prism Launcher나 MultiMC를 선호하는 편입니다. Mojang 공식 런처는 바닐라에는 충분하지만 모드는 도와주지 않습니다."
+      },
+      {
+        question: "최고의 무료 Minecraft 런처는?",
+        answer: "GDLauncher는 무료이며 Windows, macOS, Linux에서 모두 실행됩니다. CurseForge와 Modrinth 모두를 지원하고 Java, 모드 로더, 업데이트를 자동으로 처리합니다. 프리미엄 등급은 없고, 런처 안의 단일 배너 광고로 운영되며 그 수익은 CurseForge의 레비뉴 셰어를 통해 모드 작성자에게도 돌아갑니다."
+      },
+      {
+        question: "공식 Minecraft 런처가 서드파티보다 좋나요?",
+        answer: "순수 바닐라라면 공식 런처로 충분합니다. 모드 적용 Minecraft에서는 GDLauncher 같은 서드파티가 훨씬 낫습니다. 모드팩별 Java 버전 관리, 모드 로더 자동 설치, CurseForge와 Modrinth 통합으로 모드를 직접 받을 필요가 없습니다."
+      },
+      {
+        question: "서드파티 Minecraft 런처는 안전한가요?",
+        answer: "GDLauncher, Prism Launcher, CurseForge App 같은 평판 좋은 런처는 안전합니다. 실제 Microsoft 계정을 Mojang 공식 인증 API로 사용하기 때문에 비밀번호를 공유하거나 저장하지 않습니다. 비밀번호를 직접 요구하거나 출처 불명의 사이트에서 배포되는 런처는 피하세요."
+      },
+      {
+        question: "스트리머는 어떤 Minecraft 런처를 쓰나요?",
+        answer: "사람마다 다릅니다. 모드 적용 Minecraft 스트리머는 원클릭 모드팩 설치 때문에 GDLauncher나 CurseForge App을 많이 씁니다. Prism Launcher의 가벼움을 선호하는 사람도 있습니다. 바닐라 콘텐츠에는 공식 런처가 흔합니다."
+      }
+    ]
+  },
+  de: {
+    title: "Der beste Minecraft-Launcher 2026",
+    description: "Auf der Suche nach dem besten Minecraft-Launcher? Wir vergleichen GDLauncher mit CurseForge App, Prism, MultiMC, ATLauncher und Modrinth App nach Mods, Performance und Features.",
+    intro: "Welcher Minecraft-Launcher der richtige ist, hängt davon ab, was du wirklich spielst. Hier eine pragmatische, fluff-freie Übersicht der Top-Launcher 2026 und wo jeder gewinnt.",
+    faq: [
+      {
+        question: "Welcher Minecraft-Launcher ist 2026 der beste?",
+        answer: "Kommt drauf an, was du damit machst. Wenn du vor allem modded Minecraft spielst und Ein-Klick-Installs von CurseForge und Modrinth willst, ohne Java selbst zu konfigurieren, ist GDLauncher die einfachste Option. Power-User, die einen reduzierten, hyper-flexiblen Launcher wollen, neigen zu Prism Launcher oder MultiMC. Der offizielle Mojang-Launcher reicht für Vanilla, hilft aber nicht bei Mods."
+      },
+      {
+        question: "Was ist der beste kostenlose Minecraft-Launcher?",
+        answer: "GDLauncher ist kostenlos und läuft auf Windows, macOS und Linux. Er unterstützt CurseForge und Modrinth und kümmert sich automatisch um Java, Mod-Loader und Updates. Keine Premium-Stufe, der Launcher finanziert sich über ein einziges In-App-Banner, das über CurseForges Revenue-Share auch Mod-Autoren mitfinanziert."
+      },
+      {
+        question: "Ist der offizielle Minecraft-Launcher besser als Drittanbieter?",
+        answer: "Für reines Vanilla-Minecraft reicht der offizielle Launcher. Für modded Minecraft sind Drittanbieter wie GDLauncher deutlich besser. Sie handhaben Java-Versionen pro Modpack, installieren Mod-Loader automatisch und sind mit CurseForge und Modrinth verzahnt, du musst keine Mods von Hand suchen."
+      },
+      {
+        question: "Sind Drittanbieter-Minecraft-Launcher sicher?",
+        answer: "Renommierte Launcher wie GDLauncher, Prism Launcher und CurseForge App sind sicher. Sie nutzen deinen echten Microsoft-Account über Mojangs offizielle Auth-API, dein Passwort wird nicht geteilt oder gespeichert. Finger weg von allem, was direkt nach Passwörtern fragt oder über dubiose Seiten verteilt wird."
+      },
+      {
+        question: "Welchen Minecraft-Launcher nutzen Streamer?",
+        answer: "Unterschiedlich. Viele Modded-Minecraft-Streamer nehmen GDLauncher oder die CurseForge App wegen der Ein-Klick-Modpack-Installs. Andere nutzen Prism Launcher wegen der schlanken Anmutung. Bei Vanilla-Content ist der offizielle Launcher häufig."
+      }
+    ]
+  },
+  fr: {
+    title: "Le meilleur launcher Minecraft en 2026",
+    description: "Tu cherches le meilleur launcher Minecraft ? On compare GDLauncher à CurseForge App, Prism, MultiMC, ATLauncher et Modrinth App sur les mods, les perfs et les features.",
+    intro: "Le bon launcher Minecraft dépend de ce que tu joues vraiment. Voici un comparatif pragmatique et sans blabla des principaux launchers en 2026, avec là où chacun marque des points.",
+    faq: [
+      {
+        question: "Quel est le meilleur launcher Minecraft en 2026 ?",
+        answer: "Ça dépend de ton usage. Si tu joues surtout en Minecraft moddé et que tu veux des installs en un clic depuis CurseForge et Modrinth sans configurer Java toi-même, GDLauncher est l'option la plus simple. Les power users qui veulent un launcher dépouillé et hyper-flexible préfèrent Prism Launcher ou MultiMC. Le launcher Mojang officiel est correct pour le vanilla mais n'aide pas pour les mods."
+      },
+      {
+        question: "Quel est le meilleur launcher Minecraft gratuit ?",
+        answer: "GDLauncher est gratuit et tourne sur Windows, macOS et Linux. Il supporte CurseForge et Modrinth et gère Java, les mod loaders et les mises à jour automatiquement. Pas d'offre premium ; le launcher est financé par une seule bannière in-app qui rémunère aussi les auteurs de mods via le revenue share de CurseForge."
+      },
+      {
+        question: "Le launcher Minecraft officiel est-il meilleur que les tiers ?",
+        answer: "Pour du Minecraft vanilla pur, le launcher officiel suffit. Pour du Minecraft moddé, les launchers tiers comme GDLauncher sont nettement meilleurs. Ils gèrent les versions de Java par modpack, installent les mod loaders automatiquement et s'intègrent à CurseForge et Modrinth, tu n'as pas à télécharger les mods à la main."
+      },
+      {
+        question: "Les launchers Minecraft tiers sont-ils sûrs ?",
+        answer: "Les launchers de confiance comme GDLauncher, Prism Launcher et la CurseForge App sont sûrs. Ils utilisent ton vrai compte Microsoft via l'API d'auth officielle de Mojang ; ils ne partagent ni ne stockent ton mot de passe. Évite tout ce qui demande ton mot de passe directement ou qui est distribué via des sites au hasard."
+      },
+      {
+        question: "Quel launcher Minecraft utilisent les streamers ?",
+        answer: "Ça varie. Beaucoup de streamers de Minecraft moddé utilisent GDLauncher ou la CurseForge App pour les installs de modpacks en un clic. Certains utilisent Prism Launcher pour son côté léger. Le launcher officiel est courant pour le contenu vanilla."
+      }
+    ]
+  },
+  es: {
+    title: "El mejor launcher de Minecraft para 2026",
+    description: "¿Buscas el mejor launcher de Minecraft? Compara GDLauncher con CurseForge App, Prism, MultiMC, ATLauncher y Modrinth App en mods, rendimiento y funciones.",
+    intro: "El launcher de Minecraft adecuado depende de qué juegues realmente. Aquí tienes un repaso práctico y sin paja de los principales launchers de 2026 y dónde brilla cada uno.",
+    faq: [
+      {
+        question: "¿Cuál es el mejor launcher de Minecraft en 2026?",
+        answer: "Depende de para qué lo uses. Si juegas sobre todo a Minecraft moddeado y quieres instalaciones en un clic desde CurseForge y Modrinth sin configurar Java tú mismo, GDLauncher es la opción más fácil. Los usuarios avanzados que quieren un launcher minimalista y muy flexible suelen preferir Prism Launcher o MultiMC. El launcher oficial de Mojang está bien para vanilla pero no ayuda con mods."
+      },
+      {
+        question: "¿Cuál es el mejor launcher de Minecraft gratis?",
+        answer: "GDLauncher es gratis y funciona en Windows, macOS y Linux. Soporta tanto CurseForge como Modrinth y gestiona Java, los mod loaders y las actualizaciones automáticamente. No hay versión premium; el launcher se financia con un único banner dentro de la app que también ayuda a pagar a los autores de mods vía el revenue share de CurseForge."
+      },
+      {
+        question: "¿Es mejor el launcher oficial de Minecraft que los de terceros?",
+        answer: "Para Minecraft vanilla puro, el launcher oficial está bien. Para Minecraft moddeado, los launchers de terceros como GDLauncher son bastante mejores. Gestionan versiones de Java por modpack, instalan mod loaders automáticamente y se integran con CurseForge y Modrinth, así que no tienes que descargar mods a mano."
+      },
+      {
+        question: "¿Son seguros los launchers de Minecraft de terceros?",
+        answer: "Los launchers de confianza como GDLauncher, Prism Launcher y CurseForge App son seguros. Usan tu cuenta real de Microsoft a través de la API oficial de autenticación de Mojang; no comparten ni guardan tu contraseña. Evita cualquier cosa que pida la contraseña directamente o que se distribuya en sitios random."
+      },
+      {
+        question: "¿Qué launcher de Minecraft usan los streamers?",
+        answer: "Varía. Muchos streamers de Minecraft moddeado usan GDLauncher o CurseForge App por las instalaciones de modpacks en un clic. Algunos usan Prism Launcher por la sensación ligera. El launcher oficial es habitual en contenido vanilla."
+      }
+    ]
+  },
+  "pt-BR": {
+    title: "O melhor launcher de Minecraft em 2026",
+    description: "Procurando o melhor launcher de Minecraft? Compare o GDLauncher com CurseForge App, Prism, MultiMC, ATLauncher e Modrinth App em mods, performance e recursos.",
+    intro: "O launcher de Minecraft certo depende do que você realmente joga. Aqui vai um panorama prático, sem encheção, dos principais launchers em 2026 e onde cada um se destaca.",
+    faq: [
+      {
+        question: "Qual é o melhor launcher de Minecraft em 2026?",
+        answer: "Depende do que você faz com ele. Se você joga principalmente Minecraft com mods e quer instalações em um clique do CurseForge e Modrinth sem configurar Java na mão, o GDLauncher é a opção mais fácil. Usuários avançados que querem um launcher enxuto e flexível tendem a preferir o Prism Launcher ou o MultiMC. O launcher oficial da Mojang serve para vanilla, mas não ajuda com mods."
+      },
+      {
+        question: "Qual é o melhor launcher de Minecraft grátis?",
+        answer: "O GDLauncher é grátis e roda no Windows, macOS e Linux. Suporta CurseForge e Modrinth e cuida do Java, dos mod loaders e das atualizações automaticamente. Não tem versão premium; o launcher se mantém com um único banner dentro do app, que também ajuda a pagar autores de mods via o revenue share do CurseForge."
+      },
+      {
+        question: "O launcher oficial de Minecraft é melhor que os de terceiros?",
+        answer: "Para Minecraft vanilla puro, o launcher oficial dá conta. Para Minecraft com mods, launchers de terceiros como o GDLauncher são bem melhores. Eles cuidam das versões de Java por modpack, instalam mod loaders automaticamente e se integram com CurseForge e Modrinth, então você não precisa baixar mods na mão."
+      },
+      {
+        question: "Launchers de Minecraft de terceiros são seguros?",
+        answer: "Launchers de boa reputação como GDLauncher, Prism Launcher e CurseForge App são seguros. Eles usam sua conta real da Microsoft pela API oficial de autenticação da Mojang; não compartilham nem guardam sua senha. Evite qualquer coisa que peça sua senha direto ou que seja distribuída em sites aleatórios."
+      },
+      {
+        question: "Qual launcher de Minecraft os streamers usam?",
+        answer: "Varia. Muitos streamers de Minecraft com mods usam o GDLauncher ou o CurseForge App por causa das instalações de modpacks em um clique. Alguns usam o Prism Launcher pela leveza. O launcher oficial é comum em conteúdo vanilla."
+      }
+    ]
+  },
+  it: {
+    title: "Il miglior launcher Minecraft del 2026",
+    description: "Cerchi il miglior launcher Minecraft? Confronta GDLauncher con CurseForge App, Prism, MultiMC, ATLauncher e Modrinth App su mod, prestazioni e funzionalità.",
+    intro: "Il launcher Minecraft giusto dipende da cosa giochi davvero. Ecco una panoramica concreta, senza fronzoli, dei principali launcher del 2026 e di dove ciascuno fa la differenza.",
+    faq: [
+      {
+        question: "Qual è il miglior launcher Minecraft nel 2026?",
+        answer: "Dipende dall'uso che ne fai. Se giochi soprattutto a Minecraft moddato e vuoi installare con un click da CurseForge e Modrinth senza configurare Java a mano, GDLauncher è la scelta più semplice. Gli utenti esperti che cercano un launcher essenziale e iper-flessibile preferiscono Prism Launcher o MultiMC. Il launcher ufficiale Mojang basta per il vanilla, ma non ti aiuta con le mod."
+      },
+      {
+        question: "Qual è il miglior launcher Minecraft gratuito?",
+        answer: "GDLauncher è gratuito e gira su Windows, macOS e Linux. Supporta sia CurseForge sia Modrinth e gestisce Java, i mod loader e gli aggiornamenti in automatico. Niente versione premium: il launcher si regge su un singolo banner in-app che, tramite il revenue share di CurseForge, contribuisce anche a pagare gli autori delle mod."
+      },
+      {
+        question: "Il launcher ufficiale di Minecraft è meglio di quelli di terze parti?",
+        answer: "Per il Minecraft vanilla puro, il launcher ufficiale basta. Per il Minecraft moddato, i launcher di terze parti come GDLauncher sono nettamente migliori: gestiscono le versioni di Java per ogni modpack, installano i mod loader in automatico e si integrano con CurseForge e Modrinth, così non devi scaricare le mod a mano."
+      },
+      {
+        question: "I launcher Minecraft di terze parti sono sicuri?",
+        answer: "I launcher affidabili come GDLauncher, Prism Launcher e CurseForge App sono sicuri. Usano il tuo vero account Microsoft tramite l'API di autenticazione ufficiale di Mojang: non condividono né salvano la tua password. Evita tutto quello che ti chiede la password in chiaro o che gira su siti sospetti."
+      },
+      {
+        question: "Che launcher Minecraft usano gli streamer?",
+        answer: "Dipende. Molti streamer di Minecraft moddato usano GDLauncher o CurseForge App per installare modpack con un click. Altri preferiscono Prism Launcher per la sua leggerezza. Per i contenuti vanilla, il launcher ufficiale resta diffuso."
+      }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<KeywordLandingLayout
+  pageSlug="best-minecraft-launcher"
+  title={m.title}
+  description={m.description}
+  intro={m.intro}
+  keywords="best minecraft launcher, top minecraft launcher, free minecraft launcher, minecraft launcher 2026, minecraft launcher comparison"
+  faq={m.faq}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>「ベスト」の本当の意味</h2>
+      <p>「ベスト」は Minecraft で何をやるかで変わります。Vanilla プレイヤーと Modpack プレイヤーで求めるものは違います。配信者はインスタンス切替の速さを重視。サーバー運営は Mod のデプロイを重視。下記は単一の優劣でなく、用途別に分類しています。</p>
+
+      <h2>Mod 入り Minecraft のベスト: GDLauncher</h2>
+      <p>RLCraft、All The Mods、Better MC、FTB のような Modpack を遊ぶなら、ワンクリック導入と Java の自動設定をしてくれるランチャーが欲しいはず。<a href={localizedPath("/", locale)}>GDLauncher</a> はどちらも提供し、同じブラウザで CurseForge と Modrinth に対応、Windows / macOS / Linux で動きます。本体は無料、ランチャー内のバナー広告 1 枠で維持され、その収益は CurseForge のレベニューシェアを通じて Mod 作者へも還元。ソースコードは GitHub で公開。</p>
+      <p>トレードオフ: GDLauncher は最小主義のランチャーより方針が強め。Java バージョンの手動指定や JVM フラグの編集も可能ですが、99% の Modpack は既定設定で動きます。</p>
+
+      <h2>軽量ランチャーのベスト: Prism Launcher</h2>
+      <p><a href={localizedPath("/vs/prismlauncher", locale)}>Prism Launcher</a> は人気のオープンソース MultiMC フォーク。RAM 使用量は約 80MB、装飾の少ない UI、完全な手動制御を提供。Modpack 導入は GDLauncher より手数が多い (特に CurseForge パック) ですが、ミニマリズムが上級者に刺さります。</p>
+
+      <h2>Vanilla プレイヤーのベスト: Mojang 公式ランチャー</h2>
+      <p>Vanilla しか遊ばず Mod に興味がないなら公式で十分。Minecraft for Windows (Bedrock) を Java Edition と並べて扱える唯一のランチャーです。Mod を入れるなら GDLauncher か Prism に切り替えましょう。</p>
+
+      <h2>CurseForge 専門プレイヤーのベスト: CurseForge App</h2>
+      <p>Overwolf 製の <a href={localizedPath("/vs/curseforge-app", locale)}>CurseForge App</a> は CurseForge とのもっとも深い統合を持ちます。代償は Overwolf のオーバーレイ (広告付き)、Modrinth 非対応、Linux 提供が不安定なこと。GDLauncher なら CurseForge 統合の大半を、これらの問題なしで提供します。</p>
+
+      <h2>Modrinth ピューリスト向けのベスト: Modrinth App</h2>
+      <p>公式の <a href={localizedPath("/vs/modrinth-app", locale)}>Modrinth App</a> は Modrinth エコシステムに完全に住むなら優秀。人気 Modpack の多くは現在 Modrinth にもありますが、より深い Modpack カタログと多くの古い Forge コンテンツは依然として CurseForge にあります。GDLauncher の Modrinth 統合は同じ領域をカバーしつつ CurseForge も使えます。</p>
+
+      <h2>上級者・マルチインスタンスのベスト: MultiMC</h2>
+      <p><a href={localizedPath("/vs/multimc", locale)}>MultiMC</a> は Minecraft のマルチインスタンス起動の元祖。軽量で設定の幅が広く、コミュニティで尊敬されています。CurseForge 統合は弱く、Java は自分で扱う必要あり。これらの注意点が気にならないなら良い選択。気になるなら GDLauncher が同じマルチインスタンスのワークフローを手動セットアップなしで提供します。</p>
+
+      <h2>かんたん早見表</h2>
+      <ul>
+        <li><strong>Modpack をとにかくワンクリックで動かしたい:</strong> GDLauncher</li>
+        <li><strong>素朴で軽量なランチャーが欲しい:</strong> Prism Launcher</li>
+        <li><strong>CurseForge 一本:</strong> CurseForge App</li>
+        <li><strong>Modrinth 一本:</strong> Modrinth App</li>
+        <li><strong>Vanilla 専門:</strong> 公式 Minecraft Launcher</li>
+      </ul>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>"최고"의 진짜 의미</h2>
+      <p>"최고"는 Minecraft에서 무엇을 하느냐에 달려 있습니다. 바닐라 플레이어와 모드팩 플레이어가 원하는 게 다릅니다. 스트리머는 인스턴스 전환 속도를 신경 씁니다. 서버 운영자는 모드를 서버에 배포하는 걸 중요하게 봅니다. 아래에서는 단일 척도로 줄을 세우지 않고 용도별로 묶었습니다.</p>
+
+      <h2>모드 적용 Minecraft에 최고: GDLauncher</h2>
+      <p>RLCraft, All The Mods, Better MC, FTB 같은 모드팩을 즐긴다면, 원클릭으로 깔아 주고 Java 셋업도 자동으로 해 주는 런처가 필요합니다. <a href={localizedPath("/", locale)}>GDLauncher</a>가 둘 다 처리하고, 같은 브라우저에서 CurseForge와 Modrinth를 지원하며 Windows, macOS, Linux에서 동작합니다. 본체는 무료, 런처 내 배너 광고 한 칸이 운영을 지탱하고 그 수익은 CurseForge 레비뉴 셰어로 모드 작성자에게도 돌아갑니다. 소스는 GitHub에서 공개돼 있습니다.</p>
+      <p>트레이드오프: GDLauncher는 미니멀 런처보다 의견이 분명합니다. Java 버전을 수동으로 고르거나 JVM 플래그를 편집할 수도 있지만, 99%의 모드팩은 기본값으로 잘 돌아갑니다.</p>
+
+      <h2>가벼운 런처의 최고: Prism Launcher</h2>
+      <p><a href={localizedPath("/vs/prismlauncher", locale)}>Prism Launcher</a>는 인기 있는 오픈소스 MultiMC 포크입니다. RAM 사용량 약 80MB, 군더더기 없는 UI, 완전한 수동 제어를 제공합니다. 모드팩 설치는 GDLauncher보다 단계가 많지만(특히 CurseForge 팩) 그 미니멀함이 파워 유저에게 어필합니다.</p>
+
+      <h2>바닐라 플레이어에게 최고: 공식 Mojang 런처</h2>
+      <p>바닐라만 하고 모드에는 관심 없다면 공식 런처로 충분합니다. Java Edition 옆에 Minecraft for Windows(Bedrock)도 함께 다룰 수 있는 유일한 런처입니다. 모드를 만지려면 GDLauncher나 Prism으로 바꾸세요.</p>
+
+      <h2>CurseForge만 쓰는 사람에게 최고: CurseForge App</h2>
+      <p>Overwolf가 만든 <a href={localizedPath("/vs/curseforge-app", locale)}>CurseForge App</a>은 CurseForge와의 가장 깊은 통합을 자랑합니다. 대신 Overwolf 오버레이(광고 포함), Modrinth 미지원, 들쑥날쑥한 Linux 지원이 따라옵니다. GDLauncher는 그런 문제 없이 CurseForge 통합 대부분을 제공합니다.</p>
+
+      <h2>Modrinth 순정파에게 최고: Modrinth App</h2>
+      <p>공식 <a href={localizedPath("/vs/modrinth-app", locale)}>Modrinth App</a>은 Modrinth 생태계 안에서 다 해결한다면 훌륭합니다. 인기 모드팩 다수가 이제 Modrinth에도 있지만, 더 깊은 모드팩 카탈로그와 옛 Forge 콘텐츠는 여전히 CurseForge에 있습니다. GDLauncher의 Modrinth 통합도 같은 영역을 커버하면서 CurseForge까지 잡습니다.</p>
+
+      <h2>파워 유저 / 멀티 인스턴스에 최고: MultiMC</h2>
+      <p><a href={localizedPath("/vs/multimc", locale)}>MultiMC</a>는 Minecraft 멀티 인스턴스의 원조입니다. 가볍고 설정 폭이 넓으며 커뮤니티에서 존중받습니다. CurseForge 통합은 약하고 Java는 직접 다뤄야 합니다. 그런 단점이 신경 쓰이지 않는다면 좋습니다. 신경 쓰인다면 GDLauncher가 수동 셋업 없이 같은 멀티 인스턴스 흐름을 제공합니다.</p>
+
+      <h2>빠른 선택 가이드</h2>
+      <ul>
+        <li><strong>모드팩이 원클릭으로 그냥 돌아가면 됨:</strong> GDLauncher</li>
+        <li><strong>군더더기 없는 가벼운 런처가 좋다:</strong> Prism Launcher</li>
+        <li><strong>CurseForge만 쓴다:</strong> CurseForge App</li>
+        <li><strong>Modrinth만 쓴다:</strong> Modrinth App</li>
+        <li><strong>바닐라만 한다:</strong> 공식 Minecraft Launcher</li>
+      </ul>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was "best" eigentlich heißt</h2>
+      <p>"Best" hängt davon ab, was du mit Minecraft anstellst. Vanilla-Spieler haben andere Anforderungen als Modpack-Spieler. Streamer wollen schnellen Instanz-Wechsel. Server-Admins wollen Mods auf einen Server bringen. Statt einer einzigen Rangliste gruppieren wir die Launcher unten nach Anwendungsfall.</p>
+
+      <h2>Beste Wahl für modded Minecraft: GDLauncher</h2>
+      <p>Wenn du Modpacks wie RLCraft, All The Mods, Better MC oder FTB spielst, willst du den Launcher, der sie mit einem Klick installiert und das Java-Setup übernimmt. <a href={localizedPath("/", locale)}>GDLauncher</a> macht beides, unterstützt CurseForge und Modrinth im selben Browser und läuft auf Windows, macOS und Linux. Die App ist kostenlos; ein einziges In-App-Banner hält das so und finanziert über CurseForges Revenue-Share auch Mod-Autoren. Quellcode auf GitHub.</p>
+      <p>Trade-off: GDLauncher hat mehr Meinung als ein puristischer Launcher. Du kannst Java-Versionen manuell auswählen und JVM-Flags bearbeiten, aber die Defaults funktionieren für 99% aller Modpacks.</p>
+
+      <h2>Bester Lightweight-Launcher: Prism Launcher</h2>
+      <p><a href={localizedPath("/vs/prismlauncher", locale)}>Prism Launcher</a> ist der populäre Open-Source-MultiMC-Fork. Er braucht ~80MB RAM, hat ein puristisches UI und gibt dir volle Handkontrolle. Modpack-Installation ist mehr Schritte als bei GDLauncher (vor allem bei CurseForge-Packs), aber der Minimalismus zieht Power-User an.</p>
+
+      <h2>Beste Wahl für Vanilla-Spieler: offizieller Mojang-Launcher</h2>
+      <p>Wenn du nur Vanilla spielst und Mods dich nicht interessieren, ist der offizielle Launcher okay. Er ist der einzige, der Minecraft für Windows (Bedrock) neben Java Edition mitbringt. Für alles Modded wechselst du zu GDLauncher oder Prism.</p>
+
+      <h2>Beste Wahl, wenn du nur CurseForge nutzt: CurseForge App</h2>
+      <p>Die von Overwolf gebaute <a href={localizedPath("/vs/curseforge-app", locale)}>CurseForge App</a> hat die tiefste CurseForge-Integration. Der Preis: das Overwolf-Overlay (mit Werbung), keine Modrinth-Unterstützung, wackelige Linux-Verfügbarkeit. GDLauncher liefert dir die meiste CurseForge-Integration ohne diese Probleme.</p>
+
+      <h2>Beste Wahl für Modrinth-Puristen: Modrinth App</h2>
+      <p>Die offizielle <a href={localizedPath("/vs/modrinth-app", locale)}>Modrinth App</a> ist exzellent, wenn du komplett im Modrinth-Ökosystem lebst. Die meisten populären Packs sind mittlerweile auch auf Modrinth, aber CurseForge hat weiterhin den tieferen Modpack-Katalog und viel ältere Forge-Inhalte. GDLauncher deckt dasselbe Modrinth-Terrain ab und liefert dir zusätzlich CurseForge mit.</p>
+
+      <h2>Beste Wahl für Power-User / Multi-Instance: MultiMC</h2>
+      <p><a href={localizedPath("/vs/multimc", locale)}>MultiMC</a> hat das Multi-Instance-Minecraft-Launchen erfunden. Leichtgewichtig, hyper-konfigurierbar, in der Community angesehen. CurseForge-Integration ist lückenhaft und Java machst du selbst. Stören dich diese Punkte nicht, ist MultiMC super. Stören sie dich, gibt dir GDLauncher denselben Multi-Instance-Workflow ohne den manuellen Aufwand.</p>
+
+      <h2>Quick Decision Guide</h2>
+      <ul>
+        <li><strong>Modpacks sollen einfach mit einem Klick laufen:</strong> GDLauncher</li>
+        <li><strong>Schmaler, leichter Launcher gewünscht:</strong> Prism Launcher</li>
+        <li><strong>Nur CurseForge:</strong> CurseForge App</li>
+        <li><strong>Nur Modrinth:</strong> Modrinth App</li>
+        <li><strong>Nur Vanilla:</strong> offizieller Minecraft Launcher</li>
+      </ul>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Ce que veut dire "meilleur"</h2>
+      <p>"Meilleur" dépend de ce que tu fais avec Minecraft. Les joueurs vanilla n'ont pas les mêmes besoins que les joueurs de modpacks. Les streamers veulent switcher d'instance vite. Les admins de serveur veulent déployer des mods sur un serveur. On groupe les launchers ci-dessous par usage plutôt que sur une seule échelle universelle.</p>
+
+      <h2>Meilleur pour le Minecraft moddé : GDLauncher</h2>
+      <p>Si tu joues des modpacks genre RLCraft, All The Mods, Better MC ou FTB, le launcher qu'il te faut, c'est celui qui les installe en un clic et gère le setup Java automatiquement. <a href={localizedPath("/", locale)}>GDLauncher</a> fait les deux, supporte CurseForge et Modrinth dans le même navigateur et tourne sur Windows, macOS et Linux. L'app est gratuite ; une seule bannière in-app permet ça et finance les auteurs de mods via le revenue share CurseForge. Source dispo sur GitHub.</p>
+      <p>Compromis : GDLauncher est plus opinionné que les launchers très bruts. Tu peux choisir les versions de Java à la main et éditer les flags JVM, mais les défauts marchent pour 99 % des modpacks.</p>
+
+      <h2>Meilleur launcher léger : Prism Launcher</h2>
+      <p><a href={localizedPath("/vs/prismlauncher", locale)}>Prism Launcher</a> est le fork open source de MultiMC populaire. Il prend ~80MB de RAM, a une UI sans fioritures et te donne le contrôle manuel total. Installer un modpack demande plus d'étapes que sur GDLauncher (surtout pour les packs CurseForge), mais le minimalisme de Prism plaît aux power users.</p>
+
+      <h2>Meilleur pour les joueurs vanilla : launcher officiel Mojang</h2>
+      <p>Si tu joues uniquement en vanilla et que les mods ne t'intéressent pas, le launcher officiel suffit. C'est le seul qui inclut Minecraft for Windows (Bedrock) à côté de Java Edition. Pour du moddé, bascule sur GDLauncher ou Prism.</p>
+
+      <h2>Meilleur pour les joueurs CurseForge uniquement : CurseForge App</h2>
+      <p>La <a href={localizedPath("/vs/curseforge-app", locale)}>CurseForge App</a> faite par Overwolf a l'intégration CurseForge la plus poussée. La contrepartie, c'est l'overlay Overwolf (avec pubs), pas de support Modrinth et une dispo Linux en dents de scie. GDLauncher te donne la majorité de la même intégration CurseForge sans ces soucis.</p>
+
+      <h2>Meilleur pour les puristes Modrinth : Modrinth App</h2>
+      <p>L'<a href={localizedPath("/vs/modrinth-app", locale)}>app Modrinth</a> officielle est excellente si tu vis complètement dans l'écosystème Modrinth. La plupart des packs populaires sont maintenant sur Modrinth, mais CurseForge garde un catalogue de modpacks plus profond et beaucoup de contenu Forge plus ancien. L'intégration Modrinth de GDLauncher couvre le même terrain et te donne CurseForge en plus.</p>
+
+      <h2>Meilleur pour power users / multi-instance : MultiMC</h2>
+      <p><a href={localizedPath("/vs/multimc", locale)}>MultiMC</a> a inventé le multi-instance Minecraft. Léger, hyper-configurable, respecté par la communauté. L'intégration CurseForge est inégale et tu gères Java toi-même. Si ces réserves ne te dérangent pas, MultiMC est top. Si elles te dérangent, GDLauncher te donne le même workflow multi-instance sans le setup manuel.</p>
+
+      <h2>Guide de décision rapide</h2>
+      <ul>
+        <li><strong>Tu veux juste que les modpacks marchent en un clic :</strong> GDLauncher</li>
+        <li><strong>Tu veux un launcher dépouillé et léger :</strong> Prism Launcher</li>
+        <li><strong>Tu restes uniquement sur CurseForge :</strong> CurseForge App</li>
+        <li><strong>Tu restes uniquement sur Modrinth :</strong> Modrinth App</li>
+        <li><strong>Vanilla seulement :</strong> launcher Minecraft officiel</li>
+      </ul>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Qué significa "mejor" de verdad</h2>
+      <p>"Mejor" depende de qué hagas con Minecraft. Los jugadores de vanilla tienen necesidades distintas a los de modpacks. A los streamers les importa cambiar de instancia rápido. A los admins de servidor les importa desplegar mods en un servidor. A continuación agrupamos los launchers por caso de uso en vez de ordenarlos en una sola escala universal.</p>
+
+      <h2>Mejor para Minecraft moddeado: GDLauncher</h2>
+      <p>Si juegas modpacks como RLCraft, All The Mods, Better MC o FTB, el launcher que quieres es el que los instala en un clic y gestiona el setup de Java automáticamente. <a href={localizedPath("/", locale)}>GDLauncher</a> hace las dos cosas, soporta CurseForge y Modrinth en el mismo navegador y funciona en Windows, macOS y Linux. La app es gratis; un único banner dentro de la app la mantiene así y ayuda a financiar a los autores de mods vía el revenue share de CurseForge. Código en GitHub.</p>
+      <p>Trade-off: GDLauncher es más opinado que los launchers crudos. Puedes elegir versiones de Java a mano y editar flags de JVM, pero los defaults funcionan para el 99% de los modpacks.</p>
+
+      <h2>Mejor launcher ligero: Prism Launcher</h2>
+      <p><a href={localizedPath("/vs/prismlauncher", locale)}>Prism Launcher</a> es el popular fork open source de MultiMC. Usa ~80MB de RAM, tiene una UI sin adornos y te da control manual total. Instalar modpacks lleva más pasos que en GDLauncher (sobre todo packs de CurseForge), pero el minimalismo de Prism atrae a los usuarios avanzados.</p>
+
+      <h2>Mejor para jugadores vanilla: launcher oficial de Mojang</h2>
+      <p>Si solo juegas a vanilla y no te interesan los mods, el launcher oficial está bien. Es el único que incluye Minecraft for Windows (Bedrock) junto a Java Edition. Para cualquier cosa moddeada, cambia a GDLauncher o Prism.</p>
+
+      <h2>Mejor para jugadores solo de CurseForge: CurseForge App</h2>
+      <p>La <a href={localizedPath("/vs/curseforge-app", locale)}>CurseForge App</a> hecha por Overwolf tiene la integración más profunda con CurseForge. Lo malo es el overlay de Overwolf (con anuncios), falta de soporte para Modrinth y disponibilidad irregular en Linux. GDLauncher te da casi toda la misma integración con CurseForge sin esos problemas.</p>
+
+      <h2>Mejor para puristas de Modrinth: Modrinth App</h2>
+      <p>La <a href={localizedPath("/vs/modrinth-app", locale)}>Modrinth App</a> oficial es excelente si vives entero en el ecosistema Modrinth. La mayoría de packs populares ya están en Modrinth, pero CurseForge sigue teniendo el catálogo de modpacks más profundo y mucho contenido Forge antiguo. La integración de Modrinth en GDLauncher cubre el mismo terreno y encima te da CurseForge.</p>
+
+      <h2>Mejor para usuarios avanzados / multi-instancia: MultiMC</h2>
+      <p><a href={localizedPath("/vs/multimc", locale)}>MultiMC</a> inventó el lanzamiento multi-instancia de Minecraft. Es ligero, hipercofigurable y muy respetado en la comunidad. La integración con CurseForge es irregular y Java lo gestionas tú. Si esos puntos no te molestan, MultiMC está genial. Si te molestan, GDLauncher te da el mismo flujo multi-instancia sin el setup manual.</p>
+
+      <h2>Guía de decisión rápida</h2>
+      <ul>
+        <li><strong>Solo quieres que los modpacks funcionen en un clic:</strong> GDLauncher</li>
+        <li><strong>Quieres un launcher minimalista y ligero:</strong> Prism Launcher</li>
+        <li><strong>Solo CurseForge:</strong> CurseForge App</li>
+        <li><strong>Solo Modrinth:</strong> Modrinth App</li>
+        <li><strong>Solo vanilla:</strong> launcher oficial de Minecraft</li>
+      </ul>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que "melhor" significa de verdade</h2>
+      <p>"Melhor" depende do que você faz com o Minecraft. Quem joga vanilla tem necessidades diferentes de quem joga modpacks. Streamers se importam com troca rápida de instância. Admins de servidor se importam com colocar mods num servidor. Abaixo agrupamos os launchers por caso de uso em vez de tentar uma única escala universal.</p>
+
+      <h2>Melhor para Minecraft com mods: GDLauncher</h2>
+      <p>Se você joga modpacks como RLCraft, All The Mods, Better MC ou FTB, o launcher que você quer é o que instala tudo em um clique e cuida do setup do Java automaticamente. O <a href={localizedPath("/", locale)}>GDLauncher</a> faz os dois, suporta CurseForge e Modrinth no mesmo navegador e roda em Windows, macOS e Linux. O app é grátis; um único banner dentro do app mantém isso e ainda ajuda a pagar autores de mods pelo revenue share do CurseForge. Código no GitHub.</p>
+      <p>Trade-off: o GDLauncher é mais opinativo do que os launchers minimalistas. Você pode escolher versões do Java na mão e editar flags da JVM, mas os defaults funcionam para 99% dos modpacks.</p>
+
+      <h2>Melhor launcher leve: Prism Launcher</h2>
+      <p>O <a href={localizedPath("/vs/prismlauncher", locale)}>Prism Launcher</a> é o popular fork open source do MultiMC. Usa cerca de 80MB de RAM, tem uma UI sem firulas e te dá controle manual total. Instalar modpacks dá mais trabalho do que no GDLauncher (especialmente packs do CurseForge), mas o minimalismo do Prism agrada aos power users.</p>
+
+      <h2>Melhor para quem joga vanilla: launcher oficial da Mojang</h2>
+      <p>Se você só joga vanilla e não liga para mods, o launcher oficial dá conta. É o único que inclui Minecraft for Windows (Bedrock) junto com a Java Edition. Para qualquer coisa com mods, mude para o GDLauncher ou o Prism.</p>
+
+      <h2>Melhor para quem só usa CurseForge: CurseForge App</h2>
+      <p>O <a href={localizedPath("/vs/curseforge-app", locale)}>CurseForge App</a> feito pela Overwolf tem a integração mais profunda com o CurseForge. A contrapartida é o overlay da Overwolf (com anúncios), sem suporte ao Modrinth e disponibilidade no Linux que vai e volta. O GDLauncher entrega quase toda a mesma integração com o CurseForge sem esses problemas.</p>
+
+      <h2>Melhor para puristas do Modrinth: Modrinth App</h2>
+      <p>O <a href={localizedPath("/vs/modrinth-app", locale)}>Modrinth App</a> oficial é excelente se você vive inteiramente no ecossistema Modrinth. A maioria dos packs populares já está no Modrinth, mas o CurseForge ainda tem o catálogo de modpacks mais profundo e muito conteúdo Forge antigo. A integração com o Modrinth no GDLauncher cobre o mesmo terreno e ainda te dá o CurseForge.</p>
+
+      <h2>Melhor para power users / multi-instância: MultiMC</h2>
+      <p>O <a href={localizedPath("/vs/multimc", locale)}>MultiMC</a> pioneirou o lançamento multi-instância de Minecraft. É leve, hiper-configurável e respeitado na comunidade. A integração com o CurseForge é irregular e o Java fica na sua mão. Se isso não te incomoda, o MultiMC é ótimo. Se incomoda, o GDLauncher te dá o mesmo fluxo multi-instância sem o setup manual.</p>
+
+      <h2>Guia de decisão rápido</h2>
+      <ul>
+        <li><strong>Só quer que os modpacks funcionem em um clique:</strong> GDLauncher</li>
+        <li><strong>Quer um launcher leve e sem firulas:</strong> Prism Launcher</li>
+        <li><strong>Fica só no CurseForge:</strong> CurseForge App</li>
+        <li><strong>Fica só no Modrinth:</strong> Modrinth App</li>
+        <li><strong>Só vanilla:</strong> launcher oficial do Minecraft</li>
+      </ul>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cosa vuol dire davvero "migliore"</h2>
+      <p>"Migliore" dipende da come usi Minecraft. Chi gioca vanilla ha esigenze diverse da chi gioca modpack. Gli streamer vogliono cambiare istanza in fretta. Gli admin di server vogliono portare le mod su un server. Qui sotto raggruppiamo i launcher per caso d'uso, invece di provare a metterli in un'unica classifica universale.</p>
+
+      <h2>Il migliore per Minecraft moddato: GDLauncher</h2>
+      <p>Se giochi modpack come RLCraft, All The Mods, Better MC o FTB, il launcher che ti serve è quello che li installa con un click e ti sistema Java da solo. <a href={localizedPath("/", locale)}>GDLauncher</a> fa entrambe le cose, supporta CurseForge e Modrinth nella stessa interfaccia e gira su Windows, macOS e Linux. L'app è gratuita: a sostenerla c'è un singolo banner in-app che, tramite il revenue share di CurseForge, contribuisce anche a pagare gli autori delle mod. Codice sorgente su GitHub.</p>
+      <p>Compromesso: GDLauncher è più "opinato" rispetto ai launcher più spartani. Puoi scegliere a mano la versione di Java e modificare i flag della JVM, ma i valori di default funzionano per il 99% dei modpack.</p>
+
+      <h2>Miglior launcher leggero: Prism Launcher</h2>
+      <p><a href={localizedPath("/vs/prismlauncher", locale)}>Prism Launcher</a> è il popolare fork open source di MultiMC. Consuma circa 80MB di RAM, ha un'interfaccia senza fronzoli e ti lascia il controllo manuale totale. Installare i modpack richiede più passaggi rispetto a GDLauncher (soprattutto per i pack CurseForge), ma il suo minimalismo conquista gli utenti esperti.</p>
+
+      <h2>Il migliore per chi gioca vanilla: launcher ufficiale Mojang</h2>
+      <p>Se giochi solo vanilla e le mod non ti interessano, il launcher ufficiale va benissimo. È l'unico che ti dà Minecraft for Windows (Bedrock) accanto alla Java Edition. Per qualsiasi cosa moddata, passa a GDLauncher o Prism.</p>
+
+      <h2>Il migliore per chi usa solo CurseForge: CurseForge App</h2>
+      <p>La <a href={localizedPath("/vs/curseforge-app", locale)}>CurseForge App</a> firmata Overwolf ha l'integrazione più profonda con CurseForge. Il prezzo da pagare: l'overlay Overwolf (con pubblicità), nessun supporto a Modrinth e una disponibilità Linux altalenante. GDLauncher ti dà quasi tutta la stessa integrazione con CurseForge senza questi problemi.</p>
+
+      <h2>Il migliore per i puristi di Modrinth: Modrinth App</h2>
+      <p>L'<a href={localizedPath("/vs/modrinth-app", locale)}>app Modrinth</a> ufficiale è eccellente se vivi del tutto nell'ecosistema Modrinth. La maggior parte dei pack popolari ormai si trova anche su Modrinth, ma CurseForge ha ancora il catalogo di modpack più ampio e molti contenuti Forge storici. L'integrazione Modrinth di GDLauncher copre lo stesso territorio e in più ti dà CurseForge.</p>
+
+      <h2>Il migliore per utenti esperti e multi-istanza: MultiMC</h2>
+      <p><a href={localizedPath("/vs/multimc", locale)}>MultiMC</a> ha inventato il lancio multi-istanza di Minecraft. Leggero, super configurabile, molto rispettato nella community. L'integrazione con CurseForge è zoppicante e Java te lo gestisci da solo. Se queste cose non ti pesano, MultiMC è ottimo. Se invece ti pesano, GDLauncher ti offre lo stesso flusso multi-istanza senza il lavoro manuale.</p>
+
+      <h2>Guida rapida alla scelta</h2>
+      <ul>
+        <li><strong>Vuoi solo che i modpack partano con un click:</strong> GDLauncher</li>
+        <li><strong>Vuoi un launcher leggero e senza fronzoli:</strong> Prism Launcher</li>
+        <li><strong>Solo CurseForge:</strong> CurseForge App</li>
+        <li><strong>Solo Modrinth:</strong> Modrinth App</li>
+        <li><strong>Solo vanilla:</strong> launcher Minecraft ufficiale</li>
+      </ul>
+    </Fragment>
+  )}
+</KeywordLandingLayout>

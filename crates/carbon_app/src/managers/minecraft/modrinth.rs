@@ -144,7 +144,10 @@ pub async fn download_mrpack(
 
     carbon_net::download_multiple(
         &[file_downloadable],
-        DownloadOptions::builder().concurrency(1).build(),
+        DownloadOptions::builder()
+            .concurrency(1)
+            .progress_sender(download_progress_sender)
+            .build(),
     )
     .await
     .with_context(|| {
@@ -223,7 +226,7 @@ pub async fn prepare_modpack_from_mrpack(
                 let existing_path = packinfo
                     .map(|packinfo| {
                         let mut sha512 = [0u8; 64];
-                        hex::decode_to_slice(file.hashes.sha512, &mut sha512).ok()?;
+                        hex::decode_to_slice(&file.hashes.sha512, &mut sha512).ok()?;
 
                         let packinfo_path = format!("/{}", file.path);
 
@@ -236,6 +239,16 @@ pub async fn prepare_modpack_from_mrpack(
 
                 let target_path = secure_path_join(&data_path, &file.path)?;
 
+                // Modrinth manifest carries the sha512 of every file — verify
+                // it on download to defend against MITM / CDN poisoning.
+                let checksum = if !file.hashes.sha512.is_empty() {
+                    Some(carbon_net::Checksum::Sha512(file.hashes.sha512.clone()))
+                } else if !file.hashes.sha1.is_empty() {
+                    Some(carbon_net::Checksum::Sha1(file.hashes.sha1.clone()))
+                } else {
+                    None
+                };
+
                 let downloadable = Downloadable::new(
                     file.downloads
                         .first()
@@ -243,7 +256,8 @@ pub async fn prepare_modpack_from_mrpack(
                         .to_string(),
                     target_path,
                 )
-                .with_size(file.file_size as u64);
+                .with_size(file.file_size as u64)
+                .with_checksum(checksum);
 
                 progress_percentage_sender
                     .send(ProgressState::AcquiringPackMetadata(i as u64, files_len))?;
@@ -265,12 +279,13 @@ pub async fn prepare_modpack_from_mrpack(
                 }
 
                 let out_path = match file.enclosed_name() {
-                    Some(path) => secure_path_join(
-                        Path::new(&data_path),
-                        path.strip_prefix(&overrides_folder_name).expect(
-                            "valid path as we skipped paths that did not start with this prefix",
-                        ),
-                    )?,
+                    Some(path) => match path.strip_prefix(overrides_folder_name) {
+                        Ok(stripped) => secure_path_join(Path::new(&data_path), stripped)?,
+                        // The name begins with the prefix string but is not inside the
+                        // overrides directory (e.g. "overrides-extra/..."); skip it instead
+                        // of panicking on the non-matching path component.
+                        Err(_) => continue,
+                    },
                     None => continue,
                 };
 

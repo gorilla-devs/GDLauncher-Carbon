@@ -694,23 +694,25 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
             break 'modstoml;
         };
         let mut content = String::with_capacity(file.size() as usize);
-        file.read_to_string(&mut content)?;
+        if file.read_to_string(&mut content).is_err() {
+            break 'modstoml;
+        }
 
         let sanitized_content = sanitize_json_content(&content);
-        let modstoml = toml::from_str::<ModsToml>(&sanitized_content)?;
-        let mut modstoml = modstoml
-            .mods
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow!("mods.toml contained no mod entries"))?;
+        let Ok(modstoml) = toml::from_str::<ModsToml>(&sanitized_content) else {
+            // mods.toml exists but failed to parse - try neoforge.mods.toml instead
+            break 'modstoml;
+        };
+        let Some(mut modstoml) = modstoml.mods.into_iter().next() else {
+            // mods.toml has no entries - try neoforge.mods.toml instead
+            break 'modstoml;
+        };
         drop(file);
 
         if modstoml.version == "${file.jarVersion}" {
             if let Ok(mf) = zip.by_name("META-INF/MANIFEST.MF") {
                 let buffered = io::BufReader::new(mf);
-                for line in buffered.lines() {
-                    let line = line?;
-
+                for line in buffered.lines().map_while(Result::ok) {
                     if let Some((_, version)) = line.split_once("Implementation-Version: ") {
                         modstoml.version = version.to_string();
                         break;
@@ -735,15 +737,17 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
             break 'neoforge_mods_toml;
         };
         let mut content = String::with_capacity(file.size() as usize);
-        file.read_to_string(&mut content)?;
+        if file.read_to_string(&mut content).is_err() {
+            break 'neoforge_mods_toml;
+        }
 
         let sanitized_content = sanitize_json_content(&content);
-        let modstoml = toml::from_str::<ModsToml>(&sanitized_content)?;
-        let mut modstoml = modstoml
-            .mods
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow!("neoforge.mods.toml contained no mod entries"))?;
+        let Ok(modstoml) = toml::from_str::<ModsToml>(&sanitized_content) else {
+            break 'neoforge_mods_toml;
+        };
+        let Some(mut modstoml) = modstoml.mods.into_iter().next() else {
+            break 'neoforge_mods_toml;
+        };
 
         let mut metadata: ModFileMetadata = modstoml.into();
         match metadata.version {
@@ -761,12 +765,19 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
             break 'fabric_mod_json;
         };
         let mut content = String::with_capacity(file.size() as usize);
-        file.read_to_string(&mut content)?;
+        if file.read_to_string(&mut content).is_err() {
+            break 'fabric_mod_json;
+        }
 
         let sanitized_content = sanitize_json_content(&content);
-        let fabric_mod_json = serde_json::from_str::<FabricModJson>(&sanitized_content)?;
+        let Ok(fabric_mod_json) = serde_json::from_str::<FabricModJson>(&sanitized_content) else {
+            break 'fabric_mod_json;
+        };
+        let Ok(metadata) = fabric_mod_json.try_into() else {
+            break 'fabric_mod_json;
+        };
 
-        mod_metadata = merge_mod_metadata(mod_metadata, fabric_mod_json.try_into()?);
+        mod_metadata = merge_mod_metadata(mod_metadata, metadata);
     }
 
     'quilt_mod_json: {
@@ -774,10 +785,14 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
             break 'quilt_mod_json;
         };
         let mut content = String::with_capacity(file.size() as usize);
-        file.read_to_string(&mut content)?;
+        if file.read_to_string(&mut content).is_err() {
+            break 'quilt_mod_json;
+        }
 
         let sanitized_content = sanitize_json_content(&content);
-        let quilt_mod_json = serde_json::from_str::<QuiltModJson>(&sanitized_content)?;
+        let Ok(quilt_mod_json) = serde_json::from_str::<QuiltModJson>(&sanitized_content) else {
+            break 'quilt_mod_json;
+        };
 
         mod_metadata = merge_mod_metadata(mod_metadata, quilt_mod_json.into());
     }

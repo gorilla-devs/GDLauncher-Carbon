@@ -1,20 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { createSignal, Show } from "solid-js";
-import { ButtonDropdown, type ButtonDropdownProps } from "./ButtonDropdown";
-import { type JSX } from "solid-js";
-import Separator from "./Separator.astro";
-import Apple from "../../assets/Apple";
-import Windows from "../../assets/Windows";
-import Linux from "../../assets/Linux";
-
-interface Props {
-  transparent?: boolean;
-  children: JSX.Element | JSX.Element[] | string;
-  onClick?: any;
-  isDropdown?: boolean;
-  icon?: JSX.Element | JSX.Element[] | string;
-  items?: Array<string>;
-}
+import { splitProps, type JSX } from "solid-js";
 
 const button = cva("button", {
   variants: {
@@ -29,8 +14,10 @@ const button = cva("button", {
         "gap-2",
         "justify-center",
         "relative",
+        "active:scale-95",
+        "ease-spring",
       ],
-      secondary: ["bg-bluegd-600", "text-white", "rounded-xsgd"],
+      secondary: ["bg-bluegd-600", "text-white", "rounded-xsgd", "active:scale-95", "ease-spring", "transition-transform", "duration-100"],
       transparent: [
         "bg-transparent",
         "text-bluegd-500",
@@ -38,6 +25,10 @@ const button = cva("button", {
         "border-[1px]",
         "border-bluegd-500",
         "rounded-smgd",
+        "active:scale-95",
+        "ease-spring",
+        "transition-transform",
+        "duration-100",
       ],
     },
     size: {
@@ -52,65 +43,39 @@ const button = cva("button", {
   },
 });
 
-export interface ButtonProps
-  extends JSX.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof button> {}
+export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> &
+  VariantProps<typeof button> & {
+    /** Optional icon slot (rendered before children). */
+    icon?: JSX.Element | JSX.Element[] | string;
+  };
 
-const [items, showItems] = createSignal(false);
-export { showItems };
-const Button = (props: ButtonProps & Props) => {
-  const intent = props.intent;
-  const size = props.size;
-  const className = props.class;
+const Button = (props: ButtonProps) => {
+  // splitProps so the variant inputs stay reactive (reading from `props` keeps
+  // the cva call live) and every other HTML attribute (type, disabled,
+  // aria-*, id, name, autofocus, onClick, etc.) flows through to the
+  // underlying <button>. Default type="button" prevents accidental form
+  // submission when dropped inside a <form>.
+  const [local, others] = splitProps(props, [
+    "intent",
+    "size",
+    "class",
+    "icon",
+    "children",
+    "type",
+  ]);
 
   return (
     <button
-      onClick={() => {
-        if (props.isDropdown) {
-          showItems(!items());
-        }
-        if (props.onClick) props.onClick();
-      }}
-      class={button({ intent, size, className })}
+      type={local.type ?? "button"}
+      class={button({
+        intent: local.intent,
+        size: local.size,
+        className: local.class,
+      })}
+      {...others}
     >
-      {props.children}
-
-      <Show when={props.isDropdown && items()}>
-        <ButtonDropdown
-          items={[
-            {
-              item: (
-                <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
-                  href={props.items![1]}
-                >
-                  <Apple /> MacOS
-                </a>
-              ) as Element,
-            },
-            {
-              item: (
-                <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
-                  href={props.items![0]}
-                >
-                  <Windows /> Windows
-                </a>
-              ) as Element,
-            },
-            {
-              item: (
-                <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
-                  href={props.items![2]}
-                >
-                  <Linux /> Linux
-                </a>
-              ) as Element,
-            },
-          ]}
-        />
-      </Show>
+      {local.icon}
+      {local.children}
     </button>
   );
 };

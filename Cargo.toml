@@ -51,7 +51,7 @@ carbon_scheduler = { git = "https://github.com/gorilla-devs/carbon_scheduler", r
 murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32", rev = "4dfdc49b727581bbdcad4a2315452a2c28db6093" }
 nom = "7"
 num_cpus = "1.16.0"
-opener = "0.7.1"
+opener = { version = "0.7.1", features = ["reveal"] }
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",
   "sqlite",
@@ -78,7 +78,7 @@ specta = "1"
 rspc-axum = "0.1.1"
 serde = "1.0.219"
 serde_json = "1.0.140"
-daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "d3c9eed96e280312c5650ff0cf2b139393d65687" }
+daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "d795a9de27ec6e40dc2ea1b4f956bc72550b60b7" }
 sha1 = "0.10.6"
 sha2 = "0.10.8"
 tar = "0.4.44"

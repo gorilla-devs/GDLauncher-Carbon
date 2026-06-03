@@ -1,0 +1,181 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "既存インスタンスの Mod ローダーを切り替える方法",
+    description: "Forge から NeoForge、Fabric から Quilt など、インスタンスを作り直さずに Mod ローダーを変更。",
+    steps: [
+      { name: "Edit Instance を開く", text: "インスタンスを右クリックして Edit を選択。現在の設定が入った状態でインスタンス作成モーダルが開きます。" },
+      { name: "別のローダーを選択", text: "Modloader セクションで 5 つのボタン (Vanilla、Forge、NeoForge、Fabric、Quilt) のいずれかをクリック。GDLauncher がそのインスタンスの MC バージョンと互換のローダーバージョン一覧を取得。" },
+      { name: "ローダーバージョンを選ぶ", text: "バージョンドロップダウンが新ローダーのバージョンに更新。1 つ選択。推奨/最新版は上部にハイライト。" },
+      { name: "変更を保存", text: "差分が生じたため下部の Update ボタンが有効に。クリック。GDLauncher が新ローダーをインストールしインスタンスメタデータを更新。" },
+      { name: "旧ローダーの Mod を整理", text: "GDLauncher はローダー切替時に mods フォルダーをクリアしません。Forge → Fabric なら Forge Mod JAR が残り競合します。Mods タブまたは instance/mods/ の JAR 削除で手動整理。" }
+    ]
+  },
+  ko: {
+    title: "기존 인스턴스의 모드 로더 전환하는 법",
+    description: "Forge에서 NeoForge로, Fabric에서 Quilt로, 또는 어떤 조합이든, 인스턴스를 새로 만들지 않고 변경.",
+    steps: [
+      { name: "Edit Instance 열기", text: "인스턴스 오른쪽 클릭 → Edit. 현재 설정이 채워진 상태로 인스턴스 생성 모달이 편집 모드로 열립니다." },
+      { name: "다른 로더 선택", text: "Modloader 섹션에서 다섯 버튼(Vanilla, Forge, NeoForge, Fabric, Quilt) 중 하나를 클릭. GDLauncher가 그 인스턴스의 MC 버전과 호환되는 로더 버전 목록을 가져옵니다." },
+      { name: "로더 버전 선택", text: "버전 드롭다운이 새 로더 버전으로 갱신. 하나 고르세요. 권장/최신은 상단에 강조." },
+      { name: "변경 저장", text: "diff가 생겼으므로 하단 Update 버튼이 활성. 클릭. GDLauncher가 새 로더를 설치하고 인스턴스 메타데이터를 갱신." },
+      { name: "옛 로더의 모드 정리", text: "GDLauncher는 로더 전환 시 mods 폴더를 비우지 않습니다. Forge → Fabric이면 Forge 모드 JAR이 남아 충돌합니다. Mods 탭이나 instance/mods/의 JAR을 삭제해 수동으로 정리." }
+    ]
+  },
+  de: {
+    title: "Mod-Loader einer bestehenden Instanz wechseln",
+    description: "Eine Instanz von Forge auf NeoForge, Fabric auf Quilt oder beliebig anders umstellen, ohne sie neu zu bauen.",
+    steps: [
+      { name: "Edit Instance öffnen", text: "Rechtsklick auf die Instanz, Edit wählen. Der Instanz-Erstell-Dialog öffnet sich im Edit-Modus mit den aktuellen Einstellungen." },
+      { name: "Anderen Loader wählen", text: "Im Modloader-Bereich auf einen der fünf Buttons klicken: Vanilla, Forge, NeoForge, Fabric oder Quilt. GDLauncher holt die kompatiblen Loader-Versionen für die MC-Version der Instanz." },
+      { name: "Loader-Version auswählen", text: "Die Versions-Dropdown aktualisiert auf die Versionen des neuen Loaders. Eine wählen. Empfohlen/Aktuell ist oben hervorgehoben." },
+      { name: "Änderung speichern", text: "Der Update-Button unten wird aktiv, weil's jetzt einen Diff gibt. Klicken. GDLauncher installiert den neuen Loader und aktualisiert die Instanz-Metadaten." },
+      { name: "Mods des alten Loaders aufräumen", text: "GDLauncher leert den mods-Ordner beim Loader-Wechsel nicht. Von Forge auf Fabric? Die Forge-Mod-JARs liegen noch da und kollidieren. Über den Mods-Tab oder durch Löschen von JARs in instance/mods/ manuell aufräumen." }
+    ]
+  },
+  fr: {
+    title: "Comment changer de mod loader sur une instance existante",
+    description: "Passe une instance de Forge à NeoForge, de Fabric à Quilt, ou toute autre combinaison, sans recréer l'instance de zéro.",
+    steps: [
+      { name: "Ouvrir Edit Instance", text: "Clic droit sur l'instance et choisis Edit. Le modal de création s'ouvre en mode édition avec tous les réglages actuels remplis." },
+      { name: "Choisir un autre loader", text: "Dans la section Modloader, clique l'un des cinq boutons : Vanilla, Forge, NeoForge, Fabric ou Quilt. GDLauncher récupère la liste des versions de loader compatibles avec la version Minecraft de l'instance." },
+      { name: "Choisir une version de loader", text: "La dropdown des versions se met à jour avec les versions du nouveau loader. Choisis-en une. La recommandée/dernière est en haut." },
+      { name: "Sauver le changement", text: "Le bouton Update en bas s'active parce qu'il y a un diff. Clique-le. GDLauncher installe le nouveau loader et met à jour les métadonnées de l'instance." },
+      { name: "Nettoyer les mods de l'ancien loader", text: "GDLauncher ne vide pas le dossier mods quand tu changes de loader. Si tu passes de Forge à Fabric, les JARs de mods Forge restent là et entreront en conflit. Retire les incompatibles à la main via l'onglet Mods ou en supprimant des JARs dans instance/mods/." }
+    ]
+  },
+  es: {
+    title: "Cómo cambiar el mod loader en una instancia existente",
+    description: "Cambia una instancia de Forge a NeoForge, Fabric a Quilt o cualquier otra combinación sin recrear la instancia desde cero.",
+    steps: [
+      { name: "Abrir Edit Instance", text: "Clic derecho en la instancia y elige Edit. Se abre el modal de creación en modo edición con todos los ajustes actuales rellenados." },
+      { name: "Elegir otro loader", text: "En la sección Modloader, pulsa uno de los cinco botones: Vanilla, Forge, NeoForge, Fabric o Quilt. GDLauncher trae la lista de versiones de loader compatibles con la versión Minecraft de la instancia." },
+      { name: "Elegir versión de loader", text: "El desplegable de versión se actualiza con las versiones del nuevo loader. Elige una. La recomendada/última está resaltada arriba." },
+      { name: "Guardar el cambio", text: "El botón Update abajo se activa porque ahora hay diff. Pulsa. GDLauncher instala el nuevo loader y actualiza los metadatos de la instancia." },
+      { name: "Limpiar mods del loader anterior", text: "GDLauncher no vacía la carpeta mods al cambiar de loader. Si vas de Forge a Fabric, los JAR de mods Forge siguen ahí y entrarán en conflicto. Quita los incompatibles a mano vía la pestaña Mods o borrando JARs en instance/mods/." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como trocar o mod loader em uma instância existente",
+    description: "Mude uma instância de Forge pra NeoForge, Fabric pra Quilt ou qualquer outra combinação sem recriar a instância do zero.",
+    steps: [
+      { name: "Abrir Edit Instance", text: "Botão direito na instância e escolha Edit. O modal de criação abre em modo edição com todas as configurações atuais preenchidas." },
+      { name: "Escolha outro loader", text: "Na seção Modloader, clique em um dos cinco botões: Vanilla, Forge, NeoForge, Fabric ou Quilt. O GDLauncher busca a lista de versões de loader compatíveis com a versão Minecraft da instância." },
+      { name: "Escolha versão de loader", text: "O dropdown de versão atualiza pras versões do novo loader. Escolha uma. A recomendada/mais nova fica destacada no topo." },
+      { name: "Salvar a mudança", text: "O botão Update no rodapé ativa porque agora há diff. Clique. O GDLauncher instala o novo loader e atualiza a metadata da instância." },
+      { name: "Limpar mods do loader antigo", text: "O GDLauncher não esvazia a pasta mods quando você troca de loader. Se for de Forge pra Fabric, os JARs de mod Forge continuam lá e vão conflitar. Remova os incompatíveis manual via a aba Mods ou apagando JARs em instance/mods/." }
+    ]
+  },
+  it: {
+    title: "Come cambiare mod loader su un'istanza esistente",
+    description: "Passa un'istanza da Forge a NeoForge, da Fabric a Quilt o qualsiasi altra combinazione senza ricreare l'istanza da zero.",
+    steps: [
+      { name: "Apri Edit Instance", text: "Clic destro sull'istanza e scegli Edit. Il modal di creazione si apre in modalità modifica con tutte le impostazioni attuali precompilate." },
+      { name: "Scegli un altro loader", text: "Nella sezione Modloader, clicca uno dei cinque pulsanti: Vanilla, Forge, NeoForge, Fabric o Quilt. GDLauncher recupera la lista delle versioni di loader compatibili con la versione Minecraft dell'istanza." },
+      { name: "Scegli la versione del loader", text: "Il menu a tendina delle versioni si aggiorna con le versioni del nuovo loader. Scegline una. La consigliata/più recente è evidenziata in alto." },
+      { name: "Salva la modifica", text: "Il pulsante Update in basso si attiva perché ora c'è un diff. Cliccalo. GDLauncher installa il nuovo loader e aggiorna i metadati dell'istanza." },
+      { name: "Pulisci le mod del vecchio loader", text: "GDLauncher non svuota la cartella mods quando cambi loader. Se passi da Forge a Fabric, i JAR delle mod Forge restano lì e andranno in conflitto. Rimuovi quelli incompatibili a mano dalla scheda Mods o cancellando i JAR in instance/mods/." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["クリーンに動く場合", "厄介になる場合", "残るもの・変わるもの", "切替後に起動失敗したら", "別の手: 先にクローンして切替"],
+    paras: [
+      "最もクリーンなケースは Mod 未インストール時。Forge インスタンスを作り、Mod を 1 つも追加せず、Fabric に切り替えたい、ローダーとバージョンを変更、完了。Forge のインストーラーはディスクに残りますが干渉しません。次にクリーンなのは非常に近いローダー間の切替、Forge → NeoForge、または Fabric → Quilt。これらのペアでは多くの Mod がソース互換で、相当数の Forge Mod が NeoForge でそのまま動きます。",
+      "ファミリー越えの切替 (Forge → Fabric、Fabric → Forge など) は mods フォルダーの掃除が必要。Forge Mod は文字通り Fabric でロードできず、逆も同様。インスタンスは起動しますが全 Mod が無視されます。ロックされていた Modpack インスタンスは追加の制約: ロックは Addons タブ変更をブロックしますが Edit モーダルからローダー変更は可能。これは落とし穴で、パックマニフェストは特定のローダーを期待しており切替で齟齬が生じます。Modpack インスタンスで本当に切り替えるなら、先にインスタンスの Settings タブを開いて Modpack Info セクションの <strong>Unpair</strong> をクリックし、マニフェスト追跡を止めてください。",
+      "残るもの: ワールド、スクリーンショット、options.txt、アカウント、インスタンス名とアイコン、Minecraft バージョン。変わるもの: Mod ローダーとそのバージョン。mods フォルダーは触られず、自分で掃除する必要あり。",
+      "最も多い原因: 旧ローダーの Mod が <code>instance/mods/</code> に残っている。インスタンス右クリック → Open Folder、<code>instance/mods/</code> に入り、JAR をすべて削除。その後 Addons タブから新ローダー向けの Mod を追加。次に多い原因: 新ローダーバージョンが実際にはその MC バージョン向けに存在しない。一部のローダーはバージョンをスキップします (Fabric はめったになし、Forge は古めのマイナーで時々)。利用可能な最も近いものを選択。",
+      "Forge セットアップを残しつつ同じ MC バージョンで Fabric を試したいなら、インスタンス右クリック → Duplicate、複製のローダーを切替。両方残り、後でどちらを残すか決められます。"
+    ]
+  },
+  ko: {
+    headings: ["깔끔하게 작동하는 경우", "지저분해지는 경우", "남는 것, 바뀌는 것", "전환 후 실행이 실패하면", "다른 방법: 먼저 복제 후 전환"],
+    paras: [
+      "가장 깔끔한 경우는 모드가 없을 때. Forge 인스턴스를 만들고 모드를 한 번도 추가하지 않았는데 Fabric으로 바꾸고 싶다면, 로더와 버전을 바꾸고 완료. Forge의 인스톨러는 디스크에 남지만 간섭하지 않습니다. 두 번째로 깔끔한 경우는 매우 비슷한 로더 사이의 전환, Forge → NeoForge나 Fabric → Quilt. 이 쌍 사이에선 많은 모드가 소스 호환이고, 상당수의 Forge 모드가 NeoForge에서 그대로 작동합니다.",
+      "패밀리를 넘는 전환(Forge → Fabric, Fabric → Forge 등)은 mods 폴더를 비워야 합니다. Forge 모드는 말 그대로 Fabric에서 로드되지 않고 반대도 그렇습니다. 인스턴스는 부팅되지만 모든 모드가 조용히 무시됩니다. 잠긴 모드팩 인스턴스는 추가 제약: 잠금은 Addons 탭 변경을 막지만 Edit 모달에선 여전히 로더 변경이 가능합니다. 이건 함정으로, 팩 매니페스트는 특정 로더를 기대하므로 전환 시 매니페스트가 잘못된 로더를 가리키게 됩니다. 모드팩 인스턴스에서 정말 전환하고 싶다면 먼저 인스턴스의 Settings 탭을 열고 Modpack Info 섹션의 <strong>Unpair</strong>를 눌러 매니페스트 추적을 멈추세요.",
+      "남는 것: 월드, 스크린샷, options.txt, 계정, 인스턴스 이름과 아이콘, Minecraft 버전. 바뀌는 것: 모드 로더와 그 버전. mods 폴더는 건드리지 않으니 직접 정리해야 합니다.",
+      "가장 흔한 원인: 옛 로더의 모드가 <code>instance/mods/</code>에 남아 있음. 인스턴스 오른쪽 클릭 → Open Folder, <code>instance/mods/</code>에 들어가 모든 JAR 삭제. 그 다음 Addons 탭에서 새 로더용 모드를 추가. 두 번째로 흔한 원인: 새 로더 버전이 실제로 그 Minecraft 버전용으로 존재하지 않음. 일부 로더는 버전을 건너뜁니다(Fabric은 드물게, Forge는 옛 마이너에서 가끔). 사용 가능한 가장 가까운 걸 선택.",
+      "Forge 셋업을 유지하면서 같은 MC 버전에서 Fabric을 시도하고 싶다면, 인스턴스 오른쪽 클릭 → Duplicate, 복제본의 로더를 전환. 둘 다 남고 나중에 어느 쪽을 유지할지 결정할 수 있습니다."
+    ]
+  },
+  de: {
+    headings: ["Wenn's sauber läuft", "Wenn's hässlich wird", "Was bleibt, was sich ändert", "Wenn der Start nach dem Wechsel scheitert", "Alternative: erst klonen, dann am Klon wechseln"],
+    paras: [
+      "Der sauberste Fall: noch keine Mods installiert. Du hast eine Forge-Instanz, nie was reingelegt, willst auf Fabric, Loader und Version ändern, fertig. Der Forge-Installer bleibt auf der Platte liegen, stört aber nicht. Zweitsauberster Fall: Wechsel zwischen sehr ähnlichen Loadern, Forge auf NeoForge oder Fabric auf Quilt. Viele Mods sind in diesen Paaren source-kompatibel, und einiges an Forge-Mods läuft auch unter NeoForge.",
+      "Cross-Family-Wechsel (Forge → Fabric, Fabric → Forge usw.) brauchen einen leeren mods-Ordner, weil Forge-Mods unter Fabric schlicht nicht laden und umgekehrt. Die Instanz startet, aber alle Mods werden still ignoriert. Gesperrte Modpack-Instanzen sind eine zusätzliche Bremse: die Sperre blockt Addons-Tab-Änderungen, das Edit-Modal lässt aber trotzdem den Loader wechseln. Footgun: das Pack-Manifest erwartet einen bestimmten Loader, ein Wechsel macht es inkonsistent. Wenn du wirklich auf einer Modpack-Instanz wechseln willst, öffne vorher den Settings-Tab der Instanz und klick im Modpack-Info-Bereich auf <strong>Unpair</strong>, damit die Manifest-Verfolgung aufhört.",
+      "Bleibt: Welten, Screenshots, options.txt, Accounts, Name und Icon der Instanz, die Minecraft-Version. Ändert sich: der Mod-Loader und seine Version. Der mods-Ordner bleibt unangetastet, da musst du selber ran.",
+      "Häufigste Ursache: alte Loader-Mods stehen noch in <code>instance/mods/</code>. Rechtsklick auf die Instanz → Open Folder, in <code>instance/mods/</code> alle JARs löschen. Dann im Addons-Tab Mods für den neuen Loader installieren. Zweithäufigste: die neue Loader-Version existiert tatsächlich nicht für diese Minecraft-Version. Manche Loader überspringen Versionen (Fabric selten, Forge bei alten Minor-Versionen häufiger). Nächstliegende verfügbare nehmen.",
+      "Wenn du dein Forge-Setup behalten und auf derselben MC-Version Fabric probieren willst: Rechtsklick auf die Instanz → Duplicate, dann am Duplikat den Loader wechseln. Beide bleiben, du entscheidest später, was bleibt."
+    ]
+  },
+  fr: {
+    headings: ["Quand ça marche proprement", "Quand ça devient salissant", "Ce qui reste, ce qui change", "Si le lancement échoue après le changement", "Une alternative : cloner d'abord, switcher sur le clone"],
+    paras: [
+      "Le cas le plus propre, c'est quand il n'y a aucun mod installé. Tu as créé une instance Forge, jamais ajouté de mod, tu veux passer à Fabric : change le loader et la version, terminé. L'installeur Forge reste sur le disque mais ne gêne pas. Deuxième plus propre : switcher entre loaders très proches, Forge vers NeoForge, ou Fabric vers Quilt. Beaucoup de mods sont source-compatibles entre ces paires et une bonne partie des mods Forge marche directement sur NeoForge.",
+      "Les switches cross-familles (Forge → Fabric, Fabric → Forge etc.) demandent un dossier mods vidé, parce que les mods Forge ne peuvent littéralement pas se charger sous Fabric et vice versa. L'instance bootera mais chaque mod sera silencieusement ignoré. Les instances modpack verrouillées posent une contrainte supplémentaire : le verrou bloque les changements de l'onglet Addons, mais le modal Edit te laisse quand même changer le loader. C'est un piège, le manifest du pack attend un loader précis, le changer laisse le manifest pointant sur le mauvais. Si tu veux vraiment switcher sur une instance modpack, ouvre d'abord l'onglet Settings de l'instance et clique <strong>Unpair</strong> dans la section Modpack Info, pour que le launcher arrête de suivre le manifest.",
+      "Restent : mondes, screenshots, options.txt, tes comptes, le nom et l'icône de l'instance, la version Minecraft. Changent : le mod loader et sa version. Le dossier mods n'est pas touché, tu dois t'en occuper.",
+      "Cause la plus fréquente : les mods de l'ancien loader sont encore dans <code>instance/mods/</code>. Clic droit sur l'instance → Open Folder, va dans <code>instance/mods/</code>, supprime tous les JARs. Puis ajoute les mods voulus pour le nouveau loader via l'onglet Addons. Deuxième cause la plus fréquente : la nouvelle version de loader n'existe pas vraiment pour la version Minecraft. Certains loaders sautent des versions (Fabric rarement, Forge parfois sur d'anciennes mineures). Prends la plus proche dispo.",
+      "Si tu veux garder ton setup Forge et tester Fabric sur la même version Minecraft, clic droit sur l'instance → Duplicate, puis change le loader sur le duplicat. Les deux restent ; tu décides plus tard."
+    ]
+  },
+  es: {
+    headings: ["Cuándo funciona limpio", "Cuándo se enreda", "Qué se queda, qué cambia", "Si el lanzamiento falla tras cambiar", "Alternativa: clonar primero y cambiar el clon"],
+    paras: [
+      "El caso más limpio es cuando aún no hay mods instalados. Creaste una instancia Forge, no añadiste ningún mod, quieres pasarte a Fabric: cambia loader y versión, listo. El instalador de Forge se queda en disco pero no estorba. El segundo más limpio: cambiar entre loaders muy similares, Forge a NeoForge, o Fabric a Quilt. Muchos mods son source-compatibles entre esas parejas y bastantes mods Forge funcionan tal cual en NeoForge.",
+      "Los cambios cross-familia (Forge → Fabric, Fabric → Forge, etc.) necesitan vaciar la carpeta mods porque los mods Forge literalmente no cargan en Fabric y al revés. La instancia arranca pero todos los mods se ignoran en silencio. Las instancias modpack bloqueadas son una restricción extra: el bloqueo evita cambios en la pestaña Addons, pero el modal Edit aún te deja cambiar el loader. Es un footgun, el manifest del pack espera un loader concreto y cambiarlo deja el manifest apuntando al loader equivocado. Si de verdad quieres cambiar en una instancia modpack, abre primero la pestaña Settings de la instancia y pulsa <strong>Unpair</strong> en la sección Modpack Info, para que el launcher deje de seguir el manifest.",
+      "Se quedan: mundos, capturas, options.txt, tus cuentas, el nombre e icono de la instancia, la versión de Minecraft. Cambian: el mod loader y su versión. La carpeta mods no se toca, tienes que limpiarla tú.",
+      "Causa más común: los mods del loader anterior siguen en <code>instance/mods/</code>. Clic derecho en la instancia → Open Folder, entra en <code>instance/mods/</code>, borra cada JAR. Luego añade los mods que quieras para el nuevo loader vía la pestaña Addons. Segunda causa más común: la nueva versión del loader no existe realmente para esa versión de Minecraft. Algunos loaders se saltan versiones (Fabric rara vez, Forge sí en menores antiguas). Elige la más cercana disponible.",
+      "Si quieres conservar tu setup Forge y probar Fabric en la misma versión de Minecraft, clic derecho en la instancia → Duplicate, luego cambia el loader en el duplicado. Las dos se mantienen; decides después cuál te quedas."
+    ]
+  },
+  "pt-BR": {
+    headings: ["Quando funciona limpinho", "Quando vira bagunça", "O que fica, o que muda", "Se o lançamento falhar depois da troca", "Uma alternativa: clonar primeiro, trocar no clone"],
+    paras: [
+      "O caso mais limpo é quando não tem mod instalado ainda. Você criou uma instância Forge, nunca adicionou mod, quer mudar pra Fabric: muda loader e versão, pronto. O instalador do Forge fica no disco mas não atrapalha. Segundo mais limpo: trocar entre loaders bem parecidos, Forge pra NeoForge, ou Fabric pra Quilt. Muitos mods são source-compatíveis nesses pares e bastante mod Forge roda direto no NeoForge.",
+      "Trocas cross-família (Forge → Fabric, Fabric → Forge etc.) precisam da pasta mods limpa, porque mods Forge literalmente não carregam no Fabric e vice-versa. A instância sobe mas todo mod é silenciosamente ignorado. Instâncias de modpack bloqueadas têm uma restrição extra: o bloqueio impede mudanças pela aba Addons, mas o modal Edit ainda permite mudar o loader. É um footgun, o manifest do pack espera um loader específico, trocá-lo deixa o manifest apontando pro loader errado. Se quiser mesmo trocar numa instância de modpack, abra primeiro a aba Settings da instância e clique em <strong>Unpair</strong> na seção Modpack Info, pra parar de rastrear o manifest.",
+      "Ficam: mundos, prints, options.txt, suas contas, nome e ícone da instância, a versão do Minecraft. Mudam: o mod loader e a versão dele. A pasta mods não é mexida, você precisa limpar.",
+      "Causa mais comum: mods do loader antigo continuam em <code>instance/mods/</code>. Botão direito na instância → Open Folder, entre em <code>instance/mods/</code>, apague cada JAR. Depois adicione os mods que quer pro novo loader pela aba Addons. Segunda mais comum: a versão nova do loader não existe de verdade pra aquela versão do Minecraft. Alguns loaders pulam versões (Fabric raramente, Forge às vezes em menores antigas). Escolha a mais próxima disponível.",
+      "Se você quer manter o setup Forge e testar Fabric na mesma versão Minecraft, botão direito na instância → Duplicate, depois troque o loader no clone. As duas ficam, você decide depois qual mantém."
+    ]
+  },
+  it: {
+    headings: ["Quando funziona pulito", "Quando diventa un casino", "Cosa resta, cosa cambia", "Se l'avvio fallisce dopo il cambio", "Un'alternativa: clona prima, cambia sul clone"],
+    paras: [
+      "Il caso più pulito è quando non c'è ancora nessuna mod installata. Hai creato un'istanza Forge, non hai mai aggiunto una mod, vuoi passare a Fabric: cambia loader e versione, fatto. L'installer di Forge resta sul disco ma non dà fastidio. Secondo più pulito: cambiare tra loader molto simili, Forge verso NeoForge, o Fabric verso Quilt. Tante mod sono source-compatibili tra queste coppie e una buona parte delle mod Forge gira direttamente su NeoForge.",
+      "I cambi cross-famiglia (Forge → Fabric, Fabric → Forge ecc.) richiedono la cartella mods svuotata, perché le mod Forge letteralmente non si caricano su Fabric e viceversa. L'istanza si avvia ma ogni mod viene silenziosamente ignorata. Le istanze modpack bloccate hanno un vincolo extra: il blocco impedisce le modifiche dalla scheda Addons, ma il modal Edit lascia comunque cambiare il loader. È una trappola, il manifest del pack si aspetta un loader specifico e cambiarlo lascia il manifest puntato al loader sbagliato. Se vuoi davvero cambiare su un'istanza modpack, apri prima la scheda Settings dell'istanza e clicca <strong>Unpair</strong> nella sezione Modpack Info, così il launcher smette di seguire il manifest.",
+      "Restano: mappe, screenshot, options.txt, i tuoi account, nome e icona dell'istanza, la versione Minecraft. Cambiano: il mod loader e la sua versione. La cartella mods non viene toccata, devi pulirla tu.",
+      "Causa più comune: le mod del vecchio loader sono ancora in <code>instance/mods/</code>. Clic destro sull'istanza → Open Folder, entra in <code>instance/mods/</code>, cancella ogni JAR. Poi aggiungi le mod che vuoi per il nuovo loader dalla scheda Addons. Seconda più comune: la nuova versione del loader non esiste davvero per quella versione di Minecraft. Alcuni loader saltano versioni (Fabric raramente, Forge a volte su minori vecchie). Scegli la più vicina disponibile.",
+      "Se vuoi tenere il tuo setup Forge e provare Fabric sulla stessa versione Minecraft, clic destro sull'istanza → Duplicate, poi cambia il loader sul duplicato. Restano entrambe, decidi dopo quale tenere."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT3M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

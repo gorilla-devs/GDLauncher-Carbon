@@ -10,7 +10,10 @@ import { Button, Spinner, Skeleton } from "@gd/ui"
 import { createVirtualizer } from "@tanstack/solid-virtual"
 
 const Versions = () => {
-  const [searchParams] = useSearchParams()
+  const [searchParams] = useSearchParams<{
+    instanceId: string
+    serverId: string
+  }>()
   const mod = useContext(AddonContext)
   const stickyHeaderHeight = useContext(StickyHeaderHeightContext)
 
@@ -19,7 +22,14 @@ const Versions = () => {
   const rows = () => infiniteQuery.allRows()
 
   const instanceId = () => {
+    if (!searchParams.instanceId) return undefined
     const id = parseInt(searchParams.instanceId, 10)
+    return isNaN(id) ? undefined : id
+  }
+
+  const serverId = () => {
+    if (!searchParams.serverId) return undefined
+    const id = parseInt(searchParams.serverId, 10)
     return isNaN(id) ? undefined : id
   }
 
@@ -175,6 +185,7 @@ const Versions = () => {
                       modVersion={version}
                       installedFile={installedMod()}
                       instanceId={instanceId()}
+                      serverId={serverId()}
                       type={mod?.data?.type}
                       instanceMods={instanceMods.data || undefined}
                       instanceDetails={instanceDetails.data || undefined}

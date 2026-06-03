@@ -1,0 +1,299 @@
+---
+/**
+ * Localized "How to Install Minecraft Data Packs" guide. Brand names and
+ * commands left untranslated (Vanilla Tweaks, GDLauncher, CurseForge,
+ * Modrinth, /reload, /datapack list).
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft データパックの導入方法",
+    description: "Mod 不要で新しいレシピやルートテーブル、ゲームメカニクスを追加。Minecraft データパックの導入方法を解説。",
+    steps: [
+      { name: "インスタンスを開く", text: "データパックは特定のワールドに適用されるため、まずデータパックを使いたい Minecraft インスタンスを開きます。" },
+      { name: "GDLauncher でデータパックを探す", text: "Addons タブ → Add Addons をクリックし、Data Packs にフィルター。欲しいパックを検索するか、CurseForge の人気エントリを眺めます。" },
+      { name: "ワールドにダウンロード", text: "Download をクリックすると、GDLauncher が選択したワールドの datapacks フォルダにデータパックを配置します。" },
+      { name: "ワールドを再読み込み", text: "ワールドを開く (またはワールド内で /reload を実行)。データパックのレシピ、進捗、ゲーム改変が有効化されます。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 데이터팩 설치 방법",
+    description: "모드 없이 새 레시피, 전리품 테이블, 게임 메커니즘을 추가하세요. Minecraft 데이터팩 설치 방법.",
+    steps: [
+      { name: "인스턴스 열기", text: "데이터팩은 특정 월드에 적용되므로, 먼저 데이터팩을 사용할 Minecraft 인스턴스를 여세요." },
+      { name: "GDLauncher에서 데이터팩 둘러보기", text: "Addons 탭 → Add Addons를 누르고 Data Packs로 필터링하세요. 원하는 팩을 검색하거나 CurseForge의 인기 항목을 둘러보세요." },
+      { name: "월드에 다운로드", text: "Download를 누르면 GDLauncher가 선택한 월드의 datapacks 폴더에 데이터팩을 넣어 줍니다." },
+      { name: "월드 재로드", text: "월드를 열거나(또는 월드 안에서 /reload 실행). 데이터팩의 레시피, 발전 과제, 게임 변경 사항이 즉시 적용됩니다." }
+    ]
+  },
+  de: {
+    title: "So installierst du Minecraft-Datapacks",
+    description: "Lerne, wie du Datapacks in Minecraft installierst. Neue Rezepte, Loot Tables und Spielmechaniken, ganz ohne Mods.",
+    steps: [
+      { name: "Instanz öffnen", text: "Datapacks gelten pro Welt, also öffne zuerst die Minecraft-Instanz, in der du den Pack nutzen willst." },
+      { name: "Datapacks im GDLauncher durchsuchen", text: "Geh in den Addons-Tab, klick Add Addons und filter auf Data Packs. Such den gewünschten Pack oder stöber durch beliebte CurseForge-Einträge." },
+      { name: "In die Welt herunterladen", text: "Wenn du auf Download klickst, legt GDLauncher den Datapack in den datapacks-Ordner der gewählten Welt." },
+      { name: "Welt neu laden", text: "Öffne die Welt (oder führ /reload in der Welt aus). Die Rezepte, Errungenschaften und Spieländerungen des Datapacks sind jetzt aktiv." }
+    ]
+  },
+  fr: {
+    title: "Comment installer des datapacks Minecraft",
+    description: "Apprends à installer des datapacks dans Minecraft. Nouvelles recettes, loot tables et mécaniques de jeu sans mods.",
+    steps: [
+      { name: "Ouvrir l'instance", text: "Les datapacks s'appliquent à un monde précis, donc ouvre d'abord l'instance Minecraft où tu veux utiliser le pack." },
+      { name: "Parcourir les datapacks dans GDLauncher", text: "Va dans Addons → Add Addons et filtre par Data Packs. Cherche le pack que tu veux ou parcours les entrées populaires de CurseForge." },
+      { name: "Télécharger dans ton monde", text: "Quand tu cliques sur Download, GDLauncher dépose le datapack dans le dossier datapacks du monde que tu as sélectionné." },
+      { name: "Recharger le monde", text: "Ouvre le monde (ou exécute /reload depuis l'intérieur). Les recettes, succès et changements du datapack sont maintenant actifs." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar datapacks de Minecraft",
+    description: "Aprende a instalar datapacks en Minecraft. Añade recetas, loot tables y mecánicas de juego sin mods.",
+    steps: [
+      { name: "Abrir la instancia", text: "Los datapacks se aplican a un mundo concreto, así que primero abre la instancia de Minecraft donde quieras usar el pack." },
+      { name: "Buscar datapacks en GDLauncher", text: "Ve a Addons → Add Addons y filtra por Data Packs. Busca el pack que quieras o explora las entradas populares de CurseForge." },
+      { name: "Descargar al mundo", text: "Cuando pulsas Download, GDLauncher coloca el datapack en la carpeta datapacks del mundo que selecciones." },
+      { name: "Recargar el mundo", text: "Abre el mundo (o ejecuta /reload desde dentro). Las recetas, avances y cambios del datapack ya están activos." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar datapacks do Minecraft",
+    description: "Aprenda a instalar datapacks no Minecraft. Adicione receitas, loot tables e mecânicas de jogo sem mods.",
+    steps: [
+      { name: "Abrir a instância", text: "Datapacks valem por mundo, então primeiro abra a instância do Minecraft onde quer usar o pack." },
+      { name: "Procurar datapacks no GDLauncher", text: "Vá em Addons → Add Addons e filtre por Data Packs. Pesquise o pack que quer ou explore as entradas populares do CurseForge." },
+      { name: "Baixar para o mundo", text: "Ao clicar em Download, o GDLauncher coloca o datapack na pasta datapacks do mundo que você selecionou." },
+      { name: "Recarregar o mundo", text: "Abra o mundo (ou rode /reload de dentro dele). As receitas, conquistas e mudanças do datapack já estão ativas." }
+    ]
+  },
+  it: {
+    title: "Come installare Data Pack di Minecraft",
+    description: "Scopri come installare Data Pack su Minecraft. Aggiungi ricette, loot table e meccaniche di gioco senza Mod.",
+    steps: [
+      { name: "Aprire l'istanza", text: "I Data Pack agiscono per singola mappa, quindi apri prima l'istanza di Minecraft in cui vuoi usare il pack." },
+      { name: "Cercare Data Pack in GDLauncher", text: "Vai in Addons → Add Addons e filtra per Data Packs. Cerca il pack che vuoi o sfoglia le voci più popolari di CurseForge." },
+      { name: "Scaricare nella mappa", text: "Quando clicchi su Download, GDLauncher mette il Data Pack nella cartella datapacks della mappa che hai selezionato." },
+      { name: "Ricaricare la mappa", text: "Apri la mappa (o esegui /reload dall'interno). Le ricette, gli avanzamenti e le modifiche del Data Pack sono subito attivi." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install datapack minecraft, how to install data packs, minecraft datapack guide, vanilla tweaks, gdlauncher datapack"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT3M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>データパックでできること</h2>
+      <p>データパックは Mod 不要で Minecraft の動作を調整できます。クラフトレシピの追加、Mob のドロップ変更、独自の進捗作成、ワールド生成の変更、コマンドの自動実行など。すべてバニラ Minecraft 上で動きます。</p>
+      <p>Mod よりは制限があります, 新しいブロックやアイテムを追加することはできず、既存の仕組みを調整するだけです。ただし、サーバーで使うときにプレイヤー側に何もインストールさせる必要がなく、削除はファイルを消すだけです。</p>
+
+      <h2>GDLauncher でインストール (全ワールド)</h2>
+      <p>インスタンスを開いて <strong>Addons</strong> タブから <strong>Add Addons</strong>。検索バー左のドロップダウンで <strong>Data Packs</strong> を選択。データパックを見つけて <strong>Download</strong>。</p>
+      <p>この方法でインストールしたデータパックは、そのインスタンスのすべてのワールドに適用されます。ワールドごとに分けたい場合は次の節の方法を使ってください。</p>
+
+      <h2>ワールド単位のインストール</h2>
+      <p>より細かく制御したい場合は、特定のワールドだけにデータパックを入れられます。GDLauncher でインスタンスを右クリック → <strong>More options</strong> → <strong>Open folder</strong>。<code>instance</code> フォルダ内の <code>saves/[ワールド名]/datapacks</code> に .zip を置きます。</p>
+      <p>ワールドを読み込み、チャットで <code>/reload</code> を実行。<code>/datapack list</code> で動作確認できます。緑が有効、赤が無効です。</p>
+
+      <h2>新規ワールドへのインストール</h2>
+      <p>Minecraft で新しいワールドを作成する際に、生成前に "Data Packs" をクリック。"Open Pack Folder" で .zip をコピーし、Minecraft に戻って Refresh、パックを "Selected" に移動してからワールドを作成します。</p>
+
+      <h2>定番のデータパック</h2>
+      <p>Vanilla Tweaks は外せない存在。ウェブサイトで数百もの小さな調整 (1 人寝、Mob の頭、カスタム防具スタンドポーズなど) からピックアップして、自分専用のパックをメニューから組み立てられます。</p>
+      <p>ほかにもクラフトできない物をクラフト可能にするパック、QoL 改善、ゲームプレイチャレンジ系などがあります。</p>
+
+      <h2>トラブルシューティング</h2>
+      <p>パックが読み込まれない? .zip ファイルである (展開しない) こと、正しい <code>datapacks</code> フォルダに入っていることを確認。<code>/reload</code> を実行し <code>/datapack list</code> でチェック。</p>
+      <p>非互換と表示される? Minecraft バージョン違いの可能性。警告が出ても動くことがありますが、問題があれば更新版を探してみましょう。</p>
+      <p>機能が動かない? cheats を有効化 (コマンド実行に必要)、依存する別のパックがあるかも確認してください。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>데이터팩이 하는 일</h2>
+      <p>데이터팩은 모드 없이 Minecraft의 메커니즘을 조정합니다. 제작 레시피 추가, 몹 드롭 변경, 커스텀 발전 과제 생성, 월드 생성 수정, 명령어 자동 실행 등 모두 바닐라 Minecraft에서 가능합니다.</p>
+      <p>모드보다 제한적입니다, 새 블록이나 아이템을 진짜로 추가할 수는 없고 기존 메커니즘을 조정하는 정도. 하지만 서버에서 사용할 때 플레이어 쪽에는 아무것도 설치시킬 필요가 없고, 제거는 파일 하나 삭제로 끝납니다.</p>
+
+      <h2>GDLauncher로 설치 (모든 월드)</h2>
+      <p>인스턴스를 열고 <strong>Addons</strong> 탭에서 <strong>Add Addons</strong>를 누르세요. 검색창 왼쪽 드롭다운에서 <strong>Data Packs</strong>를 선택. 원하는 데이터팩을 찾아 <strong>Download</strong>.</p>
+      <p>이 방식으로 설치한 데이터팩은 해당 인스턴스의 모든 월드에 적용됩니다. 월드별로 다르게 적용하고 싶다면 아래의 월드별 방법을 쓰세요.</p>
+
+      <h2>월드별 설치</h2>
+      <p>더 세밀한 제어가 필요하다면 특정 월드에만 데이터팩을 넣을 수 있습니다. GDLauncher에서 인스턴스를 오른쪽 클릭 → <strong>More options</strong> → <strong>Open folder</strong>. <code>instance</code> 폴더 안의 <code>saves/[월드 이름]/datapacks</code>로 가서 .zip을 넣으세요.</p>
+      <p>월드를 불러오고 채팅에서 <code>/reload</code>를 실행. <code>/datapack list</code>로 확인할 수 있습니다. 초록은 활성화, 빨강은 비활성화입니다.</p>
+
+      <h2>새 월드에 설치</h2>
+      <p>Minecraft에서 새 월드를 만들 때 생성 전 "Data Packs"를 클릭하세요. "Open Pack Folder"로 .zip을 복사한 뒤 Minecraft로 돌아와 Refresh, 팩을 "Selected"로 옮긴 다음 월드를 만들면 됩니다.</p>
+
+      <h2>인기 데이터팩</h2>
+      <p>Vanilla Tweaks는 빠질 수 없는 존재입니다. 웹사이트에서 수백 가지 작은 조정(1인 수면, 몹 머리 드롭, 커스텀 갑옷 거치대 포즈 등)을 골라 자신만의 커스텀 팩을 메뉴에서 조립할 수 있습니다.</p>
+      <p>그 외에도 평소엔 만들 수 없던 아이템을 제작 가능하게 만드는 팩, QoL 개선, 게임플레이 챌린지 같은 것들이 있습니다.</p>
+
+      <h2>문제 해결</h2>
+      <p>팩이 로드되지 않나요? .zip 파일인지(압축 풀지 말 것), 올바른 <code>datapacks</code> 폴더에 있는지 확인하세요. <code>/reload</code>를 실행하고 <code>/datapack list</code>로 확인.</p>
+      <p>비호환으로 표시되나요? 다른 Minecraft 버전용일 수 있습니다. 경고에도 동작하는 경우가 있지만, 문제가 있으면 업데이트된 버전을 찾아보세요.</p>
+      <p>기능이 동작하지 않나요? 치트가 활성화되어 있어야 명령어가 작동합니다. 또 다른 팩에 의존하는 경우도 확인하세요.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was Datapacks machen</h2>
+      <p>Datapacks tunen Minecraft-Mechaniken ohne Mods. Sie können Crafting-Rezepte hinzufügen, ändern, was Mobs droppen, eigene Errungenschaften erstellen, Welt-Generierung anpassen und Befehle automatisch ausführen. Alles in Vanilla-Minecraft.</p>
+      <p>Sie sind eingeschränkter als Mods, du kannst keine echten neuen Blöcke oder Items hinzufügen, sondern nur bestehende Mechaniken justieren. Aber sie funktionieren auf Servern, ohne dass Spieler etwas installieren müssen, und das Entfernen ist so einfach wie eine Datei zu löschen.</p>
+
+      <h2>Mit GDLauncher installieren (alle Welten)</h2>
+      <p>Öffne deine Instanz und geh in den <strong>Addons</strong>-Tab. Klick <strong>Add Addons</strong>, wähl dann <strong>Data Packs</strong> aus dem Dropdown links neben der Suchleiste. Find einen Datapack und klick <strong>Download</strong>.</p>
+      <p>So installierte Datapacks gelten für alle Welten in dieser Instanz. Wenn du verschiedene Packs für verschiedene Welten willst, nimm die Pro-Welt-Methode unten.</p>
+
+      <h2>Pro-Welt-Installation</h2>
+      <p>Für mehr Kontrolle kannst du Datapacks nur in bestimmten Welten installieren. Rechtsklick auf deine Instanz im GDLauncher → <strong>More options</strong> → <strong>Open folder</strong>. Geh in den <code>instance</code>-Ordner, dann <code>saves/[deine Welt]/datapacks</code> und leg dort die .zip ab.</p>
+      <p>Lade die Welt und führ <code>/reload</code> im Chat aus. Prüf mit <code>/datapack list</code>, ob es geklappt hat. Grün heißt aktiv, rot deaktiviert.</p>
+
+      <h2>Auf einer neuen Welt installieren</h2>
+      <p>Wenn du in Minecraft eine neue Welt erstellst, klick vor dem Generieren auf "Data Packs". Klick auf "Open Pack Folder" und kopier deine .zip rein. Zurück in Minecraft, drück Refresh, schieb den Pack auf "Selected" und erstell die Welt.</p>
+
+      <h2>Beliebte Datapacks</h2>
+      <p>Vanilla Tweaks ist ein Muss. Es ist eine Website, auf der du aus hunderten kleiner Tweaks (One-Player-Sleep, Mob-Köpfe, eigene Armorstand-Posen usw.) auswählen kannst, du baust dir aus einem Menü deinen eigenen Custom-Pack.</p>
+      <p>Darüber hinaus gibt's Packs für Items, die normalerweise nicht craftbar sind, Komfortverbesserungen und Gameplay-Challenges.</p>
+
+      <h2>Problembehebung</h2>
+      <p>Pack lädt nicht? Stell sicher, dass es eine .zip-Datei ist (nicht entpacken) und im richtigen <code>datapacks</code>-Ordner liegt. Führ <code>/reload</code> aus und prüf mit <code>/datapack list</code>.</p>
+      <p>Wird als inkompatibel angezeigt? Der Pack ist vielleicht für eine andere Minecraft-Version. Manchmal funktioniert er trotz Warnung, aber such bei Problemen nach einer aktualisierten Version.</p>
+      <p>Features funktionieren nicht? Stell sicher, dass Cheats aktiviert sind (für Befehle nötig) und prüf, ob der Pack auf andere Packs angewiesen ist.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Ce que font les datapacks</h2>
+      <p>Les datapacks ajustent les mécaniques de Minecraft sans mods. Ils peuvent ajouter des recettes de craft, modifier ce que les mobs lâchent, créer des succès personnalisés, modifier la génération de monde et lancer des commandes automatiquement. Tout en Minecraft vanilla.</p>
+      <p>Ils sont plus limités que les mods, tu ne peux pas vraiment ajouter de nouveaux blocs ou items, juste tweaker les mécaniques existantes. Mais ils marchent sur des serveurs sans rien faire installer aux joueurs, et les retirer revient à supprimer un fichier.</p>
+
+      <h2>Installer avec GDLauncher (tous les mondes)</h2>
+      <p>Ouvre ton instance et va dans <strong>Addons</strong>. Clique sur <strong>Add Addons</strong>, puis sélectionne <strong>Data Packs</strong> dans le menu déroulant à gauche de la barre de recherche. Trouve un datapack et clique sur <strong>Download</strong>.</p>
+      <p>Les datapacks installés comme ça s'appliquent à tous les mondes de l'instance. Si tu veux des packs différents par monde, utilise la méthode par-monde ci-dessous.</p>
+
+      <h2>Installation par monde</h2>
+      <p>Pour plus de contrôle, tu peux installer les datapacks dans des mondes spécifiques. Clic droit sur ton instance dans GDLauncher → <strong>More options</strong> → <strong>Open folder</strong>. Va dans le dossier <code>instance</code>, puis <code>saves/[ton monde]/datapacks</code> et dépose le .zip dedans.</p>
+      <p>Charge le monde et lance <code>/reload</code> dans le chat. Vérifie avec <code>/datapack list</code>. Vert = activé, rouge = désactivé.</p>
+
+      <h2>Installer sur un nouveau monde</h2>
+      <p>Quand tu crées un nouveau monde dans Minecraft, clique sur "Data Packs" avant de générer. Clique sur "Open Pack Folder" et copie ton .zip dedans. Retourne dans Minecraft, fais Refresh, déplace le pack vers "Selected" et crée ton monde.</p>
+
+      <h2>Datapacks populaires</h2>
+      <p>Vanilla Tweaks est un incontournable. C'est un site qui te laisse picorer parmi des centaines de petits tweaks : sommeil à un joueur, têtes de mobs, poses personnalisées d'armor stand, etc. Tu construis ton propre pack custom depuis un menu.</p>
+      <p>Au-delà, tu trouveras des packs pour rendre craftables des items qui ne le sont pas, des améliorations de confort et des challenges gameplay.</p>
+
+      <h2>Dépannage</h2>
+      <p>Pack qui ne charge pas ? Vérifie que c'est bien un .zip (ne le décompresse pas) et qu'il est dans le bon dossier <code>datapacks</code>. Lance <code>/reload</code> et vérifie avec <code>/datapack list</code>.</p>
+      <p>Affiché comme incompatible ? Le pack est peut-être pour une autre version de Minecraft. Parfois ça marche malgré l'avertissement, sinon cherche une version mise à jour si tu as des soucis.</p>
+      <p>Fonctionnalités qui ne marchent pas ? Vérifie que les cheats sont activés (nécessaire pour que les commandes marchent) et regarde si le pack a des dépendances vers d'autres packs.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Qué hacen los datapacks</h2>
+      <p>Los datapacks ajustan las mecánicas de Minecraft sin mods. Pueden añadir recetas de crafteo, cambiar qué sueltan los mobs, crear logros personalizados, modificar la generación del mundo y ejecutar comandos automáticamente. Todo en Minecraft vanilla.</p>
+      <p>Son más limitados que los mods, no puedes añadir bloques o items realmente nuevos, solo ajustar mecánicas existentes. Pero funcionan en servidores sin que los jugadores tengan que instalar nada, y quitarlos es tan simple como borrar un archivo.</p>
+
+      <h2>Instalar con GDLauncher (todos los mundos)</h2>
+      <p>Abre tu instancia y ve a la pestaña <strong>Addons</strong>. Pulsa <strong>Add Addons</strong> y selecciona <strong>Data Packs</strong> en el desplegable a la izquierda de la barra de búsqueda. Busca un datapack y pulsa <strong>Download</strong>.</p>
+      <p>Los datapacks instalados así se aplican a todos los mundos de esa instancia. Si quieres packs distintos por mundo, usa el método por-mundo de abajo.</p>
+
+      <h2>Instalación por mundo</h2>
+      <p>Para más control, puedes instalar datapacks solo en mundos específicos. Clic derecho en la instancia en GDLauncher → <strong>More options</strong> → <strong>Open folder</strong>. Entra en la carpeta <code>instance</code>, luego en <code>saves/[tu mundo]/datapacks</code> y deja el .zip ahí.</p>
+      <p>Carga el mundo y ejecuta <code>/reload</code> en el chat. Comprueba con <code>/datapack list</code>. Verde = activo, rojo = desactivado.</p>
+
+      <h2>Instalar en un mundo nuevo</h2>
+      <p>Al crear un mundo nuevo en Minecraft, haz clic en "Data Packs" antes de generar. Pulsa "Open Pack Folder" y copia tu .zip ahí. Vuelve a Minecraft, dale a Refresh, mueve el pack a "Selected" y crea el mundo.</p>
+
+      <h2>Datapacks populares</h2>
+      <p>Vanilla Tweaks es imprescindible. Es una web que te deja elegir entre cientos de pequeños tweaks: dormir con un solo jugador, cabezas de mobs, poses personalizadas para armor stands, etc. Construyes tu propio pack desde un menú.</p>
+      <p>Más allá, encontrarás packs para que items normalmente no crafteables se puedan craftear, mejoras de calidad de vida y retos de gameplay.</p>
+
+      <h2>Solución de problemas</h2>
+      <p>¿El pack no carga? Asegúrate de que sea un archivo .zip (no lo descomprimas) y de que esté en la carpeta <code>datapacks</code> correcta. Ejecuta <code>/reload</code> y comprueba con <code>/datapack list</code>.</p>
+      <p>¿Se muestra como incompatible? Puede ser de otra versión de Minecraft. A veces funciona pese al aviso; si te da problemas, busca una versión actualizada.</p>
+      <p>¿Funcionalidades que no van? Comprueba que los cheats están activados (necesarios para los comandos) y mira si el pack tiene dependencias de otros packs.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que os datapacks fazem</h2>
+      <p>Datapacks ajustam mecânicas do Minecraft sem mods. Podem adicionar receitas de craft, mudar o que mobs largam, criar conquistas customizadas, modificar a geração de mundo e rodar comandos automaticamente. Tudo no Minecraft vanilla.</p>
+      <p>São mais limitados que mods, não dá pra adicionar blocos ou itens realmente novos, só ajustar mecânicas existentes. Mas funcionam em servidores sem precisar que os jogadores instalem nada, e remover é só apagar um arquivo.</p>
+
+      <h2>Instalando com o GDLauncher (todos os mundos)</h2>
+      <p>Abra sua instância e vá na aba <strong>Addons</strong>. Clique em <strong>Add Addons</strong> e selecione <strong>Data Packs</strong> no dropdown à esquerda da barra de busca. Ache um datapack e clique em <strong>Download</strong>.</p>
+      <p>Datapacks instalados assim valem para todos os mundos daquela instância. Se quiser packs diferentes em mundos diferentes, use o método por-mundo abaixo.</p>
+
+      <h2>Instalação por mundo</h2>
+      <p>Pra mais controle, dá pra instalar datapacks só em mundos específicos. Clique direito na instância no GDLauncher → <strong>More options</strong> → <strong>Open folder</strong>. Entre na pasta <code>instance</code>, depois <code>saves/[seu mundo]/datapacks</code> e jogue o .zip ali.</p>
+      <p>Carregue o mundo e rode <code>/reload</code> no chat. Veja com <code>/datapack list</code>. Verde = ativo, vermelho = desativado.</p>
+
+      <h2>Instalando em um mundo novo</h2>
+      <p>Ao criar um mundo novo no Minecraft, clique em "Data Packs" antes de gerar. Em "Open Pack Folder" copie seu .zip pra dentro. Volte ao Minecraft, dê Refresh, mova o pack para "Selected" e crie o mundo.</p>
+
+      <h2>Datapacks populares</h2>
+      <p>Vanilla Tweaks é praticamente obrigatório. É um site onde você pode escolher entre centenas de pequenos ajustes: one-player sleep, cabeças de mob, poses customizadas de armor stand etc. Você monta seu próprio pack a partir de um menu.</p>
+      <p>Além disso, há packs para tornar craftáveis itens que normalmente não são, melhorias de qualidade de vida e desafios de gameplay.</p>
+
+      <h2>Solução de problemas</h2>
+      <p>Pack não carrega? Confirme que é arquivo .zip (não descompacte) e está na pasta <code>datapacks</code> correta. Rode <code>/reload</code> e veja com <code>/datapack list</code>.</p>
+      <p>Aparece como incompatível? O pack pode ser de outra versão do Minecraft. Às vezes funciona apesar do aviso; se der problema, procure uma versão atualizada.</p>
+      <p>Funcionalidades não funcionam? Garanta que cheats estejam ativos (necessário para comandos) e veja se o pack depende de outros packs.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cosa fanno i Data Pack</h2>
+      <p>I Data Pack modificano le meccaniche di Minecraft senza Mod. Possono aggiungere ricette, cambiare cosa droppano i mob, creare avanzamenti personalizzati, modificare la generazione della mappa ed eseguire comandi in automatico. Tutto in Minecraft Vanilla.</p>
+      <p>Sono più limitati dei Mod: non puoi davvero aggiungere blocchi o oggetti nuovi, solo ritoccare meccaniche già esistenti. Però funzionano sui server senza che i giocatori debbano installare nulla, e per rimuoverli basta cancellare un file.</p>
+
+      <h2>Installare con GDLauncher (tutte le mappe)</h2>
+      <p>Apri l'istanza e vai nella scheda <strong>Addons</strong>. Clicca su <strong>Add Addons</strong>, poi seleziona <strong>Data Packs</strong> dal menu a tendina a sinistra della barra di ricerca. Trova un Data Pack e clicca su <strong>Download</strong>.</p>
+      <p>I Data Pack installati così valgono per tutte le mappe di quell'istanza. Se vuoi pack diversi su mappe diverse, usa il metodo per-mappa qui sotto.</p>
+
+      <h2>Installazione per singola mappa</h2>
+      <p>Per un controllo più fine puoi installare i Data Pack solo in mappe specifiche. Tasto destro sull'istanza in GDLauncher, <strong>More options</strong>, <strong>Open folder</strong>. Entra nella cartella <code>instance</code>, poi in <code>saves/[la tua mappa]/datapacks</code> e trascina lì il .zip.</p>
+      <p>Carica la mappa ed esegui <code>/reload</code> in chat. Controlla con <code>/datapack list</code>: verde significa attivo, rosso disattivato.</p>
+
+      <h2>Installare su una nuova mappa</h2>
+      <p>Quando crei una nuova mappa in Minecraft, prima di generarlo clicca su "Data Packs". Premi "Open Pack Folder" e copia lì il tuo .zip. Torna in Minecraft, premi Refresh, sposta il pack in "Selected" e crea la mappa.</p>
+
+      <h2>Data Pack popolari</h2>
+      <p>Vanilla Tweaks è praticamente immancabile. È un sito da cui puoi scegliere tra centinaia di piccole modifiche (sonno con un solo giocatore, teste dei mob, pose personalizzate per i porta-armature ecc.) e comporre il tuo pack su misura da un menu.</p>
+      <p>Oltre a quello trovi pack che rendono craftabili oggetti che di solito non lo sono, miglioramenti di comodità e sfide di gameplay.</p>
+
+      <h2>Risoluzione dei problemi</h2>
+      <p>Il pack non si carica? Verifica che sia un file .zip (non scompattarlo) e che si trovi nella cartella <code>datapacks</code> giusta. Esegui <code>/reload</code> e controlla con <code>/datapack list</code>.</p>
+      <p>Mostrato come incompatibile? Il pack potrebbe essere per un'altra versione di Minecraft. A volte funziona comunque nonostante l'avviso; in caso di problemi cerca una versione aggiornata.</p>
+      <p>Funzionalità che non vanno? Assicurati che i cheat siano attivi (servono per i comandi) e controlla se il pack dipende da altri pack.</p>
+    </Fragment>
+  )}
+</GuideLayout>

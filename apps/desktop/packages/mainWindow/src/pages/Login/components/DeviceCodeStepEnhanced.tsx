@@ -28,7 +28,7 @@ import { DeviceCode as DeviceCodeType } from "@gd/core_module/bindings"
 import { handleStatus } from "@/utils/login"
 import { EnrollmentError } from "@gd/core_module/bindings"
 import QRCode from "qrcode"
-import type { CreateQueryResult } from "@tanstack/solid-query"
+import type { UseQueryResult } from "@tanstack/solid-query"
 
 interface Props {
   deviceCodeObject: DeviceCodeType | null
@@ -36,7 +36,7 @@ interface Props {
   nextStep: () => void
   prevStep: () => void
   onSwitchToBrowser?: () => void
-  enrollmentStatus: CreateQueryResult<any, any> | null
+  enrollmentStatus: UseQueryResult<any, any> | null
 }
 
 export function DeviceCodeStepEnhanced(props: Props) {
@@ -52,7 +52,6 @@ export function DeviceCodeStepEnhanced(props: Props) {
   }))
 
   const userCode = () => props.deviceCodeObject?.userCode
-  const oldUserCode = () => props.deviceCodeObject?.userCode
   const deviceCodeLink = () => props.deviceCodeObject?.verificationUri
   const expiresAt = () => props.deviceCodeObject?.expiresAt
   const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime()
@@ -105,8 +104,12 @@ export function DeviceCodeStepEnhanced(props: Props) {
     }
   })
 
+  // Reset countdown when the device code rotates.
+  let prevUserCode: string | undefined
   createEffect(() => {
-    if (userCode() !== oldUserCode()) {
+    const current = userCode()
+    if (current !== prevUserCode) {
+      prevUserCode = current
       resetCountDown()
     }
   })

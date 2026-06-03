@@ -21,10 +21,12 @@ import {
   Show,
   createSignal,
   createMemo,
-  createEffect
+  createEffect,
+  onCleanup
 } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { capitalize } from "@/utils/helpers"
+import { formatModrinthCategory } from "@/utils/modrinthCategories"
 import { ModloaderIcon } from "@/utils/sidebar"
 import { useGlobalStore } from "./GlobalStoreContext"
 import useSearchContext from "./SearchInputContext"
@@ -128,7 +130,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
         (v) => v.projectType === searchResults?.searchQuery().projectType
       )
       .map((category) => ({
-        label: category.name,
+        label: formatModrinthCategory(category.name),
         value: category.id,
         icon: (
           // eslint-disable-next-line solid/no-innerhtml
@@ -279,7 +281,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
       setDebouncedQuery(query)
     }, 150) // 150ms debounce
 
-    return () => clearTimeout(timeoutId)
+    onCleanup(() => clearTimeout(timeoutId))
   })
 
   // Auto-focus input when dropdown content becomes visible
@@ -295,7 +297,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
       }
     }, 10) // Very short delay just for DOM rendering
 
-    return () => clearTimeout(timer)
+    onCleanup(() => clearTimeout(timer))
   })
 
   // Memoized modloaders list
@@ -671,7 +673,7 @@ export function SearchGameVersionDropdown(_props: DropdownProps) {
       setDebouncedQuery(query)
     }, 150) // 150ms debounce
 
-    return () => clearTimeout(timeoutId)
+    onCleanup(() => clearTimeout(timeoutId))
   })
 
   // Auto-focus input when dropdown content becomes visible
@@ -687,7 +689,7 @@ export function SearchGameVersionDropdown(_props: DropdownProps) {
       }
     }, 10) // Very short delay just for DOM rendering
 
-    return () => clearTimeout(timer)
+    onCleanup(() => clearTimeout(timer))
   })
 
   // Memoized versions list

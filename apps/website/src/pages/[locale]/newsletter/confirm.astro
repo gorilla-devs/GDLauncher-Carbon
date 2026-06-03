@@ -1,0 +1,19 @@
+---
+import type { GetStaticPaths } from "astro"
+import PageShell from "../../../components/PageShell.astro"
+import NewsletterConfirmBody from "../../../components/NewsletterConfirmBody.astro"
+import { LOCALES, DEFAULT_LOCALE } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+---
+
+<PageShell
+  title="Successfully Subscribed - GDLauncher"
+  description="You have successfully subscribed to the GDLauncher newsletter"
+  noindex
+>
+  <NewsletterConfirmBody />
+</PageShell>

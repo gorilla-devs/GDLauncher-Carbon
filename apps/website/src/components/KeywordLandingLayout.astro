@@ -1,0 +1,124 @@
+---
+/**
+ * KeywordLandingLayout - reusable layout for SEO landing pages targeting
+ * specific high-volume non-brand queries (e.g. "best minecraft launcher",
+ * "minecraft mod launcher"). Each landing page passes in keyword-targeted
+ * copy and the layout handles SEO chrome, structured data, and the CTA.
+ */
+import PageShell from "./PageShell.astro"
+import { DownloadLink } from "./DownloadLink"
+import { breadcrumbsJsonLd, faqJsonLd } from "../lib/jsonld"
+import { getLocaleFromUrl, localizedPath, useTranslations } from "../lib/i18n"
+import { SITE_URL } from "../consts"
+
+interface FaqEntry {
+  question: string
+  answer: string
+}
+
+interface Props {
+  pageSlug: string
+  title: string // Used for tab title + H1
+  description: string // Meta description
+  keywords?: string
+  /** Hero subtitle, single sentence under the H1 */
+  intro: string
+  /** Optional FAQ block at the bottom (also emitted as FAQPage schema) */
+  faq?: FaqEntry[]
+  /** Optional breadcrumb labels, defaults to [Home > Title] */
+  breadcrumbLabel?: string
+}
+
+const {
+  pageSlug,
+  title,
+  description,
+  keywords,
+  intro,
+  faq,
+  breadcrumbLabel
+} = Astro.props
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+
+// Locale-aware canonical so /ja/best-minecraft-launcher canonicalises to
+// itself, not to the English page. Same canonical-leak bug Google would
+// have collapsed all 7 locale variants to the English source otherwise.
+const canonicalUrl = new URL(
+  localizedPath(`/${pageSlug}`, locale),
+  SITE_URL,
+).toString()
+const homeUrl = new URL(localizedPath("/", locale), SITE_URL).toString()
+const vsUrl = localizedPath("/vs", locale)
+
+const jsonLd: Record<string, unknown>[] = [
+  breadcrumbsJsonLd([
+    { name: t("breadcrumb.home"), url: homeUrl },
+    { name: breadcrumbLabel ?? title, url: canonicalUrl }
+  ])
+]
+if (faq?.length) jsonLd.push(faqJsonLd(faq))
+---
+
+<PageShell
+  title={`${title} | GDLauncher`}
+  description={description}
+  canonicalUrl={canonicalUrl}
+  keywords={keywords}
+  jsonLd={jsonLd}
+>
+  <main class="py-8">
+    <div class="max-w-4xl mx-auto px-4">
+      <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 mb-8">
+        <header class="mb-10">
+          <h1 class="text-3xl md:text-5xl font-bold text-lightSlate-50 mb-4">{title}</h1>
+          <p class="text-lg text-darkSlate-100">{intro}</p>
+        </header>
+
+        <article class="prose prose-invert prose-lg max-w-none">
+          <slot />
+          {faq && faq.length > 0 && (
+            <section>
+              <h2 class="text-lightSlate-50">{t("addon.faq.heading")}</h2>
+              {faq.map((entry) => (
+                <>
+                  <h3 class="text-lightSlate-50">{entry.question}</h3>
+                  <p>{entry.answer}</p>
+                </>
+              ))}
+            </section>
+          )}
+        </article>
+
+        <div class="mt-10 flex flex-col sm:flex-row gap-4">
+          <DownloadLink
+            client:idle
+            class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors"
+            iconClass="w-5 h-5"
+            label={t("addon.downloadCta")}
+            iconLeft
+          />
+          <a
+            href={vsUrl}
+            class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-darkSlate-600 hover:bg-darkSlate-500 text-lightSlate-50 font-semibold transition-colors"
+          >
+            {t("landing.cta.compare")}
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+</PageShell>
+
+<style is:global>
+  .prose { color: rgb(var(--lightSlate-100)); }
+  .prose h2 { color: rgb(var(--lightSlate-50)); font-size: 1.6rem; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; }
+  .prose h3 { color: rgb(var(--lightSlate-50)); font-size: 1.3rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+  .prose p { margin-bottom: 1rem; line-height: 1.75; }
+  .prose ul, .prose ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+  .prose li { margin-bottom: 0.5rem; }
+  .prose strong { color: rgb(var(--lightSlate-50)); font-weight: 600; }
+  .prose a { color: rgb(var(--primary-400)); text-decoration: underline; }
+  .prose a:hover { color: rgb(var(--primary-300)); }
+</style>

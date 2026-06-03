@@ -17,7 +17,6 @@ use carbon_platforms::curseforge::{
 use reqwest_middleware::ClientWithMiddleware;
 use serde_json::json;
 use std::{env, sync::Arc};
-use tracing::{info, trace};
 use url::Url;
 
 pub struct CurseForge {
@@ -41,8 +40,6 @@ impl CurseForge {
     ) -> anyhow::Result<CurseForgeResponse<Vec<MinecraftModLoaderIndex>>> {
         let url = self.base_url.join("minecraft/modloader")?;
 
-        trace!("GET {}", url);
-
         let resp = self
             .client
             .get(url.as_str())
@@ -60,8 +57,6 @@ impl CurseForge {
     pub async fn get_categories(&self) -> anyhow::Result<CurseForgeResponse<Vec<Category>>> {
         let mut url = self.base_url.join("categories")?;
         url.set_query(Some("gameId=432"));
-
-        trace!("GET {}", url);
 
         let resp = self
             .client
@@ -96,8 +91,6 @@ impl CurseForge {
         let query = search_params.query.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
         let resp = self
             .client
             .get(url.as_str())
@@ -117,8 +110,6 @@ impl CurseForge {
         let url = self
             .base_url
             .join(&format!("mods/{}", &mod_parameters.mod_id.to_string()))?;
-
-        trace!("GET {}", url);
 
         let resp = self
             .client
@@ -146,8 +137,6 @@ impl CurseForge {
         let url = self.base_url.join("mods")?;
         let body = serde_json::to_string(&mod_parameters.body)?;
 
-        trace!("POST {url} - {body:?}");
-
         let resp = self
             .client
             .post(url.as_str())
@@ -167,8 +156,6 @@ impl CurseForge {
     ) -> anyhow::Result<CurseForgeResponse<FingerprintsMatchesResult>> {
         let url = self.base_url.join("fingerprints")?;
         let body = json!({ "fingerprints": hashes });
-
-        trace!("POST {url} - {body:?}");
 
         let resp = self
             .client
@@ -194,8 +181,6 @@ impl CurseForge {
             &mod_parameters.mod_id.to_string()
         ))?;
 
-        trace!("GET {}", url);
-
         let resp = self
             .client
             .get(url.as_str())
@@ -218,8 +203,6 @@ impl CurseForge {
             &mod_parameters.mod_id.to_string(),
             &mod_parameters.file_id.to_string()
         ))?;
-
-        trace!("GET {}", url);
 
         let resp = self
             .client
@@ -244,8 +227,6 @@ impl CurseForge {
         let query = mod_parameters.query.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
         let resp = self
             .client
             .get(url.as_str())
@@ -266,8 +247,6 @@ impl CurseForge {
         let url = self.base_url.join("mods/files")?;
 
         let body = serde_json::to_string(&mod_parameters.body)?;
-
-        trace!("POST {url} - {body:?}");
 
         let resp = self
             .client
@@ -291,8 +270,6 @@ impl CurseForge {
             &mod_parameters.mod_id.to_string(),
             &mod_parameters.file_id.to_string()
         ))?;
-
-        trace!("GET {}", url);
 
         let resp = self
             .client

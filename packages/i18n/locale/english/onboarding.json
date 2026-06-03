@@ -7,6 +7,8 @@
   "_trn_search_syntax_ids": "Use project IDs or slugs (e.g., #12345, #sodium)",
   "_trn_search_syntax_urls_label": "URLs",
   "_trn_search_syntax_id_label": "#id/slug",
+  "_trn_search_syntax_share": "Prefix a code with $ (e.g., $ABC1234), or paste a share link (gdl.gg/i/…, gdlauncher.com/instance-share/…, gdlauncher://share/…)",
+  "_trn_search_syntax_share_label": "Shared instance",
   "_trn_search_syntax_addon_type": "Select addon type (mods, modpacks, etc.) on the left",
   "_trn_search_syntax_filters": "Filter by categories and more on the right",
   "_trn_welcome_gdlauncher_title": "Welcome to GDLauncher! 🎉",

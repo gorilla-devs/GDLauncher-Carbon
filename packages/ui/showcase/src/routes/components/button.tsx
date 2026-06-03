@@ -23,7 +23,7 @@ function ButtonPage() {
         <div class="flex flex-wrap gap-4">
           <Button type="primary">Primary</Button>
           <Button type="secondary">Secondary</Button>
-          <Button type="outline">Outline</Button>
+          <Button type="secondary">Outline</Button>
           <Button type="glow">Glow</Button>
         </div>
       </ComponentDemo>

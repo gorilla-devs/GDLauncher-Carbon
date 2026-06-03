@@ -1,0 +1,60 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Install Minecraft Worlds"
+  description="Learn how to install world downloads and adventure maps in Minecraft. Play custom maps from the community."
+  keywords="install minecraft world, download minecraft maps, adventure maps, minecraft world download, custom maps"
+  lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Choose the right instance", text: "Adventure maps usually require a specific Minecraft version (and sometimes a specific resource pack). Use GDLauncher to create or pick an instance that matches what the map says it supports." },
+      { name: "Browse worlds in GDLauncher", text: "In the instance, open Addons → Add Addons and switch the addon type to Worlds. CurseForge hosts the largest collection of adventure maps and showcase builds." },
+      { name: "Download to the instance", text: "Click Download. GDLauncher extracts the world archive directly into the instance's saves folder, no manual unzipping needed. If you instead dropped a .zip in saves yourself, Minecraft won't read it, see the manual extract step below." },
+      { name: "Open the world", text: "Launch the instance, click Singleplayer, and the new world appears in the list. Select it and play." }
+    ]
+  }}
+>
+  <h2>What world downloads are</h2>
+  <p>
+    World downloads are save files from other players that you can play yourself. Adventure maps with stories and puzzles, parkour challenges, PvP arenas, survival islands, amazing builds to explore, and complex redstone machines. People have been sharing these for years.
+  </p>
+
+  <h2>Installing a world</h2>
+  <p>
+    Download the world file (usually a .zip). Right-click your instance in GDLauncher, select <strong>More options</strong> → <strong>Open folder</strong>. Navigate into the <code>instance</code> folder, then the <code>saves</code> folder, and extract the .zip there.
+  </p>
+  <p>
+    After extracting, you should have a folder with the world's name containing <code>level.dat</code>, a <code>region</code> folder, and possibly a <code>data</code> folder. Make sure <code>level.dat</code> is directly inside the world folder, not nested in another subfolder (a common issue with some downloads).
+  </p>
+  <p>
+    Launch Minecraft, click Singleplayer, and your new world should be in the list.
+  </p>
+
+  <h2>Version compatibility</h2>
+  <p>
+    Worlds can be opened in newer Minecraft versions and will upgrade automatically. Going the other way (newer world in older version) can cause problems or data loss.
+  </p>
+  <p>
+    Check what version the world was made for. If it says 1.19, you can play it on 1.19 or later. Playing on 1.18 might break things.
+  </p>
+
+  <h2>Modded worlds</h2>
+  <p>
+    Some worlds require specific mods. The download page usually lists requirements. Without the right mods, modded blocks will disappear or turn into air. Make sure you have everything installed before loading.
+  </p>
+
+  <h2>Troubleshooting</h2>
+  <p>
+    World not appearing in the list? Make sure you actually extracted the zip, not just copied it. Check that <code>level.dat</code> is in the right place. The most common mistake is having the world nested inside an extra folder (like <code>WorldName/WorldName/level.dat</code> instead of <code>WorldName/level.dat</code>).
+  </p>
+  <p>
+    World won't load? It might be from a newer Minecraft version than you're running. Or it needs mods you don't have. Try downloading again if the file seems corrupted.
+  </p>
+  <p>
+    Missing blocks? The world probably needs mods you don't have installed. Check the download page for requirements.
+  </p>
+
+</GuideLayout>

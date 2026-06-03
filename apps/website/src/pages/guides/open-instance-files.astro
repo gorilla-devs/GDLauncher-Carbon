@@ -1,0 +1,55 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Open Instance Files in GDLauncher"
+  description="Jump to the instance folder in your OS file manager to copy worlds, edit configs by hand, or grab screenshots."
+  keywords="open minecraft instance folder, find minecraft files, minecraft saves folder, instance folder gdlauncher, edit config files"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT1M",
+    steps: [
+      { name: "Right-click the instance", text: "In the Library, right-click the instance whose files you need." },
+      { name: "Open More Options", text: "Hover More Options to expand the submenu." },
+      { name: "Click Open Folder", text: "Pick Open Folder (the folder-open icon). Your OS file manager opens to the instance root." }
+    ]
+  }}
+>
+  <h2>What you'll find</h2>
+  <p>The folder you land in is the instance root. Inside, two layers: a top-level <code>logs/</code> for the launcher's per-instance session logs, and an <code>instance/</code> subfolder which is Minecraft's actual game directory. See <a href="/docs/instance-folder-anatomy">Anatomy of an Instance Folder</a> for the full layout.</p>
+  <p>The directory most people are looking for is <code>instance/saves/</code> (worlds), <code>instance/screenshots/</code> (screenshots taken with F2), or <code>instance/config/</code> (mod config files).</p>
+
+  <h2>What you can safely change</h2>
+  <ul>
+    <li><strong>Worlds</strong>: copy folders out for backup or in to import a downloaded world.</li>
+    <li><strong>Screenshots</strong>: pure assets, copy out as you like.</li>
+    <li><strong>Mod configs</strong>: edit <code>config/&lt;modid&gt;.toml</code> by hand, most mods reload changes on next launch.</li>
+    <li><strong>options.txt</strong>: Minecraft's client settings. Editable as plain text.</li>
+    <li><strong>Resource packs / shader packs</strong>: drag in or out by hand if you'd rather not use the Addons tab.</li>
+  </ul>
+
+  <h2>What you should avoid changing</h2>
+  <ul>
+    <li><strong>level.dat</strong> inside a world: it's NBT-encoded; corrupting it kills the world.</li>
+    <li><strong>Region files</strong> in a world's <code>region/</code>: same, NBT binary, edit only with proper tools (NBTExplorer, MCEdit).</li>
+    <li><strong>Mod JARs</strong> in <code>instance/mods/</code> if the instance is a locked modpack: the launcher won't know about manual changes and there'll be inconsistencies in the Addons tab.</li>
+  </ul>
+
+  <h2>Useful subfolders at a glance</h2>
+  <ul>
+    <li><code>instance/saves/</code>, your Minecraft worlds.</li>
+    <li><code>instance/screenshots/</code>, in-game F2 screenshots.</li>
+    <li><code>instance/mods/</code>, the mod JARs.</li>
+    <li><code>instance/config/</code>, mod settings.</li>
+    <li><code>instance/resourcepacks/</code>, resource packs.</li>
+    <li><code>instance/shaderpacks/</code>, shader packs.</li>
+    <li><code>instance/datapacks/</code>, global data packs.</li>
+    <li><code>instance/logs/</code>, Minecraft's session logs (game side).</li>
+    <li><code>instance/crash-reports/</code>, Minecraft crash dumps.</li>
+    <li><code>logs/</code> (one level up), GDLauncher's session logs.</li>
+  </ul>
+
+  <h2>When the launcher is running</h2>
+  <p>You can browse the instance folder while GDLauncher is running and even while Minecraft is running. Editing config files mid-session is fine for most mods (they reload on relaunch). Don't edit world files (<code>level.dat</code>, region files) while Minecraft has the world open, you'll cause corruption.</p>
+</GuideLayout>

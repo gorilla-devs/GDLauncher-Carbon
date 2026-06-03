@@ -10,8 +10,8 @@ contextBridge.exposeInMainWorld("getInitialRuntimePath", async () =>
 
 contextBridge.exposeInMainWorld(
   "changeRuntimePath",
-  async (newPath: string | null, cb: (progress: number) => void) =>
-    ipcRenderer.invoke("changeRuntimePath", newPath, cb)
+  async (newPath: string | null, switchOnly?: boolean) =>
+    ipcRenderer.invoke("changeRuntimePath", newPath, switchOnly)
 )
 
 contextBridge.exposeInMainWorld("changeRuntimePathProgress", async (cb: any) =>

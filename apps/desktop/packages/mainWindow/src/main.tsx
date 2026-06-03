@@ -13,10 +13,12 @@ import {
   useContext
 } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
-import { Router, hashIntegration } from "@solidjs/router"
+import { HashRouter } from "@solidjs/router"
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient"
+import { QueryClientProvider } from "@tanstack/solid-query"
 import { i18n, TransProvider, loadLanguageFiles } from "@gd/i18n"
 import App from "@/app"
+import { routes } from "@/route"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
@@ -61,17 +63,19 @@ render(() => {
   >(undefined)
 
   const [coreModuleLoaded] = createResource(async () => {
-    let port
+    let result: { port: number; apiToken: string } | Error
     try {
       const coreModule = await window.getCoreModule()
 
       if (coreModule?.type === "success") {
-        const convertedPort = Number(coreModule.port)
-        port = convertedPort
+        result = {
+          port: Number(coreModule.port),
+          apiToken: coreModule.apiToken
+        }
       } else if (coreModule?.type === "backwardsMigration") {
         console.log("Backwards migration detected, showing dedicated UI")
         window.backwardsMigrationError()
-        port = new Error("BackwardsMigration")
+        result = new Error("BackwardsMigration")
       } else {
         if (coreModule.logs) {
           console.error(
@@ -84,19 +88,19 @@ render(() => {
           window.fatalError("Unknown error", "CoreModule")
         }
 
-        port = new Error("CoreModule")
+        result = new Error("CoreModule")
       }
     } catch (e) {
       console.error("CoreModule getCoreModule failed", e)
       window.fatalError(e as any, "CoreModule")
-      port = new Error("CoreModule")
+      result = new Error("CoreModule")
     }
 
-    if (port instanceof Error) {
-      throw port
+    if (result instanceof Error) {
+      throw result
     }
 
-    return port
+    return result
   })
 
   window.listenToCoreModuleProgress((_, progress) => {
@@ -123,7 +127,10 @@ render(() => {
     const minLoadingTime = 3000
     const timeElapsed = Date.now() - startTime
 
-    if (coreModuleLoaded.state === "ready" && timeElapsed >= minLoadingTime) {
+    if (
+      coreModuleLoaded.state === "ready" &&
+      (timeElapsed >= minLoadingTime || import.meta.env.DEV)
+    ) {
       setIsReady(true)
     } else if (coreModuleLoaded.state === "ready") {
       setTimeout(() => {
@@ -139,7 +146,11 @@ render(() => {
           <Switch>
             <Match when={isReady()}>
               <InnerApp
-                port={coreModuleLoaded() as unknown as number}
+                port={(coreModuleLoaded() as unknown as { port: number }).port}
+                apiToken={
+                  (coreModuleLoaded() as unknown as { apiToken: string })
+                    .apiToken
+                }
                 isBackendReady={true}
               />
               <Toaster />
@@ -170,19 +181,20 @@ render(() => {
 
 interface InnerAppProps {
   port: number
+  apiToken: string
   isBackendReady: boolean
 }
 
 const InnerApp = (props: InnerAppProps) => {
-  const { client, createInvalidateQuery } = initRspc(props.port)
+  const { createInvalidateQuery } = initRspc(props.port, props.apiToken)
 
   return (
-    <rspc.Provider client={client} queryClient={queryClient}>
+    <QueryClientProvider client={queryClient}>
       <TransWrapper
         createInvalidateQuery={createInvalidateQuery}
         isBackendReady={props.isBackendReady}
       />
-    </rspc.Provider>
+    </QueryClientProvider>
   )
 }
 
@@ -282,22 +294,28 @@ const TransWrapper = (props: TransWrapperProps) => {
     <Show when={!settings.isInitialLoading && isI18nReady() && i18nOptions()}>
       <TransProvider instance={_i18nInstance} options={i18nOptions()}>
         <BackendReadyContext.Provider value={props.isBackendReady}>
-          <Router source={hashIntegration()}>
-            <GlobalStoreProvider>
-              <OnboardingProvider>
-                <NavigationManager>
-                  <ContextMenuProvider>
-                    <ModalProvider>
-                      <App
-                        createInvalidateQuery={props.createInvalidateQuery}
-                      />
-                      <SpotlightOverlay />
-                    </ModalProvider>
-                  </ContextMenuProvider>
-                </NavigationManager>
-              </OnboardingProvider>
-            </GlobalStoreProvider>
-          </Router>
+          <HashRouter
+            root={(routerProps) => (
+              <GlobalStoreProvider>
+                <OnboardingProvider>
+                  <NavigationManager>
+                    <ContextMenuProvider>
+                      <ModalProvider>
+                        <App
+                          createInvalidateQuery={props.createInvalidateQuery}
+                        >
+                          {routerProps.children}
+                        </App>
+                        <SpotlightOverlay />
+                      </ModalProvider>
+                    </ContextMenuProvider>
+                  </NavigationManager>
+                </OnboardingProvider>
+              </GlobalStoreProvider>
+            )}
+          >
+            {routes}
+          </HashRouter>
         </BackendReadyContext.Provider>
       </TransProvider>
     </Show>

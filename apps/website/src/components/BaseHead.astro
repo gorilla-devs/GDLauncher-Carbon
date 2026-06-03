@@ -1,32 +1,183 @@
 ---
-import composeCDNAssetLink from "../utils/composeCDNAssetLink";
+import "../styles/theme.css";
 import "../styles/global.css";
 import { ViewTransitions } from "astro:transitions";
+import { TWITTER_HANDLE } from "../consts";
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  getLocaleFromUrl,
+  getOgLocale,
+  localizedPath,
+  pathWithoutLocale,
+  isPathLocalized,
+  type Locale,
+} from "../lib/i18n";
+
 export interface Props {
   title: string;
   description: string;
   image?: string;
+  imageAlt?: string;
+  keywords?: string;
+  canonicalUrl?: string;
+  /** OpenGraph type: "website" (default) or "article" for blog/guides. */
+  ogType?: "website" | "article";
+  /** ISO 8601 publish time for article-type pages. */
+  publishedTime?: string;
+  /** ISO 8601 modified time for article-type pages. */
+  modifiedTime?: string;
+  /** Article author name (renders both as og:article:author and meta author). */
+  author?: string;
+  /** Set to true to instruct robots not to index this page. */
+  noindex?: boolean;
+  /**
+   * JSON-LD structured data objects to emit on this page.
+   * Each entry will be rendered as its own <script type="application/ld+json"> tag.
+   */
+  jsonLd?: Record<string, unknown>[];
 }
 
-const { title, description, image } = Astro.props as Props;
+const {
+  title,
+  description,
+  image,
+  imageAlt,
+  keywords,
+  canonicalUrl,
+  ogType = "website",
+  publishedTime,
+  modifiedTime,
+  author,
+  noindex = false,
+  jsonLd,
+} = Astro.props as Props;
+
+const DEFAULT_IMAGE = "https://cdn.gdl.gg/assets/website-preview.jpg";
+const siteUrl = Astro.site?.toString() || "https://gdlauncher.com";
+
+// Resolve og:image to an absolute URL. Many crawlers reject relative
+// paths and silently drop the preview card. Blog `heroImage` frontmatter
+// may be a CDN URL (already absolute) or a /images/foo.jpg site-relative
+// path; normalise both.
+function toAbsoluteImage(src: string | undefined): string {
+  if (!src) return DEFAULT_IMAGE;
+  if (/^https?:\/\//i.test(src)) return src;
+  return new URL(src, siteUrl).toString();
+}
+
+// Pick the og:image:type MIME based on the URL's extension so PNG/WebP
+// heroes don't mis-declare as JPEG. Defaults to JPEG when nothing matches
+// (Astro's default image and most hand-set images are JPGs).
+function imageMimeType(url: string): string {
+  const m = url.toLowerCase().match(/\.(png|webp|gif|svg|jpe?g)(\?|$)/);
+  if (!m) return "image/jpeg";
+  const ext = m[1];
+  if (ext === "svg") return "image/svg+xml";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  return `image/${ext}`;
+}
+
+const ogImage = toAbsoluteImage(image);
+const ogImageType = imageMimeType(ogImage);
+const ogImageAlt = imageAlt || `${title} - GDLauncher`;
+
+const currentLocale = getLocaleFromUrl(Astro.url.pathname);
+const pathBase = pathWithoutLocale(Astro.url.pathname);
+const currentUrl =
+  canonicalUrl || new URL(Astro.url.pathname, siteUrl).toString();
+
+// hreflang alternates: only emit them when the page actually has versions
+// in other locales. For English-only pages (e.g. /privacy-statement, /vs/...)
+// the hreflangs would otherwise point to non-existent /ja/..., /ko/..., etc.
+// and Google would index them as 404s. Also skip when noindex (the page
+// won't be in the index, so directing crawlers at locale siblings is noise).
+const pathHasLocalizedVersions = isPathLocalized(pathBase) && !noindex;
+const alternates = pathHasLocalizedVersions
+  ? LOCALES.map((loc) => ({
+      hreflang: loc === DEFAULT_LOCALE ? "en" : loc,
+      href: new URL(localizedPath(pathBase, loc as Locale), siteUrl).toString(),
+    }))
+  : [];
+const xDefault = pathHasLocalizedVersions
+  ? new URL(localizedPath(pathBase, DEFAULT_LOCALE as Locale), siteUrl).toString()
+  : null;
 ---
 
-<title>{title}</title>
-<meta name="description" content={title} />
-<meta name="og:title" property="og:title" content={title} />
-<meta property="og:type" content="website" />
-<meta property="og:description" content={description} />
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta
-  property="og:image"
-  content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"}
-/>
+<meta name="theme-color" content="#15181e" />
+<meta name="color-scheme" content="dark" />
+<meta name="application-name" content="GDLauncher" />
+<meta name="apple-mobile-web-app-title" content="GDLauncher" />
+<meta name="format-detection" content="telephone=no" />
+
+<!-- Robots -->
+<meta name="robots" content={noindex ? "noindex, follow" : "index, follow, max-image-preview:large"} />
+
+<!-- Resource hints: warm up CDN early so addon hero images and screenshots
+     don't pay a fresh DNS+TLS handshake on first paint. -->
+<link rel="preconnect" href="https://cdn.gdl.gg" crossorigin />
+<link rel="dns-prefetch" href="https://cdn.gdl.gg" />
+
+<!-- Primary Meta Tags -->
+<title>{title}</title>
+<meta name="description" content={description} />
+{keywords && <meta name="keywords" content={keywords} />}
+{author && <meta name="author" content={author} />}
+{/* Skip canonical on noindex pages: pointing at the requested URL just
+    pollutes Search Console; pointing elsewhere risks miscanonicalisation. */}
+{!noindex && <link rel="canonical" href={currentUrl} />}
+
+<!-- hreflang alternates -->
+{alternates.map((alt) => (
+  <link rel="alternate" hreflang={alt.hreflang} href={alt.href} />
+))}
+{xDefault && <link rel="alternate" hreflang="x-default" href={xDefault} />}
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content={ogType} />
+<meta property="og:url" content={currentUrl} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:secure_url" content={ogImage} />
+<meta property="og:image:type" content={ogImageType} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={ogImageAlt} />
+<meta property="og:site_name" content="GDLauncher" />
+<meta property="og:locale" content={getOgLocale(currentLocale)} />
+{LOCALES.filter((l) => l !== currentLocale).map((l) => (
+  <meta property="og:locale:alternate" content={getOgLocale(l as Locale)} />
+))}
+
+{ogType === "article" && publishedTime && (
+  <meta property="article:published_time" content={publishedTime} />
+)}
+{ogType === "article" && modifiedTime && (
+  <meta property="article:modified_time" content={modifiedTime} />
+)}
+{ogType === "article" && author && (
+  <meta property="article:author" content={author} />
+)}
+
+<!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content={TWITTER_HANDLE} />
+<meta name="twitter:creator" content={TWITTER_HANDLE} />
+<meta name="twitter:url" content={currentUrl} />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
-<meta
-  property="twitter:image"
-  content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"}
-/>
+<meta name="twitter:image" content={ogImage} />
+<meta name="twitter:image:alt" content={ogImageAlt} />
+
+<!-- Favicon -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+
+<!-- Structured data -->
+{jsonLd?.map((data) => (
+  <script type="application/ld+json" set:html={JSON.stringify(data)} />
+))}
 
 <ViewTransitions />

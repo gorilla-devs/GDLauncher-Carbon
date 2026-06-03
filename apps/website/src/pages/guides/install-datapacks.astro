@@ -1,0 +1,68 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Install Minecraft Data Packs"
+  description="Learn how to install data packs in Minecraft. Add new recipes, loot tables, and game mechanics without mods."
+  keywords="install datapack minecraft, how to install data packs, minecraft datapack guide, vanilla tweaks, gdlauncher datapack"
+  lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT3M",
+    steps: [
+      { name: "Open the instance", text: "Data packs apply to a single world, so first open the Minecraft instance you want to use the pack in." },
+      { name: "Browse data packs in GDLauncher", text: "Open the Addons tab, click Add Addons, switch the addon type to Data Packs, and search for the pack you want." },
+      { name: "Download to the instance", text: "Click Download. GDLauncher places the data pack in the instance's instance/datapacks/ folder, which applies to every world in that instance. If you need per-world scoping, see the manual flow below." },
+      { name: "Reload the world", text: "Open the world (or run /reload from inside it). The data pack's recipes, advancements, and game changes are now active." }
+    ]
+  }}
+>
+  <h2>What data packs do</h2>
+  <p>
+    Data packs tweak Minecraft's mechanics without mods. They can add crafting recipes, change what mobs drop, create custom advancements, modify world generation, and run commands automatically. All in vanilla Minecraft.
+  </p>
+  <p>
+    They're more limited than mods. You can't add truly new blocks or items, just tweak existing mechanics. But they work on servers without requiring players to install anything, and removing them is as simple as deleting a file.
+  </p>
+
+  <h2>Installing with GDLauncher (all worlds)</h2>
+  <p>
+    Open your instance and go to the <strong>Addons</strong> tab. Click <strong>Add Addons</strong>, then select <strong>Data Packs</strong> from the dropdown on the left of the search bar. Find a data pack and click <strong>Download</strong>.
+  </p>
+  <p>
+    Data packs installed this way apply to all worlds in that instance. If you want different packs for different worlds, use the per-world method below.
+  </p>
+
+  <h2>Per-world installation</h2>
+  <p>
+    For more control, you can install data packs to specific worlds only. Right-click your instance in GDLauncher, select <strong>More options</strong> → <strong>Open folder</strong>. Navigate into the <code>instance</code> folder, then <code>saves/[your world]/datapacks</code> and drop the .zip in there.
+  </p>
+  <p>
+    Load the world and run <code>/reload</code> in chat. Check if it worked with <code>/datapack list</code>. Green means enabled, red means disabled.
+  </p>
+
+  <h2>Installing on a new world</h2>
+  <p>
+    When creating a new world in Minecraft, click "Data Packs" before generating. Click "Open Pack Folder" and copy your .zip file in. Go back to Minecraft, hit refresh, move the pack to "Selected", and create your world.
+  </p>
+
+  <h2>Popular data packs</h2>
+  <p>
+    Vanilla Tweaks is a must-know. It's a website that lets you pick and choose from hundreds of small tweaks: one player sleep, mob heads, custom armor stand poses, and more. You build your own custom pack from a menu.
+  </p>
+  <p>
+    Beyond that, you'll find packs for craftable items that normally aren't, quality-of-life improvements, and gameplay challenges.
+  </p>
+
+  <h2>Troubleshooting</h2>
+  <p>
+    Pack not loading? Make sure it's a .zip file (don't extract it) and in the right <code>datapacks</code> folder. Run <code>/reload</code> and check <code>/datapack list</code>.
+  </p>
+  <p>
+    Shows as incompatible? The pack might be for a different Minecraft version. Sometimes they work anyway despite the warning, but check for an updated version if you have issues.
+  </p>
+  <p>
+    Features not working? Make sure cheats are enabled (for commands to work) and check if the pack has dependencies on other packs.
+  </p>
+
+</GuideLayout>

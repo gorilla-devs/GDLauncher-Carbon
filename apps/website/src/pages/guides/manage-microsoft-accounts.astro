@@ -1,0 +1,50 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Add, Switch, and Remove Microsoft Accounts in GDLauncher"
+  description="Sign in to multiple Microsoft accounts, choose which one Play uses, refresh expired tokens, and remove accounts you don't use anymore."
+  keywords="add microsoft account, switch minecraft account, multi account, gdlauncher accounts, microsoft sign in"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Open the Accounts page", text: "Settings → Accounts. The Microsoft Accounts table sits below the GDL Account section, with columns Active, Username, Type, Status, UUID, Actions." },
+      { name: "Add a new account", text: "Click the + button in the section header. GDLauncher offers two sign-in methods: Browser (recommended, the default) opens Microsoft's sign-in page in your default browser and returns to the launcher automatically when you finish. Device code is a fallback when the browser flow doesn't work for you: GDLauncher shows a short code and a verification link (also a QR), you open the link in any browser, enter the code, and sign in. Use the Microsoft account that owns the Minecraft license you want. On success, the account appears in the table." },
+      { name: "Switch the active account", text: "Click the Active cell of the row you want to make active. A checkmark appears, that's the account Play uses now." },
+      { name: "Re-authenticate expired or invalid accounts", text: "If Status shows expired or invalid, click the refresh icon in the Actions column. The launcher walks you back through Microsoft sign-in (you can pick Browser or device code again); on success the status flips back to ok." },
+      { name: "Remove an account", text: "Click the trash icon in the Actions column. Confirm in the modal. If the account is the linked owner of your GDL Account, a different confirmation modal appears asking whether you want to break the link before deletion proceeds." }
+    ]
+  }}
+>
+  <h2>What 'Active' means</h2>
+  <p>The Active account is the one Play uses when you launch an instance. You can be signed in to several Microsoft accounts at once, the launcher remembers all of them, but only one is "active" at a time. Switching is one click; nothing else needs to be touched.</p>
+
+  <h2>Status states explained</h2>
+  <ul>
+    <li><strong>ok (green check)</strong>: the access token is valid. Ready to launch.</li>
+    <li><strong>expired (yellow alert)</strong>: the access token expired and hasn't been auto-refreshed yet. Click the refresh icon in Actions to re-authenticate through Microsoft, or wait, the launcher will try its background refresh on the next opportunity.</li>
+    <li><strong>refreshing (yellow refresh)</strong>: the launcher is currently refreshing the token in the background. No action needed.</li>
+    <li><strong>invalid (red X)</strong>: the refresh token itself was rejected by Microsoft, so no background refresh will recover this. Common triggers: you changed your Microsoft password, signed out from Microsoft's website, or hit a security policy. Click the refresh icon in Actions to walk through Microsoft sign-in again, or remove and re-add.</li>
+  </ul>
+
+  <h2>Why an account suddenly goes invalid</h2>
+  <p>Microsoft can invalidate refresh tokens server-side at any time. The most common triggers:</p>
+  <ul>
+    <li>You changed your Microsoft password.</li>
+    <li>You enabled or disabled two-factor authentication.</li>
+    <li>You signed out from microsoft.com or account.microsoft.com explicitly.</li>
+    <li>You haven't used the account in months and Microsoft expired old tokens as a cleanup.</li>
+  </ul>
+  <p>None of these are GDLauncher's fault, the launcher just sees a "token rejected" response. The fix is always the same: remove the account, add it again, sign in fresh.</p>
+
+  <h2>Linked GDL accounts</h2>
+  <p>If you've signed up for a GDL account, one of your Microsoft accounts is the linked owner of it. Removing that Microsoft account triggers a confirmation modal, breaking the link affects what your GDL profile is anchored to. You can re-link to a different Microsoft account later in GDL Account settings.</p>
+
+  <h2>Children accounts and Family Group</h2>
+  <p>If you have a child Microsoft account or one inside a Family Group, the parent account may need to grant Minecraft access on the platform before sign-in works. Go to <code>account.microsoft.com/family</code> and check the child's app permissions. Without that, GDLauncher's sign-in flow shows a "console access required" or "Xbox Live not allowed" error.</p>
+
+  <h2>Removing the last account</h2>
+  <p>Removing the last signed-in Microsoft account signs you out of GDLauncher entirely. You're routed to the home page; you'll need to add an account again before you can launch anything.</p>
+</GuideLayout>

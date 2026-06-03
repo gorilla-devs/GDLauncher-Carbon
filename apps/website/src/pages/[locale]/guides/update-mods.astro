@@ -1,0 +1,194 @@
+---
+/**
+ * Localized "How to Update Mods in an Instance" guide.
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizedPath,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "インスタンスの Mod を更新する方法",
+    description: "GDLauncher で個別の Minecraft Mod を最新版に更新する手順。CurseForge / Modrinth の更新を 1 クリックで適用、Update All にも対応。",
+    steps: [
+      { name: "インスタンスを開く", text: "Library で対象のインスタンスをクリックして詳細を表示。" },
+      { name: "Mods タブに切り替え", text: "タブバーから Mods を開きます。GDLauncher が各 Mod を CurseForge / Modrinth と照合し、新バージョンがあるものをマーク。" },
+      { name: "個別に更新", text: "更新可能な Mod の横に Update ボタンが表示されます。クリックすると新バージョンをダウンロードして jar を置き換え。" },
+      { name: "一括更新", text: "Mods タブのツールバーの Update All を使えば、対象 Mod すべてを 1 クリックで更新。" },
+      { name: "インスタンスを再起動", text: "実行中なら停止。Mod の jar は起動時に読み込まれるため、新バージョンは再起動後に有効になります。" }
+    ]
+  },
+  ko: {
+    title: "인스턴스의 모드를 업데이트하는 방법",
+    description: "GDLauncher에서 개별 Minecraft 모드를 최신 버전으로 업데이트하는 방법. CurseForge/Modrinth 업데이트를 한 번에, Update All도 지원.",
+    steps: [
+      { name: "인스턴스 열기", text: "Library에서 대상 인스턴스를 클릭해 상세 보기를 엽니다." },
+      { name: "Mods 탭으로 이동", text: "탭바에서 Mods를 열면 GDLauncher가 각 모드를 CurseForge/Modrinth와 대조해 새 버전이 있는 모드를 표시합니다." },
+      { name: "개별 모드 업데이트", text: "업데이트 가능한 모드 옆에 Update 버튼이 표시됩니다. 클릭하면 새 버전을 받고 jar를 교체합니다." },
+      { name: "전체 업데이트", text: "Mods 탭 툴바의 Update All로 대상 전부를 한 번에 업데이트." },
+      { name: "인스턴스 재시작", text: "실행 중이면 중지하세요. 모드 jar는 시작할 때 로드되므로 다음 실행부터 새 버전이 적용됩니다." }
+    ]
+  },
+  de: {
+    title: "Mods in einer Instanz aktualisieren",
+    description: "Halt deine einzelnen Minecraft-Mods im GDLauncher aktuell. CurseForge-/Modrinth-Updates per Klick, Update-All-Action für die Stapelaktualisierung.",
+    steps: [
+      { name: "Instanz öffnen", text: "In der Library auf die Instanz klicken, um die Detail-Ansicht zu öffnen." },
+      { name: "Auf den Mods-Tab wechseln", text: "Über die Tab-Leiste zum Mods-Tab. GDLauncher gleicht jeden Mod mit CurseForge/Modrinth ab und markiert solche mit neuer Version." },
+      { name: "Einzelnen Mod aktualisieren", text: "Mods mit Update zeigen einen Update-Button. Klick, die neue Version wird geladen und die alte jar ersetzt." },
+      { name: "Alle aktualisieren", text: "Mit der Update-All-Aktion in der Mods-Toolbar werden alle markierten Mods auf einmal aktualisiert." },
+      { name: "Instanz neu starten", text: "Falls sie läuft, beenden. Mod-Jars werden beim Start geladen, die neuen Versionen greifen erst nach dem nächsten Launch." }
+    ]
+  },
+  fr: {
+    title: "Comment mettre à jour les mods d'une instance",
+    description: "Garde tes mods Minecraft à jour dans GDLauncher. Mises à jour CurseForge/Modrinth en un clic, et action Update All pour tout faire d'un coup.",
+    steps: [
+      { name: "Ouvrir l'instance", text: "Dans la Library, clique sur l'instance pour ouvrir sa vue détaillée." },
+      { name: "Aller dans l'onglet Mods", text: "Via la barre d'onglets, ouvre Mods. GDLauncher compare chaque mod à CurseForge/Modrinth et signale ceux qui ont une release plus récente." },
+      { name: "Mettre à jour un mod", text: "Les mods avec une mise à jour affichent un bouton Update. Clique, la nouvelle version est téléchargée et remplace l'ancien jar." },
+      { name: "Mettre à jour tout", text: "L'action Update All dans la toolbar des Mods met à jour tous les mods signalés en un clic." },
+      { name: "Redémarrer l'instance", text: "Si elle tourne, arrête-la. Les jars de mod sont chargés au démarrage, les nouvelles versions ne prennent effet qu'au prochain lancement." }
+    ]
+  },
+  es: {
+    title: "Cómo actualizar los mods de una instancia",
+    description: "Mantén al día los mods individuales de Minecraft en GDLauncher. Actualizaciones de CurseForge/Modrinth con un clic, y acción Update All para hacerlo en bloque.",
+    steps: [
+      { name: "Abrir la instancia", text: "En la Library, haz clic en la instancia para abrir su vista de detalle." },
+      { name: "Cambiar a la pestaña Mods", text: "Desde la barra de pestañas, abre Mods. GDLauncher contrasta cada mod con CurseForge/Modrinth y marca los que tienen versión nueva." },
+      { name: "Actualizar un mod", text: "Los mods con actualización muestran un botón Update. Pulsa, se descarga la nueva versión y reemplaza el jar antiguo." },
+      { name: "Actualizar todo", text: "La acción Update All de la barra de Mods actualiza todos los mods marcados con un solo clic." },
+      { name: "Reiniciar la instancia", text: "Si está corriendo, ciérrala. Los jars de mods se cargan al iniciar, la nueva versión solo se aplica en el siguiente arranque." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como atualizar mods de uma instância",
+    description: "Mantenha mods individuais do Minecraft atualizados no GDLauncher. Atualizações de CurseForge/Modrinth com um clique, e ação Update All para tudo de uma vez.",
+    steps: [
+      { name: "Abrir a instância", text: "Na Library, clique na instância para abrir a visão de detalhes." },
+      { name: "Trocar para a aba Mods", text: "Pela barra de abas, abra Mods. O GDLauncher compara cada mod com CurseForge/Modrinth e marca os que têm versão nova." },
+      { name: "Atualizar um mod", text: "Mods com atualização mostram um botão Update. Clique, a nova versão é baixada e substitui o jar antigo." },
+      { name: "Atualizar tudo", text: "A ação Update All na toolbar de Mods atualiza todos os mods marcados em um clique." },
+      { name: "Reiniciar a instância", text: "Se estiver rodando, pare. Os jars de mods carregam no início, a nova versão só vale no próximo arranque." }
+    ]
+  },
+  it: {
+    title: "Come aggiornare le Mod di un'istanza",
+    description: "Tieni aggiornate le singole Mod di Minecraft in GDLauncher. Aggiornamenti CurseForge/Modrinth con un clic e azione Update All per fare tutto in una volta.",
+    steps: [
+      { name: "Apri l'istanza", text: "Nella Library, clicca sull'istanza per aprire la vista di dettaglio." },
+      { name: "Passa alla scheda Mods", text: "Dalla barra delle schede, apri Mods. GDLauncher confronta ogni Mod con CurseForge/Modrinth e segnala quelle con una nuova versione." },
+      { name: "Aggiorna una singola Mod", text: "Le Mod con aggiornamento mostrano un pulsante Update. Cliccalo: la nuova versione viene scaricata e sostituisce il jar vecchio." },
+      { name: "Aggiorna tutto", text: "L'azione Update All nella toolbar dei Mods aggiorna tutte le Mod segnalate con un clic." },
+      { name: "Riavvia l'istanza", text: "Se è in esecuzione, fermala. I jar delle Mod si caricano all'avvio, le nuove versioni hanno effetto solo dal prossimo launch." }
+    ]
+  }
+}
+const m = meta[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>更新の検出方法</h2>
+      <p>各 Mod は導入元の CurseForge / Modrinth アドオンと紐付けられ、定期的にリリースフィードを照合。インスタンスの MC バージョンと Mod ローダーに合う新バージョンがあれば Update ボタンが表示されます。手動で <code>mods</code> フォルダーに入れた jar は出どころが特定できないため自動チェックの対象外です。</p>
+
+      <h2>更新すべきとき・しないとき</h2>
+      <p>安定運用中の Modpack では基本的に個別更新を避けるのが安全。Pack 作者がバージョン整合性を管理しているためです。自作インスタンスや特定の修正が必要なときは個別に更新。Pack 全体の更新は <a href={localizedPath("/guides/update-modpack-version", locale)}>Modpack の更新</a> を使うのが確実。</p>
+
+      <h2>ロックインスタンスとロールバック</h2>
+      <p>Modpack インスタンスはデフォルトでロック。Pack 管理外の Mod (自分で追加したもの) は通常通り更新できます。Pack 管理 Mod を更新したい場合はアンロックが必要。問題があれば Mod 詳細でバージョンドロップダウンから前のバージョンに戻せます。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>업데이트 감지 방식</h2>
+      <p>각 모드는 설치 출처인 CurseForge/Modrinth 애드온과 연결되어 주기적으로 릴리스를 확인합니다. 인스턴스의 MC 버전과 모드 로더에 맞는 새 버전이 있으면 Update 버튼이 나타납니다. 수동으로 <code>mods</code> 폴더에 넣은 jar는 출처를 알 수 없어 자동 체크 대상이 아닙니다.</p>
+
+      <h2>업데이트할 때 vs 안 할 때</h2>
+      <p>안정된 모드팩을 진행 중이라면 개별 업데이트는 보통 피하는 게 안전합니다. 팩 제작자가 버전 정합성을 잡아 두기 때문입니다. 직접 만든 인스턴스이거나 특정 수정이 필요한 경우엔 개별 업데이트. 팩 전체 업데이트는 <a href={localizedPath("/guides/update-modpack-version", locale)}>모드팩 업데이트</a>가 확실합니다.</p>
+
+      <h2>잠금 인스턴스와 롤백</h2>
+      <p>모드팩 인스턴스는 기본적으로 잠겨 있습니다. 팩이 관리하지 않는 모드(직접 추가한 것)는 평소대로 업데이트 가능합니다. 팩 관리 모드를 업데이트하려면 잠금 해제가 필요. 문제가 생기면 모드 상세에서 버전 드롭다운으로 이전 버전으로 되돌릴 수 있습니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Wie Updates erkannt werden</h2>
+      <p>Jeder Mod ist mit dem CurseForge-/Modrinth-Addon verknüpft, von dem er stammt. GDLauncher prüft den Release-Feed regelmäßig, gibt es eine neue Version, die zu deiner MC-Version und Loader passt, erscheint der Update-Button. Mods, die du manuell in den <code>mods</code>-Ordner gelegt hast, haben keine bekannte Quelle und werden nicht automatisch geprüft.</p>
+
+      <h2>Wann updaten, wann nicht</h2>
+      <p>Mitten in einer stabilen Modpack-Runde lieber <em>nicht</em> einzelne Mods aktualisieren. Der Pack-Author hält Versionen abgestimmt. Bei eigenen Custom-Instanzen oder wenn ein gezielter Fix nötig ist: einzeln updaten. Für ganze Pack-Updates ist <a href={localizedPath("/guides/update-modpack-version", locale)}>Modpack-Update</a> der saubere Weg.</p>
+
+      <h2>Locked-Instanzen und Rollback</h2>
+      <p>Modpack-Instanzen sind standardmäßig gesperrt. Eigene Mods (die du zusätzlich installiert hast) lassen sich trotzdem aktualisieren. Pack-verwaltete Mods erfordern Entsperren. Wenn ein Update Probleme macht, kannst du in der Mod-Detail-Ansicht über das Versions-Dropdown zur vorherigen zurück.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Comment GDLauncher détecte les mises à jour</h2>
+      <p>Chaque mod est lié à son addon d'origine sur CurseForge/Modrinth. GDLauncher consulte régulièrement le feed des releases, s'il en existe une plus récente compatible avec ta version MC et ton loader, le bouton Update apparaît. Les jars déposés manuellement dans le dossier <code>mods</code> n'ont pas de source connue et ne sont pas vérifiés automatiquement.</p>
+
+      <h2>Quand mettre à jour, et quand pas</h2>
+      <p>En cours de partie sur un modpack stable, mieux vaut <em>ne pas</em> updater les mods un par un. L'auteur du pack gère la cohérence des versions. Pour les instances perso ou un fix précis : update individuel. Pour mettre à jour le pack entier, utilise plutôt <a href={localizedPath("/guides/update-modpack-version", locale)}>la mise à jour du modpack</a>.</p>
+
+      <h2>Instances verrouillées et rollback</h2>
+      <p>Les instances de modpack sont verrouillées par défaut. Les mods que tu as ajoutés en plus restent maj-ables. Pour les mods gérés par le pack, il faut déverrouiller. Si un update casse quelque chose, le menu version dans le détail du mod permet de revenir à la version précédente.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Cómo detecta GDLauncher las actualizaciones</h2>
+      <p>Cada mod queda enlazado al addon de origen en CurseForge/Modrinth. GDLauncher revisa el feed periódicamente, si hay versión nueva compatible con tu versión MC y loader, aparece el botón Update. Los jars que metiste a mano en la carpeta <code>mods</code> no tienen origen conocido y no se chequean automáticamente.</p>
+
+      <h2>Cuándo actualizar, y cuándo no</h2>
+      <p>A media partida en un modpack estable, lo más prudente suele ser <em>no</em> actualizar mods individuales. El autor del pack mantiene la coherencia de versiones. Para instancias custom o un fix concreto: actualización individual. Para actualizar el pack entero, mejor <a href={localizedPath("/guides/update-modpack-version", locale)}>la guía de actualizar modpack</a>.</p>
+
+      <h2>Instancias bloqueadas y rollback</h2>
+      <p>Las instancias de modpack vienen bloqueadas por defecto. Los mods que añadiste tú aparte se pueden actualizar igualmente. Para mods gestionados por el pack hay que desbloquear. Si un update rompe algo, en el detalle del mod puedes volver a la versión anterior con el desplegable de versiones.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>Como o GDLauncher detecta atualizações</h2>
+      <p>Cada mod fica vinculado ao addon de origem no CurseForge/Modrinth. O GDLauncher checa o feed periodicamente, se houver versão mais nova compatível com sua versão MC e loader, o botão Update aparece. Jars colocados manualmente na pasta <code>mods</code> não têm origem conhecida e não são verificados automaticamente.</p>
+
+      <h2>Quando atualizar, e quando não</h2>
+      <p>No meio de uma run estável em um modpack, geralmente o seguro é <em>não</em> atualizar mods individuais. O autor do pack mantém o casamento de versões. Para instâncias custom ou um fix específico: update individual. Para atualizar o pack todo, use <a href={localizedPath("/guides/update-modpack-version", locale)}>o guia de atualizar modpack</a>.</p>
+
+      <h2>Instâncias bloqueadas e rollback</h2>
+      <p>Instâncias de modpack vêm bloqueadas por padrão. Mods que você adicionou por fora dão para atualizar normalmente. Para mods gerenciados pelo pack é preciso desbloquear. Se um update quebrar algo, no detalhe do mod você pode voltar para a versão anterior pelo dropdown de versões.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Come GDLauncher rileva gli aggiornamenti</h2>
+      <p>Ogni Mod resta collegato all'addon d'origine su CurseForge/Modrinth. GDLauncher controlla il feed delle release periodicamente: se c'è una versione più nuova compatibile con la tua versione MC e il loader, compare il pulsante Update. I jar messi a mano nella cartella <code>mods</code> non hanno una sorgente nota e non vengono controllati automaticamente.</p>
+
+      <h2>Quando aggiornare e quando no</h2>
+      <p>A metà di una run stabile su un Modpack, di solito è prudente <em>non</em> aggiornare i Mod singolarmente. L'autore del pack tiene allineate le versioni. Per istanze custom o se serve un fix specifico: aggiornamento individuale. Per aggiornare l'intero pack, usa <a href={localizedPath("/guides/update-modpack-version", locale)}>la guida per aggiornare il Modpack</a>.</p>
+
+      <h2>Istanze bloccate e rollback</h2>
+      <p>Le istanze Modpack sono bloccate di default. I Mod aggiunti da te a parte si possono aggiornare normalmente. Per i Mod gestiti dal pack serve sbloccare. Se un update rompe qualcosa, nel dettaglio del Mod puoi tornare alla versione precedente dal menu a tendina delle versioni.</p>
+    </Fragment>
+  )}
+</GuideLayout>

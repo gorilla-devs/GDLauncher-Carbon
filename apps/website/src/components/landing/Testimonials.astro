@@ -1,0 +1,194 @@
+---
+/**
+ * Testimonials - User quotes and community feedback.
+ *
+ * Quotes are intentionally kept in their original (English) language across
+ * all locales. Translating real user quotes feels misleading and changes
+ * their authenticity. We translate only the section chrome.
+ */
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { APP_URLS } from "../../consts"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+
+const testimonials = [
+  {
+    quote: "GDLauncher is the best launcher I've used so far. The owner releases updates frequently and actively engages with the community. It makes installing different Minecraft versions and managing mods simple and efficient.",
+    author: "Calvin",
+    platform: "Discord"
+  },
+  {
+    quote: "I don't have to worry about Java management anymore. Installing different Minecraft versions is no problem because everything is properly separated. No more incompatible mod versions because I forgot to remove an old mod. It's the best launcher I've used to this day.",
+    author: "Violet0461",
+    platform: "Discord"
+  },
+  {
+    quote: "I switched to GDLauncher after using pretty much every other launcher under the sun (Prism, Technic, CurseForge...). You couldn't pay me to go back.",
+    author: "Nikuno Menura",
+    platform: "Discord"
+  },
+  {
+    quote: "I really like how quick and easy it is to make an entirely new instance. As someone who supports people with mod-related issues, GDLauncher provides a super reliable and simple way to make vastly different instances with just a few clicks.",
+    author: "Puddle",
+    platform: "Discord"
+  },
+  {
+    quote: "Ever since I discovered GDLauncher, I love using it. It makes playing modded Minecraft easy, especially on Linux.",
+    author: "Luna",
+    platform: "Discord"
+  },
+  {
+    quote: "Even my noob friend could get it installed and start using mods.",
+    author: "lolliepoep",
+    platform: "Discord"
+  },
+  {
+    quote: "I love the design and how simple it is, and how it has everything one may need.",
+    author: "frozedy",
+    platform: "Discord"
+  },
+  {
+    quote: "GDLauncher is the best Minecraft launcher in the world.",
+    author: "montaAL",
+    platform: "Discord"
+  },
+  {
+    quote: "I love GDLauncher because it makes it super easy for me to add mods on the fly without having to open 50 folders.",
+    author: "Nony",
+    platform: "Discord"
+  },
+  {
+    quote: "GDLauncher makes my friend group's annual Minecraft bender painless.",
+    author: "Blake",
+    platform: "Discord"
+  },
+  {
+    quote: "I switched to GDLauncher after a friend recommended it to me. Easily one of the best, lightweight Minecraft mod launchers.",
+    author: "Phwee",
+    platform: "Discord"
+  },
+  {
+    quote: "GDLauncher is the easiest Minecraft launcher I have used. It can download mods from CurseForge (including the ones that you can't download in non-CurseForge clients) and Modrinth. It has all the popular mod loaders (Forge, NeoForge, Fabric and Quilt).",
+    author: "magic",
+    platform: "Discord"
+  }
+]
+
+function getPlatformIcon(platform: string) {
+  switch (platform) {
+    case "Discord":
+      return "i-simple-icons:discord"
+    case "Reddit":
+      return "i-simple-icons:reddit"
+    case "Twitter":
+      return "i-simple-icons:x"
+    case "GitHub":
+      return "i-simple-icons:github"
+    default:
+      return ""
+  }
+}
+---
+
+<section class="py-24 bg-darkSlate-800 overflow-hidden">
+  <div class="max-w-6xl mx-auto px-4">
+    <!-- Section header -->
+    <div class="text-center mb-16" data-scroll="fade-up">
+      <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
+        {t("testimonials.heading.line1")}{" "}
+        <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
+          {t("testimonials.heading.line2")}
+        </span>
+      </h2>
+      <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+        {t("testimonials.intro")}
+      </p>
+    </div>
+  </div>
+
+  <!-- Testimonials rows with fade effect -->
+  <div class="testimonials-fade">
+    <div class="flex flex-col gap-6">
+      <!-- Row 1 -->
+      <div class="flex gap-6 justify-center">
+        {testimonials.slice(0, 6).map((testimonial, index) => (
+          <div
+            class="testimonial-card flex flex-col p-6 rounded-xl bg-darkSlate-700/50 border border-darkSlate-600 w-80 shrink-0"
+            data-scroll="fade-up"
+            data-scroll-delay={index * 75}
+          >
+            <blockquote class="text-lightSlate-100 mb-6 leading-relaxed text-sm">
+              "{testimonial.quote}"
+            </blockquote>
+            <div class="flex items-center gap-3 mt-auto">
+              <div class={`${getPlatformIcon(testimonial.platform)} w-5 h-5 text-darkSlate-100`}></div>
+              <span class="text-lightSlate-50 font-medium">
+                {testimonial.author}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Row 2 (offset) -->
+      <div class="flex gap-6 justify-center ml-44">
+        {testimonials.slice(6, 12).map((testimonial, index) => (
+          <div
+            class="testimonial-card flex flex-col p-6 rounded-xl bg-darkSlate-700/50 border border-darkSlate-600 w-80 shrink-0"
+            data-scroll="fade-up"
+            data-scroll-delay={150 + index * 75}
+          >
+            <blockquote class="text-lightSlate-100 mb-6 leading-relaxed text-sm">
+              "{testimonial.quote}"
+            </blockquote>
+            <div class="flex items-center gap-3 mt-auto">
+              <div class={`${getPlatformIcon(testimonial.platform)} w-5 h-5 text-darkSlate-100`}></div>
+              <span class="text-lightSlate-50 font-medium">
+                {testimonial.author}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  <!-- Join community CTA -->
+  <div class="max-w-6xl mx-auto px-4">
+    <div class="text-center mt-12" data-scroll="scale" data-scroll-delay="200">
+      <a
+        href={APP_URLS.socials.discord}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-brands-discord hover:bg-brands-discord/90 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95"
+      >
+        <div class="i-simple-icons:discord w-5 h-5"></div>
+        {t("testimonials.cta")}
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .testimonials-fade {
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 15%,
+      black 85%,
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 15%,
+      black 85%,
+      transparent 100%
+    );
+  }
+
+  .testimonial-card {
+    min-height: 200px;
+  }
+</style>

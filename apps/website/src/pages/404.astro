@@ -1,0 +1,48 @@
+---
+/**
+ * Global 404 page. Astro serves this for any URL that doesn't resolve,
+ * including SSR routes that explicitly set `Astro.response.status = 404`
+ * (the addon catch-all does this for missing slugs).
+ *
+ * Reads the locale from the request pathname so the chrome and copy land
+ * in the user's language even though Astro doesn't pass route params here.
+ * The `notfound.*` keys are shared with the addon catch-all so both
+ * surfaces stay consistent.
+ */
+import PageShell from "../components/PageShell.astro"
+import { getLocaleFromUrl, localizedPath, useTranslations } from "../lib/i18n"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+---
+
+<PageShell
+  title={t("notfound.title")}
+  description={t("notfound.description")}
+  noindex
+>
+    <div class="min-h-screen flex flex-col">
+      <div class="flex-1 flex items-center justify-center p-6">
+        <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 max-w-lg text-center">
+          <div class="text-7xl font-bold text-primary-400 mb-4">404</div>
+
+          <h1 class="text-2xl font-bold text-lightSlate-50 mb-3">
+            {t("notfound.heading")}
+          </h1>
+
+          <p class="text-darkSlate-100 mb-8">
+            {t("notfound.body")}
+          </p>
+
+          <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href={localizedPath("/", locale)} class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors">
+              {t("notfound.cta.home")}
+            </a>
+            <a href={localizedPath("/guides", locale)} class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-darkSlate-700 hover:bg-darkSlate-600 text-lightSlate-50 font-semibold transition-colors">
+              {t("notfound.cta.guides")}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+</PageShell>

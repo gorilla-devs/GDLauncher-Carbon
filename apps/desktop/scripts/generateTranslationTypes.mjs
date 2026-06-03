@@ -55,12 +55,41 @@ function escapeKey(key) {
 }
 
 /**
+ * Detect i18next plural suffixes (_zero, _one, _two, _few, _many, _other)
+ * and add the base key so t("key", { count }) works with TypeScript types.
+ */
+function addPluralBaseKeys(keys) {
+  const pluralSuffixes = ["_zero", "_one", "_two", "_few", "_many", "_other"]
+  const baseKeys = new Set()
+
+  for (const key of keys) {
+    for (const suffix of pluralSuffixes) {
+      if (key.endsWith(suffix)) {
+        baseKeys.add(key.slice(0, -suffix.length))
+        break
+      }
+    }
+  }
+
+  // Add base keys that aren't already present
+  const keySet = new Set(keys)
+  for (const base of baseKeys) {
+    if (!keySet.has(base)) {
+      keys.push(base)
+    }
+  }
+
+  return keys
+}
+
+/**
  * Generate TypeScript type for a namespace's keys
  */
 function generateNamespaceType(namespace, keys) {
   const typeName =
     namespace.charAt(0).toUpperCase() + namespace.slice(1) + "Keys"
-  const keyList = keys.map(escapeKey).join(" | ")
+  const allKeys = addPluralBaseKeys([...keys])
+  const keyList = allKeys.map(escapeKey).join(" | ")
 
   return `export type ${typeName} = ${keyList ? keyList : "never"};`
 }

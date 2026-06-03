@@ -1,4 +1,4 @@
-import { createSignal, createMemo, createEffect } from "solid-js"
+import { createSignal, createMemo, createEffect, onCleanup } from "solid-js"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { getInstanceImageUrl } from "@/utils/instances"
 
@@ -20,7 +20,7 @@ export const useInstanceSearch = (options?: UseInstanceSearchOptions) => {
       setDebouncedQuery(query)
     }, 150)
 
-    return () => clearTimeout(timeoutId)
+    onCleanup(() => clearTimeout(timeoutId))
   })
 
   const availableInstances = createMemo(() => {

@@ -10,7 +10,7 @@ use carbon_platforms::modrinth::{
     },
     search::ProjectSearchResult,
     tag::{Category, Loader, LoaderType},
-    user::{TeamMember, User, UserRole},
+    user::{TeamMember, User},
     version::{
         AdditionalFileType, Dependency, DependencyType, HashAlgorithm, Hashes,
         RequestedVersionStatus, Status, Version, VersionFile, VersionType,
@@ -408,7 +408,6 @@ impl TryFrom<MRFEVersion> for Version {
     type Error = anyhow::Error;
 
     fn try_from(value: MRFEVersion) -> Result<Self, Self::Error> {
-        #[allow(deprecated)]
         Ok(Version {
             name: value.name,
             version_number: value.version_number,
@@ -425,7 +424,6 @@ impl TryFrom<MRFEVersion> for Version {
             author_id: value.author_id,
             date_published: value.date_published.parse()?,
             downloads: value.downloads,
-            changelog_url: None,
             files: value
                 .files
                 .into_iter()
@@ -596,6 +594,7 @@ pub enum MRFEDependencyType {
     Optional,
     Incompatible,
     Embedded,
+    Unknown,
 }
 
 impl From<DependencyType> for MRFEDependencyType {
@@ -605,6 +604,7 @@ impl From<DependencyType> for MRFEDependencyType {
             DependencyType::Optional => MRFEDependencyType::Optional,
             DependencyType::Incompatible => MRFEDependencyType::Incompatible,
             DependencyType::Embedded => MRFEDependencyType::Embedded,
+            DependencyType::Unknown => MRFEDependencyType::Unknown,
         }
     }
 }
@@ -616,6 +616,7 @@ impl From<MRFEDependencyType> for DependencyType {
             MRFEDependencyType::Optional => DependencyType::Optional,
             MRFEDependencyType::Incompatible => DependencyType::Incompatible,
             MRFEDependencyType::Embedded => DependencyType::Embedded,
+            MRFEDependencyType::Unknown => DependencyType::Unknown,
         }
     }
 }
@@ -664,6 +665,7 @@ pub enum MRFERequestedVersionStatus {
     Archived,
     Draft,
     Unlisted,
+    Unknown,
 }
 
 impl From<RequestedVersionStatus> for MRFERequestedVersionStatus {
@@ -673,6 +675,7 @@ impl From<RequestedVersionStatus> for MRFERequestedVersionStatus {
             RequestedVersionStatus::Archived => MRFERequestedVersionStatus::Archived,
             RequestedVersionStatus::Draft => MRFERequestedVersionStatus::Draft,
             RequestedVersionStatus::Unlisted => MRFERequestedVersionStatus::Unlisted,
+            RequestedVersionStatus::Unknown => MRFERequestedVersionStatus::Unknown,
         }
     }
 }
@@ -684,6 +687,7 @@ impl From<MRFERequestedVersionStatus> for RequestedVersionStatus {
             MRFERequestedVersionStatus::Archived => RequestedVersionStatus::Archived,
             MRFERequestedVersionStatus::Draft => RequestedVersionStatus::Draft,
             MRFERequestedVersionStatus::Unlisted => RequestedVersionStatus::Unlisted,
+            MRFERequestedVersionStatus::Unknown => RequestedVersionStatus::Unknown,
         }
     }
 }
@@ -693,6 +697,11 @@ impl From<MRFERequestedVersionStatus> for RequestedVersionStatus {
 pub enum MRFEAdditionalFileType {
     RequiredResourcePack,
     OptionalResourcePack,
+    SourcesJar,
+    DevJar,
+    JavadocJar,
+    Signature,
+    Unknown,
 }
 
 impl From<AdditionalFileType> for MRFEAdditionalFileType {
@@ -704,6 +713,11 @@ impl From<AdditionalFileType> for MRFEAdditionalFileType {
             AdditionalFileType::OptionalResourcePack => {
                 MRFEAdditionalFileType::OptionalResourcePack
             }
+            AdditionalFileType::SourcesJar => MRFEAdditionalFileType::SourcesJar,
+            AdditionalFileType::DevJar => MRFEAdditionalFileType::DevJar,
+            AdditionalFileType::JavadocJar => MRFEAdditionalFileType::JavadocJar,
+            AdditionalFileType::Signature => MRFEAdditionalFileType::Signature,
+            AdditionalFileType::Unknown => MRFEAdditionalFileType::Unknown,
         }
     }
 }
@@ -717,6 +731,11 @@ impl From<MRFEAdditionalFileType> for AdditionalFileType {
             MRFEAdditionalFileType::OptionalResourcePack => {
                 AdditionalFileType::OptionalResourcePack
             }
+            MRFEAdditionalFileType::SourcesJar => AdditionalFileType::SourcesJar,
+            MRFEAdditionalFileType::DevJar => AdditionalFileType::DevJar,
+            MRFEAdditionalFileType::JavadocJar => AdditionalFileType::JavadocJar,
+            MRFEAdditionalFileType::Signature => AdditionalFileType::Signature,
+            MRFEAdditionalFileType::Unknown => AdditionalFileType::Unknown,
         }
     }
 }
@@ -813,7 +832,6 @@ impl From<Project> for MRFEProject {
 impl TryFrom<MRFEProject> for Project {
     type Error = anyhow::Error;
     fn try_from(value: MRFEProject) -> Result<Self, Self::Error> {
-        #[allow(deprecated)]
         Ok(Project {
             slug: value.slug,
             title: value.title,
@@ -834,7 +852,6 @@ impl TryFrom<MRFEProject> for Project {
             color: value.color,
             id: value.id,
             team: value.team,
-            body_url: None,
             moderator_message: value.moderator_message.map(Into::into),
             published: value.published.parse()?,
             updated: value.updated.parse()?,
@@ -994,6 +1011,10 @@ pub enum MRFEProjectStatus {
     /// The project has been submitted for approval and is being reviewed
     Processing,
     Withheld,
+    /// The project is scheduled to be released in the future
+    Scheduled,
+    /// The project is approved but not viewable to the public
+    Private,
     Unknown,
 }
 
@@ -1007,6 +1028,8 @@ impl From<ProjectStatus> for MRFEProjectStatus {
             ProjectStatus::Archived => MRFEProjectStatus::Archived,
             ProjectStatus::Processing => MRFEProjectStatus::Processing,
             ProjectStatus::Withheld => MRFEProjectStatus::Withheld,
+            ProjectStatus::Scheduled => MRFEProjectStatus::Scheduled,
+            ProjectStatus::Private => MRFEProjectStatus::Private,
             ProjectStatus::Unknown => MRFEProjectStatus::Unknown,
         }
     }
@@ -1022,35 +1045,9 @@ impl From<MRFEProjectStatus> for ProjectStatus {
             MRFEProjectStatus::Archived => ProjectStatus::Archived,
             MRFEProjectStatus::Processing => ProjectStatus::Processing,
             MRFEProjectStatus::Withheld => ProjectStatus::Withheld,
+            MRFEProjectStatus::Scheduled => ProjectStatus::Scheduled,
+            MRFEProjectStatus::Private => ProjectStatus::Private,
             MRFEProjectStatus::Unknown => ProjectStatus::Unknown,
-        }
-    }
-}
-
-#[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum MRFEUserRole {
-    Developer,
-    Moderator,
-    Admin,
-}
-
-impl From<UserRole> for MRFEUserRole {
-    fn from(value: UserRole) -> Self {
-        match value {
-            UserRole::Admin => Self::Admin,
-            UserRole::Developer => Self::Developer,
-            UserRole::Moderator => Self::Moderator,
-        }
-    }
-}
-
-impl From<MRFEUserRole> for UserRole {
-    fn from(value: MRFEUserRole) -> Self {
-        match value {
-            MRFEUserRole::Admin => Self::Admin,
-            MRFEUserRole::Developer => Self::Developer,
-            MRFEUserRole::Moderator => Self::Moderator,
         }
     }
 }
@@ -1060,23 +1057,8 @@ pub struct MRFEUser {
     pub username: String,
     /// The user's display name
     pub name: Option<String>,
-    /// The user's email, only visible to the user itself when authenticated
-    pub email: Option<String>,
-    /// A description of the user
-    pub bio: Option<String>,
-    /// Various data relating to the user's payouts status,
-    /// only visible to the user itself when authenticated
     pub id: String,
-    /// The user's GitHub ID
-    pub github_id: Option<u32>,
     pub avatar_url: Option<String>,
-    pub created: String,
-    pub role: MRFEUserRole,
-    /// Any badges applicable to this user.
-    /// These are currently unused and not displayed, and as such are subject to change.
-    ///
-    /// [documentation](https://docs.modrinth.com/api-spec/#tag/user_model)
-    pub badges: u32,
 }
 
 impl From<User> for MRFEUser {
@@ -1084,14 +1066,8 @@ impl From<User> for MRFEUser {
         Self {
             username: value.username,
             name: value.name,
-            email: value.email,
-            bio: value.bio,
             id: value.id,
-            github_id: value.github_id,
             avatar_url: value.avatar_url,
-            created: value.created.to_rfc3339(),
-            role: value.role.into(),
-            badges: value.badges,
         }
     }
 }

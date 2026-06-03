@@ -41,8 +41,6 @@ impl Modrinth {
     pub async fn get_categories(&self) -> anyhow::Result<CategoriesResponse> {
         let url = self.base_url.join("tag/category")?;
 
-        trace!("GET {}", url);
-
         let categories = self
             .client
             .get(url.as_str())
@@ -57,8 +55,6 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_loaders(&self) -> anyhow::Result<LoadersResponse> {
         let url = self.base_url.join("tag/loader")?;
-
-        trace!("GET {}", url);
 
         let categories = self
             .client
@@ -79,8 +75,6 @@ impl Modrinth {
         let query = search_params.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
         let search_results = self
             .client
             .get(url.as_str())
@@ -88,14 +82,13 @@ impl Modrinth {
             .await?
             .json_with_context_reporting("modrinth::search")
             .await?;
+
         Ok(search_results)
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn get_project(&self, project: ProjectID) -> anyhow::Result<Project> {
         let url = self.base_url.join(&format!("project/{}", &*project))?;
-
-        trace!("GET {}", url);
 
         let proj = self
             .client
@@ -119,8 +112,6 @@ impl Modrinth {
         let query = filters.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
         let proj = self
             .client
             .get(url.as_str())
@@ -137,11 +128,12 @@ impl Modrinth {
         let query = projects.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
+        // HashMap-ordered ID lists produce different URLs for the same data,
+        // making the URL-keyed HTTP cache balloon without ever hitting. Skip it.
         let projects = self
             .client
             .get(url.as_str())
+            .header("avoid-caching", "")
             .send()
             .await?
             .json_with_context_reporting("modrinth::get_projects")
@@ -152,8 +144,6 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_version(&self, version: VersionID) -> anyhow::Result<Version> {
         let url = self.base_url.join(&format!("version/{}", &*version))?;
-
-        trace!("GET {}", url);
 
         let ver = self
             .client
@@ -171,11 +161,12 @@ impl Modrinth {
         let query = version_ids.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
+        // HashMap-ordered ID lists produce different URLs for the same data,
+        // making the URL-keyed HTTP cache balloon without ever hitting. Skip it.
         let versions = self
             .client
             .get(url.as_str())
+            .header("avoid-caching", "")
             .send()
             .await?
             .json_with_context_reporting("modrinth::get_versions")
@@ -192,8 +183,6 @@ impl Modrinth {
 
         let body = serde_json::to_string(hashes_query)?;
 
-        trace!("POST {url}");
-
         let versions = self
             .client
             .post(url.as_str())
@@ -208,8 +197,6 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_team(&self, team: TeamID) -> anyhow::Result<TeamResponse> {
         let url = self.base_url.join(&format!("team/{}/members", &*team))?;
-
-        trace!("GET {}", url);
 
         let team = self
             .client
@@ -230,11 +217,12 @@ impl Modrinth {
         let query = team_ids.into_query_parameters()?;
         url.set_query(Some(&query));
 
-        trace!("GET {}", url);
-
+        // HashMap-ordered ID lists produce different URLs for the same data,
+        // making the URL-keyed HTTP cache balloon without ever hitting. Skip it.
         let teams = self
             .client
             .get(url.as_str())
+            .header("avoid-caching", "")
             .send()
             .await?
             .json_with_context_reporting::<Vec<TeamResponse>>("modrinth::get_teams")
@@ -250,8 +238,6 @@ impl Modrinth {
         let url = self
             .base_url
             .join(&format!("project/{}/members", &*project))?;
-
-        trace!("GET {}", url);
 
         let team = self
             .client

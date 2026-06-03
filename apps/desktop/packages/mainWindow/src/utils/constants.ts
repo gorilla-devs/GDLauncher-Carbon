@@ -6,6 +6,7 @@ import TechnicLogo from "/assets/images/icons/technic_logo.svg"
 import PrismLogo from "/assets/images/icons/prism_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg"
+import GDLauncherLogo from "/assets/images/gdlauncher_logo.svg"
 import {
   CFFEModSearchSortField,
   ImportEntity,
@@ -88,5 +89,9 @@ export const ENTITIES: Record<ImportEntity, EntityValue> = {
   MRPack: {
     translation: "enums:_trn_entity.mrpack",
     icon: ModrinthLogo
+  },
+  GDLPack: {
+    translation: "enums:_trn_entity.gdlpack",
+    icon: GDLauncherLogo
   }
 }

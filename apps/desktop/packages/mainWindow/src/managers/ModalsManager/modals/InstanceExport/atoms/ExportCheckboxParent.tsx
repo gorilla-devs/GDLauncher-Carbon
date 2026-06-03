@@ -8,19 +8,25 @@ import _ from "lodash"
 const [checkedFiles, setCheckedFiles] = createSignal<string[][]>([])
 export { checkedFiles, setCheckedFiles }
 
-export function buildNestedObject(paths: string[][]) {
-  const root: any = {}
+export interface NestedEntry {
+  entries: Record<string, NestedEntry> | null
+}
+
+export function buildNestedObject(
+  paths: string[][]
+): Record<string, NestedEntry> {
+  const root: Record<string, NestedEntry> = {}
 
   paths.forEach((path) => {
-    let current = root
+    let current: Record<string, NestedEntry> = root
 
     path.forEach((item, index) => {
       if (!current[item]) {
         current[item] = { entries: index === path.length - 1 ? null : {} }
       } else if (current[item].entries === null) {
-        current[item].entries = index === path.length - 1 ? null : {}
+        current[item] = { entries: index === path.length - 1 ? null : {} }
       }
-      current = current[item].entries
+      current = current[item].entries ?? {}
     })
   })
 
@@ -86,7 +92,7 @@ const ExportCheckboxParent = (props: Props) => {
           checked={allSelected()}
           indeterminate={someSelected()}
           children={
-            <span class="text-sm text-[#8A8B8F]">
+            <span class="text-sm text-lightSlate-500">
               {t("content:_trn_select_all_mods")}
             </span>
           }

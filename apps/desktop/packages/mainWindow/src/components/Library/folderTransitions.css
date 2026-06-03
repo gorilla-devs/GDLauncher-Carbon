@@ -1,0 +1,22 @@
+/**
+ * View Transition API styles for folder open/close animations
+ *
+ * Folder tile container animation. Instance preview animations
+ * are dynamically injected via injectFolderTransitionCSS() to
+ * support any number of instances.
+ */
+
+/* Folder tile container animation */
+::view-transition-group(folder-tile) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+::view-transition-old(folder-tile),
+::view-transition-new(folder-tile) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  mix-blend-mode: normal;
+  height: 100%;
+  z-index: 1;
+}

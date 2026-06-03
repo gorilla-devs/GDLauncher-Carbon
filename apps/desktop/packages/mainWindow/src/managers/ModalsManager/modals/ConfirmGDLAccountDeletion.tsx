@@ -4,6 +4,7 @@ import ModalLayout from "../ModalLayout"
 import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { AccountEntry } from "@gd/core_module/bindings"
 
 const ConfirmGDLAccountDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
@@ -38,7 +39,7 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
             type="secondary"
             onClick={async () => {
               const uuid = globalStore.accounts.data?.find(
-                (account) =>
+                (account: AccountEntry) =>
                   account.uuid === globalStore.settings.data?.gdlAccountId
               )?.uuid
 
@@ -46,10 +47,23 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
                 throw new Error("No active gdl account")
               }
 
-              await requestAccountDeletionMutation.mutateAsync(uuid)
-              toast.success("Deletion Request Sent", {
-                description: "Check your email"
-              })
+              const result =
+                await requestAccountDeletionMutation.mutateAsync(uuid)
+              if (result === "success") {
+                toast.success("Deletion Request Sent", {
+                  description: "Check your email"
+                })
+              } else if (result.failed.cooldown !== null) {
+                toast.error("Too Many Requests", {
+                  description: `Please try again in ${result.failed.cooldown} seconds`
+                })
+              } else {
+                toast.error("Request Failed", {
+                  description:
+                    result.failed.message ??
+                    "Unable to process deletion request. Please try again later."
+                })
+              }
 
               modalsContext?.closeModal()
             }}

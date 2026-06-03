@@ -1,7 +1,6 @@
-/* 
-  The CSS in this style tag is based off of Bear Blog's default CSS.
-  https://github.com/HermanMartinus/bearblog/blob/297026a877bc2ab2b3bdfbd6b9f7961c350917dd/templates/styles/blog/default.css
-  License MIT: https://github.com/HermanMartinus/bearblog/blob/master/LICENSE.md
+/*
+  Global styles for GDLauncher Website
+  Uses theme CSS variables from theme.css
  */
 
 table {
@@ -14,8 +13,9 @@ img {
 }
 code {
   padding: 2px 5px;
-  background-color: rgb(var(--gray-light));
-  border-radius: 2px;
+  background-color: rgb(var(--darkSlate-600));
+  border-radius: 4px;
+  font-family: var(--font-mono);
 }
 
 /*
@@ -108,4 +108,19 @@ ul {
   overflow: hidden;
   position: fixed;
   width: 100%;
+}
+
+/*
+  Scroll Animation - Hide elements before JS runs
+*/
+[data-scroll] {
+  opacity: 0;
+}
+
+/* Reduced motion - show elements immediately */
+@media (prefers-reduced-motion: reduce) {
+  [data-scroll] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

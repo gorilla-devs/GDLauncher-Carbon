@@ -1,5 +1,5 @@
 import { Input } from "@gd/ui"
-import { For, Show, createSignal, createEffect, JSX } from "solid-js"
+import { For, Show, createSignal, createEffect, onCleanup, JSX } from "solid-js"
 import { VList } from "./VirtuaWrapper"
 
 export interface SearchableOption {
@@ -61,7 +61,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
           inputRef.focus()
         }
       }, 10)
-      return () => clearTimeout(timer)
+      onCleanup(() => clearTimeout(timer))
     }
   })
 

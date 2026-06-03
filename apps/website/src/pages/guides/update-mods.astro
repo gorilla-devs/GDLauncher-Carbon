@@ -1,0 +1,71 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Update Mods in an Instance"
+  description="Keep individual Minecraft mods up to date in GDLauncher. Per-mod updates from CurseForge and Modrinth, with a one-click Update All option."
+  keywords="update mods minecraft, update mods gdlauncher, minecraft mod update, curseforge mod update, modrinth mod update, update all mods"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT2M",
+    steps: [
+      { name: "Open the instance", text: "Click the instance in your Library to open its detail view." },
+      { name: "Switch to the Mods tab", text: "Use the tab bar to open Mods. GDLauncher checks each mod against its source platform (CurseForge or Modrinth) and marks the ones with newer releases." },
+      { name: "Update one mod", text: "Mods with an available update show an Update button next to them. Click it. GDLauncher downloads the new version and replaces the old jar." },
+      { name: "Or update all", text: "Use the Update All action in the Mods tab toolbar to update every flagged mod in a single click." },
+      { name: "Restart the instance", text: "Stop the game if it's running. Mod jars are loaded at launch, running instances keep using the old version until they relaunch." }
+    ]
+  }}
+>
+  <h2>How GDLauncher detects updates</h2>
+  <p>
+    Each mod in your instance is matched against the addon it came from on CurseForge or Modrinth. GDLauncher periodically checks the addon's release feed for a newer file that targets your instance's Minecraft version and mod loader. If one exists, the Update button appears.
+  </p>
+  <p>
+    Mods that were dragged into the <code>mods</code> folder manually (rather than installed through the Addons browser) don't have a known source, so GDLauncher can't check them automatically. Reinstalling those through Addons gives you update tracking.
+  </p>
+
+  <h2>When not to update</h2>
+  <p>
+    Mid-playthrough, in a stable modpack, the safer move is usually to <em>not</em> update individual mods. Modpacks are tested as a complete set; swapping one mod's version can introduce a dependency mismatch with a sibling mod that wasn't updated. The pack author handles the version pinning for you.
+  </p>
+  <p>
+    Update individual mods when:
+  </p>
+  <ul>
+    <li>You're running a custom instance you assembled yourself, there's no pack author to do it for you.</li>
+    <li>A mod has a known security or stability fix and you specifically want it.</li>
+    <li>The pack is unmaintained and you're keeping it limping along yourself.</li>
+  </ul>
+  <p>
+    For a maintained modpack, prefer the <a href="/guides/update-modpack-version">Change Modpack Version</a> flow, that updates the whole pack as a tested unit.
+  </p>
+
+  <h2>Locked instances</h2>
+  <p>
+    Modpack instances are locked by default. The lock prevents accidental edits to the pack-managed mod set, but the per-mod Update button still works for mods you added yourself on top of the pack. To update pack-managed mods, unlock the instance first (Settings → unlock toggle), and at that point, you're maintaining the pack manually.
+  </p>
+
+  <h2>Dependencies</h2>
+  <p>
+    Many mods depend on libraries (Architectury, Cloth Config, Fabric API, etc.). Dependencies are resolved when you first install a mod, the launcher pulls in anything it needs. Updates don't automatically bump existing libraries, though, so if a newer version of a mod requires a newer version of a library you already have, you'll need to update that library yourself from the Addons tab.
+  </p>
+  <p>
+    If a mod crashes or warns about a missing/outdated dependency after an update, the addon's page on CurseForge or Modrinth lists what version it needs.
+  </p>
+
+  <h2>Rolling back</h2>
+  <p>
+    If an update breaks something, you can revert it. Open the Mods tab, click the mod, and use the version dropdown on the mod's detail view to pick the previous release. GDLauncher will swap back to that version.
+  </p>
+  <p>
+    For a complete rollback to before any updates, the cleanest option is restoring the instance folder from a backup (right-click instance → Open folder, before/after copies).
+  </p>
+
+  <h2>Restart for changes to take effect</h2>
+  <p>
+    Updated jars load at instance launch. If your game is currently running, the new jar sits on disk but isn't active until the next start. Stop the instance, then click Play again.
+  </p>
+
+</GuideLayout>

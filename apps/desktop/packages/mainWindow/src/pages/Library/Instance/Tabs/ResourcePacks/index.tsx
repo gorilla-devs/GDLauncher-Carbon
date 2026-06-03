@@ -147,7 +147,7 @@ const NoResourcePacks = () => {
             }}
           />
         </p>
-        <Button type="outline" size="medium">
+        <Button type="secondary" size="medium">
           <Trans
             key="content:_trn_add_resource_pack"
             options={{
@@ -204,7 +204,7 @@ const ResourcePacks = () => {
               <SelectContent />
             </Select>
           </div>
-          <Button type="outline" size="medium">
+          <Button type="secondary" size="medium">
             <Trans
               key="content:_trn_add_resource_pack"
               options={{

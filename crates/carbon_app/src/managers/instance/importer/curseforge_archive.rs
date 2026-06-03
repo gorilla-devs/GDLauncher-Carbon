@@ -14,6 +14,13 @@ use crate::{
         modplatforms::curseforge::convert_cf_version_to_standard_version,
     },
 };
+use serde::Deserialize;
+
+/// Legacy GDLauncher manifest format (for reading old exports)
+#[derive(Deserialize)]
+struct LegacyGdlManifest {
+    icon: Option<String>,
+}
 use anyhow::anyhow;
 use carbon_platforms::curseforge::manifest::Manifest;
 use std::{
@@ -31,6 +38,8 @@ struct Importable {
     path: PathBuf,
     manifest: Manifest,
     meta: Option<CfMetadata>,
+    /// Icon data from GDL manifest (filename, data)
+    gdl_icon: Option<(String, Vec<u8>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -84,29 +93,59 @@ impl CurseforgeArchiveImporter {
             let mut zip = zip::ZipArchive::new(&mut file)
                 .map_err(|_| Translation::InstanceImportCfZipMalformed)?;
 
-            let mut manifest = zip
-                .by_name("manifest.json")
-                .map_err(|_| Translation::InstanceImportCfZipMissingManifest)?;
+            // Read manifest.json into data (using a block to drop the ZipFile before reading GDL files)
+            let data = {
+                let mut manifest_file = zip
+                    .by_name("manifest.json")
+                    .map_err(|_| Translation::InstanceImportCfZipMissingManifest)?;
 
-            let mut data = Vec::new();
-            manifest
-                .read_to_end(&mut data)
-                .map_err(|_| Translation::InstanceImportCfZipMalformedManifest)?;
+                let mut data = Vec::new();
+                manifest_file
+                    .read_to_end(&mut data)
+                    .map_err(|_| Translation::InstanceImportCfZipMalformedManifest)?;
+                data
+            };
 
             let manifest = serde_json::from_slice::<Manifest>(&data)
                 .map_err(|_| Translation::InstanceImportCfZipMalformedManifest)?;
 
-            let murmur2 = murmurhash32::murmurhash2({
-                // drop whitespace
-                data.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-                &data
-            });
+            // Calculate murmur2 hash (drop whitespace first)
+            let mut data_for_hash = data;
+            data_for_hash.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
+            let murmur2 = murmurhash32::murmurhash2(&data_for_hash);
 
-            Ok((manifest, murmur2))
+            // Try to read GDL manifest and icon (optional, for GDLauncher archives)
+            let gdl_icon: Option<(String, Vec<u8>)> = (|| {
+                // Read GDL manifest
+                let gdl_manifest: LegacyGdlManifest = {
+                    let mut gdl_manifest_file = zip.by_name("gdl/manifest.json").ok()?;
+                    let mut gdl_manifest_data = Vec::new();
+                    gdl_manifest_file.read_to_end(&mut gdl_manifest_data).ok()?;
+                    serde_json::from_slice(&gdl_manifest_data).ok()?
+                };
+
+                let icon_path = gdl_manifest.icon?;
+                let icon_filename = std::path::Path::new(&icon_path)
+                    .file_name()?
+                    .to_str()?
+                    .to_string();
+
+                // Read icon file
+                let icon_data = {
+                    let mut icon_file = zip.by_name(&icon_path).ok()?;
+                    let mut icon_data = Vec::new();
+                    icon_file.read_to_end(&mut icon_data).ok()?;
+                    icon_data
+                };
+
+                Some((icon_filename, icon_data))
+            })();
+
+            Ok((manifest, murmur2, gdl_icon))
         })
         .await?;
 
-        let (manifest, _murmur2) = match r {
+        let (manifest, _murmur2, gdl_icon) = match r {
             Ok(t) => t,
             Err(reason) => {
                 return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
@@ -175,6 +214,7 @@ impl CurseforgeArchiveImporter {
             path,
             manifest,
             meta,
+            gdl_icon,
         })))
     }
 }
@@ -258,6 +298,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             None => InstanceVersionSource::Version(version),
         };
 
+        // Try to get icon from CurseForge metadata first, then fall back to GDL icon
         let icon = match &instance.meta {
             Some(CfMetadata {
                 image_url: Some(image_url),
@@ -267,7 +308,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
                     .download_icon(image_url.clone())
                     .await?,
             ),
-            _ => None,
+            _ => instance.gdl_icon.clone(),
         };
 
         let initializer = |instance_path: PathBuf| {

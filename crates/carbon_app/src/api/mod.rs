@@ -14,6 +14,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 mod account;
+pub mod auth;
 pub mod instance;
 mod java;
 pub mod keys;
@@ -21,6 +22,7 @@ mod mc;
 mod metrics;
 mod modplatforms;
 pub mod router;
+pub mod server;
 pub mod settings;
 mod system_info;
 pub mod translation;
@@ -56,6 +58,7 @@ pub enum CoreModuleStatus {
     XboxAuth,
     MCEntitlements,
     McProfile,
+    ExchangingGdlToken,
     AccountRefreshComplete,
 }
 
@@ -176,6 +179,7 @@ pub fn build_rspc_router(gdl_base_api: String) -> RouterBuilder<App> {
         .merge(keys::mc::GROUP_PREFIX, mc::mount())
         .merge(keys::vtask::GROUP_PREFIX, vtask::mount())
         .merge(keys::instance::GROUP_PREFIX, instance::mount())
+        .merge(keys::server::GROUP_PREFIX, server::mount())
         .merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
         .merge(keys::settings::GROUP_PREFIX, settings::mount())
         .merge(keys::metrics::GROUP_PREFIX, metrics::mount())
@@ -186,6 +190,31 @@ pub fn build_rspc_router(gdl_base_api: String) -> RouterBuilder<App> {
 #[derive(Deserialize)]
 struct LoadImageQuery {
     path: String,
+}
+
+const MAX_LOAD_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
+
+async fn load_image_bounded(path: &str) -> Result<Vec<u8>, crate::error::AxumError> {
+    let p = std::path::Path::new(path);
+    let metadata = tokio::fs::metadata(p)
+        .await
+        .map_err(|e| crate::error::FeError::from_anyhow(&e.into()).make_axum())?;
+    if !metadata.is_file() {
+        return Err(crate::error::FeError::from_anyhow(&anyhow::anyhow!(
+            "Path is not a regular file"
+        ))
+        .make_axum());
+    }
+    if metadata.len() > MAX_LOAD_IMAGE_BYTES {
+        return Err(crate::error::FeError::from_anyhow(&anyhow::anyhow!(
+            "Image too large (>{} bytes)",
+            MAX_LOAD_IMAGE_BYTES
+        ))
+        .make_axum());
+    }
+    tokio::fs::read(p)
+        .await
+        .map_err(|e| crate::error::FeError::from_anyhow(&e.into()).make_axum())
 }
 
 pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
@@ -200,15 +229,13 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
             "/loadImage",
             axum::routing::get(
                 |axum::extract::Query(query): axum::extract::Query<LoadImageQuery>| async move {
-                    let data = tokio::fs::read(&query.path)
-                        .await
-                        .map_err(|e| crate::error::FeError::from_anyhow(&e.into()).make_axum())?;
-                    Ok::<_, crate::error::AxumError>(data)
+                    Ok::<_, crate::error::AxumError>(load_image_bounded(&query.path).await?)
                 },
             ),
         )
         .nest("/account", account::mount_axum_router())
         .nest("/instance", instance::mount_axum_router())
+        .nest("/server", server::mount_axum_router())
 }
 
 async fn invalidation_ws_handler(
@@ -223,12 +250,7 @@ async fn invalidation_ws_handler(
                 error!("Failed to serialize invalidation event: {:?}", event);
                 continue;
             };
-            match socket.send(Message::Text(message)).await {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("Failed to send invalidation event: {:?}", e);
-                }
-            }
+            let _ = socket.send(Message::Text(message)).await;
         }
 
         info!("Invalidation channel disconnected");

@@ -19,7 +19,7 @@ carbon_macro = { path = "../carbon_macro" }
 strum_macros = { workspace = true }
 strum = { workspace = true }
 daedalus = { workspace = true }
-url = { workspace = true }
+url = { workspace = true, features = ["serde"] }
 serde_repr = { workspace = true }
 itertools = { workspace = true }
 serde-enum-str = "0.4.0"

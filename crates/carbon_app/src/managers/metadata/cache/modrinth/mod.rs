@@ -1,4 +1,4 @@
-use super::{BundleSender, ModplatformCacher, UpdateNotifier};
+use super::{BundleSender, CacheEntityId, ModplatformCacher, UpdateNotifier};
 use crate::domain::instance::InstanceId;
 use crate::domain::instance::info::ModLoaderType;
 use crate::managers::App;
@@ -15,7 +15,7 @@ use carbon_platforms::modrinth::{
 use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter};
 use carbon_repos::db::{
     mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-    modrinth_mod_image_cache as mrimgdb,
+    modrinth_mod_image_cache as mrimgdb, server_mod_file_cache as sfcdb,
 };
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -40,37 +40,63 @@ impl ModplatformCacher for ModrinthModCacher {
 
     async fn query_platform(
         app: &App,
-        instance_id: InstanceId,
+        entity_id: CacheEntityId,
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()> {
-        let modlist = app
-            .prisma_client
-            .mod_file_cache()
-            .find_many(vec![
-                fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
-                    mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                        (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                    )),
-                ])]),
-            ])
-            .with(fcdb::metadata::fetch())
-            .exec()
-            .await?
-            .into_iter()
-            .map(|m| {
-                let metadata = m
-                    .metadata
-                    .expect("metadata was queried with mod cache yet is not present");
-                let sha512 = hex::encode(&metadata.sha_512);
-
-                (sha512.clone(), (metadata.id, sha512))
-            });
+        let modlist = match entity_id {
+            CacheEntityId::Instance(instance_id) => app
+                .prisma_client
+                .mod_file_cache()
+                .find_many(vec![
+                    fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                    fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
+                        mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
+                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
+                        )),
+                    ])]),
+                ])
+                .with(fcdb::metadata::fetch())
+                .exec()
+                .await?
+                .into_iter()
+                .map(|m| {
+                    let metadata = m
+                        .metadata
+                        .expect("metadata was queried with mod cache yet is not present");
+                    let sha512 = hex::encode(&metadata.sha_512);
+                    (sha512.clone(), (metadata.id, sha512))
+                })
+                .collect::<Vec<_>>(),
+            CacheEntityId::Server(server_id) => app
+                .prisma_client
+                .server_mod_file_cache()
+                .find_many(vec![
+                    sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
+                    sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
+                        mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
+                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
+                        )),
+                    ])]),
+                ])
+                .with(sfcdb::metadata::fetch())
+                .exec()
+                .await?
+                .into_iter()
+                .map(|m| {
+                    let metadata = m
+                        .metadata
+                        .expect("metadata was queried with server mod cache yet is not present");
+                    let sha512 = hex::encode(&metadata.sha_512);
+                    (sha512.clone(), (metadata.id, sha512))
+                })
+                .collect::<Vec<_>>(),
+        };
 
         let mcm = app.meta_cache_manager();
         let ignored_hashes = mcm.ignored_remote_mr_hashes.read().await;
 
         let mut modlist = modlist
+            .into_iter()
             .filter(|(_, (_, sha512))| !ignored_hashes.contains(sha512))
             .collect::<VecDeque<_>>();
 
@@ -85,12 +111,12 @@ impl ModplatformCacher for ModrinthModCacher {
         );
 
         let failed_instances = mcm.failed_mr_instances.read().await;
-        let delay = failed_instances.get(&instance_id);
+        let delay = failed_instances.get(&entity_id);
 
         if let Some((end_time, _)) = delay {
             if Instant::now() < *end_time {
                 warn!(
-                    "Not attempting to cache modrinth mods for {instance_id} as too many attempts have failed recently"
+                    "Not attempting to cache modrinth mods for {entity_id} as too many attempts have failed recently"
                 );
                 return Ok(());
             }
@@ -103,8 +129,9 @@ impl ModplatformCacher for ModrinthModCacher {
                 let (sha512_hashes, metadata) = modlist
                     .drain(0..usize::min(1000, modlist.len()))
                     .unzip::<_, _, Vec<_>, Vec<_>>();
-                trace!("querying modrinth mod batch for instance {instance_id}");
+                trace!("querying modrinth mod batch for {entity_id}");
 
+                mcm.modrinth_throttle.acquire().await;
                 let versions_response = app
                     .modplatforms_manager()
                     .modrinth
@@ -114,6 +141,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     })
                     .await?;
 
+                mcm.modrinth_throttle.acquire().await;
                 let projects_response = app
                     .modplatforms_manager()
                     .modrinth
@@ -125,6 +153,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     })
                     .await?;
 
+                mcm.modrinth_throttle.acquire().await;
                 let teams_response = app
                     .modplatforms_manager()
                     .modrinth
@@ -146,31 +175,19 @@ impl ModplatformCacher for ModrinthModCacher {
                     .collect::<Vec<_>>();
 
                 let mpm = app.modplatforms_manager();
-                let combined_version_futures = combined_versions_list
-                    .chunks(350) // ~13 chars per version, 500 worked fine at time of testing
-                    .map(|chunk| async {
-                        let resp = mpm
-                            .modrinth
-                            .get_versions(VersionIDs {
-                                ids: chunk.to_vec(),
-                            })
-                            .await;
-
-                        resp
-                    });
-
-                let combined_versions_response =
-                    futures::future::join_all(combined_version_futures)
-                        .await
-                        .into_iter()
-                        .fold(Ok::<_, anyhow::Error>(Vec::new()), |a, c| match (a, c) {
-                            (Ok(mut a), Ok(c)) => {
-                                a.extend(c.0);
-                                Ok(a)
-                            }
-                            (Err(e), _) => Err(anyhow!(e)),
-                            (_, Err(e)) => Err(anyhow!(e)),
-                        })?;
+                // Run version-batch requests sequentially so each one passes
+                // through the throttle. join_all here would race past it.
+                let mut combined_versions_response = Vec::new();
+                for chunk in combined_versions_list.chunks(350) {
+                    mcm.modrinth_throttle.acquire().await;
+                    let resp = mpm
+                        .modrinth
+                        .get_versions(VersionIDs {
+                            ids: chunk.to_vec(),
+                        })
+                        .await?;
+                    combined_versions_response.extend(resp.0);
+                }
 
                 sender.send((
                     sha512_hashes,
@@ -186,17 +203,17 @@ impl ModplatformCacher for ModrinthModCacher {
         };
 
         if let Err(e) = fut.await {
-            error!({ error = ?e }, "Error occured while caching modrinth mods for instance {instance_id}");
+            error!({ error = ?e }, "Error occured while caching modrinth mods for {entity_id}");
 
-            let mut failed_instances = mcm.failed_cf_instances.write().await;
+            let mut failed_instances = mcm.failed_mr_instances.write().await;
             let entry = failed_instances
-                .entry(instance_id)
+                .entry(entity_id)
                 .or_insert((Instant::now(), 0));
             entry.0 = Instant::now() + Duration::from_secs(u64::pow(2, entry.1));
             entry.1 += 1;
         } else {
-            let mut failed_instances = mcm.failed_cf_instances.write().await;
-            failed_instances.remove(&instance_id);
+            let mut failed_instances = mcm.failed_mr_instances.write().await;
+            failed_instances.remove(&entity_id);
         }
 
         Ok::<_, anyhow::Error>(())
@@ -204,10 +221,10 @@ impl ModplatformCacher for ModrinthModCacher {
 
     async fn save_batch(
         app: &App,
-        instance_id: InstanceId,
+        entity_id: CacheEntityId,
         (sha512_hashes, batch, versions, projects, teams, combined_versions): Self::SaveBundle,
     ) {
-        trace!("processing modrinth mod batch for instance {instance_id}");
+        trace!("processing modrinth mod batch for {entity_id}");
 
         let mut matches = sha512_hashes
             .iter()
@@ -274,48 +291,96 @@ impl ModplatformCacher for ModrinthModCacher {
         futures::future::join_all(futures).await;
     }
 
-    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier) {
-        let modlist = app
-            .prisma_client
-            .mod_file_cache()
-            .find_many(vec![
-                fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(vec![
-                    mrdb::WhereParam::LogoImageIs(vec![mrimgdb::WhereParam::UpToDate(
-                        IntFilter::Equals(0),
-                    )]),
-                ])]),
-            ])
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
-            .exec()
-            .await;
+    async fn cache_icons(app: &App, entity_id: CacheEntityId, update_notifier: &UpdateNotifier) {
+        // Collect (filename, project_id, version_id, image_row) for mods needing icon updates.
+        let modlist: Vec<(String, String, String, _)> = match entity_id {
+            CacheEntityId::Instance(instance_id) => {
+                let result = app
+                    .prisma_client
+                    .mod_file_cache()
+                    .find_many(vec![
+                        fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                        fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(vec![
+                            mrdb::WhereParam::LogoImageIs(vec![mrimgdb::WhereParam::UpToDate(
+                                IntFilter::Equals(0),
+                            )]),
+                        ])]),
+                    ])
+                    .with(
+                        fcdb::metadata::fetch()
+                            .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
+                    )
+                    .exec()
+                    .await;
 
-        let modlist = match modlist {
-            Ok(modlist) => modlist,
-            Err(e) => {
-                error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
-                return;
+                match result {
+                    Ok(list) => list
+                        .into_iter()
+                        .map(|file| {
+                            let meta = file
+                                .metadata
+                                .expect("metadata was ensured present but not returned");
+                            let mr = meta
+                                .modrinth
+                                .flatten()
+                                .expect("modrinth was ensured present but not returned");
+                            let row = mr
+                                .logo_image
+                                .flatten()
+                                .expect("mod image was ensured present but not returned");
+                            (file.filename, mr.project_id, mr.version_id, row)
+                        })
+                        .collect(),
+                    Err(e) => {
+                        error!({ error = ?e }, "error querying database for updated modrinth mod icons list");
+                        return;
+                    }
+                }
+            }
+            CacheEntityId::Server(server_id) => {
+                let result = app
+                    .prisma_client
+                    .server_mod_file_cache()
+                    .find_many(vec![
+                        sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
+                        sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(vec![
+                            mrdb::WhereParam::LogoImageIs(vec![mrimgdb::WhereParam::UpToDate(
+                                IntFilter::Equals(0),
+                            )]),
+                        ])]),
+                    ])
+                    .with(
+                        sfcdb::metadata::fetch()
+                            .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
+                    )
+                    .exec()
+                    .await;
+
+                match result {
+                    Ok(list) => list
+                        .into_iter()
+                        .map(|file| {
+                            let meta = file
+                                .metadata
+                                .expect("metadata was ensured present but not returned");
+                            let mr = meta
+                                .modrinth
+                                .flatten()
+                                .expect("modrinth was ensured present but not returned");
+                            let row = mr
+                                .logo_image
+                                .flatten()
+                                .expect("mod image was ensured present but not returned");
+                            (file.filename, mr.project_id, mr.version_id, row)
+                        })
+                        .collect(),
+                    Err(e) => {
+                        error!({ error = ?e }, "error querying database for updated modrinth mod icons list");
+                        return;
+                    }
+                }
             }
         };
-
-        let modlist = modlist.into_iter().map(|file| {
-            let meta = file
-                .metadata
-                .expect("metadata was ensured present but not returned");
-            let mr = meta
-                .modrinth
-                .flatten()
-                .expect("modrinth was ensured present but not returned");
-            let row = mr
-                .logo_image
-                .flatten()
-                .expect("mod image was ensured present but not returned");
-
-            (file.filename, mr.project_id, mr.version_id, row)
-        });
 
         let app = &app;
         let futures = modlist
@@ -379,12 +444,12 @@ impl ModplatformCacher for ModrinthModCacher {
                         .await?;
 
 
-                    let _ = update_notifier.send(instance_id);
+                    let _ = update_notifier.send(entity_id);
                     Ok::<_, anyhow::Error>(())
                 }.await;
 
                 if let Err(e) = r {
-                    error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, version: {version_id}, image url: {})", row.url);
+                    error!({ error = ?e }, "error downloading mod icon for {entity_id}/{filename} (project: {project_id}, version: {version_id}, image url: {})", row.url);
 
                     let mut fails = mcm.failed_mr_thumbs.write().await;
                     fails.entry(project_id)

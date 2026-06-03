@@ -4,11 +4,13 @@ use crate::{
         keys::{
             self,
             settings::{
-                COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY, GET_PRIVACY_STATEMENT_BODY,
-                GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, IS_FIRST_LAUNCH,
-                MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER,
-                RESET_ONBOARDING_TIPS, SET_SETTINGS, SHOULD_SHOW_BETA_PROMPT,
-                SHOULD_SHOW_CHANGELOG,
+                CLEANUP_CACHES, COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY,
+                GET_CACHE_SIZES, GET_DB_SIZE, GET_MEMORY_WARNING_DISMISSED,
+                GET_PRIVACY_STATEMENT_BODY, GET_SEARCH_SIDEBAR_DOCKED, GET_SEEN_ONBOARDING_TIPS,
+                GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, IS_FIRST_LAUNCH, MARK_CHANGELOG_SEEN,
+                MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER, RESET_ONBOARDING_TIPS,
+                SET_MEMORY_WARNING_DISMISSED, SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS,
+                SHOULD_SHOW_BETA_PROMPT, SHOULD_SHOW_CHANGELOG,
             },
         },
         router::router,
@@ -31,6 +33,24 @@ mod preference_keys {
     pub const BETA_PROMPT_DISMISSED: &str = "beta_prompt_dismissed_permanently";
     pub const BETA_PROMPT_LAST_SHOWN: &str = "beta_prompt_last_shown";
     pub const ONBOARDING_TIPS_SEEN: &str = "onboarding_tips_seen";
+    pub const SEARCH_SIDEBAR_DOCKED: &str = "search_sidebar_docked";
+    pub const MEMORY_WARNING_DISMISSED: &str = "memory_warning_dismissed";
+}
+
+/// Returns true if the user has permanently dismissed the insufficient
+/// memory warning shown when launching an instance.
+pub async fn is_memory_warning_dismissed(
+    db: &carbon_repos::db::PrismaClient,
+) -> anyhow::Result<bool> {
+    let pref = db
+        .frontend_preference()
+        .find_unique(frontend_preference::key::equals(
+            preference_keys::MEMORY_WARNING_DISMISSED.to_string(),
+        ))
+        .exec()
+        .await?;
+
+    Ok(pref.map(|p| p.value == "true").unwrap_or(false))
 }
 
 /// Input state for beta prompt decision logic
@@ -359,7 +379,116 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             Ok(())
         }
+
+        // Cache maintenance
+        query GET_DB_SIZE[app, _args: ()] {
+            Ok::<f64, anyhow::Error>(app.settings_manager().get_db_size().await)
+        }
+
+        query GET_CACHE_SIZES[app, _args: ()] {
+            Ok::<CacheSizes, anyhow::Error>(app.settings_manager().get_cache_sizes().await)
+        }
+
+        mutation CLEANUP_CACHES[app, selection: CacheCleanupSelection] {
+            let task_id = app.settings_manager().cleanup_caches(selection).await?;
+            Ok(super::vtask::FETaskId::from(task_id))
+        }
+
+        // Search sidebar docked state
+        query GET_SEARCH_SIDEBAR_DOCKED[app, _args: ()] {
+            let db = &app.prisma_client;
+
+            let pref = db
+                .frontend_preference()
+                .find_unique(frontend_preference::key::equals(
+                    preference_keys::SEARCH_SIDEBAR_DOCKED.to_string()
+                ))
+                .exec()
+                .await?;
+
+            // Default to true (docked) if no preference stored
+            match pref {
+                Some(p) => Ok(p.value == "true"),
+                None => Ok(true),
+            }
+        }
+
+        mutation SET_SEARCH_SIDEBAR_DOCKED[app, docked: bool] {
+            let db = &app.prisma_client;
+            let value = if docked { "true" } else { "false" }.to_string();
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(
+                        preference_keys::SEARCH_SIDEBAR_DOCKED.to_string()
+                    ),
+                    frontend_preference::create(
+                        preference_keys::SEARCH_SIDEBAR_DOCKED.to_string(),
+                        value.clone(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(value)],
+                )
+                .exec()
+                .await?;
+
+            app.invalidate(GET_SEARCH_SIDEBAR_DOCKED, None);
+            Ok(())
+        }
+
+        // Insufficient memory warning dismissal
+        query GET_MEMORY_WARNING_DISMISSED[app, _args: ()] {
+            is_memory_warning_dismissed(&app.prisma_client).await
+        }
+
+        mutation SET_MEMORY_WARNING_DISMISSED[app, dismissed: bool] {
+            let db = &app.prisma_client;
+            let value = if dismissed { "true" } else { "false" }.to_string();
+
+            db.frontend_preference()
+                .upsert(
+                    frontend_preference::key::equals(
+                        preference_keys::MEMORY_WARNING_DISMISSED.to_string()
+                    ),
+                    frontend_preference::create(
+                        preference_keys::MEMORY_WARNING_DISMISSED.to_string(),
+                        value.clone(),
+                        vec![]
+                    ),
+                    vec![frontend_preference::value::set(value)],
+                )
+                .exec()
+                .await?;
+
+            app.invalidate(GET_MEMORY_WARNING_DISMISSED, None);
+            Ok(())
+        }
     }
+}
+
+/// Two-tier cleanup selection. `gdlauncher` wipes the cache tables, temp dir,
+/// and log dir — fast, low-impact, the next browse/launch refills only what
+/// the user actually touches. `minecraft` additionally clears `assets`,
+/// `libraries`, and `natives` — those are also re-downloadable but cost
+/// the user a multi-GB re-download on next launch, so it's opt-in.
+#[derive(Type, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheCleanupSelection {
+    pub gdlauncher: bool,
+    pub minecraft: bool,
+}
+
+/// Per-scope cache footprint reported by `getCacheSizes`. `gdlauncher`
+/// covers what the GDLauncher-cache cleanup wipes (DB files, temp, logs);
+/// `minecraft` covers the Minecraft-cache cleanup (assets, libraries,
+/// natives). Sum is the total
+/// the Settings row displays — splitting per-scope lets the cleanup modal
+/// label each option with its real reclaim estimate.
+#[derive(Type, Serialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheSizes {
+    pub gdlauncher: f64,
+    pub minecraft: f64,
 }
 
 #[derive(Type, Serialize, Deserialize, Debug)]
@@ -439,6 +568,8 @@ impl FromStr for GameResolution {
     }
 }
 
+/// Sort criteria for instances in accordion mode (virtual grouping).
+/// When instancesSortBy is null, manual ordering is used (libraryPosition).
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InstancesSortBy {
@@ -480,10 +611,11 @@ impl TryFrom<String> for InstancesSortBy {
     }
 }
 
+/// Grouping criteria for accordion mode (virtual grouping).
+/// When instancesGroupBy is null, folders mode is used (real folders with drag-drop).
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InstancesGroupBy {
-    Group,
     Modloader,
     GameVersion,
     Modplatform,
@@ -492,7 +624,6 @@ pub enum InstancesGroupBy {
 impl From<InstancesGroupBy> for String {
     fn from(value: InstancesGroupBy) -> Self {
         match value {
-            InstancesGroupBy::Group => "group",
             InstancesGroupBy::Modloader => "modloader",
             InstancesGroupBy::GameVersion => "game_version",
             InstancesGroupBy::Modplatform => "modplatform",
@@ -506,7 +637,6 @@ impl TryFrom<String> for InstancesGroupBy {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match &*value.to_lowercase() {
-            "group" => Ok(Self::Group),
             "modloader" => Ok(Self::Modloader),
             "game_version" => Ok(Self::GameVersion),
             "modplatform" => Ok(Self::Modplatform),
@@ -528,10 +658,15 @@ struct FESettings {
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_app_close_warning: bool,
     show_featured: bool,
-    instances_sort_by: InstancesSortBy,
+    /// Sort criteria for accordion mode. None = manual ordering (libraryPosition).
+    instances_sort_by: Option<InstancesSortBy>,
     instances_sort_by_asc: bool,
-    instances_group_by: InstancesGroupBy,
+    /// Group criteria for accordion mode. None = folders mode (real folders with drag-drop).
+    instances_group_by: Option<InstancesGroupBy>,
     instances_group_by_asc: bool,
+    /// When true, favorites appear in both favorites section AND their folder/group.
+    /// When false, favorites appear ONLY in the favorites section.
+    instances_duplicate_favorites: bool,
     instances_tile_size: i32,
     deletion_through_recycle_bin: bool,
     xmx: i32,
@@ -560,10 +695,13 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             concurrent_downloads: data.concurrent_downloads,
             download_dependencies: data.download_dependencies,
             show_featured: data.show_featured,
-            instances_sort_by: data.instances_sort_by.try_into()?,
+            // instances_sort_by: None = manual ordering, Some(x) = accordion mode sorting
+            instances_sort_by: data.instances_sort_by.map(|s| s.try_into()).transpose()?,
             instances_sort_by_asc: data.instances_sort_by_asc,
-            instances_group_by: data.instances_group_by.try_into()?,
+            // instances_group_by: None = folders mode, Some(x) = accordion mode
+            instances_group_by: data.instances_group_by.map(|s| s.try_into()).transpose()?,
             instances_group_by_asc: data.instances_group_by_asc,
+            instances_duplicate_favorites: data.instances_duplicate_favorites,
             instances_tile_size: data.instances_tile_size,
             deletion_through_recycle_bin: data.deletion_through_recycle_bin,
             xmx: data.xmx,
@@ -660,14 +798,19 @@ pub struct FESettingsUpdate {
     pub concurrent_downloads: Option<Set<i32>>,
     #[specta(optional)]
     pub download_dependencies: Option<Set<bool>>,
+    /// Sort criteria for accordion mode. None = manual ordering (libraryPosition).
     #[specta(optional)]
-    pub instances_sort_by: Option<Set<InstancesSortBy>>,
+    pub instances_sort_by: Option<Set<Option<InstancesSortBy>>>,
     #[specta(optional)]
     pub instances_sort_by_asc: Option<Set<bool>>,
+    /// Group criteria for accordion mode. None = folders mode (real folders with drag-drop).
     #[specta(optional)]
-    pub instances_group_by: Option<Set<InstancesGroupBy>>,
+    pub instances_group_by: Option<Set<Option<InstancesGroupBy>>>,
     #[specta(optional)]
     pub instances_group_by_asc: Option<Set<bool>>,
+    /// When true, favorites appear in both favorites section AND their folder/group.
+    #[specta(optional)]
+    pub instances_duplicate_favorites: Option<Set<bool>>,
     #[specta(optional)]
     pub instances_tile_size: Option<Set<i32>>,
     #[specta(optional)]

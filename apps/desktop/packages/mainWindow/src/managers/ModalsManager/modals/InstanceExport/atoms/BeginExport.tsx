@@ -5,21 +5,23 @@ import { useTransContext } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { setPayload, payload, setExportStep } from ".."
 import { ExportArgs, ExportEntry } from "@gd/core_module/bindings"
-import { buildNestedObject, checkedFiles } from "./ExportCheckboxParent"
+import {
+  buildNestedObject,
+  checkedFiles,
+  type NestedEntry
+} from "./ExportCheckboxParent"
 import _ from "lodash"
 import { setFailedMsg } from "./Exporting"
 
-function convertNestedObject(obj: any): any {
-  const result: any = {}
+function convertNestedObject(obj: NestedEntry): ExportEntry {
+  const result: Record<string, ExportEntry | null> = {}
 
-  for (const key in obj.entries) {
-    if (key in obj.entries) {
+  if (obj.entries) {
+    for (const key in obj.entries) {
       const value = obj.entries[key]
-      if (value && typeof value === "object" && value.entries !== null) {
-        // If the current value has a nested 'entries' object, recursively process it
+      if (value && value.entries !== null) {
         result[key] = convertNestedObject(value)
       } else {
-        // If 'entries' is null or not an object, set the key's value to null
         result[key] = null
       }
     }
@@ -47,7 +49,12 @@ const BeginExport = (props: Props) => {
     if (typeof payload.instance_id !== "number") return false
     if (typeof payload.save_path !== "string") return false
     const extension = _.last(payload.save_path.split("."))
-    if (extension !== "zip" && extension !== "mrpack") return false
+    if (
+      extension !== "zip" &&
+      extension !== "mrpack" &&
+      extension !== "gdlpack"
+    )
+      return false
     return true
   }
 

@@ -1,0 +1,165 @@
+---
+/**
+ * ComparisonTable - GDLauncher vs other launchers comparison
+ */
+import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { DownloadLink } from "../DownloadLink"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+
+// Launcher names are proper nouns, kept untranslated. "Mojang Launcher"
+// is the first-party Minecraft Launcher shipped by Mojang/Microsoft; the
+// short label keeps the table column narrow.
+const launchers = [
+  { name: "GDLauncher", highlight: true },
+  { name: "Modrinth App" },
+  { name: "CurseForge App" },
+  { name: "Prism Launcher" },
+  { name: "ATLauncher" },
+  { name: "MultiMC" },
+  { name: "Mojang Launcher" }
+]
+
+// Feature/value matrix. Order of values matches `launchers` above.
+// We intentionally do NOT list cloudSaves: it's roadmap, not shipped, and
+// landing-page comparison tables shouldn't make forward-looking promises.
+const features: Array<{ nameKey: string; values: (boolean | string)[]; note?: string }> = [
+  { nameKey: "compare.feature.curseforgeSupport", values: [true, false, true, "partial", "partial", false, false] },
+  { nameKey: "compare.feature.modrinthSupport", values: [true, true, false, true, true, true, false] },
+  { nameKey: "compare.feature.autoJava", values: [true, true, true, true, true, false, true] },
+  { nameKey: "compare.feature.modUpdater", values: [true, true, true, false, true, false, false] },
+  { nameKey: "compare.feature.modpackUpdater", values: [true, true, true, false, true, false, false] },
+  { nameKey: "compare.feature.multiInstance", values: [true, true, true, true, true, true, false] },
+  { nameKey: "compare.feature.instanceSharing", values: [true, false, false, false, false, false, false] },
+  { nameKey: "compare.feature.serverMgmt", values: [true, true, false, false, false, false, false] },
+  { nameKey: "compare.feature.modernUi", values: [true, true, true, false, false, false, false] },
+  { nameKey: "compare.feature.paysAuthors", values: [true, true, true, false, false, false, false] },
+  { nameKey: "compare.feature.lightweight", values: [false, false, false, true, false, true, false] }
+]
+
+function getValueDisplay(value: boolean | string) {
+  if (value === true) {
+    return { icon: "check", class: "text-green-400", label: null, srText: t("compare.sr.yes") }
+  } else if (value === false) {
+    return { icon: "x", class: "text-darkSlate-400", label: null, srText: t("compare.sr.no") }
+  } else if (value === "partial") {
+    return { icon: "check", class: "text-yellow-400", label: t("compare.label.partial"), srText: t("compare.sr.partial") }
+  } else if (value === "?") {
+    return { icon: "?", class: "text-darkSlate-300", label: null, srText: t("compare.sr.unknown") }
+  } else {
+    return { icon: "x", class: "text-darkSlate-400", label: null, srText: t("compare.sr.no") }
+  }
+}
+---
+
+<section class="py-24 bg-darkSlate-900">
+  <div class="max-w-6xl mx-auto px-4">
+    <!-- Section header -->
+    <div class="text-center mb-16" data-scroll="fade-up">
+      <h2 class="text-3xl md:text-4xl font-bold text-lightSlate-50 mb-4">
+        {t("compare.heading.line1")}{" "}
+        <span class="bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
+          {t("compare.heading.line2")}
+        </span>
+      </h2>
+      <p class="text-darkSlate-100 text-lg max-w-2xl mx-auto">
+        {t("compare.subheading")}
+      </p>
+    </div>
+
+    <!-- Comparison table -->
+    <div class="overflow-x-auto" data-scroll="scale" data-scroll-delay="150">
+      <table class="w-full border-collapse">
+        <caption class="sr-only">{t("compare.tableCaption")}</caption>
+        <thead>
+          <tr>
+            <th scope="col" class="text-left p-4 text-darkSlate-100 font-medium border-b border-darkSlate-700">
+              {t("compare.column.feature")}
+            </th>
+            {launchers.map((launcher) => (
+              <th
+                scope="col"
+                class={`p-4 text-center font-semibold border-b border-darkSlate-700 ${
+                  launcher.highlight
+                    ? "text-primary-300 bg-primary-500/5"
+                    : "text-lightSlate-100"
+                }`}
+              >
+                {launcher.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {features.map((feature, rowIndex) => (
+            <tr class={rowIndex % 2 === 0 ? "bg-darkSlate-800/30" : ""}>
+              <th scope="row" class="p-4 text-lightSlate-100 font-normal text-left border-b border-darkSlate-700/50">
+                {t(feature.nameKey)}
+                {feature.note && (
+                  <span class="block text-xs text-darkSlate-200 mt-1">{feature.note}</span>
+                )}
+              </th>
+              {feature.values.map((value, colIndex) => {
+                const display = getValueDisplay(value)
+                return (
+                  <td
+                    class={`p-4 text-center border-b border-darkSlate-700/50 ${
+                      colIndex === 0 ? "bg-primary-500/5" : ""
+                    }`}
+                  >
+                    <span class="sr-only">{display.srText}</span>
+                    {display.icon === "check" && (
+                      <div class="flex flex-col items-center gap-1">
+                        <svg aria-hidden="true" class={`w-5 h-5 ${display.class}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                          <path d="M5 12l5 5L20 7"/>
+                        </svg>
+                        {display.label && (
+                          <span class="text-xs text-darkSlate-200">{display.label}</span>
+                        )}
+                      </div>
+                    )}
+                    {display.icon === "x" && (
+                      <svg aria-hidden="true" class={`w-5 h-5 mx-auto ${display.class}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                      </svg>
+                    )}
+                    {display.icon === "?" && (
+                      <span aria-hidden="true" class={`text-lg font-bold ${display.class}`}>?</span>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center mt-12" data-scroll="fade-up" data-scroll-delay="300">
+      <DownloadLink
+        client:idle
+        class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors transition-transform duration-100 ease-spring active:scale-95"
+        iconClass="w-5 h-5"
+        label={t("compare.cta")}
+        iconLeft
+      />
+    </div>
+  </div>
+</section>
+
+<style>
+  table {
+    min-width: 700px;
+  }
+
+  @media (max-width: 768px) {
+    .overflow-x-auto {
+      margin-left: -1rem;
+      margin-right: -1rem;
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+</style>

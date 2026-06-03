@@ -111,7 +111,12 @@ impl LogParser {
 
         for attr in element.attributes() {
             let attr = attr?;
-            let key = std::str::from_utf8(attr.key.as_ref()).unwrap();
+            // Only ASCII keys (logger/timestamp/level/thread) are acted on below, so an
+            // attribute name that is not valid UTF-8 can never be one we care about; skip it
+            // instead of panicking on a malformed or custom log4j layout.
+            let Ok(key) = std::str::from_utf8(attr.key.as_ref()) else {
+                continue;
+            };
             let value = attr.unescape_value()?.into_owned();
 
             match key {

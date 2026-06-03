@@ -5,9 +5,8 @@ import {
   isNewsPath,
   isNewsDetailPath
 } from "@/utils/routes"
-import { parseSearchQuery } from "@/utils/searchQueryParser"
 import { useLocation, useNavigate } from "@solidjs/router"
-import { JSX, createContext, createSignal, onMount, useContext } from "solid-js"
+import { JSX, createContext, createSignal, useContext } from "solid-js"
 
 const getTransitionClassToApply = (from: string, to: string) => {
   if (isSearchPath(from) && isAddonPath(to)) {
@@ -48,19 +47,6 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
   const [lastPathVisited, setLastPathVisited] = createSignal({
     path: location.pathname,
     searchParams: location.search
-  })
-
-  // Handle protocol URLs (curseforge://, modrinth://)
-  onMount(() => {
-    window.onProtocolUrl?.((url) => {
-      console.log("Protocol URL received in renderer:", url)
-      const parsed = parseSearchQuery(url)
-      if (parsed.mode === "direct" && parsed.items.length > 0) {
-        // Navigate to search page with the URL pre-filled
-        // The search page will parse this and show the direct results
-        navigate(`/search?q=${encodeURIComponent(url)}`)
-      }
-    })
   })
 
   const shouldTransition = () =>
@@ -117,5 +103,21 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
 }
 
 export const useGDNavigate = (): NavigationContext => {
-  return useContext(NavigationContext)!
+  const ctx = useContext(NavigationContext)
+  if (ctx) return ctx
+
+  // Fallback so call sites never crash on `navigator.navigate(...)` if the
+  // provider is briefly missing (HMR, stale tree during a route transition,
+  // etc.). Router context is still present — it wraps the provider — so
+  // plain solid-router navigate works. The transition polish and
+  // last-path tracking are skipped in this path.
+  console.warn(
+    "useGDNavigate called without NavigationManager provider; using fallback"
+  )
+  const navigate = useNavigate()
+  return {
+    navigate: (path, options) => navigate(path, { replace: options?.replace }),
+    prev: () => navigate(-1),
+    lastPathVisited: () => ({ path: "", searchParams: "" })
+  }
 }

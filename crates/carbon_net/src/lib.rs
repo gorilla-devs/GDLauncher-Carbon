@@ -4,7 +4,7 @@ use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use sha1::Sha1;
-use sha2::Sha256;
+use sha2::{Sha256, Sha512};
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt::Display;
@@ -22,6 +22,11 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, instrument, warn};
 
 const PART_POSTFIX: &str = ".__gdl_part~";
+
+/// Maximum time to wait for the next chunk of a response body before treating the connection
+/// as stalled. Generous so a slow-but-progressing download is never killed, while a half-open
+/// connection that delivers no bytes errors out instead of hanging forever.
+const READ_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
 
 #[derive(Error, Debug)]
 pub enum DownloadError {
@@ -64,11 +69,13 @@ pub enum DownloadError {
 pub enum Checksum {
     Sha1(String),
     Sha256(String),
+    Sha512(String),
     Md5(String),
 }
 
 enum HashDigest {
     Sha256(Sha256),
+    Sha512(Sha512),
     Sha1(sha1::Sha1),
     Md5(md5::Md5),
 }
@@ -77,6 +84,7 @@ impl HashDigest {
     fn update(&mut self, data: &[u8]) {
         match self {
             HashDigest::Sha256(h) => h.update(data),
+            HashDigest::Sha512(h) => h.update(data),
             HashDigest::Sha1(h) => h.update(data),
             HashDigest::Md5(h) => h.update(data),
         }
@@ -85,6 +93,7 @@ impl HashDigest {
     fn finalize(self) -> Vec<u8> {
         match self {
             HashDigest::Sha256(h) => h.finalize().to_vec(),
+            HashDigest::Sha512(h) => h.finalize().to_vec(),
             HashDigest::Sha1(h) => h.finalize().to_vec(),
             HashDigest::Md5(h) => h.finalize().to_vec(),
         }
@@ -93,6 +102,7 @@ impl HashDigest {
     fn finalize_reset(&mut self) -> Vec<u8> {
         match self {
             HashDigest::Sha256(h) => h.finalize_reset().to_vec(),
+            HashDigest::Sha512(h) => h.finalize_reset().to_vec(),
             HashDigest::Sha1(h) => h.finalize_reset().to_vec(),
             HashDigest::Md5(h) => h.finalize_reset().to_vec(),
         }
@@ -103,6 +113,7 @@ impl From<&Checksum> for HashDigest {
     fn from(value: &Checksum) -> Self {
         match value {
             Checksum::Sha256(_) => HashDigest::Sha256(Sha256::new()),
+            Checksum::Sha512(_) => HashDigest::Sha512(Sha512::new()),
             Checksum::Sha1(_) => HashDigest::Sha1(Sha1::new()),
             Checksum::Md5(_) => HashDigest::Md5(Md5::new()),
         }
@@ -322,7 +333,13 @@ pub async fn download_multiple(
 
 fn create_client(options: &DownloadOptions) -> ClientWithMiddleware {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(options.max_retries);
-    ClientBuilder::new(Client::new())
+    let client = Client::builder()
+        // Bound connection establishment so a route that never completes the handshake
+        // (captive portal, dropped route) errors out instead of hanging forever.
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .build()
+        .expect("Failed to build HTTP client");
+    ClientBuilder::new(client)
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build()
 }
@@ -632,9 +649,37 @@ async fn _download_file(
     total_files_size: u64,
     total_files_count: u64,
 ) -> Result<(), DownloadError> {
+    let resume_requested = headers.contains_key(reqwest::header::RANGE);
+
     let mut response = client.get(url).headers(headers).send().await?;
 
     check_response_status(&response, &downloadable)?;
+
+    // If we asked to resume with a Range header but the server returned the full body
+    // (200 instead of 206 Partial Content), the bytes already on disk must be discarded:
+    // appending the full response would corrupt the file, and with no size/checksum the
+    // corruption would go undetected. Discard the partial bytes and restart from scratch.
+    if resume_requested && response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+        warn!(
+            "Server ignored range request for `{}` (status {}); restarting download from scratch",
+            url,
+            response.status()
+        );
+
+        let resumed_bytes = file_processed_bytes.swap(0, Ordering::SeqCst);
+        total_downloaded_size.fetch_sub(resumed_bytes, Ordering::SeqCst);
+
+        *file = File::options()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(part_file_path)
+            .await?;
+
+        // Reset the running hash for the restarted download, mirroring the initial hasher
+        // (`From<&Checksum> for HashDigest`).
+        *hasher = downloadable.checksum.as_ref().map(HashDigest::from);
+    }
 
     download_content(
         &mut response,
@@ -663,7 +708,10 @@ async fn _download_file(
 
     if let Some(expected_checksum) = downloadable.checksum.as_ref() {
         let expected_hash = match expected_checksum {
-            Checksum::Sha256(hash) | Checksum::Sha1(hash) | Checksum::Md5(hash) => hash,
+            Checksum::Sha256(hash)
+            | Checksum::Sha512(hash)
+            | Checksum::Sha1(hash)
+            | Checksum::Md5(hash) => hash,
         };
 
         let actual_hash = hex::encode(
@@ -756,6 +804,7 @@ async fn prepare_download(
 
     let mut hasher = match downloadable.checksum {
         Some(Checksum::Sha256(_)) => Some(HashDigest::Sha256(Sha256::new())),
+        Some(Checksum::Sha512(_)) => Some(HashDigest::Sha512(Sha512::new())),
         Some(Checksum::Sha1(_)) => Some(HashDigest::Sha1(sha1::Sha1::new())),
         Some(Checksum::Md5(_)) => Some(HashDigest::Md5(md5::Md5::new())),
         None => None,
@@ -824,7 +873,17 @@ async fn download_content(
     current_files_count: &AtomicU64,
     total_count: u64,
 ) -> Result<(), DownloadError> {
-    while let Some(chunk) = response.chunk().await? {
+    loop {
+        let chunk = match tokio::time::timeout(READ_STALL_TIMEOUT, response.chunk()).await {
+            Ok(result) => result?,
+            Err(_) => {
+                return Err(DownloadError::GenericDownload(
+                    "download stalled: no data received before the read timeout".to_string(),
+                ));
+            }
+        };
+        let Some(chunk) = chunk else { break };
+
         if options.cancel_token.is_cancelled() {
             warn!("Download cancelled");
             return Err(DownloadError::Cancelled);
@@ -943,7 +1002,10 @@ async fn validate_file(
             }?;
 
             let expected_hash = match expected_checksum {
-                Checksum::Sha256(hash) | Checksum::Sha1(hash) | Checksum::Md5(hash) => hash,
+                Checksum::Sha256(hash)
+                | Checksum::Sha512(hash)
+                | Checksum::Sha1(hash)
+                | Checksum::Md5(hash) => hash,
             };
 
             if actual_hash != *expected_hash {
@@ -1695,6 +1757,59 @@ mod tests {
         }
 
         assert_eq!(std::fs::read_to_string(file_path).unwrap(), "Hello, World!");
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_download_resume_full_response_restarts() {
+        // A leftover .part file exists, but the server ignores our Range request and
+        // replies 200 with the full body. The partial bytes must be discarded and the
+        // file restarted; otherwise the full body would be appended after them and, with
+        // no size or checksum to validate against, the corruption would go undetected.
+        let mut server = mockito::Server::new_async().await;
+        let mock_url = server.url();
+
+        let mock = server
+            .mock("GET", "/test.txt")
+            .with_status(200)
+            .with_body("Hello, World!")
+            .create_async()
+            .await;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let part_path = temp_dir.path().join(format!("test.txt{}", PART_POSTFIX));
+
+        // Leftover partial download from a previous interrupted attempt.
+        {
+            let mut file = File::create(&part_path).await.unwrap();
+            file.write_all(b"Hello, ").await.unwrap();
+            file.flush().await.unwrap();
+        }
+
+        let downloadable = Downloadable {
+            url: format!("{}/test.txt", mock_url),
+            path: file_path.clone(),
+            checksum: None,
+            size: None,
+        };
+
+        let (progress_tx, _progress_rx) = watch::channel(Progress::default());
+        let options = DownloadOptions::builder()
+            .concurrency(1)
+            .progress_sender(progress_tx)
+            .build();
+
+        download_multiple(&[downloadable], options).await.unwrap();
+
+        // Restarted from scratch: exactly the server body, not the partial bytes followed
+        // by the full body.
+        assert_eq!(
+            std::fs::read_to_string(&file_path).unwrap(),
+            "Hello, World!"
+        );
 
         mock.assert();
     }

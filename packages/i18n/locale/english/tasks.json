@@ -33,5 +33,14 @@
   "_trn_instance_task_launch_waiting": "Waiting for other instances to launch",
   "_trn_instance_task_prepare": "Preparing {{name}}",
   "_trn_instance_task_launch_apply_staged_patches": "Applying staged patches",
-  "_trn_finalizing_import": "Finalizing import"
+  "_trn_finalizing_import": "Finalizing import",
+  "_trn_server_task_install": "Installing server {{server_name}}",
+  "_trn_server_task_install_from_modpack": "Installing server from modpack {{server_name}}",
+  "_trn_server_task_download_server_pack": "Downloading server pack",
+  "_trn_server_task_extract_server_pack": "Extracting server pack",
+  "_trn_server_task_download_modpack_files": "Downloading modpack files",
+  "_trn_server_task_extract_modpack_overrides": "Extracting overrides",
+  "_trn_server_task_download_server_jar": "Downloading server jar",
+  "_trn_server_task_install_modloader": "Installing modloader",
+  "_trn_cache_cleanup": "Cleaning up cache"
 }

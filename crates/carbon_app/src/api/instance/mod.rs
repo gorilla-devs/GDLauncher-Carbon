@@ -6,12 +6,20 @@ use super::translation::Translation;
 use super::vtask::FETaskId;
 use crate::api::keys;
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
-use crate::error::{AxumError, FeError};
+use crate::error::{AxumError, FeError, FeErrorCode};
+use crate::managers::account::gdl_account::{
+    PaginatedShares, QuotaInfo, RegenerateShareCodeResponse, ShareInfo, SharePreview, SharedMod,
+    UpdateShareBody, WaitForShareInstanceResponse,
+};
 use crate::managers::instance as manager;
 use crate::managers::instance::InstanceMoveTarget;
+use crate::managers::instance::export::{InstanceTooLargeError, ShareInstanceProgress};
+use crate::managers::instance::importer::ImportShareCodeProgress;
 use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
 use crate::managers::{App, AppInner, instance::importer};
 use anyhow::anyhow;
+use axum::Json;
+use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
@@ -51,13 +59,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .collect::<Vec<_>>())
         }
 
-        mutation CREATE_GROUP[app, name: String] {
-            app.instance_manager()
-                .create_group(name)
-                .await
-                .map(FEGroupId::from)
-        }
-
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
             if details.name.is_empty() {
                 return Err(anyhow::anyhow!("instance name cannot be empty"));
@@ -70,16 +71,42 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await?
             };
 
-            app.instance_manager()
-                .create_instance(
-                    group,
-                    details.name,
-                    details.use_loaded_icon,
-                    details.version.try_into()?,
-                    details.notes,
-                )
-                .await
-                .map(FEInstanceId::from)
+            let version = details.version.try_into()?;
+
+            if let Some(icon_url) = details.icon_url {
+                let icon = match app.instance_manager().download_icon(icon_url).await {
+                    Ok(icon) => Some(icon),
+                    Err(e) => {
+                        tracing::warn!("Failed to download icon for new instance, using default: {e}");
+                        None
+                    }
+                };
+
+                app.instance_manager()
+                    .create_instance_ext(
+                        group,
+                        details.name,
+                        icon,
+                        None,
+                        None,
+                        version,
+                        details.notes,
+                        |_| async { Ok(()) },
+                    )
+                    .await
+                    .map(FEInstanceId::from)
+            } else {
+                app.instance_manager()
+                    .create_instance(
+                        group,
+                        details.name,
+                        details.use_loaded_icon,
+                        version,
+                        details.notes,
+                    )
+                    .await
+                    .map(FEInstanceId::from)
+            }
         }
 
         mutation CHANGE_MODPACK[app, details: ChangeModpack] {
@@ -88,6 +115,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     details.instance.into(),
                     details.modpack.into(),
                 )
+                .await
+                .map(FETaskId::from)
+        }
+
+        mutation REINSTALL_MODPACK[app, id: FEInstanceId] {
+            app.instance_manager()
+                .reinstall_modpack(id.into())
                 .await
                 .map(FETaskId::from)
         }
@@ -107,6 +141,18 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        mutation DELETE_GROUP_WITH_INSTANCES[app, id: FEGroupId] {
+            app.instance_manager()
+                .delete_group_with_instances(id.into())
+                .await
+        }
+
+        mutation RENAME_GROUP[app, rename: RenameGroup] {
+            app.instance_manager()
+                .rename_group(rename.group.into(), rename.name)
+                .await
+        }
+
         mutation DELETE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .delete_instance(id.into())
@@ -114,11 +160,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation MOVE_GROUP[app, move_data: MoveGroup] {
+            let target = match move_data.target {
+                MoveGroupTarget::BeforeGroup(id) => manager::GroupMoveTarget::BeforeGroup(id.into()),
+                MoveGroupTarget::BeforeInstance(id) => manager::GroupMoveTarget::BeforeInstance(id.into()),
+                MoveGroupTarget::EndOfLibrary => manager::GroupMoveTarget::EndOfLibrary,
+            };
             app.instance_manager()
-                .move_group(
-                    move_data.group.into(),
-                    move_data.before.map(Into::into)
-                )
+                .move_group(move_data.group.into(), target)
                 .await
         }
 
@@ -133,8 +181,32 @@ pub(super) fn mount() -> RouterBuilder<App> {
                             => InstanceMoveTarget::BeginningOfGroup(group.into()),
                         MoveInstanceTarget::EndOfGroup(group)
                             => InstanceMoveTarget::EndOfGroup(group.into()),
+                        MoveInstanceTarget::BeforeGroup(group)
+                            => InstanceMoveTarget::BeforeGroup(group.into()),
                     }
                 )
+                .await
+        }
+
+        mutation CREATE_FOLDER_FROM_INSTANCES[app, data: CreateFolderFromInstances] {
+            app.instance_manager()
+                .create_folder_from_instances(
+                    data.instances.into_iter().map(|id| id.into()).collect(),
+                    data.target_instance_id.map(|id| id.into()),
+                )
+                .await
+                .map(FEGroupId::from)
+        }
+
+        mutation ARRANGE_LIBRARY[app, sort_by: LibrarySortCriteria] {
+            app.instance_manager()
+                .arrange_library(sort_by.into())
+                .await
+        }
+
+        mutation ARRANGE_GROUP[app, data: ArrangeGroup] {
+            app.instance_manager()
+                .arrange_group(data.group.into(), data.sort_by.into())
                 .await
         }
 
@@ -152,6 +224,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.instance_manager()
                 .update_instance(details.try_into()?)
                 .await
+                .map(|task_id| task_id.map(super::vtask::FETaskId::from))
         }
 
         mutation SET_FAVORITE[app, favorite: SetFavorite] {
@@ -201,8 +274,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation PRIORITIZE_INSTANCE_CACHE[app, instance_id: Option<FEInstanceId>] {
+            use crate::managers::metadata::cache::CacheEntityId;
             app.meta_cache_manager()
-                .watch_and_prioritize(instance_id.map(|id| id.into()))
+                .watch_and_prioritize(instance_id.map(|id| CacheEntityId::Instance(id.into())))
                 .await;
 
             Ok(())
@@ -216,7 +290,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(FETaskId::from(vtask_id))
         }
 
-        mutation LAUNCH_INSTANCE[app, id: FEInstanceId] {
+        mutation LAUNCH_INSTANCE[app, args: FELaunchInstanceArgs] {
             let account = app.account_manager()
                 .get_active_account()
                 .await?;
@@ -225,8 +299,41 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 return Err(anyhow::anyhow!("attempted to launch instance without an account"));
             };
 
+            let memory_check_dismissed = crate::api::settings::is_memory_warning_dismissed(
+                &app.prisma_client,
+            ).await.unwrap_or(false);
+
+            if !args.skip_memory_check && !memory_check_dismissed {
+                let instance_id = crate::domain::instance::InstanceId(args.id.0);
+                let (_xms, xmx) = app.instance_manager()
+                    .get_effective_memory(instance_id)
+                    .await?;
+
+                let available_bytes = app.system_info_manager()
+                    .get_available_ram()
+                    .await;
+                let available_mb: u64 = available_bytes / 1024 / 1024;
+
+                // If we couldn't determine available RAM, skip the check
+                // and let the user launch normally.
+                if available_mb > 0 {
+                    // JVM needs native memory beyond the heap for JIT compiler, thread
+                    // stacks, metaspace, GC structures, direct buffers, etc.
+                    // A 1500 MB buffer accounts for this overhead.
+                    let total_estimated_mb: u64 = u64::from(xmx).saturating_add(1500);
+
+                    if total_estimated_mb > available_mb {
+                        return Err(crate::managers::instance::run::InsufficientMemoryError {
+                            instance_id: args.id.0,
+                            requested_mb: u64::from(xmx),
+                            available_mb,
+                        }.into());
+                    }
+                }
+            }
+
             app.instance_manager()
-                .prepare_game(id.into(), Some(account), None, false)
+                .prepare_game(args.id.into(), Some(account), None, false)
                 .await?;
 
             Ok(())
@@ -268,6 +375,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.instance_manager()
                 .delete_log(id.into())
                 .await
+        }
+
+        mutation OPEN_LOG_IN_FOLDER[app, req: OpenLogInFolder] {
+            Ok(app.instance_manager()
+                .get_log_file_path(req.instance_id.into(), req.log_id.into())
+                .await?)
         }
 
         mutation ENABLE_MOD[app, imod: InstanceMod] {
@@ -352,6 +465,19 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .map(crate::api::settings::ModSources::from)
         }
 
+        query CHECK_SHADER_REQUIREMENTS[app, instance_id: FEInstanceId] {
+            app.instance_manager()
+                .check_shader_requirements(instance_id.into())
+                .await
+        }
+
+        mutation INSTALL_FABRIC_LOADER_DEFAULT[app, instance_id: FEInstanceId] {
+            let task_id = app.instance_manager()
+                .install_fabric_loader_default(instance_id.into())
+                .await?;
+            Ok(super::vtask::FETaskId::from(task_id))
+        }
+
         mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
             let task = match imod.mod_source {
                 LatestModSource::Curseforge(cf_mod) => {
@@ -381,6 +507,20 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 folder.folder.into(),
             )
             .await
+        }
+
+        query VALIDATE_SHARE_CODE[app, share_code: String] {
+            app.account_manager()
+                .validate_share_code(share_code)
+                .await
+        }
+
+        query GET_SHARE_PREVIEW[app, share_code: String] {
+            let preview = app.account_manager()
+                .get_share_preview(share_code)
+                .await?;
+
+            Ok(FESharePreview::from(preview))
         }
 
         query GET_IMPORTABLE_ENTITIES[_, _args: ()] {
@@ -449,6 +589,136 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             Ok(FETaskId::from(task))
         }
+
+        query WAIT_FOR_SHARE_INSTANCE[app, args: FEWaitForShareInstanceArgs] {
+            let instance_id = args.instance_id.map(|id| domain::InstanceId(id));
+
+            let resp = app.instance_manager()
+                .export_manager()
+                .wait_for_share_instance(args.file_key, instance_id)
+                .await?;
+
+            Ok(FEWaitForInstanceShareResponse::from(resp))
+        }
+
+        query GET_USER_SHARES[app, args: FEGetUserSharesArgs] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            let shares = app
+                .account_manager()
+                .get_user_shares(
+                    gdl_account_uuid,
+                    args.limit.map(|l| l as i64),
+                    args.offset.map(|o| o as i64),
+                )
+                .await?;
+
+            Ok(FEPaginatedShares::from(shares))
+        }
+
+        query GET_USER_QUOTA[app, args: ()] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            let quota = app
+                .account_manager()
+                .get_quota(gdl_account_uuid)
+                .await?;
+
+            Ok(FEQuotaInfo::from(quota))
+        }
+
+        mutation DELETE_SHARE[app, share_code: String] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            app.account_manager()
+                .delete_share(gdl_account_uuid, share_code)
+                .await?;
+
+            Ok(())
+        }
+
+        mutation UPDATE_SHARE[app, args: FEUpdateShareArgs] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            app.account_manager()
+                .update_share(
+                    gdl_account_uuid,
+                    args.share_code,
+                    args.title,
+                    args.max_downloads,
+                )
+                .await?;
+
+            Ok(())
+        }
+
+        mutation REPORT_SHARE[app, args: FEReportShareArgs] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            app.account_manager()
+                .report_share(
+                    gdl_account_uuid,
+                    args.share_code,
+                    args.report_type,
+                    args.reason,
+                )
+                .await?;
+
+            Ok(())
+        }
+
+        mutation REGENERATE_SHARE_CODE[app, share_code: String] {
+            let Some(gdl_account_uuid) = app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid
+            else {
+                anyhow::bail!("no gdl account found");
+            };
+
+            let response = app
+                .account_manager()
+                .regenerate_share_code(gdl_account_uuid, share_code)
+                .await?;
+
+            Ok(FERegenerateShareCodeResponse::from(response))
+        }
     }
 }
 
@@ -501,6 +771,214 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         };
 
         Ok::<_, AxumError>(res)
+    }
+
+    async fn share_instance(
+        State(app): State<Arc<AppInner>>,
+        Query(query): Query<ShareInstanceQuery>,
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+
+        let (mut rx, handle) = app
+            .instance_manager()
+            .export_manager()
+            .share_instance(
+                query.instance_id.into(),
+                query.title,
+                query.expiration_days,
+                query.max_downloads,
+                query.include_saves,
+                cancel_token.clone(),
+            )
+            .await
+            .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+        let abort_handle = handle.abort_handle();
+
+        struct CancelGuard {
+            token: tokio_util::sync::CancellationToken,
+            abort_handle: tokio::task::AbortHandle,
+            completed: bool,
+        }
+
+        impl Drop for CancelGuard {
+            fn drop(&mut self) {
+                if !self.completed {
+                    tracing::info!("ShareInstance: client disconnected, cancelling task");
+                    self.token.cancel();
+                    self.abort_handle.abort();
+                }
+            }
+        }
+
+        let guard = CancelGuard {
+            token: cancel_token,
+            abort_handle,
+            completed: false,
+        };
+
+        let response = axum::response::sse::Sse::new(async_stream::stream! {
+            // Explicitly move guard into the stream so it lives until the stream is dropped
+            let mut guard = guard;
+
+            yield Ok::<_, Infallible>(axum::response::sse::Event::default()
+                .json_data(FEShareInstanceProgress::Progress(0))
+                .unwrap());
+
+            let mut last_progress = ShareInstanceProgress::Progress(0);
+
+            while let Some(progress) = rx.recv().await {
+                if last_progress != progress {
+                    last_progress = progress.clone();
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(FEShareInstanceProgress::from(progress.clone()))
+                        .unwrap());
+                }
+            }
+
+            let result = match handle.await {
+                Ok(result) => result,
+                Err(err) => Err(anyhow::anyhow!(err)),
+            };
+
+            match result {
+                Ok(result) => {
+                    tracing::info!("Share instance finished with result: {}", result);
+                    guard.completed = true;
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(FEShareInstanceProgress::Finished(result))
+                        .unwrap());
+                }
+                Err(err) => {
+                    use crate::managers::account::gdl_account::InstanceShareError;
+                    tracing::error!("Share instance failed with error: {}", err);
+                    guard.completed = true;
+
+                    let fe_error = if let Some(too_large) =
+                        err.downcast_ref::<InstanceTooLargeError>()
+                    {
+                        FEShareInstanceProgress::Error {
+                            code: "INSTANCE_TOO_LARGE".to_string(),
+                            message: too_large.to_string(),
+                            details: Some(FEShareErrorDetails::from(too_large)),
+                        }
+                    } else if let Some(share_err) = err.downcast_ref::<InstanceShareError>() {
+                        FEShareInstanceProgress::Error {
+                            code: share_err.error_code().to_string(),
+                            message: share_err.to_string(),
+                            details: None,
+                        }
+                    } else {
+                        FEShareInstanceProgress::Error {
+                            code: "UNKNOWN_ERROR".to_string(),
+                            message: err.to_string(),
+                            details: None,
+                        }
+                    };
+
+                    // Delivered as a normal `message` event (not a named
+                    // `error` event): the frontend's EventSource reserves the
+                    // `error` event for its own connection-level failures, so
+                    // an app error sent under that name collides with native
+                    // errors and can be dropped. On the default stream
+                    // `onmessage` always sees it.
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(fe_error)
+                        .unwrap());
+                }
+            };
+        });
+
+        Ok::<_, AxumError>(response)
+    }
+
+    async fn import_share_instance(
+        State(app): State<Arc<AppInner>>,
+        Query(query): Query<ImportShareCodeQuery>,
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+
+        let (mut rx, handle) = app
+            .instance_manager()
+            .import_manager()
+            .import_instance_share_code_with_progress(query.share_code, cancel_token.clone())
+            .await
+            .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+        let abort_handle = handle.abort_handle();
+
+        struct CancelGuard {
+            token: tokio_util::sync::CancellationToken,
+            abort_handle: tokio::task::AbortHandle,
+            completed: bool,
+        }
+
+        impl Drop for CancelGuard {
+            fn drop(&mut self) {
+                if !self.completed {
+                    tracing::info!("ImportShareInstance: client disconnected, cancelling task");
+                    self.token.cancel();
+                    self.abort_handle.abort();
+                }
+            }
+        }
+
+        let guard = CancelGuard {
+            token: cancel_token,
+            abort_handle,
+            completed: false,
+        };
+
+        let response = axum::response::sse::Sse::new(async_stream::stream! {
+            let mut guard = guard;
+
+            yield Ok::<_, Infallible>(axum::response::sse::Event::default()
+                .json_data(FEImportShareCodeProgress::Progress(0))
+                .unwrap());
+
+            let mut last_progress = ImportShareCodeProgress::Progress(0);
+
+            while let Some(progress) = rx.recv().await {
+                if last_progress != progress {
+                    last_progress = progress.clone();
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(FEImportShareCodeProgress::from(progress.clone()))
+                        .unwrap());
+                }
+            }
+
+            let result = match handle.await {
+                Ok(result) => result,
+                Err(err) => Err(anyhow::anyhow!(err)),
+            };
+
+            match result {
+                Ok(()) => {
+                    tracing::info!("Import share instance finished successfully");
+                    guard.completed = true;
+                    yield Ok(axum::response::sse::Event::default()
+                        .json_data(FEImportShareCodeProgress::Finished("ok".into()))
+                        .unwrap());
+                }
+                Err(err) => {
+                    use crate::managers::account::gdl_account::InstanceShareError;
+                    tracing::error!("Import share instance failed with error: {}", err);
+                    guard.completed = true;
+
+                    let (code, message) = err
+                        .downcast_ref::<InstanceShareError>()
+                        .map(|e| (e.error_code().to_string(), e.to_string()))
+                        .unwrap_or_else(|| ("UNKNOWN_ERROR".to_string(), err.to_string()));
+
+                    yield Ok(axum::response::sse::Event::default()
+                        .event("error")
+                        .json_data(FEImportShareCodeProgress::Error { code, message })
+                        .unwrap());
+                }
+            };
+        });
+
+        Ok::<_, AxumError>(response)
     }
 
     axum::Router::new()
@@ -571,6 +1049,8 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             )
         )
         .route("/log", axum::routing::get(log::log_handler))
+        .route("/shareInstance", axum::routing::get(share_instance))
+        .route("/importShareInstance", axum::routing::get(import_share_instance))
 }
 
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -607,12 +1087,15 @@ impl From<FEInstanceId> for domain::InstanceId {
 struct ListGroup {
     id: FEGroupId,
     name: String,
+    library_position: Option<i32>,
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ListInstance {
     id: FEInstanceId,
     group_id: FEGroupId,
+    index: i32,
+    library_position: Option<i32>,
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
@@ -672,6 +1155,8 @@ struct CreateInstance {
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
     notes: String,
+    #[specta(optional)]
+    icon_url: Option<String>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -738,6 +1223,14 @@ struct FEUpdateInstance {
     mod_sources: Option<Set<Option<ModSources>>>,
     #[specta(optional)]
     modpack_locked: Option<Set<Option<bool>>>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FELaunchInstanceArgs {
+    id: FEInstanceId,
+    #[serde(default)]
+    skip_memory_check: bool,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -817,6 +1310,7 @@ struct GameLogEntry {
     instance_id: FEInstanceId,
     active: bool,
     timestamp: String,
+    file_size: Option<f64>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -864,9 +1358,57 @@ struct StandardVersion {
 }
 
 #[derive(Type, Debug, Deserialize)]
+enum MoveGroupTarget {
+    BeforeGroup(FEGroupId),
+    BeforeInstance(FEInstanceId), // Instance must be in default group (ungrouped)
+    EndOfLibrary,
+}
+
+#[derive(Type, Debug, Deserialize)]
 struct MoveGroup {
     group: FEGroupId,
-    before: Option<FEGroupId>,
+    target: MoveGroupTarget,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateFolderFromInstances {
+    instances: Vec<FEInstanceId>,
+    #[specta(optional)]
+    target_instance_id: Option<FEInstanceId>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum LibrarySortCriteria {
+    Name,
+    LastPlayed,
+    MostPlayed,
+    DateCreated,
+}
+
+impl From<LibrarySortCriteria> for manager::LibrarySortCriteria {
+    fn from(value: LibrarySortCriteria) -> Self {
+        match value {
+            LibrarySortCriteria::Name => Self::Name,
+            LibrarySortCriteria::LastPlayed => Self::LastPlayed,
+            LibrarySortCriteria::MostPlayed => Self::MostPlayed,
+            LibrarySortCriteria::DateCreated => Self::DateCreated,
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ArrangeGroup {
+    group: FEGroupId,
+    sort_by: LibrarySortCriteria,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct RenameGroup {
+    group: FEGroupId,
+    name: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -880,6 +1422,7 @@ enum MoveInstanceTarget {
     BeforeInstance(FEInstanceId),
     BeginningOfGroup(FEGroupId),
     EndOfGroup(FEGroupId),
+    BeforeGroup(FEGroupId), // Position instance before a folder (at library root level)
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -914,6 +1457,7 @@ struct InstanceDetails {
     name: String,
     favorite: bool,
     version: Option<String>,
+    // is_being_cached: bool,
     modpack: Option<ModpackInfo>,
     global_java_args: bool,
     extra_java_args: Option<String>,
@@ -965,6 +1509,12 @@ struct OpenInstanceFolder {
 }
 
 #[derive(Type, Debug, Deserialize)]
+struct OpenLogInFolder {
+    instance_id: FEInstanceId,
+    log_id: GameLogId,
+}
+
+#[derive(Type, Debug, Deserialize)]
 enum InstanceFolder {
     Root,
     Data,
@@ -1001,6 +1551,7 @@ enum LaunchState {
     Inactive {
         failed_task: Option<FETaskId>,
     },
+    Queued(FETaskId),
     Preparing(FETaskId),
     Running {
         start_time: DateTime<Utc>,
@@ -1091,6 +1642,7 @@ struct ExportEntry {
 enum ExportTarget {
     Curseforge,
     Modrinth,
+    Gdlauncher,
 }
 
 #[derive(Type, Deserialize, Debug)]
@@ -1115,6 +1667,7 @@ pub enum ImportEntity {
     FTB,
     MultiMC,
     PrismLauncher,
+    GDLPack,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1184,6 +1737,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             favorite: value.favorite,
             name: value.name,
             version: value.version,
+            // is_being_cached: value.is_being_cached,
             modpack: value.modpack.map(Into::into),
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
@@ -1368,6 +1922,7 @@ impl From<manager::ListGroup> for ListGroup {
         Self {
             id: value.id.into(),
             name: value.name,
+            library_position: value.library_position,
         }
     }
 }
@@ -1377,6 +1932,8 @@ impl From<manager::ListInstance> for ListInstance {
         Self {
             id: value.id.into(),
             group_id: value.group_id.into(),
+            index: value.index,
+            library_position: value.library_position,
             name: value.name,
             favorite: value.favorite,
             status: value.status.into(),
@@ -1455,6 +2012,7 @@ impl From<domain::LaunchState> for LaunchState {
             domain::Inactive { failed_task } => Self::Inactive {
                 failed_task: failed_task.map(Into::into),
             },
+            domain::Queued(task) => Self::Queued(task.into()),
             domain::Preparing(task) => Self::Preparing(task.into()),
             domain::Running { start_time, log_id } => Self::Running {
                 start_time,
@@ -1549,6 +2107,7 @@ impl From<domain::GameLogEntry> for GameLogEntry {
             instance_id: value.instance_id.into(),
             active: value.active,
             timestamp: value.datetime.timestamp_millis().to_string(),
+            file_size: value.file_size.map(|s| s as f64),
         }
     }
 }
@@ -1635,6 +2194,7 @@ impl From<ImportEntity> for importer::Entity {
             ImportEntity::FTB => Self::FTB,
             ImportEntity::MultiMC => Self::MultiMC,
             ImportEntity::PrismLauncher => Self::PrismLauncher,
+            ImportEntity::GDLPack => Self::GDLPack,
         }
     }
 }
@@ -1654,6 +2214,7 @@ impl From<importer::Entity> for ImportEntity {
             backend::FTB => Self::FTB,
             backend::MultiMC => Self::MultiMC,
             backend::PrismLauncher => Self::PrismLauncher,
+            backend::GDLPack => Self::GDLPack,
         }
     }
 }
@@ -1699,6 +2260,7 @@ impl From<ExportTarget> for domain::ExportTarget {
         match value {
             ExportTarget::Curseforge => Self::Curseforge,
             ExportTarget::Modrinth => Self::Modrinth,
+            ExportTarget::Gdlauncher => Self::Gdlauncher,
         }
     }
 }
@@ -1841,6 +2403,298 @@ impl From<FESearchResult> for SearchResult {
             entry_index: value.entry_index as usize,
             pos: value.pos as usize,
             len: value.len as usize,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct ShareInstanceQuery {
+    instance_id: FEInstanceId,
+    title: Option<String>,
+    expiration_days: Option<i32>,
+    max_downloads: Option<i32>,
+    #[serde(default)]
+    include_saves: bool,
+}
+
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+enum FEShareInstanceProgress {
+    Progress(i32),
+    Finished(String),
+    Error {
+        code: String,
+        message: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        details: Option<FEShareErrorDetails>,
+    },
+}
+
+/// Extra machine-readable context for a share failure. Currently only set for
+/// `INSTANCE_TOO_LARGE`, so the UI can show the size, the cap, and which
+/// folders are responsible.
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEShareErrorDetails {
+    total_bytes: f64,
+    limit_bytes: f64,
+    largest_folders: Vec<FEShareFolderSize>,
+}
+
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEShareFolderSize {
+    name: String,
+    bytes: f64,
+}
+
+impl From<&InstanceTooLargeError> for FEShareErrorDetails {
+    fn from(err: &InstanceTooLargeError) -> Self {
+        Self {
+            total_bytes: err.total_bytes as f64,
+            limit_bytes: err.limit_bytes as f64,
+            largest_folders: err
+                .largest_folders
+                .iter()
+                .map(|f| FEShareFolderSize {
+                    name: f.name.clone(),
+                    bytes: f.bytes as f64,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl From<ShareInstanceProgress> for FEShareInstanceProgress {
+    fn from(value: ShareInstanceProgress) -> Self {
+        match value {
+            ShareInstanceProgress::Progress(p) => Self::Progress(p),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct ImportShareCodeQuery {
+    share_code: String,
+}
+
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+enum FEImportShareCodeProgress {
+    Progress(i32),
+    Finished(String),
+    Error { code: String, message: String },
+}
+
+impl From<ImportShareCodeProgress> for FEImportShareCodeProgress {
+    fn from(value: ImportShareCodeProgress) -> Self {
+        match value {
+            ImportShareCodeProgress::Progress(p) => Self::Progress(p),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Type)]
+struct FEWaitForInstanceShareResponse {
+    share_code: String,
+    expires_at: DateTime<Utc>,
+}
+
+impl From<WaitForShareInstanceResponse> for FEWaitForInstanceShareResponse {
+    fn from(value: WaitForShareInstanceResponse) -> Self {
+        Self {
+            share_code: value.share_code,
+            expires_at: value.expires_at,
+        }
+    }
+}
+
+// Individual mod data for share preview
+#[derive(Debug, Serialize, Clone, Type)]
+#[serde(rename_all = "camelCase")]
+struct FESharedMod {
+    name: String,
+    curseforge_project_id: Option<i32>,
+    curseforge_file_id: Option<i32>,
+    curseforge_slug: Option<String>,
+    modrinth_project_id: Option<String>,
+    modrinth_version_id: Option<String>,
+    modrinth_slug: Option<String>,
+}
+
+impl From<SharedMod> for FESharedMod {
+    fn from(value: SharedMod) -> Self {
+        Self {
+            name: value.name,
+            curseforge_project_id: value.curseforge_project_id,
+            curseforge_file_id: value.curseforge_file_id,
+            curseforge_slug: value.curseforge_slug,
+            modrinth_project_id: value.modrinth_project_id,
+            modrinth_version_id: value.modrinth_version_id,
+            modrinth_slug: value.modrinth_slug,
+        }
+    }
+}
+
+// Share preview for public preview endpoint (no auth required)
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FESharePreview {
+    share_code: String,
+    title: Option<String>,
+    minecraft_version: Option<String>,
+    modloader_type: Option<String>,
+    modloader_version: Option<String>,
+    mods: Vec<FESharedMod>,
+    size_kilobytes: i32,
+    background_url: Option<String>,
+    expires_at: DateTime<Utc>,
+    download_count: i32,
+    max_downloads: Option<i32>,
+    sharer_display_name: String,
+    sharer_friend_code: String,
+}
+
+impl From<SharePreview> for FESharePreview {
+    fn from(value: SharePreview) -> Self {
+        Self {
+            share_code: value.share_code,
+            title: value.title,
+            minecraft_version: value.minecraft_version,
+            modloader_type: value.modloader_type,
+            modloader_version: value.modloader_version,
+            mods: value.mods.into_iter().map(FESharedMod::from).collect(),
+            size_kilobytes: value.size_kilobytes,
+            background_url: value.background_url,
+            expires_at: value.expires_at,
+            download_count: value.download_count,
+            max_downloads: value.max_downloads,
+            sharer_display_name: value.sharer_display_name,
+            sharer_friend_code: value.sharer_friend_code,
+        }
+    }
+}
+
+// Args for WAIT_FOR_SHARE_INSTANCE query
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEWaitForShareInstanceArgs {
+    file_key: String,
+    /// Optional instance_id to upload instance background after share completes
+    #[specta(optional)]
+    instance_id: Option<i32>,
+}
+
+// Args for GET_USER_SHARES query
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEGetUserSharesArgs {
+    limit: Option<i32>,
+    offset: Option<i32>,
+}
+
+// Individual share info
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEShareInfo {
+    share_code: String,
+    title: Option<String>,
+    download_count: i32,
+    max_downloads: Option<i32>,
+    expires_at: DateTime<Utc>,
+    size_kilobytes: i32,
+    created_at: DateTime<Utc>,
+    is_expired: bool,
+}
+
+impl From<ShareInfo> for FEShareInfo {
+    fn from(value: ShareInfo) -> Self {
+        Self {
+            share_code: value.share_code,
+            title: value.title,
+            download_count: value.download_count,
+            max_downloads: value.max_downloads,
+            expires_at: value.expires_at,
+            size_kilobytes: value.size_kilobytes,
+            created_at: value.created_at,
+            is_expired: value.is_expired,
+        }
+    }
+}
+
+// Paginated shares response
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEPaginatedShares {
+    items: Vec<FEShareInfo>,
+    total_count: i32,
+    limit: i32,
+    offset: i32,
+}
+
+impl From<PaginatedShares> for FEPaginatedShares {
+    fn from(value: PaginatedShares) -> Self {
+        Self {
+            items: value.items.into_iter().map(FEShareInfo::from).collect(),
+            total_count: value.total_count as i32,
+            limit: value.limit as i32,
+            offset: value.offset as i32,
+        }
+    }
+}
+
+// Quota info
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEQuotaInfo {
+    used_kilobytes: i32,
+    total_kilobytes: i32,
+}
+
+impl From<QuotaInfo> for FEQuotaInfo {
+    fn from(value: QuotaInfo) -> Self {
+        Self {
+            used_kilobytes: value.used_kilobytes as i32,
+            total_kilobytes: value.total_kilobytes as i32,
+        }
+    }
+}
+
+// Args for UPDATE_SHARE mutation
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEUpdateShareArgs {
+    share_code: String,
+    #[specta(optional)]
+    title: Option<String>,
+    #[specta(optional)]
+    max_downloads: Option<Option<i32>>,
+}
+
+// Args for REPORT_SHARE mutation
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEReportShareArgs {
+    share_code: String,
+    /// One of: "share_background", "share_title", "share_content"
+    report_type: String,
+    #[specta(optional)]
+    reason: Option<String>,
+}
+
+// Response for REGENERATE_SHARE_CODE mutation
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FERegenerateShareCodeResponse {
+    new_share_code: String,
+}
+
+impl From<RegenerateShareCodeResponse> for FERegenerateShareCodeResponse {
+    fn from(value: RegenerateShareCodeResponse) -> Self {
+        Self {
+            new_share_code: value.new_share_code,
         }
     }
 }

@@ -1,0 +1,291 @@
+---
+/**
+ * Localized "How to Install Minecraft Resource Packs" guide. Brand names
+ * left untranslated (GDLauncher, CurseForge, Modrinth, OptiFine, Continuity).
+ */
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "Minecraft リソースパックの導入方法",
+    description: "GDLauncher で Minecraft のリソースパック / テクスチャパックを導入する方法。見た目をカスタマイズする完全ガイド。",
+    steps: [
+      { name: "インスタンスを開く", text: "リソースパックを適用したい Minecraft インスタンスを開きます。リソースパックは Mod 入りでもバニラでも、どのインスタンスでも使えます。" },
+      { name: "Addons タブを開く", text: "インスタンスの Addons タブから Add Addons をクリック。アドオンタイプで「Resource Packs」を選んでブラウザを絞り込みます。" },
+      { name: "パックを選んでダウンロード", text: "名前で検索するか、人気のパックを眺めて探します。GDLauncher が対応する Minecraft バージョンを表示するので、互換性を確認してから Download。" },
+      { name: "ゲーム内で有効化", text: "インスタンスを起動し、Options → Resource Packs から目的のパックを Selected 側に移動。Apply で完了です。" }
+    ]
+  },
+  ko: {
+    title: "Minecraft 리소스 팩 설치 방법",
+    description: "GDLauncher로 Minecraft에 리소스 팩과 텍스처 팩을 설치하는 방법. 게임 외관을 커스터마이즈하는 완전 가이드.",
+    steps: [
+      { name: "인스턴스 열기", text: "리소스 팩을 적용할 Minecraft 인스턴스를 선택하세요. 리소스 팩은 모드가 적용된 인스턴스든 바닐라 인스턴스든 어디서나 동작합니다." },
+      { name: "Addons 탭 열기", text: "인스턴스 안의 Addons 탭을 누르고 Add Addons를 선택. 애드온 타입으로 'Resource Packs'를 골라 브라우저를 필터링하세요." },
+      { name: "팩을 찾아 다운로드", text: "이름으로 검색하거나 인기 팩을 둘러보세요. GDLauncher가 지원되는 Minecraft 버전을 표시해 주므로, 다운로드 전에 호환성을 확인할 수 있습니다." },
+      { name: "게임 안에서 활성화", text: "인스턴스를 실행한 뒤 Options → Resource Packs에서 팩을 Selected 목록으로 옮기고 Apply를 누르세요. 끝." }
+    ]
+  },
+  de: {
+    title: "So installierst du Minecraft-Resource-Packs",
+    description: "Lerne, wie du Resource Packs und Texture Packs in Minecraft mit GDLauncher installierst. Komplett-Guide zum Anpassen der Optik.",
+    steps: [
+      { name: "Instanz öffnen", text: "Wähl die Minecraft-Instanz, auf die du das Resource Pack anwenden willst. Resource Packs funktionieren mit jeder Minecraft-Instanz, modded oder vanilla." },
+      { name: "Addons-Tab öffnen", text: "Klick in der Instanz auf den Addons-Tab und dann auf Add Addons. Wähl als Addon-Typ 'Resource Packs', um den Browser zu filtern." },
+      { name: "Pack finden und herunterladen", text: "Such per Namen oder stöber durch die Top-Packs. GDLauncher zeigt unterstützte Minecraft-Versionen, damit du vor dem Download Kompatibilität prüfen kannst." },
+      { name: "Im Spiel aktivieren", text: "Starte die Instanz, geh in Options → Resource Packs und schieb dein Pack auf die Selected-Liste. Mit Apply bestätigen, fertig." }
+    ]
+  },
+  fr: {
+    title: "Comment installer des resource packs Minecraft",
+    description: "Apprends à installer des resource packs et texture packs dans Minecraft avec GDLauncher. Guide complet pour personnaliser l'apparence du jeu.",
+    steps: [
+      { name: "Ouvrir l'instance", text: "Choisis l'instance Minecraft sur laquelle tu veux appliquer le resource pack. Les resource packs marchent avec n'importe quelle instance, moddée ou vanilla." },
+      { name: "Ouvrir l'onglet Addons", text: "Clique sur l'onglet Addons dans l'instance, puis sur Add Addons. Choisis 'Resource Packs' comme type d'addon pour filtrer le navigateur." },
+      { name: "Trouver un pack et le télécharger", text: "Cherche par nom ou parcours les packs populaires. GDLauncher affiche les versions de Minecraft supportées pour que tu confirmes la compatibilité avant le téléchargement." },
+      { name: "Activer en jeu", text: "Lance l'instance, va dans Options → Resource Packs, et déplace ton pack vers la liste Selected. Apply, c'est fini." }
+    ]
+  },
+  es: {
+    title: "Cómo instalar resource packs de Minecraft",
+    description: "Aprende a instalar resource packs y texture packs en Minecraft con GDLauncher. Guía completa para personalizar el aspecto del juego.",
+    steps: [
+      { name: "Abrir la instancia", text: "Elige la instancia de Minecraft donde quieres aplicar el resource pack. Los resource packs funcionan en cualquier instancia, modeada o vanilla." },
+      { name: "Abrir la pestaña Addons", text: "Pulsa la pestaña Addons dentro de la instancia y luego Add Addons. Elige 'Resource Packs' como tipo de addon para filtrar el navegador." },
+      { name: "Encontrar un pack y descargarlo", text: "Busca por nombre o explora los packs más populares. GDLauncher muestra las versiones de Minecraft soportadas para que confirmes la compatibilidad antes de descargar." },
+      { name: "Activarlo en el juego", text: "Lanza la instancia, abre Options → Resource Packs y mueve tu pack a la lista Selected. Apply y listo." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como instalar resource packs do Minecraft",
+    description: "Aprenda a instalar resource packs e texture packs no Minecraft com o GDLauncher. Guia completo para personalizar o visual do jogo.",
+    steps: [
+      { name: "Abrir a instância", text: "Escolha a instância do Minecraft onde quer aplicar o resource pack. Resource packs funcionam em qualquer instância, com ou sem mods." },
+      { name: "Abrir a aba Addons", text: "Clique na aba Addons dentro da instância e depois em Add Addons. Escolha 'Resource Packs' como tipo de addon para filtrar o navegador." },
+      { name: "Achar um pack e baixar", text: "Pesquise pelo nome ou explore os mais populares. O GDLauncher mostra as versões do Minecraft suportadas para você confirmar compatibilidade antes de baixar." },
+      { name: "Ativar no jogo", text: "Inicie a instância, abra Options → Resource Packs e mova seu pack pra lista Selected. Apply e está feito." }
+    ]
+  },
+  it: {
+    title: "Come installare Resource Pack di Minecraft",
+    description: "Scopri come installare Resource Pack e Texture Pack su Minecraft con GDLauncher. Guida completa per personalizzare l'aspetto del gioco.",
+    steps: [
+      { name: "Aprire l'istanza", text: "Scegli l'istanza di Minecraft a cui vuoi applicare il Resource Pack. I Resource Pack funzionano in qualunque istanza, sia con Mod sia Vanilla." },
+      { name: "Aprire la scheda Addons", text: "Clicca sulla scheda Addons dentro l'istanza e poi su Add Addons. Seleziona 'Resource Packs' come tipo di addon per filtrare il browser." },
+      { name: "Trovare un pack e scaricarlo", text: "Cerca per nome o sfoglia i pack più popolari. GDLauncher mostra le versioni di Minecraft supportate così puoi verificare la compatibilità prima di scaricare." },
+      { name: "Attivarlo in gioco", text: "Avvia l'istanza, vai in Options → Resource Packs e sposta il pack nella lista Selected. Premi Apply e sei a posto." }
+    ]
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="install resource pack minecraft, texture pack, how to install texture packs, minecraft resource pack guide, gdlauncher resource pack"
+  lastUpdated="April 2026"
+  howTo={{ totalTimeIso: "PT2M", steps: m.steps }}
+>
+  {locale === "ja" && (
+    <Fragment>
+      <h2>リソースパックでできること</h2>
+      <p>リソースパックは新しいコンテンツを追加せずに Minecraft の見た目を変えます。テクスチャ、サウンド、音楽、フォントなどを差し替え可能。リアル風、アニメ風、中世風、現代風、その他あらゆるスタイルにできます。Mod は不要。</p>
+      <p>128x、256x、それ以上の HD テクスチャを採用しているパックもあれば、コネクテッドテクスチャでガラスがシームレスに見えるパックもあります。サウンドだけ全部入れ替える系も。複数のパックを重ねて、ブロック用と GUI 用を別々に使うこともできます。</p>
+
+      <h2>GDLauncher での導入</h2>
+      <p>インスタンスを開いて <strong>Addons</strong> タブから <strong>Add Addons</strong>。検索バー左のドロップダウンで <strong>Resource Packs</strong> を選択。CurseForge / Modrinth のパックを見つけて <strong>Download</strong>。</p>
+      <p>あとはゲームを起動して Options → Resource Packs でパックを Available から Selected に矢印で移動し、Done を押せばテクスチャが読み込まれます。</p>
+
+      <h2>手動インストール</h2>
+      <p>外部から入手した .zip ファイルがある場合: インスタンスを右クリック → <strong>More options</strong> → <strong>Open folder</strong>。<code>instance</code> フォルダ内の <code>resourcepacks</code> フォルダに .zip をそのまま置きます。展開しないこと。</p>
+      <p>手動でファイルを追加した後はホーム画面に戻ってインスタンスをもう一度クリックすると、GDLauncher が再スキャンして新しいリソースパックを検出します。</p>
+
+      <h2>パックの重ね掛け</h2>
+      <p>複数のパックを同時に使えます。リスト上位のパックが下位のパックのテクスチャを上書きします。これを使えば、メインのテクスチャパックに GUI、サウンド、空のパックを組み合わせられます。</p>
+
+      <h2>パフォーマンスへの影響</h2>
+      <p>高解像度パック (512x、1024x) は RAM と GPU を要求します。FPS に余裕がないなら 32x や 64x を選びましょう。コネクテッドテクスチャなど一部の機能は OptiFine か Continuity Mod が必要です。</p>
+
+      <h2>トラブルシューティング</h2>
+      <p>パックが表示されない? Options → Resource Packs で有効になっているかを確認。Minecraft バージョンが対応しているかもチェック。</p>
+      <p>テクスチャがピンクと黒? ファイルが欠けています。パックが古いか壊れている可能性。再ダウンロードか更新版を探してみてください。</p>
+      <p>コネクテッドテクスチャがつながらない? OptiFine または Continuity が必要です。これらの機能はバニラ Minecraft には組み込まれていません。</p>
+    </Fragment>
+  )}
+
+  {locale === "ko" && (
+    <Fragment>
+      <h2>리소스 팩이 하는 일</h2>
+      <p>리소스 팩은 새 콘텐츠를 추가하지 않고 Minecraft의 외관을 바꿉니다. 텍스처, 사운드, 음악, 폰트 등을 교체할 수 있어요. 사실풍, 카툰풍, 중세풍, 현대풍, 그 외 무엇이든 가능합니다. 모드 필요 없음.</p>
+      <p>128x, 256x 이상의 고해상도 HD 텍스처 팩도 있고, 유리창이 매끄럽게 이어지는 연결 텍스처를 적용한 팩도 있습니다. 사운드만 통째로 교체하는 팩도. 여러 팩을 겹쳐서 블록용과 GUI용을 따로 쓸 수도 있습니다.</p>
+
+      <h2>GDLauncher로 설치</h2>
+      <p>인스턴스를 열고 <strong>Addons</strong> 탭에서 <strong>Add Addons</strong>를 누른 다음, 검색창 왼쪽 드롭다운에서 <strong>Resource Packs</strong>를 선택. CurseForge와 Modrinth의 팩을 둘러보다가 좋아하는 걸 찾아 <strong>Download</strong>.</p>
+      <p>이후 게임을 실행하고 Options → Resource Packs에서 "Available" 목록의 팩을 화살표로 "Selected" 쪽으로 옮기세요. Done을 누르면 텍스처가 적용됩니다.</p>
+
+      <h2>수동 설치</h2>
+      <p>다른 곳에서 받은 .zip 파일이 있나요? 인스턴스를 오른쪽 클릭 → <strong>More options</strong> → <strong>Open folder</strong>. <code>instance</code> 폴더 안의 <code>resourcepacks</code> 폴더에 .zip을 그대로 넣으세요. 압축을 풀지 마세요.</p>
+      <p>수동으로 파일을 추가한 뒤 홈 화면으로 돌아가 인스턴스를 다시 클릭하면 GDLauncher가 재스캔해 새 리소스 팩을 찾아냅니다.</p>
+
+      <h2>여러 팩 겹치기</h2>
+      <p>여러 팩을 동시에 사용할 수 있습니다. 리스트 위쪽에 있는 팩이 아래 팩의 텍스처를 덮어씁니다. 이걸로 메인 텍스처 팩과 별도의 GUI, 사운드, 하늘 팩을 조합할 수 있습니다.</p>
+
+      <h2>성능 고려사항</h2>
+      <p>고해상도 팩(512x, 1024x)은 더 많은 RAM과 좋은 GPU가 필요합니다. 이미 프레임이 빡빡하면 32x나 64x로 가세요. 연결 텍스처 같은 일부 기능은 OptiFine이나 Continuity 모드가 필요합니다.</p>
+
+      <h2>문제 해결</h2>
+      <p>팩이 안 보이나요? Options → Resource Packs에서 활성화되어 있는지 확인하세요. 본인의 Minecraft 버전을 지원하는지도 확인.</p>
+      <p>분홍과 검정 텍스처? 파일이 누락된 겁니다. 팩이 오래되었거나 손상되었을 수 있어요. 다시 받거나 업데이트된 버전을 찾아보세요.</p>
+      <p>연결 텍스처가 연결되지 않나요? OptiFine이나 Continuity가 필요할 가능성이 큽니다. 이 기능은 바닐라 Minecraft에는 없습니다.</p>
+    </Fragment>
+  )}
+
+  {locale === "de" && (
+    <Fragment>
+      <h2>Was Resource Packs machen</h2>
+      <p>Resource Packs verändern, wie Minecraft aussieht, ohne neuen Inhalt hinzuzufügen. Sie ersetzen Texturen, Sounds, Musik, Fonts und mehr. Du kannst das Spiel realistisch, cartoon, mittelalterlich, modern oder irgendwas dazwischen aussehen lassen. Ohne Mods.</p>
+      <p>Manche Packs setzen auf HD-Texturen mit 128x, 256x oder höher. Andere fügen verbundene Texturen hinzu, sodass Glasscheiben nahtlos wirken. Manche tauschen alle Sounds. Du kannst sogar mehrere Packs stapeln und eines für Blöcke, ein anderes für die GUI nehmen.</p>
+
+      <h2>Mit GDLauncher installieren</h2>
+      <p>Öffne deine Instanz und geh in den <strong>Addons</strong>-Tab. Klick <strong>Add Addons</strong>, wähl dann <strong>Resource Packs</strong> aus dem Dropdown links neben der Suchleiste. Stöber durch die Packs aus CurseForge und Modrinth, find was du magst, klick <strong>Download</strong>.</p>
+      <p>Dann starte das Spiel, geh in Options → Resource Packs, find deinen Pack in der "Available"-Liste und klick auf den Pfeil, um ihn zu "Selected" zu schieben. Drück Done, und die Texturen werden geladen.</p>
+
+      <h2>Manuelle Installation</h2>
+      <p>Hast du eine .zip von woanders? Rechtsklick auf die Instanz → <strong>More options</strong> → <strong>Open folder</strong>. Geh in den <code>instance</code>-Ordner, dann <code>resourcepacks</code>, und leg deine .zip dort ab. Nicht entpacken.</p>
+      <p>Nach dem manuellen Ablegen geh zurück zum Startbildschirm und klick die Instanz nochmal an. GDLauncher scannt neu und erkennt das neue Resource Pack.</p>
+
+      <h2>Packs stapeln</h2>
+      <p>Du kannst mehrere Packs gleichzeitig benutzen. Packs weiter oben in der Liste überschreiben Texturen aus weiter unten liegenden Packs. So kannst du einen Haupt-Texturen-Pack mit getrennten GUI-, Sound- oder Himmel-Packs kombinieren.</p>
+
+      <h2>Performance-Überlegungen</h2>
+      <p>Hochauflösende Packs (512x, 1024x) brauchen mehr RAM und eine ordentliche GPU. Wenn du eh schon um Frames kämpfst, bleib bei 32x- oder 64x-Packs. Manche Features wie verbundene Texturen brauchen OptiFine oder den Continuity-Mod.</p>
+
+      <h2>Problembehebung</h2>
+      <p>Pack taucht nicht auf? Stell sicher, dass du es in Options → Resource Packs aktiviert hast. Prüf, dass es zu deiner Minecraft-Version passt.</p>
+      <p>Pinke und schwarze Texturen heißen fehlende Dateien. Der Pack ist vermutlich veraltet oder beschädigt. Versuch, neu zu laden oder eine aktualisierte Version zu finden.</p>
+      <p>Verbundene Texturen verbinden sich nicht? Du brauchst wahrscheinlich OptiFine oder Continuity. Diese Features sind nicht in Vanilla-Minecraft eingebaut.</p>
+    </Fragment>
+  )}
+
+  {locale === "fr" && (
+    <Fragment>
+      <h2>Ce que font les resource packs</h2>
+      <p>Les resource packs changent l'apparence de Minecraft sans ajouter de contenu. Ils remplacent textures, sons, musiques, polices, etc. Tu peux rendre le jeu réaliste, cartoon, médiéval, moderne ou n'importe quoi entre les deux. Pas besoin de mods.</p>
+      <p>Certains packs visent des textures HD en 128x, 256x ou plus. D'autres ajoutent des textures connectées pour que les vitres soient sans coutures. D'autres encore changent tous les sons. Tu peux même empiler plusieurs packs en utilisant un pour les blocs et un autre pour la GUI.</p>
+
+      <h2>Installer avec GDLauncher</h2>
+      <p>Ouvre ton instance et va dans <strong>Addons</strong>. Clique sur <strong>Add Addons</strong>, puis sélectionne <strong>Resource Packs</strong> dans le menu déroulant à gauche de la barre de recherche. Parcours les packs CurseForge et Modrinth, trouve un truc qui te plaît, clique <strong>Download</strong>.</p>
+      <p>Puis lance le jeu, va dans Options → Resource Packs, trouve ton pack dans la liste "Available" et clique sur la flèche pour le déplacer vers "Selected". Appuie sur Done et les textures se chargent.</p>
+
+      <h2>Installation manuelle</h2>
+      <p>Tu as un .zip qui vient d'ailleurs ? Clic droit sur ton instance → <strong>More options</strong> → <strong>Open folder</strong>. Va dans le dossier <code>instance</code>, puis <code>resourcepacks</code>, et dépose ton .zip dedans. Ne le décompresse pas.</p>
+      <p>Après avoir ajouté des fichiers manuellement, retourne à l'écran d'accueil et reclique sur l'instance. GDLauncher rescanne et détecte le nouveau resource pack.</p>
+
+      <h2>Empiler les packs</h2>
+      <p>Tu peux utiliser plusieurs packs à la fois. Les packs plus haut dans la liste remplacent les textures des packs en dessous. Ça te permet de mélanger un pack de textures principal avec des packs séparés pour la GUI, les sons ou le ciel.</p>
+
+      <h2>Performance</h2>
+      <p>Les packs haute résolution (512x, 1024x) demandent plus de RAM et un GPU correct. Si tu galères déjà niveau frames, reste sur des packs 32x ou 64x. Certaines fonctionnalités comme les textures connectées nécessitent OptiFine ou le mod Continuity.</p>
+
+      <h2>Dépannage</h2>
+      <p>Le pack n'apparaît pas ? Vérifie que tu l'as activé dans Options → Resource Packs. Vérifie qu'il correspond à ta version de Minecraft.</p>
+      <p>Textures roses et noires ? Ça veut dire fichiers manquants. Le pack est sans doute périmé ou corrompu. Essaie de retélécharger ou cherche une version mise à jour.</p>
+      <p>Textures connectées qui ne se connectent pas ? Il te faut probablement OptiFine ou Continuity. Ces features ne sont pas intégrées à Minecraft vanilla.</p>
+    </Fragment>
+  )}
+
+  {locale === "es" && (
+    <Fragment>
+      <h2>Qué hacen los resource packs</h2>
+      <p>Los resource packs cambian el aspecto de Minecraft sin añadir contenido nuevo. Reemplazan texturas, sonidos, música, fuentes y más. Puedes hacer que el juego se vea realista, cartoon, medieval, moderno o lo que se te ocurra. Sin mods.</p>
+      <p>Algunos packs apuestan por texturas HD en 128x, 256x o superior. Otros añaden texturas conectadas para que los cristales se vean sin costuras. Algunos cambian todos los sonidos. Incluso puedes apilar varios packs usando uno para bloques y otro para la GUI.</p>
+
+      <h2>Instalar con GDLauncher</h2>
+      <p>Abre tu instancia y ve a la pestaña <strong>Addons</strong>. Pulsa <strong>Add Addons</strong> y selecciona <strong>Resource Packs</strong> en el desplegable a la izquierda de la barra de búsqueda. Explora packs de CurseForge y Modrinth, encuentra algo que te guste y pulsa <strong>Download</strong>.</p>
+      <p>Luego arranca el juego, ve a Options → Resource Packs, encuentra tu pack en la lista "Available" y pulsa la flecha para moverlo a "Selected". Pulsa Done y las texturas se cargan.</p>
+
+      <h2>Instalación manual</h2>
+      <p>¿Tienes un .zip de otro sitio? Clic derecho en la instancia → <strong>More options</strong> → <strong>Open folder</strong>. Entra en la carpeta <code>instance</code>, luego en <code>resourcepacks</code> y deja el .zip ahí. No lo descomprimas.</p>
+      <p>Tras añadir archivos manualmente, vuelve a la pantalla principal y haz clic en la instancia otra vez. GDLauncher reescaneará y detectará el nuevo resource pack.</p>
+
+      <h2>Apilar packs</h2>
+      <p>Puedes usar varios packs a la vez. Los packs más arriba en la lista sobrescriben las texturas de los packs de abajo. Esto te permite mezclar un pack principal con packs separados para GUI, sonidos o cielo.</p>
+
+      <h2>Rendimiento</h2>
+      <p>Los packs de alta resolución (512x, 1024x) necesitan más RAM y una GPU decente. Si ya vas justo de frames, quédate con packs 32x o 64x. Algunas funciones, como las texturas conectadas, requieren OptiFine o el mod Continuity para funcionar.</p>
+
+      <h2>Solución de problemas</h2>
+      <p>¿El pack no aparece? Asegúrate de haberlo activado en Options → Resource Packs. Comprueba que sea para tu versión de Minecraft.</p>
+      <p>¿Texturas rosas y negras? Significa que faltan archivos. El pack puede estar desactualizado o corrupto. Prueba a descargarlo de nuevo o busca una versión actualizada.</p>
+      <p>¿Las texturas conectadas no se conectan? Probablemente necesites OptiFine o Continuity. Estas funciones no están integradas en Minecraft vanilla.</p>
+    </Fragment>
+  )}
+
+  {locale === "pt-BR" && (
+    <Fragment>
+      <h2>O que os resource packs fazem</h2>
+      <p>Resource packs mudam a aparência do Minecraft sem adicionar conteúdo novo. Eles substituem texturas, sons, música, fontes e mais. Dá pra deixar o jogo realista, cartoon, medieval, moderno ou qualquer coisa entre. Sem precisar de mod.</p>
+      <p>Alguns packs apostam em texturas HD 128x, 256x ou mais. Outros adicionam texturas conectadas pra vidros parecerem sem emendas. Alguns trocam todos os sons. Dá até pra empilhar vários packs, usando um pra blocos e outro pra GUI.</p>
+
+      <h2>Instalando com o GDLauncher</h2>
+      <p>Abra a instância e vá na aba <strong>Addons</strong>. Clique em <strong>Add Addons</strong> e selecione <strong>Resource Packs</strong> no dropdown à esquerda da barra de busca. Procure packs do CurseForge e Modrinth, encontre algo legal e clique em <strong>Download</strong>.</p>
+      <p>Depois inicie o jogo, vá em Options → Resource Packs, encontre seu pack na lista "Available" e clique na seta pra mover pra "Selected". Aperte Done e as texturas carregam.</p>
+
+      <h2>Instalação manual</h2>
+      <p>Tem um .zip de outro lugar? Clique direito na instância → <strong>More options</strong> → <strong>Open folder</strong>. Entre na pasta <code>instance</code>, depois <code>resourcepacks</code>, e jogue o .zip ali. Não descompacte.</p>
+      <p>Depois de adicionar arquivos manualmente, volte para a tela inicial e clique na instância de novo. O GDLauncher faz uma re-varredura e detecta o novo resource pack.</p>
+
+      <h2>Empilhando packs</h2>
+      <p>Dá pra usar vários packs ao mesmo tempo. Packs mais acima na lista sobrescrevem texturas dos de baixo. Isso permite combinar um pack de texturas principal com packs separados pra GUI, sons ou céu.</p>
+
+      <h2>Considerações de performance</h2>
+      <p>Packs de alta resolução (512x, 1024x) precisam de mais RAM e uma GPU decente. Se você já está apertado de frames, fique com packs 32x ou 64x. Alguns recursos como texturas conectadas exigem OptiFine ou o mod Continuity pra funcionar.</p>
+
+      <h2>Solução de problemas</h2>
+      <p>O pack não aparece? Garanta que está ativado em Options → Resource Packs. Confira se é para sua versão do Minecraft.</p>
+      <p>Texturas rosa e preto? Quer dizer que está faltando arquivo. O pack pode estar desatualizado ou corrompido. Tente baixar de novo ou procure uma versão atualizada.</p>
+      <p>Texturas conectadas não conectam? Você provavelmente precisa de OptiFine ou Continuity. Esses recursos não vêm no Minecraft vanilla.</p>
+    </Fragment>
+  )}
+
+  {locale === "it" && (
+    <Fragment>
+      <h2>Cosa fanno i Resource Pack</h2>
+      <p>I Resource Pack cambiano l'aspetto di Minecraft senza aggiungere contenuti nuovi. Sostituiscono texture, suoni, musica, font e altro ancora. Puoi rendere il gioco realistico, cartoon, medievale, moderno o qualunque cosa nel mezzo. Niente Mod richiesti.</p>
+      <p>Alcuni pack puntano su texture HD da 128x, 256x o più. Altri introducono texture connesse, così i vetri appaiono senza giunzioni. Altri ancora sostituiscono tutti i suoni. Puoi anche impilare più pack, usandone uno per i blocchi e un altro per la GUI.</p>
+
+      <h2>Installare con GDLauncher</h2>
+      <p>Apri la tua istanza e vai nella scheda <strong>Addons</strong>. Clicca su <strong>Add Addons</strong>, poi seleziona <strong>Resource Packs</strong> dal menu a tendina a sinistra della barra di ricerca. Sfoglia i pack di CurseForge e Modrinth, trova qualcosa che ti piace, clicca su <strong>Download</strong>.</p>
+      <p>Poi avvia il gioco, vai in Options → Resource Packs, trova il tuo pack nella lista "Available" e clicca sulla freccia per spostarlo in "Selected". Premi Done e le texture vengono caricate.</p>
+
+      <h2>Installazione manuale</h2>
+      <p>Hai un file .zip preso da altre parti? Tasto destro sull'istanza, <strong>More options</strong>, <strong>Open folder</strong>. Entra nella cartella <code>instance</code>, poi in <code>resourcepacks</code>, e trascina lì il tuo .zip. Non scompattarlo.</p>
+      <p>Dopo aver aggiunto file manualmente, torna alla schermata principale e clicca di nuovo sull'istanza: GDLauncher fa una nuova scansione e rileva il nuovo Resource Pack.</p>
+
+      <h2>Impilare i pack</h2>
+      <p>Puoi usare più pack contemporaneamente. I pack più in alto nella lista sovrascrivono le texture di quelli sotto. In questo modo puoi combinare un pack principale di texture con pack separati per GUI, suoni o cielo.</p>
+
+      <h2>Considerazioni sulle prestazioni</h2>
+      <p>I pack ad alta risoluzione (512x, 1024x) richiedono più RAM e una GPU decente. Se sei già al limite con i frame, resta su pack 32x o 64x. Alcune funzionalità come le texture connesse richiedono OptiFine o il Mod Continuity per funzionare.</p>
+
+      <h2>Risoluzione dei problemi</h2>
+      <p>Il pack non compare? Assicurati di averlo attivato in Options → Resource Packs. Verifica anche che sia compatibile con la tua versione di Minecraft.</p>
+      <p>Texture rosa e nere? Vuol dire che mancano dei file. Il pack è probabilmente vecchio o danneggiato. Prova a riscaricarlo o cerca una versione aggiornata.</p>
+      <p>Le texture connesse non si collegano? Probabilmente ti serve OptiFine o Continuity. Queste funzionalità non sono incluse in Minecraft Vanilla.</p>
+    </Fragment>
+  )}
+</GuideLayout>

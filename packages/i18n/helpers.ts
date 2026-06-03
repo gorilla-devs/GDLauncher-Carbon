@@ -212,6 +212,14 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
     'InstanceTaskLaunchInstallJava': 'tasks:_trn_instance_task_launch_install_java',
     'FinalizingImport': 'tasks:_trn_finalizing_import',
     'InstanceTaskLaunchWaiting': 'tasks:_trn_instance_task_launch_waiting',
+    'ServerTaskInstall': 'tasks:_trn_server_task_install',
+    'ServerTaskInstallFromModpack': 'tasks:_trn_server_task_install_from_modpack',
+    'ServerTaskDownloadServerPack': 'tasks:_trn_server_task_download_server_pack',
+    'ServerTaskExtractServerPack': 'tasks:_trn_server_task_extract_server_pack',
+    'ServerTaskDownloadModpackFiles': 'tasks:_trn_server_task_download_modpack_files',
+    'ServerTaskExtractModpackOverrides': 'tasks:_trn_server_task_extract_modpack_overrides',
+    'ServerTaskDownloadServerJar': 'tasks:_trn_server_task_download_server_jar',
+    'ServerTaskInstallModloader': 'tasks:_trn_server_task_install_modloader',
   }
   // Default to a valid key if type isn't mapped
   return mapping[taskType] ?? ('tasks:_trn_instance_task_prepare' as NamespacedTranslationKey)

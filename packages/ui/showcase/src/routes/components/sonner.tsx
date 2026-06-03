@@ -55,7 +55,7 @@ function SonnerPage() {
         description="Toast with action button"
       >
         <Button
-          type="outline"
+          type="secondary"
           onClick={() =>
             toast("Event has been created", {
               description: "Sunday, December 03, 2023 at 9:00 AM",
@@ -96,7 +96,7 @@ function SonnerPage() {
             Error Toast
           </Button>
           <Button
-            type="outline"
+            type="secondary"
             onClick={() =>
               toast.warning("This is a warning!", {
                 description: "Please review your changes"

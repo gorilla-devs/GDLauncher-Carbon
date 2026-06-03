@@ -43,7 +43,8 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
     }
 
     return cats.map(
-      (cat) => globalStore.categories.data?.modrinth[cat.toString()]
+      (cat) =>
+        globalStore.categories.data?.modrinth[`${props.data.data.type}:${cat}`]
     )
   })
 

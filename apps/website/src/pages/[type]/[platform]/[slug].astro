@@ -1,0 +1,106 @@
+---
+/**
+ * SSR catch-all for addon detail pages. Replaces the 11 per-(type,
+ * platform) static templates so the build doesn't have to prerender
+ * ~9k pages (and exceed Cloudflare Pages' 20k-file deployment cap).
+ *
+ * Slug lookup is O(1) via the per-(platform, type) JSON maps, which
+ * Vite bundles into the Worker. Cold start parses ~7 MB of JSON once
+ * per isolate; warm requests are a hash lookup. Missing slugs and
+ * invalid type/platform combinations fall through to /404.
+ *
+ * Astro routing precedence (static > dynamic) means this catch-all
+ * only fires for URLs the explicit pages don't handle, but the route
+ * tree currently has no other 3-segment dynamic routes, so it is
+ * effectively the single addon detail handler.
+ */
+export const prerender = false
+
+import AddonInstallLayout from "../../../components/AddonInstallLayout.astro"
+import PageShell from "../../../components/PageShell.astro"
+import type { AddonType, Platform } from "../../../lib/api/types"
+import { getAddon } from "../../../lib/addonsData"
+import { getLocaleFromUrl, useTranslations, localizedPath } from "../../../lib/i18n"
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const t = useTranslations(locale)
+
+const ADDON_TYPES = new Set<AddonType>([
+  "mods",
+  "modpacks",
+  "shaders",
+  "resourcepacks",
+  "datapacks",
+  "worlds",
+])
+const PLATFORMS = new Set<Platform>(["curseforge", "modrinth"])
+
+const { type, platform, slug } = Astro.params
+
+const invalid =
+  !type ||
+  !platform ||
+  !slug ||
+  !ADDON_TYPES.has(type as AddonType) ||
+  !PLATFORMS.has(platform as Platform)
+
+const addon = invalid
+  ? undefined
+  : getAddon(platform as Platform, type as AddonType, slug as string)
+
+// Return proper 404 status (not a 302 redirect) so search engines see
+// the URL as missing, not as a soft-404. We render the 404 chrome inline
+// at the requested URL so users keep their original location.
+if (!addon) {
+  Astro.response.status = 404
+  Astro.response.statusText = "Not Found"
+} else {
+  // Addon detail pages are stable across deploys; let Cloudflare's edge
+  // cache hold them for an hour to spare warm Worker isolates from
+  // per-request work.
+  Astro.locals.cache(3600)
+}
+---
+
+{addon ? (
+  <AddonInstallLayout
+    addonName={addon.name}
+    addonSlug={addon.slug}
+    addonType={type as AddonType}
+    platform={platform as Platform}
+    imageUrl={addon.imageUrl}
+    websiteUrl={addon.websiteUrl}
+    description={addon.description}
+    authors={addon.authors}
+    author={addon.author}
+    categories={addon.categories}
+    loaders={addon.loaders}
+    gameVersions={addon.gameVersions}
+    downloads={addon.downloads}
+    license={addon.license}
+    sourceUrl={addon.sourceUrl}
+    issuesUrl={addon.issuesUrl}
+    wikiUrl={addon.wikiUrl}
+    dateModified={addon.dateModified}
+  />
+) : (
+  <PageShell
+    title={t("addon.notfound.title")}
+    description={t("addon.notfound.description")}
+    noindex
+  >
+    <div class="min-h-screen flex flex-col">
+      <div class="flex-1 flex items-center justify-center p-6">
+        <div class="bg-darkSlate-800 rounded-xl p-8 md:p-12 max-w-lg text-center">
+          <div class="text-7xl font-bold text-primary-400 mb-4">404</div>
+          <h1 class="text-2xl font-bold text-lightSlate-50 mb-3">{t("addon.notfound.heading")}</h1>
+          <p class="text-darkSlate-100 mb-8">{t("addon.notfound.body")}</p>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href={localizedPath("/", locale)} class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-lightSlate-50 font-semibold transition-colors">{t("addon.notfound.cta.home")}</a>
+            <a href={localizedPath("/mods", locale)} class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-darkSlate-700 hover:bg-darkSlate-600 text-lightSlate-50 font-semibold transition-colors">{t("addon.notfound.cta.browse")}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </PageShell>
+)}

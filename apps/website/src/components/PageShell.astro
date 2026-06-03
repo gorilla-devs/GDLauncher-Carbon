@@ -1,0 +1,88 @@
+---
+import BaseHead from "./BaseHead.astro"
+import Header from "./Header.astro"
+import Footer from "./Footer.astro"
+import BackgroundLayers from "./BackgroundLayers.astro"
+import ParticleBackground from "./ParticleBackground.astro"
+import { getLocaleFromUrl, getHtmlLang } from "../lib/i18n"
+import "@fontsource/ubuntu"
+import "@fontsource/ubuntu/500.css"
+import "@fontsource/ubuntu/700.css"
+
+interface Props {
+  title: string
+  description: string
+  image?: string
+  imageAlt?: string
+  keywords?: string
+  canonicalUrl?: string
+  particles?: boolean
+  bodyClass?: string
+  backgroundClass?: string
+  noFooter?: boolean
+  ogType?: "website" | "article"
+  publishedTime?: string
+  modifiedTime?: string
+  author?: string
+  noindex?: boolean
+  /**
+   * Optional JSON-LD structured data objects to emit in <head>. Pass arrays
+   * of plain objects; each one is JSON-stringified into its own <script> tag.
+   * See BaseHead.astro for details.
+   */
+  jsonLd?: Record<string, unknown>[]
+}
+
+const {
+  title,
+  description,
+  image,
+  imageAlt,
+  keywords,
+  canonicalUrl,
+  particles = false,
+  bodyClass,
+  backgroundClass,
+  noFooter = false,
+  ogType,
+  publishedTime,
+  modifiedTime,
+  author,
+  noindex,
+  jsonLd,
+} = Astro.props
+
+const locale = getLocaleFromUrl(Astro.url.pathname)
+const htmlLang = getHtmlLang(locale)
+---
+
+<!doctype html>
+<html lang={htmlLang} transition:animate="none">
+  <head>
+    <BaseHead
+      title={title}
+      description={description}
+      image={image}
+      imageAlt={imageAlt}
+      keywords={keywords}
+      canonicalUrl={canonicalUrl}
+      ogType={ogType}
+      publishedTime={publishedTime}
+      modifiedTime={modifiedTime}
+      author={author}
+      noindex={noindex}
+      jsonLd={jsonLd}
+    />
+    <slot name="head" />
+  </head>
+
+  <body class:list={["bg-darkSlate-900 text-lightSlate-50 min-h-screen", bodyClass]}>
+    <BackgroundLayers class={backgroundClass} />
+    {particles && <ParticleBackground />}
+    <Header />
+
+    <slot />
+
+    {!noFooter && <Footer />}
+  </body>
+</html>

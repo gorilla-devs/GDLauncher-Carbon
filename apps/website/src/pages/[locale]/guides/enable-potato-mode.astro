@@ -1,0 +1,167 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher で Potato PC Mode を有効化する方法",
+    description: "ランチャーのアニメーションをオフにして古いマシンの CPU / GPU 負荷を軽減。Potato Mode が実際に変えるもの、変えないもの。",
+    steps: [
+      { name: "General 設定を開く", text: "Settings → General。ページの下部までスクロール。" },
+      { name: "Potato PC Mode を探す", text: "短い説明付きの Potato PC Mode トグルがあります。" },
+      { name: "オンに切替", text: "スイッチをクリック。変更は即時適用、ランチャー全体のアニメーションが easing、フェードイン、モーション効果を使わなくなります。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 Potato PC Mode 켜는 법",
+    description: "런처 애니메이션을 꺼서 오래된 머신의 CPU/GPU 부하를 줄입니다. Potato Mode가 실제로 무엇을 바꾸고 무엇을 바꾸지 않는지.",
+    steps: [
+      { name: "General 설정 열기", text: "Settings → General. 페이지 아래쪽으로 스크롤." },
+      { name: "Potato PC Mode 찾기", text: "짧은 설명이 있는 Potato PC Mode 토글이 있습니다." },
+      { name: "켜기", text: "스위치를 클릭. 즉시 적용, 런처 전반의 애니메이션이 easing, 페이드 인, 모션 효과를 사용하지 않게 됩니다." }
+    ]
+  },
+  de: {
+    title: "Potato-PC-Mode in GDLauncher aktivieren",
+    description: "Animationen des Launchers ausschalten, um CPU- und GPU-Last auf älteren Maschinen zu reduzieren. Was Potato Mode tatsächlich ändert, und was nicht.",
+    steps: [
+      { name: "General-Settings öffnen", text: "Settings → General. Auf der Seite nach unten scrollen." },
+      { name: "Potato PC Mode finden", text: "Es gibt einen Toggle 'Potato PC Mode' mit einer kurzen Beschreibung." },
+      { name: "Einschalten", text: "Auf den Switch klicken. Die Änderung greift sofort, Animationen in der ganzen App nutzen keine Easings, Fade-Ins oder Bewegungseffekte mehr." }
+    ]
+  },
+  fr: {
+    title: "Comment activer Potato PC Mode dans GDLauncher",
+    description: "Désactive les animations du launcher pour réduire la charge CPU et GPU sur des machines anciennes. Ce que Potato Mode change vraiment et ce qu'il ne change pas.",
+    steps: [
+      { name: "Ouvrir les settings General", text: "Settings → General. Scroll vers le bas de la page." },
+      { name: "Trouver Potato PC Mode", text: "Il y a un toggle Potato PC Mode avec une courte description." },
+      { name: "L'activer", text: "Clique le switch. Le changement s'applique immédiatement, les animations dans tout le launcher cessent d'utiliser easing, fade-in et effets de mouvement." }
+    ]
+  },
+  es: {
+    title: "Cómo activar Potato PC Mode en GDLauncher",
+    description: "Apaga las animaciones del launcher para reducir la carga de CPU y GPU en máquinas más antiguas. Qué cambia y qué no cambia Potato Mode realmente.",
+    steps: [
+      { name: "Abrir ajustes General", text: "Settings → General. Baja al final de la página." },
+      { name: "Buscar Potato PC Mode", text: "Hay un toggle Potato PC Mode con una breve descripción." },
+      { name: "Activar", text: "Pulsa el switch. El cambio se aplica al instante, las animaciones en todo el launcher dejan de usar easing, fade-in y efectos de movimiento." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como ativar Potato PC Mode no GDLauncher",
+    description: "Desligue as animações do launcher pra reduzir carga de CPU e GPU em máquinas mais antigas. O que o Potato Mode realmente muda e o que não muda.",
+    steps: [
+      { name: "Abrir settings General", text: "Settings → General. Role pro fim da página." },
+      { name: "Achar Potato PC Mode", text: "Tem um toggle Potato PC Mode com uma descrição curta." },
+      { name: "Ativar", text: "Clique o switch. A mudança aplica na hora, animações pelo launcher param de usar easing, fade-in e efeitos de movimento." }
+    ]
+  },
+  it: {
+    title: "Come attivare il Potato PC Mode in GDLauncher",
+    description: "Disattiva le animazioni del launcher per ridurre il carico di CPU e GPU sulle macchine più vecchie. Cosa cambia davvero il Potato Mode e cosa no.",
+    steps: [
+      { name: "Apri le impostazioni General", text: "Settings → General. Scorri fino in fondo alla pagina." },
+      { name: "Trova Potato PC Mode", text: "C'è un toggle Potato PC Mode con una breve descrizione." },
+      { name: "Attivalo", text: "Clicca lo switch. La modifica è immediata, le animazioni in tutto il launcher smettono di usare easing, fade-in ed effetti di movimento." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["Potato Mode が実際に行うこと", "Potato Mode が行わないこと", "オンにする価値がある場合", "OS の reduced-motion 設定に従う？", "元に戻す"],
+    paras: [
+      "Potato PC Mode は GDLauncher の reduced-motion 設定。内部的には単一の boolean (内部名 <code>reducedMotion</code>) で、UI のルートに CSS クラスを付け、そのクラスに紐付くスタイルがランチャー全体のアニメーションとトランジションを無効化。具体的にはボタンホバー効果、パネルのスライドイン、不透明度フェード、回転するダウンロード進捗インジケーター、スプラッシュアニメーションがすべて静的に。UI がキビキビ静的になります。",
+      "Potato Mode はランチャー側のみ。Minecraft 自体は何も変えません: 描画距離、FPS、ロードされる Mod、割り当てられる RAM 量、いずれもそのまま。トグルは純粋にランチャーのクロームについてです。Minecraft が問題 (ゲーム内 FPS 低下、カクつき) なら Potato Mode は役に立ちません。<a href=\"/guides/performance-mods\">パフォーマンス Mod</a>、<a href=\"/guides/allocate-more-ram\">RAM 割り当て</a>、Minecraft 自身のビデオ設定を見てください。",
+      "Electron 自体が苦戦する古いハードウェア。Discord、Slack など類似 Electron アプリが重く感じる? ランチャーも同様、Potato Mode が役立ちます。ノートのバッテリー節約。アニメーションは GPU を消費、静的 UI はほぼゼロ。アクセシビリティ、reduced motion 好み。UI アニメーションで乗り物酔いや気が散る人もいます。",
+      "現在は独立トグル。macOS、Windows、ほとんどの Linux デスクトップにはシステム全体の reduce motion アクセシビリティ設定がありますが、GDLauncher はまだ読みません。モーションを無効にしたいならランチャーのトグルを自分で切替。",
+      "同じトグルをオフに。アニメーションがすぐに戻り、再起動不要。"
+    ]
+  },
+  ko: {
+    headings: ["Potato Mode가 실제로 하는 일", "하지 않는 일", "켤 만한 때", "OS의 reduced-motion 설정을 따르나?", "되돌리기"],
+    paras: [
+      "Potato PC Mode는 GDLauncher의 reduced-motion 설정. 내부적으로는 단일 boolean(내부 이름 <code>reducedMotion</code>)으로 UI 루트에 CSS 클래스를 추가하고, 그 클래스에 붙은 스타일이 런처 어디서나 애니메이션과 전환을 비활성화. 구체적으로 버튼 호버 효과, 패널 슬라이드인, 투명도 페이드, 회전하는 다운로드 진행 표시, 스플래시 애니메이션이 모두 정지. UI가 빠르고 정적으로.",
+      "Potato Mode는 런처 측만. Minecraft 자체는 아무것도 변경하지 않음: 렌더 거리, FPS, 로드되는 모드, 할당되는 RAM 양, 모두 그대로. 토글은 순전히 런처 크롬에 관한 것. Minecraft가 문제라면(게임 내 FPS 저하, 끊김) Potato Mode는 도움이 안 됩니다. <a href=\"/guides/performance-mods\">성능 모드</a>, <a href=\"/guides/allocate-more-ram\">RAM 할당</a>, 또는 Minecraft 자체의 비디오 설정을 보세요.",
+      "Electron 자체가 버거운 오래된 하드웨어. Discord, Slack 같은 Electron 앱이 느리게 느껴진다면? 런처도 마찬가지, Potato Mode가 도움이 됩니다. 노트북 배터리 절약. 애니메이션은 GPU를 쓰고, 정적 UI는 거의 안 씁니다. 접근성, reduced motion 선호. UI 애니메이션 때문에 멀미하거나 산만함을 느끼는 사람들도 있습니다.",
+      "현재는 별도 토글. macOS, Windows, 대부분의 Linux 데스크톱에 시스템 전역 reduce motion 접근성 설정이 있지만 GDLauncher가 아직 그걸 읽지는 않습니다. 모션을 끄고 싶다면 런처 토글을 직접 켜세요.",
+      "같은 토글을 꺼 주세요. 애니메이션이 즉시 돌아오고 재시작 필요 없음."
+    ]
+  },
+  de: {
+    headings: ["Was Potato Mode wirklich tut", "Was es nicht tut", "Wann sich's lohnt", "Folgt es dem OS-Reduce-Motion?", "Zurückdrehen"],
+    paras: [
+      "Potato PC Mode ist die Reduced-Motion-Option von GDLauncher. Im Code ist es ein einziger Boolean (intern <code>reducedMotion</code>), der eine CSS-Klasse an die UI-Wurzel hängt; an die Klasse gebundene Styles deaktivieren Animationen und Transitions im ganzen Launcher. Konkret: Button-Hover-Effekte, Panel-Slide-Ins, Opacity-Fades, sich drehende Download-Progress-Indikatoren und Splash-Animationen hören auf zu animieren. Die UI wird snappy und statisch.",
+      "Potato Mode wirkt nur launcher-seitig. An Minecraft selbst ändert es nichts: nicht die Render-Distanz, nicht die FPS, nicht welche Mods geladen werden, nicht wie viel RAM zugewiesen wird. Der Toggle ist rein für das Chrome des Launchers. Wenn Minecraft das Problem ist (niedrige In-Game-FPS, Ruckeln), hilft Potato Mode nicht; schau in <a href=\"/guides/performance-mods\">Performance-Mods</a>, <a href=\"/guides/allocate-more-ram\">RAM-Zuweisung</a> oder Minecrafts eigene Videoeinstellungen.",
+      "Ältere Hardware, wo schon Electron schwächelt. Wenn Discord, Slack und ähnliche Electron-Apps zäh sind, wird's der Launcher auch sein, Potato Mode hilft. Akku-Sparen auf Laptops. Animationen kosten GPU, statische UI fast nichts. Accessibility, Reduced-Motion-Vorliebe. Manche werden von UI-Animationen ablenkbar oder kriegen Motion Sickness.",
+      "Aktuell ein separater Toggle. macOS, Windows und die meisten Linux-Desktops haben eine systemweite Reduce-Motion-Accessibility-Einstellung, GDLauncher liest die noch nicht. Wer Motion aus will, schaltet den Launcher-Toggle selbst um.",
+      "Toggle wieder aus. Animationen kommen sofort zurück, kein Neustart nötig."
+    ]
+  },
+  fr: {
+    headings: ["Ce que Potato Mode fait vraiment", "Ce qu'il ne fait pas", "Quand ça vaut le coup", "Est-ce qu'il suit le reduced-motion de l'OS ?", "Revenir en arrière"],
+    paras: [
+      "Potato PC Mode est le réglage reduced-motion de GDLauncher. Sous le capot, c'est un seul booléen (en interne <code>reducedMotion</code>) qui ajoute une classe CSS à la racine de l'UI ; les styles attachés à cette classe désactivent animations et transitions partout dans le launcher. Concrètement : effets de hover sur les boutons, slide-ins des panneaux, fades d'opacité, indicateurs de progression de téléchargement qui tournent, animations de splash, tous s'arrêtent. L'UI devient réactive et statique.",
+      "Potato Mode est purement côté launcher. Il ne change rien à Minecraft : pas la distance de rendu, pas les FPS, pas les mods chargés, pas la RAM allouée. Le toggle ne concerne que le chrome du launcher. Si c'est Minecraft le problème (FPS bas en jeu, stuttering), Potato Mode n'aide pas ; regarde plutôt <a href=\"/guides/performance-mods\">les mods de performance</a>, <a href=\"/guides/allocate-more-ram\">l'allocation de RAM</a> ou les settings vidéo de Minecraft.",
+      "Du hardware ancien où même Electron galère. Discord, Slack et autres apps Electron te paraissent lourdes ? Le launcher pareil, Potato Mode aide. Économie de batterie sur portable. Les animations consomment du GPU, l'UI statique presque rien. Accessibilité, préférence reduced motion. Certaines personnes ont le mal des transports ou se font distraire par les animations d'UI.",
+      "Pour l'instant un toggle séparé. macOS, Windows et la plupart des bureaux Linux ont un réglage d'accessibilité reduce motion système, GDLauncher ne le lit pas encore. Si tu veux la motion off, bascule le toggle du launcher toi-même.",
+      "Toggle off à nouveau. Les animations reviennent immédiatement, pas de redémarrage."
+    ]
+  },
+  es: {
+    headings: ["Qué hace Potato Mode en realidad", "Qué no hace", "Cuándo merece la pena", "¿Sigue el ajuste reduced-motion del SO?", "Revertir"],
+    paras: [
+      "Potato PC Mode es el ajuste reduced-motion de GDLauncher. Bajo el capó es un único booleano (internamente <code>reducedMotion</code>) que añade una clase CSS a la raíz de la UI; los estilos atados a esa clase desactivan animaciones y transiciones por todo el launcher. En concreto: efectos hover de botones, slide-ins de paneles, fades de opacidad, los indicadores de progreso de descarga que giran y las animaciones de splash, todos dejan de animarse. La UI se vuelve ágil y estática.",
+      "Potato Mode es solo del lado del launcher. No cambia nada de Minecraft: ni la distancia de render, ni los FPS, ni los mods que cargan, ni cuánto RAM se asigna. El toggle es puro chrome del launcher. Si el problema es Minecraft (FPS bajos en juego, stutter), Potato Mode no ayuda; mejor mira <a href=\"/guides/performance-mods\">mods de rendimiento</a>, <a href=\"/guides/allocate-more-ram\">asignación de RAM</a>, o los ajustes de vídeo de Minecraft.",
+      "Hardware antiguo donde el propio Electron pena. ¿Discord, Slack y similares apps Electron se sienten lentas? El launcher también, Potato Mode ayuda. Ahorrar batería en portátil. Las animaciones consumen GPU, la UI estática casi nada. Accesibilidad, preferencia reduced motion. Algunas personas se marean o se distraen con animaciones de UI.",
+      "Por ahora un toggle separado. macOS, Windows y la mayoría de escritorios Linux tienen un ajuste de accesibilidad reduce motion del sistema, GDLauncher aún no lo lee. Si quieres motion off, dale tú al toggle del launcher.",
+      "Apaga el mismo toggle. Las animaciones vuelven al instante, no hace falta reiniciar."
+    ]
+  },
+  "pt-BR": {
+    headings: ["O que o Potato Mode faz de verdade", "O que ele não faz", "Quando vale a pena ligar", "Segue o ajuste reduced-motion do SO?", "Reverter"],
+    paras: [
+      "Potato PC Mode é a configuração reduced-motion do GDLauncher. Por baixo do capô é um único boolean (internamente <code>reducedMotion</code>) que adiciona uma classe CSS à raiz da UI; os estilos amarrados nessa classe desativam animações e transições pelo launcher inteiro. Concretamente: efeitos de hover em botões, slide-ins de painel, fades de opacidade, indicadores de progresso girando, animações de splash, todos param de animar. A UI fica responsiva e estática.",
+      "Potato Mode é só do lado do launcher. Não muda nada do Minecraft em si: nem distância de render, nem FPS, nem quais mods carregam, nem quanto RAM é alocado. O toggle é puramente sobre o chrome do launcher. Se o Minecraft é o problema (FPS baixo in-game, stutter), Potato Mode não ajuda; veja <a href=\"/guides/performance-mods\">mods de performance</a>, <a href=\"/guides/allocate-more-ram\">alocação de RAM</a>, ou os settings de vídeo do próprio Minecraft.",
+      "Hardware antigo onde o próprio Electron sofre. Discord, Slack e apps Electron parecidas estão pesados? O launcher também, Potato Mode ajuda. Economizar bateria em notebook. Animações consomem GPU, UI estática quase nada. Acessibilidade, preferência reduced motion. Algumas pessoas têm enjoo ou distração com animações de UI.",
+      "Atualmente é um toggle separado. macOS, Windows e a maioria dos desktops Linux têm um ajuste de acessibilidade reduce motion no sistema, o GDLauncher ainda não lê. Quem quer motion off, vira o toggle do launcher.",
+      "Vire o mesmo toggle off. As animações voltam na hora, sem precisar reiniciar."
+    ]
+  },
+  it: {
+    headings: ["Cosa fa davvero il Potato Mode", "Cosa non fa", "Quando vale la pena attivarlo", "Segue l'impostazione reduced-motion del sistema?", "Tornare indietro"],
+    paras: [
+      "Potato PC Mode è l'impostazione reduced-motion di GDLauncher. Sotto il cofano è un singolo booleano (internamente <code>reducedMotion</code>) che aggiunge una classe CSS alla radice dell'UI, gli stili legati a quella classe disabilitano animazioni e transizioni in tutto il launcher. In concreto: effetti hover sui pulsanti, slide-in dei pannelli, fade di opacità, indicatori di avanzamento dei download che ruotano e animazioni di splash, tutto smette di animarsi. L'UI diventa rapida e statica.",
+      "Potato Mode è solo lato launcher. Non cambia nulla di Minecraft in sé: né render distance, né FPS, né quali mod si caricano, né quanta RAM viene assegnata. Il toggle riguarda puramente la cornice del launcher. Se è Minecraft il problema (FPS bassi in gioco, stuttering), Potato Mode non aiuta, guarda piuttosto <a href=\"/guides/performance-mods\">le Mod di performance</a>, <a href=\"/guides/allocate-more-ram\">l'allocazione di RAM</a> o le impostazioni video di Minecraft.",
+      "Hardware vecchio dove anche Electron arranca. Discord, Slack e app Electron simili ti sembrano lente? Anche il launcher lo è, Potato Mode aiuta. Risparmiare batteria su laptop. Le animazioni consumano GPU, una UI statica quasi nulla. Accessibilità, preferenza per reduced motion. Alcune persone hanno mal di mare o si distraggono per le animazioni dell'UI.",
+      "Al momento è un toggle separato. macOS, Windows e la maggior parte dei desktop Linux hanno un'impostazione di accessibilità reduce motion a livello di sistema, GDLauncher non la legge ancora. Se vuoi disattivare il movimento, sposta tu il toggle del launcher.",
+      "Disattiva di nuovo lo stesso toggle. Le animazioni tornano subito, non serve riavviare."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT1M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

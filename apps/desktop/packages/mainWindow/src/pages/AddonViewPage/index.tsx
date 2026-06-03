@@ -12,12 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "@gd/ui"
-import {
-  Outlet,
-  useLocation,
-  useParams,
-  useSearchParams
-} from "@solidjs/router"
+import { useLocation, useParams, useSearchParams } from "@solidjs/router"
 import {
   For,
   JSX,
@@ -42,9 +37,10 @@ import {
   FEUnifiedPlatform,
   FEUnifiedSearchResultWithDescription
 } from "@gd/core_module/bindings"
-import { CreateQueryResult } from "@tanstack/solid-query"
-import { RSPCError } from "@rspc/client"
+import { UseQueryResult } from "@tanstack/solid-query"
+import { RSPCError } from "@/utils/rspcClient"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
+import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import AuthorAvatars, { Author } from "@/components/AuthorAvatars"
 
 const getTabValueFromPath = (path: string, id: string, platform: string) => {
@@ -63,8 +59,8 @@ const getTabValueFromPath = (path: string, id: string, platform: string) => {
   return `/addon/${id}/${platform}`
 }
 
-const ModsInfiniteScrollQueryWrapper = () => {
-  const params = useParams()
+const ModsInfiniteScrollQueryWrapper = (props: { children?: any }) => {
+  const params = useParams<{ id: string; platform: string }>()
   const platform = () => params.platform as FEUnifiedPlatform
 
   // Hoisted project query to pass addonType to InfiniteScrollVersionsQueryWrapper
@@ -91,14 +87,14 @@ const ModsInfiniteScrollQueryWrapper = () => {
     >
       <AddonContext.Provider value={project}>
         <ContentWrapper zeroPadding>
-          <AddonExplore />
+          <AddonExplore>{props.children}</AddonExplore>
         </ContentWrapper>
       </AddonContext.Provider>
     </InfiniteScrollVersionsQueryWrapper>
   )
 }
 
-export const AddonContext = createContext<CreateQueryResult<
+export const AddonContext = createContext<UseQueryResult<
   FEUnifiedSearchResultWithDescription,
   RSPCError
 > | null>(null)
@@ -106,7 +102,7 @@ export const AddonContext = createContext<CreateQueryResult<
 export const StickyHeaderHeightContext = createContext<() => number>(() => 0)
 
 const ModContextProvider = (props: {
-  mod: CreateQueryResult<FEUnifiedSearchResultWithDescription, RSPCError>
+  mod: UseQueryResult<FEUnifiedSearchResultWithDescription, RSPCError>
   children: JSX.Element
 }) => {
   return (
@@ -116,24 +112,39 @@ const ModContextProvider = (props: {
   )
 }
 
-const AddonExplore = () => {
+const AddonExplore = (props: { children?: any }) => {
   const navigator = useGDNavigate()
-  const params = useParams()
+  const params = useParams<{ id: string; platform: string }>()
   const platform = () => params.platform as FEUnifiedPlatform
   const location = useLocation()
   const tabValue = () =>
     getTabValueFromPath(location.pathname, params.id, params.platform)
   const [t] = useTransContext()
-  const [searchParams] = useSearchParams()
+  const [searchParams] = useSearchParams<{
+    instanceId: string
+    serverId: string
+  }>()
 
   const selectedInstanceId = () => {
+    if (!searchParams.instanceId) return undefined
     const id = parseInt(searchParams.instanceId, 10)
+    return isNaN(id) ? undefined : id
+  }
+
+  const selectedServerId = () => {
+    if (!searchParams.serverId) return undefined
+    const id = parseInt(searchParams.serverId, 10)
     return isNaN(id) ? undefined : id
   }
 
   const instanceMods = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceMods", selectedInstanceId() ?? 0],
     enabled: selectedInstanceId() !== undefined
+  }))
+
+  const serverAddons = rspc.createQuery(() => ({
+    queryKey: ["server.getServerAddons", selectedServerId() ?? 0],
+    enabled: selectedServerId() !== undefined
   }))
 
   // Use the hoisted project query from context
@@ -395,7 +406,23 @@ const AddonExplore = () => {
                           project.data?.type && project.data?.type === "modpack"
                         }
                       >
-                        <ModpackDownloadButton addon={project.data} />
+                        <div class="flex items-center">
+                          <ModpackDownloadButton
+                            addon={project.data}
+                            splitPosition={
+                              project.data?.serverPackFileId
+                                ? "left"
+                                : undefined
+                            }
+                          />
+                          <Show when={project.data?.serverPackFileId}>
+                            <div class="w-px self-stretch bg-primary-700 shrink-0" />
+                            <ServerPackDownloadButton
+                              addon={project.data}
+                              splitPosition="right"
+                            />
+                          </Show>
+                        </div>
                       </Match>
                       <Match
                         when={
@@ -406,6 +433,8 @@ const AddonExplore = () => {
                           addon={project.data}
                           selectedInstanceId={selectedInstanceId()}
                           selectedInstanceMods={instanceMods.data ?? undefined}
+                          selectedServerAddons={serverAddons.data ?? undefined}
+                          selectedServerId={selectedServerId()}
                         />
                       </Match>
                     </Switch>
@@ -480,11 +509,24 @@ const AddonExplore = () => {
                         project.data?.type && project.data?.type === "modpack"
                       }
                     >
-                      <ModpackDownloadButton
-                        addon={project.data}
-                        size="small"
-                        iconOnly
-                      />
+                      <div class="flex items-center">
+                        <ModpackDownloadButton
+                          addon={project.data}
+                          size="small"
+                          iconOnly
+                          splitPosition={
+                            project.data?.serverPackFileId ? "left" : undefined
+                          }
+                        />
+                        <Show when={project.data?.serverPackFileId}>
+                          <div class="w-px self-stretch bg-primary-700 shrink-0" />
+                          <ServerPackDownloadButton
+                            addon={project.data}
+                            size="small"
+                            splitPosition="right"
+                          />
+                        </Show>
+                      </div>
                     </Match>
                     <Match
                       when={
@@ -495,6 +537,7 @@ const AddonExplore = () => {
                         addon={project.data}
                         selectedInstanceId={selectedInstanceId()}
                         selectedInstanceMods={instanceMods.data ?? undefined}
+                        selectedServerId={selectedServerId()}
                         size="small"
                         iconOnly
                       />
@@ -519,7 +562,7 @@ const AddonExplore = () => {
             <div class="z-0 flex flex-1 flex-col px-0 pt-4 min-w-0">
               <StickyHeaderHeightContext.Provider value={stickyHeaderHeight}>
                 <ModContextProvider mod={project}>
-                  <Outlet />
+                  {props.children}
                 </ModContextProvider>
               </StickyHeaderHeightContext.Provider>
             </div>

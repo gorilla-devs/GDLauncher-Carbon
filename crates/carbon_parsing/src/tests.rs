@@ -22,6 +22,34 @@ fn test_single_complete_xml_entry() {
 }
 
 #[test]
+fn test_non_utf8_attribute_name_is_skipped() {
+    // A complete event whose start tag carries a non-UTF-8 byte inside an attribute *name*
+    // (e.g. a non-standard or corrupted log4j layout) must not panic the parser; the
+    // undecodable attribute is skipped and the recognised attributes still parse.
+    let mut input: Vec<u8> = Vec::new();
+    input.extend_from_slice(b"<log4j:Event logger=\"TestLogger\" ");
+    input.extend_from_slice(b"bad");
+    input.push(0xFF);
+    input.extend_from_slice(b"attr=\"x\" timestamp=\"1234567890\" level=\"INFO\" thread=\"main\">");
+    input.extend_from_slice(b"<log4j:Message><![CDATA[hello]]></log4j:Message></log4j:Event>");
+
+    let mut parser = LogParser::new();
+    parser.feed(&input);
+
+    match parser.parse_next() {
+        Ok(Some(ParsedItem::LogEntry(entry))) => {
+            assert_eq!(entry.logger, "TestLogger");
+            assert_eq!(entry.timestamp, 1234567890);
+            assert_eq!(entry.level, LogEntryLevel::Info);
+            assert_eq!(entry.thread_name, "main");
+            assert_eq!(entry.message.trim(), "hello");
+        }
+        Ok(other) => panic!("Expected a LogEntry, got {other:?}"),
+        Err(e) => panic!("Parser errored instead of skipping the bad attribute: {e:?}"),
+    }
+}
+
+#[test]
 fn test_multiple_complete_events() {
     let input = r#"<log4j:Event logger="Logger1" timestamp="1234567890" level="INFO" thread="main">
             <log4j:Message><![CDATA[First message]]></log4j:Message>

@@ -1,0 +1,195 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher で Minecraft サーバーをセットアップする方法",
+    description: "GDLauncher から Vanilla / Mod 入り Minecraft サーバーを作成して起動。EULA 承認、ライブコンソール、すべて遊ぶのに使う同じランチャーから。",
+    steps: [
+      { name: "Library を Servers モードに切替", text: "Library ページで Instances / Servers の切替トグルを Servers に。Library のツールバーの + ボタン (および右クリックメニュー) がインスタンスではなくサーバーを作成するようになります。" },
+      { name: "サーバーを作成", text: "+ → Create Server をクリック。名前を付け、Minecraft バージョン、任意で Mod ローダー (Forge、NeoForge、Fabric、Quilt) とローダーバージョンを選択。デフォルトポートは 25565、複数サーバーを動かすなら別のポートを指定。" },
+      { name: "インストール待ち", text: "GDLauncher がサーバー JAR (Vanilla、または Mod 入りならローダーのサーバーインストーラー) をダウンロード、必要なら Mod ローダーインストーラー実行、開始準備完了で Stopped 報告。" },
+      { name: "EULA 承認", text: "Start をクリック。初回起動は Mojang の EULA 承認まで失敗。GDLauncher が EULA テキストへのリンク付きモーダルを表示、チェックボックスを入れ進む。サーバーは Installing → Starting → Running と進行。" },
+      { name: "コンソール使用", text: "Running になると Console タブにライブサーバー出力。下部の入力フィールドからサーバーへコマンド送信、Vanilla サーバーコンソールで打つのと同じもの (op、whitelist add、save-all、stop など)。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 Minecraft 서버 설정하는 법",
+    description: "GDLauncher에서 Vanilla 또는 모드 Minecraft 서버를 만들고 운영. EULA 수락, 라이브 콘솔, 모두 플레이하는 같은 런처에서.",
+    steps: [
+      { name: "Library를 Servers 모드로 전환", text: "Library 페이지에서 Instances / Servers 전환 토글을 Servers로. Library 툴바의 + 버튼(과 오른쪽 클릭 메뉴)이 이제 인스턴스 대신 서버를 만듭니다." },
+      { name: "서버 생성", text: "+ → Create Server 클릭. 이름을 주고, Minecraft 버전, 선택적으로 모드 로더(Forge, NeoForge, Fabric, Quilt)와 로더 버전 선택. 기본 포트는 25565, 여러 서버를 띄울 거면 다른 포트로." },
+      { name: "설치 대기", text: "GDLauncher가 서버 jar(바닐라 또는 모드용 로더 서버 인스톨러)를 다운로드, 필요하면 모드 로더 인스톨러 실행, 시작 준비 완료 시 Stopped로 보고." },
+      { name: "EULA 수락", text: "Start 클릭. 첫 실행은 Mojang EULA 수락 전까지 실패. GDLauncher가 EULA 텍스트 링크가 있는 모달을 띄움; 체크박스 체크 후 진행. 서버는 Installing → Starting → Running으로 진행." },
+      { name: "콘솔 사용", text: "Running 이후 Console 탭에 라이브 서버 출력. 하단 입력 필드로 서버에 명령 전송, 바닐라 서버 콘솔에 치는 것과 동일(op, whitelist add, save-all, stop 등)." }
+    ]
+  },
+  de: {
+    title: "Einen Minecraft-Server in GDLauncher einrichten",
+    description: "Erstell und starte einen Vanilla- oder Modded-Minecraft-Server direkt aus GDLauncher. EULA-Bestätigung, Live-Konsole, alles im selben Launcher, mit dem du spielst.",
+    steps: [
+      { name: "Library auf Servers-Modus umschalten", text: "Auf der Library-Seite den Toggle von Instances auf Servers umschalten. Der +-Button in der Library-Toolbar (und das Rechtsklick-Menü) legt jetzt Server statt Instanzen an." },
+      { name: "Server anlegen", text: "+ → Create Server klicken. Namen geben, Minecraft-Version wählen, optional Mod-Loader (Forge, NeoForge, Fabric, Quilt) und Loader-Version. Standardport 25565; wähle einen anderen, wenn mehrere Server parallel laufen sollen." },
+      { name: "Auf Installation warten", text: "GDLauncher lädt die Server-JAR runter (Vanilla oder die Server-Installer-Variante des Loaders), führt nötigenfalls den Modloader-Installer aus und meldet den Server als Stopped, sobald er startbereit ist." },
+      { name: "EULA bestätigen", text: "Start klicken. Der erste Start schlägt fehl, bis du Mojangs EULA bestätigst. GDLauncher zeigt ein Modal mit Link auf den EULA-Text; Häkchen setzen und weiter. Danach geht's Installing → Starting → Running." },
+      { name: "Konsole nutzen", text: "Im Running-Zustand zeigt der Console-Tab die Live-Server-Ausgabe. Das Eingabefeld unten schickt Befehle an den Server, dieselben wie an einer Vanilla-Server-Konsole (op, whitelist add, save-all, stop usw.)." }
+    ]
+  },
+  fr: {
+    title: "Comment monter un serveur Minecraft dans GDLauncher",
+    description: "Crée et fais tourner un serveur Minecraft (vanilla ou moddé) depuis GDLauncher, avec acceptation EULA et console live, le tout dans le même launcher que tu utilises pour jouer.",
+    steps: [
+      { name: "Basculer la Library en mode Servers", text: "Sur la page Library, bascule le toggle Instances/Servers sur Servers. Le bouton + dans la barre d'outils de la Library (et le menu clic droit) crée maintenant des serveurs au lieu d'instances." },
+      { name: "Créer un serveur", text: "Clique + → Create Server. Donne-lui un nom, choisis une version Minecraft, optionnellement un mod loader (Forge, NeoForge, Fabric, Quilt) et une version de loader. Port par défaut 25565 ; choisis-en un autre si tu vas faire tourner plusieurs serveurs." },
+      { name: "Attendre l'installation", text: "GDLauncher télécharge le jar du serveur (vanilla, ou l'installeur serveur du loader pour moddé), lance l'installeur du mod loader si nécessaire et signale le serveur Stopped quand prêt." },
+      { name: "Accepter l'EULA", text: "Clique Start. Le premier lancement échoue tant que tu n'as pas accepté l'EULA Mojang. GDLauncher ouvre un modal avec un lien vers le texte EULA ; coche la case et continue. Après ça, le serveur passe Installing → Starting → Running." },
+      { name: "Utiliser la console", text: "Une fois Running, l'onglet Console affiche la sortie serveur en direct. Le champ en bas envoie des commandes au serveur, les mêmes qu'à une console vanilla (op, whitelist add, save-all, stop, etc.)." }
+    ]
+  },
+  es: {
+    title: "Cómo montar un servidor de Minecraft en GDLauncher",
+    description: "Crea y ejecuta un servidor de Minecraft (vanilla o moddeado) desde GDLauncher con aceptación de EULA y consola en vivo, todo desde el mismo launcher que usas para jugar.",
+    steps: [
+      { name: "Cambiar la Library a modo Servers", text: "En la página Library, cambia el toggle de Instances a Servers. El botón + de la barra de la Library (y el menú clic derecho) ahora crea servidores en vez de instancias." },
+      { name: "Crear un servidor", text: "Pulsa + → Create Server. Dale un nombre, escoge una versión de Minecraft, opcionalmente un mod loader (Forge, NeoForge, Fabric, Quilt) y una versión de loader. Puerto por defecto 25565; pon otro si vas a tener varios servidores." },
+      { name: "Esperar la instalación", text: "GDLauncher baja el jar del servidor (vanilla, o el instalador de servidor del loader si es moddeado), corre el instalador del mod loader si toca, y reporta el servidor Stopped cuando está listo para arrancar." },
+      { name: "Aceptar la EULA", text: "Pulsa Start. El primer arranque falla hasta que aceptes la EULA de Mojang. GDLauncher abre un modal con enlace al texto de la EULA; marca la casilla y continúa. Tras eso, el servidor pasa Installing → Starting → Running." },
+      { name: "Usar la consola", text: "Una vez Running, la pestaña Console muestra la salida en vivo del servidor. El campo de entrada de la consola envía comandos al servidor, los mismos que escribirías en una consola vanilla (op, whitelist add, save-all, stop, etc.)." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como montar um servidor Minecraft no GDLauncher",
+    description: "Crie e rode um servidor Minecraft (vanilla ou moddado) direto do GDLauncher com aceitação de EULA e console ao vivo, tudo no mesmo launcher que você usa pra jogar.",
+    steps: [
+      { name: "Trocar a Library pro modo Servers", text: "Na página Library, alterne o toggle de Instances pra Servers. O botão + na barra da Library (e o menu de botão direito) agora cria servidores em vez de instâncias." },
+      { name: "Criar um servidor", text: "Clique + → Create Server. Dê um nome, escolha uma versão Minecraft, opcionalmente um mod loader (Forge, NeoForge, Fabric, Quilt) e uma versão de loader. Porta padrão é 25565; escolha outra se for ter vários servidores rodando." },
+      { name: "Esperar a instalação", text: "O GDLauncher baixa o jar do servidor (vanilla, ou o instalador de servidor do loader se for moddado), roda o instalador do mod loader se preciso, e reporta o servidor como Stopped quando pronto pra iniciar." },
+      { name: "Aceitar a EULA", text: "Clique Start. A primeira tentativa falha até você aceitar a EULA da Mojang. O GDLauncher abre um modal com link pro texto da EULA; marque a checkbox e continue. Depois disso, o servidor passa Installing → Starting → Running." },
+      { name: "Usar o console", text: "Uma vez Running, a aba Console mostra a saída do servidor ao vivo. O campo de entrada no fim do console envia comandos ao servidor, os mesmos que você digitaria num console vanilla (op, whitelist add, save-all, stop, etc.)." }
+    ]
+  },
+  it: {
+    title: "Come configurare un server Minecraft in GDLauncher",
+    description: "Crea e avvia un server Minecraft Vanilla o con mod direttamente da GDLauncher, con accettazione EULA e console live, tutto nello stesso launcher che usi per giocare.",
+    steps: [
+      { name: "Passa la Library in modalità Servers", text: "Nella pagina Library, sposta il toggle Instances/Servers su Servers. Il pulsante + nella toolbar della Library (e il menu del clic destro) ora crea server invece che istanze." },
+      { name: "Crea un server", text: "Clicca + → Create Server. Dagli un nome, scegli una versione di Minecraft, opzionalmente un mod loader (Forge, NeoForge, Fabric, Quilt) e una versione del loader. La porta di default è 25565, sceglietene un'altra se vuoi più server attivi insieme." },
+      { name: "Aspetta l'installazione", text: "GDLauncher scarica il jar del server (Vanilla, o l'installer server del loader se è con mod), esegue se serve l'installer del mod loader, e segna il server come Stopped quando è pronto al lancio." },
+      { name: "Accetta l'EULA", text: "Clicca Start. Il primo avvio fallisce finché non accetti l'EULA di Mojang. GDLauncher apre un modal con un link al testo dell'EULA, spunta la checkbox e prosegui. Dopo questo il server passa per Installing → Starting → Running." },
+      { name: "Usa la console", text: "Una volta Running, la scheda Console mostra l'output live del server. Il campo di input in fondo invia comandi al server, gli stessi che scriveresti in una console Vanilla (op, whitelist add, save-all, stop, ecc.)." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["サーバーインスタンスの違い", "EULA モーダル", "サーバーへの接続", "サーバーのタブ", "コンソールコマンド", "Mod 入りサーバー", "RAM とパフォーマンス"],
+    paras: [
+      "GDLauncher ではサーバーは独自のインスタンスタイプで、通常のクライアントインスタンスの設定ではありません。サーバーはゲームをレンダリングせず、クライアントが接続するヘッドレスバックエンドを動かします。ステートマシンもサーバー固有: Stopped → Installing → Starting → Running → Stopping → Deleting。クライアントインスタンスとサーバーインスタンスを並べて持てます。一般的なパターン: 友達が参加するサーバー 1 つに加え、変更テスト用に <code>localhost</code> を指すクライアントインスタンス 1 つ。",
+      "Mojang は Minecraft サーバー実行前に EULA 承認を要求します。GDLauncher は最初の失敗起動を捕まえ、モーダルを表示、承諾するとサーバーフォルダーの <code>eula.txt</code> に <code>eula=true</code> を書きます。承諾しないとサーバーは起動を拒否。これは Minecraft プレイ時に承諾したのと同じ EULA、サーバー側で再確認するだけ。撤回が必要な場合 (まれ) は <code>server/eula.txt</code> を直接編集。",
+      "同じマシンから: Minecraft クライアントでアドレス <code>localhost</code> (または <code>127.0.0.1</code>) のサーバーを追加。ポートは指定したもの (デフォルト 25565)。同 LAN の別マシンから: ホストマシンのローカル IP (例 <code>192.168.1.50</code>) を使用。ホストマシンのファイアウォールでサーバーポートへの着信接続を許可。インターネット越し: ルーターのポート転送 (サーバーポートをホストマシンへ転送) と公開 IP が必要、これは多くの家庭接続で変動します。Playit.gg や ngrok のようなツールでルーター変更なしに実現可能、レイテンシ犠牲。",
+      "各サーバーは 5 つのタブを持ちます: <strong>Console</strong> (ライブサーバー出力と下部のコマンド入力)、<strong>Addons</strong> (Mod 管理、Mod ローダー付きサーバーのみ表示)、<strong>Properties</strong> (server.properties エディタ、MOTD、最大プレイヤー、オンラインモード、視界距離など)、<strong>Players</strong> (接続中プレイヤー、op、ホワイトリスト、BAN プレイヤー)、<strong>Settings</strong> (名前、ポート、Java メモリ、Mod ローダーバージョン、削除)。",
+      "Console タブの入力フィールドは Vanilla サーバーコンソールと同じ動作: <code>op &lt;player&gt;</code> (op 付与)、<code>whitelist add &lt;player&gt;</code> (ホワイトリスト追加)、<code>save-all</code> (ワールドをディスクへ書き出し)、<code>stop</code> (クリーンシャットダウン)、<code>say &lt;message&gt;</code> (全プレイヤーへブロードキャスト)。",
+      "作成時に Mod ローダーを選んだ場合、GDLauncher がローダーのサーバー配布版 (Forge、NeoForge、Fabric、Quilt) をインストールします。Mod は <code>server/mods/</code> へ、クライアントインスタンスと同じ。サーバーインスタンスの Addons タブが管理、クライアントと完全に同じ。互換性のためクライアントとサーバーで同じ Mod を実行。クライアント専用 Mod (Sodium、シェーダー) はサーバーに不要、サーバー専用 Mod (管理ツール、パフォーマンスモニター) はクライアントに不要。大型 Modpack はクライアント Pack とサーバー Pack の両方を配布することがあり、サーバー Pack を Import でサーバーインスタンスとして入れます。",
+      "サーバーのデフォルトは 2 GB。Mod 入りサーバーや多人数サーバーはより多く要求、スライダーと推奨値については <a href=\"/guides/allocate-server-ram\">Minecraft サーバーに RAM を増やす方法</a>を参照。"
+    ]
+  },
+  ko: {
+    headings: ["서버 인스턴스의 차이", "EULA 모달", "서버에 연결하기", "서버 탭", "콘솔 명령", "모드 서버", "RAM과 성능"],
+    paras: [
+      "GDLauncher에서 서버는 일반 클라이언트 인스턴스의 설정이 아니라 자체 인스턴스 타입입니다. 서버는 게임을 렌더하지 않고, 클라이언트가 연결하는 헤드리스 백엔드를 돌립니다. 상태 기계도 서버 전용: Stopped → Installing → Starting → Running → Stopping → Deleting. 클라이언트 인스턴스와 서버 인스턴스를 나란히 가질 수 있습니다. 흔한 패턴: 친구들이 들어오는 서버 하나에 변경 사항을 테스트하려고 <code>localhost</code>를 가리키는 클라이언트 인스턴스 하나.",
+      "Mojang은 Minecraft 서버 실행 전 EULA 수락을 요구합니다. GDLauncher가 첫 실패 시작을 가로채 모달을 띄우고, 수락 시 서버 폴더의 <code>eula.txt</code>에 <code>eula=true</code>를 적습니다. 수락 없이는 서버가 실행을 거부. 이건 Minecraft 플레이 시 수락한 그 EULA와 같고, 서버 측 재확인일 뿐. 철회가 필요하다면(드뭄) <code>server/eula.txt</code>를 직접 편집.",
+      "같은 머신에서: Minecraft 클라이언트에서 주소 <code>localhost</code>(또는 <code>127.0.0.1</code>)로 서버 추가. 포트는 설정한 것(기본 25565). 같은 LAN의 다른 머신에서: 호스트 머신의 로컬 IP(예 <code>192.168.1.50</code>) 사용. 호스트의 방화벽이 서버 포트에 대한 들어오는 연결을 허용해야 함. 인터넷에서: 라우터 포트 포워딩(서버 포트를 호스트 머신으로)과 공인 IP가 필요, 대부분의 가정용 연결에선 변동. Playit.gg나 ngrok 같은 도구로 라우터 변경 없이 할 수 있음, 지연 시간 트레이드.",
+      "각 서버는 다섯 탭을 가집니다: <strong>Console</strong>(라이브 서버 출력과 하단 명령 입력), <strong>Addons</strong>(모드 관리, 모드 로더가 있는 서버만 표시), <strong>Properties</strong>(server.properties 에디터, MOTD, 최대 플레이어, 온라인 모드, 시야 거리 등), <strong>Players</strong>(접속 중 플레이어, op, 화이트리스트, 차단 플레이어), <strong>Settings</strong>(이름, 포트, Java 메모리, 모드 로더 버전, 삭제).",
+      "Console 탭의 입력 필드는 바닐라 서버 콘솔과 같이 동작: <code>op &lt;player&gt;</code>(op 부여), <code>whitelist add &lt;player&gt;</code>(화이트리스트), <code>save-all</code>(디스크로 월드 플러시), <code>stop</code>(정상 종료), <code>say &lt;message&gt;</code>(전체 브로드캐스트).",
+      "생성 시 모드 로더를 선택했다면 GDLauncher가 로더의 서버 배포판(Forge, NeoForge, Fabric, Quilt)을 설치합니다. 모드는 <code>server/mods/</code>에, 클라이언트 인스턴스와 동일. 서버 인스턴스의 Addons 탭이 관리, 클라이언트와 똑같이. 호환성을 위해 클라이언트와 서버에서 같은 모드를 실행. 클라이언트 전용 모드(Sodium, 셰이더)는 서버에 두지 말고, 서버 전용 모드(관리 도구, 성능 모니터)는 클라이언트에 두지 말 것. 큰 모드팩들은 클라이언트 팩과 서버 팩을 함께 배포하는 경우가 있음, Import로 서버 팩을 서버 인스턴스로 설치.",
+      "서버 기본값은 2 GB. 모드 서버와 다인원 서버는 더 필요, 슬라이더와 권장값은 <a href=\"/guides/allocate-server-ram\">Minecraft 서버에 RAM 더 할당</a>을 참고."
+    ]
+  },
+  de: {
+    headings: ["Was Server-Instanzen anders macht", "Das EULA-Modal", "Mit dem Server verbinden", "Server-Tabs", "Konsolen-Kommandos", "Modded Server", "RAM und Performance"],
+    paras: [
+      "In GDLauncher ist ein Minecraft-Server ein eigener Instanz-Typ, kein Setting an einer normalen Client-Instanz. Server rendern das Spiel nicht, sie betreiben das Headless-Backend, an das Clients sich connecten. Die State-Machine ist auch server-spezifisch: Stopped → Installing → Starting → Running → Stopping → Deleting. Du kannst Client- und Server-Instanzen parallel haben. Gängiges Muster: ein Server für Freunde plus eine Client-Instanz, die auf <code>localhost</code> zeigt, zum Testen.",
+      "Mojang verlangt das Bestätigen der EULA vor jedem Minecraft-Server. GDLauncher fängt den ersten fehlschlagenden Start ab, zeigt das Modal und schreibt bei Bestätigung <code>eula=true</code> in <code>eula.txt</code> im Server-Ordner. Ohne Bestätigung startet der Server nicht. Es ist dieselbe EULA, die du beim Minecraft-Spielen schon angenommen hast, einfach eine serverseitige Re-Confirmation. Falls du sie je widerrufen willst (selten), die <code>server/eula.txt</code> direkt editieren.",
+      "Von derselben Maschine: Im Minecraft-Client einen Server mit Adresse <code>localhost</code> (oder <code>127.0.0.1</code>) hinzufügen. Port wie eingestellt, Default 25565. Von einem anderen Rechner im selben LAN: lokale IP des Host-Rechners benutzen (z. B. <code>192.168.1.50</code>). Firewall am Host für eingehende Verbindungen auf dem Server-Port öffnen. Aus dem offenen Internet: braucht Router-Port-Forwarding (Server-Port auf den Host-Rechner) plus deine öffentliche IP, die sich bei den meisten Heimanschlüssen ändert. Tools wie Playit.gg oder ngrok regeln das ohne Router-Eingriff, kostet Latenz.",
+      "Jeder Server hat fünf Tabs: <strong>Console</strong> (Live-Server-Ausgabe plus Befehlseingabe unten), <strong>Addons</strong> (Mod-Verwaltung, nur sichtbar bei Server mit Mod-Loader), <strong>Properties</strong> (server.properties-Editor: MOTD, Max-Players, Online-Mode, View-Distance usw.), <strong>Players</strong> (verbundene Spieler, Ops, Whitelist, gebannte Spieler), <strong>Settings</strong> (Name, Port, Java-Memory, Modloader-Version, Löschen).",
+      "Das Eingabefeld im Console-Tab funktioniert wie eine Vanilla-Server-Konsole: <code>op &lt;player&gt;</code> (Op vergeben), <code>whitelist add &lt;player&gt;</code> (Whitelist), <code>save-all</code> (Welt auf Platte sichern), <code>stop</code> (sauberes Herunterfahren), <code>say &lt;message&gt;</code> (Broadcast an alle).",
+      "Hast du beim Erstellen einen Mod-Loader gewählt, installiert GDLauncher dessen Server-Distribution (Forge, NeoForge, Fabric oder Quilt). Mods kommen nach <code>server/mods/</code>, wie bei Client-Instanzen. Der Addons-Tab der Server-Instanz verwaltet sie genauso wie auf Clients. Für beste Kompatibilität dieselben Mods auf Client und Server fahren. Client-only-Mods (Sodium, Shader) gehören nicht auf den Server, Server-only-Mods (Admin-Tools, Performance-Monitore) nicht auf Clients. Viele große Modpacks werden als Client-Pack und Server-Pack ausgeliefert, den Server-Pack per Import als Server-Instanz installieren.",
+      "Server starten standardmäßig mit 2 GB. Modded und Server mit vielen Spielern brauchen mehr, Slider und Empfehlungen in <a href=\"/guides/allocate-server-ram\">Mehr RAM für einen Minecraft-Server zuweisen</a>."
+    ]
+  },
+  fr: {
+    headings: ["Ce qui change pour une instance serveur", "Le modal EULA", "Se connecter à ton serveur", "Onglets du serveur", "Commandes console", "Serveurs moddés", "RAM et performance"],
+    paras: [
+      "Dans GDLauncher, un serveur Minecraft est un type d'instance à part, pas un réglage sur une instance client classique. Les serveurs ne rendent pas le jeu ; ils font tourner le backend headless auquel les clients se connectent. La machine à états est aussi spécifique au serveur : Stopped → Installing → Starting → Running → Stopping → Deleting. Tu peux avoir des instances client et serveur côte à côte. Pattern courant : un serveur pour que les amis rejoignent, plus une instance client pointant sur <code>localhost</code> pour tester des changements.",
+      "Mojang demande d'accepter sa EULA avant de faire tourner tout serveur Minecraft. GDLauncher intercepte le premier lancement raté, affiche le modal et écrit <code>eula=true</code> dans <code>eula.txt</code> du dossier serveur quand tu acceptes. Sans acceptation, le serveur refuse de démarrer. C'est la même EULA que tu as acceptée pour jouer à Minecraft, juste une re-confirmation côté serveur. Si jamais tu veux la révoquer (rare), édite <code>server/eula.txt</code> directement.",
+      "Depuis la même machine : dans ton client Minecraft, ajoute un serveur d'adresse <code>localhost</code> (ou <code>127.0.0.1</code>). Le port est celui que tu as configuré, 25565 par défaut. Depuis une autre machine du même LAN : utilise l'IP locale de la machine hôte (par exemple <code>192.168.1.50</code>). Vérifie que le firewall de la machine hôte autorise les connexions entrantes sur le port serveur. Depuis internet ouvert : il faut le port forwarding sur le routeur (rediriger le port serveur vers la machine hôte) plus ton IP publique, qui change sur la plupart des connexions résidentielles. Des outils comme Playit.gg ou ngrok le font sans toucher au routeur, au prix de latence.",
+      "Chaque serveur a cinq onglets : <strong>Console</strong> (sortie serveur en direct et champ de commande en bas), <strong>Addons</strong> (gestion des mods, affiché seulement quand le serveur a un mod loader), <strong>Properties</strong> (éditeur server.properties : MOTD, max joueurs, online mode, distance de vue, etc.), <strong>Players</strong> (joueurs connectés, ops, whitelist, joueurs bannis), <strong>Settings</strong> (nom, port, Java memory, version de modloader, suppression).",
+      "Le champ de saisie de l'onglet Console marche comme une console serveur vanilla : <code>op &lt;player&gt;</code> (donner op), <code>whitelist add &lt;player&gt;</code> (whitelist), <code>save-all</code> (flush du monde sur disque), <code>stop</code> (arrêt propre), <code>say &lt;message&gt;</code> (broadcast à tout le monde).",
+      "Si tu as choisi un mod loader à la création, GDLauncher installe la distribution serveur du loader (Forge, NeoForge, Fabric ou Quilt). Les mods vont dans <code>server/mods/</code>, comme pour les instances client. L'onglet Addons de l'instance serveur les gère, exactement comme pour les clients. Pour la meilleure compatibilité, fais tourner les mêmes mods côté client et côté serveur. Les mods client-only (Sodium, shaders) ne devraient pas être sur le serveur ; les mods server-only (outils admin, monitors perf) pas sur les clients. Beaucoup de gros modpacks sortent en pack client et pack serveur, installe le pack serveur via Import en instance serveur.",
+      "Les serveurs démarrent par défaut à 2 Go. Les serveurs moddés et à grand nombre de joueurs en veulent plus, voir <a href=\"/guides/allocate-server-ram\">Allouer plus de RAM à un serveur Minecraft</a> pour le slider et les valeurs recommandées."
+    ]
+  },
+  es: {
+    headings: ["Qué tiene de distinto una instancia servidor", "El modal de EULA", "Conectarse a tu servidor", "Pestañas del servidor", "Comandos de consola", "Servidores moddeados", "RAM y rendimiento"],
+    paras: [
+      "En GDLauncher un servidor de Minecraft es su propio tipo de instancia, no un ajuste de una instancia cliente normal. Los servidores no renderizan el juego; corren el backend headless al que se conectan los clientes. La máquina de estados también es específica de servidor: Stopped → Installing → Starting → Running → Stopping → Deleting. Puedes tener instancias cliente y servidor lado a lado. Patrón habitual: un servidor para que entren amigos y una instancia cliente apuntando a <code>localhost</code> para que pruebes cambios.",
+      "Mojang requiere aceptar su EULA antes de correr cualquier servidor Minecraft. GDLauncher intercepta el primer arranque fallido, muestra el modal y, al aceptar, escribe <code>eula=true</code> en <code>eula.txt</code> dentro de la carpeta del servidor. Sin aceptación, el servidor se niega a arrancar. Es la misma EULA que aceptaste para jugar Minecraft, solo una reconfirmación del lado servidor. Si alguna vez quieres revocarla (raro), edita <code>server/eula.txt</code> directamente.",
+      "Desde la misma máquina: en tu cliente Minecraft, añade un servidor con dirección <code>localhost</code> (o <code>127.0.0.1</code>). El puerto el que hayas puesto, 25565 por defecto. Desde otra máquina en el mismo LAN: usa la IP local de la máquina anfitriona (por ejemplo <code>192.168.1.50</code>). Asegúrate de que el firewall del anfitrión permite conexiones entrantes en el puerto del servidor. Desde internet abierto: necesitas port forwarding en el router (redirigir el puerto del servidor a tu máquina anfitriona) más tu IP pública, que cambia en la mayoría de conexiones domésticas. Herramientas como Playit.gg o ngrok lo hacen sin tocar el router, a costa de latencia.",
+      "Cada servidor tiene cinco pestañas: <strong>Console</strong> (salida en vivo del servidor más campo de comando abajo), <strong>Addons</strong> (gestión de mods, solo se muestra si el servidor tiene mod loader), <strong>Properties</strong> (editor de server.properties: MOTD, max jugadores, online mode, view distance, etc.), <strong>Players</strong> (jugadores conectados, ops, whitelist, jugadores baneados), <strong>Settings</strong> (nombre, puerto, Java memory, versión de modloader, eliminación).",
+      "El campo de entrada de la pestaña Console funciona como una consola de servidor vanilla: <code>op &lt;player&gt;</code> (dar op), <code>whitelist add &lt;player&gt;</code> (whitelist), <code>save-all</code> (volcar mundo a disco), <code>stop</code> (apagado limpio), <code>say &lt;message&gt;</code> (broadcast a todos).",
+      "Si elegiste mod loader al crear, GDLauncher instala la distribución de servidor del loader (Forge, NeoForge, Fabric o Quilt). Los mods van a <code>server/mods/</code>, igual que en instancias cliente. La pestaña Addons de la instancia servidor los gestiona, exactamente como en clientes. Para mejor compatibilidad, corre los mismos mods en cliente y servidor. Mods client-only (Sodium, shaders) no deberían estar en el servidor; mods server-only (herramientas de admin, monitores) no en clientes. Muchos modpacks grandes se distribuyen como pack cliente y pack servidor, instala el pack servidor vía Import como instancia servidor.",
+      "Los servidores arrancan con 2 GB por defecto. Servidores moddeados y con muchos jugadores quieren más, ver <a href=\"/guides/allocate-server-ram\">Asignar más RAM a un servidor de Minecraft</a> para el slider y valores recomendados."
+    ]
+  },
+  "pt-BR": {
+    headings: ["O que difere numa instância de servidor", "O modal da EULA", "Conectando ao seu servidor", "Abas do servidor", "Comandos do console", "Servidores moddados", "RAM e performance"],
+    paras: [
+      "No GDLauncher, um servidor Minecraft é um tipo de instância à parte, não uma configuração de uma instância cliente comum. Servidores não renderizam o jogo; rodam o backend headless ao qual clientes se conectam. A máquina de estado também é específica: Stopped → Installing → Starting → Running → Stopping → Deleting. Você pode ter instâncias cliente e servidor lado a lado. Padrão comum: um servidor pra amigos entrarem mais uma instância cliente apontando pra <code>localhost</code> pra você testar mudanças.",
+      "A Mojang exige aceitar a EULA antes de rodar qualquer servidor Minecraft. O GDLauncher intercepta a primeira tentativa de start, mostra o modal, e ao aceitar escreve <code>eula=true</code> no <code>eula.txt</code> da pasta do servidor. Sem aceitação, o servidor recusa iniciar. É a mesma EULA que você aceitou pra jogar Minecraft, só uma reconfirmação do lado servidor. Se um dia precisar revogar (raro), edite <code>server/eula.txt</code> direto.",
+      "Da mesma máquina: no seu cliente Minecraft, adicione um servidor com endereço <code>localhost</code> (ou <code>127.0.0.1</code>). A porta é a que você configurou, 25565 por padrão. De outra máquina na mesma LAN: use o IP local do host (por exemplo <code>192.168.1.50</code>). Garanta que o firewall do host permite conexões na porta do servidor. Da internet aberta: precisa de port forwarding no roteador (encaminhar a porta do servidor pra máquina host) mais seu IP público, que muda na maioria das conexões residenciais. Ferramentas como Playit.gg ou ngrok fazem isso sem mexer no roteador, com custo de latência.",
+      "Cada servidor tem cinco abas: <strong>Console</strong> (saída do servidor ao vivo mais campo de comando embaixo), <strong>Addons</strong> (gerenciamento de mod, só aparece se o servidor tem mod loader), <strong>Properties</strong> (editor server.properties: MOTD, max players, online mode, view distance etc.), <strong>Players</strong> (jogadores conectados, ops, whitelist, jogadores banidos), <strong>Settings</strong> (nome, porta, Java memory, versão de modloader, exclusão).",
+      "O campo de entrada da aba Console funciona como um console de servidor vanilla: <code>op &lt;player&gt;</code> (dar op), <code>whitelist add &lt;player&gt;</code> (whitelist), <code>save-all</code> (descarregar mundo no disco), <code>stop</code> (shutdown limpo), <code>say &lt;message&gt;</code> (broadcast pra todos).",
+      "Se você escolheu um mod loader na criação, o GDLauncher instala a distribuição de servidor do loader (Forge, NeoForge, Fabric ou Quilt). Mods vão pra <code>server/mods/</code>, igual em instâncias cliente. A aba Addons da instância de servidor gerencia, igualzinho aos clientes. Pra melhor compatibilidade, rode os mesmos mods no cliente e no servidor. Mods só-cliente (Sodium, shaders) não devem estar no servidor; mods só-servidor (ferramentas de admin, monitores) não nos clientes. Muitos modpacks grandes saem como pack cliente e pack servidor, instale o pack servidor via Import como instância de servidor.",
+      "Servidores começam com 2 GB por padrão. Servidores moddados e com muitos jogadores querem mais, veja <a href=\"/guides/allocate-server-ram\">Alocar mais RAM pra um servidor Minecraft</a> pro slider e valores recomendados."
+    ]
+  },
+  it: {
+    headings: ["Cosa cambia in un'istanza server", "Il modal dell'EULA", "Connettersi al tuo server", "Le schede del server", "Comandi della console", "Server con mod", "RAM e prestazioni"],
+    paras: [
+      "In GDLauncher un server Minecraft è un tipo di istanza a sé, non un'impostazione di una normale istanza client. I server non renderizzano il gioco, fanno girare il backend headless a cui si collegano i client. Anche la macchina a stati è specifica del server: Stopped → Installing → Starting → Running → Stopping → Deleting. Puoi avere istanze client e server affiancate. Pattern comune: un server in cui entrano gli amici più un'istanza client che punta a <code>localhost</code> per testare le modifiche.",
+      "Mojang richiede di accettare la sua EULA prima di far girare qualsiasi server Minecraft. GDLauncher intercetta il primo avvio fallito, mostra il modal e, all'accettazione, scrive <code>eula=true</code> in <code>eula.txt</code> dentro la cartella del server. Senza accettazione il server si rifiuta di partire. È la stessa EULA che hai accettato per giocare a Minecraft, solo una riconferma lato server. Se mai dovessi revocarla (raro), modifica direttamente <code>server/eula.txt</code>.",
+      "Dalla stessa macchina: nel tuo client Minecraft, aggiungi un server con indirizzo <code>localhost</code> (o <code>127.0.0.1</code>). La porta è quella che hai configurato, 25565 di default. Da un'altra macchina nella stessa LAN: usa l'IP locale della macchina host (per esempio <code>192.168.1.50</code>). Assicurati che il firewall dell'host permetta le connessioni in ingresso sulla porta del server. Da internet aperta: serve il port forwarding sul router (inoltrare la porta del server alla macchina host) più il tuo IP pubblico, che cambia sulla maggior parte delle connessioni domestiche. Strumenti come Playit.gg o ngrok lo fanno senza toccare il router, a costo di latenza.",
+      "Ogni server ha cinque schede: <strong>Console</strong> (output del server in diretta più campo comandi in basso), <strong>Addons</strong> (gestione delle mod, visibile solo se il server ha un mod loader), <strong>Properties</strong> (editor di server.properties: MOTD, max players, online mode, view distance ecc.), <strong>Players</strong> (giocatori connessi, op, whitelist, giocatori bannati), <strong>Settings</strong> (nome, porta, Java memory, versione del modloader, eliminazione).",
+      "Il campo di input nella scheda Console funziona come una console server Vanilla: <code>op &lt;player&gt;</code> (assegna op), <code>whitelist add &lt;player&gt;</code> (whitelist), <code>save-all</code> (scarica la mappa su disco), <code>stop</code> (arresto pulito), <code>say &lt;message&gt;</code> (broadcast a tutti).",
+      "Se hai scelto un mod loader in fase di creazione, GDLauncher installa la distribuzione server del loader (Forge, NeoForge, Fabric o Quilt). Le mod vanno in <code>server/mods/</code>, come per le istanze client. La scheda Addons dell'istanza server le gestisce, esattamente come sui client. Per la migliore compatibilità, fai girare le stesse mod su client e server. Le mod solo-client (Sodium, shader) non dovrebbero stare sul server, le mod solo-server (tool di amministrazione, monitor di prestazioni) non sui client. Tanti Modpack grandi vengono distribuiti come pack client e pack server, installa il pack server tramite Import come istanza server.",
+      "I server partono di default con 2 GB. Server con mod e con molti giocatori ne vogliono di più: per slider e valori consigliati vedi <a href=\"/guides/allocate-server-ram\">Allocare più RAM a un server Minecraft</a>."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT5M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

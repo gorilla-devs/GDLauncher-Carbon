@@ -2,9 +2,8 @@ import ThemePreview from "@/components/ThemePreview"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
 import { getThemeKey } from "@gd/i18n/helpers"
-import { useRouteData } from "@solidjs/router"
 import { For } from "solid-js"
-import fetchData from "./settings.general.data"
+import useSettingsGeneralData from "./settings.general.data"
 import LoadingError from "@/components/LoadingError"
 import {
   applyThemeByName,
@@ -16,7 +15,7 @@ import Row from "./components/Row"
 import Title from "./components/Title"
 
 const Appearance = () => {
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const routeData = useSettingsGeneralData()
   const themeName = () => routeData?.data?.data?.theme || "main"
 
   const settingsMutation = rspc.createMutation(() => ({

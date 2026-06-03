@@ -14,6 +14,11 @@ const ExportFormat = () => {
 
   const options: ImportEntityStatus[] = [
     {
+      entity: "GDLPack",
+      supported: true,
+      selection_type: "file" satisfies ImportEntitySelectionType
+    },
+    {
       entity: "CurseForge",
       supported: true,
       selection_type: "file" satisfies ImportEntitySelectionType
@@ -26,6 +31,7 @@ const ExportFormat = () => {
   ]
 
   const exportTargets: Partial<Record<ImportEntity, ExportTarget>> = {
+    GDLPack: "Gdlauncher",
     CurseForge: "Curseforge",
     Modrinth: "Modrinth"
   }

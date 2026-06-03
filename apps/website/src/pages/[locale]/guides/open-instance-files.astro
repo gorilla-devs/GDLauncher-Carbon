@@ -1,0 +1,167 @@
+---
+import GuideLayout from "../../../components/GuideLayout.astro"
+import type { GetStaticPaths } from "astro"
+import { LOCALES, DEFAULT_LOCALE, type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[] }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "GDLauncher でインスタンスのファイルを開く方法",
+    description: "OS のファイルマネージャーでインスタンスフォルダーへ移動。ワールドのコピー、設定の手動編集、スクリーンショットの取り出しなど。",
+    steps: [
+      { name: "インスタンスを右クリック", text: "Library でファイルが必要なインスタンスを右クリック。" },
+      { name: "More Options を開く", text: "More Options にホバーしてサブメニューを表示。" },
+      { name: "Open Folder をクリック", text: "Open Folder (folder-open アイコン) を選択。OS のファイルマネージャーがインスタンスルートを開きます。" }
+    ]
+  },
+  ko: {
+    title: "GDLauncher에서 인스턴스 파일 열기",
+    description: "OS 파일 매니저에서 인스턴스 폴더로 점프해 월드 복사, 설정 수동 편집, 스크린샷 가져오기.",
+    steps: [
+      { name: "인스턴스 오른쪽 클릭", text: "Library에서 파일이 필요한 인스턴스를 오른쪽 클릭." },
+      { name: "More Options 열기", text: "More Options 위에 마우스를 올려 서브메뉴 표시." },
+      { name: "Open Folder 클릭", text: "Open Folder(folder-open 아이콘) 선택. OS 파일 매니저가 인스턴스 루트로 열림." }
+    ]
+  },
+  de: {
+    title: "Instanz-Dateien in GDLauncher öffnen",
+    description: "In den Instanz-Ordner im OS-Datei-Explorer springen, um Welten zu kopieren, Configs per Hand zu bearbeiten oder Screenshots zu holen.",
+    steps: [
+      { name: "Rechtsklick auf die Instanz", text: "In der Library Rechtsklick auf die Instanz, deren Dateien du brauchst." },
+      { name: "More Options öffnen", text: "Über More Options hovern, um das Untermenü zu öffnen." },
+      { name: "Open Folder klicken", text: "Open Folder wählen (folder-open-Icon). Der OS-Explorer springt zum Instanz-Root." }
+    ]
+  },
+  fr: {
+    title: "Comment ouvrir les fichiers d'une instance dans GDLauncher",
+    description: "Saute jusqu'au dossier de l'instance dans ton explorateur de fichiers OS pour copier des mondes, éditer des configs à la main ou récupérer des screenshots.",
+    steps: [
+      { name: "Clic droit sur l'instance", text: "Dans la Library, clic droit sur l'instance dont tu as besoin des fichiers." },
+      { name: "Ouvrir More Options", text: "Survole More Options pour étendre le sous-menu." },
+      { name: "Cliquer Open Folder", text: "Choisis Open Folder (icône folder-open). L'explorateur de fichiers OS s'ouvre à la racine de l'instance." }
+    ]
+  },
+  es: {
+    title: "Cómo abrir los archivos de una instancia en GDLauncher",
+    description: "Salta a la carpeta de la instancia en el explorador de archivos del SO para copiar mundos, editar configs a mano o sacar capturas.",
+    steps: [
+      { name: "Clic derecho en la instancia", text: "En la Library, clic derecho en la instancia cuyos archivos necesitas." },
+      { name: "Abrir More Options", text: "Pasa el ratón por More Options para expandir el submenú." },
+      { name: "Pulsar Open Folder", text: "Elige Open Folder (icono folder-open). Tu explorador del SO se abre en la raíz de la instancia." }
+    ]
+  },
+  "pt-BR": {
+    title: "Como abrir os arquivos de uma instância no GDLauncher",
+    description: "Pule pra pasta da instância no gerenciador de arquivos do SO pra copiar mundos, editar configs na mão ou pegar prints.",
+    steps: [
+      { name: "Botão direito na instância", text: "Na Library, botão direito na instância cujos arquivos você precisa." },
+      { name: "Abra More Options", text: "Passe o mouse por More Options pra expandir o submenu." },
+      { name: "Clique Open Folder", text: "Escolha Open Folder (ícone folder-open). O explorador do seu SO abre na raiz da instância." }
+    ]
+  },
+  it: {
+    title: "Come aprire i file di un'istanza in GDLauncher",
+    description: "Salta alla cartella dell'istanza nel file manager del sistema operativo per copiare mappe, modificare i config a mano o recuperare gli screenshot.",
+    steps: [
+      { name: "Clic destro sull'istanza", text: "Nella Library, fai clic destro sull'istanza di cui ti servono i file." },
+      { name: "Apri More Options", text: "Passa il mouse su More Options per espandere il sottomenu." },
+      { name: "Clicca Open Folder", text: "Scegli Open Folder (icona folder-open). Il file manager del tuo sistema si apre alla radice dell'istanza." }
+    ]
+  }
+}
+const m = meta[locale]
+
+const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] }> = {
+  ja: {
+    headings: ["何が見つかるか", "安全に変更できるもの", "変更を避けるべきもの", "便利なサブフォルダー一覧", "ランチャー稼働中の場合"],
+    paras: [
+      "開くフォルダーはインスタンスルート。中は 2 層: トップレベルの <code>logs/</code> はランチャーのインスタンス別セッションログ、<code>instance/</code> サブフォルダーが Minecraft の実際のゲームディレクトリ。全構造は <a href=\"/docs/instance-folder-anatomy\">インスタンスフォルダーの構造</a> 参照。多くの人が探すのは <code>instance/saves/</code> (ワールド)、<code>instance/screenshots/</code> (F2 で撮ったスクリーンショット)、<code>instance/config/</code> (Mod 設定ファイル)。",
+      "<strong>ワールド</strong>: バックアップにフォルダーをコピーアウト、ダウンロードしたワールドをコピーイン。<strong>スクリーンショット</strong>: 純粋なアセット、好きにコピーアウト。<strong>Mod 設定</strong>: <code>config/&lt;modid&gt;.toml</code> を手動編集、多くの Mod は次回起動時に変更を反映。<strong>options.txt</strong>: Minecraft クライアント設定、プレーンテキストとして編集可能。<strong>リソースパック / シェーダーパック</strong>: Addons タブを使わないなら手動でドラッグイン / アウト。",
+      "ワールドの <strong>level.dat</strong>: NBT エンコードで、破損するとワールドが死ぬ。ワールドの <code>region/</code> 内の <strong>region ファイル</strong>: 同じく NBT バイナリ、適切なツール (NBTExplorer、MCEdit) でのみ編集。インスタンスがロックされた Modpack の場合、<code>instance/mods/</code> の <strong>Mod JAR</strong>: ランチャーは手動変更を認識せず、Addons タブで不整合が発生。",
+      "<code>instance/saves/</code> Minecraft ワールド。<code>instance/screenshots/</code> F2 で撮ったスクリーンショット。<code>instance/mods/</code> Mod JAR。<code>instance/config/</code> Mod 設定。<code>instance/resourcepacks/</code> リソースパック。<code>instance/shaderpacks/</code> シェーダーパック。<code>instance/datapacks/</code> グローバルデータパック。<code>instance/logs/</code> Minecraft セッションログ (ゲーム側)。<code>instance/crash-reports/</code> Minecraft クラッシュダンプ。<code>logs/</code> (1 階層上) GDLauncher セッションログ。",
+      "GDLauncher 稼働中、さらには Minecraft 稼働中でもインスタンスフォルダーを参照できます。セッション途中の設定ファイル編集は多くの Mod で OK (再起動時にリロード)。Minecraft が開いているワールドのファイル (<code>level.dat</code>、region ファイル) を編集しないでください、破損の原因。"
+    ]
+  },
+  ko: {
+    headings: ["무엇을 찾을 수 있나", "안전하게 바꿀 수 있는 것", "변경을 피해야 하는 것", "유용한 하위 폴더 요약", "런처가 실행 중일 때"],
+    paras: [
+      "열리는 폴더는 인스턴스 루트. 안은 두 층: 최상위의 <code>logs/</code>는 런처의 인스턴스별 세션 로그, <code>instance/</code> 하위 폴더가 Minecraft의 실제 게임 디렉터리. 전체 레이아웃은 <a href=\"/docs/instance-folder-anatomy\">인스턴스 폴더의 구조</a> 참고. 대부분의 사람이 찾는 건 <code>instance/saves/</code>(월드), <code>instance/screenshots/</code>(F2로 찍은 스크린샷), <code>instance/config/</code>(모드 설정 파일).",
+      "<strong>월드</strong>: 백업으로 폴더 복사 또는 다운로드한 월드 가져오기. <strong>스크린샷</strong>: 순수 에셋, 마음대로 복사. <strong>모드 설정</strong>: <code>config/&lt;modid&gt;.toml</code> 수동 편집, 대부분의 모드는 다음 실행 시 반영. <strong>options.txt</strong>: Minecraft 클라이언트 설정, 일반 텍스트로 편집 가능. <strong>리소스 팩 / 셰이더 팩</strong>: Addons 탭을 안 쓰고 싶으면 수동으로 드래그 인/아웃.",
+      "월드 내 <strong>level.dat</strong>: NBT 인코딩, 손상 시 월드가 죽음. 월드 <code>region/</code>의 <strong>region 파일</strong>: 동일, NBT 바이너리, 적절한 도구(NBTExplorer, MCEdit)로만 편집. 인스턴스가 잠긴 모드팩이라면 <code>instance/mods/</code>의 <strong>모드 JAR</strong>: 런처가 수동 변경을 인식하지 못하고 Addons 탭에 불일치 발생.",
+      "<code>instance/saves/</code> Minecraft 월드. <code>instance/screenshots/</code> 게임 내 F2 스크린샷. <code>instance/mods/</code> 모드 JAR. <code>instance/config/</code> 모드 설정. <code>instance/resourcepacks/</code> 리소스 팩. <code>instance/shaderpacks/</code> 셰이더 팩. <code>instance/datapacks/</code> 글로벌 데이터 팩. <code>instance/logs/</code> Minecraft 세션 로그(게임 측). <code>instance/crash-reports/</code> Minecraft 크래시 덤프. <code>logs/</code>(한 단계 위) GDLauncher 세션 로그.",
+      "GDLauncher가 실행 중이어도, Minecraft가 실행 중이어도 인스턴스 폴더를 볼 수 있습니다. 세션 중 설정 파일 편집은 대부분의 모드에서 괜찮음(다시 실행 시 리로드). Minecraft가 월드를 연 상태에선 월드 파일(<code>level.dat</code>, region 파일)을 편집하지 마세요, 손상 유발."
+    ]
+  },
+  de: {
+    headings: ["Was du dort findest", "Was du gefahrlos ändern kannst", "Was du nicht anfassen solltest", "Nützliche Unterordner im Überblick", "Wenn der Launcher läuft"],
+    paras: [
+      "Du landest im Instanz-Root. Drin gibt's zwei Ebenen: oben ein <code>logs/</code> für die Per-Instanz-Session-Logs des Launchers, und ein <code>instance/</code>-Unterordner, der eigentliche Game-Verzeichnis von Minecraft. Komplettes Layout in <a href=\"/docs/instance-folder-anatomy\">Aufbau eines Instanz-Ordners</a>. Die meisten suchen <code>instance/saves/</code> (Welten), <code>instance/screenshots/</code> (mit F2 in-game gemacht) oder <code>instance/config/</code> (Mod-Configs).",
+      "<strong>Welten</strong>: Ordner rauskopieren für Backups oder reinkopieren, um ein heruntergeladenes Save zu importieren. <strong>Screenshots</strong>: reine Assets, frei zu kopieren. <strong>Mod-Configs</strong>: <code>config/&lt;modid&gt;.toml</code> per Hand editieren, die meisten Mods lesen beim nächsten Start neu. <strong>options.txt</strong>: Minecrafts Client-Settings, als Text editierbar. <strong>Resource Packs / Shader Packs</strong>: per Hand rein- oder rausziehen, wenn du den Addons-Tab nicht nutzen willst.",
+      "<strong>level.dat</strong> in einer Welt: NBT-codiert, schon kleine Beschädigungen killen die Welt. <strong>Region-Dateien</strong> im <code>region/</code> einer Welt: ebenfalls NBT-Binär, nur mit passenden Tools (NBTExplorer, MCEdit) editieren. <strong>Mod-JARs</strong> in <code>instance/mods/</code> bei einer gesperrten Modpack-Instanz: der Launcher merkt manuelle Änderungen nicht, der Addons-Tab wird inkonsistent.",
+      "<code>instance/saves/</code> deine Minecraft-Welten. <code>instance/screenshots/</code> F2-Screenshots aus dem Spiel. <code>instance/mods/</code> die Mod-JARs. <code>instance/config/</code> Mod-Settings. <code>instance/resourcepacks/</code> Resource Packs. <code>instance/shaderpacks/</code> Shader Packs. <code>instance/datapacks/</code> globale Data Packs. <code>instance/logs/</code> Minecrafts Session-Logs (Game-Seite). <code>instance/crash-reports/</code> Minecraft-Crash-Dumps. <code>logs/</code> (eine Ebene drüber) GDLauncher-Session-Logs.",
+      "Den Instanz-Ordner kannst du durchschauen, während GDLauncher läuft, und sogar während Minecraft läuft. Configs mitten in der Session zu editieren ist bei den meisten Mods okay (laden beim Neustart neu). Welt-Dateien (<code>level.dat</code>, Region-Dateien) aber nicht editieren, solange Minecraft die Welt offen hat, das führt zu Korruption."
+    ]
+  },
+  fr: {
+    headings: ["Ce que tu vas trouver", "Ce que tu peux changer sans risque", "Ce qu'il vaut mieux ne pas toucher", "Sous-dossiers utiles en un coup d'œil", "Quand le launcher tourne"],
+    paras: [
+      "Le dossier où tu atterris est la racine de l'instance. Dedans, deux niveaux : un <code>logs/</code> au sommet pour les logs de session par instance du launcher, et un sous-dossier <code>instance/</code> qui est le vrai répertoire de jeu Minecraft. Voir <a href=\"/docs/instance-folder-anatomy\">Anatomie d'un dossier d'instance</a> pour la disposition complète. Le plus souvent on cherche <code>instance/saves/</code> (mondes), <code>instance/screenshots/</code> (F2 en jeu) ou <code>instance/config/</code> (configs de mods).",
+      "<strong>Mondes</strong> : copie des dossiers vers l'extérieur pour backup ou vers l'intérieur pour importer un monde téléchargé. <strong>Screenshots</strong> : assets purs, copie à volonté. <strong>Configs de mods</strong> : édite <code>config/&lt;modid&gt;.toml</code> à la main, la plupart des mods rechargent au prochain lancement. <strong>options.txt</strong> : settings client Minecraft, éditable en texte brut. <strong>Resource packs / shader packs</strong> : glisse dans ou hors à la main si tu préfères ne pas utiliser l'onglet Addons.",
+      "<strong>level.dat</strong> dans un monde : encodé NBT, la corrompre tue le monde. <strong>Region files</strong> dans le <code>region/</code> d'un monde : pareil, binaire NBT, à éditer uniquement avec les bons outils (NBTExplorer, MCEdit). <strong>JARs de mods</strong> dans <code>instance/mods/</code> si l'instance est un modpack verrouillé : le launcher ignorera les changements manuels et l'onglet Addons sera incohérent.",
+      "<code>instance/saves/</code> tes mondes Minecraft. <code>instance/screenshots/</code> screenshots in-game F2. <code>instance/mods/</code> JARs de mods. <code>instance/config/</code> settings de mods. <code>instance/resourcepacks/</code> resource packs. <code>instance/shaderpacks/</code> shader packs. <code>instance/datapacks/</code> data packs globaux. <code>instance/logs/</code> logs de session Minecraft (côté jeu). <code>instance/crash-reports/</code> crash dumps Minecraft. <code>logs/</code> (un niveau au-dessus) logs de session GDLauncher.",
+      "Tu peux parcourir le dossier de l'instance pendant que GDLauncher tourne, et même pendant que Minecraft tourne. Éditer des configs en pleine session est ok pour la plupart des mods (rechargement au relancement). N'édite pas les fichiers de monde (<code>level.dat</code>, region files) tant que Minecraft a le monde ouvert, tu causerais de la corruption."
+    ]
+  },
+  es: {
+    headings: ["Qué vas a encontrar", "Qué puedes cambiar con seguridad", "Qué evitar cambiar", "Subcarpetas útiles de un vistazo", "Cuando el launcher está corriendo"],
+    paras: [
+      "La carpeta donde aterrizas es la raíz de la instancia. Dentro, dos capas: un <code>logs/</code> arriba para los logs de sesión por instancia del launcher, y una subcarpeta <code>instance/</code> que es el directorio de juego real de Minecraft. Ver <a href=\"/docs/instance-folder-anatomy\">Anatomía de una carpeta de instancia</a> para el layout completo. La mayoría busca <code>instance/saves/</code> (mundos), <code>instance/screenshots/</code> (F2 en juego) o <code>instance/config/</code> (configs de mods).",
+      "<strong>Mundos</strong>: saca carpetas para backup o méte una descargada para importar un mundo. <strong>Capturas</strong>: assets puros, copia a tu gusto. <strong>Configs de mods</strong>: edita <code>config/&lt;modid&gt;.toml</code> a mano, la mayoría de mods recargan al siguiente lanzamiento. <strong>options.txt</strong>: settings del cliente Minecraft, editable como texto plano. <strong>Resource packs / shader packs</strong>: mete o saca a mano si prefieres no usar la pestaña Addons.",
+      "<strong>level.dat</strong> dentro de un mundo: codificado en NBT, corromperlo mata el mundo. <strong>Region files</strong> en <code>region/</code> de un mundo: igual, binario NBT, edita solo con herramientas adecuadas (NBTExplorer, MCEdit). <strong>JARs de mods</strong> en <code>instance/mods/</code> si la instancia es un modpack bloqueado: el launcher no se enterará de los cambios manuales y la pestaña Addons quedará inconsistente.",
+      "<code>instance/saves/</code> tus mundos. <code>instance/screenshots/</code> capturas F2 en juego. <code>instance/mods/</code> JARs de mods. <code>instance/config/</code> settings de mods. <code>instance/resourcepacks/</code> resource packs. <code>instance/shaderpacks/</code> shader packs. <code>instance/datapacks/</code> data packs globales. <code>instance/logs/</code> logs de sesión de Minecraft (lado juego). <code>instance/crash-reports/</code> crash dumps de Minecraft. <code>logs/</code> (un nivel arriba) logs de sesión de GDLauncher.",
+      "Puedes navegar por la carpeta de la instancia mientras GDLauncher está corriendo, incluso mientras Minecraft está corriendo. Editar archivos de config en plena sesión va bien para la mayoría de mods (recargan al relanzar). No edites archivos de mundo (<code>level.dat</code>, region files) mientras Minecraft tiene el mundo abierto, causarás corrupción."
+    ]
+  },
+  "pt-BR": {
+    headings: ["O que você vai achar", "O que dá pra mudar com segurança", "O que evitar mudar", "Subpastas úteis de relance", "Quando o launcher está rodando"],
+    paras: [
+      "A pasta que abre é a raiz da instância. Dentro, duas camadas: um <code>logs/</code> no topo pros logs de sessão por instância do launcher, e uma subpasta <code>instance/</code> que é o diretório real de jogo do Minecraft. Veja <a href=\"/docs/instance-folder-anatomy\">Anatomia de uma pasta de instância</a> pro layout completo. A maioria procura <code>instance/saves/</code> (mundos), <code>instance/screenshots/</code> (F2 in-game) ou <code>instance/config/</code> (configs de mod).",
+      "<strong>Mundos</strong>: copie pastas pra fora pra backup ou pra dentro pra importar um mundo baixado. <strong>Prints</strong>: assets puros, copie à vontade. <strong>Configs de mod</strong>: edite <code>config/&lt;modid&gt;.toml</code> na mão, a maioria dos mods recarrega no próximo lançamento. <strong>options.txt</strong>: settings de cliente Minecraft, editável como texto puro. <strong>Resource packs / shader packs</strong>: arraste pra dentro ou pra fora se preferir não usar a aba Addons.",
+      "<strong>level.dat</strong> dentro de um mundo: codificado em NBT, corromper mata o mundo. <strong>Region files</strong> em <code>region/</code> de um mundo: igual, binário NBT, edite só com ferramentas adequadas (NBTExplorer, MCEdit). <strong>JARs de mod</strong> em <code>instance/mods/</code> se a instância é um modpack bloqueado: o launcher não vai saber de mudanças manuais e a aba Addons fica inconsistente.",
+      "<code>instance/saves/</code> seus mundos. <code>instance/screenshots/</code> prints F2 in-game. <code>instance/mods/</code> JARs de mod. <code>instance/config/</code> configs de mod. <code>instance/resourcepacks/</code> resource packs. <code>instance/shaderpacks/</code> shader packs. <code>instance/datapacks/</code> data packs globais. <code>instance/logs/</code> logs de sessão do Minecraft (lado jogo). <code>instance/crash-reports/</code> crash dumps do Minecraft. <code>logs/</code> (um nível acima) logs de sessão do GDLauncher.",
+      "Você pode navegar pela pasta da instância enquanto o GDLauncher está rodando, e mesmo enquanto o Minecraft tá rodando. Editar configs no meio da sessão tá ok pra maioria dos mods (recarregam no relançamento). Não edite arquivos de mundo (<code>level.dat</code>, region files) enquanto o Minecraft tem o mundo aberto, vai causar corrupção."
+    ]
+  },
+  it: {
+    headings: ["Cosa troverai", "Cosa puoi modificare senza rischi", "Cosa è meglio non toccare", "Sottocartelle utili a colpo d'occhio", "Quando il launcher è in esecuzione"],
+    paras: [
+      "La cartella che si apre è la radice dell'istanza. Dentro ci sono due livelli: un <code>logs/</code> in cima per i log di sessione per-istanza del launcher, e una sottocartella <code>instance/</code> che è la vera directory di gioco di Minecraft. Vedi <a href=\"/docs/instance-folder-anatomy\">Anatomia di una cartella di istanza</a> per il layout completo. La maggior parte delle persone cerca <code>instance/saves/</code> (mappe), <code>instance/screenshots/</code> (F2 in gioco) o <code>instance/config/</code> (config delle mod).",
+      "<strong>Mappe</strong>: copia le cartelle fuori per backup o dentro per importare una mappa scaricata. <strong>Screenshot</strong>: asset puri, copiali a piacere. <strong>Config delle mod</strong>: modifica <code>config/&lt;modid&gt;.toml</code> a mano, la maggior parte delle mod ricarica al prossimo avvio. <strong>options.txt</strong>: impostazioni del client Minecraft, modificabili come testo semplice. <strong>Resource pack / shader pack</strong>: trascinali dentro o fuori a mano se preferisci non usare la scheda Addons.",
+      "<strong>level.dat</strong> dentro una mappa: codificato in NBT, corromperlo uccide la mappa. <strong>Region file</strong> nel <code>region/</code> di una mappa: idem, binari NBT, modificali solo con strumenti adatti (NBTExplorer, MCEdit). <strong>JAR di mod</strong> in <code>instance/mods/</code> se l'istanza è un modpack bloccato: il launcher non si accorgerà delle modifiche manuali e la scheda Addons risulterà incoerente.",
+      "<code>instance/saves/</code> i tuole mappe Minecraft. <code>instance/screenshots/</code> screenshot F2 in gioco. <code>instance/mods/</code> JAR delle mod. <code>instance/config/</code> impostazioni delle mod. <code>instance/resourcepacks/</code> resource pack. <code>instance/shaderpacks/</code> shader pack. <code>instance/datapacks/</code> data pack globali. <code>instance/logs/</code> log di sessione di Minecraft (lato gioco). <code>instance/crash-reports/</code> crash dump di Minecraft. <code>logs/</code> (un livello sopra) log di sessione di GDLauncher.",
+      "Puoi sfogliare la cartella dell'istanza mentre GDLauncher è in esecuzione, e anche mentre Minecraft è in esecuzione. Modificare file di config durante la sessione va bene per la maggior parte delle mod (ricaricano al riavvio). Non modificare i file di una mappa (<code>level.dat</code>, region file) mentre Minecraft ha la mappa aperta, causerai corruzione."
+    ]
+  }
+}
+const b = body[locale]
+---
+
+<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT1M", steps: m.steps }}>
+  {b.headings.map((heading, idx) => (
+    <Fragment>
+      <h2>{heading}</h2>
+      <p set:html={localizeInternalLinks(b.paras[idx], locale)}></p>
+    </Fragment>
+  ))}
+</GuideLayout>

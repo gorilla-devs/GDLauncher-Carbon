@@ -45,7 +45,15 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         electron: "@overwolf/ow-electron"
-      }
+      },
+      // Electron main runs in Node; drop the "browser" mainField so the
+      // object-form `browser` package.json remap isn't honored. Without
+      // this, @opentelemetry/instrumentation's Node platform file (pulled in
+      // by @sentry/electron v7 → @sentry/node → SentryNodeFetchInstrumentation)
+      // gets swapped for a browser stub that lacks `enable()`, throwing
+      // "(intermediate value).enable is not a function" during Sentry.init.
+      mainFields: ["module", "jsnext:main", "jsnext"],
+      conditions: ["node"]
     },
     define: definitions,
     test: {
@@ -66,7 +74,8 @@ export default defineConfig(({ mode }) => {
         external: [
           "electron",
           "@overwolf/ow-electron",
-          ...builtinModules
+          ...builtinModules,
+          ...builtinModules.map((m) => `node:${m}`)
           // ...Object.keys(pkg.dependencies || {}),
         ]
       },

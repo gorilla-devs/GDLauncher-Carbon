@@ -1,0 +1,36 @@
+OTHER THIRD-PARTY ASSETS
+========================
+
+## Ubuntu Font Family [Ubuntu Font License 1.0]
+
+Copyright: © Canonical Ltd.
+License: Ubuntu Font License 1.0
+Files: ubuntu-regular-webfont.woff2, ubuntu-medium-webfont.woff2,
+       ubuntu-bold-webfont.woff2, ubuntu-light-webfont.woff2,
+       UbuntuMono-Regular.ttf, UbuntuMono-Bold.ttf
+Source: https://design.ubuntu.com/font/
+
+The Ubuntu Font License allows free use, modification, and redistribution.
+Full license: https://ubuntu.com/legal/font-licence
+
+
+## Monocraft [SIL Open Font License 1.1]
+
+Copyright: © 2022 Idrees Hassan
+License: SIL Open Font License 1.1 (OFL-1.1)
+Files: monocraft.ttf, monocraft-bold.ttf, monocraft-semibold.ttf, monocraft-light.ttf
+Source: https://github.com/IdreesInc/Monocraft
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+Full license: https://scripts.sil.org/OFL
+
+
+## W95FA [SIL Open Font License 1.1]
+
+Creator: Alina Sava / FontsArena
+License: SIL Open Font License 1.1 (OFL-1.1)
+Files: w95fa.woff2
+Source: https://arnesava.github.io/w95font/
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+Full license: https://scripts.sil.org/OFL

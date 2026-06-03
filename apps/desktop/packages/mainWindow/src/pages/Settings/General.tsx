@@ -6,13 +6,13 @@ import {
   SelectItem,
   SelectValue,
   Input,
+  Skeleton,
   Switch
 } from "@gd/ui"
 import { wideLogoUrl } from "@/utils/logos"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
-import SettingsData from "./settings.general.data"
-import { useRouteData } from "@solidjs/router"
+import useSettingsGeneralData from "./settings.general.data"
 import { Show, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
 import {
@@ -27,9 +27,10 @@ import Title from "./components/Title"
 import RowsContainer from "./components/RowsContainer"
 import { useModal } from "@/managers/ModalsManager"
 import { manualCheckForUpdates, isCheckingForUpdates } from "@/utils/updater"
+import { formatBytes } from "@/utils/formatBytes"
 
 const General = () => {
-  const routeData: ReturnType<typeof SettingsData> = useRouteData()
+  const routeData = useSettingsGeneralData()
   const [t] = useTransContext()
   const modalsContext = useModal()
 
@@ -40,6 +41,13 @@ const General = () => {
 
   const settingsMutation = rspc.createMutation(() => ({
     mutationKey: ["settings.setSettings"]
+  }))
+
+  // Per-scope cache sizes — gdlauncher (db + temp + logs) and minecraft
+  // (assets + libraries + natives). Walks dirs once on the backend; the
+  // CacheCleanup modal shares this query so the walk runs once per visit.
+  const cacheSizes = rspc.createQuery(() => ({
+    queryKey: ["settings.getCacheSizes"]
   }))
 
   createEffect(() => {
@@ -457,6 +465,37 @@ const General = () => {
               <div class="i-hugeicons:refresh text-lg" />
               <Trans key="settings:_trn_rerun_onboarding" />
             </Button>
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title description={<Trans key="settings:_trn_cache_storage_text" />}>
+            <Trans key="settings:_trn_cache_storage_title" />
+          </Title>
+          <RightHandSide>
+            <div class="flex flex-col items-center gap-2">
+              <Button
+                type="secondary"
+                size="small"
+                rounded={false}
+                class="min-w-44"
+                onClick={() => {
+                  modalsContext?.openModal({ name: "cacheCleanup" })
+                }}
+              >
+                <div class="i-hugeicons:delete-02 h-4 w-4" />
+                <Trans key="settings:_trn_cache_storage_clean_up" />
+              </Button>
+              <Show
+                when={cacheSizes.data !== undefined}
+                fallback={<Skeleton class="h-3 w-16" />}
+              >
+                <div class="text-lightSlate-400 text-xs tabular-nums">
+                  {formatBytes(
+                    cacheSizes.data!.gdlauncher + cacheSizes.data!.minecraft
+                  )}
+                </div>
+              </Show>
+            </div>
           </RightHandSide>
         </Row>
         <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">

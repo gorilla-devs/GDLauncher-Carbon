@@ -11,11 +11,12 @@
       http-equiv="Content-Security-Policy"
       content="
        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.gdl.gg;
+       worker-src 'self' blob:;
        img-src 'self' data: https: blob: http://127.0.0.1:* http://localhost:* http://i.imgur.com;
        media-src 'self' https://*.gdl.gg;
        default-src 'unsafe-inline' 'self';
-       frame-src 'self' https: https://youtube.com;
-       connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com http://127.0.0.1:* https://unpkg.com/@rive-app/canvas@2.21.5/rive.wasm https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.21.5/rive_fallback.wasm https://*.gdl.gg;
+       frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://i.imgur.com https://cdn.ko-fi.com;
+       connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com http://127.0.0.1:* https://unpkg.com/@rive-app/canvas@2.35.0/rive.wasm https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.35.0/rive_fallback.wasm https://*.gdl.gg;
      "
     />
 
@@ -119,11 +120,7 @@
 
       * {
         font-family: var(--font);
-
         font-synthesis: none;
-        text-rendering: optimizeLegibility;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
       }
 
       /* View transition classes */
@@ -225,6 +222,43 @@
         animation-name: slide-in-from-left;
       }
 
+      /* Folder expansion view transitions */
+      /* Disable default crossfade - only the group morph should animate */
+      ::view-transition-old(folder-tile) {
+        animation: none;
+        opacity: 0;
+      }
+
+      ::view-transition-new(folder-tile) {
+        animation: none;
+      }
+
+      /* Control size/position morphing for folder tile */
+      ::view-transition-group(folder-tile) {
+        animation-duration: 200ms;
+        animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation-fill-mode: both;
+      }
+
+      /* Folder preview image transitions */
+      ::view-transition-old(folder-preview-0),
+      ::view-transition-new(folder-preview-0),
+      ::view-transition-old(folder-preview-1),
+      ::view-transition-new(folder-preview-1),
+      ::view-transition-old(folder-preview-2),
+      ::view-transition-new(folder-preview-2),
+      ::view-transition-old(folder-preview-3),
+      ::view-transition-new(folder-preview-3) {
+        animation-duration: 200ms;
+        animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation-fill-mode: both;
+      }
+
+      /* Disable root transition to avoid full page morph during folder transitions */
+      ::view-transition-group(root) {
+        animation: none;
+      }
+
       html,
       body {
         background: rgb(var(--darkSlate-800));
@@ -241,12 +275,13 @@
         will-change: transform; */
       }
 
-      *:not(#instance_logs_container *) {
+      *:not(#instance_logs_container *):not(#server_console_container *) {
         user-select: none;
         cursor: default;
       }
 
-      #instance_logs_container * {
+      #instance_logs_container *,
+      #server_console_container * {
         user-select: text;
         cursor: auto;
         font-family: var(--font-mono);
@@ -261,7 +296,8 @@
       }
 
       .instance-tile-spinning {
-        background-image: linear-gradient(to right, transparent, transparent),
+        background-image:
+          linear-gradient(to right, transparent, transparent),
           conic-gradient(
             from var(--instance-tile-angle),
             rgb(var(--primary)) 0deg 90deg,
@@ -304,6 +340,37 @@
         outline-offset: 0px;
         border-radius: 1rem;
         animation: pulse-new-instance 1.5s ease-in-out infinite;
+      }
+
+      /* Selection border drawing animation */
+      @keyframes draw-selection-border {
+        from {
+          stroke-dashoffset: var(--border-perimeter);
+        }
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+
+      @keyframes undraw-selection-border {
+        from {
+          stroke-dashoffset: 0;
+        }
+        to {
+          stroke-dashoffset: var(--border-perimeter);
+        }
+      }
+
+      .selection-border-draw {
+        stroke-dasharray: var(--border-perimeter);
+        stroke-dashoffset: var(--border-perimeter);
+        animation: draw-selection-border 0.15s ease-out forwards;
+      }
+
+      .selection-border-undraw {
+        stroke-dasharray: var(--border-perimeter);
+        stroke-dashoffset: 0;
+        animation: undraw-selection-border 0.1s ease-in forwards;
       }
 
       .appFatalCrash {

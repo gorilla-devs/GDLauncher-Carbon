@@ -1,0 +1,40 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Delete Instances Safely in GDLauncher"
+  description="Remove single or multiple Minecraft instances, what gets deleted, what gets kept, and how to recover from accidental deletion."
+  keywords="delete minecraft instance, remove instance gdlauncher, batch delete instances, recover deleted instance"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT1M",
+    steps: [
+      { name: "Right-click the instance", text: "In the Library, right-click the instance you want to delete. Select Delete (the trash icon)." },
+      { name: "Confirm in the modal", text: "The ConfirmInstanceDeletion modal asks you to confirm. It shows the instance name so you can double-check you're deleting the right one." },
+      { name: "Wait for deletion", text: "GDLauncher removes the instance folder from disk and the database row. For big modpacks this can take a few seconds." }
+    ]
+  }}
+>
+  <h2>Single vs batch delete</h2>
+  <p>For one instance: right-click → Delete. For multiple: hold Ctrl (Cmd on macOS) and click each instance to multi-select, then right-click and pick Delete Selected. A different modal (<code>ConfirmBatchInstanceDeletion</code>) lists everything you're about to delete and shows a progress bar as they go.</p>
+
+  <h2>What gets deleted</h2>
+  <p>Everything in the instance folder: mods, configs, worlds, screenshots, options.txt, resource packs, shaderpacks, logs, crash reports. The database row tracking the instance is removed. The instance disappears from the Library.</p>
+
+  <h2>What's kept</h2>
+  <p>Outside the instance folder: nothing of the instance survives. But Minecraft's <em>shared</em> assets and libraries (in the runtime path, not the instance) are kept because other instances may still need them. Same for Java installations.</p>
+  <p>Your accounts, launcher settings, and other instances are unaffected.</p>
+
+  <h2>Is deletion reversible?</h2>
+  <p>GDLauncher itself has no Trash or Recently Deleted view, but it does send the instance folder to your OS's recycle bin by default. The setting that controls this is <strong>Settings → General → Delete through Recycle Bin</strong>, on by default. With it on, deleted instances go to Windows Recycle Bin, macOS Trash, or your Linux desktop's trash bucket and you can restore them with the standard OS tools. With it off, files are removed directly and aren't recoverable.</p>
+  <p>The database row tracking the instance is gone either way. If you restore the folder from the recycle bin, you'll need to re-import it via Library → + → Import Instance → legacy GDLauncher (or by hand, depending on how the launcher resolves the orphan).</p>
+  <p>For deliberate backups before risky changes, see <a href="/guides/duplicate-an-instance">How to Duplicate an Instance</a>, or copy the instance folder somewhere outside the runtime path through your OS file manager.</p>
+
+  <h2>Worlds and saves</h2>
+  <p>The worlds in <code>instance/saves/</code> go with the instance. If you want to keep a world but delete the instance, copy <code>saves/&lt;world-name&gt;</code> out of the instance folder before deleting.</p>
+  <p>You can then start a new instance and drop the world back into its <code>saves/</code>. Minecraft will pick it up.</p>
+
+  <h2>If deletion fails</h2>
+  <p>Rare, but it happens, usually because a file is still locked by another process. The modal shows an error. Close Minecraft if it's running (it locks files in the instance), close any text editors that have files open from the instance, and try again. As a last resort, exit GDLauncher entirely, manually delete the instance folder via your OS file manager, and on next launch GDLauncher will clean up the orphaned database row.</p>
+</GuideLayout>

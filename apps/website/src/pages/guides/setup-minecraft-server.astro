@@ -1,0 +1,60 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="How to Set Up a Minecraft Server in GDLauncher"
+  description="Create and run a Minecraft server (vanilla or modded) from GDLauncher with EULA acceptance, live console, and metrics, all from the same launcher you use to play."
+  keywords="minecraft server setup, gdlauncher server, run minecraft server, server hosting, modded minecraft server, server eula, server console"
+  lastUpdated="May 2026"
+  howTo={{
+    totalTimeIso: "PT5M",
+    steps: [
+      { name: "Switch the Library to Servers mode", text: "Open the Library page and switch the mode toggle from Instances to Servers. The + button in the Library toolbar (and the right-click menu) now creates servers instead of instances." },
+      { name: "Create a server", text: "Click + → Create Server. Give it a name, pick a Minecraft version, optionally pick a mod loader (Forge, NeoForge, Fabric, Quilt) and a loader version. Default port is 25565; pick a different one if you'll run multiple servers." },
+      { name: "Wait for install", text: "GDLauncher downloads the server jar (vanilla, or the loader's server installer for modded), runs the mod-loader installer if needed, and reports the server as Stopped when ready to start." },
+      { name: "Accept the EULA", text: "Click Start. The first launch is blocked until you accept Mojang's EULA. GDLauncher pops a modal with a link to the EULA text; tick the checkbox and proceed. The server then walks through Installing → Starting → Running." },
+      { name: "Use the console", text: "Once Running, the Console tab shows live server output. The input field at the bottom sends commands to the server, the same ones you'd type at a vanilla server console (op, whitelist add, save-all, stop, etc.)." }
+    ]
+  }}
+>
+  <h2>What's different about server instances</h2>
+  <p>In GDLauncher, a Minecraft server is its own type of instance, not a setting on a regular client instance. Servers don't render the game; they run the headless backend that clients connect to. The state machine is server-specific too: Stopped → Installing → Starting → Running → Stopping → Deleting.</p>
+  <p>You can have client instances and server instances side by side. A common pattern: one server for friends to join, plus a client instance pointing at <code>localhost</code> for you to test changes.</p>
+
+  <h2>The EULA modal</h2>
+  <p>Mojang requires you to accept their EULA before running any Minecraft server. GDLauncher handles this by intercepting the first failed start, showing the modal, and writing <code>eula=true</code> to <code>eula.txt</code> in the server folder when you accept. Without acceptance, the server refuses to launch.</p>
+  <p>This is the same EULA you accepted to play Minecraft, it's a server-side re-confirmation that you understand the rules. If you ever need to revoke (rare), edit <code>server/eula.txt</code> directly.</p>
+
+  <h2>Connecting to your server</h2>
+  <p>From the same machine: in your Minecraft client, add a server with address <code>localhost</code> (or <code>127.0.0.1</code>). The port is whatever you set, default 25565.</p>
+  <p>From another machine on the same LAN: use the host machine's local IP (e.g. <code>192.168.1.50</code>). Make sure the host machine's firewall allows incoming connections on the server port.</p>
+  <p>From the open internet: needs router port forwarding (forward the server port to your host machine) plus your public IP, which changes with most home connections. Tools like Playit.gg or ngrok do this without router changes, at the cost of latency.</p>
+
+  <h2>Server tabs</h2>
+  <p>Each server has five tabs:</p>
+  <ul>
+    <li><strong>Console</strong>: live server output, plus an input field at the bottom for commands.</li>
+    <li><strong>Addons</strong>: mod management (only shown when the server has a mod loader).</li>
+    <li><strong>Properties</strong>: server.properties editor (MOTD, max players, online mode, view distance, etc.).</li>
+    <li><strong>Players</strong>: connected players, ops, whitelist, banned players.</li>
+    <li><strong>Settings</strong>: name, port, Java memory, modloader version, deletion.</li>
+  </ul>
+
+  <h2>Console commands</h2>
+  <p>The Console tab's input field works like a vanilla server console:</p>
+  <ul>
+    <li><code>op &lt;player&gt;</code>: grant op</li>
+    <li><code>whitelist add &lt;player&gt;</code>: whitelist a player</li>
+    <li><code>save-all</code>: flush world to disk</li>
+    <li><code>stop</code>: clean shutdown</li>
+    <li><code>say &lt;message&gt;</code>: broadcast to all players</li>
+  </ul>
+
+  <h2>Modded servers</h2>
+  <p>If you picked a mod loader at creation, GDLauncher installs the loader's server distribution (Forge, NeoForge, Fabric, or Quilt). Mods go into <code>server/mods/</code>, same as for client instances. The Addons tab on the server instance manages them, exactly like clients.</p>
+  <p>For best compatibility, run the same mods on the client and the server. Client-only mods (Sodium, shaders) shouldn't be on the server; server-only mods (admin tools, performance monitors) shouldn't be on clients. Many large modpacks ship as both a client pack and a server pack, install the server pack as the server instance via Import.</p>
+
+  <h2>RAM and performance</h2>
+  <p>Servers default to 2 GB. Modded servers and high-player-count servers want more, see <a href="/guides/allocate-server-ram">How to Allocate More RAM to a Minecraft Server</a> for the slider and recommended values.</p>
+</GuideLayout>

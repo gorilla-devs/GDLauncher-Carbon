@@ -1,0 +1,217 @@
+---
+/**
+ * LocaleSwitcher - dropdown that lets the user jump between localized
+ * versions of the current page. Driven by Astro's i18n config so it stays
+ * in sync with the locale list automatically.
+ *
+ * If the current page is localized (has a `[locale]/` counterpart), each
+ * link preserves the path: visiting /guides/install-fabric in JA goes to
+ * /ja/guides/install-fabric. If the current page isn't localized (e.g.
+ * /privacy-statement, /vs/...), the links fall back to the locale's
+ * homepage so the user lands somewhere valid in their chosen language
+ * instead of hitting a 404.
+ */
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  LOCALE_LABELS,
+  getLocaleFromUrl,
+  pathWithoutLocale,
+  localizedPath,
+  isPathLocalized,
+  useTranslations,
+  type Locale,
+} from "../lib/i18n"
+
+const currentLocale = getLocaleFromUrl(Astro.url.pathname)
+const basePath = pathWithoutLocale(Astro.url.pathname)
+const pathIsLocalized = isPathLocalized(basePath)
+const t = useTranslations(currentLocale)
+---
+
+<div class="relative inline-block locale-switcher">
+  <button
+    type="button"
+    class="flex items-center gap-2 px-3 py-2 rounded-lg bg-darkSlate-700 hover:bg-darkSlate-600 transition-colors text-sm font-medium text-lightSlate-100"
+    aria-haspopup="listbox"
+    aria-expanded="false"
+    aria-label={t("nav.language")}
+    data-locale-switcher-trigger
+  >
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z" />
+    </svg>
+    <span>{LOCALE_LABELS[currentLocale]}</span>
+    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  </button>
+
+  <ul
+    role="listbox"
+    aria-label={t("nav.language")}
+    class="locale-menu list-none hidden absolute left-0 md:left-auto md:right-0 mt-2 min-w-[14rem] bg-darkSlate-700 border border-darkSlate-600 rounded-lg shadow-lg overflow-hidden z-50"
+    data-locale-switcher-menu
+  >
+    {LOCALES.map((loc) => {
+      const isCurrent = loc === currentLocale
+      const target = pathIsLocalized ? basePath : "/"
+      const href = localizedPath(target, loc as Locale)
+      return (
+        <li role="none">
+          <a
+            role="option"
+            href={href}
+            hreflang={loc === DEFAULT_LOCALE ? "en" : loc}
+            aria-current={isCurrent ? "page" : undefined}
+            class={`block px-4 py-2.5 text-sm transition-colors ${
+              isCurrent
+                ? "bg-primary-500/20 text-primary-300 font-medium"
+                : "text-lightSlate-100 hover:bg-darkSlate-600"
+            }`}
+          >
+            {LOCALE_LABELS[loc]}
+          </a>
+        </li>
+      )
+    })}
+  </ul>
+</div>
+
+<script>
+  // The setup runs on initial load AND on every view-transition swap, so the
+  // freshly-injected DOM nodes get their listeners. Trigger handlers are
+  // tagged idempotently so re-running on the same node is safe.
+  function getOptions(menu: HTMLElement): HTMLAnchorElement[] {
+    return Array.from(menu.querySelectorAll<HTMLAnchorElement>('a[role="option"]'))
+  }
+
+  function openMenu(trigger: HTMLButtonElement, menu: HTMLElement) {
+    // Close every other open switcher first.
+    document
+      .querySelectorAll<HTMLElement>("[data-locale-switcher-menu]")
+      .forEach((m) => {
+        if (m !== menu) m.classList.add("hidden")
+      })
+    document
+      .querySelectorAll<HTMLButtonElement>("[data-locale-switcher-trigger]")
+      .forEach((t) => {
+        if (t !== trigger) t.setAttribute("aria-expanded", "false")
+      })
+    menu.classList.remove("hidden")
+    trigger.setAttribute("aria-expanded", "true")
+  }
+
+  function closeMenu(trigger: HTMLButtonElement, menu: HTMLElement) {
+    menu.classList.add("hidden")
+    trigger.setAttribute("aria-expanded", "false")
+  }
+
+  function focusOption(menu: HTMLElement, index: number) {
+    const options = getOptions(menu)
+    if (options.length === 0) return
+    const i = ((index % options.length) + options.length) % options.length
+    options[i].focus()
+  }
+
+  function setup() {
+    const triggers = document.querySelectorAll<HTMLButtonElement>(
+      "[data-locale-switcher-trigger]"
+    )
+    for (const trigger of triggers) {
+      if (trigger.dataset.lsInit === "1") continue
+      trigger.dataset.lsInit = "1"
+
+      const menu = trigger.parentElement?.querySelector<HTMLElement>(
+        "[data-locale-switcher-menu]"
+      )
+      if (!menu) continue
+
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation()
+        const willOpen = menu.classList.contains("hidden")
+        if (willOpen) openMenu(trigger, menu)
+        else closeMenu(trigger, menu)
+      })
+
+      // Keyboard: ArrowDown / ArrowUp / Home / End from the trigger open the
+      // menu and focus the appropriate option, matching the WAI-ARIA listbox
+      // pattern. Enter / Space already work via native button click.
+      trigger.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault()
+          openMenu(trigger, menu)
+          const options = getOptions(menu)
+          if (options.length === 0) return
+          // Start on the currently-selected locale if it exists, else first/last.
+          const currentIdx = options.findIndex((o) => o.getAttribute("aria-current") === "page")
+          if (e.key === "ArrowDown") focusOption(menu, currentIdx >= 0 ? currentIdx : 0)
+          else focusOption(menu, currentIdx >= 0 ? currentIdx : options.length - 1)
+        } else if (e.key === "Home" || e.key === "End") {
+          e.preventDefault()
+          openMenu(trigger, menu)
+          focusOption(menu, e.key === "Home" ? 0 : getOptions(menu).length - 1)
+        }
+      })
+
+      // Menu-level keyboard nav: arrows cycle, Home/End jump, Escape returns
+      // focus to the trigger. Enter is the native <a> click.
+      menu.addEventListener("keydown", (e) => {
+        const options = getOptions(menu)
+        const currentIdx = options.indexOf(document.activeElement as HTMLAnchorElement)
+        if (e.key === "ArrowDown") {
+          e.preventDefault()
+          focusOption(menu, currentIdx + 1)
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault()
+          focusOption(menu, currentIdx - 1)
+        } else if (e.key === "Home") {
+          e.preventDefault()
+          focusOption(menu, 0)
+        } else if (e.key === "End") {
+          e.preventDefault()
+          focusOption(menu, options.length - 1)
+        } else if (e.key === "Escape") {
+          e.preventDefault()
+          closeMenu(trigger, menu)
+          trigger.focus()
+        }
+      })
+    }
+  }
+
+  function closeAll() {
+    document
+      .querySelectorAll<HTMLElement>("[data-locale-switcher-menu]")
+      .forEach((m) => m.classList.add("hidden"))
+    document
+      .querySelectorAll<HTMLButtonElement>("[data-locale-switcher-trigger]")
+      .forEach((t) => t.setAttribute("aria-expanded", "false"))
+  }
+
+  // Document-level handlers attach exactly once. They keep working across
+  // view transitions because the listener stays bound to `document`, which
+  // persists, while the switcher DOM nodes get re-resolved each fire.
+  if (!(window as unknown as { __lsDocBound?: boolean }).__lsDocBound) {
+    ;(window as unknown as { __lsDocBound?: boolean }).__lsDocBound = true
+
+    document.addEventListener("click", (e) => {
+      const target = e.target as Node | null
+      if (!target) return
+      const switchers = document.querySelectorAll<HTMLElement>(".locale-switcher")
+      let inside = false
+      switchers.forEach((s) => {
+        if (s.contains(target)) inside = true
+      })
+      if (!inside) closeAll()
+    })
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAll()
+    })
+  }
+
+  document.addEventListener("astro:page-load", setup)
+</script>

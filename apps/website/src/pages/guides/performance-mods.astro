@@ -1,0 +1,74 @@
+---
+import GuideLayout from "../../components/GuideLayout.astro"
+---
+
+<GuideLayout
+  title="Minecraft Performance Mods Guide"
+  description="The performance mods that actually help: Sodium, Lithium, FerriteCore, Iris, and the Forge/NeoForge equivalents."
+  keywords="minecraft performance mods, fps mods, minecraft optimization, sodium, optifine alternative, boost minecraft fps, lag fix minecraft"
+  lastUpdated="April 2026"
+  howTo={{
+    totalTimeIso: "PT5M",
+    steps: [
+      { name: "Pick a compatible instance", text: "Sodium, Lithium, and Iris originated on Fabric. Most have Forge/NeoForge ports now (Embeddium, Radium, etc.). Create or open an instance with the matching loader." },
+      { name: "Install the core trio", text: "In the Addons tab: Sodium (chunk rendering), Lithium (game logic), and FerriteCore (memory). These three give the biggest FPS gain and don't change gameplay." },
+      { name: "Add Iris for shaders (optional)", text: "Iris pairs with Sodium and replaces OptiFine for shader support. Install it from the Addons browser. Most modern shader packs target Iris." },
+      { name: "Tune in-game settings", text: "Lower render distance to 8–12 chunks, set particles to Minimal, and try Fast graphics. F3 shows live FPS so you can see what helps." },
+      { name: "Allocate enough RAM", text: "Heavy modpacks need 6–8 GB; vanilla + performance mods is fine on 2–4 GB. See the 'Allocate More RAM' guide." }
+    ]
+  }}
+>
+  <h2>What performance mods actually do</h2>
+  <p>
+    Vanilla Minecraft's chunk rendering is single-threaded and dated. Performance mods replace or patch the slow parts: better chunk meshing, fewer redundant memory allocations, multithreaded tasks where it's safe. On most systems you'll see a clear FPS gain; exact numbers depend on your CPU, GPU, render distance, and how many mods you've stacked on top.
+  </p>
+
+  <h2>The core trio (Fabric / Quilt / NeoForge)</h2>
+
+  <h3>Sodium</h3>
+  <p>
+    Replaces the chunk renderer. Far and away the biggest FPS win in most setups. Adds a redesigned video-settings screen with the new options.
+  </p>
+
+  <h3>Lithium</h3>
+  <p>
+    Optimizes game logic, entity AI, hopper interactions, block ticks. No gameplay changes. Helps both clients and servers.
+  </p>
+
+  <h3>FerriteCore</h3>
+  <p>
+    Cuts memory use by deduplicating block-state and model data. Smaller heap means shorter and less frequent GC pauses, which is what most "lag spikes" actually are.
+  </p>
+
+  <h2>Useful extras</h2>
+  <p>
+    <strong>ModernFix</strong> bundles a long list of memory and startup patches. <strong>Entity Culling</strong> skips rendering entities whose bounding boxes aren't visible. <strong>ImmediatelyFast</strong> speeds up text and GUI rendering. <strong>Krypton</strong> trims networking overhead in multiplayer. <strong>More Culling</strong> extends culling to block entities and particles.
+  </p>
+  <p>
+    You don't need all of these. Add the ones that target your specific bottleneck.
+  </p>
+
+  <h2>Forge and NeoForge equivalents</h2>
+  <p>
+    Most of the Fabric stack has been ported. <strong>Embeddium</strong> is the Forge/NeoForge fork of Sodium. <strong>Radium</strong> is Lithium for Forge/NeoForge. FerriteCore and ModernFix already support all four loaders. OptiFine still exists, but it conflicts with many modern mods and Sodium-based stacks generally outperform it now.
+  </p>
+
+  <h2>If you'd rather not pick mods individually</h2>
+  <p>
+    Install a performance-only modpack. <strong>Fabulously Optimized</strong> bundles Sodium + Iris + a long tail of patches and aims to match or beat OptiFine in features. <strong>Simply Optimized</strong> is a smaller alternative. Both are on Modrinth.
+  </p>
+
+  <h2>In-game settings that help</h2>
+  <p>
+    Render distance 8–12 chunks is plenty for normal play. Fast graphics, particles Minimal, clouds Fast or Off. Disable VSync unless you see tearing. Sodium adds its own performance tab with extra toggles.
+  </p>
+  <p>
+    System-side: update GPU drivers, close other heavy apps, and disable overlays (Discord, Steam, GeForce Experience), they regularly cost a few FPS.
+  </p>
+
+  <h2>Compatibility notes</h2>
+  <p>
+    Sodium and OptiFine can't run together, they hook the same parts of the renderer. Iris requires Sodium. Most other performance mods compose fine with each other.
+  </p>
+
+</GuideLayout>
