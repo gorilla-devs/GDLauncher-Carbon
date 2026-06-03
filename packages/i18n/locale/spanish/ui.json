@@ -36,5 +36,11 @@
   "_trn_last_played": "Última vez jugada",
   "_trn_last_updated": "Última actualización",
   "_trn_game_version": "Versión del juego",
-  "_trn_modloader": "Cargador de mods"
+  "_trn_modloader": "Cargador de mods",
+  "_trn_manual": "Manual",
+  "_trn_folders": "Carpetas",
+  "_trn_by_name": "Por nombre",
+  "_trn_by_last_played": "Por última vez jugado",
+  "_trn_by_most_played": "Por más jugado",
+  "_trn_by_date_created": "Por fecha de creación"
 }

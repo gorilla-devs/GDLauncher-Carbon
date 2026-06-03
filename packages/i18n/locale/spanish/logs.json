@@ -18,5 +18,11 @@
   "_trn_columns.source_kind": "Tipo de fuente",
   "_trn_columns.thread_name": "Nombre del hilo",
   "_trn_columns.level": "Nivel de registro",
-  "_trn_font_size": "Tamaño de fuente"
+  "_trn_font_size": "Tamaño de fuente",
+  "_trn_open_in_folder": "Abrir en la carpeta",
+  "_trn_server_not_running": "El servidor no está en ejecución",
+  "_trn_waiting_for_output": "Esperando salida...",
+  "_trn_type_command": "Escribe un comando...",
+  "_trn_start_server_to_send": "Inicia el servidor para enviar comandos",
+  "_trn_send": "Enviar"
 }

@@ -65,8 +65,6 @@
   "_trn_privacy": "Privacidad",
   "_trn_language": "Idioma",
   "_trn_java": "Java",
-  "_trn_general": "General",
-  "_trn_appearance": "Apariencia",
   "_trn_confirm_change_confirm_button": "Sí, cambiar ruta",
   "_trn_confirm_change_cancel_button": "No, cancelar",
   "_trn_documents_title": "Documentos",
@@ -76,5 +74,10 @@
   "_trn_change_email": "Cambiar correo",
   "_trn_custom_commands": "Comandos personalizados",
   "_trn_runtime_path": "Ruta de tiempo de ejecución",
-  "_trn_expert_user_mod": "Modo de usuario experto"
+  "_trn_expert_user_mod": "Modo de usuario experto",
+  "_trn_cache_storage_title": "Tamaño de la caché",
+  "_trn_cache_storage_text": "GDLauncher almacena en caché las respuestas de las plataformas de mods y los metadatos de Minecraft para acelerar la navegación y los inicios. Si la caché crece de forma inesperada, limpiarla recuperará espacio en disco; el contenido en caché se reconstruye automáticamente según sea necesario.",
+  "_trn_cache_storage_clean_up": "Limpiar",
+  "_trn_cache_storage_bloat_banner_title": "Tu base de datos del launcher está usando {{size}}",
+  "_trn_cache_storage_bloat_banner_desc": "Eso está muy por encima de lo normal. Limpiarla liberará espacio en disco sin afectar a tus instancias instaladas."
 }

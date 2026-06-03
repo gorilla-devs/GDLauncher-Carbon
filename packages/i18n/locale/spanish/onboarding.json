@@ -31,5 +31,7 @@
   "_trn_select_all": "Seleccionar todo",
   "_trn_introduction": "Introducción",
   "_trn_handle_preferences": "Gestionar preferencias",
-  "_trn_import_instances": "Importar instancias"
+  "_trn_import_instances": "Importar instancias",
+  "_trn_search_syntax_share": "Antepón $ a un código (p. ej., $ABC1234), o pega un enlace de compartir (gdl.gg/i/…, gdlauncher.com/instance-share/…, gdlauncher://share/…)",
+  "_trn_search_syntax_share_label": "Instancia compartida"
 }

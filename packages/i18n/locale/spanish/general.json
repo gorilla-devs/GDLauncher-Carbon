@@ -37,5 +37,9 @@
   "_trn_instance_unpair_confirmation": "Desemparejar elimina el enlace entre tu instancia y el modpack. Esto significa que no podrás cambiar la versión del modpack más. Esta acción no se puede deshacer.",
   "_trn_text": "Texto",
   "_trn_select_image": "Seleccionar imagen",
-  "_trn_delete": "Eliminar"
+  "_trn_delete": "Eliminar",
+  "_trn_edit": "Editar",
+  "_trn_ok": "Aceptar",
+  "_trn_field_required": "Este campo es obligatorio",
+  "_trn_dismiss": "Descartar"
 }

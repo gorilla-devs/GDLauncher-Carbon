@@ -18,7 +18,7 @@
   "_trn_modloaders": "Cargadores de mods",
   "_trn_no_modloaders_found": "No se encontraron cargadores de mods",
   "_trn_environment": "Entorno",
-  "_trn_sort_by": "Ordenar: {{sort}}",
+  "_trn_sort_by": "Ordenar por",
   "_trn_relevance": "Relevancia",
   "_trn_downloads": "Descargas",
   "_trn_last_updated": "Última actualización",
@@ -48,7 +48,10 @@
   "_trn_sort_order": "Orden: {{order}}",
   "_trn_platform_filters": "Filtros de {{platform}}",
   "_trn_search": "Buscar",
-  "_trn_sort_by": "Ordenar por",
   "_trn_group_by": "Agrupar por",
-  "_trn_direct": "Directo"
+  "_trn_direct": "Directo",
+  "_trn_search_servers": "Buscar servidores",
+  "_trn_context_instance": "Instancia",
+  "_trn_context_server": "Servidor",
+  "_trn_share": "Compartir"
 }

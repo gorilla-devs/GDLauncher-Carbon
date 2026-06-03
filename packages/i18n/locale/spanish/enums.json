@@ -18,5 +18,6 @@
   "_trn_entity.multimc": "MultiMC",
   "_trn_entity.technic": "Technic",
   "_trn_entity.atlauncher": "ATLauncher",
-  "_trn_entity.prismlauncher": "PrismLauncher"
+  "_trn_entity.prismlauncher": "PrismLauncher",
+  "_trn_entity.gdlpack": "GDLPack"
 }
