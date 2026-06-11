@@ -30,7 +30,7 @@ use std::ffi::OsStr;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::SeekFrom;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic;
 use std::sync::atomic::AtomicI32;
@@ -1212,6 +1212,42 @@ impl ManagerRef<'_, MetaCacheManager> {
         })
     }
 
+    /// Build a parse result for a world directory. Worlds are directories, not
+    /// archives, so they get stable name-derived hashes instead of content
+    /// hashes, letting rescans dedupe to the same metadata row.
+    async fn world_dir_parse_result(
+        &self,
+        worlds_dir_path: &Path,
+        dir_name: &str,
+    ) -> anyhow::Result<ModFileParseResult> {
+        let dir_meta = tokio::fs::metadata(worlds_dir_path.join(dir_name)).await?;
+
+        let mut sha512 = Sha512::new();
+        sha512.update(b"gdl-world-dir:");
+        sha512.update(dir_name.as_bytes());
+
+        let mut sha1 = Sha1::new();
+        sha1.update(b"gdl-world-dir:");
+        sha1.update(dir_name.as_bytes());
+
+        Ok(ModFileParseResult {
+            sha512: sha512.finalize().into(),
+            sha1: sha1.finalize().into(),
+            murmur2: 0,
+            content_len: dir_meta.len() as usize,
+            meta: Some(super::mods::ModFileMetadata {
+                modid: None,
+                name: Some(dir_name.to_string()),
+                version: None,
+                description: None,
+                authors: None,
+                modloaders: Vec::new(),
+                logo_file: None,
+            }),
+            image_data: None,
+        })
+    }
+
     /// Find or create a ModMetadata row for the given parse result. Entity-independent.
     async fn ensure_mod_metadata(
         &self,
@@ -1322,9 +1358,16 @@ impl ManagerRef<'_, MetaCacheManager> {
         enabled: bool,
         addon_type: String,
     ) -> anyhow::Result<String> {
-        let result = self
-            .hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled)
-            .await?;
+        let is_world = crate::domain::instance::AddonType::from_db_string(&addon_type)
+            == Some(crate::domain::instance::AddonType::Worlds);
+
+        let result = if is_world {
+            self.world_dir_parse_result(mods_dir_path, &mod_filename)
+                .await?
+        } else {
+            self.hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled)
+                .await?
+        };
         let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
 
         self.app
@@ -1726,7 +1769,6 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             scanning_subtask.complete_items();
 
             let mut has_outdated_entries = false;
-            let files_needing_update_count = modpaths.len();
 
             if let Ok(Ok(cached_entries)) = cached_entries.await {
                 has_outdated_entries = cached_entries.len() != modpaths.len();
@@ -1799,15 +1841,27 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             pathbuf.push(&root_path);
                             pathbuf.push(&addon_subpath);
 
-                            app.meta_cache_manager()
+                            let stored = match app
+                                .meta_cache_manager()
                                 .cache_mod_file_unchecked(
                                     instance_id,
                                     &pathbuf,
-                                    filename,
+                                    filename.clone(),
                                     enabled,
                                     addon_type_str,
                                 )
-                                .await?;
+                                .await
+                            {
+                                Ok(_) => true,
+                                Err(e) => {
+                                    // One bad entry must not poison the rest of the scan.
+                                    error!(
+                                        { error = ?e },
+                                        "could not store scan result for `{filename}` of instance {instance_id} in db"
+                                    );
+                                    false
+                                }
+                            };
 
                             if let Some(finalization_subtask) = finalization_subtask {
                                 let current_count = processed_count_clone
@@ -1819,28 +1873,21 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
                             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-                            update_notifier.send(CacheEntityId::Instance(instance_id));
+                            if stored {
+                                update_notifier.send(CacheEntityId::Instance(instance_id));
+                            }
 
-                            Ok(())
+                            stored
                         }
                     });
 
-            let r = futures::future::join_all(entry_futures)
-                .await
-                .into_iter()
-                .collect::<anyhow::Result<()>>();
+            let results = futures::future::join_all(entry_futures).await;
 
             if let Some(finalization_subtask) = finalization_subtask {
                 finalization_subtask.complete_items();
             }
 
-            let success_count = match &r {
-                Ok(_) => files_needing_update_count,
-                Err(e) => {
-                    error!({ error = ?e }, "could not store mod scan results for instance {instance_id} in db");
-                    0
-                }
-            };
+            let success_count = results.into_iter().filter(|&stored| stored).count();
 
             if has_outdated_entries {
                 let _ = update_notifier.send(CacheEntityId::Instance(instance_id));
