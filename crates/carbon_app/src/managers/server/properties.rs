@@ -4,7 +4,13 @@ use std::path::Path;
 use anyhow::{Context, Result};
 
 /// Generate a server.properties file content from server settings
-pub fn generate_properties(port: i32, motd: &str, max_players: i32, online_mode: bool) -> String {
+pub fn generate_properties(
+    port: i32,
+    motd: &str,
+    max_players: i32,
+    online_mode: bool,
+    game_version: &str,
+) -> String {
     let mut props = BTreeMap::new();
     props.insert("server-port", port.to_string());
     props.insert("motd", motd.to_string());
@@ -13,11 +19,31 @@ pub fn generate_properties(port: i32, motd: &str, max_players: i32, online_mode:
     props.insert("enable-command-block", "true".to_string());
     props.insert("spawn-protection", "0".to_string());
 
+    // Pre-1.14 servers regularly blow past the watchdog's 60s single-tick
+    // limit while generating the world on first boot, and the watchdog then
+    // kills the server. Disable it for those versions.
+    if is_pre_1_14(game_version) {
+        props.insert("max-tick-time", "-1".to_string());
+    }
+
     let mut output = String::from("#Minecraft server properties\n");
     for (key, value) in &props {
         output.push_str(&format!("{}={}\n", key, value));
     }
     output
+}
+
+/// Whether the given release version (e.g. "1.12.2") is below 1.14. Returns
+/// false for snapshots and other non-release version strings.
+fn is_pre_1_14(game_version: &str) -> bool {
+    let mut parts = game_version.split('.');
+    let (Some(major), Some(minor)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    let (Ok(major), Ok(minor)) = (major.parse::<u32>(), minor.parse::<u32>()) else {
+        return false;
+    };
+    major == 1 && minor < 14
 }
 
 /// Parse a server.properties file into a key-value map
@@ -83,4 +109,31 @@ pub async fn read_properties(path: &Path) -> Result<BTreeMap<String, String>> {
         .await
         .context("Failed to read server.properties")?;
     Ok(parse_properties(&content))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tick_watchdog_disabled_only_below_1_14() {
+        assert!(is_pre_1_14("1.7.10"));
+        assert!(is_pre_1_14("1.8"));
+        assert!(is_pre_1_14("1.12.2"));
+        assert!(is_pre_1_14("1.13.2"));
+
+        assert!(!is_pre_1_14("1.14"));
+        assert!(!is_pre_1_14("1.14.4"));
+        assert!(!is_pre_1_14("1.20.1"));
+
+        // Snapshots and other non-release strings keep the default watchdog
+        assert!(!is_pre_1_14("18w50a"));
+        assert!(!is_pre_1_14("unknown"));
+
+        let props = parse_properties(&generate_properties(25565, "motd", 20, true, "1.12.2"));
+        assert_eq!(props.get("max-tick-time").map(String::as_str), Some("-1"));
+
+        let props = parse_properties(&generate_properties(25565, "motd", 20, true, "1.20.1"));
+        assert_eq!(props.get("max-tick-time"), None);
+    }
 }

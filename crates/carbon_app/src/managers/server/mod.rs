@@ -425,8 +425,13 @@ impl ManagerRef<'_, ServerManager> {
                 .context("Failed to download server jar")?;
 
                 // Write initial server.properties
-                let props_content =
-                    properties::generate_properties(port, "A Minecraft Server", 20, true);
+                let props_content = properties::generate_properties(
+                    port,
+                    "A Minecraft Server",
+                    20,
+                    true,
+                    &game_version,
+                );
                 properties::write_properties(
                     &server_path.get_server_properties_path(),
                     &props_content,
@@ -807,8 +812,13 @@ impl ManagerRef<'_, ServerManager> {
                 // Write server.properties if not present
                 let props_path = server_path.get_server_properties_path();
                 if !props_path.exists() {
-                    let props =
-                        properties::generate_properties(port, "A Minecraft Server", 20, true);
+                    let props = properties::generate_properties(
+                        port,
+                        "A Minecraft Server",
+                        20,
+                        true,
+                        &pack_result.game_version,
+                    );
                     properties::write_properties(&props_path, &props).await?;
                 }
 
