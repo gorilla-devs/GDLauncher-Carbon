@@ -103,6 +103,8 @@ pub enum InstanceShareError {
     ShareNotFound,
     #[error("Storage quota exceeded")]
     QuotaExceeded,
+    #[error("Instance is too large to share")]
+    InstanceTooLarge,
     #[error("Maximum downloads exceeded")]
     MaxDownloadsExceeded,
     #[error("Upload timed out")]
@@ -140,6 +142,7 @@ impl crate::error::FeErrorCode for InstanceShareError {
         match self {
             Self::ShareNotFound => "SHARE_NOT_FOUND",
             Self::QuotaExceeded => "QUOTA_EXCEEDED",
+            Self::InstanceTooLarge => "INSTANCE_TOO_LARGE",
             Self::MaxDownloadsExceeded => "MAX_DOWNLOADS_EXCEEDED",
             Self::UploadTimeout => "UPLOAD_TIMEOUT",
             Self::UserNotVerified => "USER_NOT_VERIFIED",
@@ -164,6 +167,7 @@ impl InstanceShareError {
             match resp.error.code.as_str() {
                 "SHARE_NOT_FOUND" => Self::ShareNotFound,
                 "QUOTA_EXCEEDED" => Self::QuotaExceeded,
+                "INSTANCE_TOO_LARGE" => Self::InstanceTooLarge,
                 "MAX_DOWNLOADS_EXCEEDED" => Self::MaxDownloadsExceeded,
                 "UPLOAD_TIMEOUT" => Self::UploadTimeout,
                 "USER_NOT_VERIFIED" => Self::UserNotVerified,

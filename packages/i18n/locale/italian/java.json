@@ -13,6 +13,7 @@
   "_trn_setup": "Configurazione",
   "_trn_java_memory_title": "Memoria Java",
   "_trn_java_arguments_title": "Argomenti Java",
+  "_trn_java_arguments_hint": "Separa gli argomenti con uno spazio. Racchiudi tra virgolette doppie i percorsi che contengono spazi, ad es. -javaagent:\"C:\\Program Files\\agent.jar\".",
   "_trn_reset_java_args": "Ripristina",
   "_trn_java": "Java",
   "_trn_all_versions": "Tutte le Versioni",

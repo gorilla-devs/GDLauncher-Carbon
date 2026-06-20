@@ -301,7 +301,7 @@ pub async fn process_minecraft(
         instance_path.get_resources_path(),
     )
     .await
-    .unwrap();
+    .context("Failed to resolve assets directory")?;
 
     for modloader in version.modloaders.iter() {
         let instance_path = instance_path.clone();

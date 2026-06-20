@@ -30,6 +30,7 @@ import { InstanceDetails, ListInstance } from "@gd/core_module/bindings"
 import {
   getInstanceImageUrl,
   getPreparingState,
+  getQueuedState,
   getRunningState
 } from "@/utils/instances"
 import DefaultImg from "/assets/images/default-instance-img.png"
@@ -224,6 +225,12 @@ const Instance = (props: { children?: any }) => {
       killInstanceMutation.mutate(parsedInstanceId)
       return
     }
+    // Already queued or preparing: ignore the click. A second launch would be rejected by the
+    // backend with a confusing "already being prepared" error toast (matches the guard used by
+    // the instance tile and the favorites bar).
+    if (isQueued() !== undefined || isPreparing() !== undefined) {
+      return
+    }
     if (
       globalStore.currentlySelectedAccount()?.status === "expired" ||
       globalStore.currentlySelectedAccount()?.status === "invalid"
@@ -251,6 +258,10 @@ const Instance = (props: { children?: any }) => {
   const isPreparing = () =>
     routeData.instanceDetails.data?.state &&
     getPreparingState(routeData.instanceDetails.data?.state)
+
+  const isQueued = () =>
+    routeData.instanceDetails.data?.state &&
+    getQueuedState(routeData.instanceDetails.data?.state)
 
   const curseforgeProjectId = () => {
     const modpack = routeData.instanceDetails.data?.modpack
@@ -587,7 +598,7 @@ const Instance = (props: { children?: any }) => {
           uppercase
           size="large"
           variant={isRunning() && "red"}
-          loading={isPreparing() !== undefined}
+          loading={isPreparing() !== undefined || isQueued() !== undefined}
           style={{
             "view-transition-name": `instance-tile-play-button`,
             contain: "layout"
@@ -706,7 +717,7 @@ const Instance = (props: { children?: any }) => {
             <Button
               size="small"
               variant={isRunning() && "red"}
-              loading={isPreparing() !== undefined}
+              loading={isPreparing() !== undefined || isQueued() !== undefined}
               onClick={handlePlay}
             >
               <Switch>

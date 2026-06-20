@@ -13,7 +13,7 @@ use crate::managers::account::gdl_account::{
 };
 use crate::managers::instance as manager;
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::instance::export::ShareInstanceProgress;
+use crate::managers::instance::export::{InstanceTooLargeError, ShareInstanceProgress};
 use crate::managers::instance::importer::ImportShareCodeProgress;
 use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
 use crate::managers::{App, AppInner, instance::importer};
@@ -854,15 +854,36 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                     tracing::error!("Share instance failed with error: {}", err);
                     guard.completed = true;
 
-                    // Try to extract error code from InstanceShareError
-                    let (code, message) = err
-                        .downcast_ref::<InstanceShareError>()
-                        .map(|e| (e.error_code().to_string(), e.to_string()))
-                        .unwrap_or_else(|| ("UNKNOWN_ERROR".to_string(), err.to_string()));
+                    let fe_error = if let Some(too_large) =
+                        err.downcast_ref::<InstanceTooLargeError>()
+                    {
+                        FEShareInstanceProgress::Error {
+                            code: "INSTANCE_TOO_LARGE".to_string(),
+                            message: too_large.to_string(),
+                            details: Some(FEShareErrorDetails::from(too_large)),
+                        }
+                    } else if let Some(share_err) = err.downcast_ref::<InstanceShareError>() {
+                        FEShareInstanceProgress::Error {
+                            code: share_err.error_code().to_string(),
+                            message: share_err.to_string(),
+                            details: None,
+                        }
+                    } else {
+                        FEShareInstanceProgress::Error {
+                            code: "UNKNOWN_ERROR".to_string(),
+                            message: err.to_string(),
+                            details: None,
+                        }
+                    };
 
+                    // Delivered as a normal `message` event (not a named
+                    // `error` event): the frontend's EventSource reserves the
+                    // `error` event for its own connection-level failures, so
+                    // an app error sent under that name collides with native
+                    // errors and can be dropped. On the default stream
+                    // `onmessage` always sees it.
                     yield Ok(axum::response::sse::Event::default()
-                        .event("error")
-                        .json_data(FEShareInstanceProgress::Error { code, message })
+                        .json_data(fe_error)
                         .unwrap());
                 }
             };
@@ -2402,7 +2423,47 @@ struct ShareInstanceQuery {
 enum FEShareInstanceProgress {
     Progress(i32),
     Finished(String),
-    Error { code: String, message: String },
+    Error {
+        code: String,
+        message: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        details: Option<FEShareErrorDetails>,
+    },
+}
+
+/// Extra machine-readable context for a share failure. Currently only set for
+/// `INSTANCE_TOO_LARGE`, so the UI can show the size, the cap, and which
+/// folders are responsible.
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEShareErrorDetails {
+    total_bytes: f64,
+    limit_bytes: f64,
+    largest_folders: Vec<FEShareFolderSize>,
+}
+
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+struct FEShareFolderSize {
+    name: String,
+    bytes: f64,
+}
+
+impl From<&InstanceTooLargeError> for FEShareErrorDetails {
+    fn from(err: &InstanceTooLargeError) -> Self {
+        Self {
+            total_bytes: err.total_bytes as f64,
+            limit_bytes: err.limit_bytes as f64,
+            largest_folders: err
+                .largest_folders
+                .iter()
+                .map(|f| FEShareFolderSize {
+                    name: f.name.clone(),
+                    bytes: f.bytes as f64,
+                })
+                .collect(),
+        }
+    }
 }
 
 impl From<ShareInstanceProgress> for FEShareInstanceProgress {

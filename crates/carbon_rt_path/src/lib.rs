@@ -409,22 +409,40 @@ impl<T: tempentry::TempEntryType> TempEntry<T> {
     }
 
     pub async fn try_rename_or_move(self, path: impl AsRef<Path>) -> anyhow::Result<()> {
-        let res = tokio::fs::rename(&*self, &path).await;
+        let dest = path.as_ref();
 
-        if let Err(err) = &res {
-            tokio::fs::copy(&*self, &path).await.with_context(|| {
-                format!(
-                    "failed to copy {} to {}",
-                    (&*self).display(),
-                    path.as_ref().display(),
-                )
-            })?;
+        if tokio::fs::rename(&*self, dest).await.is_ok() {
+            return Ok(());
+        }
 
-            if self.is_dir() {
-                tokio::fs::remove_dir_all(&*self).await?;
-            } else {
-                tokio::fs::remove_file(&*self).await?;
+        // rename failed (typically EXDEV: the temp source and the destination live on different
+        // filesystems). Stage the copy as a sibling temp file in the destination directory and
+        // rename it into place, so the publish stays atomic — a crash mid-copy cannot leave a
+        // partially written destination. (Only files reach here; tokio::fs::copy is file-only.)
+        let staging = match dest.file_name() {
+            Some(name) => {
+                let mut staged = name.to_os_string();
+                staged.push(".__gdl_xdev~");
+                dest.with_file_name(staged)
             }
+            None => anyhow::bail!("destination path has no file name: {}", dest.display()),
+        };
+
+        tokio::fs::copy(&*self, &staging).await.with_context(|| {
+            format!(
+                "failed to copy {} to {}",
+                (&*self).display(),
+                staging.display(),
+            )
+        })?;
+        tokio::fs::rename(&staging, dest).await.with_context(|| {
+            format!("failed to move {} to {}", staging.display(), dest.display())
+        })?;
+
+        if self.is_dir() {
+            tokio::fs::remove_dir_all(&*self).await?;
+        } else {
+            tokio::fs::remove_file(&*self).await?;
         }
 
         Ok(())

@@ -96,9 +96,36 @@ impl PersistenceManager {
         }
     }
 }
+/// Maximum time a user-configured pre/post-launch hook may run before it is killed. Generous
+/// enough for real setup scripts, but bounds a hook that never exits so it cannot wedge the
+/// launch (or, for a pre-launch hook, the whole launch queue) until the app is restarted.
+const HOOK_TIMEOUT: Duration = Duration::from_secs(300);
+
 type InstanceCallback = Box<
     dyn FnOnce(&Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
 >;
+
+/// Clamp the stored i32 heap settings (MB) into the u16 the JVM args use, saturating instead of
+/// wrapping: a raw `as u16` cast would turn e.g. 66000 MB into 464 MB and silently hand the JVM
+/// a tiny heap.
+fn clamp_heap_mb(xms: i32, xmx: i32) -> (u16, u16) {
+    (
+        xms.clamp(0, u16::MAX as i32) as u16,
+        xmx.clamp(0, u16::MAX as i32) as u16,
+    )
+}
+
+/// Split a user-configured hook command line into program + arguments. shlex uses POSIX
+/// backslash escaping, so on Windows a path like `C:\tools\setup.bat` would lose its separators
+/// (or fail to parse on a trailing one); escape backslashes first there so they survive the
+/// split, mirroring how the wrapper command is handled in `launch_minecraft`.
+fn split_hook_command(raw: &str) -> Option<Vec<String>> {
+    #[cfg(target_os = "windows")]
+    let escaped = raw.replace('\\', "\\\\");
+    #[cfg(target_os = "windows")]
+    let raw: &str = &escaped;
+    shlex::split(raw)
+}
 
 impl ManagerRef<'_, InstanceManager> {
     /// Resolve the effective memory (xms, xmx) for an instance.
@@ -120,7 +147,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .settings_manager()
                 .get_settings()
                 .await
-                .map(|c| (c.xms as u16, c.xmx as u16)),
+                .map(|c| clamp_heap_mb(c.xms, c.xmx)),
         }
     }
 
@@ -179,7 +206,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .settings_manager()
                 .get_settings()
                 .await
-                .map(|c| (c.xms as u16, c.xmx as u16))?,
+                .map(|c| clamp_heap_mb(c.xms, c.xmx))?,
         };
 
         let global_java_args = match config.game_configuration.global_java_args {
@@ -340,34 +367,47 @@ impl ManagerRef<'_, InstanceManager> {
             None => None,
         };
 
-        let result = app.instance_manager().list_mods(instance_id, None).await?;
-        let msg = format!(
-            "Mods ({} enabled / {} disabled): {}",
-            result.iter().filter(|mod_| mod_.enabled).count(),
-            result.iter().filter(|mod_| !mod_.enabled).count(),
-            result.into_iter().fold(String::new(), |mut acc, mod_| {
-                acc.push_str("\n\t [");
-                if mod_.enabled {
-                    acc.push_str("x]");
-                } else {
-                    acc.push_str(" ]");
+        // Logging the mod list is best-effort: a failure to read the mod list or write the log
+        // line must not abort the launch and leave the instance stuck in Queued with no task to
+        // drive it out. The installation task spawned below is what actually drives the state.
+        match app.instance_manager().list_mods(instance_id, None).await {
+            Ok(result) => {
+                let msg = format!(
+                    "Mods ({} enabled / {} disabled): {}",
+                    result.iter().filter(|mod_| mod_.enabled).count(),
+                    result.iter().filter(|mod_| !mod_.enabled).count(),
+                    result.into_iter().fold(String::new(), |mut acc, mod_| {
+                        acc.push_str("\n\t [");
+                        if mod_.enabled {
+                            acc.push_str("x]");
+                        } else {
+                            acc.push_str(" ]");
+                        }
+
+                        acc.push(' ');
+                        acc.push_str(&mod_.filename);
+
+                        acc
+                    })
+                );
+
+                if let Some(file) = file.as_mut() {
+                    if let Some(log) = log.as_ref() {
+                        log.send_modify(|log| {
+                            log.add_entry(LogEntry::system_message(msg.clone()));
+                        });
+                    }
+                    if let Err(e) = file
+                        .write_all(format_message_as_log4j_event(&msg).as_bytes())
+                        .await
+                    {
+                        tracing::warn!({ error = ?e }, "Failed to write mod list to log file");
+                    }
                 }
-
-                acc.push(' ');
-                acc.push_str(&mod_.filename);
-
-                acc
-            })
-        );
-
-        if let Some(file) = file.as_mut() {
-            if let Some(log) = log.as_ref() {
-                log.send_modify(|log| {
-                    log.add_entry(LogEntry::system_message(msg.clone()));
-                });
             }
-            file.write_all(format_message_as_log4j_event(&msg).as_bytes())
-                .await?;
+            Err(e) => {
+                tracing::warn!({ error = ?e }, "Failed to list mods for the launch log");
+            }
         }
 
         let installation_task = tokio::spawn(async move {
@@ -380,7 +420,7 @@ impl ManagerRef<'_, InstanceManager> {
             // Acquire semaphore FIRST - this is where queuing happens
             // Instance stays in Queued state until we get the lock
             let instance_manager = app.instance_manager();
-            let _download_guard = instance_manager
+            let download_guard = instance_manager
                 .persistence_manager
                 .instance_download_lock
                 .acquire()
@@ -478,7 +518,7 @@ impl ManagerRef<'_, InstanceManager> {
                 match launch_account {
                     Some(account) => {
                         if let Some(pre_launch_hook) = pre_launch_hook.filter(|v| !v.is_empty()) {
-                            let mut split = shlex::split(&pre_launch_hook)
+                            let mut split = split_hook_command(&pre_launch_hook)
                                 .ok_or_else(|| anyhow::anyhow!("Failed to parse pre-launch hook"))?
                                 .into_iter();
 
@@ -486,14 +526,23 @@ impl ManagerRef<'_, InstanceManager> {
                                 .next()
                                 .ok_or_else(|| anyhow::anyhow!("Pre-launch hook is empty"))?;
 
-                            let pre_launch_command = tokio::process::Command::new(main_command)
-                                .args(split)
-                                .current_dir(instance_path.get_data_path())
-                                .output()
-                                .await
-                                .map_err(|e| {
-                                    anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
-                                })?;
+                            let pre_launch_command = tokio::time::timeout(
+                                HOOK_TIMEOUT,
+                                tokio::process::Command::new(main_command)
+                                    .args(split)
+                                    .current_dir(instance_path.get_data_path())
+                                    .kill_on_drop(true)
+                                    .output(),
+                            )
+                            .await
+                            .map_err(|_| {
+                                anyhow::anyhow!(
+                                    "Pre-launch hook did not finish within {HOOK_TIMEOUT:?}"
+                                )
+                            })?
+                            .map_err(|e| {
+                                anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
+                            })?;
 
                             if !pre_launch_command.status.success() {
                                 return Err(anyhow::anyhow!(
@@ -551,6 +600,11 @@ impl ManagerRef<'_, InstanceManager> {
                 }
             }
             .await;
+
+            // Downloading, installing and spawning the process are done; release the global
+            // download permit before the game-session wait so other instances can be prepared
+            // and launched concurrently instead of queuing behind an already-running game.
+            drop(download_guard);
 
             match try_result {
                 Err(e) => {
@@ -721,21 +775,29 @@ impl ManagerRef<'_, InstanceManager> {
                     let _ = app.rich_presence_manager().stop_activity().await;
 
                     if let Some(post_exit_hook) = post_exit_hook.filter(|v| !v.is_empty()) {
-                        match shlex::split(&post_exit_hook)
+                        match split_hook_command(&post_exit_hook)
                             .ok_or_else(|| anyhow::anyhow!("Failed to parse post-exit hook"))
                             .map(|v| v.into_iter())
                         {
                             Ok(mut split) => match split.next() {
                                 Some(main_command) => {
-                                    let post_exit_command =
+                                    let post_exit_command = tokio::time::timeout(
+                                        HOOK_TIMEOUT,
                                         tokio::process::Command::new(main_command)
                                             .args(split)
                                             .current_dir(instance_path.get_data_path())
-                                            .output()
-                                            .await;
+                                            .kill_on_drop(true)
+                                            .output(),
+                                    )
+                                    .await;
 
                                     match post_exit_command {
-                                        Ok(post_exit_command) => {
+                                        Err(_) => {
+                                            tracing::warn!(
+                                                "Post-exit hook did not finish within {HOOK_TIMEOUT:?}; killed it"
+                                            );
+                                        }
+                                        Ok(Ok(post_exit_command)) => {
                                             if !post_exit_command.status.success() {
                                                 tracing::error!(
                                                     "Post-exit hook failed with status: {:?} \n{}",
@@ -751,7 +813,7 @@ impl ManagerRef<'_, InstanceManager> {
                                                 );
                                             }
                                         }
-                                        Err(e) => {
+                                        Ok(Err(e)) => {
                                             tracing::error!(
                                                 "Post-exit hook failed to start: {:?}",
                                                 e

@@ -13,6 +13,7 @@
   "_trn_setup": "Setup",
   "_trn_java_memory_title": "Java Memory",
   "_trn_java_arguments_title": "Java Arguments",
+  "_trn_java_arguments_hint": "Separate arguments with spaces. Wrap any path that contains spaces in double quotes, e.g. -javaagent:\"C:\\Program Files\\agent.jar\".",
   "_trn_reset_java_args": "Reset",
   "_trn_java": "Java",
   "_trn_all_versions": "All Versions",

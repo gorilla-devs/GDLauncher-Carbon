@@ -279,12 +279,13 @@ pub async fn prepare_modpack_from_mrpack(
                 }
 
                 let out_path = match file.enclosed_name() {
-                    Some(path) => secure_path_join(
-                        Path::new(&data_path),
-                        path.strip_prefix(&overrides_folder_name).expect(
-                            "valid path as we skipped paths that did not start with this prefix",
-                        ),
-                    )?,
+                    Some(path) => match path.strip_prefix(overrides_folder_name) {
+                        Ok(stripped) => secure_path_join(Path::new(&data_path), stripped)?,
+                        // The name begins with the prefix string but is not inside the
+                        // overrides directory (e.g. "overrides-extra/..."); skip it instead
+                        // of panicking on the non-matching path component.
+                        Err(_) => continue,
+                    },
                     None => continue,
                 };
 

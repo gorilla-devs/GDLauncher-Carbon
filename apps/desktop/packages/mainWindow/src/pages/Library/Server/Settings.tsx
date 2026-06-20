@@ -237,7 +237,7 @@ const Settings = (props: SettingsProps) => {
         </Row>
 
         <Row>
-          <Title>
+          <Title description={<Trans key="java:_trn_java_arguments_hint" />}>
             <Trans key="instances:_trn_server_settings_extra_args" />
           </Title>
           <RightHandSide>

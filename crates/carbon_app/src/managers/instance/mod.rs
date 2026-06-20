@@ -2371,7 +2371,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     let mut instances = instance_manager.instances.write().await;
                     instances.get_mut(&instance_id).and_then(|instance| {
                         if let InstanceType::Valid(data) = &mut instance.type_ {
-                            data.state = LaunchState::Inactive { failed_task: None };
+                            // Only the mid-delete failure path leaves the instance in Deleting.
+                            // A refusal to delete a running/preparing instance returns Err while
+                            // that live state is still set, so it must not be clobbered here (that
+                            // would drop the kill channel and orphan the running game).
+                            if matches!(data.state, LaunchState::Deleting) {
+                                data.state = LaunchState::Inactive { failed_task: None };
+                            }
                             Some(data.config.name.clone())
                         } else {
                             None
@@ -2428,6 +2434,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let InstanceType::Valid(data) = &mut instance.type_ else {
             return Err(anyhow!("Instance {instance_id} is not in a valid state"));
         };
+
+        // Refuse to delete an instance that is in use: tearing down a running or preparing
+        // instance would kill the game and remove its directory mid-session. It must be
+        // stopped first.
+        if !matches!(data.state, LaunchState::Inactive { .. }) {
+            return Err(anyhow!(
+                "Instance {instance_id} cannot be deleted while it is preparing or running; stop it first"
+            ));
+        }
 
         data.state = LaunchState::Deleting;
 
@@ -2587,7 +2602,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceIcon::RelativePath(_) => Some(1),
         };
 
-        tokio::fs::write(&tmpdir.join("instance.json"), json).await?;
+        // Write the new config inside the copied directory so the rename below carries it.
+        // Writing to `tmpdir` would place it beside the directory, where it is discarded,
+        // leaving the duplicate with the source's instance.json (its old name and metadata).
+        tokio::fs::write(&tmppath.join("instance.json"), json).await?;
 
         tokio::fs::rename(&tmppath, new_path).await?;
         let id = self
@@ -2754,27 +2772,66 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .exec()
             .await?;
 
-        // Delete all instances in the group (spawn async tasks for each)
-        let app = self.app.clone();
-        for instance in instances_in_group {
-            let instance_id = InstanceId(instance.id);
-            let app_clone = app.clone();
-            tokio::spawn(async move {
-                if let Err(e) = app_clone
-                    .instance_manager()
-                    ._delete_instance(instance_id)
-                    .await
+        // Refuse the whole operation if any contained instance is preparing or running, before
+        // deleting anything. Otherwise the per-instance delete below returns an error for the
+        // running instance (which the old code only logged) while the group row is removed
+        // anyway, orphaning that instance: it keeps running with a dangling group id and vanishes
+        // from list_groups (SQLite foreign keys are not enforced on this connection, so the group
+        // row deletes regardless of the referencing row). Mirror the single-instance guard.
+        {
+            let instances = self.instances.read().await;
+            for instance in &instances_in_group {
+                let instance_id = InstanceId(instance.id);
+                if let Some(InstanceType::Valid(data)) =
+                    instances.get(&instance_id).map(|i| &i.type_)
                 {
-                    tracing::error!("Failed to delete instance {:?}: {:?}", instance_id, e);
+                    if !matches!(data.state, LaunchState::Inactive { .. }) {
+                        bail!(
+                            "Instance group cannot be deleted while instance {instance_id} is preparing or running; stop it first"
+                        );
+                    }
                 }
-            });
+            }
         }
 
-        // Delete the group record
+        // Every instance is inactive; delete each one, awaiting so a failure aborts before the
+        // group row is removed rather than being spawned and ignored.
+        for instance in instances_in_group {
+            let instance_id = InstanceId(instance.id);
+            if let Err(e) = self
+                .app
+                .instance_manager()
+                ._delete_instance(instance_id)
+                .await
+            {
+                // _delete_instance set the instance to Deleting before it failed. Unlike the
+                // single-instance path (delete_instance), nothing here restores it, so reset it
+                // to Inactive — otherwise the UI leaves it stuck on the deleting spinner and it
+                // can be neither deleted nor played until the app restarts.
+                {
+                    let mut instances = self.instances.write().await;
+                    if let Some(instance) = instances.get_mut(&instance_id) {
+                        if let InstanceType::Valid(data) = &mut instance.type_ {
+                            if matches!(data.state, LaunchState::Deleting) {
+                                data.state = LaunchState::Inactive { failed_task: None };
+                            }
+                        }
+                    }
+                }
+                self.app.invalidate(GET_GROUPS, None);
+                self.app.invalidate(GET_ALL_INSTANCES, None);
+                return Err(e);
+            }
+        }
+
+        // Delete the group record. _delete_instance auto-removes an emptied non-default group
+        // after deleting its last instance, so the row may already be gone here; delete_many is
+        // idempotent (no error on zero rows), whereas delete() would fail with RecordNotFound on
+        // the happy path and surface a spurious error toast on a successful deletion.
         self.app
             .prisma_client
             .instance_group()
-            .delete(instance_group::UniqueWhereParam::IdEquals(*group))
+            .delete_many(vec![instance_group::id::equals(*group)])
             .exec()
             .await?;
 
@@ -3502,7 +3559,11 @@ mod test {
             get_ordered_instances(&app.prisma_client, group1).await?[..],
         );
 
-        // move 0:0 to end of group 1
+        // move 0:0 to end of group 1. group0 is then left with a single
+        // instance, which auto-dissolves: the last instance returns to the
+        // default group and the now-empty group0 is deleted.
+        let surviving_instance = group0_instances[1];
+
         app.instance_manager()
             .move_instance(group0_instances[0], InstanceMoveTarget::EndOfGroup(group1))
             .await?;
@@ -3514,7 +3575,7 @@ mod test {
             group0_instances[0],
         ];
 
-        let group0_instances = [group0_instances[1]];
+        let group0_instances: [InstanceId; 0] = [];
 
         assert_eq!(
             group0_instances[..],
@@ -3524,6 +3585,14 @@ mod test {
         assert_eq!(
             group1_instances[..],
             get_ordered_instances(&app.prisma_client, group1).await?[..],
+        );
+
+        // the dissolved group's last instance returns to the default group
+        let default_group = app.instance_manager().get_default_group().await?;
+        assert!(
+            get_ordered_instances(&app.prisma_client, default_group)
+                .await?
+                .contains(&surviving_instance)
         );
 
         Ok(())

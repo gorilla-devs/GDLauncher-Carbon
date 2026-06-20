@@ -1755,7 +1755,11 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 }
             }
 
-            let default_parallelism_approx = available_parallelism().unwrap().get() / 2;
+            // Throttle concurrent file hashing to about half the available cores, with a
+            // floor of 1 so single-core or cgroup-limited hosts still make progress; a value
+            // of 0 would make the Semaphore::acquire below block forever.
+            let default_parallelism_approx =
+                (available_parallelism().map_or(1, |n| n.get()) / 2).max(1);
 
             let rate_limiter = Arc::new(tokio::sync::Semaphore::new(default_parallelism_approx));
 

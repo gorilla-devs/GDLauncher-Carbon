@@ -19,6 +19,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  For,
   Match,
   onCleanup,
   Show,
@@ -31,6 +32,7 @@ import { MAX_DOWNLOADS_LIMIT, validateMaxDownloads } from "@/utils/validation"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import VerificationRequiredPlaceholder from "@/components/VerificationRequiredPlaceholder"
 import { getErrorCode } from "@/components/SharePreviewContent"
+import { formatBytes } from "@/utils/formatBytes"
 
 const PERMANENT_SHARE_ERROR_CODES = new Set([
   "IMAGE_REJECTED_BY_MODERATION",
@@ -46,6 +48,7 @@ const PERMANENT_SHARE_ERROR_CODES = new Set([
 // Map error codes to translation keys for share instance errors
 type ShareErrorKey =
   | "instances:_trn_share_errors.quota_exceeded"
+  | "instances:_trn_share_errors.instance_too_large"
   | "instances:_trn_share_errors.too_many_shares"
   | "instances:_trn_share_errors.not_verified"
   | "instances:_trn_share_errors.network_error"
@@ -61,6 +64,8 @@ const getShareErrorKey = (code: string | null): ShareErrorKey => {
   switch (code) {
     case "QUOTA_EXCEEDED":
       return "instances:_trn_share_errors.quota_exceeded"
+    case "INSTANCE_TOO_LARGE":
+      return "instances:_trn_share_errors.instance_too_large"
     case "TOO_MANY_ACTIVE_SHARES":
       return "instances:_trn_share_errors.too_many_shares"
     case "USER_NOT_VERIFIED":
@@ -82,6 +87,17 @@ const getShareErrorKey = (code: string | null): ShareErrorKey => {
     default:
       return "instances:_trn_share_errors.upload_failed"
   }
+}
+
+interface ShareErrorDetails {
+  totalBytes: number
+  limitBytes: number
+  largestFolders: { name: string; bytes: number }[]
+}
+
+interface ShareErrorState {
+  code: string | null
+  details?: ShareErrorDetails
 }
 
 interface Props {
@@ -112,6 +128,7 @@ function ShareInstance(props: ModalProps) {
   const [fileKey, setFileKey] = createSignal<string>()
   const [isLoading, setIsLoading] = createSignal(false)
   const [progress, setProgress] = createSignal(0)
+  const [shareError, setShareError] = createSignal<ShareErrorState>()
 
   let sseStream: EventSource | null = null
 
@@ -157,9 +174,21 @@ function ShareInstance(props: ModalProps) {
     enabled: !!fileKey()
   }))
 
+  const handleShareError = (
+    code: string | null,
+    details?: ShareErrorDetails
+  ) => {
+    toast.error(t(getShareErrorKey(code)))
+    setShareError({ code, details })
+    setFileKey(undefined)
+    setIsLoading(false)
+    setProgress(0)
+  }
+
   createEffect(() => {
     if (waitForShareInstanceMutation.data) {
       setShareObject(waitForShareInstanceMutation.data)
+      setShareError(undefined)
       setIsLoading(false)
     }
   })
@@ -167,13 +196,13 @@ function ShareInstance(props: ModalProps) {
   createEffect(() => {
     const err = waitForShareInstanceMutation.error
     if (!err) return
-    toast.error(t(getShareErrorKey(getErrorCode(err))))
-    setFileKey(undefined)
-    setIsLoading(false)
+    handleShareError(getErrorCode(err) ?? null)
   })
 
   const handleShare = async () => {
     if (isLoading()) return
+    setShareError(undefined)
+    setProgress(0)
     setIsLoading(true)
 
     // Build URL with new parameters
@@ -197,33 +226,63 @@ function ShareInstance(props: ModalProps) {
       params.set("includeSaves", "true")
     }
 
+    // Once a terminal message (error or finished) arrives we close the stream
+    // ourselves; this flag tells the native "error" listener below to ignore
+    // the connection-closed event EventSource fires right after.
+    let terminal = false
+    const finish = () => {
+      terminal = true
+      sseStream?.close()
+      sseStream = null
+    }
+
     sseStream = new EventSource(
       apiUrl(`/instance/shareInstance?${params.toString()}`)
     )
 
     sseStream.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      if (data.progress) {
-        setProgress(data.progress)
+      let payload: {
+        progress?: number
+        finished?: string
+        error?: {
+          code?: string | null
+          message?: string
+          details?: ShareErrorDetails
+        }
       }
-      if (data.finished) {
-        setFileKey(data.finished)
-        sseStream?.close()
+      try {
+        payload = JSON.parse(event.data)
+      } catch {
+        return
+      }
+
+      // Terminal failure. Share errors now arrive on the normal message stream
+      // (not a named "error" event) so they can't collide with EventSource's
+      // own dataless "error" event and get dropped.
+      if (payload.error) {
+        finish()
+        handleShareError(payload.error.code ?? null, payload.error.details)
+        return
+      }
+
+      if (typeof payload.progress === "number") {
+        setProgress(payload.progress)
+      }
+
+      if (payload.finished) {
+        finish()
+        setFileKey(payload.finished)
       }
     }
 
-    sseStream.addEventListener("error", (event) => {
-      try {
-        const data = JSON.parse((event as MessageEvent).data)
-        // New format: { error: { code: string, message: string } }
-        const errorCode = data?.error?.code || null
-        toast.error(t(getShareErrorKey(errorCode)))
-      } catch {
-        // Fallback for unparseable errors
-        toast.error(t("instances:_trn_share_errors.upload_failed"))
-      }
-      setIsLoading(false)
-      sseStream?.close()
+    sseStream.addEventListener("error", () => {
+      // Native EventSource connection error — carries no payload. If a terminal
+      // message already arrived this is just the post-close signal; otherwise
+      // the stream dropped before completing, so surface it as a failure
+      // instead of silently resetting.
+      if (terminal) return
+      finish()
+      handleShareError(null)
     })
   }
 
@@ -242,6 +301,59 @@ function ShareInstance(props: ModalProps) {
               <div class="text-lightSlate-500 mb-4 text-sm">
                 <Trans key="instances:_trn_instance_share.description" />
               </div>
+
+              <Show when={shareError()}>
+                {(err) => (
+                  <div class="border-red-500/40 bg-red-500/10 mb-4 rounded-md border p-3 text-sm">
+                    <div class="text-red-400 flex items-center gap-2 font-medium">
+                      <div class="i-ri:error-warning-line shrink-0" />
+                      <span>{t(getShareErrorKey(err().code))}</span>
+                    </div>
+                    <Show
+                      when={
+                        err().code === "INSTANCE_TOO_LARGE" && err().details
+                      }
+                    >
+                      {(details) => (
+                        <div class="text-lightSlate-300 mt-2 flex flex-col gap-2">
+                          <div>
+                            {t("instances:_trn_share_errors.too_large_detail", {
+                              size: formatBytes(details().totalBytes),
+                              limit: formatBytes(details().limitBytes)
+                            })}
+                          </div>
+                          <Show when={details().largestFolders.length > 0}>
+                            <div>
+                              <div class="text-lightSlate-400 mb-1 text-xs uppercase">
+                                {t(
+                                  "instances:_trn_share_errors.too_large_folders"
+                                )}
+                              </div>
+                              <ul class="m-0 flex flex-col gap-1 p-0">
+                                <For each={details().largestFolders}>
+                                  {(folder) => (
+                                    <li class="flex list-none justify-between gap-4">
+                                      <span class="truncate font-mono">
+                                        {folder.name}
+                                      </span>
+                                      <span class="text-lightSlate-400 shrink-0">
+                                        {formatBytes(folder.bytes)}
+                                      </span>
+                                    </li>
+                                  )}
+                                </For>
+                              </ul>
+                            </div>
+                          </Show>
+                          <div class="text-lightSlate-400 text-xs">
+                            {t("instances:_trn_share_errors.too_large_hint")}
+                          </div>
+                        </div>
+                      )}
+                    </Show>
+                  </div>
+                )}
+              </Show>
 
               {/* Title Input */}
               <div class="mb-2">

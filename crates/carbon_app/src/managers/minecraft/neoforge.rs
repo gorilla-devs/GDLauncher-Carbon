@@ -79,6 +79,16 @@ pub async fn get_version(
             )
         })?;
 
+        // Validate the freshly fetched body before caching it: a 200 response with an
+        // unparseable body must not overwrite a previously-good cached version.
+        let parsed =
+            serde_json::from_slice::<PartialVersionInfo>(&version_bytes).with_context(|| {
+                format!(
+                    "Failed to parse neoforge version from `{}`",
+                    version_url.clone()
+                )
+            })?;
+
         db_client
             .partial_version_info_cache()
             .upsert(
@@ -97,11 +107,11 @@ pub async fn get_version(
             .exec()
             .await?;
 
-        Ok(version_bytes)
+        Ok(parsed)
     };
 
-    let version_bytes = match update_cache().await {
-        Ok(version_bytes) => version_bytes,
+    match update_cache().await {
+        Ok(parsed) => Ok(parsed),
         Err(err) => {
             let db_cache = db_client
                 .partial_version_info_cache()
@@ -128,9 +138,7 @@ pub async fn get_version(
 
             anyhow::bail!("Failed to fetch neoforge version: {}", err);
         }
-    };
-
-    Ok(serde_json::from_slice(&version_bytes)?)
+    }
 }
 
 fn get_class_paths_jar(libraries_path: &Path, libraries: &[String]) -> anyhow::Result<String> {

@@ -319,8 +319,6 @@ impl ManagerRef<'_, InstanceExportManager> {
     )> {
         let app = self.app.clone();
         let title = title.clone();
-        let expiration_days = expiration_days;
-        let max_downloads = max_downloads;
 
         let tmpdir = app
             .settings_manager()
@@ -342,31 +340,48 @@ impl ManagerRef<'_, InstanceExportManager> {
             .get_instance_path(&instance.shortpath)
             .get_data_path();
 
-        let mut hashmap = HashMap::new();
-
-        for entry in fs::read_dir(basepath)? {
-            let entry = entry?;
-            let name = entry.file_name();
-            let name = name.to_string_lossy().to_string();
-
-            // `saves` holds the user's worlds and player data. Off by default
-            // because (a) it can be very large, (b) most shares are "give me
-            // your modpack, I'll start a new world" — opt-in via the UI when
-            // the user actually wants their world to travel with the share.
-            if name == "saves" && !include_saves {
-                continue;
-            }
-
-            hashmap.insert(name, None);
-        }
+        let filter = build_share_filter(&basepath, include_saves)?;
 
         drop(instances);
-
-        let filter = ExportEntry(hashmap);
 
         let (tx, rx) = tokio::sync::mpsc::channel(1);
 
         let handle = tokio::spawn(async move {
+            // Measure the instance once up front: this drives both the
+            // pre-flight gate below and the per-folder breakdown shown when a
+            // share is rejected for being too large.
+            let (uncompressed_total, largest_folders) = {
+                let filter_for_size = filter.clone();
+                let (total, breakdown) = tokio::task::spawn_blocking(move || {
+                    compute_share_breakdown(&basepath, &filter_for_size)
+                })
+                .await?;
+                (
+                    total,
+                    breakdown
+                        .into_iter()
+                        .take(SHARE_BREAKDOWN_TOP_N)
+                        .collect::<Vec<_>>(),
+                )
+            };
+
+            // Pre-flight: fast-fail only when the uncompressed size is so far
+            // over the cap that no amount of DEFLATE could bring it under,
+            // avoiding a pointless multi-gigabyte export. Borderline instances
+            // pass through and are re-checked against the real archive size
+            // after export, so a share that would actually fit is never
+            // wrongly rejected here.
+            if uncompressed_total > MAX_SHARE_SIZE_BYTES * SHARE_PREFLIGHT_MARGIN {
+                // This branch returns, so the later exact-size check can't also run; move
+                // `largest_folders` instead of cloning it.
+                return Err(InstanceTooLargeError {
+                    total_bytes: uncompressed_total,
+                    limit_bytes: MAX_SHARE_SIZE_BYTES,
+                    largest_folders,
+                }
+                .into());
+            }
+
             let phases_count = 4;
             let mut current_phase = 0;
 
@@ -458,6 +473,22 @@ impl ManagerRef<'_, InstanceExportManager> {
             current_phase += 1;
 
             let content_length = tokio::fs::metadata(&initial_tmpfile).await?.len();
+
+            // Exact check now that the archive exists: reject if the real
+            // (compressed) size is over the cap. This catches borderline
+            // instances that passed the permissive pre-flight, before the
+            // checksum + upload. enderium enforces the same cap as a final
+            // safety net. The breakdown stays in uncompressed on-disk sizes —
+            // that's what the user sees and can trim.
+            if content_length > MAX_SHARE_SIZE_BYTES {
+                return Err(InstanceTooLargeError {
+                    total_bytes: uncompressed_total,
+                    limit_bytes: MAX_SHARE_SIZE_BYTES,
+                    largest_folders,
+                }
+                .into());
+            }
+
             let sha256_checksum = {
                 use base64::{Engine as _, engine::general_purpose};
                 use sha2::{Digest, Sha256};
@@ -702,6 +733,207 @@ enum ZipMode<'a, W: io::Write + io::Seek, T: FileOptionExtension + Clone> {
         FileOptions<'a, T>,
         tokio::sync::watch::Sender<(u64, u64)>,
     ),
+}
+
+/// Maximum size of a shared instance archive. Mirrors enderium's
+/// `MAX_CONTENT_LENGTH` (crates/enderium-app/src/routes/v1/instance_share.rs),
+/// which stays authoritative. The share task checks against it twice: a
+/// permissive pre-flight on the uncompressed size (fast-fails obviously huge
+/// instances before the expensive export) and an exact check on the real
+/// archive size once it's built (catches borderline cases without ever wrongly
+/// blocking a share that would compress under the cap).
+pub const MAX_SHARE_SIZE_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Pre-flight multiplier applied to `MAX_SHARE_SIZE_BYTES`. The pre-flight
+/// measures uncompressed bytes, so we only fast-fail when the instance is so
+/// far over the cap that DEFLATE could not bring it under — the dominant share
+/// contents (resource/shader packs, jars) barely compress, so realistically
+/// nothing exceeds ~2x uncompressed yet fits once zipped. Anything below this
+/// is exported and re-checked against the real archive size.
+const SHARE_PREFLIGHT_MARGIN: u64 = 2;
+
+/// How many of the largest top-level entries to surface when a share is
+/// rejected for being too large.
+const SHARE_BREAKDOWN_TOP_N: usize = 5;
+
+/// Top-level instance folders that are never included in a share: regenerable,
+/// machine/world-specific caches that would only bloat the upload because the
+/// recipient's install recreates them. `Distant_Horizons_server_data` is the
+/// Distant Horizons LOD cache (server/multiplayer render-distance data) and is
+/// commonly several GB — the usual reason a share blows past the size cap.
+/// Distant Horizons' singleplayer LODs instead live inside `saves/<world>/data`
+/// and are already covered by the `saves` exclusion.
+const SHARE_EXCLUDED_FOLDERS: &[&str] = &["Distant_Horizons_server_data"];
+
+/// Size of a single top-level entry (folder or file) included in a share.
+#[derive(Debug, Clone)]
+pub struct ShareFolderSize {
+    pub name: String,
+    pub bytes: u64,
+}
+
+/// Returned when an instance's included files exceed `MAX_SHARE_SIZE_BYTES`.
+/// Carries a breakdown of the largest entries so the UI can tell the user
+/// which folders are responsible.
+#[derive(Debug, thiserror::Error)]
+#[error("instance is too large to share: {total_bytes} bytes exceeds the {limit_bytes} byte limit")]
+pub struct InstanceTooLargeError {
+    pub total_bytes: u64,
+    pub limit_bytes: u64,
+    pub largest_folders: Vec<ShareFolderSize>,
+}
+
+/// Build the set of top-level instance entries to include in a share. Skips
+/// the always-excluded cache folders (`SHARE_EXCLUDED_FOLDERS`) and, unless the
+/// user opted in, the `saves` directory. Each kept entry maps to `None`,
+/// meaning "include its whole subtree".
+fn build_share_filter(basepath: &Path, include_saves: bool) -> anyhow::Result<ExportEntry> {
+    let mut hashmap = HashMap::new();
+
+    for entry in fs::read_dir(basepath)? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        // Regenerable cache folders (e.g. the Distant Horizons LOD cache) only
+        // bloat the upload; the recipient's install recreates them.
+        if SHARE_EXCLUDED_FOLDERS.contains(&name.as_str()) {
+            continue;
+        }
+
+        // `saves` holds the user's worlds and player data. Off by default
+        // because it can be very large and most shares are "give me your
+        // modpack, I'll start a new world"; opt in via the UI to ship it.
+        if name == "saves" && !include_saves {
+            continue;
+        }
+
+        hashmap.insert(name, None);
+    }
+
+    Ok(ExportEntry(hashmap))
+}
+
+/// Sum the on-disk size of every regular file a share would include, grouped by
+/// top-level entry and sorted largest-first. Mirrors `zip_excluding`'s
+/// inclusion rules: only entries present in `filter` are counted and symlinks
+/// are skipped (so we never follow a link out of the instance or double-count).
+///
+/// Unreadable entries count as zero — under-counting defers to enderium's
+/// authoritative check rather than risking a wrong "too large" rejection.
+fn compute_share_breakdown(base_path: &Path, filter: &ExportEntry) -> (u64, Vec<ShareFolderSize>) {
+    fn entry_size(path: &Path) -> u64 {
+        let Ok(meta) = fs::symlink_metadata(path) else {
+            return 0;
+        };
+        if meta.file_type().is_symlink() {
+            return 0;
+        }
+        if meta.is_dir() {
+            let Ok(read) = fs::read_dir(path) else {
+                return 0;
+            };
+            read.flatten().map(|e| entry_size(&e.path())).sum()
+        } else {
+            meta.len()
+        }
+    }
+
+    let mut folders: Vec<ShareFolderSize> = filter
+        .0
+        .keys()
+        .filter_map(|name| {
+            let bytes = entry_size(&base_path.join(name));
+            (bytes > 0).then(|| ShareFolderSize {
+                name: name.clone(),
+                bytes,
+            })
+        })
+        .collect();
+
+    folders.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+    let total = folders.iter().map(|f| f.bytes).sum();
+    (total, folders)
+}
+
+#[cfg(test)]
+mod share_breakdown_tests {
+    use super::*;
+    use crate::domain::instance::ExportEntry;
+
+    fn filter_of(names: &[&str]) -> ExportEntry {
+        ExportEntry(names.iter().map(|n| (n.to_string(), None)).collect())
+    }
+
+    #[test]
+    fn sums_included_top_level_entries_and_excludes_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+
+        std::fs::create_dir(base.join("mods")).unwrap();
+        std::fs::write(base.join("mods").join("a.jar"), vec![0u8; 100]).unwrap();
+
+        std::fs::create_dir_all(base.join("resourcepacks").join("nested")).unwrap();
+        std::fs::write(
+            base.join("resourcepacks").join("nested").join("big.zip"),
+            vec![0u8; 1000],
+        )
+        .unwrap();
+
+        // Not in the filter — must be ignored (mirrors the `saves` exclusion).
+        std::fs::create_dir(base.join("saves")).unwrap();
+        std::fs::write(base.join("saves").join("world.dat"), vec![0u8; 5000]).unwrap();
+
+        let (total, folders) =
+            compute_share_breakdown(base, &filter_of(&["mods", "resourcepacks"]));
+
+        assert_eq!(total, 1100);
+        assert_eq!(folders.len(), 2);
+        // Sorted largest-first.
+        assert_eq!(folders[0].name, "resourcepacks");
+        assert_eq!(folders[0].bytes, 1000);
+        assert_eq!(folders[1].name, "mods");
+        assert_eq!(folders[1].bytes, 100);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn skips_symlinks() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+
+        std::fs::create_dir(base.join("mods")).unwrap();
+        std::fs::write(base.join("mods").join("real.jar"), vec![0u8; 200]).unwrap();
+        // A symlink inside an included folder must not be counted.
+        std::os::unix::fs::symlink(
+            base.join("mods").join("real.jar"),
+            base.join("mods").join("link.jar"),
+        )
+        .unwrap();
+
+        let (total, _) = compute_share_breakdown(base, &filter_of(&["mods"]));
+        assert_eq!(total, 200);
+    }
+
+    #[test]
+    fn filter_excludes_cache_folders_and_optional_saves() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        for d in ["mods", "config", "saves", "Distant_Horizons_server_data"] {
+            std::fs::create_dir(base.join(d)).unwrap();
+        }
+
+        // saves excluded by default; the DH LOD cache is always excluded.
+        let f = build_share_filter(base, false).unwrap();
+        assert!(f.0.contains_key("mods"));
+        assert!(f.0.contains_key("config"));
+        assert!(!f.0.contains_key("saves"));
+        assert!(!f.0.contains_key("Distant_Horizons_server_data"));
+
+        // Opting into saves ships it, but the DH cache stays excluded.
+        let f = build_share_filter(base, true).unwrap();
+        assert!(f.0.contains_key("saves"));
+        assert!(!f.0.contains_key("Distant_Horizons_server_data"));
+    }
 }
 
 fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(

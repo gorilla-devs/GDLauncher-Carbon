@@ -280,8 +280,13 @@ pub async fn prepare_modpack_from_zip(
                 }
 
                 let outpath = match file.enclosed_name() {
-                    Some(path) => Path::new(&override_full_path)
-                        .join(path.strip_prefix(&override_folder_name).unwrap()),
+                    Some(path) => match path.strip_prefix(&override_folder_name) {
+                        Ok(stripped) => Path::new(&override_full_path).join(stripped),
+                        // The name begins with the prefix string but is not inside the
+                        // overrides directory (e.g. "overrides-extra/..."); skip it instead
+                        // of panicking on the non-matching path component.
+                        Err(_) => continue,
+                    },
                     None => continue,
                 };
 

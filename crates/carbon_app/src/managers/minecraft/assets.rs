@@ -1,3 +1,4 @@
+use crate::domain::minecraft::minecraft::asset_object_location;
 use anyhow::Context;
 use carbon_repos::db::PrismaClient;
 use carbon_repos::pcr::QueryError;
@@ -46,6 +47,15 @@ pub async fn get_meta(
             )
         })?;
 
+        // Validate the freshly fetched body before caching it: a 200 response with an
+        // unparseable body must not overwrite a previously-good cached asset index.
+        let parsed = serde_json::from_slice::<AssetsIndex>(&asset_index).with_context(|| {
+            format!(
+                "Failed to parse asset index from `{}`",
+                version_asset_index.url
+            )
+        })?;
+
         db_client
             .assets_meta_cache()
             .upsert(
@@ -62,13 +72,11 @@ pub async fn get_meta(
             .exec()
             .await?;
 
-        Ok(asset_index)
+        Ok((parsed, asset_index.to_vec()))
     };
 
-    let asset_index = update_cache().await;
-
-    let asset_index = match asset_index {
-        Ok(asset_index) => Ok((serde_json::from_slice(&asset_index)?, asset_index.to_vec())),
+    let asset_index = match update_cache().await {
+        Ok(result) => Ok(result),
         Err(err) => {
             let db_cache = db_client
                 .assets_meta_cache()
@@ -209,7 +217,10 @@ pub async fn reconstruct_assets(
         let objects_path = assets_path.get_objects_path();
 
         for (path, object) in assets_index.objects.iter() {
-            let object_path = objects_path.join(&object.hash[0..2]).join(&object.hash);
+            let Some((_, object_path)) = asset_object_location(&objects_path, &object.hash) else {
+                tracing::warn!("Skipping asset with malformed hash {:?}", object.hash);
+                continue;
+            };
             let asset_path = target_path.join(path);
 
             existing_files.remove(&asset_path);

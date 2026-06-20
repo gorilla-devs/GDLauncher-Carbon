@@ -519,7 +519,7 @@ const Settings = () => {
       </Show>
 
       <Row>
-        <Title>
+        <Title description={<Trans key="java:_trn_java_arguments_hint" />}>
           <Trans key="java:_trn_instance_settings.java_arguments_title" />
         </Title>
         <Switch

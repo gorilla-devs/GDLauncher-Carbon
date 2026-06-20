@@ -177,6 +177,9 @@ pub async fn prepare_modpack_from_gdlpack(
     let total_files = platform_files.len() as u64;
     let mut downloadables: Vec<(Downloadable, Option<String>)> = Vec::new();
     let mut unresolved_platform_files: Vec<FileHashes> = Vec::new();
+    // Tracks a platform API call that errored (as opposed to a successful "not found"), so a
+    // transient outage is surfaced as retryable instead of being misreported as a missing file.
+    let mut platform_error: Option<anyhow::Error> = None;
 
     if platform_files.is_empty() {
         debug!("No platform files to resolve");
@@ -195,6 +198,7 @@ pub async fn prepare_modpack_from_gdlpack(
             }
             Err(e) => {
                 warn!("Modrinth batch resolution failed: {}", e);
+                platform_error = Some(e.context("Modrinth file resolution failed"));
                 HashMap::new()
             }
         };
@@ -224,6 +228,9 @@ pub async fn prepare_modpack_from_gdlpack(
                 }
                 Err(e) => {
                     warn!("CurseForge batch resolution failed: {}", e);
+                    if platform_error.is_none() {
+                        platform_error = Some(e.context("CurseForge file resolution failed"));
+                    }
                     HashMap::new()
                 }
             }
@@ -284,6 +291,10 @@ pub async fn prepare_modpack_from_gdlpack(
 
     // Verify that unresolved platform files exist in overrides
     if !unresolved_platform_files.is_empty() {
+        // Scan the overrides first: a file bundled in overrides must install even when a
+        // platform API errored, since it never needed the platform. Only a file that is on
+        // neither platform AND missing from the overrides is a real failure (handled per-file
+        // below, where a platform error is surfaced as retryable).
         let found_in_overrides = tokio::task::spawn_blocking({
             let gdlpack_path = gdlpack_path.to_path_buf();
             let overrides_dir = manifest.overrides.clone();
@@ -353,6 +364,14 @@ pub async fn prepare_modpack_from_gdlpack(
         // Check if any unresolved files were NOT found in overrides
         for (i, found) in found_in_overrides.iter().enumerate() {
             if !found {
+                // On neither platform and not in the overrides. If a platform API errored, the
+                // file may resolve once it recovers, so surface the retryable cause; otherwise
+                // it is genuinely missing from the pack.
+                if let Some(err) = platform_error.take() {
+                    return Err(err.context(
+                        "A platform API was temporarily unavailable while resolving modpack files; please retry",
+                    ));
+                }
                 return Err(anyhow!(
                     "Required file could not be resolved from platforms or found in overrides. SHA512: {}",
                     unresolved_platform_files[i].sha512
