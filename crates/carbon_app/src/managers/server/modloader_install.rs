@@ -252,9 +252,7 @@ struct FabricInstallerVersion {
 
 /// Fetch the newest stable Fabric installer version from the fabric meta API,
 /// newest first. The server jar endpoint requires it as a path segment.
-async fn latest_fabric_installer_version(
-    reqwest_client: &ClientWithMiddleware,
-) -> Result<String> {
+async fn latest_fabric_installer_version(reqwest_client: &ClientWithMiddleware) -> Result<String> {
     let versions: Vec<FabricInstallerVersion> = reqwest_client
         .get("https://meta.fabricmc.net/v2/versions/installer")
         .send()
@@ -280,9 +278,7 @@ struct QuiltInstaller {
 
 /// Fetch the newest Quilt installer (version and jar url) from the quilt meta
 /// API, which lists installers newest first.
-async fn latest_quilt_installer(
-    reqwest_client: &ClientWithMiddleware,
-) -> Result<QuiltInstaller> {
+async fn latest_quilt_installer(reqwest_client: &ClientWithMiddleware) -> Result<QuiltInstaller> {
     let mut installers: Vec<QuiltInstaller> = reqwest_client
         .get("https://meta.quiltmc.org/v3/versions/installer")
         .send()
