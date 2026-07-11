@@ -425,8 +425,13 @@ impl ManagerRef<'_, ServerManager> {
                 .context("Failed to download server jar")?;
 
                 // Write initial server.properties
-                let props_content =
-                    properties::generate_properties(port, "A Minecraft Server", 20, true);
+                let props_content = properties::generate_properties(
+                    port,
+                    "A Minecraft Server",
+                    20,
+                    true,
+                    &game_version,
+                );
                 properties::write_properties(
                     &server_path.get_server_properties_path(),
                     &props_content,
@@ -439,7 +444,7 @@ impl ManagerRef<'_, ServerManager> {
                 {
                     let java_path = app
                         .java_manager()
-                        .find_best_java_for_server()
+                        .find_java_for_server_version(&game_version, Some(ml_type.as_str()))
                         .await
                         .context("Cannot install modloader: no Java available")?;
 
@@ -780,7 +785,10 @@ impl ManagerRef<'_, ServerManager> {
                 {
                     let java_path = app
                         .java_manager()
-                        .find_best_java_for_server()
+                        .find_java_for_server_version(
+                            &pack_result.game_version,
+                            Some(ml_type.as_str()),
+                        )
                         .await
                         .context("Cannot install modloader: no Java available")?;
 
@@ -804,8 +812,13 @@ impl ManagerRef<'_, ServerManager> {
                 // Write server.properties if not present
                 let props_path = server_path.get_server_properties_path();
                 if !props_path.exists() {
-                    let props =
-                        properties::generate_properties(port, "A Minecraft Server", 20, true);
+                    let props = properties::generate_properties(
+                        port,
+                        "A Minecraft Server",
+                        20,
+                        true,
+                        &pack_result.game_version,
+                    );
                     properties::write_properties(&props_path, &props).await?;
                 }
 
@@ -1119,8 +1132,17 @@ impl ManagerRef<'_, ServerManager> {
             return Err(EulaNotAcceptedError { server_id: id.0 }.into());
         }
 
-        // Find Java
-        let java_path = self.app.java_manager().find_best_java_for_server().await?;
+        // Find a Java matching the server's Minecraft version. Old versions
+        // (Forge ≤1.16 in particular) hard-require Java 8 and crash on boot
+        // with a newer one.
+        let java_path = self
+            .app
+            .java_manager()
+            .find_java_for_server_version(
+                &db_server.game_version,
+                db_server.modloader_type.as_deref(),
+            )
+            .await?;
 
         // Set up log streaming — clean up previous session's log entry first
         let log_id = {
