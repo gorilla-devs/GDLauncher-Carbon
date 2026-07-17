@@ -84,6 +84,29 @@ pub enum ChangeDisplayNameError {
     RequestFailed(anyhow::Error),
 }
 
+/// Error from fetching the GDL user profile.
+#[derive(Error, Debug)]
+pub enum GetAccountError {
+    /// The backend rejected the GDL token. Recoverable — exchange a new one.
+    #[error("GDL token rejected by the server")]
+    Unauthorized,
+
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl From<reqwest::Error> for GetAccountError {
+    fn from(value: reqwest::Error) -> Self {
+        Self::Other(value.into())
+    }
+}
+
+impl From<reqwest_middleware::Error> for GetAccountError {
+    fn from(value: reqwest_middleware::Error) -> Self {
+        Self::Other(value.into())
+    }
+}
+
 /// Error response structure from enderium API
 #[derive(Debug, Deserialize)]
 struct EnderiumErrorResponse {
@@ -621,7 +644,7 @@ impl GDLAccountTask {
         }
     }
 
-    pub async fn get_account(&self, gdl_token: String) -> anyhow::Result<Option<GDLUser>> {
+    pub async fn get_account(&self, gdl_token: String) -> Result<Option<GDLUser>, GetAccountError> {
         let url = format!("{}/v1/users/user", self.base_api);
         let authorization = format!("Bearer {}", gdl_token);
         let mut headers = HeaderMap::new();
@@ -635,6 +658,13 @@ impl GDLAccountTask {
 
         if resp.status() == StatusCode::IM_A_TEAPOT {
             return Ok(None);
+        }
+
+        // Surfaced separately so callers can re-mint the token and retry: the
+        // token may have been rejected for reasons no local `exp` check can
+        // see, such as the backend rotating its JWT signing key.
+        if resp.status() == StatusCode::UNAUTHORIZED {
+            return Err(GetAccountError::Unauthorized);
         }
 
         let resp = resp.error_for_status()?;

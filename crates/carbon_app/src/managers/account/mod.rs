@@ -17,10 +17,10 @@ use carbon_repos::pcr::{
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
     CancelGDLAccountDeletionError, ChangeDisplayNameError, DisplayNameHistoryEntry,
-    GDLAccountStatus, GDLAccountTask, GDLUser, GetPresignedUploadUrlResponse, PaginatedShares,
-    QuotaInfo, RegisterAccountBody, RequestGDLAccountDeletionError, RequestNewEmailChangeError,
-    RequestNewVerificationTokenError, ShareInfo, ShareMetadata, SharePreview,
-    WaitForShareInstanceResponse,
+    GDLAccountStatus, GDLAccountTask, GDLUser, GetAccountError, GetPresignedUploadUrlResponse,
+    PaginatedShares, QuotaInfo, RegisterAccountBody, RequestGDLAccountDeletionError,
+    RequestNewEmailChangeError, RequestNewVerificationTokenError, ShareInfo, ShareMetadata,
+    SharePreview, WaitForShareInstanceResponse,
 };
 use jwt::{Header, Token};
 use reqwest::Client;
@@ -57,6 +57,13 @@ pub mod skin;
 const GDL_TOKEN_INITIAL_BACKOFF: Duration = Duration::from_secs(30);
 /// Maximum backoff duration for GDL token exchange retries.
 const GDL_TOKEN_MAX_BACKOFF: Duration = Duration::from_secs(300);
+/// How long before a JWT's `exp` to stop treating it as usable. Covers the
+/// request's own flight time plus modest client clock skew.
+const TOKEN_EXPIRY_SKEW: Duration = Duration::from_secs(60);
+/// How long to wait on a refresh started elsewhere before giving up. Generous:
+/// a full refresh is several sequential network round-trips (MS, Xbox, MC).
+const REFRESH_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
+const REFRESH_WAIT_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 pub(crate) struct AccountManager {
     currently_refreshing: RwLock<HashMap<String, EnrollmentTask>>,
@@ -182,17 +189,35 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(token)
     }
 
-    /// Ensure we have a GDL auth token for the given account, lazily exchanging if needed.
+    /// Ensure we have a *usable* GDL auth token for the given account.
     ///
-    /// Fast path: returns the existing token if present.
-    /// Slow path: checks backoff, then calls exchange_gdl_token to obtain one.
-    async fn ensure_gdl_auth_token(self, account: &db::account::Data) -> anyhow::Result<String> {
-        // Fast path — token already present
-        if let Some(token) = &account.gdl_token {
-            return Ok(token.clone());
-        }
-
+    /// The backend mints GDL tokens with the same `exp` as the Microsoft
+    /// id_token they were exchanged from (~1h), so a stored token goes stale
+    /// long before anything else about the account does. Presence is therefore
+    /// not evidence of validity — every path here re-checks `exp`.
+    ///
+    /// Fast path: the stored token is still within its lifetime.
+    /// Slow path: refresh the Microsoft tokens if the id_token is itself dead
+    /// (the exchange endpoint would only answer 401 otherwise), then exchange.
+    ///
+    /// `force` skips the fast path, for when the backend has rejected a token
+    /// that still looked locally valid.
+    async fn ensure_gdl_auth_token(
+        self,
+        account: &db::account::Data,
+        force: bool,
+    ) -> anyhow::Result<String> {
         let uuid = &account.uuid;
+
+        // Fast path — stored token still within its lifetime
+        if !force {
+            if let Some(token) = &account.gdl_token {
+                if !is_jwt_expired(token) {
+                    return Ok(token.clone());
+                }
+                debug!("Stored GDL token for {uuid} has expired, re-exchanging");
+            }
+        }
 
         // Check backoff
         {
@@ -209,9 +234,40 @@ impl<'s> ManagerRef<'s, AccountManager> {
             }
         }
 
-        let Some(_id_token) = &account.id_token else {
-            bail!("No MS id_token available for account {uuid}, cannot exchange GDL token");
-        };
+        // An expired id_token can only ever yield a 401 from the exchange
+        // endpoint. Refreshing the Microsoft account re-mints the id_token and,
+        // through the enrollment task, stores a freshly exchanged GDL token.
+        let id_token_usable = account
+            .id_token
+            .as_deref()
+            .is_some_and(|token| !is_jwt_expired(token));
+
+        if !id_token_usable {
+            debug!("MS id_token for {uuid} is missing or expired, refreshing Microsoft account");
+
+            self.refresh_ms_tokens(uuid)
+                .await
+                .with_context(|| format!("cannot mint a GDL token for account {uuid}"))?;
+
+            // The refresh stores a token exchanged from the new id_token; take
+            // it rather than burning a second exchange on the same id_token.
+            if let Some(token) = self
+                .get_account_entries()
+                .await?
+                .into_iter()
+                .find(|entry| &entry.uuid == uuid)
+                .and_then(|entry| entry.gdl_token)
+                .filter(|token| !is_jwt_expired(token))
+            {
+                self.manager
+                    .gdl_token_exchange_backoff
+                    .lock()
+                    .await
+                    .remove(uuid.as_str());
+
+                return Ok(token);
+            }
+        }
 
         // Attempt exchange
         match self.exchange_gdl_token(uuid).await {
@@ -241,13 +297,124 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
     }
 
+    /// The GDL account email for `uuid`, or `None` if it can't be resolved.
+    /// Best-effort: this only feeds ad personalization, so a failure here must
+    /// never fail the caller.
+    async fn gdl_account_email(self, uuid: &str) -> Option<String> {
+        let account = self
+            .get_account_entries()
+            .await
+            .ok()?
+            .into_iter()
+            .find(|account| account.uuid == uuid)?;
+
+        match self.fetch_gdl_user(&account).await {
+            Ok(user) => user.map(|user| user.email),
+            Err(e) => {
+                warn!("Could not resolve GDL account email for {uuid}: {e}");
+                None
+            }
+        }
+    }
+
+    /// Fetch the GDL profile for an account, re-minting the token once if the
+    /// backend rejects it.
+    ///
+    /// The local `exp` check in [`Self::ensure_gdl_auth_token`] cannot see
+    /// server-side invalidation (a rotated signing key, a revoked token), so a
+    /// 401 here is treated as "this token is dead" rather than surfaced to the
+    /// user — otherwise the stored token wedges every future call and only
+    /// deleting the database clears it.
+    async fn fetch_gdl_user(self, account: &db::account::Data) -> anyhow::Result<Option<GDLUser>> {
+        let token = self.ensure_gdl_auth_token(account, false).await?;
+
+        match self.gdl_account_task.get_account(token).await {
+            Err(GetAccountError::Unauthorized) => {
+                warn!(
+                    "Server rejected the GDL token for {}, re-exchanging and retrying",
+                    account.uuid
+                );
+
+                // Re-read first: the call above may have refreshed the account,
+                // and deciding off the stale snapshot would repeat that work.
+                let account = self
+                    .app
+                    .prisma_client
+                    .account()
+                    .find_unique(db::account::UniqueWhereParam::UuidEquals(
+                        account.uuid.clone(),
+                    ))
+                    .exec()
+                    .await?
+                    .ok_or_else(|| anyhow!("Account not found: {}", account.uuid))?;
+
+                let token = self.ensure_gdl_auth_token(&account, true).await?;
+
+                Ok(self.gdl_account_task.get_account(token).await?)
+            }
+            other => Ok(other?),
+        }
+    }
+
+    /// Drive a Microsoft token refresh to completion so the account ends up
+    /// with a fresh `id_token` (and the `gdl_token` exchanged from it).
+    ///
+    /// The periodic refresh loop only fires within 12h of the *access* token
+    /// expiring, which says nothing about the ~1h id_token, so GDL callers that
+    /// need a live token have to ask for one directly.
+    async fn refresh_ms_tokens(self, uuid: &str) -> anyhow::Result<()> {
+        match self.refresh_account(uuid.to_string()).await {
+            Ok(handler) => {
+                handler.await??;
+                Ok(())
+            }
+            Err(e) => {
+                // Someone else is already refreshing this account; wait for
+                // their result instead of racing a second enrollment.
+                if let Some(RefreshAccountError::AlreadyRefreshing) = e.downcast_ref() {
+                    return self.wait_for_refresh(uuid).await;
+                }
+
+                Err(e)
+            }
+        }
+    }
+
+    /// Wait for an in-flight refresh of `uuid` to drop out of the refresh map.
+    async fn wait_for_refresh(self, uuid: &str) -> anyhow::Result<()> {
+        let deadline = Instant::now() + REFRESH_WAIT_TIMEOUT;
+
+        loop {
+            if !self.currently_refreshing.read().await.contains_key(uuid) {
+                return Ok(());
+            }
+
+            if Instant::now() >= deadline {
+                bail!("timed out waiting for an in-flight refresh of account {uuid}");
+            }
+
+            tokio::time::sleep(REFRESH_WAIT_POLL_INTERVAL).await;
+        }
+    }
+
     /// Re-exchange GDL tokens for all Microsoft accounts on startup.
     /// This ensures tokens are always valid even if the backend target changed
     /// (e.g. switching between prod and dev where JWT signing keys differ).
+    ///
+    /// Accounts whose stored id_token has expired are skipped: the exchange
+    /// endpoint would reject it, and the refresh loop re-mints both tokens
+    /// anyway. GDL callers recover on demand via `ensure_gdl_auth_token`.
     pub async fn refresh_all_gdl_tokens(self) -> anyhow::Result<()> {
         let accounts = self.get_account_entries().await?;
 
-        let eligible = accounts.iter().filter(|a| a.id_token.is_some()).count();
+        let is_eligible = |account: &db::account::Data| {
+            account
+                .id_token
+                .as_deref()
+                .is_some_and(|token| !is_jwt_expired(token))
+        };
+
+        let eligible = accounts.iter().filter(|a| is_eligible(a)).count();
         debug!(
             "[startup-timing] refresh_all_gdl_tokens: {} eligible account(s) of {} total",
             eligible,
@@ -255,7 +422,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         );
 
         for account in accounts {
-            if account.id_token.is_some() {
+            if is_eligible(&account) {
                 let t = std::time::Instant::now();
                 info!("Refreshing GDL token for account {}", account.uuid);
                 let result = self.exchange_gdl_token(&account.uuid).await;
@@ -375,7 +542,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         info!("Waiting for account validation");
 
@@ -394,9 +561,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
-
-        Ok(self.gdl_account_task.get_account(auth_token).await?)
+        self.fetch_gdl_user(&account).await
     }
 
     pub async fn request_gdl_account_deletion(
@@ -416,7 +581,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let auth_token = self
-            .ensure_gdl_auth_token(&account)
+            .ensure_gdl_auth_token(&account, false)
             .await
             .map_err(RequestGDLAccountDeletionError::RequestFailed)?;
 
@@ -448,7 +613,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let auth_token = self
-            .ensure_gdl_auth_token(&account)
+            .ensure_gdl_auth_token(&account, false)
             .await
             .map_err(CancelGDLAccountDeletionError::RequestFailed)?;
 
@@ -480,7 +645,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         let user = self
             .gdl_account_task
@@ -508,26 +673,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
         self.app.invalidate(GET_SETTINGS, None);
 
         // Notify Electron main process of GDL account email change for Overwolf ad personalization
-        if let Some(account_uuid) = uuid {
-            // Fetch the account to get the email
-            if let Some(auth_token) = self
-                .get_account_entries()
-                .await?
-                .into_iter()
-                .find(|account| account.uuid == account_uuid)
-                .and_then(|account| account.gdl_token.clone())
-            {
-                if let Ok(Some(user)) = self.gdl_account_task.get_account(auth_token).await {
-                    println!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
-                } else {
-                    println!("_GDL_ACCOUNT_EMAIL_:");
-                }
-            } else {
-                println!("_GDL_ACCOUNT_EMAIL_:");
-            }
-        } else {
-            println!("_GDL_ACCOUNT_EMAIL_:");
-        }
+        let email = match uuid {
+            Some(account_uuid) => self.gdl_account_email(&account_uuid).await,
+            None => None,
+        };
+
+        println!("_GDL_ACCOUNT_EMAIL_:{}", email.unwrap_or_default());
 
         // TODO!: Should get status from the API
 
@@ -559,9 +710,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get a gdl account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
-
-        let Some(user) = self.gdl_account_task.get_account(auth_token).await? else {
+        let Some(user) = self.fetch_gdl_user(&account).await? else {
             return Ok(GDLAccountStatus::Invalid);
         };
 
@@ -595,7 +744,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get a presigned url for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .get_presigned_upload_url(
@@ -630,7 +779,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to upload a share instance for an account that does not exist"
             ))?;
 
-        let _auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let _auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .upload_share_instance(
@@ -658,7 +807,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to upload a share instance for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .wait_for_share_instance(file_key, auth_token)
@@ -682,7 +831,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get shares for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .get_user_shares(auth_token, limit, offset)
@@ -701,7 +850,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to delete a share for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .delete_share(auth_token, share_code)
@@ -726,7 +875,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to update a share for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .update_share(
@@ -759,7 +908,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to report a share for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .report_share(
@@ -789,7 +938,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to regenerate a share code for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .regenerate_share_code(auth_token, share_code)
@@ -808,7 +957,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get quota for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .get_quota(auth_token)
@@ -848,7 +997,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to upload background for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .upload_share_background(auth_token, share_code, image_data)
@@ -871,7 +1020,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?;
 
         let auth_token = self
-            .ensure_gdl_auth_token(&account)
+            .ensure_gdl_auth_token(&account, false)
             .await
             .map_err(RequestNewVerificationTokenError::RequestFailed)?;
 
@@ -905,7 +1054,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             )))?;
 
         let auth_token = self
-            .ensure_gdl_auth_token(&account)
+            .ensure_gdl_auth_token(&account, false)
             .await
             .map_err(RequestNewEmailChangeError::RequestFailed)?;
 
@@ -962,7 +1111,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             )))?;
 
         let auth_token = self
-            .ensure_gdl_auth_token(&account)
+            .ensure_gdl_auth_token(&account, false)
             .await
             .map_err(ChangeDisplayNameError::RequestFailed)?;
 
@@ -996,7 +1145,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         self.gdl_account_task
             .clear_display_name_history(auth_token)
@@ -1015,7 +1164,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to get an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         let request = self
             .gdl_account_task
@@ -1042,7 +1191,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 "attempted to delete profile icon for an account that does not exist"
             ))?;
 
-        let auth_token = self.ensure_gdl_auth_token(&account).await?;
+        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
 
         let request = self.gdl_account_task.delete_profile_icon(auth_token).await;
 
@@ -2051,6 +2200,35 @@ fn extract_email(token: Option<&String>) -> Option<String> {
     })
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+struct ExpiryClaims {
+    exp: Option<u64>,
+}
+
+/// Whether `token` is past its `exp`, treating anything expiring within
+/// [`TOKEN_EXPIRY_SKEW`] as already dead so a token can't lapse in flight
+/// between this check and the request that uses it.
+///
+/// A token whose `exp` is unreadable counts as expired: a redundant exchange
+/// is cheap, whereas trusting an unverifiable token risks a 401 that no
+/// later call can recover from.
+fn is_jwt_expired(token: &str) -> bool {
+    let parsed: Result<Token<Header, ExpiryClaims, _>, _> = jwt::Token::parse_unverified(token);
+
+    let Ok(parsed) = parsed else {
+        return true;
+    };
+
+    let Some(exp) = parsed.claims().exp else {
+        return true;
+    };
+
+    let now = Utc::now().timestamp();
+    let deadline = now.saturating_add(TOKEN_EXPIRY_SKEW.as_secs() as i64);
+
+    (exp as i64) <= deadline
+}
+
 // get_gdl_auth_token removed — replaced by ensure_gdl_auth_token on ManagerRef
 
 /*impl From<FullAccount> for db::account::Data {
@@ -2172,4 +2350,102 @@ pub enum FullAccountLoadError {
         "attempted to parse microsoft account DB entry(uuid {0}), but was missing refresh token expiration timestamp"
     )]
     MissingExpiration(String),
+}
+
+#[cfg(test)]
+mod gdl_token_tests {
+    use super::*;
+    use base64::Engine;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    /// Build an unsigned JWT with the given `exp` claim. `is_jwt_expired`
+    /// parses unverified, so the signature only needs to be well-formed.
+    fn jwt_with_exp(exp: i64) -> String {
+        let header = URL_SAFE_NO_PAD.encode(r#"{"alg":"RS256","kid":"gdl-v1"}"#);
+        let claims = URL_SAFE_NO_PAD.encode(format!(r#"{{"exp":{exp}}}"#));
+        format!("{header}.{claims}.c2ln")
+    }
+
+    #[test]
+    fn fresh_token_is_not_expired() {
+        let exp = Utc::now().timestamp() + 3600;
+        assert!(!is_jwt_expired(&jwt_with_exp(exp)));
+    }
+
+    /// The bug: a GDL token inherits the Microsoft id_token's `exp` (~1h), so
+    /// one stored more than an hour ago is dead and can only produce a 401.
+    #[test]
+    fn hour_old_token_is_expired() {
+        let exp = Utc::now().timestamp() - 1;
+        assert!(is_jwt_expired(&jwt_with_exp(exp)));
+    }
+
+    #[test]
+    fn token_expiring_within_skew_is_expired() {
+        let exp = Utc::now().timestamp() + (TOKEN_EXPIRY_SKEW.as_secs() as i64) - 5;
+        assert!(is_jwt_expired(&jwt_with_exp(exp)));
+    }
+
+    #[test]
+    fn token_without_exp_claim_is_expired() {
+        let header = URL_SAFE_NO_PAD.encode(r#"{"alg":"RS256"}"#);
+        let claims = URL_SAFE_NO_PAD.encode(r#"{"sub":"abc"}"#);
+        assert!(is_jwt_expired(&format!("{header}.{claims}.c2ln")));
+    }
+
+    #[test]
+    fn unparseable_token_is_expired() {
+        assert!(is_jwt_expired("not-a-jwt"));
+        assert!(is_jwt_expired(""));
+    }
+
+    /// The reported bug: an account whose stored GDL token has aged out (they
+    /// only live ~1h, inheriting the MS id_token's `exp`) must never have that
+    /// token handed back. Doing so sends it to `/v1/users/user`, which answers
+    /// 401 — and since nothing re-minted it, every later call did the same,
+    /// leaving "Failed to Check Account" until the database was deleted.
+    ///
+    /// Both tokens are expired here, so no exchange can succeed offline: the
+    /// point is strictly that the dead token is not returned.
+    #[tokio::test]
+    async fn expired_stored_token_is_never_returned() {
+        let app = crate::setup_managers_for_test().await;
+        let expired = jwt_with_exp(Utc::now().timestamp() - 3600);
+
+        app.prisma_client
+            .account()
+            .create(
+                "test-uuid".to_string(),
+                "test-user".to_string(),
+                Utc::now().into(),
+                vec![
+                    db::account::SetParam::SetGdlToken(Some(expired.clone())),
+                    db::account::SetParam::SetIdToken(Some(expired.clone())),
+                ],
+            )
+            .exec()
+            .await
+            .unwrap();
+
+        let account = app
+            .prisma_client
+            .account()
+            .find_unique(db::account::UniqueWhereParam::UuidEquals(
+                "test-uuid".to_string(),
+            ))
+            .exec()
+            .await
+            .unwrap()
+            .unwrap();
+
+        let result = app
+            .account_manager()
+            .ensure_gdl_auth_token(&account, false)
+            .await;
+
+        match result {
+            Ok(token) => panic!("handed back a token for an expired account: {token}"),
+            Err(_) => {}
+        }
+    }
 }
