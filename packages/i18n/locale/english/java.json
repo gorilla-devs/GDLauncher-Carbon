@@ -65,7 +65,7 @@
   "_trn_add_custom_java_path": "Add Custom Path",
   "_trn_ram_warning_high_allocation": "Allocating more than 80% of system RAM may cause Minecraft to crash or system instability.",
   "_trn_insufficient_memory_title": "Insufficient Memory",
-  "_trn_insufficient_memory_body": "Minecraft is configured to use {{requested}} MB of RAM, but only {{available}} MB is currently available. Java also needs ~1.5 GB of additional memory beyond this for its internal operations. This will likely cause the game to crash.",
+  "_trn_insufficient_memory_body": "Minecraft is configured to use {{requested}} MB of RAM, and Java needs ~1.5 GB more for its internal operations — about {{needed}} MB total — but only {{available}} MB is currently available. This will likely cause the game to crash.",
   "_trn_launch_anyway": "Launch Anyway",
   "_trn_adjust_memory": "Adjust Memory",
   "_trn_insufficient_memory_dont_show_again": "Don't show this warning again",

@@ -59,10 +59,13 @@ mod minecraft;
 mod modpack;
 
 #[derive(thiserror::Error, Debug)]
-#[error("Minecraft needs {requested_mb} MB but only {available_mb} MB is available")]
+#[error(
+    "Minecraft needs an estimated {needed_mb} MB ({requested_mb} MB heap + JVM overhead) but only {available_mb} MB is available"
+)]
 pub struct InsufficientMemoryError {
     pub instance_id: i32,
     pub requested_mb: u64,
+    pub needed_mb: u64,
     pub available_mb: u64,
 }
 
@@ -75,6 +78,7 @@ impl crate::error::FeErrorCode for InsufficientMemoryError {
         Some(serde_json::json!({
             "instance_id": self.instance_id,
             "requested_mb": self.requested_mb,
+            "needed_mb": self.needed_mb,
             "available_mb": self.available_mb
         }))
     }
