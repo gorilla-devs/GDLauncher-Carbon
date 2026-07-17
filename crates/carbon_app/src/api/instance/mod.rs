@@ -326,6 +326,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                         return Err(crate::managers::instance::run::InsufficientMemoryError {
                             instance_id: args.id.0,
                             requested_mb: u64::from(xmx),
+                            needed_mb: total_estimated_mb,
                             available_mb,
                         }.into());
                     }
