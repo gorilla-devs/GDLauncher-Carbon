@@ -72,7 +72,7 @@ pub fn required_files(
 }
 
 /// Mirrors the side filter in `execute_processors` exactly
-/// (`run/minecraft.rs`): no `sides` means every side, otherwise the list
+/// (`managers/minecraft/forge.rs` / `neoforge.rs`): no `sides` means every side, otherwise the list
 /// must contain "client".
 fn runs_on_client(processor: &Processor) -> bool {
     match &processor.sides {
@@ -152,7 +152,12 @@ pub async fn missing_files(required: &[RequiredFile], verify_hashes: bool) -> Ve
                                  (expected {expected}, got {actual}): {:?}",
                                 file.path
                             );
-                            let _ = std::fs::remove_file(&file.path);
+                            if let Err(remove_err) = std::fs::remove_file(&file.path) {
+                                tracing::warn!(
+                                    "Failed to delete hash-mismatched processor output {:?}: {remove_err}",
+                                    file.path
+                                );
+                            }
                             missing.push(file.path.clone());
                         }
                         Err(e) => {

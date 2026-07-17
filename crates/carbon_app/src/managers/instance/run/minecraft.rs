@@ -321,17 +321,23 @@ pub async fn process_minecraft(
                         version_info.data.as_ref(),
                         &libraries_path.to_path(),
                     );
-                    let missing = processor_outputs::missing_files(&required, deep_check).await;
 
-                    if missing.is_empty() {
+                    // First installs always run processors: they can have
+                    // per-instance side effects (e.g. NeoForge's
+                    // --extract-libraries-to {ROOT}) that shared-libraries
+                    // validation cannot see. Deep checks always take the
+                    // locked path so hash validation and any deletion happen
+                    // under the install lock.
+                    let needs_lock_path = is_setup
+                        || deep_check
+                        || !processor_outputs::missing_files(&required, false)
+                            .await
+                            .is_empty();
+
+                    if !needs_lock_path {
                         t_forge_processors.start_opaque();
                         t_forge_processors.complete_opaque();
                     } else {
-                        info!(
-                            "Running Forge processors for {} missing output(s): {:?}",
-                            missing.len(),
-                            missing
-                        );
                         t_forge_processors.start_opaque();
 
                         let instance_manager = app.instance_manager();
@@ -342,11 +348,20 @@ pub async fn process_minecraft(
                             .await
                             .unwrap();
 
-                        // Another instance sharing this loader version may have
-                        // regenerated the outputs while we waited on the lock.
                         let missing_under_lock =
-                            processor_outputs::missing_files(&required, false).await;
-                        if !missing_under_lock.is_empty() {
+                            processor_outputs::missing_files(&required, deep_check).await;
+
+                        if is_setup || !missing_under_lock.is_empty() {
+                            if missing_under_lock.is_empty() {
+                                info!("Running Forge processors for first-time instance setup");
+                            } else {
+                                info!(
+                                    "Running Forge processors for {} missing output(s): {:?}",
+                                    missing_under_lock.len(),
+                                    missing_under_lock
+                                );
+                            }
+
                             if let Some(processors) = &version_info.processors {
                                 managers::minecraft::forge::execute_processors(
                                     processors,
@@ -375,6 +390,10 @@ pub async fn process_minecraft(
                                     still_missing
                                 );
                             }
+                        } else {
+                            info!(
+                                "Forge processor outputs verified present; nothing to regenerate"
+                            );
                         }
 
                         t_forge_processors.complete_opaque();
@@ -391,17 +410,23 @@ pub async fn process_minecraft(
                         version_info.data.as_ref(),
                         &libraries_path.to_path(),
                     );
-                    let missing = processor_outputs::missing_files(&required, deep_check).await;
 
-                    if missing.is_empty() {
+                    // First installs always run processors: they can have
+                    // per-instance side effects (e.g. NeoForge's
+                    // --extract-libraries-to {ROOT}) that shared-libraries
+                    // validation cannot see. Deep checks always take the
+                    // locked path so hash validation and any deletion happen
+                    // under the install lock.
+                    let needs_lock_path = is_setup
+                        || deep_check
+                        || !processor_outputs::missing_files(&required, false)
+                            .await
+                            .is_empty();
+
+                    if !needs_lock_path {
                         t_neoforge_processors.start_opaque();
                         t_neoforge_processors.complete_opaque();
                     } else {
-                        info!(
-                            "Running NeoForge processors for {} missing output(s): {:?}",
-                            missing.len(),
-                            missing
-                        );
                         t_neoforge_processors.start_opaque();
 
                         let instance_manager = app.instance_manager();
@@ -412,11 +437,20 @@ pub async fn process_minecraft(
                             .await
                             .unwrap();
 
-                        // Another instance sharing this loader version may have
-                        // regenerated the outputs while we waited on the lock.
                         let missing_under_lock =
-                            processor_outputs::missing_files(&required, false).await;
-                        if !missing_under_lock.is_empty() {
+                            processor_outputs::missing_files(&required, deep_check).await;
+
+                        if is_setup || !missing_under_lock.is_empty() {
+                            if missing_under_lock.is_empty() {
+                                info!("Running NeoForge processors for first-time instance setup");
+                            } else {
+                                info!(
+                                    "Running NeoForge processors for {} missing output(s): {:?}",
+                                    missing_under_lock.len(),
+                                    missing_under_lock
+                                );
+                            }
+
                             if let Some(processors) = &version_info.processors {
                                 managers::minecraft::neoforge::execute_processors(
                                     processors,
@@ -445,6 +479,10 @@ pub async fn process_minecraft(
                                     still_missing
                                 );
                             }
+                        } else {
+                            info!(
+                                "NeoForge processor outputs verified present; nothing to regenerate"
+                            );
                         }
 
                         t_neoforge_processors.complete_opaque();
