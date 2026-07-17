@@ -22,12 +22,9 @@ pub fn required_files(
 ) -> Vec<RequiredFile> {
     let mut out: Vec<RequiredFile> = Vec::new();
 
-    let data_ref_path = |key: &str| -> Option<PathBuf> {
-        resolve_ref(&data?.get(key)?.client, libraries_path)
-    };
-    let data_sha = |key: &str| -> Option<String> {
-        strip_sha_literal(&data?.get(key)?.client)
-    };
+    let data_ref_path =
+        |key: &str| -> Option<PathBuf> { resolve_ref(&data?.get(key)?.client, libraries_path) };
+    let data_sha = |key: &str| -> Option<String> { strip_sha_literal(&data?.get(key)?.client) };
 
     for processor in processors.iter().filter(|p| runs_on_client(p)) {
         for arg in &processor.args {
@@ -49,9 +46,8 @@ pub fn required_files(
                 let declared_sha = if is_maven_ref(out_val) {
                     None
                 } else {
-                    strip_sha_literal(out_val).or_else(|| {
-                        data_keys_in(out_val).into_iter().find_map(|k| data_sha(&k))
-                    })
+                    strip_sha_literal(out_val)
+                        .or_else(|| data_keys_in(out_val).into_iter().find_map(|k| data_sha(&k)))
                 };
 
                 if is_maven_ref(out_key) {
@@ -244,10 +240,7 @@ mod tests {
         "BINPATCH":{"client":"[net.minecraftforge:forge:neoforge-26.2.0.23-beta:client@lzma]","server":"[net.minecraftforge:forge:neoforge-26.2.0.23-beta:client@lzma]"}
     }"#;
 
-    fn parse(
-        processors: &str,
-        data: &str,
-    ) -> (Vec<Processor>, HashMap<String, SidedDataEntry>) {
+    fn parse(processors: &str, data: &str) -> (Vec<Processor>, HashMap<String, SidedDataEntry>) {
         (
             serde_json::from_str(processors).unwrap(),
             serde_json::from_str(data).unwrap(),
@@ -267,12 +260,30 @@ mod tests {
         let required = required_files(&procs, Some(&data), Path::new("/libs"));
 
         assert_eq!(required.len(), 6, "{required:?}");
-        find(&required, "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-slim.jar");
-        find(&required, "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-extra.jar");
-        find(&required, "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar");
-        find(&required, "de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412-mappings-merged.txt");
-        find(&required, "net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-client.jar");
-        find(&required, "net/minecraftforge/forge/1.20.1-forge-47.2.0/forge-1.20.1-forge-47.2.0-client.lzma");
+        find(
+            &required,
+            "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-slim.jar",
+        );
+        find(
+            &required,
+            "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-extra.jar",
+        );
+        find(
+            &required,
+            "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar",
+        );
+        find(
+            &required,
+            "de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412-mappings-merged.txt",
+        );
+        find(
+            &required,
+            "net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-client.jar",
+        );
+        find(
+            &required,
+            "net/minecraftforge/forge/1.20.1-forge-47.2.0/forge-1.20.1-forge-47.2.0-client.lzma",
+        );
     }
 
     #[test]
@@ -280,7 +291,9 @@ mod tests {
         let (procs, data) = parse(FORGE_1_20_1_PROCESSORS, FORGE_1_20_1_DATA);
         let required = required_files(&procs, Some(&data), Path::new("/libs"));
         assert!(
-            !required.iter().any(|f| f.path.to_string_lossy().contains("unpacked")),
+            !required
+                .iter()
+                .any(|f| f.path.to_string_lossy().contains("unpacked")),
             "MC_UNPACKED is only referenced by a server-sided processor: {required:?}"
         );
     }
@@ -313,9 +326,15 @@ mod tests {
         let required = required_files(&procs, Some(&data), Path::new("/libs"));
 
         assert_eq!(required.len(), 2, "{required:?}");
-        let patched = find(&required, "net/neoforged/minecraft-client-patched/26.2.0.23-beta/minecraft-client-patched-26.2.0.23-beta.jar");
+        let patched = find(
+            &required,
+            "net/neoforged/minecraft-client-patched/26.2.0.23-beta/minecraft-client-patched-26.2.0.23-beta.jar",
+        );
         assert_eq!(patched.expected_sha1, None);
-        find(&required, "net/minecraftforge/forge/neoforge-26.2.0.23-beta/forge-neoforge-26.2.0.23-beta-client.lzma");
+        find(
+            &required,
+            "net/minecraftforge/forge/neoforge-26.2.0.23-beta/forge-neoforge-26.2.0.23-beta-client.lzma",
+        );
     }
 
     #[test]
@@ -339,8 +358,14 @@ mod tests {
         .unwrap();
         let required = required_files(&procs, None, Path::new("/libs"));
         assert_eq!(required.len(), 2);
-        find(&required, "de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412.zip");
-        find(&required, "net/minecraftforge/forge/neoforge-26.1.0.0-alpha.1+snapshot-1/forge-neoforge-26.1.0.0-alpha.1+snapshot-1-client.lzma");
+        find(
+            &required,
+            "de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412.zip",
+        );
+        find(
+            &required,
+            "net/minecraftforge/forge/neoforge-26.1.0.0-alpha.1+snapshot-1/forge-neoforge-26.1.0.0-alpha.1+snapshot-1-client.lzma",
+        );
         assert_eq!(required[0].expected_sha1, None);
     }
 
@@ -364,8 +389,14 @@ mod tests {
         let absent = dir.path().join("a/c/1/c-1.jar");
 
         let required = vec![
-            RequiredFile { path: present.clone(), expected_sha1: None },
-            RequiredFile { path: absent.clone(), expected_sha1: None },
+            RequiredFile {
+                path: present.clone(),
+                expected_sha1: None,
+            },
+            RequiredFile {
+                path: absent.clone(),
+                expected_sha1: None,
+            },
         ];
 
         let missing = missing_files(&required, false).await;
@@ -404,13 +435,22 @@ mod tests {
                 path: good.clone(),
                 expected_sha1: Some("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d".into()),
             },
-            RequiredFile { path: unhashed.clone(), expected_sha1: None },
+            RequiredFile {
+                path: unhashed.clone(),
+                expected_sha1: None,
+            },
         ];
 
         let missing = missing_files(&required, true).await;
         assert_eq!(missing, vec![bad.clone()]);
-        assert!(!bad.exists(), "mismatched file is deleted so regeneration replaces it");
+        assert!(
+            !bad.exists(),
+            "mismatched file is deleted so regeneration replaces it"
+        );
         assert!(good.is_file());
-        assert!(unhashed.is_file(), "files without a known SHA are existence-checked only");
+        assert!(
+            unhashed.is_file(),
+            "files without a known SHA are existence-checked only"
+        );
     }
 }
