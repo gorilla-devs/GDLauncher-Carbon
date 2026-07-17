@@ -150,12 +150,24 @@ pub async fn process_modpack(
 
     let t_reconstruct_assets = task.subtask(Translation::InstanceTaskReconstructAssets);
 
-    let t_forge_processors = match is_setup {
+    // Fresh modpack installs may not have the version in config until
+    // modpack processing resolves it, so is_setup must keep creating the
+    // subtasks unconditionally; loader-keyed creation covers every launch
+    // after that so regeneration has a progress subtask to report through.
+    let has_loader = |wanted: ModLoaderType| {
+        matches!(
+            &config.game_configuration.version,
+            Some(GameVersion::Standard(v))
+                if v.modloaders.iter().any(|m| m.type_ == wanted)
+        )
+    };
+
+    let t_forge_processors = match is_setup || has_loader(ModLoaderType::Forge) {
         true => Some(task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors)),
         false => None,
     };
 
-    let t_neoforge_processors = match is_setup {
+    let t_neoforge_processors = match is_setup || has_loader(ModLoaderType::Neoforge) {
         true => Some(task.subtask(Translation::InstanceTaskLaunchRunNeoforgeProcessors)),
         false => None,
     };
