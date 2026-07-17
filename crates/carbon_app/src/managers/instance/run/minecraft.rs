@@ -15,6 +15,7 @@ use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
 use crate::managers::minecraft::assets::{AssetsDir, get_assets_dir};
 use crate::managers::minecraft::modrinth;
+use crate::managers::minecraft::processor_outputs;
 use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
 use crate::managers::modplatforms::modrinth::convert_mr_version_to_standard_version;
 use crate::managers::vtask::Subtask;
@@ -315,36 +316,69 @@ pub async fn process_minecraft(
                 ..
             } => {
                 if let Some(t_forge_processors) = &t_subtasks.t_forge_processors {
-                    t_forge_processors.start_opaque();
+                    let required = processor_outputs::required_files(
+                        version_info.processors.as_deref().unwrap_or(&[]),
+                        version_info.data.as_ref(),
+                        &libraries_path.to_path(),
+                    );
+                    let missing = processor_outputs::missing_files(&required, deep_check).await;
 
-                    let instance_manager = app.instance_manager();
-                    let _lock = instance_manager
-                        .persistence_manager
-                        .loader_install_lock
-                        .acquire()
-                        .await
-                        .unwrap();
+                    if missing.is_empty() {
+                        t_forge_processors.start_opaque();
+                        t_forge_processors.complete_opaque();
+                    } else {
+                        info!(
+                            "Running Forge processors for {} missing output(s): {:?}",
+                            missing.len(),
+                            missing
+                        );
+                        t_forge_processors.start_opaque();
 
-                    if let Some(processors) = &version_info.processors {
-                        managers::minecraft::forge::execute_processors(
-                            processors,
-                            version_info
-                                .data
-                                .as_ref()
-                                .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            PathBuf::from(&java.path),
-                            instance_path,
-                            client_path,
-                            game_version,
-                            libraries_path,
-                            Some(Box::new(|current, total| {
-                                t_forge_processors.update_items(current, total);
-                            })),
-                        )
-                        .await?;
+                        let instance_manager = app.instance_manager();
+                        let _lock = instance_manager
+                            .persistence_manager
+                            .loader_install_lock
+                            .acquire()
+                            .await
+                            .unwrap();
+
+                        // Another instance sharing this loader version may have
+                        // regenerated the outputs while we waited on the lock.
+                        let missing_under_lock =
+                            processor_outputs::missing_files(&required, false).await;
+                        if !missing_under_lock.is_empty() {
+                            if let Some(processors) = &version_info.processors {
+                                managers::minecraft::forge::execute_processors(
+                                    processors,
+                                    version_info
+                                        .data
+                                        .as_ref()
+                                        .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                                    PathBuf::from(&java.path),
+                                    instance_path,
+                                    client_path,
+                                    game_version,
+                                    libraries_path,
+                                    Some(Box::new(|current, total| {
+                                        t_forge_processors.update_items(current, total);
+                                    })),
+                                )
+                                .await?;
+                            }
+
+                            let still_missing =
+                                processor_outputs::missing_files(&required, false).await;
+                            if !still_missing.is_empty() {
+                                tracing::warn!(
+                                    "Processor outputs still missing after regeneration, \
+                                     launching anyway: {:?}",
+                                    still_missing
+                                );
+                            }
+                        }
+
+                        t_forge_processors.complete_opaque();
                     }
-
-                    t_forge_processors.complete_opaque();
                 }
             }
             ModLoader {
@@ -352,36 +386,69 @@ pub async fn process_minecraft(
                 ..
             } => {
                 if let Some(t_neoforge_processors) = &t_subtasks.t_neoforge_processors {
-                    t_neoforge_processors.start_opaque();
+                    let required = processor_outputs::required_files(
+                        version_info.processors.as_deref().unwrap_or(&[]),
+                        version_info.data.as_ref(),
+                        &libraries_path.to_path(),
+                    );
+                    let missing = processor_outputs::missing_files(&required, deep_check).await;
 
-                    let instance_manager = app.instance_manager();
-                    let _lock = instance_manager
-                        .persistence_manager
-                        .loader_install_lock
-                        .acquire()
-                        .await
-                        .unwrap();
+                    if missing.is_empty() {
+                        t_neoforge_processors.start_opaque();
+                        t_neoforge_processors.complete_opaque();
+                    } else {
+                        info!(
+                            "Running NeoForge processors for {} missing output(s): {:?}",
+                            missing.len(),
+                            missing
+                        );
+                        t_neoforge_processors.start_opaque();
 
-                    if let Some(processors) = &version_info.processors {
-                        managers::minecraft::neoforge::execute_processors(
-                            processors,
-                            version_info
-                                .data
-                                .as_ref()
-                                .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            PathBuf::from(&java.path),
-                            instance_path.clone(),
-                            client_path,
-                            game_version,
-                            libraries_path,
-                            Some(Box::new(|current, total| {
-                                t_neoforge_processors.update_items(current, total);
-                            })),
-                        )
-                        .await?;
+                        let instance_manager = app.instance_manager();
+                        let _lock = instance_manager
+                            .persistence_manager
+                            .loader_install_lock
+                            .acquire()
+                            .await
+                            .unwrap();
+
+                        // Another instance sharing this loader version may have
+                        // regenerated the outputs while we waited on the lock.
+                        let missing_under_lock =
+                            processor_outputs::missing_files(&required, false).await;
+                        if !missing_under_lock.is_empty() {
+                            if let Some(processors) = &version_info.processors {
+                                managers::minecraft::neoforge::execute_processors(
+                                    processors,
+                                    version_info
+                                        .data
+                                        .as_ref()
+                                        .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                                    PathBuf::from(&java.path),
+                                    instance_path.clone(),
+                                    client_path,
+                                    game_version,
+                                    libraries_path,
+                                    Some(Box::new(|current, total| {
+                                        t_neoforge_processors.update_items(current, total);
+                                    })),
+                                )
+                                .await?;
+                            }
+
+                            let still_missing =
+                                processor_outputs::missing_files(&required, false).await;
+                            if !still_missing.is_empty() {
+                                tracing::warn!(
+                                    "Processor outputs still missing after regeneration, \
+                                     launching anyway: {:?}",
+                                    still_missing
+                                );
+                            }
+                        }
+
+                        t_neoforge_processors.complete_opaque();
                     }
-
-                    t_neoforge_processors.complete_opaque();
                 }
             }
             _ => {}
