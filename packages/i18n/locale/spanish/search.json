@@ -1,5 +1,6 @@
 {
   "_trn_search_instances": "Buscar instancias",
+  "_trn_search_servers": "Buscar servidores",
   "_trn_browser_table_headers.name": "Nombre",
   "_trn_browser_table_headers.published": "Publicado",
   "_trn_browser_table_headers.downloads": "Descargas",
@@ -14,6 +15,8 @@
   "_trn_clear_all_filters": "Limpiar todo",
   "_trn_platform": "Plataforma",
   "_trn_categories": "Categorías",
+  "_trn_context_instance": "Instancia",
+  "_trn_context_server": "Servidor",
   "_trn_no_categories_found": "No se encontraron categorías",
   "_trn_modloaders": "Cargadores de mods",
   "_trn_no_modloaders_found": "No se encontraron cargadores de mods",
@@ -50,8 +53,5 @@
   "_trn_search": "Buscar",
   "_trn_group_by": "Agrupar por",
   "_trn_direct": "Directo",
-  "_trn_search_servers": "Buscar servidores",
-  "_trn_context_instance": "Instancia",
-  "_trn_context_server": "Servidor",
   "_trn_share": "Compartir"
 }
