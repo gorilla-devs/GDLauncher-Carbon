@@ -3,7 +3,7 @@
   "_trn_all_sessions": "Все сессии",
   "_trn_no_log_sessions_available": "Нет доступных логов сессий",
   "_trn_copy": "Копировать",
-  "_trn_new_logs": "Новые логи",
+  "_trn_new_logs": "Новых логов: {{logsCount}}",
   "_trn_see_new_logs": "Посмотреть новые логи",
   "_trn_logs_paused_due_to_scroll": "Прокрутка логов приостановлена",
   "_trn_autofollow": "Автопрокрутка",

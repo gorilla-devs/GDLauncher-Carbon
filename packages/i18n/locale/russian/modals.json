@@ -1,7 +1,7 @@
 {
   "_trn_title.new_instance": "Создание экземпляра",
   "_trn_title.modify_instance": "Настройка экземпляра",
-  "_trn_bisectHosting.promotion": "Нужен сервер для игры с друзьями? Используйте BisectHosting!",
+  "_trn_bisectHosting.promotion": "Закажите сервер у нашего официального партнера <0>BisectHosting</0> для легкой установки и обновления модов на сервере. Новые клиенты могут сэкономить <1>25%</1> в первый месяц, используя промокод <2>GDL</2> при оформлении заказа.",
   "_trn_bisectHosting.buttonText": "Арендовать сервер со скидкой",
   "_trn_privacy_statement": "Политика конфиденциальности",
   "_trn_terms_and_conditions": "Условия использования",
@@ -73,7 +73,7 @@
   "_trn_cache_cleanup.close": "Закрыть",
   "_trn_cache_cleanup.in_progress": "Идет очистка кэша, пожалуйста, подождите...",
   "_trn_cache_cleanup.done_title": "Очистка завершена",
-  "_trn_cache_cleanup.done_reclaimed": "Успешно освобождено: {{reclaimed}}",
+  "_trn_cache_cleanup.done_reclaimed": "Освобождено {{size}} в базе данных.",
   "_trn_cache_cleanup.failed_title": "Ошибка очистки",
   "_trn_cache_cleanup.gdlauncher_title": "Кэш GDLauncher",
   "_trn_cache_cleanup.gdlauncher_desc": "Временные файлы лаунчера, логи и картинки модов.",

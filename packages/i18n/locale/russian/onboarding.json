@@ -12,7 +12,7 @@
   "_trn_search_syntax_addon_type": "Тип дополнения",
   "_trn_search_syntax_filters": "Фильтры",
   "_trn_welcome_gdlauncher_title": "Добро пожаловать в GDLauncher",
-  "_trn_welcome_gdlauncher_text": "GDLauncher Carbon — это современный и быстрый лаунчер для Minecraft с поддержкой модов и удобным интерфейсом.",
+  "_trn_welcome_gdlauncher_text": "Привет, {{user}}!\n\nМы рады видеть вас на борту! GDLauncher — это ваш личный командный центр Minecraft, разработанный для максимального улучшения игрового процесса.\n\nОт собственных сборок и встроенного поиска модов до тонкой настройки производительности и внешнего вида — всё, что вам нужно, находится под рукой.\n\nГотовы создать своё идеальное приключение в Minecraft? Давайте начнем!\n\nКоманда GDLauncher",
   "_trn_manage_more_options_from_settings": "Вы можете изменить другие параметры в настройках позже.",
   "_trn_import_instance_text": "Хотите перенести существующие сборки из других лаунчеров?",
   "_trn_add_instance": "Создать экземпляр",
