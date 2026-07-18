@@ -556,6 +556,8 @@ const AddonExplore = (props: { children?: any }) => {
                   modplatform={platform()}
                   type="mod"
                   addonType={project.data?.type}
+                  supportedGameVersions={project.data?.minecraftVersions}
+                  supportedModloaders={project.data?.loaders}
                 />
               </Show>
             </div>
