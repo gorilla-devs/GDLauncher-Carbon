@@ -42,6 +42,7 @@ pub mod gdlpack;
 pub mod minecraft;
 pub mod modrinth;
 pub mod neoforge;
+pub mod processor_outputs;
 pub mod quilt;
 
 const META_VERSION: &str = formatcp!("v{}", CURRENT_FORMAT_VERSION);

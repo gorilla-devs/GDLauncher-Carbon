@@ -21,6 +21,7 @@ function InsufficientMemory(props: ModalProps) {
 
   const instanceId = () => props.data?.instance_id as number
   const requestedMb = () => props.data?.requested_mb as number
+  const neededMb = () => props.data?.needed_mb as number
   const availableMb = () => props.data?.available_mb as number
 
   return (
@@ -36,6 +37,7 @@ function InsufficientMemory(props: ModalProps) {
               key="java:_trn_insufficient_memory_body"
               options={{
                 requested: requestedMb(),
+                needed: neededMb(),
                 available: availableMb()
               }}
             />
