@@ -289,7 +289,10 @@ pub async fn download_multiple(
     // only one file with the same path can be downloaded concurrently to avoid race conditions
     let file_path_lock = Arc::new(FilePathLock::new());
 
-    let total_files_size: u64 = files.iter().filter_map(|f| f.size).sum();
+    // Files with an unknown size contribute nothing to this total up front; their real
+    // size is added once known (Content-Length or streamed bytes) so downloaded bytes
+    // can never exceed the total and progress can never pass 100%.
+    let total_files_size = Arc::new(AtomicU64::new(files.iter().filter_map(|f| f.size).sum()));
     let total_downloaded_size = Arc::new(AtomicU64::new(0));
     let total_files_count = files.len() as u64;
     let current_files_count = Arc::new(AtomicU64::new(0));
@@ -297,14 +300,14 @@ pub async fn download_multiple(
     info!(
         "Starting processing of {} files - {} MB",
         files.len(),
-        total_files_size / 1024 / 1024
+        total_files_size.load(Ordering::SeqCst) / 1024 / 1024
     );
 
     if let Some(sender) = &options.progress_sender {
         let _ = sender.send(Progress {
             total_count: total_files_count,
             current_count: 0,
-            total_size: total_files_size,
+            total_size: total_files_size.load(Ordering::SeqCst),
             current_size: 0,
         });
     }
@@ -316,7 +319,7 @@ pub async fn download_multiple(
         &semaphore,
         &total_downloaded_size,
         &current_files_count,
-        total_files_size,
+        &total_files_size,
         total_files_count,
         &file_path_lock,
     );
@@ -326,7 +329,7 @@ pub async fn download_multiple(
         options.only_validate,
         &options.progress_sender,
         total_files_count,
-        total_files_size,
+        &total_files_size,
     )
     .await
 }
@@ -351,7 +354,7 @@ fn create_download_tasks(
     semaphore: &Arc<Semaphore>,
     total_downloaded_size: &Arc<AtomicU64>,
     current_files_count: &Arc<AtomicU64>,
-    total_files_size: u64,
+    total_files_size: &Arc<AtomicU64>,
     total_files_count: u64,
     file_path_lock: &Arc<FilePathLock>,
 ) -> Vec<tokio::task::JoinHandle<Result<(), DownloadError>>> {
@@ -364,6 +367,7 @@ fn create_download_tasks(
             let file = file.clone();
             let total_downloaded_size = Arc::clone(total_downloaded_size);
             let current_files_count = Arc::clone(current_files_count);
+            let total_files_size = Arc::clone(total_files_size);
             let file_path_lock = Arc::clone(file_path_lock);
 
             tokio::spawn(async move {
@@ -374,7 +378,7 @@ fn create_download_tasks(
                     client,
                     &total_downloaded_size,
                     &current_files_count,
-                    total_files_size,
+                    &total_files_size,
                     total_files_count,
                     &file_path_lock,
                 )
@@ -397,7 +401,7 @@ async fn process_file(
     client: ClientWithMiddleware,
     total_downloaded_size: &AtomicU64,
     current_files_count: &AtomicU64,
-    total_files_size: u64,
+    total_files_size: &AtomicU64,
     total_files_count: u64,
     file_path_lock: &FilePathLock,
 ) -> Result<(), DownloadError> {
@@ -435,7 +439,7 @@ async fn process_file(
                 let progress = Progress {
                     total_count: total_files_count,
                     current_count: current_files_count.load(Ordering::SeqCst),
-                    total_size: total_files_size,
+                    total_size: total_files_size.load(Ordering::SeqCst),
                     current_size: total_downloaded_size.load(Ordering::SeqCst),
                 };
 
@@ -459,7 +463,7 @@ async fn download_file(
     client: ClientWithMiddleware,
     total_downloaded_size: &AtomicU64,
     current_files_count: &AtomicU64,
-    total_files_size: u64,
+    total_files_size: &AtomicU64,
     total_files_count: u64,
     file_path_lock: &FilePathLock,
 ) -> Result<(), DownloadError> {
@@ -469,6 +473,9 @@ async fn download_file(
     let _guard = file_lock.lock().await;
 
     let file_processed_bytes = AtomicU64::new(0);
+    // Bytes this file contributed to the shared total (for unknown-size files), so a
+    // retry can subtract them again instead of inflating the total.
+    let file_added_to_total = AtomicU64::new(0);
 
     let progress = options.progress_sender.as_ref();
 
@@ -495,6 +502,7 @@ async fn download_file(
         client.clone(),
         total_downloaded_size,
         &file_processed_bytes,
+        &file_added_to_total,
         current_files_count,
         total_files_size,
         total_files_count,
@@ -505,7 +513,7 @@ async fn download_file(
         let _ = sender.send(Progress {
             total_count: total_files_count,
             current_count: current_files_count.load(Ordering::SeqCst),
-            total_size: total_files_size,
+            total_size: total_files_size.load(Ordering::SeqCst),
             current_size: total_downloaded_size.load(Ordering::SeqCst),
         });
     }
@@ -527,7 +535,7 @@ async fn download_file(
                 let _ = sender.send(Progress {
                     total_count: total_files_count,
                     current_count: current_files_count.load(Ordering::SeqCst),
-                    total_size: total_files_size,
+                    total_size: total_files_size.load(Ordering::SeqCst),
                     current_size: total_downloaded_size.load(Ordering::SeqCst),
                 });
             }
@@ -546,11 +554,16 @@ async fn download_file(
 
             file_processed_bytes.store(0, Ordering::SeqCst);
 
+            total_files_size.fetch_sub(
+                file_added_to_total.swap(0, Ordering::SeqCst),
+                Ordering::SeqCst,
+            );
+
             if let Some(sender) = progress {
                 let _ = sender.send(Progress {
                     total_count: total_files_count,
                     current_count: current_files_count.load(Ordering::SeqCst),
-                    total_size: total_files_size,
+                    total_size: total_files_size.load(Ordering::SeqCst),
                     current_size: total_downloaded_size.load(Ordering::SeqCst),
                 });
             }
@@ -578,6 +591,7 @@ async fn download_file(
                 client,
                 total_downloaded_size,
                 &file_processed_bytes,
+                &file_added_to_total,
                 current_files_count,
                 total_files_size,
                 total_files_count,
@@ -601,7 +615,7 @@ async fn download_file(
                         let _ = sender.send(Progress {
                             total_count: total_files_count,
                             current_count: current_files_count.load(Ordering::SeqCst),
-                            total_size: total_files_size,
+                            total_size: total_files_size.load(Ordering::SeqCst),
                             current_size: total_downloaded_size.load(Ordering::SeqCst),
                         });
                     }
@@ -645,8 +659,9 @@ async fn _download_file(
     client: ClientWithMiddleware,
     total_downloaded_size: &AtomicU64,
     file_processed_bytes: &AtomicU64,
+    file_added_to_total: &AtomicU64,
     current_count: &AtomicU64,
-    total_files_size: u64,
+    total_files_size: &AtomicU64,
     total_files_count: u64,
 ) -> Result<(), DownloadError> {
     let resume_requested = headers.contains_key(reqwest::header::RANGE);
@@ -681,6 +696,21 @@ async fn _download_file(
         *hasher = downloadable.checksum.as_ref().map(HashDigest::from);
     }
 
+    // Unknown-size files aren't part of the shared total yet: account them now from
+    // Content-Length (plus any resumed prefix), or chunk-by-chunk when the response
+    // doesn't declare a length, so the total always covers every byte being counted.
+    let mut count_chunks_into_total = false;
+    if downloadable.size.is_none() {
+        match response.content_length() {
+            Some(remaining) => {
+                let full_size = file_processed_bytes.load(Ordering::SeqCst) + remaining;
+                file_added_to_total.fetch_add(full_size, Ordering::SeqCst);
+                total_files_size.fetch_add(full_size, Ordering::SeqCst);
+            }
+            None => count_chunks_into_total = true,
+        }
+    }
+
     download_content(
         &mut response,
         file,
@@ -688,6 +718,8 @@ async fn _download_file(
         &options,
         total_downloaded_size,
         file_processed_bytes,
+        file_added_to_total,
+        count_chunks_into_total,
         total_files_size,
         current_count,
         total_files_count,
@@ -747,7 +779,7 @@ async fn prepare_download(
     total_downloaded_size: &AtomicU64,
     file_processed_bytes: &AtomicU64,
     current_files_count: &AtomicU64,
-    total_files_size: u64,
+    total_files_size: &AtomicU64,
     total_files_count: u64,
     progress: Option<&Sender<Progress>>,
 ) -> Result<
@@ -826,7 +858,7 @@ async fn prepare_download(
                 let _progress = Progress {
                     total_count: total_files_count,
                     current_count: current_files_count.load(Ordering::SeqCst),
-                    total_size: total_files_size,
+                    total_size: total_files_size.load(Ordering::SeqCst),
                     current_size: total_downloaded_size.load(Ordering::SeqCst),
                 };
 
@@ -869,7 +901,9 @@ async fn download_content(
     options: &DownloadOptions,
     total_downloaded_size: &AtomicU64,
     file_processed_bytes: &AtomicU64,
-    total_size: u64,
+    file_added_to_total: &AtomicU64,
+    count_chunks_into_total: bool,
+    total_size: &AtomicU64,
     current_files_count: &AtomicU64,
     total_count: u64,
 ) -> Result<(), DownloadError> {
@@ -898,11 +932,16 @@ async fn download_content(
         total_downloaded_size.fetch_add(chunk.len() as u64, Ordering::SeqCst);
         file_processed_bytes.fetch_add(chunk.len() as u64, Ordering::SeqCst);
 
+        if count_chunks_into_total {
+            file_added_to_total.fetch_add(chunk.len() as u64, Ordering::SeqCst);
+            total_size.fetch_add(chunk.len() as u64, Ordering::SeqCst);
+        }
+
         if let Some(sender) = &options.progress_sender {
             let progress = Progress {
                 total_count,
                 current_count: current_files_count.load(Ordering::SeqCst),
-                total_size,
+                total_size: total_size.load(Ordering::SeqCst),
                 current_size: total_downloaded_size.load(Ordering::SeqCst),
             };
 
@@ -919,7 +958,7 @@ async fn process_download_tasks(
     only_validate: bool,
     progress_sender: &Option<tokio::sync::watch::Sender<Progress>>,
     total_count: u64,
-    total_size: u64,
+    total_size: &AtomicU64,
 ) -> Result<bool, DownloadError> {
     for task in tasks {
         match task.await? {
@@ -940,6 +979,7 @@ async fn process_download_tasks(
 
     // Send final progress update
     if let Some(sender) = progress_sender {
+        let total_size = total_size.load(Ordering::SeqCst);
         let progress = Progress {
             total_count,
             current_count: total_count,
@@ -1690,6 +1730,89 @@ mod tests {
             std::fs::read_to_string(file_path2).unwrap(),
             "Hello, World 2!"
         );
+
+        mock1.assert();
+        mock2.assert();
+    }
+
+    // Files with an unknown size used to contribute bytes to current_size but nothing to
+    // total_size, letting progress exceed 100%. The total must instead grow once the
+    // real size is learned, and current_size must never pass it.
+    #[tokio::test]
+    #[traced_test]
+    async fn test_download_progress_with_unknown_size_never_exceeds_total() {
+        let mut server = mockito::Server::new_async().await;
+        let mock_url = server.url();
+
+        let mock1 = server
+            .mock("GET", "/known.txt")
+            .with_status(200)
+            .with_header("content-length", "13")
+            .with_body("Hello, World!")
+            .create_async()
+            .await;
+
+        let mock2 = server
+            .mock("GET", "/unknown.txt")
+            .with_status(200)
+            .with_header("content-length", "15")
+            .with_body("Hello, World 2!")
+            .create_async()
+            .await;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path1 = temp_dir.path().join("known.txt");
+        let file_path2 = temp_dir.path().join("unknown.txt");
+
+        let downloadable1 = Downloadable {
+            url: format!("{}/known.txt", mock_url),
+            path: file_path1.clone(),
+            checksum: None,
+            size: Some(13),
+        };
+
+        let downloadable2 = Downloadable {
+            url: format!("{}/unknown.txt", mock_url),
+            path: file_path2.clone(),
+            checksum: None,
+            size: None,
+        };
+
+        let (progress_tx, mut progress_rx) = watch::channel(Progress::default());
+
+        let options = DownloadOptions::builder()
+            .concurrency(2)
+            .progress_sender(progress_tx)
+            .build();
+
+        let download_handle = tokio::spawn(async move {
+            download_multiple(&[downloadable1, downloadable2], options).await
+        });
+
+        let mut last_progress = Progress::default();
+
+        while !download_handle.is_finished() {
+            tokio::select! {
+                _ = progress_rx.changed() => {
+                    let progress = progress_rx.borrow().clone();
+                    assert!(progress.current_count <= progress.total_count);
+                    assert!(progress.current_size <= progress.total_size);
+                    assert!(progress.total_size >= last_progress.total_size);
+                    // 13 until the unknown file's Content-Length is learned, 28 after
+                    assert!(progress.total_size == 13 || progress.total_size == 28);
+                    last_progress = progress;
+                }
+                _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                    panic!("Test timed out");
+                }
+            }
+        }
+
+        let result = download_handle.await.unwrap();
+        assert!(result.is_ok());
+
+        assert_eq!(last_progress.total_size, 28);
+        assert_eq!(last_progress.current_size, 28);
 
         mock1.assert();
         mock2.assert();

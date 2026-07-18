@@ -54,7 +54,8 @@ declare global {
     openExternalLink: (link: string) => void
     openFolder: (path: string) => void
     copyToClipboard: (text: string) => void
-    openCMPWindow: () => void
+    openCMPWindow: () => Promise<boolean>
+    isCMPWindowAvailable: () => Promise<boolean>
     getCoreModule: () => Promise<
       | {
           type: "success"

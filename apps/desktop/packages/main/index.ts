@@ -921,11 +921,15 @@ ipcMain.handle("openFolder", async (_, path) => {
 })
 
 ipcMain.handle("openCMPWindow", async () => {
-  // @ts-ignore - Overwolf types not available
-  if (app.overwolf.openCMPWindow) {
-    // @ts-ignore - Overwolf types not available
-    app.overwolf.openCMPWindow()
+  if ((app as any).overwolf?.openCMPWindow) {
+    ;(app as any).overwolf.openCMPWindow()
+    return true
   }
+  return false
+})
+
+ipcMain.handle("isCMPWindowAvailable", async () => {
+  return !!(app as any).overwolf?.openCMPWindow
 })
 
 ipcMain.handle("closeWindow", async () => {
