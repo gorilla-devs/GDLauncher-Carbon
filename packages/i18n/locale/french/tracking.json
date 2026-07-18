@@ -1,0 +1,11 @@
+{
+  "_trn_setting_disabled": "Désactivé",
+  "_trn_x_days_ago": "Il y a {{count}} jours",
+  "_trn_soon": "BIENTÔT",
+  "_trn_setting_disabled_text": "Désactive presque totalement l'envoi de mesures vers nos services. Faire cela désactivera également certaines fonctionnalités comme l'envoi de rapports de bugs automatiques et l'accès aux fonctionnalités en avant-première.",
+  "_trn_setting_anonymous": "Anonyme",
+  "_trn_setting_anonymous_text": "Réduit au minimum la quantité de mesures envoyées. Toutes les mesures collectées sont totalement anonymes. Cela n'affecte aucune fonctionnalité.",
+  "_trn_setting_anonymous_with_session_recordings": "Anonyme avec enregistrements de sessions",
+  "_trn_setting_anonymous_with_session_recordings_text": "Cela envoie la même quantité de données que l'option Anonyme, mais inclut également des enregistrements de sessions, qui sont de brefs enregistrements de l'utilisation de l'application.",
+  "_trn_settings_authenticated_with_session_recordings": "Authentifié avec enregistrements de sessions"
+}

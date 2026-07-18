@@ -1,0 +1,8 @@
+{
+  "_trn_type_java_path": "Введите путь к Java",
+  "_trn_type_profile_name": "Введите имя профиля",
+  "_trn_type_custom_java_path": "Введите пользовательский путь к Java",
+  "_trn_select_java_profile": "Выберите профиль Java",
+  "_trn_find_logs": "Найти (Ctrl+F)",
+  "_trn_email_example": "email@example.com"
+}

@@ -13,8 +13,10 @@ export const supportedLanguages = {
   english: "united-states",
   italian: "italy",
   japanese: "japan",
+  russian: "russia",
   spanish: "spain",
-  simplified_chinese: "china"
+  simplified_chinese: "china",
+  french: "france"
 }
 
 type NamespacesMap = {
