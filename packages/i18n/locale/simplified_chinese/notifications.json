@@ -1,0 +1,14 @@
+{
+  "_trn_copied_to_clipboard": "已复制到剪贴板",
+  "_trn_instance_created_success": "实例创建成功。",
+  "_trn_instance_created_error": "创建实例时出错。",
+  "_trn_modpack_download_error": "下载整合包时出错。",
+  "_trn_server_from_modpack_success": "从整合包创建服务器成功。",
+  "_trn_server_from_modpack_error": "从整合包创建服务器时出错。",
+  "_trn_cannot_delete_instance": "无法删除实例",
+  "_trn_cannot_delete_server": "无法删除服务器",
+  "_trn_eula_accept_failed": "接受 EULA 失败",
+  "_trn_custom_java_added": "自定义 Java 路径添加成功",
+  "_trn_addon_downloading_to_server": "{{title}} 正在下载到服务器",
+  "_trn_addon_fallback_name": "附加组件"
+}
