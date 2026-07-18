@@ -65,7 +65,7 @@
   "_trn_scanning_files": "Analizando archivos...",
   "_trn_ram_warning_high_allocation": "Asignar más del 80% de la RAM del sistema puede provocar que Minecraft se bloquee o causar inestabilidad del sistema.",
   "_trn_insufficient_memory_title": "Memoria insuficiente",
-  "_trn_insufficient_memory_body": "Minecraft está configurado para usar {{requested}} MB de RAM, pero solo hay {{available}} MB disponibles actualmente. Java también necesita ~1.5 GB de memoria adicional más allá de esto para sus operaciones internas. Es probable que esto provoque que el juego se bloquee.",
+  "_trn_insufficient_memory_body": "Minecraft está configurado para usar {{requested}} MB de RAM y Java necesita ~1,5 GB adicionales para sus operaciones internas (unos {{needed}} MB en total), pero solo hay {{available}} MB disponibles actualmente. Es probable que esto provoque que el juego se bloquee.",
   "_trn_launch_anyway": "Iniciar de todas formas",
   "_trn_adjust_memory": "Ajustar memoria",
   "_trn_insufficient_memory_dont_show_again": "No volver a mostrar esta advertencia",
