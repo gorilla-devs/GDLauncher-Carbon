@@ -34,9 +34,12 @@ import ContentWrapper from "@/components/ContentWrapper"
 import InfiniteScrollVersionsQueryWrapper from "@/components/InfiniteScrollVersionsQueryWrapper"
 import { rspc } from "@/utils/rspcClient"
 import {
+  FEUnifiedModLoaderType,
   FEUnifiedPlatform,
   FEUnifiedSearchResultWithDescription
 } from "@gd/core_module/bindings"
+import { ModloaderIcon } from "@/utils/sidebar"
+import { getModloaderDisplayName } from "@/utils/helpers"
 import { UseQueryResult } from "@tanstack/solid-query"
 import { RSPCError } from "@/utils/rspcClient"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
@@ -190,6 +193,25 @@ const AddonExplore = (props: { children?: any }) => {
         url: null // FEUnifiedAuthor doesn't include profile URLs
       })
     )
+  })
+
+  const LOADER_DISPLAY_ORDER: FEUnifiedModLoaderType[] = [
+    "forge",
+    "neoforge",
+    "fabric",
+    "quilt"
+  ]
+
+  const displayedLoaders = createMemo(() => {
+    const loaders = project.data?.loaders || []
+    return [...loaders].sort((a, b) => {
+      const orderA = LOADER_DISPLAY_ORDER.indexOf(a)
+      const orderB = LOADER_DISPLAY_ORDER.indexOf(b)
+      return (
+        (orderA === -1 ? LOADER_DISPLAY_ORDER.length : orderA) -
+        (orderB === -1 ? LOADER_DISPLAY_ORDER.length : orderB)
+      )
+    })
   })
 
   const instancePages = () => [
@@ -360,6 +382,18 @@ const AddonExplore = (props: { children?: any }) => {
                         </Match>
                       </Switch>
                     </div>
+                    <Show when={!isFetching() && displayedLoaders().length > 0}>
+                      <div class="border-darkSlate-500 flex items-center gap-3 border-r-2 px-2">
+                        <For each={displayedLoaders()}>
+                          {(loader) => (
+                            <div class="flex items-center gap-1">
+                              <ModloaderIcon modloader={loader} />
+                              <span>{getModloaderDisplayName(loader)}</span>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
                     <div class="border-darkSlate-500 flex items-center gap-2 border-r-2 px-2">
                       <div class="i-hugeicons:clock-01 text-lg h-5 w-5" />
                       <Switch>
