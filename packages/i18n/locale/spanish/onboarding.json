@@ -7,6 +7,8 @@
   "_trn_search_syntax_ids": "Usa ID de proyecto (p. ej., #12345)",
   "_trn_search_syntax_urls_label": "URLs",
   "_trn_search_syntax_id_label": "#id",
+  "_trn_search_syntax_share": "Antepón $ a un código (p. ej., $ABC1234), o pega un enlace de compartir (gdl.gg/i/…, gdlauncher.com/instance-share/…, gdlauncher://share/…)",
+  "_trn_search_syntax_share_label": "Instancia compartida",
   "_trn_search_syntax_addon_type": "Selecciona el tipo de complemento (mods, modpacks, etc.) a la izquierda",
   "_trn_search_syntax_filters": "Filtra por categorías y más a la derecha",
   "_trn_welcome_gdlauncher_title": "¡Bienvenido a GDLauncher! 🎉",
@@ -31,7 +33,5 @@
   "_trn_select_all": "Seleccionar todo",
   "_trn_introduction": "Introducción",
   "_trn_handle_preferences": "Gestionar preferencias",
-  "_trn_import_instances": "Importar instancias",
-  "_trn_search_syntax_share": "Antepón $ a un código (p. ej., $ABC1234), o pega un enlace de compartir (gdl.gg/i/…, gdlauncher.com/instance-share/…, gdlauncher://share/…)",
-  "_trn_search_syntax_share_label": "Instancia compartida"
+  "_trn_import_instances": "Importar instancias"
 }

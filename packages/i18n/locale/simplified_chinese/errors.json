@@ -14,5 +14,7 @@
   "_trn_404_message": "页面未找到",
   "_trn_its_gone": "它不见了",
   "_trn_error.enrollment_failed": "注册失败",
-  "_trn_error.xbox_code": "Xbox 错误代码"
+  "_trn_error.xbox_code": "Xbox 错误代码",
+  "_trn_network_error_toast": "网络错误：请检查您的网络连接",
+  "_trn_rate_limited_toast": "服务暂时不可用，部分内容可能无法加载"
 }
