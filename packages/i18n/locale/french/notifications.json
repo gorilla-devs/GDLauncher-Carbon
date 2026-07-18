@@ -1,0 +1,14 @@
+{
+  "_trn_copied_to_clipboard": "Copié dans le presse-papiers",
+  "_trn_instance_created_success": "Instance créée avec succès.",
+  "_trn_instance_created_error": "Erreur lors de la création de l'instance.",
+  "_trn_modpack_download_error": "Erreur lors du téléchargement du modpack.",
+  "_trn_server_from_modpack_success": "Serveur créé à partir du modpack avec succès.",
+  "_trn_server_from_modpack_error": "Erreur lors de la création du serveur à partir du modpack.",
+  "_trn_cannot_delete_instance": "Impossible de supprimer l'instance",
+  "_trn_cannot_delete_server": "Impossible de supprimer le serveur",
+  "_trn_eula_accept_failed": "Échec de l'acceptation de l'EULA",
+  "_trn_custom_java_added": "Chemin Java personnalisé ajouté avec succès",
+  "_trn_addon_downloading_to_server": "Téléchargement de {{title}} vers le serveur",
+  "_trn_addon_fallback_name": "Addon"
+}
