@@ -10,5 +10,7 @@
   "simplified_chinese": "Simplified Chinese",
   "simplified_chinese_native": "简体中文",
   "french" : "French",
-  "french_native" : "Français"
+  "french_native" : "Français",
+  "russian": "Russian",
+  "russian_native": "Русский"
 }

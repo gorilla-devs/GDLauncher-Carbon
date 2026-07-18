@@ -1,0 +1,20 @@
+{
+  "_trn_error.missing_field_title": "Название не может быть пустым",
+  "_trn_error.no_mc_versions": "Версии Minecraft сейчас недоступны, повторите попытку позже!",
+  "_trn_profile_name_exists": "Имя профиля уже существует",
+  "_trn_some_error": "Произошла ошибка",
+  "_trn_xbox_noAccount": "Учетная запись Xbox не найдена",
+  "_trn_xbox_xboxServicesBanned": "Ваша учетная запись заблокирована в службах Xbox",
+  "_trn_xbox_adultVerificationRequired": "Требуется подтверждение совершеннолетия",
+  "_trn_xbox_childAccount": "Детские учетные записи не поддерживаются",
+  "_trn_deviceCodeExpired": "Срок действия кода устройства истек",
+  "_trn_xboxAccount": "Ошибка учетной записи Xbox",
+  "_trn_noGameOwnership": "У вас нет купленной версии Minecraft Java Edition",
+  "_trn_noGameProfile": "Игровой профиль не найден",
+  "_trn_404_message": "Страница не найдена",
+  "_trn_its_gone": "Этого больше нет",
+  "_trn_error.enrollment_failed": "Не удалось завершить регистрацию",
+  "_trn_error.xbox_code": "Код ошибки Xbox",
+  "_trn_network_error_toast": "Ошибка сети: проверьте подключение к интернету",
+  "_trn_rate_limited_toast": "Сервис временно недоступен, часть контента может не загрузиться"
+}
