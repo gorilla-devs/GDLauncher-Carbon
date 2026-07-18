@@ -13,7 +13,9 @@ export const supportedLanguages = {
   english: "united-states",
   italian: "italy",
   japanese: "japan",
-  russian: "russia"
+  russian: "russia",
+  spanish: "spain",
+  simplified_chinese: "china"
 }
 
 type NamespacesMap = {
@@ -103,8 +105,8 @@ type HelperFunctionKeys =
   | `errors:xbox_${'noAccount' | 'xboxServicesBanned' | 'adultVerificationRequired' | 'childAccount'}`
   | `errors:${'deviceCodeExpired' | 'xboxAccount' | 'noGameOwnership' | 'noGameProfile'}`
   | `settings:theme_${'main' | 'pixelato' | 'win95' | 'inferno' | 'aether' | 'frost'}`
-  | `languages:${'english' | 'french' | 'german' | 'japanese' | 'italian' | 'spanish' | 'portuguese' | 'russian' | 'arabic' | 'chinese' | 'hindi' | 'turkish' | 'thai' | 'vietnamese' | 'korean' | 'polish' | 'dutch' | 'hungarian' | 'swedish' | 'czech' | 'catalan' | 'greek' | 'danish' | 'finnish' | 'norwegian' | 'bulgarian' | 'serbian' | 'ukrainian' | 'hebrew' | 'romanian' | 'indonesian' | 'croatian' | 'latvian' | 'slovak' | 'slovenian' | 'lithuanian' | 'filipino' | 'bengali' | 'malay' | 'persian' | 'afrikaans' | 'albanian' | 'armenian' | 'azerbaijani' | 'basque' | 'belarusian'}`
-  | `languages:${'english' | 'french' | 'german' | 'japanese' | 'italian' | 'spanish' | 'portuguese' | 'russian' | 'arabic' | 'chinese' | 'hindi' | 'turkish' | 'thai' | 'vietnamese' | 'korean' | 'polish' | 'dutch' | 'hungarian' | 'swedish' | 'czech' | 'catalan' | 'greek' | 'danish' | 'finnish' | 'norwegian' | 'bulgarian' | 'serbian' | 'ukrainian' | 'hebrew' | 'romanian' | 'indonesian' | 'croatian' | 'latvian' | 'slovak' | 'slovenian' | 'lithuanian' | 'filipino' | 'bengali' | 'malay' | 'persian' | 'afrikaans' | 'albanian' | 'armenian' | 'azerbaijani' | 'basque' | 'belarusian'}_native`
+  | `languages:${'english' | 'french' | 'german' | 'japanese' | 'italian' | 'spanish' | 'portuguese' | 'russian' | 'arabic' | 'chinese' | 'simplified_chinese' | 'hindi' | 'turkish' | 'thai' | 'vietnamese' | 'korean' | 'polish' | 'dutch' | 'hungarian' | 'swedish' | 'czech' | 'catalan' | 'greek' | 'danish' | 'finnish' | 'norwegian' | 'bulgarian' | 'serbian' | 'ukrainian' | 'hebrew' | 'romanian' | 'indonesian' | 'croatian' | 'latvian' | 'slovak' | 'slovenian' | 'lithuanian' | 'filipino' | 'bengali' | 'malay' | 'persian' | 'afrikaans' | 'albanian' | 'armenian' | 'azerbaijani' | 'basque' | 'belarusian'}`
+  | `languages:${'english' | 'french' | 'german' | 'japanese' | 'italian' | 'spanish' | 'portuguese' | 'russian' | 'arabic' | 'chinese' | 'simplified_chinese' | 'hindi' | 'turkish' | 'thai' | 'vietnamese' | 'korean' | 'polish' | 'dutch' | 'hungarian' | 'swedish' | 'czech' | 'catalan' | 'greek' | 'danish' | 'finnish' | 'norwegian' | 'bulgarian' | 'serbian' | 'ukrainian' | 'hebrew' | 'romanian' | 'indonesian' | 'croatian' | 'latvian' | 'slovak' | 'slovenian' | 'lithuanian' | 'filipino' | 'bengali' | 'malay' | 'persian' | 'afrikaans' | 'albanian' | 'armenian' | 'azerbaijani' | 'basque' | 'belarusian'}_native`
 
 /**
  * Type-safe translation function with autocomplete support.
