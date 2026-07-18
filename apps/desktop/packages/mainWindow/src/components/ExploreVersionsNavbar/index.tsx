@@ -1,5 +1,9 @@
 import DefaultImg from "/assets/images/default-instance-img.png"
-import { FEUnifiedSearchType, McType } from "@gd/core_module/bindings"
+import {
+  FEUnifiedModLoaderType,
+  FEUnifiedSearchType,
+  McType
+} from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import {
   Checkbox,
@@ -40,6 +44,8 @@ interface Props {
   modplatform: "curseforge" | "modrinth"
   type: "modpack" | "mod"
   addonType?: FEUnifiedSearchType
+  supportedGameVersions?: string[]
+  supportedModloaders?: FEUnifiedModLoaderType[]
 }
 
 const ExploreVersionsNavbar = (props: Props) => {
@@ -82,9 +88,18 @@ const ExploreVersionsNavbar = (props: Props) => {
   const SUPPORTED_MODLOADERS = ["forge", "fabric", "quilt", "neoforge"]
 
   const modloaders = () => {
-    // Always show all supported modloaders
-    // The default selection is set in InfiniteScrollVersionsQueryWrapper based on instance
-    return ["", ...SUPPORTED_MODLOADERS]
+    // Only offer the loaders the addon actually supports (falling back to all when the
+    // addon doesn't report any). The default selection is set in
+    // InfiniteScrollVersionsQueryWrapper based on instance
+    const supported = props.supportedModloaders
+    if (!supported?.length) return ["", ...SUPPORTED_MODLOADERS]
+
+    return [
+      "",
+      ...SUPPORTED_MODLOADERS.filter((loader) =>
+        supported.includes(loader as FEUnifiedModLoaderType)
+      )
+    ]
   }
 
   const getModloaderLabel = (value: string | null | undefined) => {
@@ -97,12 +112,18 @@ const ExploreVersionsNavbar = (props: Props) => {
     const oldAlpha = gameVersionFilters.oldAlpha
     const oldBeta = gameVersionFilters.oldBeta
 
+    // Only offer the game versions the addon actually has files for, when known
+    const supported = props.supportedGameVersions?.length
+      ? new Set(props.supportedGameVersions)
+      : null
+
     return globalStore.minecraftVersions.data?.filter(
       (item) =>
-        item.type === "release" ||
-        (item.type === "snapshot" && snapshot) ||
-        (item.type === "old_beta" && oldBeta) ||
-        (item.type === "old_alpha" && oldAlpha)
+        (!supported || supported.has(item.id)) &&
+        (item.type === "release" ||
+          (item.type === "snapshot" && snapshot) ||
+          (item.type === "old_beta" && oldBeta) ||
+          (item.type === "old_alpha" && oldAlpha))
     )
   })
 

@@ -6,6 +6,7 @@ export const INSUFFICIENT_MEMORY_EVENT = "gdl:insufficient-memory"
 export interface InsufficientMemoryData {
   instance_id: number
   requested_mb: number
+  needed_mb: number
   available_mb: number
 }
 

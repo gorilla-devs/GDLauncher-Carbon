@@ -65,7 +65,7 @@
   "_trn_add_custom_java_path": "添加自定义路径",
   "_trn_ram_warning_high_allocation": "分配超过系统内存 80% 可能导致 Minecraft 崩溃或系统不稳定。",
   "_trn_insufficient_memory_title": "内存不足",
-  "_trn_insufficient_memory_body": "Minecraft 配置为使用 {{requested}} MB 内存，但当前仅有 {{available}} MB 可用。Java 还需要约 1.5 GB 的额外内存用于其内部操作。这很可能会导致游戏崩溃。",
+  "_trn_insufficient_memory_body": "Minecraft 配置为使用 {{requested}} MB 内存，Java 还需要约 1.5 GB 用于其内部操作（总计约 {{needed}} MB），但当前仅有 {{available}} MB 可用。这很可能会导致游戏崩溃。",
   "_trn_launch_anyway": "仍然启动",
   "_trn_adjust_memory": "调整内存",
   "_trn_insufficient_memory_dont_show_again": "不再显示此警告",

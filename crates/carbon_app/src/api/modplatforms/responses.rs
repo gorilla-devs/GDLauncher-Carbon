@@ -383,9 +383,22 @@ pub struct FEUnifiedSearchResult {
     pub categories: Vec<FEUnifiedCategoryId>,
     pub screenshot_urls: Vec<String>,
     pub minecraft_versions: Vec<String>,
+    #[serde(default)]
+    pub loaders: Vec<FEUnifiedModLoaderType>,
     pub versions: Option<Vec<String>>,
     pub main_file_id: Option<String>,
     pub server_pack_file_id: Option<String>,
+}
+
+/// Parses platform loader strings (e.g. modrinth `loaders`, or search-hit categories,
+/// which mix loaders and actual categories) into unified loader types, dropping
+/// anything unrecognized.
+fn unified_loaders_from_strings(loaders: &[String]) -> Vec<FEUnifiedModLoaderType> {
+    loaders
+        .iter()
+        .filter_map(|loader| loader.parse::<FEUnifiedModLoaderType>().ok())
+        .filter(|loader| *loader != FEUnifiedModLoaderType::Unknown)
+        .collect()
 }
 
 impl From<ProjectSearchResponse> for FEUnifiedSearchResponse {
@@ -497,6 +510,20 @@ impl From<Mod> for FEUnifiedSearchResult {
                 all_versions.dedup();
                 all_versions
             },
+            loaders: {
+                let mut loaders = Vec::new();
+                for index in &value.latest_files_indexes {
+                    let Some(loader) = index.mod_loader.clone() else {
+                        continue;
+                    };
+
+                    let loader = FEUnifiedModLoaderType::from(loader);
+                    if loader != FEUnifiedModLoaderType::Unknown && !loaders.contains(&loader) {
+                        loaders.push(loader);
+                    }
+                }
+                loaders
+            },
             versions: Some(
                 value
                     .latest_files_indexes
@@ -546,6 +573,7 @@ impl From<Project> for FEUnifiedSearchResult {
                 .map(|gallery| gallery.url.clone())
                 .collect(),
             minecraft_versions: value.game_versions,
+            loaders: unified_loaders_from_strings(&value.loaders),
             versions: Some(value.versions),
             server_pack_file_id: if value.project_type == ProjectType::Modpack
                 && !matches!(value.server_side, ProjectSupportRange::Unsupported)
@@ -606,6 +634,7 @@ impl FEUnifiedSearchResult {
                 .map(|gallery| gallery.url.clone())
                 .collect(),
             minecraft_versions: value.game_versions,
+            loaders: unified_loaders_from_strings(&value.loaders),
             versions: Some(value.versions),
             server_pack_file_id: if value.project_type == ProjectType::Modpack
                 && !matches!(value.server_side, ProjectSupportRange::Unsupported)
@@ -620,6 +649,14 @@ impl FEUnifiedSearchResult {
 
 impl From<ProjectSearchResult> for FEUnifiedSearchResult {
     fn from(value: ProjectSearchResult) -> Self {
+        // Modrinth search hits don't have a dedicated loaders field; loaders are mixed
+        // into `categories`.
+        let loaders = value
+            .categories
+            .as_deref()
+            .map(unified_loaders_from_strings)
+            .unwrap_or_default();
+
         FEUnifiedSearchResult {
             title: value.title,
             description: value.description,
@@ -651,6 +688,7 @@ impl From<ProjectSearchResult> for FEUnifiedSearchResult {
                 .collect(),
             screenshot_urls: value.gallery.unwrap_or_default(),
             minecraft_versions: value.versions,
+            loaders,
             versions: None,
             server_pack_file_id: if value.project_type == ProjectType::Modpack
                 && !matches!(value.server_side, ProjectSupportRange::Unsupported)

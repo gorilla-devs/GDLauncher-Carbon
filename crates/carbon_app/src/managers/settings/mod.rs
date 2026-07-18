@@ -422,7 +422,8 @@ impl ManagerRef<'_, SettingsManager> {
     /// 1. If `gdlauncher`: clears every cache table, wipes `temp/` and
     ///    `__gdl_logs__/`, then VACUUMs.
     /// 2. If `minecraft`: also wipes `assets/`, `libraries/`, `natives/` —
-    ///    these are big, re-downloaded on next launch, opt-in.
+    ///    these are big and opt-in; the next launch re-downloads them and
+    ///    re-runs the loader processors for generated files.
     ///
     /// Rejects with an error if another cleanup is already running. The
     /// task is best-effort per step: individual failures are logged but

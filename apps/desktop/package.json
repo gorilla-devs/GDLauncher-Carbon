@@ -9,7 +9,7 @@
   "license": "ARR",
   "type": "module",
   "_comment": "DO NOT MANUALLY EDIT THE VERSION",
-  "version": "2.0.30",
+  "version": "0.0.0",
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/watch.mjs",
@@ -36,7 +36,7 @@
     "@gd/core_module": "workspace:*",
     "@gd/i18n": "workspace:*",
     "@gd/ui": "workspace:*",
-    "@overwolf/ow-electron": "39.6.1",
+    "@overwolf/ow-electron": "39.8.10",
     "@overwolf/ow-electron-builder": "^26.0.12",
     "@playwright/test": "^1.58.2",
     "@rive-app/canvas": "^2.35.0",
