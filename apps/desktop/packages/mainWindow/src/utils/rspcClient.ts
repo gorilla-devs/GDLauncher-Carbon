@@ -71,10 +71,69 @@ export class RSPCError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Error toast deduplication
+//
+// Failing background queries used to spawn one toast per request, which flooded
+// the UI when offline or when a platform API rate-limited us. Connection-level
+// and rate-limit errors each collapse into one shared toast regardless of the
+// exact URL/endpoint in the message; everything else dedups on its exact text.
+// ---------------------------------------------------------------------------
+
+const NETWORK_ERROR_RE =
+  /error sending request|failed to make network request|error trying to connect|connection (refused|reset|closed|error)|dns error|timed out|timeout|network unreachable|no address associated/i
+
+const THROTTLE_ERROR_RE =
+  /\b429\b|too many requests|too many api errors|temporarily blocked|\b503\b|service unavailable/i
+
+// Mutations get a short cooldown so a deliberate user retry still gives
+// feedback, while a bulk operation ("Update All") can't burst dozens of
+// identical toasts.
+const ERROR_TOAST_COOLDOWN_MS = { query: 60_000, mutation: 5_000 }
+
+const errorToastLastShown = new Map<string, number>()
+
+function showDedupedErrorToast(display: string, source: "query" | "mutation") {
+  let key = `message:${display}`
+  let message = display
+  let description: string | undefined
+
+  if (NETWORK_ERROR_RE.test(display)) {
+    key = "network"
+    message = i18n.t("errors:_trn_network_error_toast")
+    description = display
+  } else if (THROTTLE_ERROR_RE.test(display)) {
+    key = "throttle"
+    message = i18n.t("errors:_trn_rate_limited_toast")
+    description = display
+  }
+
+  const now = Date.now()
+
+  const lastShown = errorToastLastShown.get(key)
+  if (
+    lastShown !== undefined &&
+    now - lastShown < ERROR_TOAST_COOLDOWN_MS[source]
+  ) {
+    return
+  }
+
+  if (errorToastLastShown.size > 200) {
+    for (const [seenKey, shownAt] of errorToastLastShown) {
+      if (now - shownAt > 300_000) {
+        errorToastLastShown.delete(seenKey)
+      }
+    }
+  }
+
+  errorToastLastShown.set(key, now)
+  toast.error(message, description ? { description } : undefined)
+}
+
+// ---------------------------------------------------------------------------
 // Global error handler (same logic as the old createClient onError)
 // ---------------------------------------------------------------------------
 
-function handleGlobalError(error: Error) {
+function handleGlobalError(error: Error, source: "query" | "mutation") {
   console.error("RSPC error:", error)
 
   try {
@@ -118,10 +177,10 @@ function handleGlobalError(error: Error) {
     }
 
     if (!hasCustomCode && parsed.cause?.[0]?.display) {
-      toast.error(parsed.cause[0].display)
+      showDedupedErrorToast(parsed.cause[0].display, source)
     }
   } catch {
-    toast.error(error.message)
+    showDedupedErrorToast(error.message, source)
   }
 }
 
@@ -131,10 +190,10 @@ function handleGlobalError(error: Error) {
 
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    onError: handleGlobalError
+    onError: (error) => handleGlobalError(error, "query")
   }),
   mutationCache: new MutationCache({
-    onError: handleGlobalError
+    onError: (error) => handleGlobalError(error, "mutation")
   }),
   defaultOptions: {
     queries: {

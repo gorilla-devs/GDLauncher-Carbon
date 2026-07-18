@@ -14,5 +14,7 @@
   "_trn_404_message": "Página no encontrada",
   "_trn_its_gone": "Se ha ido",
   "_trn_error.enrollment_failed": "Error al completar el registro",
-  "_trn_error.xbox_code": "Código de error de Xbox"
+  "_trn_error.xbox_code": "Código de error de Xbox",
+  "_trn_network_error_toast": "Error de red: comprueba tu conexión a internet",
+  "_trn_rate_limited_toast": "Un servicio no está disponible temporalmente, es posible que algunos contenidos no se carguen"
 }
