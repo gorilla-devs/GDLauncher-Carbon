@@ -16,7 +16,7 @@ export const supportedLanguages = {
   russian: "russia",
   spanish: "spain",
   simplified_chinese: "china",
-  french: "France"
+  french: "france"
 }
 
 type NamespacesMap = {
