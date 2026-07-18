@@ -8,11 +8,12 @@ use tracing::info;
 
 /// Install a modloader for a server. Returns the LaunchConfig to use for launching.
 ///
-/// Currently supports Fabric and Quilt (self-contained server jars).
-/// Forge and NeoForge require processor execution and are more complex.
+/// Fabric uses the self-contained server launcher jar served by the fabric meta API.
+/// Quilt, Forge and NeoForge download their installer jar and run it with Java.
 ///
 /// If `progress` is provided, reports staged item-based progress:
-/// - Fabric/Quilt: 2 stages (download, extract)
+/// - Fabric: 2 stages (download, write)
+/// - Quilt: 2 stages (download installer, run installer)
 /// - Forge/NeoForge: 3 stages (download installer, run installer, finalize)
 pub async fn install_modloader(
     reqwest_client: &ClientWithMiddleware,
@@ -40,6 +41,7 @@ pub async fn install_modloader(
                 server_path,
                 game_version,
                 modloader_version,
+                java_path,
                 progress,
             )
             .await
@@ -72,7 +74,8 @@ pub async fn install_modloader(
 
 /// Install Fabric server.
 /// Fabric provides a self-contained server launcher jar that includes everything needed.
-/// Download from: https://meta.fabricmc.net/v2/versions/loader/{game_version}/{loader_version}/server/jar
+/// Download from: https://meta.fabricmc.net/v2/versions/loader/{game_version}/{loader_version}/{installer_version}/server/jar
+/// The installer version path segment is required; without it the endpoint returns 404.
 async fn install_fabric(
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
@@ -84,9 +87,13 @@ async fn install_fabric(
         p.update_items(0, 2);
     }
 
+    let installer_version = latest_fabric_installer_version(reqwest_client)
+        .await
+        .context("Failed to determine Fabric installer version")?;
+
     let url = format!(
-        "https://meta.fabricmc.net/v2/versions/loader/{}/{}/server/jar",
-        game_version, loader_version
+        "https://meta.fabricmc.net/v2/versions/loader/{}/{}/{}/server/jar",
+        game_version, loader_version, installer_version
     );
 
     info!("Downloading Fabric server jar from {}", url);
@@ -133,47 +140,89 @@ async fn install_fabric(
 }
 
 /// Install Quilt server.
-/// Quilt also provides a self-contained server launcher jar.
-/// Download from: https://meta.quiltmc.org/v3/versions/loader/{game_version}/{loader_version}/server/jar
+/// Quilt's meta API has no bundled server jar endpoint. Instead it serves the
+/// quilt-installer jar, which is run with `install server` to generate
+/// quilt-server-launch.jar and its libraries in the server directory. The
+/// generated launcher picks up the vanilla `server.jar` already downloaded
+/// next to it.
 async fn install_quilt(
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
     game_version: &str,
     loader_version: &str,
+    java_path: &Path,
     progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
     if let Some(p) = progress {
         p.update_items(0, 2);
     }
 
-    let url = format!(
-        "https://meta.quiltmc.org/v3/versions/loader/{}/{}/server/jar",
-        game_version, loader_version
+    let installer = latest_quilt_installer(reqwest_client)
+        .await
+        .context("Failed to determine Quilt installer version")?;
+
+    info!(
+        "Downloading Quilt installer {} from {}",
+        installer.version, installer.url
     );
 
-    info!("Downloading Quilt server jar from {}", url);
-
     let response = reqwest_client
-        .get(&url)
+        .get(&installer.url)
         .send()
         .await
-        .context("Failed to download Quilt server jar")?;
+        .context("Failed to download Quilt installer")?;
 
     if !response.status().is_success() {
         bail!(
-            "Failed to download Quilt server jar: HTTP {}",
+            "Failed to download Quilt installer: HTTP {}",
             response.status()
         );
     }
 
     let bytes = response.bytes().await?;
+    let data_path = server_path.get_data_path();
+    let installer_path = data_path.join("quilt-installer.jar");
+    tokio::fs::write(&installer_path, &bytes)
+        .await
+        .context("Failed to write Quilt installer")?;
+
     if let Some(p) = progress {
         p.update_items(1, 2);
     }
-    let jar_path = server_path.get_data_path().join("quilt-server-launch.jar");
-    tokio::fs::write(&jar_path, &bytes)
+
+    info!("Running Quilt installer...");
+    let output = tokio::process::Command::new(java_path)
+        .arg("-jar")
+        .arg("quilt-installer.jar")
+        .arg("install")
+        .arg("server")
+        .arg(game_version)
+        .arg(loader_version)
+        .arg(format!("--install-dir={}", data_path.display()))
+        .current_dir(&data_path)
+        .output()
         .await
-        .context("Failed to write Quilt server jar")?;
+        .context("Failed to run Quilt installer")?;
+
+    // Clean up installer
+    let _ = tokio::fs::remove_file(&installer_path).await;
+
+    if !output.status.success() {
+        bail!(
+            "Quilt installer exited with code {:?}.\nstdout:\n{}\nstderr:\n{}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let launch_jar = data_path.join("quilt-server-launch.jar");
+    if !launch_jar.exists() {
+        bail!(
+            "Quilt installer did not produce quilt-server-launch.jar in {}",
+            data_path.display()
+        );
+    }
 
     // Create mods directory
     tokio::fs::create_dir_all(server_path.get_mods_path())
@@ -183,7 +232,7 @@ async fn install_quilt(
     if let Some(p) = progress {
         p.update_items(2, 2);
     }
-    info!("Quilt server jar installed successfully");
+    info!("Quilt server installed successfully");
 
     Ok(LaunchConfig {
         jar_path: Some("quilt-server-launch.jar".to_string()),
@@ -192,6 +241,57 @@ async fn install_quilt(
         extra_jvm_args: Vec::new(),
         extra_game_args: Vec::new(),
     })
+}
+
+#[derive(serde::Deserialize)]
+struct FabricInstallerVersion {
+    version: String,
+    #[serde(default)]
+    stable: bool,
+}
+
+/// Fetch the newest stable Fabric installer version from the fabric meta API,
+/// newest first. The server jar endpoint requires it as a path segment.
+async fn latest_fabric_installer_version(reqwest_client: &ClientWithMiddleware) -> Result<String> {
+    let versions: Vec<FabricInstallerVersion> = reqwest_client
+        .get("https://meta.fabricmc.net/v2/versions/installer")
+        .send()
+        .await
+        .context("Failed to fetch Fabric installer versions")?
+        .json()
+        .await
+        .context("Failed to parse Fabric installer versions")?;
+
+    versions
+        .iter()
+        .find(|v| v.stable)
+        .or_else(|| versions.first())
+        .map(|v| v.version.clone())
+        .ok_or_else(|| anyhow::anyhow!("Fabric meta returned no installer versions"))
+}
+
+#[derive(serde::Deserialize)]
+struct QuiltInstaller {
+    version: String,
+    url: String,
+}
+
+/// Fetch the newest Quilt installer (version and jar url) from the quilt meta
+/// API, which lists installers newest first.
+async fn latest_quilt_installer(reqwest_client: &ClientWithMiddleware) -> Result<QuiltInstaller> {
+    let mut installers: Vec<QuiltInstaller> = reqwest_client
+        .get("https://meta.quiltmc.org/v3/versions/installer")
+        .send()
+        .await
+        .context("Failed to fetch Quilt installer versions")?
+        .json()
+        .await
+        .context("Failed to parse Quilt installer versions")?;
+
+    if installers.is_empty() {
+        bail!("Quilt meta returned no installer versions");
+    }
+    Ok(installers.remove(0))
 }
 
 /// Install Forge server.

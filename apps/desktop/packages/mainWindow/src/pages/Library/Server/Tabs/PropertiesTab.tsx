@@ -143,8 +143,11 @@ const PropertiesTab = () => {
           <Show when={prop.type === "boolean"}>
             <Switch
               checked={value() === "true"}
-              onChange={(checked) =>
-                updateProperty(prop.key, checked ? "true" : "false")
+              onChange={(e) =>
+                updateProperty(
+                  prop.key,
+                  e.currentTarget.checked ? "true" : "false"
+                )
               }
             />
           </Show>

@@ -1,6 +1,7 @@
 import { Trans } from "@gd/i18n"
 import { Checkbox } from "@gd/ui"
 import { useModal } from "@/managers/ModalsManager"
+import { createResource, Show } from "solid-js"
 import type { AuthStep } from "../flow/types"
 
 /**
@@ -19,6 +20,7 @@ interface TermsStepProps {
 
 export function TermsStep(props: TermsStepProps) {
   const modalsContext = useModal()
+  const [cmpAvailable] = createResource(() => window.isCMPWindowAvailable())
 
   return (
     <div class="flex w-full flex-1 flex-col items-center justify-center gap-8 p-6 text-center">
@@ -77,17 +79,19 @@ export function TermsStep(props: TermsStepProps) {
               <Trans key="auth:_trn_login.privacy_link_label" />
             </button>
 
-            <span class="text-darkSlate-500">•</span>
+            <Show when={cmpAvailable()}>
+              <span class="text-darkSlate-500">•</span>
 
-            <button
-              class="text-primary-400 hover:text-primary-300 flex items-center gap-1.5 whitespace-nowrap font-medium transition-colors"
-              onClick={() => {
-                window?.openCMPWindow()
-              }}
-            >
-              <div class="i-hugeicons:settings-02 h-4 w-4 shrink-0" />
-              <Trans key="auth:_trn_login.manage_cmp" />
-            </button>
+              <button
+                class="text-primary-400 hover:text-primary-300 flex items-center gap-1.5 whitespace-nowrap font-medium transition-colors"
+                onClick={() => {
+                  window?.openCMPWindow()
+                }}
+              >
+                <div class="i-hugeicons:settings-02 h-4 w-4 shrink-0" />
+                <Trans key="auth:_trn_login.manage_cmp" />
+              </button>
+            </Show>
           </div>
         </div>
       </div>

@@ -146,8 +146,13 @@ pub(super) async fn load_and_migrate(
         .exec()
         .await
         .map_err(|e| anyhow::anyhow!("PRAGMA temp_store failed: {e}"))?;
+    // Cap the mmap window at 256 MiB: mapped DB pages sit in the process
+    // working set (not reclaimable cache), so a window sized beyond the hot
+    // page set turns a bloated DB directly into launcher RAM pressure. Reads
+    // past the window go through the OS page cache, which stays reclaimable
+    // "available" memory.
     let _: Vec<Whatever> = db_client
-        ._query_raw(raw!("PRAGMA mmap_size = 30000000000;"))
+        ._query_raw(raw!("PRAGMA mmap_size = 268435456;"))
         .exec()
         .await
         .map_err(|e| anyhow::anyhow!("PRAGMA mmap_size failed: {e}"))?;

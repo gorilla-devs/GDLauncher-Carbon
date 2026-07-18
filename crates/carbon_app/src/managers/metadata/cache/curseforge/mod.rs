@@ -16,7 +16,7 @@ use carbon_platforms::curseforge::filters::ModParameters;
 use carbon_platforms::curseforge::filters::ModsParameters;
 use carbon_platforms::curseforge::filters::ModsParametersBody;
 use carbon_repos::db::read_filters::DateTimeFilter;
-use carbon_repos::db::read_filters::IntFilter;
+use carbon_repos::db::read_filters::{IntFilter, StringFilter};
 use carbon_repos::db::{
     curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
     mod_metadata as metadb, server_mod_file_cache as sfcdb,
@@ -57,6 +57,13 @@ impl ModplatformCacher for CurseforgeModCacher {
                 .mod_file_cache()
                 .find_many(vec![
                     fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                    // Worlds are directories with name-derived pseudo-hashes,
+                    // so there is nothing to match on the platform.
+                    fcdb::WhereParam::AddonType(StringFilter::Not(
+                        crate::domain::instance::AddonType::Worlds
+                            .to_db_string()
+                            .to_string(),
+                    )),
                     fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIsNot(vec![
                         cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
                             (chrono::Utc::now() - chrono::Duration::days(1)).into(),

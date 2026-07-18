@@ -617,6 +617,104 @@ impl ManagerRef<'_, JavaManager> {
         Ok(Some(java))
     }
 
+    /// Find a Java appropriate for a server running the given Minecraft version.
+    ///
+    /// Resolves the version's java profile from the version manifest (matching
+    /// the instance launch behavior), preferring the profile's linked Java, then
+    /// any valid installed Java with a compatible version, then an automatic
+    /// install when system java profiles are auto-managed. Falls back to the
+    /// newest installed Java when the version's requirement cannot be determined.
+    pub async fn find_java_for_server_version(
+        self,
+        game_version: &str,
+        modloader_type: Option<&str>,
+    ) -> anyhow::Result<PathBuf> {
+        let Some(required_profile) = self
+            .required_profile_for_server_version(game_version, modloader_type)
+            .await
+        else {
+            tracing::warn!(
+                "Could not determine the java requirement for Minecraft {game_version}, \
+                 using the newest installed Java"
+            );
+            return self.find_best_java_for_server().await;
+        };
+
+        if let Some(java) = self
+            .get_usable_java_for_profile_name(required_profile)
+            .await?
+        {
+            return Ok(PathBuf::from(java.path));
+        }
+
+        // The profile has no usable linked Java — accept any valid installed
+        // Java with a compatible version.
+        let javas = self.get_available_javas().await?;
+        for versions in javas.values() {
+            for java in versions {
+                if java.is_valid
+                    && required_profile.is_java_version_compatible(&java.component.version)
+                {
+                    return Ok(PathBuf::from(&java.component.path));
+                }
+            }
+        }
+
+        let auto_manage_java_system_profiles = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .auto_manage_java_system_profiles;
+
+        if auto_manage_java_system_profiles {
+            if let Some(java) = self
+                .require_java_install(required_profile, true, None)
+                .await?
+            {
+                return Ok(PathBuf::from(java.path));
+            }
+        }
+
+        bail!(
+            "Minecraft {game_version} servers require a {required_profile:?} Java which is not \
+             installed. Install a compatible Java or enable automatic Java management."
+        )
+    }
+
+    /// Resolve the system java profile a server of the given Minecraft version
+    /// requires, from the version manifest. Forge on 1.16.5 needs the patched
+    /// legacy profile (Java 8 below update 312), same as the instance launch path.
+    async fn required_profile_for_server_version(
+        self,
+        game_version: &str,
+        modloader_type: Option<&str>,
+    ) -> Option<SystemJavaProfileName> {
+        if game_version == "1.16.5" && modloader_type == Some("forge") {
+            return Some(SystemJavaProfileName::LegacyFixed1);
+        }
+
+        let manifest = match self.app.minecraft_manager().get_minecraft_manifest().await {
+            Ok(manifest) => manifest,
+            Err(e) => {
+                tracing::warn!(
+                    "Could not get the version manifest to determine the java requirement \
+                     for Minecraft {game_version}: {e}"
+                );
+                return None;
+            }
+        };
+
+        let java_profile = manifest
+            .versions
+            .iter()
+            .find(|version| version.id == game_version)?
+            .java_profile
+            .clone()?;
+
+        SystemJavaProfileName::try_from(java_profile).ok()
+    }
+
     /// Find the best available Java for running a Minecraft server.
     /// Prefers the highest major version available. Returns the path to the java binary.
     pub async fn find_best_java_for_server(self) -> anyhow::Result<PathBuf> {

@@ -12,7 +12,7 @@ use carbon_platforms::modrinth::{
     search::{ProjectIDs, TeamIDs, VersionHashesQuery},
     version::HashAlgorithm,
 };
-use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter};
+use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter, StringFilter};
 use carbon_repos::db::{
     mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
     modrinth_mod_image_cache as mrimgdb, server_mod_file_cache as sfcdb,
@@ -49,6 +49,13 @@ impl ModplatformCacher for ModrinthModCacher {
                 .mod_file_cache()
                 .find_many(vec![
                     fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                    // Worlds are directories with name-derived pseudo-hashes,
+                    // so there is nothing to match on the platform.
+                    fcdb::WhereParam::AddonType(StringFilter::Not(
+                        crate::domain::instance::AddonType::Worlds
+                            .to_db_string()
+                            .to_string(),
+                    )),
                     fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
                         mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
                             (chrono::Utc::now() - chrono::Duration::days(1)).into(),
