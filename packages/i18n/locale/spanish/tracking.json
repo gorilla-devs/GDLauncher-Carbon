@@ -1,0 +1,11 @@
+{
+  "_trn_setting_disabled": "Deshabilitado",
+  "_trn_x_days_ago": "Hace {{count}} días",
+  "_trn_soon": "PRONTO",
+  "_trn_setting_disabled_text": "Desactiva casi completamente cualquier métrica que nos envíes. Hacer esto también deshabilitará algunas funcionalidades como enviar informes automáticos de errores y acceso a características de vista previa.",
+  "_trn_setting_anonymous": "Anónimo",
+  "_trn_setting_anonymous_text": "Reduce la cantidad de métricas enviadas a un mínimo. Todas las métricas recopiladas son completamente anónimas. Esto no afecta ninguna funcionalidad.",
+  "_trn_setting_anonymous_with_session_recordings": "Anónimo con grabaciones de sesiones",
+  "_trn_setting_anonymous_with_session_recordings_text": "Esto envía la misma cantidad de datos que Anónimo, pero también incluye grabaciones de sesiones, que son grabaciones breves del uso de la aplicación.",
+  "_trn_settings_authenticated_with_session_recordings": "Autenticado con grabaciones de sesiones"
+}
