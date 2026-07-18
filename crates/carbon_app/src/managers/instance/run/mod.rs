@@ -1,4 +1,4 @@
-use super::log::LogProcessor;
+use super::log::{CappedLogFile, LogProcessor};
 use super::modpack::PackVersionFile;
 use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 use crate::{
@@ -339,11 +339,13 @@ impl ManagerRef<'_, InstanceManager> {
         let log_file_name = format!("{}", now.format("%Y-%m-%d_%H-%M-%S"));
 
         let logs_file_path = if launch_account.is_some() {
-            Some(
-                instance_path
-                    .get_gdl_logs_path()
-                    .join(format!("{}.log", log_file_name)),
-            )
+            let gdl_logs_path = instance_path.get_gdl_logs_path();
+
+            // Same retention as the launcher's own __gdl_logs__; these files previously
+            // accumulated forever.
+            crate::logger::cleanup_old_logs(&gdl_logs_path, 10);
+
+            Some(gdl_logs_path.join(format!("{}.log", log_file_name)))
         } else {
             None
         };
@@ -1104,8 +1106,16 @@ async fn process_logs(
     log: &watch::Sender<GameLog>,
     mut stdout_rx: mpsc::Receiver<Vec<u8>>,
     mut stderr_rx: mpsc::Receiver<Vec<u8>>,
-    mut file: Option<&mut File>,
+    file: Option<&mut File>,
 ) {
+    let mut file = match file {
+        Some(file) => {
+            let already_written = file.metadata().await.map(|m| m.len()).unwrap_or(0);
+            Some(CappedLogFile::new(file, already_written))
+        }
+        None => None,
+    };
+
     let mut stdout_processor = LogProcessor::new(LogEntrySourceKind::StdOut, log).await;
 
     let mut stderr_processor = LogProcessor::new(LogEntrySourceKind::StdErr, log).await;
@@ -1113,12 +1123,12 @@ async fn process_logs(
     loop {
         tokio::select! {
             Some(data) = stdout_rx.recv() => {
-                if let Err(e) = stdout_processor.process_data(&data, file.as_deref_mut()).await {
+                if let Err(e) = stdout_processor.process_data(&data, file.as_mut()).await {
                     tracing::error!("Failed to process stdout data: {}", e);
                 }
             }
             Some(data) = stderr_rx.recv() => {
-                if let Err(e) = stderr_processor.process_data(&data, file.as_deref_mut()).await {
+                if let Err(e) = stderr_processor.process_data(&data, file.as_mut()).await {
                     tracing::error!("Failed to process stderr data: {}", e);
                 }
             }
