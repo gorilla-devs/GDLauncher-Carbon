@@ -14,5 +14,7 @@
   "_trn_404_message": "Страница не найдена",
   "_trn_its_gone": "Этого больше нет",
   "_trn_error.enrollment_failed": "Не удалось завершить регистрацию",
-  "_trn_error.xbox_code": "Код ошибки Xbox"
+  "_trn_error.xbox_code": "Код ошибки Xbox",
+  "_trn_network_error_toast": "Ошибка сети: проверьте подключение к интернету",
+  "_trn_rate_limited_toast": "Сервис временно недоступен, часть контента может не загрузиться"
 }
