@@ -1,0 +1,11 @@
+{
+  "_trn_setting_disabled": "已禁用",
+  "_trn_x_days_ago": "{{count}} 天前",
+  "_trn_soon": "即将推出",
+  "_trn_setting_disabled_text": "几乎完全禁止向我们发送任何指标数据。这样做也会禁用部分功能，例如自动发送错误报告以及访问预览功能。",
+  "_trn_setting_anonymous": "匿名",
+  "_trn_setting_anonymous_text": "将发送的指标数据降至最低。所收集的指标完全匿名。这不会影响任何功能。",
+  "_trn_setting_anonymous_with_session_recordings": "匿名（包含会话录像）",
+  "_trn_setting_anonymous_with_session_recordings_text": "发送的数据量与“匿名”相同，但还会包含会话录像，即应用使用过程的简短录像。",
+  "_trn_settings_authenticated_with_session_recordings": "已验证（包含会话录像）"
+}

@@ -294,6 +294,22 @@ impl Installer {
                 let lock = self.inner.lock().await;
 
                 if lock.is_already_installed(app, instance_id).await? {
+                    // The UI's installed-state can lag behind the file cache (platform
+                    // metadata still being scanned), so a plain install of a file that
+                    // is already on disk is a successful no-op rather than an error.
+                    // Dropping the task right after spawning completes it immediately.
+                    // Replacing is still an error: skipping it would silently leave the
+                    // old version behind.
+                    if replaces_mod_id.is_none() {
+                        let task = VisualTask::new(Translation::InstanceTaskInstallMod {
+                            mod_name: lock.display_name(),
+                            instance_name: data.config.name.clone(),
+                        });
+
+                        let id = app.task_manager().spawn_task(&task).await;
+                        return Ok((None, id, None));
+                    }
+
                     bail!("resource is already installed");
                 }
 
@@ -312,9 +328,14 @@ impl Installer {
                 .get_instance_path(shortpath);
 
             let id = app.task_manager().spawn_task(&task).await;
-            Ok((task, id, instance_path))
+            Ok((Some(task), id, Some(instance_path)))
         }
         .await?;
+
+        let (Some(task), Some(instance_path)) = (task, instance_path) else {
+            return Ok(task_id);
+        };
+
         let visited_ids = Arc::new(Mutex::new(Vec::new()));
         let task = Arc::new(Mutex::new(task));
         self.install_inner(

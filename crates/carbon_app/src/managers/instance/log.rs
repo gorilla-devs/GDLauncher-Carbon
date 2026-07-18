@@ -25,8 +25,16 @@ use crate::{
 
 use super::InstanceManager;
 
+/// Hard cap on in-memory log entries per game session. A log-spamming game would
+/// otherwise grow this without bound; past the cap, entries are dropped after a single
+/// notice (indices never shift, so the streaming API stays consistent).
+const MAX_LOG_ENTRIES: usize = 250_000;
+
 #[derive(Debug, Default)]
-pub struct GameLog(Vec<LogEntry>);
+pub struct GameLog {
+    entries: Vec<LogEntry>,
+    truncated: bool,
+}
 
 impl GameLog {
     pub fn search(
@@ -47,7 +55,7 @@ impl GameLog {
             None
         };
 
-        for (entry_index, entry) in self.0.iter().enumerate() {
+        for (entry_index, entry) in self.entries.iter().enumerate() {
             let message: Cow<str> = if match_case {
                 entry.message.as_str().into()
             } else {
@@ -236,12 +244,31 @@ impl GameLog {
 
     /// Inserts a new entry into the log.
     pub fn add_entry(&mut self, entry: LogEntry) {
-        self.0.push(entry)
+        let _ = self.try_add_entry(entry);
+    }
+
+    /// Inserts a new entry into the log, returning whether the log was modified.
+    /// Returns `false` once the entry cap has been reached.
+    pub fn try_add_entry(&mut self, entry: LogEntry) -> bool {
+        if self.truncated {
+            return false;
+        }
+
+        if self.entries.len() >= MAX_LOG_ENTRIES {
+            self.truncated = true;
+            self.entries.push(LogEntry::system_error(format!(
+                "Log exceeded {MAX_LOG_ENTRIES} entries, further output will not be shown"
+            )));
+            return true;
+        }
+
+        self.entries.push(entry);
+        true
     }
 
     /// Retrieves the requested entry from the log.
     pub fn get_entry(&self, line: usize) -> Option<&LogEntry> {
-        self.0.get(line)
+        self.entries.get(line)
     }
 
     /// Get a region of log entries containing the given start and end lines
@@ -254,21 +281,21 @@ impl GameLog {
         };
 
         let end = match lines.end_bound() {
-            Bound::Included(e) if *e <= self.0.len() => *e + 1, // normalize to excluded
-            Bound::Excluded(e) if *e < self.0.len() => *e,
-            _ => self.0.len(),
+            Bound::Included(e) if *e <= self.entries.len() => *e + 1, // normalize to excluded
+            Bound::Excluded(e) if *e < self.entries.len() => *e,
+            _ => self.entries.len(),
         };
 
         if start >= end {
             return Default::default();
         }
 
-        &self.0[start..end]
+        &self.entries[start..end]
     }
 
     /// Get the number of entries contained in the log.
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.entries.len()
     }
 }
 
@@ -519,6 +546,44 @@ pub fn format_message_as_log4j_event(message: &str) -> String {
     )
 }
 
+/// On-disk game log with a hard size cap ([`crate::logger::MAX_LOG_FILE_SIZE`]): once
+/// reached, further output is dropped after a single truncation notice, so a
+/// log-spamming game can't fill the disk.
+pub struct CappedLogFile<'a> {
+    file: &'a mut File,
+    written: u64,
+    truncated: bool,
+}
+
+impl<'a> CappedLogFile<'a> {
+    pub fn new(file: &'a mut File, already_written: u64) -> Self {
+        Self {
+            file,
+            written: already_written,
+            truncated: false,
+        }
+    }
+
+    pub async fn write_all(&mut self, data: &[u8]) -> std::io::Result<()> {
+        if self.truncated {
+            return Ok(());
+        }
+
+        if self.written + data.len() as u64 > crate::logger::MAX_LOG_FILE_SIZE {
+            self.truncated = true;
+            self.file
+                .write_all(crate::logger::LOG_TRUNCATION_NOTICE)
+                .await?;
+            self.file.flush().await?;
+            return Ok(());
+        }
+
+        self.file.write_all(data).await?;
+        self.written += data.len() as u64;
+        Ok(())
+    }
+}
+
 pub struct LogProcessor<'a> {
     pub parser: LogParser,
     pub kind: LogEntrySourceKind,
@@ -537,7 +602,7 @@ impl<'a> LogProcessor<'a> {
     pub async fn process_data(
         &mut self,
         data: &[u8],
-        file: Option<&mut File>,
+        file: Option<&mut CappedLogFile<'_>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(file) = file {
             file.write_all(data).await?;
@@ -550,15 +615,12 @@ impl<'a> LogProcessor<'a> {
         while let Some(item) = self.parser.parse_next()? {
             match item {
                 ParsedItem::LogEntry(entry) => {
-                    self.log.send_if_modified(|log| {
-                        log.add_entry((self.kind, entry).into());
-                        true
-                    });
+                    self.log
+                        .send_if_modified(|log| log.try_add_entry((self.kind, entry).into()));
                 }
                 ParsedItem::PlainText(text) => {
                     self.log.send_if_modified(|log| {
-                        log.add_entry(LogEntry::plaintext(text, self.kind));
-                        true
+                        log.try_add_entry(LogEntry::plaintext(text, self.kind))
                     });
                 }
                 ParsedItem::Partial(_) => {
@@ -624,6 +686,23 @@ mod test {
         test_span(&log, 1..0, []);
         test_span(&log, 1..2, ["item 2"]);
         test_span(&log, 1..=3, ["item 2", "item 3", "item 4"]);
+    }
+
+    #[test]
+    fn entry_cap() {
+        let mut log = GameLog::new();
+
+        for i in 0..(MAX_LOG_ENTRIES + 100) {
+            log.add_entry(LogEntry::system_message(format!("item {i}")));
+        }
+
+        // Capped entries plus a single truncation notice, indices never shift
+        assert_eq!(log.len(), MAX_LOG_ENTRIES + 1);
+        let last = log.get_entry(MAX_LOG_ENTRIES).unwrap();
+        assert!(last.message.contains("further output will not be shown"));
+
+        assert!(!log.try_add_entry(LogEntry::system_message("dropped")));
+        assert_eq!(log.len(), MAX_LOG_ENTRIES + 1);
     }
 
     #[test]

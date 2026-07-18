@@ -629,6 +629,7 @@ for (const deepLinkProtocol of deepLinkProtocols) {
 }
 
 let lastDisplay: Display | null = null
+let pendingDisplayChange = false
 
 let isSpawningWindow = false
 
@@ -690,7 +691,44 @@ async function createWindow(): Promise<BrowserWindow> {
 
   win.on("closed", () => {
     win = null
+    pendingDisplayChange = false
   })
+
+  const applyAdLayoutForCurrentDisplay = () => {
+    pendingDisplayChange = false
+
+    const bounds = win?.getBounds()
+    if (!bounds) {
+      return
+    }
+
+    const display = screen.getDisplayMatching(bounds)
+    const { minWidth, minHeight, adSize, bannerAdSize, hideAdText } =
+      getAdSize(display)
+
+    win?.setMinimumSize(minWidth, minHeight)
+
+    // Grow to satisfy the new minimums and stay within the display, but never
+    // shrink a window the user made larger
+    const workArea = display.workArea
+    const targetWidth = Math.min(
+      Math.max(bounds.width, minWidth),
+      workArea.width
+    )
+    const targetHeight = Math.min(
+      Math.max(bounds.height, minHeight),
+      workArea.height
+    )
+    if (targetWidth !== bounds.width || targetHeight !== bounds.height) {
+      win?.setSize(targetWidth, targetHeight)
+    }
+
+    win?.webContents?.send("adSizeChanged", {
+      adSize,
+      bannerAdSize,
+      hideAdText
+    })
+  }
 
   win.on("move", () => {
     const bounds = win?.getBounds()
@@ -700,20 +738,25 @@ async function createWindow(): Promise<BrowserWindow> {
     }
 
     const currentDisplay = screen.getDisplayMatching(bounds)
-    if (lastDisplay?.id === currentDisplay?.id) {
-      return
-    }
+    if (lastDisplay?.id !== currentDisplay?.id) {
+      lastDisplay = currentDisplay
+      pendingDisplayChange = true
 
-    lastDisplay = currentDisplay
-    const { minWidth, minHeight, adSize, bannerAdSize, hideAdText } =
-      getAdSize(currentDisplay)
-    win?.setMinimumSize(minWidth, minHeight)
-    win?.setSize(minWidth, minHeight)
-    win?.webContents?.send("adSizeChanged", {
-      adSize,
-      bannerAdSize,
-      hideAdText
-    })
+      // Linux never emits `moved`, so apply immediately there
+      if (process.platform === "linux") {
+        applyAdLayoutForCurrentDisplay()
+      }
+    }
+  })
+
+  // Resizing while the user is still dragging fights the OS drag loop and makes
+  // the window snap to the seam between monitors. `moved` fires once when the
+  // interactive move ends on Windows (on macOS it's an alias of `move`), so the
+  // new ad layout is applied only after the drag is released.
+  win.on("moved", () => {
+    if (pendingDisplayChange) {
+      applyAdLayoutForCurrentDisplay()
+    }
   })
 
   win.on("close", (e) => {
@@ -921,11 +964,15 @@ ipcMain.handle("openFolder", async (_, path) => {
 })
 
 ipcMain.handle("openCMPWindow", async () => {
-  // @ts-ignore - Overwolf types not available
-  if (app.overwolf.openCMPWindow) {
-    // @ts-ignore - Overwolf types not available
-    app.overwolf.openCMPWindow()
+  if ((app as any).overwolf?.openCMPWindow) {
+    ;(app as any).overwolf.openCMPWindow()
+    return true
   }
+  return false
+})
+
+ipcMain.handle("isCMPWindowAvailable", async () => {
+  return !!(app as any).overwolf?.openCMPWindow
 })
 
 ipcMain.handle("closeWindow", async () => {

@@ -1,0 +1,8 @@
+{
+  "_trn_type_java_path": "Escribe una ruta de java",
+  "_trn_type_profile_name": "Escribe un nombre de perfil",
+  "_trn_type_custom_java_path": "Escribe una ruta de java personalizada",
+  "_trn_select_java_profile": "Selecciona un perfil de java",
+  "_trn_find_logs": "Buscar (Ctrl+F)",
+  "_trn_email_example": "correo@ejemplo.com"
+}

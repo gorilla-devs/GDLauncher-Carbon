@@ -1,5 +1,6 @@
 import { Button } from "@gd/ui"
 import { Trans } from "@gd/i18n"
+import { createResource, Show } from "solid-js"
 import PageTitle from "./components/PageTitle"
 import RowsContainer from "./components/RowsContainer"
 import Row from "./components/Row"
@@ -9,6 +10,7 @@ import { useModal } from "@/managers/ModalsManager"
 
 const Privacy = () => {
   const modalsContext = useModal()
+  const [cmpAvailable] = createResource(() => window.isCMPWindowAvailable())
 
   return (
     <>
@@ -16,25 +18,29 @@ const Privacy = () => {
         <Trans key="settings:_trn_privacy" />
       </PageTitle>
       <RowsContainer>
-        <Row>
-          <Title
-            description={<Trans key="settings:_trn_ads_personalization_text" />}
-          >
-            <Trans key="settings:_trn_ads_personalization_title" />
-          </Title>
-          <RightHandSide>
-            <Button
-              type="secondary"
-              size="small"
-              rounded={false}
-              onClick={() => {
-                window?.openCMPWindow()
-              }}
+        <Show when={cmpAvailable()}>
+          <Row>
+            <Title
+              description={
+                <Trans key="settings:_trn_ads_personalization_text" />
+              }
             >
-              <Trans key="auth:_trn_login.manage" />
-            </Button>
-          </RightHandSide>
-        </Row>
+              <Trans key="settings:_trn_ads_personalization_title" />
+            </Title>
+            <RightHandSide>
+              <Button
+                type="secondary"
+                size="small"
+                rounded={false}
+                onClick={() => {
+                  window?.openCMPWindow()
+                }}
+              >
+                <Trans key="auth:_trn_login.manage" />
+              </Button>
+            </RightHandSide>
+          </Row>
+        </Show>
         <Row forceContentBelow>
           <Title description={<Trans key="settings:_trn_documents_text" />}>
             <Trans key="settings:_trn_documents_title" />

@@ -1,7 +1,7 @@
 import { Trans } from "@gd/i18n"
 import { Checkbox } from "@gd/ui"
 import { useModal } from "@/managers/ModalsManager"
-import { createSignal } from "solid-js"
+import { createResource, createSignal, Show } from "solid-js"
 
 /**
  * Terms and Privacy acceptance step
@@ -20,6 +20,7 @@ interface TermsAndPrivacyStepProps {
 
 export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
   const modalsContext = useModal()
+  const [cmpAvailable] = createResource(() => window.isCMPWindowAvailable())
   const [termsAccepted, setTermsAccepted] = createSignal(
     props.initialAccepted ?? false
   )
@@ -107,17 +108,19 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
             <Trans key="auth:_trn_login.privacy_link_label" />
           </button>
 
-          <span class="text-darkSlate-500">•</span>
+          <Show when={cmpAvailable()}>
+            <span class="text-darkSlate-500">•</span>
 
-          <button
-            class="text-primary-400 hover:text-primary-300 flex items-center gap-1.5 whitespace-nowrap font-medium transition-colors"
-            onClick={() => {
-              window?.openCMPWindow()
-            }}
-          >
-            <div class="i-hugeicons:settings-02 h-4 w-4 shrink-0" />
-            <Trans key="auth:_trn_login.manage_cmp" />
-          </button>
+            <button
+              class="text-primary-400 hover:text-primary-300 flex items-center gap-1.5 whitespace-nowrap font-medium transition-colors"
+              onClick={() => {
+                window?.openCMPWindow()
+              }}
+            >
+              <div class="i-hugeicons:settings-02 h-4 w-4 shrink-0" />
+              <Trans key="auth:_trn_login.manage_cmp" />
+            </button>
+          </Show>
         </div>
       </div>
     </div>
