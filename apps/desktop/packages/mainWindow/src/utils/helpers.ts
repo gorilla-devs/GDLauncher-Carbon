@@ -202,3 +202,16 @@ export const capitalize = (word: string | null | undefined) => {
 
   return word?.charAt(0).toUpperCase() + word?.slice(1).toLowerCase()
 }
+
+const MODLOADER_DISPLAY_NAMES: Record<string, string> = {
+  forge: "Forge",
+  neoforge: "NeoForge",
+  fabric: "Fabric",
+  quilt: "Quilt"
+}
+
+export const getModloaderDisplayName = (loader: string | null | undefined) => {
+  if (!loader) return loader
+
+  return MODLOADER_DISPLAY_NAMES[loader.toLowerCase()] ?? capitalize(loader)
+}
