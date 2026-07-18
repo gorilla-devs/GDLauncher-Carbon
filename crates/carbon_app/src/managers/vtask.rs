@@ -506,12 +506,14 @@ pub enum Progress {
 
 impl Progress {
     pub fn as_float(self) -> f32 {
+        // Clamped so a miscounted total (or a 0 total before the first update) can never
+        // surface as NaN or >100% in the UI.
         match self {
             Self::Download {
                 downloaded, total, ..
-            } => downloaded as f32 / total as f32,
-            Self::Item { current, total } => current as f32 / total as f32,
-            Self::Opaque(false) => 0.0,
+            } if total > 0 => (downloaded as f32 / total as f32).min(1.0),
+            Self::Item { current, total } if total > 0 => (current as f32 / total as f32).min(1.0),
+            Self::Download { .. } | Self::Item { .. } | Self::Opaque(false) => 0.0,
             Self::Opaque(true) => 1.0,
         }
     }
