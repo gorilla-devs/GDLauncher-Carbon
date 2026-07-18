@@ -1,0 +1,8 @@
+{
+  "_trn_type_java_path": "输入 Java 路径",
+  "_trn_type_profile_name": "输入配置名称",
+  "_trn_type_custom_java_path": "输入自定义 Java 路径",
+  "_trn_select_java_profile": "选择一个 Java 配置",
+  "_trn_find_logs": "查找 (Ctrl+F)",
+  "_trn_email_example": "email@example.com"
+}

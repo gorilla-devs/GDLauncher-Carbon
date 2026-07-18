@@ -168,19 +168,80 @@ const Changelog = () => {
   const rspcContext = rspc.useContext()
 
   const routeData = useChangelogData()
-  const lastFile = () =>
-    routeData.isCurseforge &&
-    routeData.modpackDetails?.data?.data.latestFiles[
-      routeData.modpackDetails?.data?.data.latestFiles.length - 1
-    ]
 
   const [options, setOptions] = createSignal<string[]>([])
   const [optionLabels, setOptionLabels] = createSignal<Record<string, string>>(
     {}
   )
+  const [cfFiles, setCfFiles] = createSignal<CFFEFile[]>([])
+  const [cfFilesLoading, setCfFilesLoading] = createSignal(
+    routeData.isCurseforge
+  )
   const [fileId, setFileId] = createSignal<number | string | undefined>(
     undefined
   )
+
+  // CurseForge's `latestFiles` only contains a handful of recent files, which made
+  // older versions' changelogs unreachable. Page through the full files list instead;
+  // `latestFiles` remains only as a fallback if that fetch fails.
+  createAsyncEffect((isStale) => {
+    if (!routeData.isCurseforge) return
+    const modpackId = parseInt(params.id, 10)
+
+    // Don't leak the previous addon's files into the selector while refetching
+    setCfFiles([])
+    setCfFilesLoading(true)
+
+    const PAGE_SIZE = 50
+    const MAX_FILES = 1000
+
+    const all: CFFEFile[] = []
+
+    const fetchAll = async () => {
+      while (all.length < MAX_FILES) {
+        const response = await rspcContext.client.query([
+          "modplatforms.curseforge.getModFiles",
+          {
+            modId: modpackId,
+            query: { index: all.length, pageSize: PAGE_SIZE }
+          }
+        ])
+
+        if (isStale()) return
+        all.push(...response.data)
+
+        const total = response.pagination?.totalCount
+        if (
+          response.data.length < PAGE_SIZE ||
+          (total != null && all.length >= total)
+        ) {
+          break
+        }
+      }
+
+      if (isStale()) return
+      setCfFiles(all)
+      setCfFilesLoading(false)
+    }
+
+    fetchAll().catch((e) => {
+      console.error(e)
+      if (isStale()) return
+
+      // Failure fallback: whatever pages were fetched plus the `latestFiles` subset,
+      // so the selector is still usable
+      const fallback = [...all]
+      for (const file of routeData.modpackDetails.data?.data.latestFiles ||
+        []) {
+        if (!fallback.some((f) => f.id === file.id)) {
+          fallback.push(file)
+        }
+      }
+
+      setCfFiles(fallback)
+      setCfFilesLoading(false)
+    })
+  })
   const [changeLog, setChangelog] = createSignal<string | undefined>(undefined)
   const [releaseDate, setReleaseDate] = createSignal<string | undefined>(
     undefined
@@ -210,20 +271,32 @@ const Changelog = () => {
         setOptionLabels(labels)
       }
     } else {
-      // Use latestFiles for actual distinct file versions (not latestFilesIndexes which is per-game-version)
-      const files = routeData.modpackDetails.data?.data.latestFiles || []
-      setChangelog(undefined)
-      setReleaseDate(undefined)
-      setIsLoadingChangelog(false)
+      if (cfFilesLoading()) {
+        // Keep the skeleton up until the full files list is in
+        setFileId(undefined)
+        setChangelog(undefined)
+        setReleaseDate(undefined)
+        setIsLoadingChangelog(true)
+        setOptions([])
+        setOptionLabels({})
+        return
+      }
+
+      const files = [...cfFiles()].sort(
+        (a, b) =>
+          new Date(b.fileDate).getTime() - new Date(a.fileDate).getTime()
+      )
 
       const opts = files.map((file) => file.id.toString())
       const labels = Object.fromEntries(
         files.map((file) => [file.id.toString(), file.displayName])
       )
 
-      // Set default value to first option for CurseForge
-      if (opts.length > 0) {
+      const current = fileId()?.toString()
+      if (opts.length > 0 && (!current || !opts.includes(current))) {
         setFileId(opts[0])
+      } else if (opts.length === 0) {
+        setIsLoadingChangelog(false)
       }
 
       setOptions(opts)
@@ -234,21 +307,15 @@ const Changelog = () => {
   createAsyncEffect((isStale) => {
     const modpackId = parseInt(params.id, 10)
     const currentFileId = fileId()
-    const currentLastFile = lastFile()
     const isCurseforge = routeData.isCurseforge
 
     if (isCurseforge) {
-      if (
-        currentFileId !== undefined ||
-        (currentLastFile && currentLastFile.id !== undefined)
-      ) {
+      if (currentFileId !== undefined) {
         setIsLoadingChangelog(true)
         setChangelog(undefined)
         setReleaseDate(undefined)
 
-        const targetFileId =
-          parseInt(currentFileId as string, 10) ||
-          (currentLastFile as CFFEFile).id
+        const targetFileId = parseInt(currentFileId as string, 10)
 
         rspcContext.client
           .query([
@@ -263,6 +330,7 @@ const Changelog = () => {
             if (!isStale()) {
               setChangelog(changelogQuery.data)
               const fileData =
+                cfFiles().find((file) => file.id === targetFileId) ||
                 routeData.modpackDetails.data?.data.latestFiles.find(
                   (file) => file.id === targetFileId
                 ) ||

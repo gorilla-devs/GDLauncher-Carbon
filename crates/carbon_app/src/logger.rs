@@ -5,6 +5,56 @@ use tracing_subscriber::{
     EnvFilter, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
 };
 
+/// Hard cap for a single log file (launcher session logs and per-instance game logs).
+/// A log-spamming game previously grew one session file past 100 GB; once the cap is
+/// reached, further output is dropped after a single truncation notice.
+pub const MAX_LOG_FILE_SIZE: u64 = 256 * 1024 * 1024;
+
+pub const LOG_TRUNCATION_NOTICE: &[u8] = b"\n[log truncated: file size cap reached]\n";
+
+/// `Write` wrapper that drops output past [`MAX_LOG_FILE_SIZE`].
+#[cfg_attr(debug_assertions, allow(dead_code))]
+struct SizeCappedWriter<W: std::io::Write> {
+    inner: W,
+    written: u64,
+    truncated: bool,
+}
+
+impl<W: std::io::Write> SizeCappedWriter<W> {
+    #[cfg_attr(debug_assertions, allow(dead_code))]
+    fn new(inner: W) -> Self {
+        Self {
+            inner,
+            written: 0,
+            truncated: false,
+        }
+    }
+}
+
+impl<W: std::io::Write> std::io::Write for SizeCappedWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.truncated {
+            // Report the bytes as written so tracing doesn't treat this as an error.
+            return Ok(buf.len());
+        }
+
+        if self.written + buf.len() as u64 > MAX_LOG_FILE_SIZE {
+            self.truncated = true;
+            let _ = self.inner.write_all(LOG_TRUNCATION_NOTICE);
+            let _ = self.inner.flush();
+            return Ok(buf.len());
+        }
+
+        let n = self.inner.write(buf)?;
+        self.written += n as u64;
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
 fn generate_logs_filters() -> String {
     #[cfg(debug_assertions)]
     let app_level = "carbon_app=trace";
@@ -134,7 +184,8 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
         let file_appender =
             tracing_appender::rolling::never(logs_path, format!("{}.log", file_name));
 
-        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        let (non_blocking, guard) =
+            tracing_appender::non_blocking(SizeCappedWriter::new(file_appender));
 
         let printer = tracing_subscriber::fmt::layer()
             .with_target(true)
@@ -149,5 +200,32 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
 
         tracing::trace!("Logger initialized");
         return Some(guard);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::io::Write;
+
+    #[test]
+    fn size_capped_writer_stops_at_cap() {
+        let mut writer = super::SizeCappedWriter {
+            inner: Vec::new(),
+            written: super::MAX_LOG_FILE_SIZE - 10,
+            truncated: false,
+        };
+
+        writer.write_all(b"0123456789").unwrap();
+        assert_eq!(writer.inner, b"0123456789");
+
+        // This write crosses the cap: dropped, notice appended, no error reported
+        writer.write_all(b"overflow").unwrap();
+        assert!(writer.truncated);
+        let expected = [b"0123456789" as &[u8], super::LOG_TRUNCATION_NOTICE].concat();
+        assert_eq!(writer.inner, expected);
+
+        // Subsequent writes are silently dropped
+        writer.write_all(b"more").unwrap();
+        assert_eq!(writer.inner, expected);
     }
 }
