@@ -31,7 +31,7 @@
   "_trn_common.read_more": "Читать далее",
   "_trn_common.view_all": "Посмотреть все",
   "_trn_common.clear_all": "Очистить все",
-  "_trn_add_custom_java_path": "Добавить путь к Java",
+  "_trn_add_custom_java_path": "Добавить пользовательский путь к Java",
   "_trn_profile_name": "Имя профиля",
   "_trn_assigned_java_path": "Назначенный путь к Java",
   "_trn_instance_unlock_confirmation": "Разблокировка позволяет устанавливать дополнительный контент в этот экземпляр. Неправильные действия могут привести к тому, что экземпляр перестанет запускаться. Это действие нельзя отменить.",

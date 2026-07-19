@@ -10,7 +10,7 @@
   "_trn_tile_size": "Размер плитки",
   "_trn_sort_options": "Параметры сортировки",
   "_trn_group_options": "Параметры группировки",
-  "_trn_live": "ПРЯМОЙ ЭФИР",
+  "_trn_live": "LIVE",
   "_trn_no_results": "Нет результатов",
   "_trn_overview": "Обзор",
   "_trn_changelog": "Список изменений",
@@ -41,6 +41,6 @@
   "_trn_folders": "Папки",
   "_trn_by_name": "По имени",
   "_trn_by_last_played": "По последней игре",
-  "_trn_by_most_played": "По количеству времени",
+  "_trn_by_most_played": "По времени игры",
   "_trn_by_date_created": "По дате создания"
 }
