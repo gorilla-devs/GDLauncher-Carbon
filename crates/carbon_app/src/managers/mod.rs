@@ -134,6 +134,14 @@ mod app {
 
             update_core_module_status(CoreModuleStatus::LoadAndMigrate);
 
+            // CurseForge rejects unauthenticated CDN downloads, so the key has to reach the
+            // downloader as well as the API client.
+            carbon_net::set_curseforge_api_key(env!(
+                "CURSEFORGE_API_KEY",
+                "missing curseforge env api key"
+            ))
+            .expect("Failed to parse CURSEFORGE_API_KEY as header value");
+
             let app = unsafe {
                 let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
                 let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
