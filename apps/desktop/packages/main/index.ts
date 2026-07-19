@@ -972,6 +972,10 @@ ipcMain.handle("openCMPWindow", async () => {
 })
 
 ipcMain.handle("isCMPWindowAvailable", async () => {
+  // Availability means "can the CMP window open at all" (i.e. an ow-electron
+  // build with the overwolf API injected). Deliberately NOT `isCMPRequired()`:
+  // that is country-dependent, and users outside CMP-required regions must
+  // still be able to manage their consent.
   return !!(app as any).overwolf?.openCMPWindow
 })
 
