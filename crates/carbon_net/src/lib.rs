@@ -28,6 +28,41 @@ const PART_POSTFIX: &str = ".__gdl_part~";
 /// connection that delivers no bytes errors out instead of hanging forever.
 const READ_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
 
+/// CurseForge requires an API key on direct CDN downloads; unauthenticated requests to
+/// `edge.forgecdn.net` are rejected with `401 A valid api-key is required.`
+///
+/// The key is registered here rather than carried on each [`Downloadable`] so that it is
+/// applied at the single point every download request passes through. Resumed range
+/// requests reuse the same header map, and no caller can omit it by forgetting to opt in.
+static CURSEFORGE_API_KEY: std::sync::OnceLock<reqwest::header::HeaderValue> =
+    std::sync::OnceLock::new();
+
+/// Registers the CurseForge API key used to authenticate CDN downloads.
+///
+/// Called once during app startup: the key lives in the app crate's compile-time
+/// environment, which this crate cannot read.
+pub fn set_curseforge_api_key(key: &str) -> Result<(), reqwest::header::InvalidHeaderValue> {
+    let mut value = reqwest::header::HeaderValue::from_str(key)?;
+    value.set_sensitive(true);
+    let _ = CURSEFORGE_API_KEY.set(value);
+    Ok(())
+}
+
+/// Returns the CurseForge API key when `url` points at a CurseForge CDN host.
+///
+/// Matches the registrable domain and its subdomains only, so a lookalike host such as
+/// `notforgecdn.net` never receives the key.
+fn curseforge_cdn_auth(url: &str) -> Option<reqwest::header::HeaderValue> {
+    let parsed = reqwest::Url::parse(url).ok()?;
+    let host = parsed.host_str()?;
+
+    if host != "forgecdn.net" && !host.ends_with(".forgecdn.net") {
+        return None;
+    }
+
+    CURSEFORGE_API_KEY.get().cloned()
+}
+
 #[derive(Error, Debug)]
 pub enum DownloadError {
     #[error("Failed to download {0}")]
@@ -832,6 +867,11 @@ async fn prepare_download(
         .await?;
 
     let mut headers = reqwest::header::HeaderMap::new();
+
+    if let Some(api_key) = curseforge_cdn_auth(&downloadable.url) {
+        headers.insert("x-api-key", api_key);
+    }
+
     let mut processed_bytes = 0;
 
     let mut hasher = match downloadable.checksum {
@@ -1075,6 +1115,37 @@ mod tests {
     use tokio::io::AsyncWriteExt;
     use tokio::sync::watch;
     use tracing_test::traced_test;
+
+    #[test]
+    fn curseforge_key_is_sent_only_to_forgecdn_hosts() {
+        set_curseforge_api_key("test-api-key").unwrap();
+
+        for url in [
+            "https://edge.forgecdn.net/files/3272/32/jei.jar",
+            "https://mediafilez.forgecdn.net/files/3272/32/jei.jar",
+            "https://media.forgecdn.net/files/3272/32/jei.jar",
+            "https://forgecdn.net/files/3272/32/jei.jar",
+        ] {
+            assert!(
+                curseforge_cdn_auth(url).is_some(),
+                "expected CurseForge key for {url}"
+            );
+        }
+
+        for url in [
+            "https://cdn.modrinth.com/data/AABBCCDD/versions/1/mod.jar",
+            "https://piston-data.mojang.com/v1/objects/abc/client.jar",
+            // Suffix lookalike: must not match the registrable domain check.
+            "https://notforgecdn.net/files/3272/32/jei.jar",
+            "https://evil.example.com/?x=edge.forgecdn.net",
+            "not a url at all",
+        ] {
+            assert!(
+                curseforge_cdn_auth(url).is_none(),
+                "did not expect CurseForge key for {url}"
+            );
+        }
+    }
 
     #[tokio::test]
     #[traced_test]
