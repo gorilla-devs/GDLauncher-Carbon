@@ -37,7 +37,7 @@
     "@gd/i18n": "workspace:*",
     "@gd/ui": "workspace:*",
     "@overwolf/ow-electron": "39.8.10",
-    "@overwolf/ow-electron-builder": "^26.0.12",
+    "@overwolf/ow-electron-builder": "^26.9.0",
     "@playwright/test": "^1.58.2",
     "@rive-app/canvas": "^2.35.0",
     "@sentry/electron": "^7.9.0",
