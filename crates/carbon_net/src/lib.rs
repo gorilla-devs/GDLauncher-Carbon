@@ -48,18 +48,20 @@ pub fn set_curseforge_api_key(key: &str) -> Result<(), reqwest::header::InvalidH
     Ok(())
 }
 
-/// Returns the CurseForge API key when `url` points at a CurseForge CDN host.
+/// Returns the CurseForge API key when `url` points at the enforcing CurseForge CDN host.
 ///
-/// Matches the registrable domain and its subdomains only, so a lookalike host such as
-/// `notforgecdn.net` never receives the key.
+/// Matches `edge.forgecdn.net` exactly — the only host CurseForge requires the key on.
+/// Sibling hosts (`media.forgecdn.net` images, `mediafilez.forgecdn.net` files) are open
+/// and stay keyless on direct fetches. A download redirected away from `edge` still
+/// carries the key to the redirect target, since reqwest re-sends custom headers on
+/// redirects it follows.
 ///
 /// Public so that callers downloading CurseForge files outside this crate's download
 /// pipeline (e.g. streamed server-pack fetches) can attach the same `x-api-key` header.
 pub fn curseforge_cdn_auth(url: &str) -> Option<reqwest::header::HeaderValue> {
     let parsed = reqwest::Url::parse(url).ok()?;
-    let host = parsed.host_str()?;
 
-    if host != "forgecdn.net" && !host.ends_with(".forgecdn.net") {
+    if parsed.host_str()? != "edge.forgecdn.net" {
         return None;
     }
 
@@ -1089,27 +1091,24 @@ mod tests {
     use tracing_test::traced_test;
 
     #[test]
-    fn curseforge_key_is_sent_only_to_forgecdn_hosts() {
+    fn curseforge_key_is_sent_only_to_the_edge_cdn_host() {
         set_curseforge_api_key("test-api-key").unwrap();
 
+        assert!(
+            curseforge_cdn_auth("https://edge.forgecdn.net/files/3272/32/jei.jar").is_some(),
+            "expected CurseForge key for edge.forgecdn.net"
+        );
+
         for url in [
-            "https://edge.forgecdn.net/files/3272/32/jei.jar",
+            // Open CurseForge hosts: enforcement applies to edge only.
             "https://mediafilez.forgecdn.net/files/3272/32/jei.jar",
             "https://media.forgecdn.net/files/3272/32/jei.jar",
             "https://forgecdn.net/files/3272/32/jei.jar",
-        ] {
-            assert!(
-                curseforge_cdn_auth(url).is_some(),
-                "expected CurseForge key for {url}"
-            );
-        }
-
-        for url in [
             "https://cdn.modrinth.com/data/AABBCCDD/versions/1/mod.jar",
             "https://piston-data.mojang.com/v1/objects/abc/client.jar",
-            // Suffix lookalike: must not match the registrable domain check.
             "https://notforgecdn.net/files/3272/32/jei.jar",
             "https://evil.example.com/?x=edge.forgecdn.net",
+            "https://forgecdn.net@edge.forgecdn.net.evil.com/files/1/2/x.jar",
             "not a url at all",
         ] {
             assert!(
