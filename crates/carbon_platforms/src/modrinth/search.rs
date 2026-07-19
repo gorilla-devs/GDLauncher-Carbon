@@ -502,6 +502,7 @@ impl FromIterator<String> for TeamIDs {
 mod test {
     use super::{ProjectSearchParameters, SearchFacet};
 
+    #[test]
     fn test_project_into_query() -> anyhow::Result<()> {
         let facets = vec![
             SearchFacet::Category("forge".to_string()),
