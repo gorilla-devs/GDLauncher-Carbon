@@ -8,7 +8,8 @@ import {
   Switch,
   createEffect,
   createSignal,
-  createMemo
+  createMemo,
+  untrack
 } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
@@ -194,33 +195,63 @@ const Changelog = () => {
 
     const PAGE_SIZE = 50
     const MAX_FILES = 1000
+    const PARALLEL_PAGES = 6
 
     const all: CFFEFile[] = []
 
+    const fetchPage = (index: number) =>
+      rspcContext.client.query([
+        "modplatforms.curseforge.getModFiles",
+        {
+          modId: modpackId,
+          query: { index, pageSize: PAGE_SIZE }
+        }
+      ])
+
     const fetchAll = async () => {
-      while (all.length < MAX_FILES) {
-        const response = await rspcContext.client.query([
-          "modplatforms.curseforge.getModFiles",
-          {
-            modId: modpackId,
-            query: { index: all.length, pageSize: PAGE_SIZE }
+      const first = await fetchPage(0)
+      if (isStale()) return
+      all.push(...first.data)
+
+      const reportedTotal = first.pagination?.totalCount
+
+      if (reportedTotal != null) {
+        // Fetch the remaining pages in parallel batches; don't stop on short
+        // pages, since server-side filtering can shrink individual pages
+        const total = Math.min(reportedTotal, MAX_FILES)
+        const indices: number[] = []
+        for (let index = first.data.length; index < total; index += PAGE_SIZE) {
+          indices.push(index)
+        }
+
+        for (let i = 0; i < indices.length; i += PARALLEL_PAGES) {
+          const pages = await Promise.all(
+            indices.slice(i, i + PARALLEL_PAGES).map(fetchPage)
+          )
+          if (isStale()) return
+          for (const page of pages) {
+            all.push(...page.data)
           }
-        ])
-
-        if (isStale()) return
-        all.push(...response.data)
-
-        const total = response.pagination?.totalCount
-        if (
-          response.data.length < PAGE_SIZE ||
-          (total != null && all.length >= total)
-        ) {
-          break
+        }
+      } else {
+        while (all.length < MAX_FILES) {
+          const response = await fetchPage(all.length)
+          if (isStale()) return
+          if (response.data.length === 0) break
+          all.push(...response.data)
         }
       }
 
+      // Paginating a list that can change server-side may duplicate entries
+      const seen = new Set<number>()
+      const files = all.filter((file) => {
+        if (seen.has(file.id)) return false
+        seen.add(file.id)
+        return true
+      })
+
       if (isStale()) return
-      setCfFiles(all)
+      setCfFiles(files)
       setCfFilesLoading(false)
     }
 
@@ -292,7 +323,7 @@ const Changelog = () => {
         files.map((file) => [file.id.toString(), file.displayName])
       )
 
-      const current = fileId()?.toString()
+      const current = untrack(fileId)?.toString()
       if (opts.length > 0 && (!current || !opts.includes(current))) {
         setFileId(opts[0])
       } else if (opts.length === 0) {
