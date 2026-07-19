@@ -760,7 +760,16 @@ async fn _download_file(
                 file_added_to_total.fetch_add(full_size, Ordering::SeqCst);
                 total_files_size.fetch_add(full_size, Ordering::SeqCst);
             }
-            None => count_chunks_into_total = true,
+            None => {
+                // The resumed prefix is already in the downloaded counter; mirror it
+                // into the total, since the chunk counting below only covers new bytes.
+                let prefix = file_processed_bytes.load(Ordering::SeqCst);
+                if prefix > 0 {
+                    file_added_to_total.fetch_add(prefix, Ordering::SeqCst);
+                    total_files_size.fetch_add(prefix, Ordering::SeqCst);
+                }
+                count_chunks_into_total = true;
+            }
         }
     }
 
@@ -983,13 +992,15 @@ async fn download_content(
             hasher.update(&chunk);
         }
 
-        total_downloaded_size.fetch_add(chunk.len() as u64, Ordering::SeqCst);
-        file_processed_bytes.fetch_add(chunk.len() as u64, Ordering::SeqCst);
-
+        // Total before downloaded, so a concurrent progress send between the two
+        // can never observe current_size > total_size
         if count_chunks_into_total {
             file_added_to_total.fetch_add(chunk.len() as u64, Ordering::SeqCst);
             total_size.fetch_add(chunk.len() as u64, Ordering::SeqCst);
         }
+
+        total_downloaded_size.fetch_add(chunk.len() as u64, Ordering::SeqCst);
+        file_processed_bytes.fetch_add(chunk.len() as u64, Ordering::SeqCst);
 
         if let Some(sender) = &options.progress_sender {
             let progress = Progress {
@@ -1958,7 +1969,7 @@ mod tests {
 
         download_multiple(&[downloadable], options).await.unwrap();
 
-        let mut last_progress = Progress::default();
+        let last_progress = Progress::default();
 
         tokio::select! {
             _ = progress_rx.changed() => {
@@ -1968,7 +1979,6 @@ mod tests {
                 assert!(progress.current_size >= last_progress.current_size);
                 assert_eq!(progress.total_count, 1);
                 assert_eq!(progress.total_size, 13);
-                last_progress = progress;
             }
             _ = tokio::time::sleep(Duration::from_secs(5)) => {
                 panic!("Test timed out");
