@@ -630,6 +630,7 @@ for (const deepLinkProtocol of deepLinkProtocols) {
 
 let lastDisplay: Display | null = null
 let pendingDisplayChange = false
+let adSizeFallbackTimeout: NodeJS.Timeout | null = null
 
 let isSpawningWindow = false
 
@@ -692,6 +693,11 @@ async function createWindow(): Promise<BrowserWindow> {
   win.on("closed", () => {
     win = null
     pendingDisplayChange = false
+
+    if (adSizeFallbackTimeout) {
+      clearTimeout(adSizeFallbackTimeout)
+      adSizeFallbackTimeout = null
+    }
   })
 
   const applyAdLayoutForCurrentDisplay = () => {
@@ -709,15 +715,16 @@ async function createWindow(): Promise<BrowserWindow> {
     win?.setMinimumSize(minWidth, minHeight)
 
     // Grow to satisfy the new minimums and stay within the display, but never
-    // shrink a window the user made larger
+    // shrink a window the user made larger. When the work area is smaller than
+    // the minimums, the minimums win (matching setMinimumSize above).
     const workArea = display.workArea
-    const targetWidth = Math.min(
-      Math.max(bounds.width, minWidth),
-      workArea.width
+    const targetWidth = Math.max(
+      Math.min(bounds.width, workArea.width),
+      minWidth
     )
-    const targetHeight = Math.min(
-      Math.max(bounds.height, minHeight),
-      workArea.height
+    const targetHeight = Math.max(
+      Math.min(bounds.height, workArea.height),
+      minHeight
     )
     if (targetWidth !== bounds.width || targetHeight !== bounds.height) {
       win?.setSize(targetWidth, targetHeight)
@@ -745,8 +752,30 @@ async function createWindow(): Promise<BrowserWindow> {
       // Linux never emits `moved`, so apply immediately there
       if (process.platform === "linux") {
         applyAdLayoutForCurrentDisplay()
+        return
       }
     }
+
+    if (!pendingDisplayChange) {
+      return
+    }
+
+    // Fallback for moves that never emit `moved` on Windows (Win+Shift+Arrow,
+    // programmatic setPosition, OS relocation on monitor unplug): debounce past
+    // the last `move`. During an interactive drag `moved` fires on release and
+    // cancels this. A >400ms mid-drag pause could let the timer elapse, but in
+    // practice Windows starves libuv timers inside the modal move loop, so the
+    // callback only runs after the drag ends; if that ever changes, the resize
+    // would fight the drag (the snap-to-seam issue handled below).
+    if (adSizeFallbackTimeout) {
+      clearTimeout(adSizeFallbackTimeout)
+    }
+    adSizeFallbackTimeout = setTimeout(() => {
+      adSizeFallbackTimeout = null
+      if (pendingDisplayChange) {
+        applyAdLayoutForCurrentDisplay()
+      }
+    }, 400)
   })
 
   // Resizing while the user is still dragging fights the OS drag loop and makes
@@ -754,6 +783,11 @@ async function createWindow(): Promise<BrowserWindow> {
   // interactive move ends on Windows (on macOS it's an alias of `move`), so the
   // new ad layout is applied only after the drag is released.
   win.on("moved", () => {
+    if (adSizeFallbackTimeout) {
+      clearTimeout(adSizeFallbackTimeout)
+      adSizeFallbackTimeout = null
+    }
+
     if (pendingDisplayChange) {
       applyAdLayoutForCurrentDisplay()
     }
