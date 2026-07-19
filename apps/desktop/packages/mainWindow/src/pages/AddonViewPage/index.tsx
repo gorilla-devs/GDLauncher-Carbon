@@ -195,12 +195,15 @@ const AddonExplore = (props: { children?: any }) => {
     )
   })
 
+  // Loaders with a real icon; others render as text-only so the vanilla grass
+  // block isn't shown next to e.g. Iris or OptiFine
   const LOADER_DISPLAY_ORDER: FEUnifiedModLoaderType[] = [
     "forge",
     "neoforge",
     "fabric",
     "quilt"
   ]
+  const MAX_LOADER_BADGES = 4
 
   const displayedLoaders = createMemo(() => {
     const loaders = project.data?.loaders || []
@@ -383,15 +386,28 @@ const AddonExplore = (props: { children?: any }) => {
                       </Switch>
                     </div>
                     <Show when={!isFetching() && displayedLoaders().length > 0}>
-                      <div class="border-darkSlate-500 flex items-center gap-3 border-r-2 px-2">
-                        <For each={displayedLoaders()}>
+                      <div class="border-darkSlate-500 flex items-center gap-2 border-r-2 px-2">
+                        <For
+                          each={displayedLoaders().slice(0, MAX_LOADER_BADGES)}
+                        >
                           {(loader) => (
                             <div class="flex items-center gap-1">
-                              <ModloaderIcon modloader={loader} />
+                              <Show
+                                when={LOADER_DISPLAY_ORDER.includes(loader)}
+                              >
+                                <ModloaderIcon modloader={loader} />
+                              </Show>
                               <span>{getModloaderDisplayName(loader)}</span>
                             </div>
                           )}
                         </For>
+                        <Show
+                          when={displayedLoaders().length > MAX_LOADER_BADGES}
+                        >
+                          <span>
+                            +{displayedLoaders().length - MAX_LOADER_BADGES}
+                          </span>
+                        </Show>
                       </div>
                     </Show>
                     <div class="border-darkSlate-500 flex items-center gap-2 border-r-2 px-2">
