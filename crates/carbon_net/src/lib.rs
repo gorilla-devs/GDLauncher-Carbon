@@ -52,7 +52,10 @@ pub fn set_curseforge_api_key(key: &str) -> Result<(), reqwest::header::InvalidH
 ///
 /// Matches the registrable domain and its subdomains only, so a lookalike host such as
 /// `notforgecdn.net` never receives the key.
-fn curseforge_cdn_auth(url: &str) -> Option<reqwest::header::HeaderValue> {
+///
+/// Public so that callers downloading CurseForge files outside this crate's download
+/// pipeline (e.g. streamed server-pack fetches) can attach the same `x-api-key` header.
+pub fn curseforge_cdn_auth(url: &str) -> Option<reqwest::header::HeaderValue> {
     let parsed = reqwest::Url::parse(url).ok()?;
     let host = parsed.host_str()?;
 
@@ -61,6 +64,19 @@ fn curseforge_cdn_auth(url: &str) -> Option<reqwest::header::HeaderValue> {
     }
 
     CURSEFORGE_API_KEY.get().cloned()
+}
+
+/// Base header map for a download request to `url`: carries the CurseForge API key
+/// when the target is a CurseForge CDN host, and is empty otherwise. Resume logic
+/// layers the `Range` header on top of this map.
+fn download_headers(url: &str) -> reqwest::header::HeaderMap {
+    let mut headers = reqwest::header::HeaderMap::new();
+
+    if let Some(api_key) = curseforge_cdn_auth(url) {
+        headers.insert("x-api-key", api_key);
+    }
+
+    headers
 }
 
 #[derive(Error, Debug)]
@@ -866,11 +882,7 @@ async fn prepare_download(
         .open(&part_file_path)
         .await?;
 
-    let mut headers = reqwest::header::HeaderMap::new();
-
-    if let Some(api_key) = curseforge_cdn_auth(&downloadable.url) {
-        headers.insert("x-api-key", api_key);
-    }
+    let mut headers = download_headers(&downloadable.url);
 
     let mut processed_bytes = 0;
 
@@ -1145,6 +1157,20 @@ mod tests {
                 "did not expect CurseForge key for {url}"
             );
         }
+    }
+
+    #[test]
+    fn download_headers_carry_the_curseforge_key_for_cdn_urls() {
+        set_curseforge_api_key("test-api-key").unwrap();
+
+        let headers = download_headers("https://edge.forgecdn.net/files/3272/32/jei.jar");
+        assert_eq!(
+            headers.get("x-api-key").map(|v| v.to_str().unwrap()),
+            Some("test-api-key")
+        );
+
+        let headers = download_headers("https://cdn.modrinth.com/data/AABBCCDD/versions/1/mod.jar");
+        assert!(headers.get("x-api-key").is_none());
     }
 
     #[tokio::test]

@@ -134,9 +134,14 @@ pub async fn process_curseforge_server_pack(
         .context("Failed to create temp directory")?;
     let zip_path = temp_dir.join(&file_info.data.file_name);
 
-    let response = app
-        .reqwest_client
-        .get(download_url)
+    let mut request = app.reqwest_client.get(download_url);
+    // CurseForge rejects unauthenticated CDN downloads; this fetch streams directly
+    // instead of going through carbon_net's downloader, so attach the key here too.
+    if let Some(api_key) = carbon_net::curseforge_cdn_auth(download_url) {
+        request = request.header("x-api-key", api_key);
+    }
+
+    let response = request
         .send()
         .await
         .context("Failed to download server pack")?;
