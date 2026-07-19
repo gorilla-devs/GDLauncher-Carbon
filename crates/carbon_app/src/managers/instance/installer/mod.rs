@@ -307,6 +307,11 @@ impl Installer {
                         });
 
                         let id = app.task_manager().spawn_task(&task).await;
+
+                        // Nudge the UI to re-read the mods list, since its stale
+                        // installed-state is the usual reason we ended up here
+                        app.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+
                         return Ok((None, id, None));
                     }
 
