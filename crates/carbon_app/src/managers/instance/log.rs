@@ -25,14 +25,18 @@ use crate::{
 
 use super::InstanceManager;
 
-/// Hard cap on in-memory log entries per game session. A log-spamming game would
-/// otherwise grow this without bound; past the cap, entries are dropped after a single
-/// notice (indices never shift, so the streaming API stays consistent).
+/// Hard caps on in-memory log entries per game session. A log-spamming game would
+/// otherwise grow this without bound; past either cap, entries are dropped after a
+/// single notice (indices never shift, so the streaming API stays consistent).
+/// The byte budget covers games that spam few but enormous lines, which the entry
+/// count alone would not bound.
 const MAX_LOG_ENTRIES: usize = 250_000;
+const MAX_LOG_BYTES: usize = 128 * 1024 * 1024;
 
 #[derive(Debug, Default)]
 pub struct GameLog {
     entries: Vec<LogEntry>,
+    message_bytes: usize,
     truncated: bool,
 }
 
@@ -248,20 +252,21 @@ impl GameLog {
     }
 
     /// Inserts a new entry into the log, returning whether the log was modified.
-    /// Returns `false` once the entry cap has been reached.
+    /// Returns `false` once the entry or byte cap has been reached.
     pub fn try_add_entry(&mut self, entry: LogEntry) -> bool {
         if self.truncated {
             return false;
         }
 
-        if self.entries.len() >= MAX_LOG_ENTRIES {
+        if self.entries.len() >= MAX_LOG_ENTRIES || self.message_bytes >= MAX_LOG_BYTES {
             self.truncated = true;
-            self.entries.push(LogEntry::system_error(format!(
-                "Log exceeded {MAX_LOG_ENTRIES} entries, further output will not be shown"
-            )));
+            self.entries.push(LogEntry::system_error(
+                "Log exceeded the in-memory limit, further output will not be shown",
+            ));
             return true;
         }
 
+        self.message_bytes += entry.message.len();
         self.entries.push(entry);
         true
     }
