@@ -12,7 +12,7 @@
   "_trn_search_syntax_addon_type": "在左侧选择附加组件类型（模组、整合包等）",
   "_trn_search_syntax_filters": "在右侧按分类等进行筛选",
   "_trn_welcome_gdlauncher_title": "欢迎使用 GDLauncher！🎉",
-  "_trn_welcome_gdlauncher_text": "您好，{{user}}！\n\n欢迎加入我们！GDLauncher 是您的个人 Minecraft 指挥中心，专为提升您的游戏体验而打造。\n\n从自定义实例、内置模组搜索，到性能调优和界面个性化——您所需的一切都触手可及。\n\n准备好打造属于您的完美 Minecraft 之旅了吗？现在就开始吧！\n\nGDLauncher 团队",
+  "_trn_welcome_gdlauncher_text": "您好，{{user}}！\n\n欢迎加入我们！GDLauncher 是您的个人 Minecraft 指挥中心，专为提升您的游戏体验而打造。\n\n从自定义实例、内置模组搜索，到性能调优和界面个性化，您所需的一切都触手可及。\n\n准备好打造属于您的完美 Minecraft 之旅了吗？现在就开始吧！\n\nGDLauncher 团队",
   "_trn_manage_more_options_from_settings": "您可以随时在设置页面更改这些设置，以及许多其他选项",
   "_trn_import_instance_text": "要开始享受您最爱的游戏，您需要创建一个实例。您可以选择一个可用的整合包，或者从电脑上的 zip 文件或其他启动器导入实例。",
   "_trn_add_instance": "+ 添加实例",

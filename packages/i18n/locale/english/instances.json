@@ -317,7 +317,7 @@
   "_trn_share_errors.instance_too_large": "Instance too large to share",
   "_trn_share_errors.too_large_detail": "This instance is {{size}}, but shares are limited to {{limit}}.",
   "_trn_share_errors.too_large_folders": "Largest folders",
-  "_trn_share_errors.too_large_hint": "Remove what you don't need to share — resource packs, shader packs and worlds are usually the biggest.",
+  "_trn_share_errors.too_large_hint": "Remove what you don't need to share: resource packs, shader packs and worlds are usually the biggest.",
   "_trn_share_errors.background_rejected": "Your instance icon was rejected by content moderation. Pick a different icon and try again.",
   "_trn_share_errors.background_moderation_unavailable": "Content moderation is temporarily unavailable. Please try again in a minute.",
   "_trn_share_errors.background_rate_limited": "You've uploaded too many images recently. Please wait a bit before trying again.",

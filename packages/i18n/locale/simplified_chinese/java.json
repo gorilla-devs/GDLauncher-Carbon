@@ -52,7 +52,7 @@
   "_trn_confirm_change_runtime_path_already_used_text": "确定要更改运行时路径吗？由于目标文件夹已被使用，这只会切换运行时路径配置，不会移动或复制任何文件。",
   "_trn_applying_new_runtime_path": "正在应用新的运行时路径...",
   "_trn_do_not_close_app": "请不要关闭应用。完成后它会自动重启。",
-  "_trn_do_not_close_app_or_pc_title": "迁移进行中 — 请勿关闭应用或关闭电脑",
+  "_trn_do_not_close_app_or_pc_title": "迁移进行中：请勿关闭应用或关闭电脑",
   "_trn_do_not_close_app_or_pc_body": "在迁移过程中关闭启动器或关机会导致您的数据分散在旧位置和新位置之间。完成后应用会自动重启。",
   "_trn_migration_errored": "运行时路径迁移失败。状态可能已损坏。点击<0>这里</0>了解如何继续的更多信息。",
   "_trn_scanning_files": "正在扫描文件...",

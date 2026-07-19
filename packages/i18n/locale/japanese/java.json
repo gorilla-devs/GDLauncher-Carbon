@@ -52,7 +52,7 @@
   "_trn_confirm_change_runtime_path_already_used_text": "ランタイムパスを変更しますか？対象フォルダはすでに使用されているため、ランタイムパスの設定のみが切り替わり、ファイルの移動やコピーは行われません。",
   "_trn_applying_new_runtime_path": "新しいランタイムパスを適用中...",
   "_trn_do_not_close_app": "アプリを閉じないでください。完了後に自動で再起動します。",
-  "_trn_do_not_close_app_or_pc_title": "移行中 — アプリを閉じたりPCをシャットダウンしないでください",
+  "_trn_do_not_close_app_or_pc_title": "移行中：アプリを閉じたりPCをシャットダウンしないでください",
   "_trn_do_not_close_app_or_pc_body": "移行中にランチャーを閉じたり電源を切ると、データが新旧の場所に分散して残ります。完了後にアプリは自動で再起動します。",
   "_trn_migration_errored": "ランタイムパスの移行に失敗しました。状態が破損している可能性があります。対処方法は<0>こちら</0>。",
   "_trn_scanning_files": "ファイルをスキャン中...",

@@ -27,7 +27,7 @@
   "_trn_account_scheduled_for_deletion_title": "Cuenta programada para eliminación",
   "_trn_account_scheduled_for_deletion_description": "Tu cuenta se eliminará permanentemente en {{time}}. Puedes cancelar en cualquier momento antes de eso.",
   "_trn_cancel_account_deletion": "Cancelar eliminación",
-  "_trn_cancel_deletion_success": "Eliminación cancelada — tu cuenta está a salvo.",
+  "_trn_cancel_deletion_success": "Eliminación cancelada: tu cuenta está a salvo.",
   "_trn_cancel_deletion_already_completed": "Esta eliminación ya ha sido procesada.",
   "_trn_cancel_deletion_failed": "No se pudo cancelar la eliminación. Inténtalo de nuevo.",
   "_trn_remove_ms_account_with_gdl_account_removal_description": "Esta cuenta de Microsoft se ha vinculado a una cuenta de GDLauncher. Si eliminas esta cuenta, también cerrarás sesión en la cuenta de GDLauncher y los datos no continuarán sincronizándose.",
