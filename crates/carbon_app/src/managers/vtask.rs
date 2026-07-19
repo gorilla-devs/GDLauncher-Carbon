@@ -506,6 +506,12 @@ pub enum Progress {
 
 impl Progress {
     pub fn as_float(self) -> f32 {
+        // A completed subtask must read 1.0 even with a zero/unknown total, or its
+        // weight share would permanently drag the aggregate below 100%.
+        if self.is_complete() {
+            return 1.0;
+        }
+
         // Clamped so a miscounted total (or a 0 total before the first update) can never
         // surface as NaN or >100% in the UI.
         match self {
@@ -513,8 +519,7 @@ impl Progress {
                 downloaded, total, ..
             } if total > 0 => (downloaded as f32 / total as f32).min(1.0),
             Self::Item { current, total } if total > 0 => (current as f32 / total as f32).min(1.0),
-            Self::Download { .. } | Self::Item { .. } | Self::Opaque(false) => 0.0,
-            Self::Opaque(true) => 1.0,
+            _ => 0.0,
         }
     }
 
