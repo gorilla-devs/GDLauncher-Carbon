@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+carbon_macro = { path = "../carbon_macro" }
 prisma-client-rust = { workspace = true, features = [
   "sqlite-create-many",
   "sqlite",

@@ -682,11 +682,15 @@ dependencies = [
 name = "carbon_repos"
 version = "0.1.0"
 dependencies = [
+ "carbon_macro",
  "chrono",
  "prisma-client-rust",
  "rusqlite",
  "rusqlite_migration",
  "serde",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]

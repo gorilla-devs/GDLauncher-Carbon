@@ -1,12 +1,17 @@
 #![allow(warnings)]
 #![allow(dead_code)]
 
+// Lets the `FromRow` derive emit `carbon_repos::` paths that resolve both
+// inside this crate's own modules and in its `tests/` integration crates.
+extern crate self as carbon_repos;
+
 use rusqlite_migration::{M, Migrations};
 
 pub mod db;
 pub mod db_error;
 pub mod db_exec;
 pub mod dbtypes;
+pub mod from_row;
 pub mod pcr; // wip
 
 pub fn get_migrations() -> (Migrations<'static>, i32) {
