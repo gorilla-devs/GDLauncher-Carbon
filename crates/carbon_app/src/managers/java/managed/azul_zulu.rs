@@ -145,6 +145,18 @@ impl Managed for AzulZulu {
                         None => continue,
                     };
 
+                    // Skip symlink entries. The JRE zip ships convenience aliases
+                    // (e.g. bin -> zulu-.../Contents/Home/bin) as symlinks whose body
+                    // is just the target-path text; writing that as a regular file
+                    // corrupts the tree. The real bin/java is a regular file, so this
+                    // must run before main-binary detection to avoid selecting a link.
+                    if file
+                        .unix_mode()
+                        .is_some_and(|mode| mode & 0o170000 == 0o120000)
+                    {
+                        continue;
+                    }
+
                     if (*file.name()).ends_with("bin/java")
                         || (*file.name()).ends_with("bin/java.exe")
                     {

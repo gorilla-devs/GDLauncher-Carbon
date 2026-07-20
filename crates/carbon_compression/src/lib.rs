@@ -78,6 +78,17 @@ where
             None => continue,
         };
 
+        // Skip symlink entries: a zip stores the link target as the entry body, so
+        // writing it out as a regular file corrupts the tree and is a zip-slip-
+        // adjacent risk. Mirrors decompress_tar's symlink/hardlink handling.
+        if file
+            .unix_mode()
+            .is_some_and(|mode| mode & 0o170000 == 0o120000)
+        {
+            warn!("Skipping zip symlink entry: {}", outpath.display());
+            continue;
+        }
+
         {
             let comment = file.comment();
             if !comment.is_empty() {
