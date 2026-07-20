@@ -492,7 +492,9 @@ const Instance = (props: { children?: any }) => {
               <h1
                 ref={nameRef}
                 onInput={(e) => {
-                  setNewName(e.target.innerHTML)
+                  // An instance name is plain text; read textContent so pasted
+                  // markup is never captured into (or later rendered from) it.
+                  setNewName(e.currentTarget.textContent ?? "")
                 }}
                 class="border-box z-10 m-0 min-h-10 cursor-text focus:outline-none focus-visible:border-0 focus-visible:outline-none"
                 contentEditable={editableName()}
@@ -538,7 +540,7 @@ const Instance = (props: { children?: any }) => {
                 onClick={() => {
                   if (routeData.instanceDetails.data?.name && nameRef) {
                     setNewName(routeData.instanceDetails.data?.name)
-                    nameRef.innerHTML = routeData.instanceDetails.data?.name
+                    nameRef.textContent = routeData.instanceDetails.data?.name
                   }
                   setEditableName(false)
                 }}
