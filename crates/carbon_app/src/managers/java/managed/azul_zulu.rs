@@ -5,7 +5,7 @@ use crate::{
 };
 use anyhow::Context;
 use carbon_net::{DownloadOptions, Downloadable, Progress};
-use carbon_repos::db::PrismaClient;
+use carbon_repos::db_exec::Db;
 use carbon_rt_path::{ManagedJavasPath, TempPath};
 use serde::Deserialize;
 use std::{
@@ -27,14 +27,14 @@ pub struct AzulZulu {
 
 #[async_trait::async_trait]
 impl Managed for AzulZulu {
-    #[instrument(skip(self, java_checker, db_client, progress_report))]
+    #[instrument(skip(self, java_checker, db, progress_report))]
     async fn setup<G: JavaChecker + Send + Sync>(
         &self,
         version: &ManagedJavaVersion,
         tmp_path: TempPath,
         base_managed_java_path: ManagedJavasPath,
         java_checker: &G,
-        db_client: &Arc<PrismaClient>,
+        db: &Db,
         progress_report: Sender<Step>,
     ) -> anyhow::Result<String> {
         let progress_report = Arc::new(progress_report);
@@ -277,7 +277,7 @@ impl Managed for AzulZulu {
             }
         };
 
-        let java_id = upsert_java_component_to_db(db_client, java_component).await?;
+        let java_id = upsert_java_component_to_db(db, java_component).await?;
 
         Ok(java_id)
     }

@@ -359,7 +359,7 @@ impl ManagerRef<'_, SettingsManager> {
             incoming_settings.auto_manage_java_system_profiles
         {
             if auto_manage_java_system_profiles.inner() {
-                super::java::scan_and_sync::sync_system_java_profiles(db).await?;
+                super::java::scan_and_sync::sync_system_java_profiles(&self.app.db).await?;
             }
         }
 

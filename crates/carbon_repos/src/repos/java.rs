@@ -23,6 +23,13 @@ pub struct JavaProfileRow {
     pub java_id: Option<String>,
 }
 
+/// A single `Java.path` value, used to collect the set of java paths a profile
+/// links to without materializing whole `JavaRow`s.
+#[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
+pub struct JavaPathRow {
+    pub path: String,
+}
+
 queries! {
     fn get_all_java() -> Vec<JavaRow> =
         "SELECT id, path, major, fullVersion, type, os, arch, vendor, isValid FROM Java";
@@ -30,30 +37,46 @@ queries! {
         "SELECT id, path, major, fullVersion, type, os, arch, vendor, isValid FROM Java WHERE id = :id";
     fn get_java_by_path(path: &str) -> Option<JavaRow> =
         "SELECT id, path, major, fullVersion, type, os, arch, vendor, isValid FROM Java WHERE path = :path";
+    fn get_java_by_type(ty: &str) -> Vec<JavaRow> =
+        "SELECT id, path, major, fullVersion, type, os, arch, vendor, isValid FROM Java WHERE type = :ty";
     fn count_java() -> i64 =
         "SELECT COUNT(*) FROM Java";
     fn set_java_validity(id: &str, valid: bool) -> usize =
         "UPDATE Java SET isValid = :valid WHERE id = :id";
+    fn set_java_validity_by_path(path: &str, valid: bool) -> usize =
+        "UPDATE Java SET isValid = :valid WHERE path = :path";
+    fn update_java_component(id: &str, major: i32, full_version: &str, arch: &str, os: &str, vendor: &str) -> usize =
+        "UPDATE Java SET major = :major, fullVersion = :full_version, arch = :arch, os = :os, vendor = :vendor, isValid = 1 WHERE id = :id";
     fn delete_java(id: &str) -> usize =
         "DELETE FROM Java WHERE id = :id";
+    fn delete_java_by_path(path: &str) -> usize =
+        "DELETE FROM Java WHERE path = :path";
     fn get_all_profiles() -> Vec<JavaProfileRow> =
         "SELECT name, isSystemProfile, javaId FROM JavaProfile";
     fn get_profile(name: &str) -> Option<JavaProfileRow> =
         "SELECT name, isSystemProfile, javaId FROM JavaProfile WHERE name = :name";
+    fn get_profile_linked_java_paths() -> Vec<JavaPathRow> =
+        "SELECT j.path FROM JavaProfile p INNER JOIN Java j ON p.javaId = j.id";
     fn upsert_profile(name: &str, is_system: bool) -> usize =
         "INSERT INTO JavaProfile (name, isSystemProfile) VALUES (:name, :is_system)
          ON CONFLICT(name) DO UPDATE SET isSystemProfile = excluded.isSystemProfile";
     fn set_profile_java(name: &str, java_id: Option<&str>) -> usize =
         "UPDATE JavaProfile SET javaId = :java_id WHERE name = :name";
+    fn delete_profile(name: &str) -> usize =
+        "DELETE FROM JavaProfile WHERE name = :name";
 }
+
+/// The `INSERT` executed by `insert_java` and validated by `INSERT_JAVA_CHECK`.
+/// Shared by both so the checker always covers the exact SQL the fn runs — a
+/// second verbatim copy could drift and silently void the guarantee.
+const INSERT_JAVA_SQL: &str =
+    "INSERT INTO Java (id, path, major, fullVersion, type, os, arch, vendor, isValid)
+         VALUES (:id, :path, :major, :fv, :ty, :os, :arch, :vendor, :valid)";
 
 /// Inserts a `Java` row. Hand-written (not macro-generated) because the
 /// macro's arg list only takes scalar params, not a struct.
 pub fn insert_java(conn: &rusqlite::Connection, j: &JavaRow) -> Result<usize, rusqlite::Error> {
-    let mut st = conn.prepare_cached(
-        "INSERT INTO Java (id, path, major, fullVersion, type, os, arch, vendor, isValid)
-         VALUES (:id, :path, :major, :fv, :ty, :os, :arch, :vendor, :valid)",
-    )?;
+    let mut st = conn.prepare_cached(INSERT_JAVA_SQL)?;
     st.execute(rusqlite::named_params! {
         ":id": j.id, ":path": j.path, ":major": j.major, ":fv": j.full_version,
         ":ty": j.r#type, ":os": j.os, ":arch": j.arch, ":vendor": j.vendor, ":valid": j.is_valid,
@@ -65,8 +88,7 @@ pub fn insert_java(conn: &rusqlite::Connection, j: &JavaRow) -> Result<usize, ru
 /// macro-generated query.
 const INSERT_JAVA_CHECK: crate::registry::QueryCheck = crate::registry::QueryCheck {
     name: "insert_java",
-    sql: "INSERT INTO Java (id, path, major, fullVersion, type, os, arch, vendor, isValid)
-         VALUES (:id, :path, :major, :fv, :ty, :os, :arch, :vendor, :valid)",
+    sql: INSERT_JAVA_SQL,
     params: &[":id", ":path", ":major", ":fv", ":ty", ":os", ":arch", ":vendor", ":valid"],
     columns: None,
 };

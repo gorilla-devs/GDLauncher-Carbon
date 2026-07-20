@@ -169,7 +169,7 @@ pub(super) async fn load_and_migrate(
         .await
         .map_err(|e| anyhow::anyhow!("PRAGMA mmap_size failed: {e}"))?;
 
-    seed_init_db(&db_client, latest_consent_sha).await?;
+    seed_init_db(&db_client, &db, latest_consent_sha).await?;
 
     Ok(LoadedDb {
         prisma_client: db_client,
@@ -212,6 +212,7 @@ pub fn is_in_beta_prompt_cohort(installation_id: &str, percentage: f64) -> bool 
 
 async fn seed_init_db(
     db_client: &PrismaClient,
+    db: &carbon_repos::db_exec::Db,
     latest_consent_sha: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let release_channel = match APP_VERSION {
@@ -329,7 +330,7 @@ async fn seed_init_db(
         .exec()
         .await?;
 
-    JavaManager::ensure_profiles_in_db(db_client)
+    JavaManager::ensure_profiles_in_db(db)
         .await
         .map_err(DatabaseError::EnsureProfiles)?;
 
