@@ -3255,6 +3255,13 @@ pub struct InstanceData {
     icon_revision: Option<u32>,
 }
 
+impl InstanceData {
+    /// The game version this instance is configured to launch, if it has one.
+    pub fn game_version(&self) -> Option<&GameVersion> {
+        self.config.game_configuration.version.as_ref()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Mod {
     id: String,

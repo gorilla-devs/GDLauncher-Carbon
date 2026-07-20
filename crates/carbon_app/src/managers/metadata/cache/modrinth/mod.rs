@@ -1,21 +1,21 @@
 use super::{BundleSender, CacheEntityId, ModplatformCacher, UpdateNotifier};
 use crate::domain::instance::InstanceId;
-use crate::domain::instance::info::ModLoaderType;
+use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::managers::App;
+use crate::managers::instance::InstanceType;
 use anyhow::anyhow;
 use carbon_platforms::ModChannel;
-use carbon_platforms::modrinth::search::VersionIDs;
 use carbon_platforms::modrinth::version::Version;
 use carbon_platforms::modrinth::{
     project::Project,
     responses::{ProjectsResponse, TeamResponse, VersionHashesResponse},
     search::{ProjectIDs, TeamIDs, VersionHashesQuery},
-    version::HashAlgorithm,
+    version::{HashAlgorithm, LatestVersionsBody, VersionType},
 };
 use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter, StringFilter};
 use carbon_repos::db::{
     mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-    modrinth_mod_image_cache as mrimgdb, server_mod_file_cache as sfcdb,
+    modrinth_mod_image_cache as mrimgdb, server as serverdb, server_mod_file_cache as sfcdb,
 };
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -23,6 +23,93 @@ use std::time::{Duration, Instant};
 use tracing::{debug, error, trace, warn};
 
 pub mod modpack;
+
+/// The game version and loaders an entity runs, as Modrinth spells them.
+///
+/// Update paths are only ever read filtered by this pair, so it is also the only
+/// filter worth asking the API about. `None` when the entity has no usable
+/// version yet, in which case update paths are left alone.
+async fn target_compatibility(
+    app: &App,
+    entity_id: CacheEntityId,
+) -> Option<(Vec<String>, Vec<String>)> {
+    match entity_id {
+        CacheEntityId::Instance(instance_id) => {
+            let instance_manager = app.instance_manager();
+            let instances = instance_manager.instances.read().await;
+            let instance = instances.get(&instance_id)?;
+
+            let InstanceType::Valid(data) = &instance.type_ else {
+                return None;
+            };
+
+            let Some(GameVersion::Standard(version)) = data.game_version() else {
+                return None;
+            };
+
+            let loaders = version
+                .modloaders
+                .iter()
+                .map(|loader| loader.type_.to_string().to_lowercase())
+                .collect::<Vec<_>>();
+
+            (!loaders.is_empty()).then(|| (vec![version.release.clone()], loaders))
+        }
+        CacheEntityId::Server(server_id) => {
+            let server = app
+                .prisma_client
+                .server()
+                .find_unique(serverdb::UniqueWhereParam::IdEquals(server_id))
+                .exec()
+                .await
+                .ok()??;
+
+            let loader = server.modloader_type?;
+
+            Some((vec![server.game_version], vec![loader.to_lowercase()]))
+        }
+    }
+}
+
+/// The `gamever,loader,channel` triples an installed file can be updated along,
+/// in the `;`-separated form the cache stores and the mod list parses back.
+///
+/// `candidates` are the versions the platform reported as compatible with what
+/// the entity runs. A candidate only describes an update when it belongs to the
+/// same project and was published after the installed file: the newest version
+/// for this entity's game version can predate a file installed for another one.
+fn build_update_paths(installed: &Version, project_id: &str, candidates: &[Version]) -> String {
+    let mut paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
+
+    let updates = candidates.iter().filter(|candidate| {
+        candidate.project_id == project_id
+            && candidate.id != installed.id
+            && candidate.date_published > installed.date_published
+    });
+
+    for update in updates {
+        for game_version in &update.game_versions {
+            for loader in &update.loaders {
+                let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
+                    continue;
+                };
+
+                paths.insert((game_version, loader, update.version_type.into()));
+            }
+        }
+    }
+
+    paths
+        .into_iter()
+        .map(|(gamever, loader, channel)| {
+            format!(
+                "{gamever},{},{}",
+                loader.to_string().to_lowercase(),
+                channel.as_str(),
+            )
+        })
+        .join(";")
+}
 
 pub struct ModrinthModCacher;
 
@@ -131,6 +218,8 @@ impl ModplatformCacher for ModrinthModCacher {
 
         drop(failed_instances);
 
+        let target_compat = target_compatibility(app, entity_id).await;
+
         let fut = async {
             while !modlist.is_empty() {
                 let (sha512_hashes, metadata) = modlist
@@ -174,27 +263,42 @@ impl ModplatformCacher for ModrinthModCacher {
 
                 let mpm = app.modplatforms_manager();
 
-                let combined_versions_list = projects_response
-                    .iter()
-                    .map(|project| &project.versions)
-                    .flatten()
-                    .map(|v| v.clone())
-                    .collect::<Vec<_>>();
+                // Update paths are only ever read filtered by what the entity runs,
+                // so let the server pick the newest version for that game version
+                // and loader. Fetching every version every project ever published
+                // costs hundreds of requests and answers the same question.
+                //
+                // Each channel is asked separately: a mod whose newest build is a
+                // beta may still have a newer stable one than the installed file,
+                // and which of them counts as an update is the user's choice.
+                let combined_versions_response = match &target_compat {
+                    Some((game_versions, loaders)) => {
+                        let mut newest_per_channel = Vec::new();
 
-                let mpm = app.modplatforms_manager();
-                // Run version-batch requests sequentially so each one passes
-                // through the throttle. join_all here would race past it.
-                let mut combined_versions_response = Vec::new();
-                for chunk in combined_versions_list.chunks(350) {
-                    mcm.modrinth_throttle.acquire().await;
-                    let resp = mpm
-                        .modrinth
-                        .get_versions(VersionIDs {
-                            ids: chunk.to_vec(),
-                        })
-                        .await?;
-                    combined_versions_response.extend(resp.0);
-                }
+                        for version_type in
+                            [VersionType::Release, VersionType::Beta, VersionType::Alpha]
+                        {
+                            mcm.modrinth_throttle.acquire().await;
+                            let latest = mpm
+                                .modrinth
+                                .get_latest_versions_from_hashes(&LatestVersionsBody {
+                                    hashes: sha512_hashes.clone(),
+                                    algorithm: HashAlgorithm::SHA512,
+                                    loaders: loaders.clone(),
+                                    game_versions: game_versions.clone(),
+                                    version_types: Some(vec![version_type]),
+                                })
+                                .await?;
+
+                            newest_per_channel.extend(latest.0.into_values());
+                        }
+
+                        newest_per_channel
+                    }
+                    // Without a known game version and loader there is nothing to
+                    // ask for; mods are still cached, only update paths are skipped.
+                    None => Vec::new(),
+                };
 
                 sender.send((
                     sha512_hashes,
@@ -487,47 +591,7 @@ async fn cache_modrinth_meta_unchecked(
     authors: String,
     versions: &[Version],
 ) -> anyhow::Result<()> {
-    let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
-
-    let mut versions_sorted = versions.iter().collect::<Vec<_>>();
-    versions_sorted.sort_by(|f1, f2| Ord::cmp(&f2.date_published, &f1.date_published));
-
-    for other_version in versions_sorted {
-        if other_version.project_id != project.id
-            || other_version.id == version.id
-            || !version
-                .game_versions
-                .iter()
-                .any(|v| other_version.game_versions.contains(v))
-            || !version
-                .loaders
-                .iter()
-                .any(|l| other_version.loaders.contains(l))
-        {
-            break;
-        }
-
-        for game_version in &other_version.game_versions {
-            for loader in &other_version.loaders {
-                let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
-                    continue;
-                };
-
-                file_update_paths.insert((game_version, loader, other_version.version_type.into()));
-            }
-        }
-    }
-
-    let update_paths = file_update_paths
-        .into_iter()
-        .map(|(gamever, loader, channel)| {
-            format!(
-                "{gamever},{},{}",
-                loader.to_string().to_lowercase(),
-                channel.as_str(),
-            )
-        })
-        .join(";");
+    let update_paths = build_update_paths(version, &project.id, versions);
 
     if let Ok(Some(existing_entry)) = app
         .prisma_client
@@ -617,4 +681,103 @@ async fn cache_modrinth_meta_unchecked(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use carbon_platforms::modrinth::UtcDateTime;
+    use carbon_platforms::modrinth::version::VersionType;
+
+    fn version(id: &str, project: &str, day: u32, version_type: VersionType) -> Version {
+        Version {
+            name: id.to_string(),
+            version_number: id.to_string(),
+            changelog: None,
+            dependencies: Vec::new(),
+            game_versions: vec!["1.20.1".to_string()],
+            version_type,
+            loaders: vec!["forge".to_string()],
+            featured: false,
+            status: None,
+            requested_status: None,
+            id: id.to_string(),
+            project_id: project.to_string(),
+            author_id: "author".to_string(),
+            date_published: format!("2026-01-{day:02}T00:00:00Z")
+                .parse::<UtcDateTime>()
+                .unwrap(),
+            downloads: 0,
+            files: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn no_update_paths_without_candidates() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+
+        assert_eq!(build_update_paths(&installed, "project", &[]), "");
+    }
+
+    #[test]
+    fn the_installed_version_is_not_an_update_of_itself() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+
+        assert_eq!(
+            build_update_paths(&installed, "project", &[installed.clone()]),
+            ""
+        );
+    }
+
+    #[test]
+    fn only_versions_published_after_the_installed_one_are_updates() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+        let older = version("older", "project", 5, VersionType::Release);
+        let newer = version("newer", "project", 20, VersionType::Release);
+
+        assert_eq!(build_update_paths(&installed, "project", &[older]), "");
+        assert_eq!(
+            build_update_paths(&installed, "project", &[newer]),
+            "1.20.1,forge,stable"
+        );
+    }
+
+    /// Every project's versions used to be walked as one list, which collected
+    /// nothing as soon as another project's version came first.
+    #[test]
+    fn versions_of_other_projects_are_ignored_without_hiding_later_ones() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+        // Published later than the real update and distinguishable, so including
+        // it would both hide the update and show up in the result.
+        let mut foreign = version("foreign", "other-project", 30, VersionType::Release);
+        foreign.game_versions = vec!["1.19.2".to_string()];
+        let newer = version("newer", "project", 20, VersionType::Release);
+
+        assert_eq!(
+            build_update_paths(&installed, "project", &[foreign, newer]),
+            "1.20.1,forge,stable"
+        );
+    }
+
+    #[test]
+    fn each_channel_is_reported_so_the_allowed_one_can_be_picked() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+        let stable = version("stable", "project", 20, VersionType::Release);
+        let beta = version("beta", "project", 30, VersionType::Beta);
+
+        let paths = build_update_paths(&installed, "project", &[stable, beta]);
+        let mut paths = paths.split(';').collect::<Vec<_>>();
+        paths.sort();
+
+        assert_eq!(paths, vec!["1.20.1,forge,beta", "1.20.1,forge,stable"]);
+    }
+
+    #[test]
+    fn unknown_loaders_are_skipped() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+        let mut newer = version("newer", "project", 20, VersionType::Release);
+        newer.loaders = vec!["not-a-loader".to_string()];
+
+        assert_eq!(build_update_paths(&installed, "project", &[newer]), "");
+    }
 }
