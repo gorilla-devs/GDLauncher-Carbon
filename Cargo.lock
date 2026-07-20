@@ -682,6 +682,7 @@ dependencies = [
 name = "carbon_repos"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "prisma-client-rust",
  "rusqlite",
  "rusqlite_migration",

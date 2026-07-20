@@ -4,6 +4,7 @@
 use rusqlite_migration::{M, Migrations};
 
 pub mod db;
+pub mod dbtypes;
 pub mod pcr; // wip
 
 pub fn get_migrations() -> (Migrations<'static>, i32) {

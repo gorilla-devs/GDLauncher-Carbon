@@ -12,3 +12,4 @@ prisma-client-rust = { workspace = true, features = [
 serde = { workspace = true, features = ["derive", "rc"] }
 rusqlite = { version = "0.25.4", features = ["bundled"] }
 rusqlite_migration = "1.0.2"
+chrono = { workspace = true }
