@@ -580,6 +580,7 @@ const HomeGridInner = () => {
                     <Match when={!showFoldersView()}>
                       <AccordionView
                         virtualGroups={data().virtualGroups}
+                        libraryMode={libraryMode()}
                         tileSize={tileSize}
                         selection={selection}
                         onDragStart={(type, ids, e) =>

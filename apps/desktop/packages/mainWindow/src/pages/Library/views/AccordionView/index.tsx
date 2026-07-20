@@ -6,12 +6,13 @@
  */
 
 import { For, Accessor } from "solid-js"
+import { ListInstance, ListServer } from "@gd/core_module/bindings"
 import { GroupSection } from "./GroupSection"
-import { VirtualGroup, SelectionState } from "../../types"
+import { VirtualGroup, SelectionState, LibraryMode } from "../../types"
 import { DragType } from "../../DragContext"
 
 interface AccordionViewProps {
-  virtualGroups: VirtualGroup[]
+  virtualGroups: VirtualGroup<ListInstance | ListServer>[]
   tileSize: Accessor<number>
   selection: SelectionState
   onDragStart: (type: DragType, ids: number[], e: PointerEvent) => void
@@ -19,6 +20,7 @@ interface AccordionViewProps {
   animatedInstanceIds: Set<string | number>
   initialAnimationComplete: { value: boolean }
   tileRefs: Map<string, HTMLDivElement>
+  libraryMode?: LibraryMode
   selectedCount?: number
   onBatchDelete?: () => void
   onSelectExclusive?: (id: string) => void
@@ -39,6 +41,7 @@ export default function AccordionView(props: AccordionViewProps) {
           animatedInstanceIds={props.animatedInstanceIds}
           initialAnimationComplete={props.initialAnimationComplete}
           tileRefs={props.tileRefs}
+          libraryMode={props.libraryMode}
           selectedCount={props.selectedCount}
           onBatchDelete={props.onBatchDelete}
           onSelectExclusive={props.onSelectExclusive}

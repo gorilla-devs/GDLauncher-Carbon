@@ -6,6 +6,7 @@
 
 import { createMemo, createEffect, on, Accessor } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
+import { useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { ListServer } from "@gd/core_module/bindings"
@@ -15,16 +16,20 @@ import {
   LibraryViewMode,
   getViewMode
 } from "../types"
+import {
+  computeServerLibraryItems,
+  computeServerVirtualGroups
+} from "../utils/serverGrouping"
 
 interface ServerDataStore {
   libraryItems: LibraryItem[]
-  virtualGroups: VirtualGroup[]
+  virtualGroups: VirtualGroup<ListServer>[]
   favoriteIds: number[]
 }
 
 export interface UseServerDataReturn {
   libraryItems: LibraryItem[]
-  virtualGroups: VirtualGroup[]
+  virtualGroups: VirtualGroup<ListServer>[]
   favoriteIds: number[]
   viewMode: Accessor<LibraryViewMode>
   isFoldersView: Accessor<boolean>
@@ -34,6 +39,7 @@ export interface UseServerDataReturn {
 }
 
 export function useServerData(filter: Accessor<string>): UseServerDataReturn {
+  const [t] = useTransContext()
   const globalStore = useGlobalStore()
 
   const defaultGroupQuery = rspc.createQuery(() => ({
@@ -120,7 +126,8 @@ export function useServerData(filter: Accessor<string>): UseServerDataReturn {
         const virtualGroups = computeServerVirtualGroups(
           servers || [],
           settings,
-          filterValue
+          filterValue,
+          t("library:_trn_search_results")
         )
         setStore("virtualGroups", reconcile(virtualGroups, { key: "id" }))
       }
@@ -154,130 +161,4 @@ export function useServerData(filter: Accessor<string>): UseServerDataReturn {
     isLoading,
     isEmpty
   }
-}
-
-function computeServerLibraryItems(
-  servers: ListServer[],
-  groups: { id: number; name: string; libraryPosition: number | null }[],
-  filterValue: string,
-  defaultGroupId: number
-): LibraryItem[] {
-  const items: LibraryItem[] = []
-  const nameFilter = filterValue.replaceAll(" ", "").toLowerCase()
-
-  // Group servers by group_id
-  const serversByGroup = new Map<number, ListServer[]>()
-  for (const server of servers) {
-    const list = serversByGroup.get(server.groupId) || []
-    list.push(server)
-    serversByGroup.set(server.groupId, list)
-  }
-
-  for (const group of groups) {
-    const groupServers = serversByGroup.get(group.id) || []
-    const filteredServers = groupServers.filter((s) =>
-      s.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
-    )
-
-    if (group.id === defaultGroupId) {
-      for (const server of filteredServers) {
-        items.push({
-          id: `server-${server.id}`,
-          type: "server",
-          data: server
-        })
-      }
-    } else if (groupServers.length === 0 || filteredServers.length > 0) {
-      // Show as folder — servers inside are rendered by ExpandedFolderContent
-      items.push({
-        id: `folder-${group.id}`,
-        type: "folder",
-        data: {
-          id: group.id,
-          name: group.name,
-          libraryPosition: group.libraryPosition,
-          instances: filteredServers
-        }
-      })
-    }
-  }
-
-  // Folders always come before ungrouped servers, regardless of
-  // libraryPosition. Within each bucket, sort ascending by libraryPosition
-  // (falling back to index for servers).
-  items.sort((a, b) => {
-    const aFolder = a.type === "folder"
-    const bFolder = b.type === "folder"
-    if (aFolder !== bFolder) return aFolder ? -1 : 1
-    const getKey = (item: LibraryItem) => {
-      if (item.type === "server") {
-        return item.data.libraryPosition ?? item.data.index
-      }
-      if (item.type === "folder") {
-        return item.data.libraryPosition ?? 10000
-      }
-      return 10000
-    }
-    return getKey(a) - getKey(b)
-  })
-
-  return items
-}
-
-function computeServerVirtualGroups(
-  servers: ListServer[],
-  settings:
-    | {
-        instancesGroupBy?: string | null
-        instancesSortBy?: string | null
-        instancesSortByAsc?: boolean
-        instancesGroupByAsc?: boolean
-      }
-    | undefined,
-  filterValue: string
-): VirtualGroup[] {
-  const nameFilter = filterValue.replaceAll(" ", "").toLowerCase()
-  const groupBy = settings?.instancesGroupBy
-  const groupByAsc = settings?.instancesGroupByAsc ?? true
-
-  const matching = servers.filter((s) =>
-    s.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
-  )
-
-  if (groupBy === null || groupBy === undefined) {
-    // Flat search results or folders mode — single group
-    matching.sort((a, b) => a.name.localeCompare(b.name))
-    return matching.length > 0
-      ? [{ id: "search-results", name: "Search Results", instances: [] }]
-      : []
-  }
-
-  // Group by gameVersion is the only meaningful grouping for servers initially
-  const groupsMap = new Map<string, VirtualGroup>()
-
-  for (const server of matching) {
-    let groupName = server.gameVersion || "Unknown"
-    let groupId: string = groupName
-
-    if (groupBy === "gameVersion") {
-      groupName = server.gameVersion || "Unknown"
-      groupId = groupName
-    }
-
-    if (!groupsMap.has(groupName)) {
-      groupsMap.set(groupName, {
-        id: groupId,
-        name: groupName,
-        instances: [] // VirtualGroup uses instances field
-      })
-    }
-  }
-
-  const result = Array.from(groupsMap.values())
-  result.sort((a, b) => {
-    const cmp = a.name.localeCompare(b.name, undefined, { numeric: true })
-    return groupByAsc ? cmp : -cmp
-  })
-
-  return result
 }

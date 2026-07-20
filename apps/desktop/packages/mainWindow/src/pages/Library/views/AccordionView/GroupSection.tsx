@@ -15,20 +15,22 @@ import {
   Accessor
 } from "solid-js"
 import { Collapsable } from "@gd/ui"
-import { ListInstance } from "@gd/core_module/bindings"
+import { ListInstance, ListServer } from "@gd/core_module/bindings"
 import InstanceTile from "@/components/InstanceTile"
+import ServerTile from "@/components/Server/Tile"
 import { useDragContext, DragType } from "../../DragContext"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import GroupHeader from "@/components/Library/GroupHeader"
 import { EndOfGroupDropZone } from "../../components/EndOfGroupDropZone"
 import DropPreviewTile from "../../components/DropPreviewTile"
-import { VirtualGroup, SelectionState } from "../../types"
+import { VirtualGroup, SelectionState, LibraryMode } from "../../types"
+import { parseServerIds } from "../../utils/selectionIds"
 import { ANIMATION, TILE_SIZES, TileSize } from "../../constants"
 
 interface GroupSectionProps {
-  group: VirtualGroup
+  group: VirtualGroup<ListInstance | ListServer>
   groupIndex: number
-  displayedGroups: VirtualGroup[]
+  displayedGroups: VirtualGroup<ListInstance | ListServer>[]
   tileSize: Accessor<number>
   selection: SelectionState
   onDragStart: (type: DragType, ids: number[], e: PointerEvent) => void
@@ -36,6 +38,7 @@ interface GroupSectionProps {
   animatedInstanceIds: Set<string | number>
   initialAnimationComplete: { value: boolean }
   tileRefs: Map<string, HTMLDivElement>
+  libraryMode?: LibraryMode
   selectedCount?: number
   onBatchDelete?: () => void
   onSelectExclusive?: (id: string) => void
@@ -119,28 +122,55 @@ export function GroupSection(props: GroupSectionProps) {
           }}
         >
           <For each={props.group.instances}>
-            {(instance, j) => (
-              <InstanceTileWrapper
-                instance={instance}
-                instanceIndex={j()}
-                groupId={props.group.id}
-                groupIndex={props.groupIndex}
-                groupStaggerBase={groupStaggerBase()}
-                tileSize={props.tileSize}
-                selection={props.selection}
-                onDragStart={props.onDragStart}
-                justDropped={props.justDropped}
-                animatedInstanceIds={props.animatedInstanceIds}
-                initialAnimationComplete={props.initialAnimationComplete}
-                tileRefs={props.tileRefs}
-                isLastInGroup={j() === props.group.instances.length - 1}
-                isLastGroup={
-                  props.groupIndex === props.displayedGroups.length - 1
+            {(item, j) => (
+              <Show
+                when={props.libraryMode === "servers"}
+                fallback={
+                  <InstanceTileWrapper
+                    instance={item as ListInstance}
+                    instanceIndex={j()}
+                    groupId={props.group.id}
+                    groupIndex={props.groupIndex}
+                    groupStaggerBase={groupStaggerBase()}
+                    tileSize={props.tileSize}
+                    selection={props.selection}
+                    onDragStart={props.onDragStart}
+                    justDropped={props.justDropped}
+                    animatedInstanceIds={props.animatedInstanceIds}
+                    initialAnimationComplete={props.initialAnimationComplete}
+                    tileRefs={props.tileRefs}
+                    isLastInGroup={j() === props.group.instances.length - 1}
+                    isLastGroup={
+                      props.groupIndex === props.displayedGroups.length - 1
+                    }
+                    selectedCount={props.selectedCount}
+                    onBatchDelete={props.onBatchDelete}
+                    onSelectExclusive={props.onSelectExclusive}
+                  />
                 }
-                selectedCount={props.selectedCount}
-                onBatchDelete={props.onBatchDelete}
-                onSelectExclusive={props.onSelectExclusive}
-              />
+              >
+                <ServerTileWrapper
+                  server={item as ListServer}
+                  serverIndex={j()}
+                  groupId={props.group.id}
+                  groupIndex={props.groupIndex}
+                  groupStaggerBase={groupStaggerBase()}
+                  tileSize={props.tileSize}
+                  selection={props.selection}
+                  onDragStart={props.onDragStart}
+                  justDropped={props.justDropped}
+                  animatedInstanceIds={props.animatedInstanceIds}
+                  initialAnimationComplete={props.initialAnimationComplete}
+                  tileRefs={props.tileRefs}
+                  isLastInGroup={j() === props.group.instances.length - 1}
+                  isLastGroup={
+                    props.groupIndex === props.displayedGroups.length - 1
+                  }
+                  selectedCount={props.selectedCount}
+                  onBatchDelete={props.onBatchDelete}
+                  onSelectExclusive={props.onSelectExclusive}
+                />
+              </Show>
             )}
           </For>
 
@@ -345,5 +375,120 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
         />
       </div>
     </>
+  )
+}
+
+interface ServerTileWrapperProps {
+  server: ListServer
+  serverIndex: number
+  groupId: string | number | null
+  groupIndex: number
+  groupStaggerBase: number
+  tileSize: Accessor<number>
+  selection: SelectionState
+  onDragStart: (type: DragType, ids: number[], e: PointerEvent) => void
+  justDropped: Accessor<boolean>
+  animatedInstanceIds: Set<string | number>
+  initialAnimationComplete: { value: boolean }
+  tileRefs: Map<string, HTMLDivElement>
+  isLastInGroup: boolean
+  isLastGroup: boolean
+  selectedCount?: number
+  onBatchDelete?: () => void
+  onSelectExclusive?: (id: string) => void
+}
+
+// Server virtual groups are computed (game version / search results), never
+// database groups, so unlike InstanceTileWrapper there are no reorder drop
+// zones here — manual arrangement lives in the folders view.
+function ServerTileWrapper(props: ServerTileWrapperProps) {
+  const dragContext = useDragContext()
+  let ref: HTMLDivElement | undefined
+
+  // Type-prefixed string ID for selection and animation tracking
+  const serverStringId = `server-${props.server.id}`
+
+  const totalDelay =
+    props.groupStaggerBase + props.serverIndex * ANIMATION.STAGGER_PER_ITEM
+
+  const isBeingDragged = createMemo(
+    () =>
+      dragContext.isDragging() &&
+      dragContext.dragDetached() &&
+      dragContext.dragType() === "server" &&
+      dragContext.draggedIds().includes(props.server.id)
+  )
+
+  onMount(() => {
+    const shouldAnimate =
+      !props.animatedInstanceIds.has(serverStringId) &&
+      !props.initialAnimationComplete.value
+
+    if (ref && shouldAnimate) {
+      props.animatedInstanceIds.add(serverStringId)
+      const anim = ref.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: ANIMATION.ENTRANCE_DURATION,
+        delay: totalDelay,
+        easing: "linear",
+        fill: "both"
+      })
+      anim.onfinish = () => {
+        if (ref) ref.style.opacity = "1"
+      }
+    }
+
+    if (ref) {
+      props.tileRefs.set(serverStringId, ref)
+    }
+
+    // Mark initial animation complete after last server
+    if (props.isLastGroup && props.isLastInGroup) {
+      requestAnimationFrame(() => {
+        props.initialAnimationComplete.value = true
+      })
+    }
+  })
+
+  onCleanup(() => {
+    props.tileRefs.delete(serverStringId)
+  })
+
+  return (
+    <div
+      ref={(el) => {
+        ref = el
+        if (
+          props.animatedInstanceIds.has(serverStringId) ||
+          props.initialAnimationComplete.value
+        ) {
+          el.style.opacity = "1"
+        }
+      }}
+      data-server-tile
+      class="relative"
+      style="opacity:0"
+    >
+      <ServerTile
+        server={props.server}
+        identifier={`${props.groupId?.toString() || props.groupIndex}-${props.server.id}`}
+        size={props.tileSize() as 1 | 2 | 3 | 4 | 5}
+        isMultiSelected={props.selection.isSelected(serverStringId)}
+        onToggleSelection={() =>
+          props.selection.toggleSelection(serverStringId)
+        }
+        isDragging={isBeingDragged()}
+        isDragActive={dragContext.isDragging()}
+        onDragStart={(e) => {
+          const ids = props.selection.isSelected(serverStringId)
+            ? parseServerIds(props.selection.selectedIds())
+            : [props.server.id]
+          props.onDragStart("server", ids, e)
+        }}
+        preventClick={props.justDropped()}
+        selectedCount={props.selectedCount}
+        onBatchDelete={props.onBatchDelete}
+        onSelectExclusive={() => props.onSelectExclusive?.(serverStringId)}
+      />
+    </div>
   )
 }
