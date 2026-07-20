@@ -96,7 +96,7 @@ impl Managed for AzulZulu {
 
             let progress_report_clone = progress_report.clone();
             let version_name = version.name.clone();
-            let main_binary_path = spawn_blocking(move || {
+            let (main_binary_path, install_root) = spawn_blocking(move || {
                 let total_archive_files = archive.len() as u64;
 
                 let root_dir = {
@@ -130,6 +130,16 @@ impl Managed for AzulZulu {
                 } else {
                     let removed_extension = PathBuf::from(version_name).with_extension("");
                     base_managed_java_path.to_path().join(removed_extension)
+                };
+
+                // Directory to wipe if this install turns out unusable. Always a
+                // per-install subdirectory (base/<root_dir> in the single-root case,
+                // where java_managed_path is the managed-javas root itself), never
+                // the managed-javas root, so cleanup can't take out other JREs.
+                let install_root = if is_single_root_dir {
+                    java_managed_path.join(&root_dir)
+                } else {
+                    java_managed_path.clone()
                 };
 
                 std::fs::create_dir_all(&java_managed_path).with_context(|| {
@@ -213,13 +223,16 @@ impl Managed for AzulZulu {
                     progress_report_clone.send(Step::Extracting(i as u64, total_archive_files))?;
                 }
 
-                main_binary_path.ok_or_else(|| anyhow::anyhow!("No main binary found"))
+                let main_binary_path =
+                    main_binary_path.ok_or_else(|| anyhow::anyhow!("No main binary found"))?;
+
+                Ok::<_, anyhow::Error>((main_binary_path, install_root))
             })
             .await??;
 
             progress_report.send(Step::Done)?;
 
-            Ok::<_, anyhow::Error>(main_binary_path)
+            Ok::<_, anyhow::Error>((main_binary_path, install_root))
         };
 
         let delete = std::fs::remove_file(&downloadable.path);
@@ -228,26 +241,41 @@ impl Managed for AzulZulu {
             tracing::warn!("Could not delete downloaded file: {}", e);
         }
 
-        let main_binary_path = {
-            let tmp = result?;
-            match dunce::canonicalize(&tmp) {
-                Ok(p) => p,
-                Err(_) => tmp,
-            }
+        let (main_binary_path, install_root) = result?;
+        let main_binary_path = match dunce::canonicalize(&main_binary_path) {
+            Ok(p) => p,
+            Err(_) => main_binary_path,
         };
 
-        let java_component = java_checker
+        let java_component = match java_checker
             .get_bin_info(
                 &main_binary_path,
                 crate::domain::java::JavaComponentType::Managed,
             )
             .await
-            .with_context(|| {
-                format!(
-                    "Could not get bin info for main binary: {:?}",
-                    &main_binary_path
-                )
-            })?;
+        {
+            Ok(component) => component,
+            Err(e) => {
+                // A partially or incorrectly extracted JRE would otherwise persist and
+                // fail every launch — the size-based skip in the extraction loop never
+                // re-writes an existing same-size file, so it can't self-heal. Remove
+                // the install directory to force a clean re-download on the next try.
+                if let Err(rm) = std::fs::remove_dir_all(&install_root) {
+                    tracing::warn!(
+                        "Could not clean up unusable managed JRE at {:?}: {}",
+                        install_root,
+                        rm
+                    );
+                }
+
+                return Err(e).with_context(|| {
+                    format!(
+                        "Could not get bin info for main binary: {:?}",
+                        &main_binary_path
+                    )
+                });
+            }
+        };
 
         let java_id = upsert_java_component_to_db(db_client, java_component).await?;
 
