@@ -7,6 +7,7 @@ extern crate self as carbon_repos;
 
 use rusqlite_migration::{M, Migrations};
 
+pub mod checker;
 pub mod db;
 pub mod db_error;
 pub mod db_exec;
