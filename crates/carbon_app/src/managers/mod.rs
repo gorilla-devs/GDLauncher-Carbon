@@ -82,6 +82,7 @@ mod app {
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
+        pub db: Arc<carbon_repos::db_exec::Db>,
         task_manager: VisualTaskManager,
         system_info_manager: SystemInfoManager,
         rich_presence_manager: rich_presence::RichPresenceManager,
@@ -110,13 +111,13 @@ mod app {
                     .map_err(DatabaseError::TermsAndPrivacy)
                     .ok();
 
-            let db_client = match prisma_client::load_and_migrate(
+            let loaded_db = match prisma_client::load_and_migrate(
                 runtime_path.clone(),
                 latest_tos_privacy_checksum.clone(),
             )
             .await
             {
-                Ok(client) => Arc::new(client),
+                Ok(loaded_db) => loaded_db,
                 Err(e) => {
                     // Check if this is a backwards migration error
                     if e.downcast_ref::<DatabaseError>()
@@ -131,6 +132,8 @@ mod app {
                     panic!("Database migration failed: {}", e);
                 }
             };
+            let db_client = Arc::new(loaded_db.prisma_client);
+            let db = loaded_db.db;
 
             update_core_module_status(CoreModuleStatus::LoadAndMigrate);
 
@@ -175,6 +178,7 @@ mod app {
                     invalidation_channel,
                     reqwest_client: http_client.clone(),
                     prisma_client: Arc::clone(&db_client),
+                    db,
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
                     rich_presence_manager: rich_presence::RichPresenceManager::new(),

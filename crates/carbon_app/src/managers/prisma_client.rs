@@ -33,11 +33,18 @@ pub enum DatabaseError {
     BackwardsMigration,
 }
 
+/// PCR client alongside the rusqlite-backed executor, opened against the
+/// same on-disk database.
+pub(super) struct LoadedDb {
+    pub prisma_client: PrismaClient,
+    pub db: std::sync::Arc<carbon_repos::db_exec::Db>,
+}
+
 #[instrument]
 pub(super) async fn load_and_migrate(
     runtime_path: PathBuf,
     latest_consent_sha: Option<String>,
-) -> Result<PrismaClient, anyhow::Error> {
+) -> Result<LoadedDb, anyhow::Error> {
     let runtime_path = dunce::simplified(&runtime_path);
 
     let db_path = runtime_path.join("gdl_conf.db");
@@ -122,6 +129,11 @@ pub(super) async fn load_and_migrate(
     conn.close()
         .map_err(|(_, e)| anyhow::anyhow!("Failed to close migration DB connection: {e}"))?;
 
+    let db = std::sync::Arc::new(
+        carbon_repos::db_exec::Db::open(&db_path, 4)
+            .map_err(|e| anyhow::anyhow!("failed to open sqlite executor: {e}"))?,
+    );
+
     debug!("Starting prisma connection");
 
     let db_client = db::new_client_with_url(&db_uri)
@@ -159,7 +171,10 @@ pub(super) async fn load_and_migrate(
 
     seed_init_db(&db_client, latest_consent_sha).await?;
 
-    Ok(db_client)
+    Ok(LoadedDb {
+        prisma_client: db_client,
+        db,
+    })
 }
 
 async fn find_appropriate_default_xmx() -> i32 {
@@ -342,6 +357,7 @@ mod test {
 
         assert_eq!(
             db_client
+                .prisma_client
                 .app_configuration()
                 .find_unique(db::app_configuration::id::equals(0))
                 .exec()
@@ -364,6 +380,7 @@ mod test {
             .unwrap();
 
         db_client
+            .prisma_client
             .app_configuration()
             .update(
                 db::app_configuration::id::equals(0),
@@ -384,6 +401,7 @@ mod test {
 
         assert_eq!(
             db_client
+                .prisma_client
                 .app_configuration()
                 .find_unique(db::app_configuration::id::equals(0))
                 .exec()
