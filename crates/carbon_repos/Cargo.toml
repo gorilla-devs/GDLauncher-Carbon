@@ -14,3 +14,7 @@ rusqlite = { version = "0.25.4", features = ["bundled"] }
 rusqlite_migration = "1.0.2"
 chrono = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
