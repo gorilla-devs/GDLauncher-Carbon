@@ -21,6 +21,7 @@ import {
   SelectValue
 } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
+import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
 import useChangelogData from "./changelog.data"
 import { CFFEFile } from "@gd/core_module/bindings"
 import { format, formatDistanceToNowStrict } from "date-fns"
@@ -97,7 +98,9 @@ const ChangelogCard = (props: {
                    prose-table:text-sm
                    prose-table:border-collapse prose-th:border prose-th:border-darkSlate-500 prose-th:bg-darkSlate-600 prose-th:p-2 prose-td:border
                    prose-td:border-darkSlate-500 prose-td:p-2 max-w-none"
-            innerHTML={props.content}
+            // CurseForge changelogs are attacker-controlled HTML; sanitize
+            // before injecting to prevent stored XSS in the renderer.
+            innerHTML={parseToHtml(props.content)}
           />
         </Show>
         <Show when={props.type === "text"}>
