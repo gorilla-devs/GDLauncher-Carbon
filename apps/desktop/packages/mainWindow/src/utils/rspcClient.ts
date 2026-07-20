@@ -123,7 +123,29 @@ function showDedupedErrorToast(display: string, source: "query" | "mutation") {
   }
 
   errorToastLastShown.set(key, now)
-  toast.error(message, description ? { description } : undefined)
+
+  // The full technical error is what users need when reporting a bug, but a
+  // friendly network/throttle toast hides it behind a generic message. Offer a
+  // one-click copy of the raw `display` regardless of how the toast is worded.
+  const copyAction = {
+    label: i18n.t("general:_trn_copy") || "Copy",
+    onClick: () => {
+      navigator.clipboard
+        .writeText(display)
+        .then(() =>
+          toast.success(
+            i18n.t("general:_trn_general_copied_to_clipboard") ||
+              "Copied to clipboard"
+          )
+        )
+        .catch(() => {})
+    }
+  }
+
+  toast.error(message, {
+    action: copyAction,
+    ...(description && { description })
+  })
 }
 
 // ---------------------------------------------------------------------------
