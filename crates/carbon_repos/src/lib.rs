@@ -13,6 +13,7 @@ pub mod db_exec;
 pub mod dbtypes;
 pub mod from_row;
 pub mod pcr; // wip
+pub mod registry;
 
 pub fn get_migrations() -> (Migrations<'static>, i32) {
     let migration_list = vec![
