@@ -13,8 +13,8 @@ fn migrated_db() -> (tempfile::TempDir, Connection) {
 #[test]
 fn all_registered_queries_pass_against_migrated_schema() {
     let (_d, conn) = migrated_db();
-    // one line per repo module; Task 9 adds java here, later plans extend
-    let all: Vec<String> = check_module(&conn, &[]);
+    // one line per repo module; java is first, later plans extend this list
+    let all: Vec<String> = check_module(&conn, &carbon_repos::repos::java::all_queries());
     assert!(all.is_empty(), "query checker violations:\n{}", all.join("\n"));
 }
 

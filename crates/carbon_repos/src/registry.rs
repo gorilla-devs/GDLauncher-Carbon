@@ -6,6 +6,7 @@
 
 use crate::from_row::ColumnSpec;
 
+#[derive(Debug, Clone, Copy)]
 pub struct QueryCheck {
     pub name: &'static str,
     pub sql: &'static str,
@@ -18,9 +19,10 @@ pub struct QueryCheck {
 ///
 /// Return-type arms select the execution strategy: `Option<R>` →
 /// `query_row(...).optional()`; `Vec<R>` → `query_map` + collect; `usize` →
-/// `execute`; a bare `R` → `query_row`. Params bind through a
-/// `&[(&str, &dyn ToSql)]` slice, with each arg name stringified and
-/// `:`-prefixed as its key.
+/// `execute`; `i64` → `query_row` reading column 0 directly (no `FromRow`
+/// needed for a bare scalar); a bare `R` → `query_row` via `FromRow`. Params
+/// bind through a `&[(&str, &dyn ToSql)]` slice, with each arg name
+/// stringified and `:`-prefixed as its key.
 ///
 /// Dispatch runs as a token-tree muncher: each query is matched on its concrete
 /// return shape and consumed one at a time, threading the accumulated
@@ -85,6 +87,27 @@ macro_rules! queries {
         pub fn $name(conn: &rusqlite::Connection, $($arg : $aty),*) -> Result<usize, rusqlite::Error> {
             let mut st = conn.prepare_cached($sql)?;
             st.execute(&[ $( (concat!(":", stringify!($arg)), &$arg as &dyn rusqlite::ToSql) ),* ] as &[(&str, &dyn rusqlite::ToSql)])
+        }
+        $crate::queries!(@munch [ $($acc)* $crate::registry::QueryCheck {
+            name: stringify!($name),
+            sql: $sql,
+            params: &[ $( concat!(":", stringify!($arg)) ),* ],
+            columns: None,
+        }, ] $($rest)*);
+    };
+
+    // i64 → query_row scalar (no FromRow needed — matched before the generic
+    // bare-Row arm so a plain `i64` return never falls into `$row:ty` and
+    // wrongly demands `FromRow` on `i64`).
+    (@munch [ $($acc:tt)* ]
+        $(#[$doc:meta])* fn $name:ident( $($arg:ident : $aty:ty),* $(,)? ) -> i64 = $sql:literal ;
+        $($rest:tt)*
+    ) => {
+        $(#[$doc])*
+        pub fn $name(conn: &rusqlite::Connection, $($arg : $aty),*) -> Result<i64, rusqlite::Error> {
+            let mut st = conn.prepare_cached($sql)?;
+            st.query_row(&[ $( (concat!(":", stringify!($arg)), &$arg as &dyn rusqlite::ToSql) ),* ] as &[(&str, &dyn rusqlite::ToSql)],
+                         |r| r.get(0))
         }
         $crate::queries!(@munch [ $($acc)* $crate::registry::QueryCheck {
             name: stringify!($name),
