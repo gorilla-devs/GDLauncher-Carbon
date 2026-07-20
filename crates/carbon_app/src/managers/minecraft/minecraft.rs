@@ -776,14 +776,38 @@ pub async fn launch_minecraft(
         _ => None,
     };
 
+    // On Windows, launch the game with javaw.exe rather than java.exe. The vanilla
+    // launcher uses javaw, and game-capture / injection tools (OBS, Insights, Medal,
+    // ...) key off the javaw.exe process name; the console-subsystem java.exe can
+    // also flash a console window. Redirected stdout/stderr are still delivered to
+    // javaw, so the in-app log viewer is unaffected. Fall back to the original
+    // binary when a sibling javaw.exe isn't present.
+    #[cfg(target_os = "windows")]
+    let launch_java_path = {
+        let original = std::path::Path::new(&java_component.path);
+        match original.file_name().and_then(|n| n.to_str()) {
+            Some(name) if name.eq_ignore_ascii_case("java.exe") => {
+                let javaw = original.with_file_name("javaw.exe");
+                if javaw.is_file() {
+                    javaw.to_string_lossy().into_owned()
+                } else {
+                    java_component.path.clone()
+                }
+            }
+            _ => java_component.path.clone(),
+        }
+    };
+    #[cfg(not(target_os = "windows"))]
+    let launch_java_path = java_component.path.clone();
+
     let (main_command, command_args) = match wrapper_tokens {
         Some(mut tokens) => {
             let program = tokens.remove(0);
-            tokens.push(java_component.path.clone());
+            tokens.push(launch_java_path);
             tokens.extend(startup_command);
             (program, tokens)
         }
-        None => (java_component.path.clone(), startup_command),
+        None => (launch_java_path, startup_command),
     };
 
     let logged_command = match &secret_to_redact {
