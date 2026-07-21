@@ -489,6 +489,7 @@ pub fn verify_kind(
     declared: MigrationKind,
 ) -> Result<(), VerifyError> {
     let derivation = derive_kind_explained(prev_ups, up)?;
+    // CENSUS-RULE: manifest.kind-derivation
     if derivation.kind == declared {
         Ok(())
     } else {
@@ -512,7 +513,9 @@ pub fn verify_data_down(
     let actual = seeded_lost_fields(prev_ups, up, down)?;
     let declared_fields = declared.declared_fields();
 
+    // CENSUS-RULE: manifest.data-down-undeclared-lost
     let missing: BTreeSet<String> = actual.difference(&declared_fields).cloned().collect();
+    // CENSUS-RULE: manifest.data-down-stale-declared
     let stale: BTreeSet<String> = declared_fields.difference(&actual).cloned().collect();
     if missing.is_empty() && stale.is_empty() {
         Ok(())

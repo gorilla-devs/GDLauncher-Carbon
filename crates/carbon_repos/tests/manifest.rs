@@ -255,6 +255,7 @@ fn dropped_integer_and_blob_columns_are_both_detected_lost() {
 
 #[test]
 fn planted_mislabeled_kind_fails() {
+    // CENSUS-SELFTEST: manifest.kind-derivation
     // A genuinely breaking migration declared additive must be caught.
     let up = "CREATE UNIQUE INDEX \"idx_a_name\" ON \"A\" (name);";
     assert!(
@@ -265,6 +266,7 @@ fn planted_mislabeled_kind_fails() {
 
 #[test]
 fn planted_undeclared_lossy_drop_fails() {
+    // CENSUS-SELFTEST: manifest.data-down-undeclared-lost
     // Dropping an old column and declaring the down lossless must be caught.
     let up = "CREATE TABLE \"A_new\" (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\
               INSERT INTO \"A_new\" (id, name) SELECT id, name FROM \"A\";\
@@ -282,6 +284,7 @@ fn planted_undeclared_lossy_drop_fails() {
 
 #[test]
 fn planted_stale_partial_declaration_fails() {
+    // CENSUS-SELFTEST: manifest.data-down-stale-declared
     // A lossless additive migration declaring a partial loss must be caught as
     // stale (declared-but-preserved).
     let up = "ALTER TABLE \"A\" ADD COLUMN age INTEGER;";

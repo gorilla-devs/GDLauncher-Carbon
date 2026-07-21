@@ -215,6 +215,7 @@ fn breaking_ahead_down_runs_and_restores_byte_identical_schema() {
 
 #[test]
 fn corrupt_down_rolls_back_and_leaves_the_database_intact() {
+    // CENSUS-SELFTEST: compat.downgrade-corrupt-down
     let (_d, path) = temp_db();
     let bad_down = MigrationDef {
         name: "27_bad_down",
@@ -253,6 +254,7 @@ fn corrupt_down_rolls_back_and_leaves_the_database_intact() {
 
 #[test]
 fn a_down_that_succeeds_into_the_wrong_schema_is_caught() {
+    // CENSUS-SELFTEST: compat.downgrade-schema-mismatch
     // Planted verifier self-test: the down runs cleanly but does not restore the
     // binary's schema. Verification must reject it and roll back.
     let (_d, path) = temp_db();
@@ -289,6 +291,7 @@ fn a_down_that_succeeds_into_the_wrong_schema_is_caught() {
 
 #[test]
 fn tampered_checksum_is_refused_as_diverged() {
+    // CENSUS-SELFTEST: compat.diverged-checksum
     let (_d, path) = temp_db();
     let set = base();
     {
@@ -307,6 +310,7 @@ fn tampered_checksum_is_refused_as_diverged() {
 
 #[test]
 fn missing_metadata_above_own_count_is_backwards_migration() {
+    // CENSUS-SELFTEST: compat.backwards-missing-metadata
     // A version ahead with no metadata row is a pre-floor database an old binary
     // cannot understand: today's refusal.
     let (_d, path) = temp_db();
@@ -324,6 +328,51 @@ fn missing_metadata_above_own_count_is_backwards_migration() {
         l25.open(&mut conn, &path).unwrap(),
         OpenVerdict::Refuse(RefusalKind::BackwardsMigration)
     );
+}
+
+#[test]
+fn breaking_ahead_without_a_stored_down_is_refused_and_snapshot_kept() {
+    // CENSUS-SELFTEST: compat.downgrade-breaking-no-down
+    // A breaking migration ahead that carries no stored down cannot be reversed:
+    // the down-run must refuse (never overlay a breaking change) with the
+    // pre-downgrade snapshot preserved and the database left intact.
+    let (_d, path) = temp_db();
+    let breaking_no_down = MigrationDef {
+        name: "27_breaking_no_down",
+        up_sql: "CREATE TABLE Sprocket (id INTEGER PRIMARY KEY, note TEXT);\
+                 CREATE UNIQUE INDEX idx_sprocket_note ON Sprocket (note);",
+        // A breaking migration deliberately shipped with no down (the historical/
+        // pre-floor shape): the runner cannot step back through it.
+        down_sql: None,
+        kind: MigrationKind::Breaking,
+        data_down: "full",
+    };
+    let l26 = extend(&base(), &[breaking_no_down]);
+    let l25 = base();
+
+    {
+        let mut conn = open_db(&path);
+        l26.to_latest(&mut conn).unwrap();
+        assert_eq!(user_version(&conn), 26);
+    }
+
+    {
+        let mut conn = open_db(&path);
+        let verdict = l25.open(&mut conn, &path).unwrap();
+        match verdict {
+            OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }) => {
+                assert!(snapshot_path.exists(), "snapshot preserved when no down exists");
+            }
+            other => panic!("expected DowngradeFailed for a down-less breaking migration, got {other:?}"),
+        }
+        // Untouched: still at 26 with the table and its metadata row.
+        assert_eq!(user_version(&conn), 26);
+        assert!(table_exists(&conn, "Sprocket"));
+        let ahead: i64 = conn
+            .query_row("SELECT COUNT(*) FROM _migrations WHERE version = 26", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(ahead, 1, "the ahead metadata row must remain after refusal");
+    }
 }
 
 #[test]

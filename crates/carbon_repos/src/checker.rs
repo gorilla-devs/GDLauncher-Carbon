@@ -35,6 +35,7 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
     let mut violations = Vec::new();
     for q in queries {
         // 1. prepare: syntax, tables, columns, params must exist
+        // CENSUS-RULE: checker.prepare
         let st = match conn.prepare(q.sql) {
             Ok(st) => st,
             Err(e) => {
@@ -53,11 +54,13 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
             }
         }
         for p in q.params {
+            // CENSUS-RULE: checker.declared-param-present
             if !actual.iter().any(|a| a == p) {
                 violations.push(format!("{}: declared param {p} not present in SQL", q.name));
             }
         }
         for a in &actual {
+            // CENSUS-RULE: checker.undeclared-param
             if !q.params.iter().any(|p| p == a) {
                 violations.push(format!("{}: SQL param {a} is not declared in the registry", q.name));
             }
@@ -65,6 +68,7 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
         // 3. multi-param queries must use named params (no bare '?'), scanning
         // only outside string literals so a literal '?' in a text value is not
         // mistaken for a positional placeholder.
+        // CENSUS-RULE: checker.positional-param
         if q.params.len() > 1 && sql_has_positional_param(q.sql) {
             violations.push(format!("{}: multi-param query uses positional '?'", q.name));
         }
@@ -73,6 +77,7 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
             let actual_cols: Vec<String> =
                 st.column_names().iter().map(|s| s.to_string()).collect();
             for spec in cols {
+                // CENSUS-RULE: checker.result-column-present
                 if !actual_cols.iter().any(|a| a == spec.name) {
                     violations.push(format!(
                         "{}: column '{}' missing from result set {actual_cols:?}",
@@ -197,6 +202,7 @@ pub fn check_manifests(conn: &Connection, queries: &[QueryCheck]) -> Vec<String>
                 .filter(|(t, _)| t == table)
                 .map(|(_, c)| c.as_str())
                 .collect();
+            // CENSUS-RULE: checker.freshness
             if !updated_cols.is_empty() && !updated_cols.iter().any(|c| c == fresh_col) {
                 violations.push(format!(
                     "{}: writes {} but does not set freshness column '{}'",
@@ -244,6 +250,7 @@ pub fn check_nullability(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
             };
             match st.column_metadata(idx) {
                 Ok(Some((_, _, _, _, _, not_null, _, _))) => {
+                    // CENSUS-RULE: checker.nullability-nullable-source
                     if !not_null && !spec.nullable {
                         violations.push(format!(
                             "{}: column '{}' maps a nullable source column but is declared non-null (use Option or #[nullable(true)])",
@@ -252,6 +259,7 @@ pub fn check_nullability(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
                     }
                 }
                 Ok(None) => {
+                    // CENSUS-RULE: checker.nullability-expression-origin
                     if !spec.nullable {
                         violations.push(format!(
                             "{}: column '{}' is a SQL expression with no resolvable origin; declare it Option or add an explicit #[nullable(...)] override",
@@ -290,8 +298,8 @@ pub const SCAN_ALLOWLIST: &[&str] = &[
     // `metadataId`). Runs rarely, off the hot path.
     "gc_orphan_metadata",
     // Content-hash dedup lookup on ModMetadata by `(sha512, murmur2)`, neither
-    // of which is indexed in the schema. Behaves exactly as it did under Prisma;
-    // the schema is frozen here, so an index would need a future migration.
+    // of which is indexed in the schema. The schema is frozen here, so an index
+    // would need a future migration.
     "find_metadata_by_hashes",
 ];
 
@@ -325,6 +333,7 @@ pub fn check_query_plans(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
         };
         for detail in &details {
             for table in SCAN_GUARDED_TABLES {
+                // CENSUS-RULE: checker.query-plan-full-scan
                 if plan_full_scans_table(detail, table) {
                     violations.push(format!(
                         "{}: query plan full-scans guarded table '{}' ({}); add an index/PK filter or allowlist it",

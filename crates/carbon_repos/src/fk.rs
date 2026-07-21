@@ -443,28 +443,75 @@ mod tests {
         assert!(matches!(sweep_and_decide(&mut conn).unwrap(), SweepOutcome::Enabled));
     }
 
-    #[test]
-    fn edge_list_matches_schema() {
-        // Every encoded edge exists in the live schema (guards against schema
-        // drift silently orphaning an edge from the sweep).
-        let (_d, conn) = migrated();
-        for edge in EDGES {
+    /// Every `(child table, parent table, child column)` foreign key the live
+    /// schema declares, read from `pragma_foreign_key_list` over every user
+    /// table — the ground truth both directions of `edge_list_matches_schema`
+    /// compare `EDGES` against.
+    fn schema_fk_triples(conn: &Connection) -> Vec<(String, String, String)> {
+        let tables: Vec<String> = {
             let mut st = conn
-                .prepare(&format!("PRAGMA foreign_key_list('{}')", edge.child))
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' \
+                     AND name NOT LIKE 'sqlite_%' \
+                     AND name NOT IN ('_migrations', '_prisma_migrations')",
+                )
+                .unwrap();
+            let rows = st.query_map([], |r| r.get::<_, String>(0)).unwrap();
+            rows.collect::<Result<Vec<_>, _>>().unwrap()
+        };
+
+        let mut triples = Vec::new();
+        for table in &tables {
+            let mut st = conn
+                .prepare(&format!("PRAGMA foreign_key_list('{table}')"))
                 .unwrap();
             let cols: Vec<String> =
                 st.column_names().into_iter().map(|s| s.to_string()).collect();
             let ti = |n: &str| cols.iter().position(|c| c == n).unwrap();
             let mut rows = st.query([]).unwrap();
-            let mut found = false;
             while let Some(r) = rows.next().unwrap() {
                 let parent: String = r.get(ti("table")).unwrap();
                 let from: String = r.get(ti("from")).unwrap();
-                if parent == edge.parent && edge.child_cols.contains(&from.as_str()) {
-                    found = true;
-                }
+                triples.push((table.clone(), parent, from));
             }
-            assert!(found, "encoded edge {:?} not present in live schema", edge);
+        }
+        triples
+    }
+
+    #[test]
+    fn edge_list_matches_schema() {
+        // Bidirectional completeness (spec §7.2, Plan-4 global constraint): the
+        // encoded `EDGES` list must be exactly the set of foreign keys the live
+        // schema declares. Checking only one direction would let a schema FK
+        // silently fall out of the sweep (a new migration adds a reference the
+        // sweep never repairs) or an encoded edge point at a reference the
+        // schema no longer has.
+        let (_d, conn) = migrated();
+        let schema = schema_fk_triples(&conn);
+
+        // Forward: every encoded edge exists in the live schema.
+        for edge in EDGES {
+            let found = schema.iter().any(|(child, parent, from)| {
+                child == edge.child
+                    && parent == edge.parent
+                    && edge.child_cols.contains(&from.as_str())
+            });
+            assert!(found, "encoded edge {edge:?} not present in live schema");
+        }
+
+        // Reverse: every foreign key in the live schema is encoded in EDGES, so
+        // no reference can silently fall out of the repair sweep.
+        for (child, parent, from) in &schema {
+            let encoded = EDGES.iter().any(|edge| {
+                edge.child == child
+                    && edge.parent == parent
+                    && edge.child_cols.contains(&from.as_str())
+            });
+            assert!(
+                encoded,
+                "schema foreign key {child}.{from} -> {parent} is not encoded in EDGES; \
+                 add it (with its repair class) so the sweep covers it",
+            );
         }
     }
 

@@ -415,6 +415,7 @@ pub fn verify_round_trip(prev_ups: &[&str], up: &str, down: &str) -> Result<(), 
     after.execute_batch(down)?;
     let actual = dump_schema(&after)?;
 
+    // CENSUS-RULE: downgen.round-trip
     if actual == expected {
         Ok(())
     } else {
@@ -450,6 +451,7 @@ pub fn analyze_up(prev_ups: &[&str], up: &str) -> DbResult<UpAnalysis> {
 /// tables the migration itself creates (the table-rebuild dance's temp table) are
 /// not reported, because those tables are absent from the pre-existing set.
 pub fn detect_dml_on_existing_tables(prev_ups: &[&str], up: &str) -> DbResult<Vec<String>> {
+    // CENSUS-RULE: downgen.dml-flag
     let conn = build(prev_ups)?;
     let existing: BTreeSet<String> = read_schema(&conn)?.tables.into_keys().collect();
 
@@ -520,6 +522,7 @@ pub fn detect_dml_on_existing_tables(prev_ups: &[&str], up: &str) -> DbResult<Ve
 /// - a table is dropped whose ordered column names exactly match those of a
 ///   table the migration adds (a table rename expressed as drop+create).
 pub fn detect_rename(prev_ups: &[&str], up: &str) -> DbResult<bool> {
+    // CENSUS-RULE: downgen.rename-flag
     if contains_rename_column(up) {
         return Ok(true);
     }

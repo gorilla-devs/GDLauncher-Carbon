@@ -126,6 +126,7 @@ fn added_trigger_is_dropped() {
 
 #[test]
 fn rename_column_is_flagged_and_not_auto_inverted() {
+    // CENSUS-SELFTEST: downgen.rename-flag
     let analysis = analyze_up(&[BASE], "ALTER TABLE \"A\" RENAME COLUMN name TO title;").unwrap();
     assert!(analysis.rename, "RENAME COLUMN must be flagged");
     assert!(detect_rename(&[BASE], "ALTER TABLE \"A\" RENAME COLUMN name TO title;").unwrap());
@@ -161,6 +162,7 @@ fn rename_keyword_inside_a_string_literal_is_not_flagged() {
 
 #[test]
 fn dml_on_existing_table_is_flagged_but_rebuild_temp_writes_are_not() {
+    // CENSUS-SELFTEST: downgen.dml-flag
     // Direct DML on a pre-existing table is flagged.
     let dml =
         detect_dml_on_existing_tables(&[BASE], "UPDATE \"A\" SET name = 'x' WHERE id = 1;").unwrap();
@@ -185,6 +187,7 @@ fn dml_on_existing_table_is_flagged_but_rebuild_temp_writes_are_not() {
 
 #[test]
 fn a_wrong_hand_written_down_fails_round_trip_verification() {
+    // CENSUS-SELFTEST: downgen.round-trip
     // Planted-failure self-test: the down is valid SQL but leaves a spurious
     // table, so it must not verify.
     let up = "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY);";

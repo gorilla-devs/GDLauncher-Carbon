@@ -67,6 +67,9 @@ fn query_plan_lint_passes_for_all_registered_queries() {
 
 #[test]
 fn checker_catches_planted_structural_failures() {
+    // CENSUS-SELFTEST: checker.prepare
+    // CENSUS-SELFTEST: checker.declared-param-present
+    // CENSUS-SELFTEST: checker.undeclared-param
     let (_d, conn) = migrated_db();
     let planted = [
         // Unknown table → does not prepare.
@@ -129,6 +132,7 @@ fn checker_does_not_flag_question_mark_in_string_literal() {
 
 #[test]
 fn checker_flags_real_positional_param_in_multiparam_query() {
+    // CENSUS-SELFTEST: checker.positional-param
     let (_d, conn) = migrated_db();
     let planted = [QueryCheck {
         name: "positional_multiparam",
@@ -144,7 +148,35 @@ fn checker_flags_real_positional_param_in_multiparam_query() {
 }
 
 #[test]
+fn checker_flags_declared_column_missing_from_result_set() {
+    // CENSUS-SELFTEST: checker.result-column-present
+    // A `columns` spec naming a column the query never selects must be flagged:
+    // the row decode would look up a name the result set does not carry.
+    use carbon_repos::from_row::{ColumnSpec, TypeClass};
+    const COLS: &[ColumnSpec] = &[ColumnSpec {
+        name: "major",
+        ty: TypeClass::Integer,
+        nullable: false,
+        explicit_nullable: false,
+    }];
+    let (_d, conn) = migrated_db();
+    let planted = [QueryCheck {
+        name: "missing_result_column",
+        sql: "SELECT id FROM Java WHERE id = :id",
+        params: &[":id"],
+        columns: Some(COLS),
+    }];
+    let v = check_module(&conn, &planted);
+    assert!(
+        v.iter()
+            .any(|m| m.contains("missing_result_column") && m.contains("major")),
+        "must flag a declared column absent from the result set, got: {v:?}"
+    );
+}
+
+#[test]
 fn manifest_freshness_lint_catches_planted_failure() {
+    // CENSUS-SELFTEST: checker.freshness
     // An UPDATE on a freshness table that never sets lastUpdatedAt must be
     // flagged by the authorizer-driven manifest lint.
     let (_d, conn) = migrated_db();
@@ -208,6 +240,7 @@ mod planted_rows {
 
 #[test]
 fn nullability_lint_catches_nullable_source_declared_non_null() {
+    // CENSUS-SELFTEST: checker.nullability-nullable-source
     let (_d, conn) = migrated_db();
     let v = check_nullability(&conn, planted_rows::QUERIES);
     assert!(
@@ -218,6 +251,7 @@ fn nullability_lint_catches_nullable_source_declared_non_null() {
 
 #[test]
 fn nullability_lint_catches_unmarked_expression_column() {
+    // CENSUS-SELFTEST: checker.nullability-expression-origin
     let (_d, conn) = migrated_db();
     let v = check_nullability(&conn, planted_rows::QUERIES);
     assert!(
@@ -228,6 +262,7 @@ fn nullability_lint_catches_unmarked_expression_column() {
 
 #[test]
 fn query_plan_lint_catches_planted_full_scan() {
+    // CENSUS-SELFTEST: checker.query-plan-full-scan
     // ModMetadata is a guarded table with no index on `name`, so a WHERE on it
     // full-scans and must be flagged.
     let (_d, conn) = migrated_db();

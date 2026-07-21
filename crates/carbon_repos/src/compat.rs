@@ -211,6 +211,7 @@ impl MigrationSet {
 
         // Divergence is checked before anything else: a forked history at a
         // known version taints the whole database, up or down.
+        // CENSUS-RULE: compat.diverged-checksum
         if let Some(version) = self.first_divergent(conn, user_version.min(count))? {
             return Ok(OpenVerdict::Refuse(RefusalKind::Diverged { version }));
         }
@@ -320,6 +321,7 @@ impl MigrationSet {
         // Any version in (count, user_version] without a metadata row is a
         // pre-floor database we cannot step back through.
         let present: HashSet<i32> = ahead.iter().map(|(v, _, _)| *v).collect();
+        // CENSUS-RULE: compat.backwards-missing-metadata
         if ((count + 1)..=user_version).any(|v| !present.contains(&v)) {
             return Ok(OpenVerdict::Refuse(RefusalKind::BackwardsMigration));
         }
@@ -362,6 +364,7 @@ impl MigrationSet {
 
         let tx = conn.transaction()?;
         for (version, _kind, down_sql) in ahead {
+            // CENSUS-RULE: compat.downgrade-breaking-no-down
             let Some(sql) = down_sql else {
                 // A breaking migration ahead with no stored down cannot be
                 // reversed; refuse and keep the snapshot.
@@ -371,6 +374,7 @@ impl MigrationSet {
                 drop(tx);
                 return Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }));
             };
+            // CENSUS-RULE: compat.downgrade-corrupt-down
             if let Err(e) = tx.execute_batch(sql) {
                 tracing::error!("down-run of migration {version} failed: {e}");
                 drop(tx); // rollback: the whole down-run is atomic
@@ -382,6 +386,7 @@ impl MigrationSet {
 
         // Verify against our own ground truth before committing: the future's
         // downs are trusted, then checked.
+        // CENSUS-RULE: compat.downgrade-schema-mismatch
         let actual = dump_schema(&tx)?;
         if actual == reference {
             tx.commit()?;
