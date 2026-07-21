@@ -3,7 +3,7 @@
 //! across an .await is impossible by construction.
 
 use crate::db_error::{DbError, DbResult};
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
@@ -68,12 +68,23 @@ pub struct Db {
     next_reader: AtomicUsize,
 }
 
-fn apply_runtime_pragmas(conn: &Connection, foreign_keys: bool) -> rusqlite::Result<()> {
-    // The connection-level PRAGMAs the app runs against every pool connection
-    // (spec §2.6).
+/// Applies the connection-level PRAGMAs the app runs against every pool
+/// connection (spec §2.6).
+///
+/// `read_only` gates `journal_mode`: it is a database-header setting, so
+/// *setting* it needs write access to the file. The writer always opens
+/// first and puts the file into WAL mode before any reader connects, so
+/// readers just need to observe that mode, not set it — attempting to set
+/// journal_mode on a read-only connection would either error or (per SQLite)
+/// silently return the current mode as a query result instead of executing,
+/// which `execute_batch` can't express. Skip it here and let the writer own
+/// journal-mode exclusively.
+fn apply_runtime_pragmas(conn: &Connection, foreign_keys: bool, read_only: bool) -> rusqlite::Result<()> {
+    if !read_only {
+        conn.execute_batch("PRAGMA journal_mode = WAL;")?;
+    }
     conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA synchronous = NORMAL;
+        "PRAGMA synchronous = NORMAL;
          PRAGMA temp_store = MEMORY;
          PRAGMA mmap_size = 268435456;
          PRAGMA busy_timeout = 5000;",
@@ -85,13 +96,20 @@ fn apply_runtime_pragmas(conn: &Connection, foreign_keys: bool) -> rusqlite::Res
 
 impl Db {
     pub fn open(path: &Path, read_connections: usize, foreign_keys: bool) -> DbResult<Db> {
+        // Writer opens (and WAL-initializes) first: readers below open
+        // read-only and must find the file already in WAL mode.
         let wconn = Connection::open(path)?;
-        apply_runtime_pragmas(&wconn, foreign_keys)?;
+        apply_runtime_pragmas(&wconn, foreign_keys, false)?;
         let writer = Actor::spawn(wconn);
         let mut readers = Vec::with_capacity(read_connections);
+        // SQLITE_OPEN_READ_ONLY makes any write attempt through the read pool
+        // fail loudly (SQLITE_READONLY) instead of silently succeeding.
+        let read_flags = OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_URI
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX;
         for _ in 0..read_connections.max(1) {
-            let rconn = Connection::open(path)?;
-            apply_runtime_pragmas(&rconn, foreign_keys)?;
+            let rconn = Connection::open_with_flags(path, read_flags)?;
+            apply_runtime_pragmas(&rconn, foreign_keys, true)?;
             readers.push(Actor::spawn(rconn));
         }
         Ok(Db { writer, readers, next_reader: AtomicUsize::new(0) })
@@ -191,6 +209,22 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(n, 0);
+    }
+
+    #[tokio::test]
+    async fn write_through_read_pool_fails_loudly() {
+        let (_d, db) = temp_db();
+        db.write(|c| Ok(c.execute_batch("CREATE TABLE t (v INTEGER)")?))
+            .await
+            .unwrap();
+        // A write attempted through the read pool must fail: the connection
+        // is opened SQLITE_OPEN_READ_ONLY, so this cannot silently succeed.
+        let err = db.read(|c| Ok(c.execute_batch("CREATE TABLE nope (x)")?)).await;
+        assert!(err.is_err(), "write through the read pool must fail loudly, got {err:?}");
+        // The same statement through the write pool succeeds.
+        db.write(|c| Ok(c.execute_batch("CREATE TABLE nope (x)")?))
+            .await
+            .expect("write through the write pool must succeed");
     }
 
     #[tokio::test]
