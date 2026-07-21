@@ -82,7 +82,7 @@ mod app {
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
-        pub db: Arc<carbon_repos::db_exec::Db>,
+        pub(crate) db: Arc<carbon_repos::db_exec::Db>,
         task_manager: VisualTaskManager,
         system_info_manager: SystemInfoManager,
         rich_presence_manager: rich_presence::RichPresenceManager,

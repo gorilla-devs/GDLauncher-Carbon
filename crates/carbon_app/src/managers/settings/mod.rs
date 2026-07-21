@@ -435,8 +435,7 @@ impl ManagerRef<'_, SettingsManager> {
             let mut db_total: u64 = 0;
             if selection.gdlauncher {
                 for table in TABLES {
-                    db_total =
-                        db_total.saturating_add(count_table(&app.prisma_client, table).await);
+                    db_total = db_total.saturating_add(count_table(&app.db, table).await);
                 }
             }
             let total_units = disk_total + db_total;
@@ -479,12 +478,11 @@ impl ManagerRef<'_, SettingsManager> {
                         "DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} LIMIT {CHUNK})"
                     );
                     loop {
-                        match app
-                            .prisma_client
-                            ._execute_raw(carbon_repos::pcr::raw::Raw::new(&sql, vec![]))
-                            .exec()
-                            .await
-                        {
+                        let dq = carbon_repos::registry::DynamicQuery {
+                            sql: sql.clone(),
+                            params: vec![],
+                        };
+                        match app.db.write(move |conn| Ok(dq.execute(conn)?)).await {
                             Ok(0) => break,
                             Ok(n) => {
                                 let new =
@@ -531,23 +529,15 @@ impl ManagerRef<'_, SettingsManager> {
 
 /// COUNT(*) on a cache table. Uses the rowid index, so it scales with
 /// row count not byte count — fast even on a multi-GB HTTPCache.
-async fn count_table(prisma: &carbon_repos::db::PrismaClient, table: &str) -> u64 {
-    #[derive(serde::Deserialize)]
-    struct Row {
-        n: Option<i64>,
-    }
-    let sql = format!("SELECT COUNT(*) AS n FROM {table}");
-    match prisma
-        ._query_raw::<Row>(carbon_repos::pcr::raw::Raw::new(&sql, vec![]))
-        .exec()
-        .await
-    {
-        Ok(rows) => rows
-            .into_iter()
-            .next()
-            .and_then(|r| r.n)
-            .map(|n| n.max(0) as u64)
-            .unwrap_or(0),
+async fn count_table(db: &carbon_repos::db_exec::Db, table: &str) -> u64 {
+    let sql = format!("SELECT COUNT(*) FROM {table}");
+    let table = table.to_string();
+    let dq = carbon_repos::registry::DynamicQuery {
+        sql,
+        params: vec![],
+    };
+    match db.read(move |conn| Ok(dq.query_scalar_i64(conn)?)).await {
+        Ok(n) => n.max(0) as u64,
         Err(e) => {
             warn!("Failed to count `{table}`: {e}");
             0

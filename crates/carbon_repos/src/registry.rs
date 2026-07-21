@@ -31,6 +31,18 @@ impl DynamicQuery {
             .collect();
         st.execute(&bound[..])
     }
+
+    /// Reads a single scalar column-0 value, mirroring `queries!`'s `i64`
+    /// return arm (no `FromRow` needed for a bare scalar).
+    pub fn query_scalar_i64(&self, conn: &rusqlite::Connection) -> Result<i64, rusqlite::Error> {
+        let mut st = conn.prepare(&self.sql)?;
+        let bound: Vec<(&str, &dyn rusqlite::types::ToSql)> = self
+            .params
+            .iter()
+            .map(|(n, v)| (*n, v.as_ref() as &dyn rusqlite::types::ToSql))
+            .collect();
+        st.query_row(&bound[..], |r| r.get(0))
+    }
 }
 
 /// Emits a typed wrapper `fn` for each query and a `QUERIES` const covering them

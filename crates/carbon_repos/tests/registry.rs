@@ -1,7 +1,6 @@
 use rusqlite::Connection;
 
 mod q {
-    use carbon_repos::from_row::FromRow;
     use carbon_repos::queries;
 
     #[derive(carbon_macro::FromRow, Debug, PartialEq)]
