@@ -64,6 +64,7 @@ const EXPECTED_RULES: &[&str] = &[
     "checker.nullability-expression-origin",
     "checker.query-plan-full-scan",
     "checker.handwritten-sql-registered",
+    "checker.insert-datetime-explicit",
     // Bidirectional runner verifier + refusals (compat.rs).
     "compat.diverged-checksum",
     "compat.backwards-missing-metadata",

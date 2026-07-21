@@ -1,5 +1,6 @@
 use carbon_repos::checker::{
-    check_manifests, check_module, check_nullability, check_query_plans,
+    check_insert_datetime_columns, check_manifests, check_module, check_nullability,
+    check_query_plans,
 };
 use carbon_repos::registry::QueryCheck;
 use rusqlite::Connection;
@@ -58,6 +59,13 @@ fn query_plan_lint_passes_for_all_registered_queries() {
     let (_d, conn) = migrated_db();
     let v = check_query_plans(&conn, &all_registered_queries());
     assert!(v.is_empty(), "query plan lint violations:\n{}", v.join("\n"));
+}
+
+#[test]
+fn insert_datetime_lint_passes_for_all_registered_queries() {
+    let (_d, conn) = migrated_db();
+    let v = check_insert_datetime_columns(&conn, &all_registered_queries());
+    assert!(v.is_empty(), "insert datetime lint violations:\n{}", v.join("\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -276,6 +284,62 @@ fn query_plan_lint_catches_planted_full_scan() {
     assert!(
         v.iter().any(|m| m.contains("scan_mod_metadata") && m.contains("ModMetadata")),
         "must flag a full scan of a guarded table, got: {v:?}"
+    );
+}
+
+#[test]
+fn insert_datetime_lint_catches_planted_failures() {
+    // CENSUS-SELFTEST: checker.insert-datetime-explicit
+    let (_d, conn) = migrated_db();
+    let planted = [
+        // Omits the DATETIME `lastUpdatedAt` column from its list.
+        QueryCheck {
+            name: "bad_insert_missing_datetime",
+            sql: "INSERT INTO VersionInfoCache (id, versionInfo) VALUES (:id, :v)",
+            params: &[":id", ":v"],
+            columns: None,
+        },
+        // No column list at all — flagged outright regardless of the table.
+        QueryCheck {
+            name: "bad_insert_no_column_list",
+            sql: "INSERT INTO VersionInfoCache VALUES (:id, :v, :t)",
+            params: &[":id", ":v", ":t"],
+            columns: None,
+        },
+    ];
+    let v = check_insert_datetime_columns(&conn, &planted);
+    assert!(
+        v.iter().any(|m| m.contains("bad_insert_missing_datetime") && m.contains("lastUpdatedAt")),
+        "must flag an INSERT that omits a DATETIME column, got: {v:?}"
+    );
+    assert!(
+        v.iter().any(|m| m.contains("bad_insert_no_column_list")),
+        "must flag a column-list-less INSERT outright, got: {v:?}"
+    );
+
+    // A conforming INSERT (every DATETIME column listed) must pass.
+    let ok = [QueryCheck {
+        name: "good_insert",
+        sql: "INSERT INTO VersionInfoCache (id, versionInfo, lastUpdatedAt) VALUES (:id, :v, :t)",
+        params: &[":id", ":v", ":t"],
+        columns: None,
+    }];
+    assert!(
+        check_insert_datetime_columns(&conn, &ok).is_empty(),
+        "a conforming INSERT must not be flagged"
+    );
+
+    // A non-INSERT statement is ignored entirely, even one touching the same
+    // table and omitting the same column in its SET list.
+    let non_insert = [QueryCheck {
+        name: "an_update",
+        sql: "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
+        params: &[":v", ":id"],
+        columns: None,
+    }];
+    assert!(
+        check_insert_datetime_columns(&conn, &non_insert).is_empty(),
+        "a non-INSERT statement must never be flagged by this lint"
     );
 }
 

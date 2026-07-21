@@ -10,7 +10,7 @@
 
 use carbon_repos::downgen::{
     analyze_up, detect_dml_on_existing_tables, detect_rename, full_schema_dump, generate_down,
-    verify_round_trip, HumanAction,
+    insert_migration_entry, verify_round_trip, HumanAction, InsertError, MIGRATION_LIST_ANCHOR,
 };
 use carbon_repos::schema_dump::dump_schema;
 use rusqlite::Connection;
@@ -227,6 +227,67 @@ fn every_committed_migration_with_a_down_round_trips() {
                 .unwrap_or_else(|e| panic!("migration {} down does not round-trip: {e}", def.name));
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// In-place migration-list editing (`insert_migration_entry`).
+// ---------------------------------------------------------------------------
+
+const FIXTURE_LIB_SRC: &str = "pub fn get_migrations() -> (MigrationSet, i32) {\n\
+    let migrations = vec![\n\
+        historical_migration!(\"20240120134904_init\"),\n\
+        // new-migration:anchor — the tool inserts new MigrationDef entries directly above this line\n\
+    ];\n\
+    let count = migrations.len() as i32;\n\
+    (MigrationSet { migrations }, count)\n\
+}\n";
+
+const FIXTURE_ENTRY: &str = "        MigrationDef {\n\
+            name: \"20260501000000_add_widget\",\n\
+            up_sql: include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/prisma/migrations/20260501000000_add_widget/migration.sql\")),\n\
+            down_sql: Some(include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/prisma/migrations/20260501000000_add_widget/down.sql\"))),\n\
+            kind: MigrationKind::Additive,\n\
+            data_down: \"full\",\n\
+        },\n";
+
+#[test]
+fn insert_migration_entry_places_entry_directly_above_the_anchor() {
+    let updated = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
+    let anchor_pos = updated.find(MIGRATION_LIST_ANCHOR).expect("anchor must survive the edit");
+    let entry_pos = updated.find("20260501000000_add_widget").expect("entry must be inserted");
+    assert!(entry_pos < anchor_pos, "entry must be inserted above the anchor:\n{updated}");
+    assert!(
+        updated.contains("20240120134904_init"),
+        "the pre-existing entry must be preserved:\n{updated}"
+    );
+    // The anchor line itself is untouched (still present exactly once).
+    assert_eq!(updated.matches(MIGRATION_LIST_ANCHOR).count(), 1);
+}
+
+#[test]
+fn insert_migration_entry_fails_when_anchor_is_missing() {
+    let no_anchor = FIXTURE_LIB_SRC.replace(MIGRATION_LIST_ANCHOR, "");
+    let err = insert_migration_entry(&no_anchor, FIXTURE_ENTRY).unwrap_err();
+    assert_eq!(err, InsertError::AnchorMissing);
+}
+
+#[test]
+fn insert_migration_entry_fails_when_anchor_is_duplicated() {
+    let doubled = format!("{FIXTURE_LIB_SRC}{MIGRATION_LIST_ANCHOR}\n");
+    let err = insert_migration_entry(&doubled, FIXTURE_ENTRY).unwrap_err();
+    assert_eq!(err, InsertError::AnchorDuplicated);
+}
+
+#[test]
+fn insert_migration_entry_is_idempotent_on_rerun_for_the_same_migration() {
+    let once = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
+    let twice = insert_migration_entry(&once, FIXTURE_ENTRY).unwrap();
+    assert_eq!(once, twice, "rerunning for the same migration must not duplicate the entry");
+    assert_eq!(
+        twice.matches("name: \"20260501000000_add_widget\",").count(),
+        1,
+        "the entry must appear exactly once after a rerun:\n{twice}"
+    );
 }
 
 #[test]

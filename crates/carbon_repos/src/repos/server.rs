@@ -167,12 +167,14 @@ queries! {
 
 /// `INSERT` shared by `insert_server` and its `QueryCheck`. The columns not
 /// listed (motd, maxPlayers, onlineMode, xmx, xms, extraJavaArgs, autoRestart,
-/// providerType, hostedServerId, iconRevision, lastStarted) take their DDL
-/// defaults. `dateCreated` is written explicitly as epoch-millis (not the SQL
-/// `CURRENT_TIMESTAMP` text default).
+/// providerType, hostedServerId, iconRevision) take their DDL defaults.
+/// `dateCreated` is written explicitly as epoch-millis (not the SQL
+/// `CURRENT_TIMESTAMP` text default); `lastStarted` is listed explicitly as a
+/// literal `NULL` (a server has never been started at creation) rather than
+/// left to the column-list omission the datetime lint forbids.
 const INSERT_SERVER_SQL: &str =
-    "INSERT INTO Server (name, shortpath, \"index\", groupId, gameVersion, port, serverType, modloaderType, modloaderVersion, modpackPlatform, modpackProjectId, modpackFileId, libraryPosition, dateCreated)
-         VALUES (:name, :shortpath, :index, :group_id, :game_version, :port, :server_type, :modloader_type, :modloader_version, :modpack_platform, :modpack_project_id, :modpack_file_id, :library_position, :date_created)";
+    "INSERT INTO Server (name, shortpath, \"index\", groupId, gameVersion, port, serverType, modloaderType, modloaderVersion, modpackPlatform, modpackProjectId, modpackFileId, libraryPosition, dateCreated, lastStarted)
+         VALUES (:name, :shortpath, :index, :group_id, :game_version, :port, :server_type, :modloader_type, :modloader_version, :modpack_platform, :modpack_project_id, :modpack_file_id, :library_position, :date_created, NULL)";
 
 /// `INSERT` shared by `insert_server_group` and its `QueryCheck`.
 const INSERT_SERVER_GROUP_SQL: &str =

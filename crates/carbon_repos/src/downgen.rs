@@ -435,6 +435,77 @@ pub fn full_schema_dump(prev_ups: &[&str], up: &str) -> DbResult<String> {
     dump_schema(&conn)
 }
 
+/// The exact anchor comment `get_migrations()` in `lib.rs` carries inside its
+/// migration `vec!`. `new_migration` inserts each new `MigrationDef` entry
+/// directly above this line instead of printing it for a manual paste.
+pub const MIGRATION_LIST_ANCHOR: &str =
+    "// new-migration:anchor — the tool inserts new MigrationDef entries directly above this line";
+
+/// Why [`insert_migration_entry`] could not place `entry` in `lib_src`.
+#[derive(Debug, PartialEq, Eq)]
+pub enum InsertError {
+    /// [`MIGRATION_LIST_ANCHOR`] does not appear in `lib_src` at all.
+    AnchorMissing,
+    /// [`MIGRATION_LIST_ANCHOR`] appears more than once — the insertion point
+    /// is ambiguous.
+    AnchorDuplicated,
+}
+
+impl std::fmt::Display for InsertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InsertError::AnchorMissing => write!(
+                f,
+                "no `{MIGRATION_LIST_ANCHOR}` marker found in lib.rs — add it directly above the \
+                 closing `];` of get_migrations()'s migration list"
+            ),
+            InsertError::AnchorDuplicated => write!(
+                f,
+                "more than one `{MIGRATION_LIST_ANCHOR}` marker found in lib.rs — the insertion \
+                 point is ambiguous; there must be exactly one"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for InsertError {}
+
+/// Inserts `entry` (a fully formatted `MigrationDef { … },` block, indented as
+/// it should appear in the source) directly above [`MIGRATION_LIST_ANCHOR`] in
+/// `lib_src`, returning the updated source. Idempotent: `entry` is identified
+/// by its `name: "…"` line, and if a line with that exact text is already
+/// present in `lib_src`, the source is returned unchanged — rerunning the tool
+/// for the same migration never duplicates the entry. Fails if the anchor is
+/// missing or appears more than once, since there would then be no single
+/// unambiguous insertion point.
+pub fn insert_migration_entry(lib_src: &str, entry: &str) -> Result<String, InsertError> {
+    let anchor_count = lib_src.matches(MIGRATION_LIST_ANCHOR).count();
+    if anchor_count == 0 {
+        return Err(InsertError::AnchorMissing);
+    }
+    if anchor_count > 1 {
+        return Err(InsertError::AnchorDuplicated);
+    }
+
+    if let Some(name_line) = entry.lines().map(str::trim).find(|l| l.starts_with("name:")) {
+        if lib_src.lines().any(|l| l.trim() == name_line) {
+            return Ok(lib_src.to_string());
+        }
+    }
+
+    let anchor_pos = lib_src.find(MIGRATION_LIST_ANCHOR).expect("anchor_count == 1 checked above");
+    let line_start = lib_src[..anchor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+
+    let mut out = String::with_capacity(lib_src.len() + entry.len() + 1);
+    out.push_str(&lib_src[..line_start]);
+    for line in entry.lines() {
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.push_str(&lib_src[line_start..]);
+    Ok(out)
+}
+
 /// Analyses `up` (applied after `prev_ups`) for the touchpoints the schema diff
 /// cannot resolve: renames and DML on pre-existing tables.
 pub fn analyze_up(prev_ups: &[&str], up: &str) -> DbResult<UpAnalysis> {

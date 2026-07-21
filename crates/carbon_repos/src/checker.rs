@@ -19,6 +19,10 @@
 //!   explicit `#[nullable(...)]` override.
 //! - [`check_query_plans`]: `EXPLAIN QUERY PLAN` must not full-scan a guarded
 //!   hot cache table unless the query is explicitly allowlisted.
+//! - [`check_insert_datetime_columns`]: every registered `INSERT`'s explicit
+//!   column list (parsed from the SQL text, not SQLite metadata) must name
+//!   every `DATETIME`-typed column of its target table, so none can fall back
+//!   to a DDL default silently.
 //!
 //! Exported so later plans/tasks can call these directly instead of redefining
 //! them per test file.
@@ -358,6 +362,148 @@ fn plan_full_scans_table(detail: &str, table: &str) -> bool {
     };
     let object = rest.split_whitespace().next().unwrap_or("");
     object == table && !rest.contains("USING")
+}
+
+/// Finds the first case-insensitive whole-word occurrence of `word` in `text`,
+/// returning its byte offset. "Whole word" means neither neighbor is an
+/// identifier character, so a keyword embedded in a longer identifier is never
+/// mistaken for the keyword itself.
+fn find_word(text: &str, word: &str) -> Option<usize> {
+    let upper = text.to_ascii_uppercase();
+    let word_upper = word.to_ascii_uppercase();
+    let bytes = upper.as_bytes();
+    let is_ident = |c: u8| (c as char).is_ascii_alphanumeric() || c == b'_';
+    let mut from = 0;
+    while let Some(rel) = upper[from..].find(&word_upper) {
+        let at = from + rel;
+        let end = at + word_upper.len();
+        let before_ok = at == 0 || !is_ident(bytes[at - 1]);
+        let after_ok = end >= bytes.len() || !is_ident(bytes[end]);
+        if before_ok && after_ok {
+            return Some(at);
+        }
+        from = at + 1;
+    }
+    None
+}
+
+/// Consumes one SQL identifier (bare, or quoted with `"…"`, `` `…` ``, or
+/// `[…]`) from the start of `s`, returning the identifier text (quotes
+/// included) and the remainder of `s` after it.
+fn take_identifier(s: &str) -> Option<(&str, &str)> {
+    let bytes = s.as_bytes();
+    if bytes.is_empty() {
+        return None;
+    }
+    match bytes[0] {
+        b'"' | b'`' => {
+            let close = s[1..].find(bytes[0] as char)? + 1;
+            Some((&s[..=close], &s[close + 1..]))
+        }
+        b'[' => {
+            let close = s.find(']')?;
+            Some((&s[..=close], &s[close + 1..]))
+        }
+        _ => {
+            let end = s
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                .unwrap_or(s.len());
+            if end == 0 {
+                None
+            } else {
+                Some((&s[..end], &s[end..]))
+            }
+        }
+    }
+}
+
+/// Strips a single layer of `"…"`, `` `…` ``, or `[…]` quoting from a SQL
+/// identifier, if present; otherwise returns it unchanged.
+fn strip_ident_quotes(s: &str) -> &str {
+    let s = s.trim();
+    for (open, close) in [("\"", "\""), ("`", "`"), ("[", "]")] {
+        if let Some(inner) = s.strip_prefix(open).and_then(|r| r.strip_suffix(close)) {
+            return inner;
+        }
+    }
+    s
+}
+
+/// Parses `INSERT [OR …] INTO <table> (<col1>, <col2>, …)`, returning the
+/// (unquoted) table name and column list. Returns `None` when the statement
+/// has no explicit column list (`INSERT INTO t VALUES …`) — the DDL defaults
+/// then apply silently, which [`check_insert_datetime_columns`] treats as an
+/// outright violation since it can't be verified safe without the list.
+fn parse_insert_target(sql: &str) -> Option<(String, Vec<String>)> {
+    let into_at = find_word(sql, "INTO")?;
+    let rest = sql[into_at + 4..].trim_start();
+    let (table_raw, after_table) = take_identifier(rest)?;
+    let table = strip_ident_quotes(table_raw).to_string();
+    let after_table = after_table.trim_start();
+    let after_table = after_table.strip_prefix('(')?;
+    let close = after_table.find(')')?;
+    let columns: Vec<String> = after_table[..close]
+        .split(',')
+        .map(|c| strip_ident_quotes(c.trim()).to_string())
+        .filter(|c| !c.is_empty())
+        .collect();
+    Some((table, columns))
+}
+
+/// INSERT-datetime lint: every registered query whose SQL is an `INSERT` must
+/// list every `DATETIME`-typed column of its target table (per `PRAGMA
+/// table_info`) explicitly in its column list. Every migration DDL declares
+/// its `DATETIME` columns with `DEFAULT CURRENT_TIMESTAMP` (a TEXT string) or
+/// leaves them nullable with no default — either way, a bare `INSERT` that
+/// omits the column relies on the DDL rather than [`crate::dbtypes::DbDateTime`],
+/// so a column meant to hold epoch-millis silently gets a `CURRENT_TIMESTAMP`
+/// text value the moment a future migration adds a default to it. Listing the
+/// column explicitly (bound to `DbDateTime`, or a literal `NULL` when the value
+/// is not yet known) is required no matter what the current DDL default is,
+/// so the query stays correct even if the DDL default later changes.
+/// A column-list-less `INSERT INTO t VALUES …` is flagged outright: without a
+/// column list there is nothing to verify against.
+pub fn check_insert_datetime_columns(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for q in queries {
+        let first_word: String = q.sql.trim_start().chars().take_while(|c| c.is_ascii_alphabetic()).collect();
+        if !first_word.eq_ignore_ascii_case("INSERT") {
+            continue;
+        }
+        // CENSUS-RULE: checker.insert-datetime-explicit
+        let Some((table, columns)) = parse_insert_target(q.sql) else {
+            violations.push(format!(
+                "{}: INSERT has no explicit column list (`INSERT INTO <table> VALUES …`) — \
+                 a DATETIME column relying on its DDL default could silently receive a \
+                 CURRENT_TIMESTAMP text value instead of DbDateTime's epoch-millis; list every \
+                 column explicitly",
+                q.name
+            ));
+            continue;
+        };
+        let mut info_stmt = match conn.prepare(&format!("PRAGMA table_info(\"{table}\")")) {
+            Ok(st) => st,
+            // Unknown table is already reported by check_module.
+            Err(_) => continue,
+        };
+        let table_cols: rusqlite::Result<Vec<(String, String)>> = info_stmt
+            .query_map([], |r| Ok((r.get::<_, String>(1)?, r.get::<_, String>(2)?)))
+            .and_then(Iterator::collect);
+        let Ok(table_cols) = table_cols else { continue };
+        for (col_name, decltype) in &table_cols {
+            if decltype.eq_ignore_ascii_case("DATETIME")
+                && !columns.iter().any(|c| c.eq_ignore_ascii_case(col_name))
+            {
+                violations.push(format!(
+                    "{}: INSERT into {table} omits DATETIME column '{col_name}' from its column \
+                     list — list it explicitly (bind DbDateTime, or a literal NULL if the value \
+                     is not yet known) so it never falls back to the DDL default",
+                    q.name
+                ));
+            }
+        }
+    }
+    violations
 }
 
 /// CENSUS-RULE: checker.handwritten-sql-registered — every hand-written SQL

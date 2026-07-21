@@ -74,6 +74,7 @@ pub fn get_migrations() -> (MigrationSet, i32) {
         historical_migration!("20260325000000_add_server_icon_revision"),
         historical_migration!("20260328000000_add_server_modloader_and_addons"),
         historical_migration!("20260410000000_add_server_modpack_info"),
+        // new-migration:anchor — the tool inserts new MigrationDef entries directly above this line
     ];
     let count = migrations.len() as i32;
     (MigrationSet { migrations }, count)

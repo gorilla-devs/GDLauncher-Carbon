@@ -32,9 +32,11 @@ queries! {
     // Offline account: only uuid/username/lastUsed are meaningful; skinId is
     // passed through for interface symmetry with `insert_account_microsoft`
     // but is always `None` at today's only call site (an offline account is
-    // never created with a skin).
+    // never created with a skin). `tokenExpires` is listed explicitly as a
+    // literal `NULL` (an offline account never has one) rather than left to
+    // the column-list omission the datetime lint forbids.
     fn insert_account_offline(uuid: &str, username: &str, last_used: DbDateTime, skin_id: Option<&str>) -> usize =
-        "INSERT INTO Account (uuid, username, lastUsed, skinId) VALUES (:uuid, :username, :last_used, :skin_id)";
+        "INSERT INTO Account (uuid, username, lastUsed, tokenExpires, skinId) VALUES (:uuid, :username, :last_used, NULL, :skin_id)";
     fn insert_account_microsoft(
         uuid: &str,
         username: &str,
