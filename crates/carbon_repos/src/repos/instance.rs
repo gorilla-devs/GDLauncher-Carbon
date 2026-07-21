@@ -8,10 +8,10 @@
 //! and deadlock on `index_lock`).
 
 use crate::db_error::DbResult;
-use crate::db_exec::Db;
+use crate::db_exec::{Db, ReadAccess, WriteAccess};
 use crate::queries;
 use crate::registry::QueryCheck;
-use rusqlite::{Connection, named_params};
+use rusqlite::named_params;
 
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct InstanceRow {
@@ -192,7 +192,7 @@ pub struct InstanceArrange {
 /// Inserts a group and returns its new id. Hand-written to return
 /// `last_insert_rowid()`.
 pub fn insert_group_conn(
-    conn: &Connection,
+    conn: &impl crate::db_exec::WriteAccess,
     name: &str,
     group_index: i32,
     library_position: Option<i32>,
@@ -211,7 +211,7 @@ pub async fn insert_group(
     group_index: i32,
     library_position: Option<i32>,
 ) -> DbResult<i64> {
-    db.write(move |conn| Ok(insert_group_conn(conn, &name, group_index, library_position)?))
+    db.write(move |conn| Ok(insert_group_conn(&conn, &name, group_index, library_position)?))
         .await
 }
 
@@ -225,7 +225,7 @@ pub async fn move_instance_tx(
     index: i32,
     library_position: Option<i32>,
 ) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         for shift in &shifts {
             match *shift {
@@ -263,7 +263,7 @@ pub async fn arrange_library_tx(
     groups: Vec<GroupArrange>,
     instances: Vec<InstanceArrange>,
 ) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         for g in &groups {
             if g.set_library_position {
@@ -289,7 +289,7 @@ pub async fn arrange_library_tx(
 /// Restamps every instance's `index` within a folder in one write-pool
 /// transaction.
 pub async fn set_instance_indexes_tx(db: &Db, updates: Vec<(i32, i32)>) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         for (id, index) in &updates {
             set_instance_index_conn(&tx, *id, *index)?;
@@ -310,7 +310,7 @@ pub async fn add_instance_tx(
     group_id: i32,
     library_position: Option<i32>,
 ) -> DbResult<i64> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         delete_instances_by_shortpath_conn(&tx, &shortpath)?;
         {
@@ -338,7 +338,7 @@ pub async fn delete_group_tx(
     default_group_id: i32,
     base_index: i32,
 ) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         move_all_instances_to_group_conn(&tx, group_id, default_group_id, base_index)?;
         delete_group_conn(&tx, group_id)?;
@@ -351,7 +351,7 @@ pub async fn delete_group_tx(
 /// Creates the `"localize➽default"` group and points the singleton config row
 /// at it, in one write-pool transaction. Returns the new group id.
 pub async fn create_default_group_tx(db: &Db, group_index: i32) -> DbResult<i32> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         {
             let mut st = tx.prepare_cached(INSERT_GROUP_SQL)?;
@@ -376,18 +376,21 @@ const INSERT_INSTANCE_CHECK: QueryCheck = QueryCheck {
     sql: INSERT_INSTANCE_SQL,
     params: &[":name", ":shortpath", ":index", ":group_id", ":library_position"],
     columns: None,
+    class: crate::registry::class_of(INSERT_INSTANCE_SQL),
 };
 const INSERT_GROUP_CHECK: QueryCheck = QueryCheck {
     name: "insert_group",
     sql: INSERT_GROUP_SQL,
     params: &[":name", ":group_index", ":library_position"],
     columns: None,
+    class: crate::registry::class_of(INSERT_GROUP_SQL),
 };
 const UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_CHECK: QueryCheck = QueryCheck {
     name: "create_default_group_tx::set_default_instance_group",
     sql: UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_SQL,
     params: &[":group_id"],
     columns: None,
+    class: crate::registry::class_of(UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_SQL),
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the

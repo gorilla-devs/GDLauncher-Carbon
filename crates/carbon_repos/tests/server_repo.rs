@@ -1,4 +1,4 @@
-use carbon_repos::db_exec::Db;
+use carbon_repos::db_exec::{Db, ReadAccess};
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::server::{self as s, IndexShift, ServerPatch};
 use chrono::{TimeZone, Utc};
@@ -166,7 +166,7 @@ async fn shift_library_positions_scoped_to_group() {
     let other_srv = seed_server(&db, "o", "spo", 0, other, Some(2)).await;
 
     let affected = db
-        .write(move |conn| {
+        .write(move |mut conn| {
             let tx = conn.transaction()?;
             let n = s::shift_server_library_positions_down_scoped_conn(&tx, def, 1, 3)?;
             tx.commit()?;
@@ -200,7 +200,7 @@ async fn shift_indexes_up_from_and_down_after() {
         ids.push(seed_server(&db, &format!("n{p}"), &format!("sp{p}"), p, g, None).await);
     }
 
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         s::shift_server_indexes_up_from_conn(&tx, g, 2)?;
         tx.commit()?;
@@ -213,7 +213,7 @@ async fn shift_indexes_up_from_and_down_after() {
     assert_eq!(idx_of(&db, ids[2]).await, 3);
     assert_eq!(idx_of(&db, ids[3]).await, 4);
 
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         s::shift_server_indexes_down_after_conn(&tx, g, 3)?;
         tx.commit()?;
@@ -238,7 +238,7 @@ async fn move_all_servers_to_group_preserves_relative_order() {
 
     let base_index = s::count_servers_in_group(&db, dst).await.unwrap() as i32;
     assert_eq!(base_index, 2);
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         s::move_all_servers_to_group_conn(&tx, src, dst, base_index)?;
         tx.commit()?;
@@ -341,7 +341,7 @@ async fn server_patch_settings_subset_updates_only_present_fields() {
         ..Default::default()
     };
     let q = patch.build(id).unwrap();
-    let n = db.write(move |conn| Ok(q.execute(conn)?)).await.unwrap();
+    let n = db.write(move |conn| Ok(q.execute(&conn)?)).await.unwrap();
     assert_eq!(n, 1);
 
     let row = s::get_server(&db, id).await.unwrap().unwrap();
@@ -369,7 +369,7 @@ async fn server_patch_properties_subset_updates_only_present_fields() {
         ..Default::default()
     };
     let q = patch.build(id).unwrap();
-    assert_eq!(db.write(move |conn| Ok(q.execute(conn)?)).await.unwrap(), 1);
+    assert_eq!(db.write(move |conn| Ok(q.execute(&conn)?)).await.unwrap(), 1);
 
     let row = s::get_server(&db, id).await.unwrap().unwrap();
     assert_eq!(row.port, 25599);

@@ -1,4 +1,4 @@
-use carbon_repos::db_exec::Db;
+use carbon_repos::db_exec::{Db, ReadAccess};
 use carbon_repos::repos::app_configuration as ac;
 use carbon_repos::repos::instance as i;
 use rusqlite::Connection;
@@ -93,7 +93,7 @@ async fn shift_library_positions_down_exact_layout() {
 
     // shift (1, 3] down by one -> positions 2 and 3 become 1 and 2
     let affected = db
-        .write(|conn| {
+        .write(|mut conn| {
             let tx = conn.transaction()?;
             let n = i::shift_instance_library_positions_down_conn(&tx, 1, 3)?;
             tx.commit()?;
@@ -124,7 +124,7 @@ async fn shift_indexes_up_from_and_down_after() {
     }
 
     // increment index for all with index >= 2
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         i::shift_instance_indexes_up_from_conn(&tx, g, 2)?;
         tx.commit()?;
@@ -138,7 +138,7 @@ async fn shift_indexes_up_from_and_down_after() {
     assert_eq!(idx_of(&db, ids[3]).await, 4);
 
     // decrement index for all with index > 3
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         i::shift_instance_indexes_down_after_conn(&tx, g, 3)?;
         tx.commit()?;
@@ -166,7 +166,7 @@ async fn move_all_instances_to_group_preserves_relative_order() {
 
     let base_index = i::count_instances_in_group(&db, dst).await.unwrap() as i32;
     assert_eq!(base_index, 2);
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         i::move_all_instances_to_group_conn(&tx, src, dst, base_index)?;
         tx.commit()?;

@@ -72,7 +72,7 @@ const INSERT_APP_CONFIGURATION_SQL: &str =
 /// the macro's arg list only takes scalar params and the remaining columns rely
 /// on their DDL defaults.
 pub fn insert_app_configuration_conn(
-    conn: &rusqlite::Connection,
+    conn: &impl crate::db_exec::WriteAccess,
     release_channel: &str,
     xmx: i32,
     installation_id: Option<&str>,
@@ -94,7 +94,7 @@ pub async fn insert_app_configuration(
 ) -> DbResult<usize> {
     db.write(move |conn| {
         Ok(insert_app_configuration_conn(
-            conn,
+            &conn,
             &release_channel,
             xmx,
             installation_id.as_deref(),
@@ -108,6 +108,7 @@ const INSERT_APP_CONFIGURATION_CHECK: crate::registry::QueryCheck = crate::regis
     sql: INSERT_APP_CONFIGURATION_SQL,
     params: &[":release_channel", ":xmx", ":installation_id"],
     columns: None,
+    class: crate::registry::class_of(INSERT_APP_CONFIGURATION_SQL),
 };
 
 /// Every checkable query in this module.

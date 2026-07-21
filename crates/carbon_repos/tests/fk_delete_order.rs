@@ -8,7 +8,7 @@
 //! that still runs is an idempotent no-op, and `gc_orphan_metadata` only
 //! deletes NOT-EXISTS orphans and so never trips the RESTRICT edge.
 
-use carbon_repos::db_exec::Db;
+use carbon_repos::db_exec::{Db, ReadAccess, WriteAccess};
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::instance as inst;
 use carbon_repos::repos::mod_file_cache as mfc;

@@ -3,8 +3,16 @@
 //! table name (an identifier cannot be a bound `:param`, so this is exempt
 //! from the static checker per registry.rs's `DynamicQuery` doc comment).
 
+use carbon_repos::db_exec::{ReadGuard, WriteGuard};
 use carbon_repos::registry::DynamicQuery;
 use rusqlite::Connection;
+
+fn wg(c: &mut Connection) -> WriteGuard<'_> {
+    WriteGuard::new(c)
+}
+fn rg(c: &Connection) -> ReadGuard<'_> {
+    ReadGuard::new(c)
+}
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -33,7 +41,7 @@ fn query_scalar_i64_counts_rows_in_a_runtime_named_table() {
         sql: format!("SELECT COUNT(*) FROM {table}"),
         params: vec![],
     };
-    assert_eq!(dq.query_scalar_i64(&conn).unwrap(), 2);
+    assert_eq!(dq.query_scalar_i64(&rg(&conn)).unwrap(), 2);
 }
 
 #[test]
@@ -43,12 +51,12 @@ fn query_scalar_i64_on_empty_table_is_zero() {
         sql: "SELECT COUNT(*) FROM HTTPCache".to_string(),
         params: vec![],
     };
-    assert_eq!(dq.query_scalar_i64(&conn).unwrap(), 0);
+    assert_eq!(dq.query_scalar_i64(&rg(&conn)).unwrap(), 0);
 }
 
 #[test]
 fn execute_deletes_a_chunk_from_a_runtime_named_table() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     for i in 0..5 {
         conn.execute(
             "INSERT INTO HTTPCache (url, status_code, data) VALUES (?1, 200, ?2)",
@@ -66,14 +74,14 @@ fn execute_deletes_a_chunk_from_a_runtime_named_table() {
         params: vec![],
     };
 
-    assert_eq!(dq.execute(&conn).unwrap(), 2);
+    assert_eq!(dq.execute(&wg(&mut conn)).unwrap(), 2);
     let remaining: i64 = conn
         .query_row("SELECT COUNT(*) FROM HTTPCache", [], |r| r.get(0))
         .unwrap();
     assert_eq!(remaining, 3);
 
     // Draining loop matches the call site: repeat until a 0-row delete.
-    assert_eq!(dq.execute(&conn).unwrap(), 2);
-    assert_eq!(dq.execute(&conn).unwrap(), 1);
-    assert_eq!(dq.execute(&conn).unwrap(), 0);
+    assert_eq!(dq.execute(&wg(&mut conn)).unwrap(), 2);
+    assert_eq!(dq.execute(&wg(&mut conn)).unwrap(), 1);
+    assert_eq!(dq.execute(&wg(&mut conn)).unwrap(), 0);
 }

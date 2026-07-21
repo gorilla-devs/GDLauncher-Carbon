@@ -2,7 +2,7 @@
 //! consumed by `cache_middleware`.
 
 use crate::db_error::DbResult;
-use crate::db_exec::Db;
+use crate::db_exec::{Db, WriteAccess};
 use crate::dbtypes::DbDateTime;
 use crate::queries;
 use crate::registry::QueryCheck;
@@ -42,7 +42,7 @@ pub async fn replace_cached(
     last_modified: Option<String>,
     etag: Option<String>,
 ) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         tx.execute(DELETE_HTTP_CACHE_SQL, rusqlite::named_params! { ":url": url })?;
         tx.execute(
@@ -67,6 +67,7 @@ const DELETE_HTTP_CACHE_CHECK: QueryCheck = QueryCheck {
     sql: DELETE_HTTP_CACHE_SQL,
     params: &[":url"],
     columns: None,
+    class: crate::registry::class_of(DELETE_HTTP_CACHE_SQL),
 };
 const INSERT_HTTP_CACHE_CHECK: QueryCheck = QueryCheck {
     name: "replace_cached::insert_http_cache",
@@ -80,6 +81,7 @@ const INSERT_HTTP_CACHE_CHECK: QueryCheck = QueryCheck {
         ":etag",
     ],
     columns: None,
+    class: crate::registry::class_of(INSERT_HTTP_CACHE_SQL),
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus

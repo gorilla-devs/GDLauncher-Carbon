@@ -62,6 +62,205 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Typed connection guards
+//
+// `Db::read` hands a closure a `ReadGuard`, `Db::write` a `WriteGuard`. The two
+// access traits below split the mirrored `Connection` surface so that a
+// write-class `_conn` fn (which takes `&impl WriteAccess`) can never be called
+// through a read guard: the read-only pool's connection is unreachable from a
+// write signature at compile time, not merely rejected at runtime.
+//
+// Writability is orthogonal to transaction-ness: `ReadGuard::snapshot()` yields
+// a `ReadTx` (a WAL read snapshot — `ReadAccess` only), while
+// `WriteGuard::transaction()` yields a `WriteTx` (`ReadAccess + WriteAccess`, so
+// a write transaction can read but a read snapshot can never write).
+// ---------------------------------------------------------------------------
+
+/// Read-only access surface shared by every connection guard. Mirrors just the
+/// `rusqlite::Connection` methods the repository layer needs for reads. All four
+/// guards (`ReadGuard`, `ReadTx`, `WriteGuard`, `WriteTx`) implement it — write
+/// access is a strict superset of read access.
+pub trait ReadAccess {
+    fn prepare_cached(&self, sql: &str) -> rusqlite::Result<rusqlite::CachedStatement<'_>>;
+    fn query_row<T, P, F>(&self, sql: &str, params: P, f: F) -> rusqlite::Result<T>
+    where
+        P: rusqlite::Params,
+        F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>;
+    /// Escape hatch to the underlying connection for repo-internal, runtime-SQL
+    /// paths (`DynamicQuery`). The hand-written-SQL census still governs what
+    /// SQL runs through it.
+    #[doc(hidden)]
+    fn raw(&self) -> &Connection;
+}
+
+/// Write access surface: everything `ReadAccess` offers plus the mutating
+/// `Connection` methods. Only the write guards (`WriteGuard`, `WriteTx`)
+/// implement it, so a write-class `_conn` fn — which takes `&impl WriteAccess`
+/// — cannot be called through a read guard or a read snapshot.
+pub trait WriteAccess: ReadAccess {
+    fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> rusqlite::Result<usize>;
+    fn execute_batch(&self, sql: &str) -> rusqlite::Result<()>;
+    fn last_insert_rowid(&self) -> i64;
+}
+
+/// A borrowed handle to a read-pool connection. Grants `ReadAccess` only.
+#[derive(Clone, Copy)]
+pub struct ReadGuard<'a>(&'a Connection);
+
+/// A borrowed handle to the write-pool connection. Grants `ReadAccess +
+/// WriteAccess`. Holds `&mut Connection` so `transaction()` uses rusqlite's
+/// checked `Connection::transaction` and the borrow checker forbids touching the
+/// connection directly while a transaction is live.
+pub struct WriteGuard<'a>(&'a mut Connection);
+
+/// A WAL read snapshot: a `BEGIN DEFERRED` transaction on a read-pool connection
+/// pinning one consistent view across several reads. `ReadAccess` only — a
+/// snapshot can never write.
+pub struct ReadTx<'a>(rusqlite::Transaction<'a>);
+
+/// A write transaction on the write-pool connection. `ReadAccess + WriteAccess`
+/// — a write transaction can read.
+pub struct WriteTx<'a>(rusqlite::Transaction<'a>);
+
+impl<'a> ReadGuard<'a> {
+    /// Wraps a connection reference in a read guard. `#[doc(hidden)]` — the
+    /// executor plumbs guards to closures; this constructor also lets tests
+    /// exercise `_conn` fns against a raw migrated connection.
+    #[doc(hidden)]
+    pub fn new(conn: &'a Connection) -> Self {
+        ReadGuard(conn)
+    }
+
+    /// Opens a `BEGIN DEFERRED` read transaction that pins one WAL snapshot for
+    /// the duration of the returned `ReadTx`, so several reads observe one
+    /// consistent view.
+    pub fn snapshot(&self) -> DbResult<ReadTx<'_>> {
+        Ok(ReadTx(self.0.unchecked_transaction()?))
+    }
+}
+
+impl<'a> WriteGuard<'a> {
+    /// Wraps a mutable connection reference in a write guard. `#[doc(hidden)]` —
+    /// see [`ReadGuard::new`].
+    #[doc(hidden)]
+    pub fn new(conn: &'a mut Connection) -> Self {
+        WriteGuard(conn)
+    }
+
+    /// Begins a write transaction. Borrows the guard mutably, so the underlying
+    /// connection cannot be used directly until the transaction is committed or
+    /// dropped.
+    pub fn transaction(&mut self) -> DbResult<WriteTx<'_>> {
+        Ok(WriteTx(self.0.transaction()?))
+    }
+}
+
+impl WriteTx<'_> {
+    /// Commits the write transaction.
+    pub fn commit(self) -> DbResult<()> {
+        self.0.commit()?;
+        Ok(())
+    }
+}
+
+impl ReadTx<'_> {
+    /// Ends the read snapshot. A read snapshot performs no writes, so committing
+    /// and dropping are equivalent; provided for symmetry with `WriteTx`.
+    pub fn commit(self) -> DbResult<()> {
+        self.0.commit()?;
+        Ok(())
+    }
+}
+
+impl ReadAccess for ReadGuard<'_> {
+    fn prepare_cached(&self, sql: &str) -> rusqlite::Result<rusqlite::CachedStatement<'_>> {
+        self.0.prepare_cached(sql)
+    }
+    fn query_row<T, P, F>(&self, sql: &str, params: P, f: F) -> rusqlite::Result<T>
+    where
+        P: rusqlite::Params,
+        F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+    {
+        self.0.query_row(sql, params, f)
+    }
+    fn raw(&self) -> &Connection {
+        self.0
+    }
+}
+
+impl ReadAccess for ReadTx<'_> {
+    fn prepare_cached(&self, sql: &str) -> rusqlite::Result<rusqlite::CachedStatement<'_>> {
+        self.0.prepare_cached(sql)
+    }
+    fn query_row<T, P, F>(&self, sql: &str, params: P, f: F) -> rusqlite::Result<T>
+    where
+        P: rusqlite::Params,
+        F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+    {
+        self.0.query_row(sql, params, f)
+    }
+    fn raw(&self) -> &Connection {
+        &self.0
+    }
+}
+
+impl ReadAccess for WriteGuard<'_> {
+    fn prepare_cached(&self, sql: &str) -> rusqlite::Result<rusqlite::CachedStatement<'_>> {
+        self.0.prepare_cached(sql)
+    }
+    fn query_row<T, P, F>(&self, sql: &str, params: P, f: F) -> rusqlite::Result<T>
+    where
+        P: rusqlite::Params,
+        F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+    {
+        self.0.query_row(sql, params, f)
+    }
+    fn raw(&self) -> &Connection {
+        self.0
+    }
+}
+
+impl WriteAccess for WriteGuard<'_> {
+    fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> rusqlite::Result<usize> {
+        self.0.execute(sql, params)
+    }
+    fn execute_batch(&self, sql: &str) -> rusqlite::Result<()> {
+        self.0.execute_batch(sql)
+    }
+    fn last_insert_rowid(&self) -> i64 {
+        self.0.last_insert_rowid()
+    }
+}
+
+impl ReadAccess for WriteTx<'_> {
+    fn prepare_cached(&self, sql: &str) -> rusqlite::Result<rusqlite::CachedStatement<'_>> {
+        self.0.prepare_cached(sql)
+    }
+    fn query_row<T, P, F>(&self, sql: &str, params: P, f: F) -> rusqlite::Result<T>
+    where
+        P: rusqlite::Params,
+        F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+    {
+        self.0.query_row(sql, params, f)
+    }
+    fn raw(&self) -> &Connection {
+        &self.0
+    }
+}
+
+impl WriteAccess for WriteTx<'_> {
+    fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> rusqlite::Result<usize> {
+        self.0.execute(sql, params)
+    }
+    fn execute_batch(&self, sql: &str) -> rusqlite::Result<()> {
+        self.0.execute_batch(sql)
+    }
+    fn last_insert_rowid(&self) -> i64 {
+        self.0.last_insert_rowid()
+    }
+}
+
 pub struct Db {
     writer: Actor,
     readers: Vec<Actor>,
@@ -115,21 +314,64 @@ impl Db {
         Ok(Db { writer, readers, next_reader: AtomicUsize::new(0) })
     }
 
+    /// Runs `f` on the write-pool connection, handing it a [`WriteGuard`]
+    /// (`ReadAccess + WriteAccess`).
     pub async fn write<T, F>(&self, f: F) -> DbResult<T>
     where
-        F: FnOnce(&mut Connection) -> DbResult<T> + Send + 'static,
+        F: FnOnce(WriteGuard) -> DbResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.writer.run(f).await
+        self.writer.run(move |conn| f(WriteGuard(conn))).await
     }
 
+    /// Runs `f` on a read-pool connection, handing it a [`ReadGuard`]
+    /// (`ReadAccess` only).
+    ///
+    /// The read/write split is enforced by the type system. A write-class
+    /// `_conn` fn takes `&impl WriteAccess`, which a `ReadGuard` does not
+    /// satisfy:
+    ///
+    /// ```compile_fail
+    /// use carbon_repos::db_exec::ReadGuard;
+    /// let conn = rusqlite::Connection::open_in_memory().unwrap();
+    /// let guard = ReadGuard::new(&conn);
+    /// // `set_instance_index_conn` is write-class (`&impl WriteAccess`); a
+    /// // `ReadGuard` grants `ReadAccess` only, so this does not compile.
+    /// carbon_repos::repos::instance::set_instance_index_conn(&guard, 1, 2).unwrap();
+    /// ```
+    ///
+    /// A read snapshot (`ReadTx`) likewise grants `ReadAccess` only, so a write
+    /// through it is a compile error, not a runtime read-only failure:
+    ///
+    /// ```compile_fail
+    /// use carbon_repos::db_exec::ReadGuard;
+    /// let conn = rusqlite::Connection::open_in_memory().unwrap();
+    /// let guard = ReadGuard::new(&conn);
+    /// let snap = guard.snapshot().unwrap();
+    /// carbon_repos::repos::instance::set_instance_index_conn(&snap, 1, 2).unwrap();
+    /// ```
+    ///
+    /// Writability is orthogonal to transaction-ness: a `WriteTx` grants
+    /// `ReadAccess + WriteAccess`, so a write transaction can call a read-class
+    /// `_conn` fn. This compiles:
+    ///
+    /// ```
+    /// use carbon_repos::db_exec::WriteGuard;
+    /// let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+    /// let mut guard = WriteGuard::new(&mut conn);
+    /// let tx = guard.transaction().unwrap();
+    /// // `get_instance_conn` is read-class (`&impl ReadAccess`); a `WriteTx`
+    /// // satisfies that bound. (The call errors at runtime on the empty schema;
+    /// // we only assert it type-checks.)
+    /// let _ = carbon_repos::repos::instance::get_instance_conn(&tx, 1);
+    /// ```
     pub async fn read<T, F>(&self, f: F) -> DbResult<T>
     where
-        F: FnOnce(&mut Connection) -> DbResult<T> + Send + 'static,
+        F: FnOnce(ReadGuard) -> DbResult<T> + Send + 'static,
         T: Send + 'static,
     {
         let i = self.next_reader.fetch_add(1, Ordering::Relaxed) % self.readers.len();
-        self.readers[i].run(f).await
+        self.readers[i].run(move |conn| f(ReadGuard(conn))).await
     }
 }
 
@@ -218,8 +460,10 @@ mod tests {
             .await
             .unwrap();
         // A write attempted through the read pool must fail: the connection
-        // is opened SQLITE_OPEN_READ_ONLY, so this cannot silently succeed.
-        let err = db.read(|c| Ok(c.execute_batch("CREATE TABLE nope (x)")?)).await;
+        // is opened SQLITE_OPEN_READ_ONLY, so this cannot silently succeed. A
+        // `ReadGuard` cannot even express a write, so this reaches for the raw
+        // connection to prove the OS-level read-only flag still refuses it.
+        let err = db.read(|c| Ok(c.raw().execute_batch("CREATE TABLE nope (x)")?)).await;
         assert!(err.is_err(), "write through the read pool must fail loudly, got {err:?}");
         // The same statement through the write pool succeeds.
         db.write(|c| Ok(c.execute_batch("CREATE TABLE nope (x)")?))

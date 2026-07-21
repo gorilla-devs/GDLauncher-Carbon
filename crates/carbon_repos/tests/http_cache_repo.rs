@@ -1,4 +1,4 @@
-use carbon_repos::db_exec::Db;
+use carbon_repos::db_exec::{Db, ReadAccess};
 use carbon_repos::dbtypes::{DbDateTime, from_millis};
 use carbon_repos::repos::http_cache as hc;
 use rusqlite::Connection;

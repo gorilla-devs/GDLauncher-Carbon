@@ -1,7 +1,7 @@
 //! Repository queries for the `Skin` table.
 
 use crate::db_error::DbResult;
-use crate::db_exec::Db;
+use crate::db_exec::{Db, WriteAccess};
 use crate::queries;
 use crate::registry::QueryCheck;
 
@@ -32,7 +32,7 @@ pub async fn replace_skin_and_link_account(
     skin_data: Vec<u8>,
     account_uuid: String,
 ) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         tx.execute(DELETE_SKIN_SQL, rusqlite::named_params! { ":id": skin_id })?;
         tx.execute(
@@ -54,18 +54,21 @@ const DELETE_SKIN_CHECK: QueryCheck = QueryCheck {
     sql: DELETE_SKIN_SQL,
     params: &[":id"],
     columns: None,
+    class: crate::registry::class_of(DELETE_SKIN_SQL),
 };
 const INSERT_SKIN_CHECK: QueryCheck = QueryCheck {
     name: "replace_skin_and_link_account::insert_skin",
     sql: INSERT_SKIN_SQL,
     params: &[":id", ":skin"],
     columns: None,
+    class: crate::registry::class_of(INSERT_SKIN_SQL),
 };
 const UPDATE_ACCOUNT_SKIN_CHECK: QueryCheck = QueryCheck {
     name: "replace_skin_and_link_account::update_account_skin",
     sql: UPDATE_ACCOUNT_SKIN_SQL,
     params: &[":id", ":uuid"],
     columns: None,
+    class: crate::registry::class_of(UPDATE_ACCOUNT_SKIN_SQL),
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus

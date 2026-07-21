@@ -206,7 +206,7 @@ const UPSERT_CF_MOD_CACHE_SQL: &str =
 /// key and returns the `metadataId` of the surviving row.
 #[allow(clippy::too_many_arguments)]
 pub fn upsert_cf_mod_cache_conn(
-    conn: &rusqlite::Connection,
+    conn: &impl crate::db_exec::WriteAccess,
     murmur2: i32,
     project_id: i32,
     file_id: i32,
@@ -261,7 +261,7 @@ pub async fn upsert_cf_mod_cache(
 ) -> DbResult<String> {
     db.write(move |conn| {
         Ok(upsert_cf_mod_cache_conn(
-            conn,
+            &conn,
             murmur2,
             project_id,
             file_id,
@@ -297,6 +297,7 @@ const UPSERT_CF_MOD_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::
         ":cached_at",
     ],
     columns: None,
+    class: crate::registry::class_of(UPSERT_CF_MOD_CACHE_SQL),
 };
 
 /// SQL executed by `upsert_mr_mod_cache`, shared with its `QueryCheck`. Conflict
@@ -326,7 +327,7 @@ const UPSERT_MR_MOD_CACHE_SQL: &str =
 /// key and returns the `metadataId` of the surviving row.
 #[allow(clippy::too_many_arguments)]
 pub fn upsert_mr_mod_cache_conn(
-    conn: &rusqlite::Connection,
+    conn: &impl crate::db_exec::WriteAccess,
     sha512: &str,
     project_id: &str,
     version_id: &str,
@@ -387,7 +388,7 @@ pub async fn upsert_mr_mod_cache(
 ) -> DbResult<String> {
     db.write(move |conn| {
         Ok(upsert_mr_mod_cache_conn(
-            conn,
+            &conn,
             &sha512,
             &project_id,
             &version_id,
@@ -427,6 +428,7 @@ const UPSERT_MR_MOD_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::
         ":cached_at",
     ],
     columns: None,
+    class: crate::registry::class_of(UPSERT_MR_MOD_CACHE_SQL),
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the

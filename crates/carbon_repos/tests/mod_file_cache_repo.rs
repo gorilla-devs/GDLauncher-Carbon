@@ -82,14 +82,14 @@ fn insert_mr(
 
 #[test]
 fn upsert_inserts_then_conflict_preserves_id_and_refreshes_freshness() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "meta-1", 111, b"s512", b"s1", None, None);
 
-    let n = mfc::upsert_mod_file_cache_conn(&conn, 7, "a.jar", 100, true, "mods", "meta-1", ts(1000))
+    let n = mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 7, "a.jar", 100, true, "mods", "meta-1", ts(1000))
         .unwrap();
     assert_eq!(n, 1);
 
-    let row = mfc::get_mod_file_cache_by_instance_filename_conn(&conn, 7, "a.jar")
+    let row = mfc::get_mod_file_cache_by_instance_filename_conn(&wg(&mut conn), 7, "a.jar")
         .unwrap()
         .unwrap();
     let original_id = row.id.clone();
@@ -100,10 +100,10 @@ fn upsert_inserts_then_conflict_preserves_id_and_refreshes_freshness() {
 
     // Conflict on (instanceId, filename): row keeps its id, other cols + freshness update.
     insert_metadata(&conn, "meta-2", 222, b"s512b", b"s1b", None, None);
-    mfc::upsert_mod_file_cache_conn(&conn, 7, "a.jar", 200, false, "shaders", "meta-2", ts(5000))
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 7, "a.jar", 200, false, "shaders", "meta-2", ts(5000))
         .unwrap();
 
-    let row = mfc::get_mod_file_cache_by_instance_filename_conn(&conn, 7, "a.jar")
+    let row = mfc::get_mod_file_cache_by_instance_filename_conn(&wg(&mut conn), 7, "a.jar")
         .unwrap()
         .unwrap();
     assert_eq!(row.id, original_id, "id must survive the conflict");
@@ -114,16 +114,16 @@ fn upsert_inserts_then_conflict_preserves_id_and_refreshes_freshness() {
     assert_eq!(row.last_updated_at, ts(5000).0, "freshness column refreshed");
 
     // Exactly one row for this instance.
-    assert_eq!(mfc::get_mod_files_by_instance_conn(&conn, 7).unwrap().len(), 1);
+    assert_eq!(mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 7).unwrap().len(), 1);
 }
 
 #[test]
 fn upsert_generates_distinct_uuids_per_row() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "b.jar", 1, true, "mods", "m", ts(1)).unwrap();
-    let rows = mfc::get_mod_files_by_instance_conn(&conn, 1).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "b.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    let rows = mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 1).unwrap();
     assert_eq!(rows.len(), 2);
     assert_ne!(rows[0].id, rows[1].id);
     // uuid v4 shape (36 chars with dashes)
@@ -132,16 +132,16 @@ fn upsert_generates_distinct_uuids_per_row() {
 
 #[test]
 fn server_upsert_conflict_preserves_id_and_freshness() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
-    mfc::upsert_server_mod_file_cache_conn(&conn, 3, "a.jar", 10, true, "mods", "m", ts(1000)).unwrap();
-    let row = mfc::get_server_mod_files_by_server_conn(&conn, 3).unwrap().remove(0);
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 3, "a.jar", 10, true, "mods", "m", ts(1000)).unwrap();
+    let row = mfc::get_server_mod_files_by_server_conn(&wg(&mut conn), 3).unwrap().remove(0);
     let id = row.id.clone();
     assert_eq!(row.last_updated_at, ts(1000).0);
 
-    mfc::upsert_server_mod_file_cache_conn(&conn, 3, "a.jar", 20, false, "datapacks", "m", ts(2000))
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 3, "a.jar", 20, false, "datapacks", "m", ts(2000))
         .unwrap();
-    let row = mfc::get_server_mod_file_cache_by_id_conn(&conn, &id).unwrap().unwrap();
+    let row = mfc::get_server_mod_file_cache_by_id_conn(&wg(&mut conn), &id).unwrap().unwrap();
     assert_eq!(row.id, id);
     assert_eq!(row.filesize, 20);
     assert_eq!(row.enabled, false);
@@ -153,40 +153,40 @@ fn server_upsert_conflict_preserves_id_and_freshness() {
 
 #[test]
 fn update_enabled_sets_flag_and_freshness() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
-    let id = mfc::get_mod_files_by_instance_conn(&conn, 1).unwrap().remove(0).id;
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    let id = mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 1).unwrap().remove(0).id;
 
-    assert_eq!(mfc::update_mod_file_enabled_conn(&conn, &id, false, ts(9999)).unwrap(), 1);
-    let row = mfc::get_mod_file_cache_by_id_conn(&conn, &id).unwrap().unwrap();
+    assert_eq!(mfc::update_mod_file_enabled_conn(&wg(&mut conn), &id, false, ts(9999)).unwrap(), 1);
+    let row = mfc::get_mod_file_cache_by_id_conn(&wg(&mut conn), &id).unwrap().unwrap();
     assert_eq!(row.enabled, false);
     assert_eq!(row.last_updated_at, ts(9999).0);
 
-    assert_eq!(mfc::update_server_mod_file_enabled_conn(&conn, "nope", true, ts(1)).unwrap(), 0);
+    assert_eq!(mfc::update_server_mod_file_enabled_conn(&wg(&mut conn), "nope", true, ts(1)).unwrap(), 0);
 }
 
 #[test]
 fn deletes_scope_correctly() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "b.jar", 1, true, "mods", "m", ts(1)).unwrap();
-    mfc::upsert_mod_file_cache_conn(&conn, 2, "c.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "b.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 2, "c.jar", 1, true, "mods", "m", ts(1)).unwrap();
 
-    assert_eq!(mfc::delete_mod_file_cache_by_instance_filename_conn(&conn, 1, "a.jar").unwrap(), 1);
-    assert_eq!(mfc::get_mod_files_by_instance_conn(&conn, 1).unwrap().len(), 1);
-    assert_eq!(mfc::delete_mod_file_cache_by_instance_conn(&conn, 1).unwrap(), 1);
-    assert_eq!(mfc::get_mod_files_by_instance_conn(&conn, 1).unwrap().len(), 0);
+    assert_eq!(mfc::delete_mod_file_cache_by_instance_filename_conn(&wg(&mut conn), 1, "a.jar").unwrap(), 1);
+    assert_eq!(mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 1).unwrap().len(), 1);
+    assert_eq!(mfc::delete_mod_file_cache_by_instance_conn(&wg(&mut conn), 1).unwrap(), 1);
+    assert_eq!(mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 1).unwrap().len(), 0);
     // instance 2 untouched
-    assert_eq!(mfc::get_mod_files_by_instance_conn(&conn, 2).unwrap().len(), 1);
+    assert_eq!(mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 2).unwrap().len(), 1);
 }
 
 // --- full flat JOIN row -----------------------------------------------------
 
 #[test]
 fn full_row_decodes_populated_and_bare_metadata() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
 
     // Fully-populated: metadata + local image + cf(+image w/ data) + mr(+image w/ data).
     insert_metadata(&conn, "full", 111, b"S512", b"S1", Some("jei"), Some("JEI"));
@@ -207,14 +207,14 @@ fn full_row_decodes_populated_and_bare_metadata() {
         [],
     )
     .unwrap();
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "full.jar", 42, true, "mods", "full", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "full.jar", 42, true, "mods", "full", ts(1)).unwrap();
 
     // Bare: metadata only, no platform rows, no local image.
     insert_metadata(&conn, "bare", 222, b"b512", b"b1", None, None);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "bare.jar", 7, false, "resourcepacks", "bare", ts(1))
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "bare.jar", 7, false, "resourcepacks", "bare", ts(1))
         .unwrap();
 
-    let mut rows = mfc::get_instance_mods_full_conn(&conn, 1).unwrap();
+    let mut rows = mfc::get_instance_mods_full_conn(&wg(&mut conn), 1).unwrap();
     rows.sort_by(|a, b| a.filename.cmp(&b.filename));
     assert_eq!(rows.len(), 2);
 
@@ -253,7 +253,7 @@ fn full_row_decodes_populated_and_bare_metadata() {
 fn cf_image_presence_checks_data_for_instance_but_relation_for_server() {
     // Instance full row: has_cf_image = (ci.data IS NOT NULL).
     // Server full row:   has_cf_image = (ci.metadataId IS NOT NULL).
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
     insert_cf(&conn, "m", 1, 1, "n", "s", 2, "", 1);
     // image row exists but data is NULL (marked stale, not yet downloaded)
@@ -262,13 +262,13 @@ fn cf_image_presence_checks_data_for_instance_but_relation_for_server() {
         [],
     )
     .unwrap();
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
-    mfc::upsert_server_mod_file_cache_conn(&conn, 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
 
-    let inst = mfc::get_instance_mods_full_conn(&conn, 1).unwrap().remove(0);
+    let inst = mfc::get_instance_mods_full_conn(&wg(&mut conn), 1).unwrap().remove(0);
     assert_eq!(inst.has_cf_image, false, "instance checks data presence");
 
-    let srv = mfc::get_server_mods_full_conn(&conn, 1).unwrap().remove(0);
+    let srv = mfc::get_server_mods_full_conn(&wg(&mut conn), 1).unwrap().remove(0);
     assert_eq!(srv.has_cf_image, true, "server checks relation presence");
     assert_eq!(srv.cf_project_id, Some(1));
 }
@@ -277,7 +277,7 @@ fn cf_image_presence_checks_data_for_instance_but_relation_for_server() {
 
 #[test]
 fn icon_data_returns_all_three_blobs() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
     conn.execute(
         "INSERT INTO LocalModImageCache (metadataId, data) VALUES ('m', X'01')",
@@ -290,10 +290,10 @@ fn icon_data_returns_all_three_blobs() {
         [],
     )
     .unwrap();
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
-    let id = mfc::get_mod_files_by_instance_conn(&conn, 1).unwrap().remove(0).id;
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    let id = mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 1).unwrap().remove(0).id;
 
-    let icon = mfc::get_instance_mod_icon_data_conn(&conn, &id).unwrap().unwrap();
+    let icon = mfc::get_instance_mod_icon_data_conn(&wg(&mut conn), &id).unwrap().unwrap();
     assert_eq!(icon.local_data, Some(vec![1u8]));
     assert_eq!(icon.cf_data, Some(vec![2u8]));
     assert_eq!(icon.mr_data, None);
@@ -303,23 +303,23 @@ fn icon_data_returns_all_three_blobs() {
 
 #[test]
 fn cf_refresh_selects_missing_and_stale_excluding_worlds() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     // no cf row -> needs refresh
     insert_metadata(&conn, "missing", 1, b"a", b"b", None, None);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "missing.jar", 1, true, "mods", "missing", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "missing.jar", 1, true, "mods", "missing", ts(1)).unwrap();
     // fresh cf row (cachedAt AFTER cutoff) -> excluded
     insert_metadata(&conn, "fresh", 2, b"a", b"b", None, None);
     insert_cf(&conn, "fresh", 1, 1, "n", "s", 2, "", 10_000);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "fresh.jar", 1, true, "mods", "fresh", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "fresh.jar", 1, true, "mods", "fresh", ts(1)).unwrap();
     // stale cf row (cachedAt BEFORE cutoff) -> included
     insert_metadata(&conn, "stale", 3, b"a", b"b", None, None);
     insert_cf(&conn, "stale", 2, 2, "n", "s", 2, "", 100);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "stale.jar", 1, true, "mods", "stale", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "stale.jar", 1, true, "mods", "stale", ts(1)).unwrap();
     // world addon with no cf -> excluded by addonType filter
     insert_metadata(&conn, "world", 4, b"a", b"b", None, None);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "world1", 1, true, "worlds", "world", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "world1", 1, true, "worlds", "world", ts(1)).unwrap();
 
-    let mut ids: Vec<String> = mfc::instance_mods_needing_cf_refresh_conn(&conn, 1, ts(5000))
+    let mut ids: Vec<String> = mfc::instance_mods_needing_cf_refresh_conn(&wg(&mut conn), 1, ts(5000))
         .unwrap()
         .into_iter()
         .map(|r| r.metadata_id)
@@ -330,15 +330,15 @@ fn cf_refresh_selects_missing_and_stale_excluding_worlds() {
 
 #[test]
 fn mr_refresh_and_server_variants_work() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m1", 1, b"a", b"b", None, None);
-    mfc::upsert_server_mod_file_cache_conn(&conn, 9, "a.jar", 1, true, "mods", "m1", ts(1)).unwrap();
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 9, "a.jar", 1, true, "mods", "m1", ts(1)).unwrap();
     // fresh mr -> excluded
     insert_metadata(&conn, "m2", 2, b"a", b"b", None, None);
     insert_mr(&conn, "m2", "p", "v", "t", "s", "f", 10_000);
-    mfc::upsert_server_mod_file_cache_conn(&conn, 9, "b.jar", 1, true, "mods", "m2", ts(1)).unwrap();
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 9, "b.jar", 1, true, "mods", "m2", ts(1)).unwrap();
 
-    let ids: Vec<String> = mfc::server_mods_needing_mr_refresh_conn(&conn, 9, ts(5000))
+    let ids: Vec<String> = mfc::server_mods_needing_mr_refresh_conn(&wg(&mut conn), 9, ts(5000))
         .unwrap()
         .into_iter()
         .map(|r| r.metadata_id)
@@ -348,7 +348,7 @@ fn mr_refresh_and_server_variants_work() {
 
 #[test]
 fn stale_cf_logo_selects_only_uptodate_zero() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
     insert_cf(&conn, "m", 77, 88, "n", "s", 2, "", 1);
     conn.execute(
@@ -356,9 +356,9 @@ fn stale_cf_logo_selects_only_uptodate_zero() {
         [],
     )
     .unwrap();
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
 
-    let rows = mfc::instance_mods_stale_cf_logo_conn(&conn, 1).unwrap();
+    let rows = mfc::instance_mods_stale_cf_logo_conn(&wg(&mut conn), 1).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].project_id, 77);
     assert_eq!(rows[0].file_id, 88);
@@ -368,51 +368,51 @@ fn stale_cf_logo_selects_only_uptodate_zero() {
     // mark up to date -> no longer selected
     conn.execute("UPDATE CurseForgeModImageCache SET upToDate = 1 WHERE metadataId = 'm'", [])
         .unwrap();
-    assert_eq!(mfc::instance_mods_stale_cf_logo_conn(&conn, 1).unwrap().len(), 0);
+    assert_eq!(mfc::instance_mods_stale_cf_logo_conn(&wg(&mut conn), 1).unwrap().len(), 0);
 }
 
 // --- existence / update-id / shader / export --------------------------------
 
 #[test]
 fn exists_by_project_matches_only_installed() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
     insert_cf(&conn, "m", 4242, 1, "n", "s", 2, "", 1);
-    mfc::upsert_mod_file_cache_conn(&conn, 5, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 5, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
 
-    assert!(mfc::instance_mod_exists_by_cf_project_conn(&conn, 5, 4242).unwrap().is_some());
-    assert!(mfc::instance_mod_exists_by_cf_project_conn(&conn, 5, 9999).unwrap().is_none());
+    assert!(mfc::instance_mod_exists_by_cf_project_conn(&wg(&mut conn), 5, 4242).unwrap().is_some());
+    assert!(mfc::instance_mod_exists_by_cf_project_conn(&wg(&mut conn), 5, 9999).unwrap().is_none());
     // wrong instance
-    assert!(mfc::instance_mod_exists_by_cf_project_conn(&conn, 6, 4242).unwrap().is_none());
+    assert!(mfc::instance_mod_exists_by_cf_project_conn(&wg(&mut conn), 6, 4242).unwrap().is_none());
 }
 
 #[test]
 fn update_ids_and_platform_ids() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
     insert_cf(&conn, "m", 10, 20, "n", "s", 2, "", 1);
     insert_mr(&conn, "m", "mp", "mv", "t", "s", "f", 1);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
-    let id = mfc::get_mod_files_by_instance_conn(&conn, 1).unwrap().remove(0).id;
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    let id = mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 1).unwrap().remove(0).id;
 
-    let cf = mfc::get_instance_mod_cf_ids_conn(&conn, &id).unwrap().unwrap();
+    let cf = mfc::get_instance_mod_cf_ids_conn(&wg(&mut conn), &id).unwrap().unwrap();
     assert_eq!((cf.cf_project_id, cf.cf_file_id), (Some(10), Some(20)));
-    let mr = mfc::get_instance_mod_mr_ids_conn(&conn, &id).unwrap().unwrap();
+    let mr = mfc::get_instance_mod_mr_ids_conn(&wg(&mut conn), &id).unwrap().unwrap();
     assert_eq!(mr.mr_project_id.as_deref(), Some("mp"));
-    let both = mfc::get_instance_mod_update_ids_conn(&conn, &id).unwrap().unwrap();
+    let both = mfc::get_instance_mod_update_ids_conn(&wg(&mut conn), &id).unwrap().unwrap();
     assert_eq!(both.cf_project_id, Some(10));
     assert_eq!(both.mr_version_id.as_deref(), Some("mv"));
 }
 
 #[test]
 fn enabled_modids_only() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "on", 1, b"a", b"b", Some("iris"), None);
     insert_metadata(&conn, "off", 2, b"a", b"b", Some("optifine"), None);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "on.jar", 1, true, "mods", "on", ts(1)).unwrap();
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "off.jar", 1, false, "mods", "off", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "on.jar", 1, true, "mods", "on", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "off.jar", 1, false, "mods", "off", ts(1)).unwrap();
 
-    let modids: Vec<String> = mfc::get_enabled_instance_mod_modids_conn(&conn, 1)
+    let modids: Vec<String> = mfc::get_enabled_instance_mod_modids_conn(&wg(&mut conn), 1)
         .unwrap()
         .into_iter()
         .filter_map(|r| r.modid)
@@ -422,33 +422,37 @@ fn enabled_modids_only() {
 
 #[test]
 fn export_queries_shape() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 55, b"S512", b"S1", None, Some("meta name"));
     insert_cf(&conn, "m", 1, 2, "cfname", "cfslug", 2, "", 1);
     insert_mr(&conn, "m", "mrp", "mrv", "mrtitle", "mrslug", "http://url", 1);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "a.jar", 321, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 321, true, "mods", "m", ts(1)).unwrap();
     // datapacks entry should be excluded from get_instance_export_mods (addonType = 'mods')
     insert_metadata(&conn, "dp", 66, b"a", b"b", None, None);
-    mfc::upsert_mod_file_cache_conn(&conn, 1, "d.zip", 1, true, "datapacks", "dp", ts(1)).unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "d.zip", 1, true, "datapacks", "dp", ts(1)).unwrap();
 
-    let shared = mfc::get_instance_export_mods_conn(&conn, 1).unwrap();
+    let shared = mfc::get_instance_export_mods_conn(&wg(&mut conn), 1).unwrap();
     assert_eq!(shared.len(), 1);
     assert_eq!(shared[0].cf_name.as_deref(), Some("cfname"));
     assert_eq!(shared[0].mr_title.as_deref(), Some("mrtitle"));
 
-    let mr = mfc::get_instance_mr_export_files_conn(&conn, 1).unwrap();
+    let mr = mfc::get_instance_mr_export_files_conn(&wg(&mut conn), 1).unwrap();
     let a = mr.iter().find(|r| r.filename == "a.jar").unwrap();
     assert_eq!(a.filesize, 321);
     assert_eq!(a.sha512, b"S512");
     assert_eq!(a.mr_file_url.as_deref(), Some("http://url"));
 
-    let gdl = mfc::get_instance_gdl_export_files_conn(&conn, 1).unwrap();
+    let gdl = mfc::get_instance_gdl_export_files_conn(&wg(&mut conn), 1).unwrap();
     let a = gdl.iter().find(|r| r.filename == "a.jar").unwrap();
     assert_eq!(a.murmur2, 55);
     assert_eq!(a.cf_project_id, Some(1));
     assert_eq!(a.mr_project_id.as_deref(), Some("mrp"));
 
-    let cf = mfc::get_instance_cf_export_files_conn(&conn, 1).unwrap();
+    let cf = mfc::get_instance_cf_export_files_conn(&wg(&mut conn), 1).unwrap();
     let a = cf.iter().find(|r| r.filename == "a.jar").unwrap();
     assert_eq!((a.cf_project_id, a.cf_file_id), (Some(1), Some(2)));
+}
+
+fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
+    carbon_repos::db_exec::WriteGuard::new(c)
 }

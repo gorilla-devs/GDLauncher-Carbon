@@ -18,7 +18,7 @@ use crate::dbtypes::DbDateTime;
 use crate::queries;
 use crate::registry::{DynamicQuery, QueryCheck};
 use chrono::{DateTime, FixedOffset};
-use rusqlite::{Connection, named_params};
+use rusqlite::named_params;
 
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct ServerRow {
@@ -215,7 +215,7 @@ pub struct ServerArrange {
 /// `last_insert_rowid()` and to write `dateCreated` explicitly as millis.
 #[allow(clippy::too_many_arguments)]
 pub fn insert_server_conn(
-    conn: &Connection,
+    conn: &impl crate::db_exec::WriteAccess,
     name: &str,
     shortpath: &str,
     index: i32,
@@ -272,7 +272,7 @@ pub async fn insert_server(
 ) -> DbResult<i64> {
     db.write(move |conn| {
         Ok(insert_server_conn(
-            conn,
+            &conn,
             &name,
             &shortpath,
             index,
@@ -295,7 +295,7 @@ pub async fn insert_server(
 /// Inserts a server group and returns its new id. Hand-written to return
 /// `last_insert_rowid()`.
 pub fn insert_server_group_conn(
-    conn: &Connection,
+    conn: &impl crate::db_exec::WriteAccess,
     name: &str,
     group_index: i32,
     library_position: Option<i32>,
@@ -316,7 +316,7 @@ pub async fn insert_server_group(
 ) -> DbResult<i64> {
     db.write(move |conn| {
         Ok(insert_server_group_conn(
-            conn,
+            &conn,
             &name,
             group_index,
             library_position,
@@ -335,7 +335,7 @@ pub async fn move_server_tx(
     index: i32,
     library_position: Option<i32>,
 ) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         for shift in &shifts {
             match *shift {
@@ -373,7 +373,7 @@ pub async fn arrange_server_library_tx(
     groups: Vec<ServerGroupArrange>,
     servers: Vec<ServerArrange>,
 ) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         for g in &groups {
             if g.set_library_position {
@@ -407,7 +407,7 @@ pub async fn delete_server_group_tx(
     default_group_id: i32,
     base_index: i32,
 ) -> DbResult<()> {
-    db.write(move |conn| {
+    db.write(move |mut conn| {
         let tx = conn.transaction()?;
         move_all_servers_to_group_conn(&tx, group_id, default_group_id, base_index)?;
         delete_server_group_conn(&tx, group_id)?;
@@ -479,12 +479,14 @@ const INSERT_SERVER_CHECK: QueryCheck = QueryCheck {
         ":modpack_file_id", ":library_position", ":date_created",
     ],
     columns: None,
+    class: crate::registry::class_of(INSERT_SERVER_SQL),
 };
 const INSERT_SERVER_GROUP_CHECK: QueryCheck = QueryCheck {
     name: "insert_server_group",
     sql: INSERT_SERVER_GROUP_SQL,
     params: &[":name", ":group_index", ":library_position"],
     columns: None,
+    class: crate::registry::class_of(INSERT_SERVER_GROUP_SQL),
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the

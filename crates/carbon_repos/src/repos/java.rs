@@ -75,7 +75,7 @@ const INSERT_JAVA_SQL: &str =
 
 /// Inserts a `Java` row. Hand-written (not macro-generated) because the
 /// macro's arg list only takes scalar params, not a struct.
-pub fn insert_java_conn(conn: &rusqlite::Connection, j: &JavaRow) -> Result<usize, rusqlite::Error> {
+pub fn insert_java_conn(conn: &impl crate::db_exec::WriteAccess, j: &JavaRow) -> Result<usize, rusqlite::Error> {
     let mut st = conn.prepare_cached(INSERT_JAVA_SQL)?;
     st.execute(rusqlite::named_params! {
         ":id": j.id, ":path": j.path, ":major": j.major, ":fv": j.full_version,
@@ -86,7 +86,7 @@ pub fn insert_java_conn(conn: &rusqlite::Connection, j: &JavaRow) -> Result<usiz
 /// Pool-routing wrapper for [`insert_java_conn`]: takes the row by value (the
 /// executor closure is `'static`) and routes to the writer.
 pub async fn insert_java(db: &crate::db_exec::Db, j: JavaRow) -> crate::db_error::DbResult<usize> {
-    db.write(move |conn| Ok(insert_java_conn(conn, &j)?)).await
+    db.write(move |conn| Ok(insert_java_conn(&conn, &j)?)).await
 }
 
 /// `QueryCheck` entry for `insert_java`, covering the hand-written fn above so
@@ -97,6 +97,7 @@ const INSERT_JAVA_CHECK: crate::registry::QueryCheck = crate::registry::QueryChe
     sql: INSERT_JAVA_SQL,
     params: &[":id", ":path", ":major", ":fv", ":ty", ":os", ":arch", ":vendor", ":valid"],
     columns: None,
+    class: crate::registry::class_of(INSERT_JAVA_SQL),
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus

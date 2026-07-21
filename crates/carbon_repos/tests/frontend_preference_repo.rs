@@ -12,13 +12,13 @@ fn migrated_db() -> (tempfile::TempDir, Connection) {
 
 #[test]
 fn upsert_inserts_then_updates_value_and_updated_at() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     let t1 = DbDateTime(from_millis(1_700_000_000_000).unwrap());
     assert_eq!(
-        fp::upsert_preference_conn(&conn, "last_seen_version", "1.0.0", t1).unwrap(),
+        fp::upsert_preference_conn(&wg(&mut conn), "last_seen_version", "1.0.0", t1).unwrap(),
         1
     );
-    let row = fp::get_preference_conn(&conn, "last_seen_version")
+    let row = fp::get_preference_conn(&wg(&mut conn), "last_seen_version")
         .unwrap()
         .unwrap();
     assert_eq!(row.key, "last_seen_version");
@@ -27,8 +27,8 @@ fn upsert_inserts_then_updates_value_and_updated_at() {
 
     // Conflict on key updates value AND updatedAt.
     let t2 = DbDateTime(from_millis(1_784_557_692_104).unwrap());
-    fp::upsert_preference_conn(&conn, "last_seen_version", "2.0.0", t2).unwrap();
-    let row = fp::get_preference_conn(&conn, "last_seen_version")
+    fp::upsert_preference_conn(&wg(&mut conn), "last_seen_version", "2.0.0", t2).unwrap();
+    let row = fp::get_preference_conn(&wg(&mut conn), "last_seen_version")
         .unwrap()
         .unwrap();
     assert_eq!(row.value, "2.0.0");
@@ -37,19 +37,23 @@ fn upsert_inserts_then_updates_value_and_updated_at() {
 
 #[test]
 fn get_missing_returns_none() {
-    let (_d, conn) = migrated_db();
-    assert!(fp::get_preference_conn(&conn, "nope").unwrap().is_none());
+    let (_d, mut conn) = migrated_db();
+    assert!(fp::get_preference_conn(&wg(&mut conn), "nope").unwrap().is_none());
 }
 
 #[test]
 fn delete_removes_row() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     let t = DbDateTime(from_millis(1_700_000_000_000).unwrap());
-    fp::upsert_preference_conn(&conn, "onboarding_tips_seen", "[]", t).unwrap();
-    assert_eq!(fp::delete_preference_conn(&conn, "onboarding_tips_seen").unwrap(), 1);
-    assert!(fp::get_preference_conn(&conn, "onboarding_tips_seen")
+    fp::upsert_preference_conn(&wg(&mut conn), "onboarding_tips_seen", "[]", t).unwrap();
+    assert_eq!(fp::delete_preference_conn(&wg(&mut conn), "onboarding_tips_seen").unwrap(), 1);
+    assert!(fp::get_preference_conn(&wg(&mut conn), "onboarding_tips_seen")
         .unwrap()
         .is_none());
     // Deleting a missing key affects 0 rows.
-    assert_eq!(fp::delete_preference_conn(&conn, "onboarding_tips_seen").unwrap(), 0);
+    assert_eq!(fp::delete_preference_conn(&wg(&mut conn), "onboarding_tips_seen").unwrap(), 0);
+}
+
+fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
+    carbon_repos::db_exec::WriteGuard::new(c)
 }

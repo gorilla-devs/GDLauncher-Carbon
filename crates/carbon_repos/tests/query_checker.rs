@@ -86,6 +86,7 @@ fn checker_catches_planted_structural_failures() {
             sql: "SELECT id FROM NotATable",
             params: &[],
             columns: None,
+            class: carbon_repos::registry::class_of("SELECT id FROM NotATable"),
         },
         // Declared param the SQL does not bind.
         QueryCheck {
@@ -93,6 +94,7 @@ fn checker_catches_planted_structural_failures() {
             sql: "SELECT id FROM Java WHERE id = :id",
             params: &[":wrong"],
             columns: None,
+            class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
         },
         // SQL param the registry does not declare (exact set equality flags a
         // bound parameter with no matching declaration).
@@ -101,6 +103,7 @@ fn checker_catches_planted_structural_failures() {
             sql: "SELECT id FROM Java WHERE id = :id",
             params: &[],
             columns: None,
+            class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
         },
     ];
     let v = check_module(&conn, &planted);
@@ -128,6 +131,7 @@ fn checker_does_not_flag_question_mark_in_string_literal() {
         sql: "SELECT id FROM Java WHERE major = :major OR os = 'what?'",
         params: &[":major", ":unused_but_present"],
         columns: None,
+        class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE major = :major OR os = 'what?'"),
     }];
     // The '?'-in-literal rule must not fire; only the param-set mismatch for the
     // deliberately-unused declared name should show up.
@@ -147,6 +151,7 @@ fn checker_flags_real_positional_param_in_multiparam_query() {
         sql: "SELECT id FROM Java WHERE major = :major AND arch = ?",
         params: &[":major", ":arch"],
         columns: None,
+        class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE major = :major AND arch = ?"),
     }];
     let v = check_module(&conn, &planted);
     assert!(
@@ -173,6 +178,7 @@ fn checker_flags_declared_column_missing_from_result_set() {
         sql: "SELECT id FROM Java WHERE id = :id",
         params: &[":id"],
         columns: Some(COLS),
+        class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
     }];
     let v = check_module(&conn, &planted);
     assert!(
@@ -193,6 +199,7 @@ fn manifest_freshness_lint_catches_planted_failure() {
         sql: "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
         params: &[":v", ":id"],
         columns: None,
+        class: carbon_repos::registry::class_of("UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id"),
     }];
     let v = check_manifests(&conn, &planted);
     assert_eq!(
@@ -213,6 +220,7 @@ fn manifest_freshness_lint_catches_upsert_missing_freshness() {
               ON CONFLICT(id) DO UPDATE SET versionInfo = excluded.versionInfo",
         params: &[":id", ":v", ":t"],
         columns: None,
+        class: carbon_repos::registry::QueryClass::Write,
     }];
     let v = check_manifests(&conn, &planted);
     assert_eq!(
@@ -279,6 +287,7 @@ fn query_plan_lint_catches_planted_full_scan() {
         sql: "SELECT id FROM ModMetadata WHERE name = :name",
         params: &[":name"],
         columns: None,
+        class: carbon_repos::registry::class_of("SELECT id FROM ModMetadata WHERE name = :name"),
     }];
     let v = check_query_plans(&conn, &planted);
     assert!(
@@ -298,6 +307,7 @@ fn insert_datetime_lint_catches_planted_failures() {
             sql: "INSERT INTO VersionInfoCache (id, versionInfo) VALUES (:id, :v)",
             params: &[":id", ":v"],
             columns: None,
+            class: carbon_repos::registry::class_of("INSERT INTO VersionInfoCache (id, versionInfo) VALUES (:id, :v)"),
         },
         // No column list at all — flagged outright regardless of the table.
         QueryCheck {
@@ -305,6 +315,7 @@ fn insert_datetime_lint_catches_planted_failures() {
             sql: "INSERT INTO VersionInfoCache VALUES (:id, :v, :t)",
             params: &[":id", ":v", ":t"],
             columns: None,
+            class: carbon_repos::registry::class_of("INSERT INTO VersionInfoCache VALUES (:id, :v, :t)"),
         },
     ];
     let v = check_insert_datetime_columns(&conn, &planted);
@@ -323,6 +334,7 @@ fn insert_datetime_lint_catches_planted_failures() {
         sql: "INSERT INTO VersionInfoCache (id, versionInfo, lastUpdatedAt) VALUES (:id, :v, :t)",
         params: &[":id", ":v", ":t"],
         columns: None,
+        class: carbon_repos::registry::class_of("INSERT INTO VersionInfoCache (id, versionInfo, lastUpdatedAt) VALUES (:id, :v, :t)"),
     }];
     assert!(
         check_insert_datetime_columns(&conn, &ok).is_empty(),
@@ -336,6 +348,7 @@ fn insert_datetime_lint_catches_planted_failures() {
         sql: "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
         params: &[":v", ":id"],
         columns: None,
+        class: carbon_repos::registry::class_of("UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id"),
     }];
     assert!(
         check_insert_datetime_columns(&conn, &non_insert).is_empty(),

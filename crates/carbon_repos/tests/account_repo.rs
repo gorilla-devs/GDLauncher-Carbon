@@ -30,13 +30,13 @@ const KNOWN_MS: i64 = 1_784_557_692_104;
 
 #[test]
 fn insert_and_get_offline_account() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     let last_used = DbDateTime(from_millis(KNOWN_MS).unwrap());
     assert_eq!(
-        a::insert_account_offline_conn(&conn, "uuid-1", "Steve", last_used, None).unwrap(),
+        a::insert_account_offline_conn(&wg(&mut conn), "uuid-1", "Steve", last_used, None).unwrap(),
         1
     );
-    let row = a::get_account_conn(&conn, "uuid-1").unwrap().unwrap();
+    let row = a::get_account_conn(&wg(&mut conn), "uuid-1").unwrap().unwrap();
     assert_eq!(row.uuid, "uuid-1");
     assert_eq!(row.username, "Steve");
     assert_eq!(row.access_token, None);
@@ -47,10 +47,10 @@ fn insert_and_get_offline_account() {
 
 #[test]
 fn insert_and_get_microsoft_account_roundtrips_millis_exactly() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     let last_used = DbDateTime(from_millis(KNOWN_MS).unwrap());
     let token_expires = DbDateTime(from_millis(KNOWN_MS + 3_600_000).unwrap());
-    a::insert_account_microsoft_conn(&conn,
+    a::insert_account_microsoft_conn(&wg(&mut conn),
         "uuid-2",
         "Alex",
         last_used,
@@ -63,7 +63,7 @@ fn insert_and_get_microsoft_account_roundtrips_millis_exactly() {
     )
     .unwrap();
 
-    let row = a::get_account_conn(&conn, "uuid-2").unwrap().unwrap();
+    let row = a::get_account_conn(&wg(&mut conn), "uuid-2").unwrap().unwrap();
     assert_eq!(row.access_token.as_deref(), Some("access-tok"));
     assert_eq!(row.ms_refresh_token.as_deref(), Some("refresh-tok"));
     assert_eq!(row.id_token.as_deref(), Some("id-tok"));
@@ -90,10 +90,10 @@ fn insert_and_get_microsoft_account_roundtrips_millis_exactly() {
 
 #[test]
 fn update_offline_nulls_the_three_token_columns() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     let last_used = DbDateTime(from_millis(KNOWN_MS).unwrap());
     let token_expires = DbDateTime(from_millis(KNOWN_MS).unwrap());
-    a::insert_account_microsoft_conn(&conn,
+    a::insert_account_microsoft_conn(&wg(&mut conn),
         "uuid-3",
         "WasMicrosoft",
         last_used,
@@ -110,11 +110,11 @@ fn update_offline_nulls_the_three_token_columns() {
     // columns are explicitly NULLed, everything else (idToken, gdlToken,
     // skinId, lastUsed) is untouched — mirrors PCR's SetParam list exactly.
     assert_eq!(
-        a::update_account_offline_conn(&conn, "uuid-3", "NowOffline").unwrap(),
+        a::update_account_offline_conn(&wg(&mut conn), "uuid-3", "NowOffline").unwrap(),
         1
     );
 
-    let row = a::get_account_conn(&conn, "uuid-3").unwrap().unwrap();
+    let row = a::get_account_conn(&wg(&mut conn), "uuid-3").unwrap().unwrap();
     assert_eq!(row.username, "NowOffline");
     assert_eq!(row.access_token, None);
     assert_eq!(row.ms_refresh_token, None);
@@ -128,12 +128,12 @@ fn update_offline_nulls_the_three_token_columns() {
 
 #[test]
 fn update_microsoft_sets_all_seven_columns() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     let last_used = DbDateTime(from_millis(KNOWN_MS).unwrap());
-    a::insert_account_offline_conn(&conn, "uuid-4", "Old", last_used, None).unwrap();
+    a::insert_account_offline_conn(&wg(&mut conn), "uuid-4", "Old", last_used, None).unwrap();
 
     let new_expires = DbDateTime(from_millis(KNOWN_MS + 1000).unwrap());
-    a::update_account_microsoft_conn(&conn,
+    a::update_account_microsoft_conn(&wg(&mut conn),
         "uuid-4",
         "New",
         "new-access",
@@ -145,7 +145,7 @@ fn update_microsoft_sets_all_seven_columns() {
     )
     .unwrap();
 
-    let row = a::get_account_conn(&conn, "uuid-4").unwrap().unwrap();
+    let row = a::get_account_conn(&wg(&mut conn), "uuid-4").unwrap().unwrap();
     assert_eq!(row.username, "New");
     assert_eq!(row.access_token.as_deref(), Some("new-access"));
     assert_eq!(row.ms_refresh_token.as_deref(), Some("new-refresh"));
@@ -159,22 +159,22 @@ fn update_microsoft_sets_all_seven_columns() {
 
 #[test]
 fn next_active_account_orders_by_last_used_desc_excluding_self() {
-    let (_d, conn) = migrated_db();
-    a::insert_account_offline_conn(&conn,
+    let (_d, mut conn) = migrated_db();
+    a::insert_account_offline_conn(&wg(&mut conn),
         "older",
         "Older",
         DbDateTime(from_millis(1000).unwrap()),
         None,
     )
     .unwrap();
-    a::insert_account_offline_conn(&conn,
+    a::insert_account_offline_conn(&wg(&mut conn),
         "newest",
         "Newest",
         DbDateTime(from_millis(3000).unwrap()),
         None,
     )
     .unwrap();
-    a::insert_account_offline_conn(&conn,
+    a::insert_account_offline_conn(&wg(&mut conn),
         "middle",
         "Middle",
         DbDateTime(from_millis(2000).unwrap()),
@@ -184,10 +184,10 @@ fn next_active_account_orders_by_last_used_desc_excluding_self() {
 
     // excluding the most-recently-used account should surface the next
     // most recent, not just any other row
-    let next = a::get_next_active_account_conn(&conn, "newest").unwrap().unwrap();
+    let next = a::get_next_active_account_conn(&wg(&mut conn), "newest").unwrap().unwrap();
     assert_eq!(next.uuid, "middle");
 
-    let all = a::get_accounts_by_last_used_conn(&conn).unwrap();
+    let all = a::get_accounts_by_last_used_conn(&wg(&mut conn)).unwrap();
     assert_eq!(
         all.iter().map(|r| r.uuid.as_str()).collect::<Vec<_>>(),
         vec!["newest", "middle", "older"]
@@ -196,8 +196,8 @@ fn next_active_account_orders_by_last_used_desc_excluding_self() {
 
 #[test]
 fn set_account_gdl_token_and_expire_now() {
-    let (_d, conn) = migrated_db();
-    a::insert_account_offline_conn(&conn,
+    let (_d, mut conn) = migrated_db();
+    a::insert_account_offline_conn(&wg(&mut conn),
         "uuid-5",
         "User",
         DbDateTime(from_millis(KNOWN_MS).unwrap()),
@@ -205,24 +205,24 @@ fn set_account_gdl_token_and_expire_now() {
     )
     .unwrap();
 
-    a::set_account_gdl_token_conn(&conn, "uuid-5", Some("tok-a")).unwrap();
+    a::set_account_gdl_token_conn(&wg(&mut conn), "uuid-5", Some("tok-a")).unwrap();
     assert_eq!(
-        a::get_account_conn(&conn, "uuid-5").unwrap().unwrap().gdl_token.as_deref(),
+        a::get_account_conn(&wg(&mut conn), "uuid-5").unwrap().unwrap().gdl_token.as_deref(),
         Some("tok-a")
     );
 
     let now = DbDateTime(from_millis(KNOWN_MS + 42).unwrap());
-    a::expire_account_token_now_conn(&conn, "uuid-5", now).unwrap();
+    a::expire_account_token_now_conn(&wg(&mut conn), "uuid-5", now).unwrap();
     assert_eq!(
-        a::get_account_conn(&conn, "uuid-5").unwrap().unwrap().token_expires,
+        a::get_account_conn(&wg(&mut conn), "uuid-5").unwrap().unwrap().token_expires,
         Some(from_millis(KNOWN_MS + 42).unwrap())
     );
 }
 
 #[test]
 fn update_account_profile_sets_username_and_skin() {
-    let (_d, conn) = migrated_db();
-    a::insert_account_offline_conn(&conn,
+    let (_d, mut conn) = migrated_db();
+    a::insert_account_offline_conn(&wg(&mut conn),
         "uuid-6",
         "OldName",
         DbDateTime(from_millis(KNOWN_MS).unwrap()),
@@ -230,16 +230,16 @@ fn update_account_profile_sets_username_and_skin() {
     )
     .unwrap();
 
-    a::update_account_profile_conn(&conn, "uuid-6", "NewName", Some("skin-x")).unwrap();
-    let row = a::get_account_conn(&conn, "uuid-6").unwrap().unwrap();
+    a::update_account_profile_conn(&wg(&mut conn), "uuid-6", "NewName", Some("skin-x")).unwrap();
+    let row = a::get_account_conn(&wg(&mut conn), "uuid-6").unwrap().unwrap();
     assert_eq!(row.username, "NewName");
     assert_eq!(row.skin_id.as_deref(), Some("skin-x"));
 }
 
 #[test]
 fn delete_account_reports_rows_affected() {
-    let (_d, conn) = migrated_db();
-    a::insert_account_offline_conn(&conn,
+    let (_d, mut conn) = migrated_db();
+    a::insert_account_offline_conn(&wg(&mut conn),
         "uuid-7",
         "Gone",
         DbDateTime(from_millis(KNOWN_MS).unwrap()),
@@ -247,17 +247,17 @@ fn delete_account_reports_rows_affected() {
     )
     .unwrap();
 
-    assert_eq!(a::delete_account_conn(&conn, "uuid-7").unwrap(), 1);
-    assert_eq!(a::get_account_conn(&conn, "uuid-7").unwrap(), None);
+    assert_eq!(a::delete_account_conn(&wg(&mut conn), "uuid-7").unwrap(), 1);
+    assert_eq!(a::get_account_conn(&wg(&mut conn), "uuid-7").unwrap(), None);
     // deleting again affects 0 rows — this is how the call site detects
     // the PCR `RecordNotFound` case without a dedicated error type.
-    assert_eq!(a::delete_account_conn(&conn, "uuid-7").unwrap(), 0);
+    assert_eq!(a::delete_account_conn(&wg(&mut conn), "uuid-7").unwrap(), 0);
 }
 
 #[test]
 fn skin_get_missing_is_none() {
-    let (_d, conn) = migrated_db();
-    assert_eq!(s::get_skin_conn(&conn, "nope").unwrap(), None);
+    let (_d, mut conn) = migrated_db();
+    assert_eq!(s::get_skin_conn(&wg(&mut conn), "nope").unwrap(), None);
 }
 
 #[tokio::test]
@@ -313,31 +313,35 @@ async fn replace_skin_and_link_account_replaces_existing_row_with_same_id() {
 
 #[test]
 fn active_downloads_crud_roundtrip() {
-    let (_d, conn) = migrated_db();
+    let (_d, mut conn) = migrated_db();
     assert_eq!(
-        ad::find_active_download_by_url_conn(&conn, "https://example.com/f.jar")
+        ad::find_active_download_by_url_conn(&wg(&mut conn), "https://example.com/f.jar")
             .unwrap(),
         None
     );
 
-    ad::insert_active_download_conn(&conn, "https://example.com/f.jar", "file-id-1").unwrap();
+    ad::insert_active_download_conn(&wg(&mut conn), "https://example.com/f.jar", "file-id-1").unwrap();
 
-    let row = ad::find_active_download_by_url_conn(&conn, "https://example.com/f.jar")
+    let row = ad::find_active_download_by_url_conn(&wg(&mut conn), "https://example.com/f.jar")
         .unwrap()
         .unwrap();
     assert_eq!(row.file_id, "file-id-1");
 
     assert_eq!(
-        ad::delete_active_download_by_file_id_conn(&conn, "file-id-1").unwrap(),
+        ad::delete_active_download_by_file_id_conn(&wg(&mut conn), "file-id-1").unwrap(),
         1
     );
     assert_eq!(
-        ad::find_active_download_by_url_conn(&conn, "https://example.com/f.jar").unwrap(),
+        ad::find_active_download_by_url_conn(&wg(&mut conn), "https://example.com/f.jar").unwrap(),
         None
     );
     // deleting again affects 0 rows (mirrors the "won't error on 0 deleted" comment)
     assert_eq!(
-        ad::delete_active_download_by_file_id_conn(&conn, "file-id-1").unwrap(),
+        ad::delete_active_download_by_file_id_conn(&wg(&mut conn), "file-id-1").unwrap(),
         0
     );
+}
+
+fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
+    carbon_repos::db_exec::WriteGuard::new(c)
 }

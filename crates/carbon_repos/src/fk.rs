@@ -559,8 +559,13 @@ mod tests {
     #[test]
     fn dangling_app_config_active_account_is_nulled() {
         let (_d, mut conn) = migrated();
-        crate::repos::app_configuration::insert_app_configuration_conn(&conn, "stable", 2048, None)
-            .unwrap();
+        crate::repos::app_configuration::insert_app_configuration_conn(
+            &crate::db_exec::WriteGuard::new(&mut conn),
+            "stable",
+            2048,
+            None,
+        )
+        .unwrap();
         conn.execute(
             "UPDATE AppConfiguration SET activeAccountUuid = 'no-such-account' WHERE id = 0",
             [],
@@ -580,10 +585,21 @@ mod tests {
     #[test]
     fn instance_with_dead_group_is_reassigned_to_default() {
         let (_d, mut conn) = migrated();
-        crate::repos::app_configuration::insert_app_configuration_conn(&conn, "stable", 2048, None)
-            .unwrap();
+        crate::repos::app_configuration::insert_app_configuration_conn(
+            &crate::db_exec::WriteGuard::new(&mut conn),
+            "stable",
+            2048,
+            None,
+        )
+        .unwrap();
         // A real default group the config points at.
-        let def = crate::repos::instance::insert_group_conn(&conn, "localize➽default", 0, None).unwrap();
+        let def = crate::repos::instance::insert_group_conn(
+            &crate::db_exec::WriteGuard::new(&mut conn),
+            "localize➽default",
+            0,
+            None,
+        )
+        .unwrap();
         conn.execute(
             "UPDATE AppConfiguration SET defaultInstanceGroup = ?1 WHERE id = 0",
             [def],
@@ -607,8 +623,13 @@ mod tests {
     #[test]
     fn dead_group_reassign_creates_default_when_absent() {
         let (_d, mut conn) = migrated();
-        crate::repos::app_configuration::insert_app_configuration_conn(&conn, "stable", 2048, None)
-            .unwrap();
+        crate::repos::app_configuration::insert_app_configuration_conn(
+            &crate::db_exec::WriteGuard::new(&mut conn),
+            "stable",
+            2048,
+            None,
+        )
+        .unwrap();
         // No group at all; instance points at a missing one.
         conn.execute(
             "INSERT INTO Instance (name, shortpath, \"index\", groupId) VALUES ('i', 'sp', 0, 5)",

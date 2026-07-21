@@ -499,7 +499,7 @@ const UPSERT_MOD_FILE_CACHE_SQL: &str =
 /// row keeps its existing id.
 #[allow(clippy::too_many_arguments)]
 pub fn upsert_mod_file_cache_conn(
-    conn: &rusqlite::Connection,
+    conn: &impl crate::db_exec::WriteAccess,
     instance_id: i32,
     filename: &str,
     filesize: i32,
@@ -536,7 +536,7 @@ pub async fn upsert_mod_file_cache(
 ) -> DbResult<usize> {
     db.write(move |conn| {
         Ok(upsert_mod_file_cache_conn(
-            conn,
+            &conn,
             instance_id,
             &filename,
             filesize,
@@ -563,6 +563,7 @@ const UPSERT_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck = crate::registry
         ":updated_at",
     ],
     columns: None,
+    class: crate::registry::class_of(UPSERT_MOD_FILE_CACHE_SQL),
 };
 
 /// SQL executed by `upsert_server_mod_file_cache`.
@@ -579,7 +580,7 @@ const UPSERT_SERVER_MOD_FILE_CACHE_SQL: &str =
 /// Upserts a `ServerModFileCache` row on the `(serverId, filename)` unique key.
 #[allow(clippy::too_many_arguments)]
 pub fn upsert_server_mod_file_cache_conn(
-    conn: &rusqlite::Connection,
+    conn: &impl crate::db_exec::WriteAccess,
     server_id: i32,
     filename: &str,
     filesize: i32,
@@ -616,7 +617,7 @@ pub async fn upsert_server_mod_file_cache(
 ) -> DbResult<usize> {
     db.write(move |conn| {
         Ok(upsert_server_mod_file_cache_conn(
-            conn,
+            &conn,
             server_id,
             &filename,
             filesize,
@@ -643,6 +644,7 @@ const UPSERT_SERVER_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck = crate::r
         ":updated_at",
     ],
     columns: None,
+    class: crate::registry::class_of(UPSERT_SERVER_MOD_FILE_CACHE_SQL),
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the
