@@ -638,12 +638,18 @@ impl GDLAccountTask {
                 .send()
                 .await?;
 
-            if resp.status() == cloudflare_timeout_status {
-                tracing::warn!("Account validation timed out. Retrying...");
+            // The server's wait is a long poll: 408 means its window expired
+            // before the account was verified, 524 means Cloudflare cut the
+            // request first. Both mean "not verified yet" — poll again.
+            if resp.status() == cloudflare_timeout_status
+                || resp.status() == StatusCode::REQUEST_TIMEOUT
+            {
+                tracing::debug!("Account validation wait window expired, re-polling");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 continue;
             }
 
-            resp.bytes().await?;
+            resp.error_for_status()?;
 
             return Ok(());
         }
