@@ -34,10 +34,31 @@ impl Actor {
     {
         let (otx, orx) = tokio::sync::oneshot::channel();
         let job: Job = Box::new(move |conn| {
-            let _ = otx.send(f(conn));
+            // A panic inside a job must not tear down the executor thread: catch
+            // it here, convert it to a `Conversion` error reply, and let the
+            // thread keep serving later jobs. `AssertUnwindSafe` is required
+            // because neither `f` nor `&mut Connection` is `UnwindSafe`.
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(conn)));
+            let reply = outcome.unwrap_or_else(|payload| {
+                let msg = panic_message(payload.as_ref());
+                tracing::error!("database job panicked: {msg}");
+                Err(DbError::Conversion(format!("panic: {msg}")))
+            });
+            let _ = otx.send(reply);
         });
         self.tx.send(job).map_err(|_| DbError::Closed)?;
         orx.await.map_err(|_| DbError::Closed)?
+    }
+}
+
+/// Best-effort extraction of a panic payload's message.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "unknown panic".to_string()
     }
 }
 
@@ -146,6 +167,30 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(mode.to_lowercase(), "wal");
+    }
+
+    #[tokio::test]
+    async fn panicking_job_is_contained_and_thread_survives() {
+        let (_d, db) = temp_db();
+        // A job that panics must come back as a Conversion error, not tear the
+        // executor thread down.
+        let panicked: DbResult<()> = db.write(|_c| panic!("boom in a job")).await;
+        match panicked {
+            Err(DbError::Conversion(msg)) => assert!(
+                msg.contains("panic") && msg.contains("boom"),
+                "panic reply should carry the message, got: {msg}"
+            ),
+            other => panic!("expected a Conversion error from a panicking job, got: {other:?}"),
+        }
+        // The same executor must still serve subsequent jobs.
+        db.write(|c| Ok(c.execute_batch("CREATE TABLE survived (v INTEGER)")?))
+            .await
+            .expect("writer thread must survive a panicked job");
+        let n: i64 = db
+            .read(|c| Ok(c.query_row("SELECT COUNT(*) FROM survived", [], |r| r.get(0))?))
+            .await
+            .unwrap();
+        assert_eq!(n, 0);
     }
 
     #[tokio::test]

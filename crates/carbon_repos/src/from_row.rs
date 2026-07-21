@@ -19,6 +19,12 @@ pub struct ColumnSpec {
     pub name: &'static str,
     pub ty: TypeClass,
     pub nullable: bool,
+    /// True when nullability was declared explicitly via `#[nullable(...)]`
+    /// rather than inferred from the field being `Option<T>`. The origin-based
+    /// nullability lint trusts an explicit declaration and skips source-column
+    /// inference — this is how SQL expression / aggregate columns (whose origin
+    /// table+column can't be resolved) opt out of the "must be Option" rule.
+    pub explicit_nullable: bool,
 }
 
 pub trait FromRow: Sized {

@@ -32,6 +32,7 @@ pub struct CfModpackWithLogoRow {
     pub url_slug: String,
     pub updated_at: DateTime<FixedOffset>,
     pub logo_data: Option<Vec<u8>>,
+    #[nullable(false)]
     pub has_logo: bool,
 }
 
@@ -49,6 +50,7 @@ pub struct MrModpackWithLogoRow {
     pub url_slug: String,
     pub updated_at: DateTime<FixedOffset>,
     pub logo_data: Option<Vec<u8>>,
+    #[nullable(false)]
     pub has_logo: bool,
 }
 

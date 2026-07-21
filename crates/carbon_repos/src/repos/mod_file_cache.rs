@@ -67,6 +67,7 @@ pub struct ModFullRow {
     pub sha512: Vec<u8>,
     pub sha1: Vec<u8>,
     pub murmur2: i32,
+    #[nullable(false)]
     pub has_local_image: bool,
     pub cf_project_id: Option<i32>,
     pub cf_file_id: Option<i32>,
@@ -77,6 +78,7 @@ pub struct ModFullRow {
     pub cf_authors: Option<String>,
     pub cf_release_type: Option<i32>,
     pub cf_update_paths: Option<String>,
+    #[nullable(false)]
     pub has_cf_image: bool,
     pub mr_project_id: Option<String>,
     pub mr_version_id: Option<String>,
@@ -87,6 +89,7 @@ pub struct ModFullRow {
     pub mr_authors: Option<String>,
     pub mr_release_type: Option<i32>,
     pub mr_update_paths: Option<String>,
+    #[nullable(false)]
     pub has_mr_image: bool,
 }
 
@@ -102,10 +105,13 @@ pub struct ServerAddonFullRow {
     pub addon_type: String,
     pub filesize: i32,
     pub meta_name: Option<String>,
+    #[nullable(false)]
     pub has_local_image: bool,
     pub cf_project_id: Option<i32>,
+    #[nullable(false)]
     pub has_cf_image: bool,
     pub mr_project_id: Option<String>,
+    #[nullable(false)]
     pub has_mr_image: bool,
 }
 

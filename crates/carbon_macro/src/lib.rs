@@ -8,7 +8,13 @@ use syn::{Data, DeriveInput, Fields, parse_macro_input};
 /// default to the field name mapped snake_case → camelCase, matching how PCR
 /// mapped the schema; `#[column("explicitName")]` overrides the default.
 /// `DateTime<FixedOffset>` fields route through `carbon_repos::dbtypes::DbDateTime`.
-#[proc_macro_derive(FromRow, attributes(column))]
+///
+/// `#[nullable(true|false)]` explicitly declares a column's nullability instead
+/// of inferring it from the field being `Option<T>`. SQL expression / aggregate
+/// columns (`(x IS NOT NULL) AS flag`, `COUNT(*)`, …) have no resolvable origin
+/// column, so the origin-based nullability lint requires them to either be
+/// `Option` or carry this attribute.
+#[proc_macro_derive(FromRow, attributes(column, nullable))]
 pub fn derive_from_row(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
@@ -22,9 +28,11 @@ pub fn derive_from_row(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     for f in fields {
         let ident = f.ident.as_ref().expect("named fields only");
         let col = column_name(f, ident);
-        let (ty_class, nullable, inner) = classify(&f.ty);
+        let (ty_class, type_nullable, inner) = classify(&f.ty);
+        // Row reads follow the field's Rust type (Option<T> vs T); the
+        // `#[nullable(...)]` override affects only the reported ColumnSpec.
         let getter = if is_datetime(&inner) {
-            if nullable {
+            if type_nullable {
                 quote! { #ident: row.get::<_, Option<carbon_repos::dbtypes::DbDateTime>>(#col)?.map(|d| d.0) }
             } else {
                 quote! { #ident: row.get::<_, carbon_repos::dbtypes::DbDateTime>(#col)?.0 }
@@ -33,8 +41,12 @@ pub fn derive_from_row(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             quote! { #ident: row.get(#col)? }
         };
         getters.push(getter);
+        let (nullable, explicit) = match nullable_override(f) {
+            Some(b) => (b, true),
+            None => (type_nullable, false),
+        };
         specs.push(quote! {
-            carbon_repos::from_row::ColumnSpec { name: #col, ty: carbon_repos::from_row::TypeClass::#ty_class, nullable: #nullable }
+            carbon_repos::from_row::ColumnSpec { name: #col, ty: carbon_repos::from_row::TypeClass::#ty_class, nullable: #nullable, explicit_nullable: #explicit }
         });
     }
 
@@ -47,6 +59,19 @@ pub fn derive_from_row(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
         }
     }
     .into()
+}
+
+/// Explicit nullability from `#[nullable(true|false)]`, if present.
+fn nullable_override(field: &syn::Field) -> Option<bool> {
+    for attr in &field.attrs {
+        if attr.path().is_ident("nullable") {
+            let lit: syn::LitBool = attr
+                .parse_args()
+                .expect("#[nullable(true|false)] expects a bool literal");
+            return Some(lit.value());
+        }
+    }
+    None
 }
 
 /// Column name for a field: `#[column("...")]` override, else snake→camel.
@@ -92,19 +117,38 @@ fn classify(ty: &syn::Type) -> (syn::Ident, bool, syn::Type) {
 }
 
 /// Maps a concrete (non-Option) type to its `TypeClass` variant ident.
+///
+/// `Vec` maps to `Blob` only for `Vec<u8>`; any other element type is a
+/// compile error (a blob column is raw bytes — `Vec<i32>` etc. never round-trip
+/// through a SQLite BLOB and would silently mis-decode).
 fn class_of(ty: &syn::Type) -> syn::Ident {
-    let ident = last_segment_ident(ty)
+    let seg = last_segment(ty)
         .unwrap_or_else(|| panic!("FromRow: unsupported field type (expected a named type)"));
-    let variant = match ident.to_string().as_str() {
+    let variant = match seg.ident.to_string().as_str() {
         "String" => "Text",
         "i32" | "i64" => "Integer",
         "f64" => "Real",
         "bool" => "Bool",
-        "Vec" => "Blob",
+        "Vec" => {
+            if !is_vec_u8(seg) {
+                panic!("FromRow: blob columns must be `Vec<u8>`; other `Vec<T>` element types are unsupported");
+            }
+            "Blob"
+        }
         "DateTime" => "DateTime",
         other => panic!("FromRow: unsupported field type `{}`", other),
     };
-    syn::Ident::new(variant, ident.span())
+    syn::Ident::new(variant, seg.ident.span())
+}
+
+/// True when `seg` is `Vec<u8>` (element type's last path segment is `u8`).
+fn is_vec_u8(seg: &syn::PathSegment) -> bool {
+    if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
+        if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
+            return last_segment(inner).map(|s| s.ident == "u8").unwrap_or(false);
+        }
+    }
+    false
 }
 
 /// Inner type of `Option<T>`, if `ty` is an `Option`.
@@ -123,13 +167,18 @@ fn option_inner(ty: &syn::Type) -> Option<&syn::Type> {
     None
 }
 
-/// Last path segment ident of a `Type::Path`.
-fn last_segment_ident(ty: &syn::Type) -> Option<&syn::Ident> {
+/// Last path segment of a `Type::Path`.
+fn last_segment(ty: &syn::Type) -> Option<&syn::PathSegment> {
     if let syn::Type::Path(tp) = ty {
-        tp.path.segments.last().map(|s| &s.ident)
+        tp.path.segments.last()
     } else {
         None
     }
+}
+
+/// Last path segment ident of a `Type::Path`.
+fn last_segment_ident(ty: &syn::Type) -> Option<&syn::Ident> {
+    last_segment(ty).map(|s| &s.ident)
 }
 
 /// True when the type's last path segment is `DateTime`.
