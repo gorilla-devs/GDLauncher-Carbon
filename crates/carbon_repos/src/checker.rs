@@ -27,7 +27,7 @@
 //! Exported so later plans/tasks can call these directly instead of redefining
 //! them per test file.
 
-use crate::registry::QueryCheck;
+use crate::registry::{QueryCheck, QueryClass};
 use rusqlite::Connection;
 use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
 use std::sync::{Arc, Mutex};
@@ -162,6 +162,35 @@ struct WriteManifest {
     /// `(table, column)` pairs the statement updates. Covers both plain
     /// `UPDATE ... SET` and the `DO UPDATE SET` branch of an upsert.
     updates: Vec<(String, String)>,
+    /// Table names the statement inserts into.
+    inserts: Vec<String>,
+    /// Table names the statement deletes from.
+    deletes: Vec<String>,
+}
+
+impl WriteManifest {
+    /// True when the statement performs no write action at all (no insert,
+    /// update, or delete) — the manifest-lock rule's definition of "actually a
+    /// read".
+    fn is_empty(&self) -> bool {
+        self.updates.is_empty() && self.inserts.is_empty() && self.deletes.is_empty()
+    }
+
+    /// Human-readable summary of every write action recorded, for violation
+    /// messages.
+    fn describe(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        for table in &self.inserts {
+            parts.push(format!("INSERT into {table}"));
+        }
+        for table in &self.deletes {
+            parts.push(format!("DELETE from {table}"));
+        }
+        for (table, column) in &self.updates {
+            parts.push(format!("UPDATE {table}.{column}"));
+        }
+        parts.join(", ")
+    }
 }
 
 /// Runs the authorizer over `sql`'s preparation to capture its write manifest.
@@ -172,8 +201,17 @@ fn build_manifest(conn: &Connection, sql: &str) -> rusqlite::Result<WriteManifes
     let sink = collected.clone();
     conn.authorizer(Some(move |ctx: AuthContext<'_>| {
         if let Ok(mut m) = sink.lock() {
-            if let AuthAction::Update { table_name, column_name } = ctx.action {
-                m.updates.push((table_name.to_string(), column_name.to_string()));
+            match ctx.action {
+                AuthAction::Update { table_name, column_name } => {
+                    m.updates.push((table_name.to_string(), column_name.to_string()));
+                }
+                AuthAction::Insert { table_name } => {
+                    m.inserts.push(table_name.to_string());
+                }
+                AuthAction::Delete { table_name } => {
+                    m.deletes.push(table_name.to_string());
+                }
+                _ => {}
             }
         }
         Authorization::Allow
@@ -213,6 +251,45 @@ pub fn check_manifests(conn: &Connection, queries: &[QueryCheck]) -> Vec<String>
                     q.name, table, fresh_col
                 ));
             }
+        }
+    }
+    violations
+}
+
+/// Manifest-locked classification rule: every `Read`-classified [`QueryCheck`]
+/// must have an empty authorizer write-set. `class` is derived at compile time
+/// from the SQL's leading verb (`SELECT`/`WITH` ⇒ `Read`), which the async
+/// wrapper trusts to route the query to the read-only pool connection — but a
+/// `WITH` CTE can wrap a data-modifying statement (`WITH x AS (DELETE FROM t
+/// RETURNING *) SELECT * FROM x`) whose leading verb lies about what the
+/// engine actually executes. This rule asks the authorizer instead of the SQL
+/// text: any insert/update/delete action on a `Read`-classified statement is a
+/// violation, because the wrapper would route it to the read-only pool where
+/// it either fails loudly (best case) or, if the pool is not truly read-only in
+/// some future configuration, silently corrupts data.
+///
+/// `Write`-classified queries are never checked here: a `Write` class routes to
+/// the writer connection regardless of whether the statement happens to write
+/// anything, so an empty write-set on a `Write`-classified query (a `Write`ish
+/// `SELECT`-adjacent statement misclassified conservatively) is legal — the
+/// conservative default can never be a violation of this rule.
+pub fn check_classification(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for q in queries {
+        if q.class != QueryClass::Read {
+            continue;
+        }
+        let manifest = match build_manifest(conn, q.sql) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        // CENSUS-RULE: checker.read-class-no-writes
+        if !manifest.is_empty() {
+            violations.push(format!(
+                "{}: classified Read but the engine reports writes ({}) — the wrapper would route it to the read-only pool",
+                q.name,
+                manifest.describe()
+            ));
         }
     }
     violations

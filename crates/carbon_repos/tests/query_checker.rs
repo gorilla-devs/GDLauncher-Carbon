@@ -1,6 +1,6 @@
 use carbon_repos::checker::{
-    check_insert_datetime_columns, check_manifests, check_module, check_nullability,
-    check_query_plans,
+    check_classification, check_insert_datetime_columns, check_manifests, check_module,
+    check_nullability, check_query_plans,
 };
 use carbon_repos::registry::QueryCheck;
 use rusqlite::Connection;
@@ -66,6 +66,13 @@ fn insert_datetime_lint_passes_for_all_registered_queries() {
     let (_d, conn) = migrated_db();
     let v = check_insert_datetime_columns(&conn, &all_registered_queries());
     assert!(v.is_empty(), "insert datetime lint violations:\n{}", v.join("\n"));
+}
+
+#[test]
+fn classification_lint_passes_for_all_registered_queries() {
+    let (_d, conn) = migrated_db();
+    let v = check_classification(&conn, &all_registered_queries());
+    assert!(v.is_empty(), "read-class-no-writes violations:\n{}", v.join("\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -353,6 +360,61 @@ fn insert_datetime_lint_catches_planted_failures() {
     assert!(
         check_insert_datetime_columns(&conn, &non_insert).is_empty(),
         "a non-INSERT statement must never be flagged by this lint"
+    );
+}
+
+#[test]
+fn classification_lint_catches_planted_read_that_actually_writes() {
+    // CENSUS-SELFTEST: checker.read-class-no-writes
+    let (_d, conn) = migrated_db();
+
+    // A statement whose engine-reported actions include a DELETE, but forced
+    // to `class: Read` — as if a `WITH` CTE wrapper had fooled the leading-verb
+    // heuristic that ordinarily derives the class. This is exactly what the
+    // manifest lock exists to catch: the async wrapper would trust `class` and
+    // route this to the read-only pool.
+    let planted = [QueryCheck {
+        name: "fake_read_that_deletes",
+        sql: "DELETE FROM Java WHERE id = :id",
+        params: &[":id"],
+        columns: None,
+        class: carbon_repos::registry::QueryClass::Read,
+    }];
+    let v = check_classification(&conn, &planted);
+    assert_eq!(
+        v.len(),
+        1,
+        "must flag a Read-classified query whose engine manifest reports writes, got: {v:?}"
+    );
+    assert!(v[0].contains("fake_read_that_deletes"));
+
+    // A genuine read, correctly classified, must pass.
+    let real_read = [QueryCheck {
+        name: "real_read",
+        sql: "SELECT id FROM Java WHERE id = :id",
+        params: &[":id"],
+        columns: None,
+        class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
+    }];
+    assert!(
+        check_classification(&conn, &real_read).is_empty(),
+        "a real read must not be flagged"
+    );
+
+    // A Write-classified statement is never checked by this rule, even one
+    // whose own write-set happens to be empty (e.g. `PRAGMA`-shaped statement
+    // classified conservatively as Write) — the conservative default can never
+    // be a violation.
+    let write_class_no_writes = [QueryCheck {
+        name: "write_class_but_no_writes",
+        sql: "PRAGMA table_info(Java)",
+        params: &[],
+        columns: None,
+        class: carbon_repos::registry::QueryClass::Write,
+    }];
+    assert!(
+        check_classification(&conn, &write_class_no_writes).is_empty(),
+        "write-class queries must never be checked by the read-class-no-writes rule"
     );
 }
 
