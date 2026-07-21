@@ -91,8 +91,6 @@ playwright-report
 test-results
 
 **/.idea
-crates/carbon_repos/prisma/dev.db
-crates/carbon_repos/prisma/dev.db-journal
 crates/iridium
 .vscode
 .zed
