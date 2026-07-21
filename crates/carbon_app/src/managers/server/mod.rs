@@ -180,15 +180,15 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn list_groups(self) -> anyhow::Result<Vec<server::ServerGroup>> {
-        // Both reads run back-to-back on one reader connection so groups and
-        // servers load together; each SELECT autocommits its own read txn, so
-        // this is not a single snapshot. Uses `_conn` forms inside.
         let (groups, all_servers) = self
             .app
             .db
             .read(|conn| {
-                let groups = server_repo::get_all_server_groups_ordered_by_group_index_conn(conn)?;
-                let servers = server_repo::get_all_servers_ordered_by_index_conn(conn)?;
+                // reads share one WAL snapshot
+                let snap = conn.snapshot()?;
+                let groups =
+                    server_repo::get_all_server_groups_ordered_by_group_index_conn(&snap)?;
+                let servers = server_repo::get_all_servers_ordered_by_index_conn(&snap)?;
                 Ok((groups, servers))
             })
             .await?;
@@ -291,16 +291,16 @@ impl ManagerRef<'_, ServerManager> {
         let default_group_id = self.clone().get_default_group().await?;
         let library_position = if group_id == default_group_id {
             let default_id = default_group_id.0;
-            // Both reads run back-to-back on one reader connection; each SELECT
-            // autocommits its own read txn, so this is not a single snapshot.
-            // Uses `_conn` forms inside the closure.
             let (min_server_pos, min_group_pos) = self
                 .app
                 .db
                 .read(move |conn| {
-                    let srv = server_repo::min_library_position_server_in_group_conn(conn, default_id)?
-                        .and_then(|s| s.library_position);
-                    let grp = server_repo::min_library_position_server_group_conn(conn)?
+                    // reads share one WAL snapshot
+                    let snap = conn.snapshot()?;
+                    let srv =
+                        server_repo::min_library_position_server_in_group_conn(&snap, default_id)?
+                            .and_then(|s| s.library_position);
+                    let grp = server_repo::min_library_position_server_group_conn(&snap)?
                         .and_then(|g| g.library_position);
                     Ok((srv, grp))
                 })
@@ -544,16 +544,16 @@ impl ManagerRef<'_, ServerManager> {
         let default_group_id = self.clone().get_default_group().await?;
         let library_position = if group_id == default_group_id {
             let default_id = default_group_id.0;
-            // Both reads run back-to-back on one reader connection; each SELECT
-            // autocommits its own read txn, so this is not a single snapshot.
-            // Uses `_conn` forms inside the closure.
             let (min_server_pos, min_group_pos) = self
                 .app
                 .db
                 .read(move |conn| {
-                    let srv = server_repo::min_library_position_server_in_group_conn(conn, default_id)?
-                        .and_then(|s| s.library_position);
-                    let grp = server_repo::min_library_position_server_group_conn(conn)?
+                    // reads share one WAL snapshot
+                    let snap = conn.snapshot()?;
+                    let srv =
+                        server_repo::min_library_position_server_in_group_conn(&snap, default_id)?
+                            .and_then(|s| s.library_position);
+                    let grp = server_repo::min_library_position_server_group_conn(&snap)?
                         .and_then(|g| g.library_position);
                     Ok((srv, grp))
                 })
@@ -1485,7 +1485,7 @@ impl ManagerRef<'_, ServerManager> {
             .db
             .write(move |conn| {
                 if let Some(q) = patch.build(server_id) {
-                    q.execute(conn)?;
+                    q.execute(&conn)?;
                 }
                 Ok(())
             })
@@ -1574,7 +1574,7 @@ impl ManagerRef<'_, ServerManager> {
             .db
             .write(move |conn| {
                 if let Some(q) = patch.build(id.0) {
-                    q.execute(conn)?;
+                    q.execute(&conn)?;
                 }
                 Ok(())
             })
@@ -2336,17 +2336,16 @@ impl ManagerRef<'_, ServerManager> {
                     .await? as i32;
 
                 let lib_pos = if group == default_group_id {
-                    // Both reads run back-to-back on one reader connection; each
-                    // SELECT autocommits its own read txn, not a single snapshot.
-                    // Uses `_conn` forms inside.
                     let (max_server_pos, max_group_pos) = self
                         .app
                         .db
                         .read(move |conn| {
+                            // reads share one WAL snapshot
+                            let snap = conn.snapshot()?;
                             let srv =
-                                server_repo::max_library_position_server_in_group_conn(conn, group_val)?
+                                server_repo::max_library_position_server_in_group_conn(&snap, group_val)?
                                     .and_then(|s| s.library_position);
-                            let grp = server_repo::max_library_position_server_group_conn(conn)?
+                            let grp = server_repo::max_library_position_server_group_conn(&snap)?
                                 .and_then(|g| g.library_position);
                             Ok((srv, grp))
                         })
@@ -2431,13 +2430,13 @@ impl ManagerRef<'_, ServerManager> {
                         .db
                         .write(move |conn| {
                             server_repo::shift_server_library_positions_up_in_group_except_conn(
-                                conn,
+                                &conn,
                                 default_id,
                                 target_lib_pos,
                                 sid,
                             )?;
                             server_repo::shift_all_server_group_library_positions_up_from_conn(
-                                conn,
+                                &conn,
                                 target_lib_pos,
                             )?;
                             Ok(())
@@ -2458,12 +2457,12 @@ impl ManagerRef<'_, ServerManager> {
                     .db
                     .write(move |conn| {
                         server_repo::shift_server_library_positions_down_in_group_conn(
-                            conn,
+                            &conn,
                             default_id,
                             start_lib_pos,
                         )?;
                         server_repo::shift_all_server_group_library_positions_down_after_conn(
-                            conn,
+                            &conn,
                             start_lib_pos,
                         )?;
                         Ok(())
@@ -2562,17 +2561,16 @@ impl ManagerRef<'_, ServerManager> {
             }
             ServerGroupMoveTarget::EndOfLibrary => {
                 let default_id = default_group_id.0;
-                // Both reads run back-to-back on one reader connection; each
-                // SELECT autocommits its own read txn, so this is not a single
-                // snapshot. Uses `_conn` forms inside.
                 let (max_server_pos, max_group_pos) = self
                     .app
                     .db
                     .read(move |conn| {
+                        // reads share one WAL snapshot
+                        let snap = conn.snapshot()?;
                         let srv =
-                            server_repo::max_library_position_server_in_group_conn(conn, default_id)?
+                            server_repo::max_library_position_server_in_group_conn(&snap, default_id)?
                                 .and_then(|s| s.library_position);
-                        let grp = server_repo::max_library_position_server_group_conn(conn)?
+                        let grp = server_repo::max_library_position_server_group_conn(&snap)?
                             .and_then(|g| g.library_position);
                         Ok((srv, grp))
                     })
@@ -2602,18 +2600,18 @@ impl ManagerRef<'_, ServerManager> {
                 .db
                 .write(move |conn| {
                     server_repo::shift_server_group_library_positions_down_conn(
-                        conn,
+                        &conn,
                         start_pos,
                         target_upper,
                     )?;
                     server_repo::shift_server_library_positions_down_scoped_conn(
-                        conn,
+                        &conn,
                         default_id,
                         start_pos,
                         target_upper,
                     )?;
                     server_repo::set_server_group_library_position_conn(
-                        conn,
+                        &conn,
                         group_val,
                         Some(target_upper),
                     )?;
@@ -2629,13 +2627,13 @@ impl ManagerRef<'_, ServerManager> {
                 .db
                 .write(move |conn| {
                     server_repo::shift_server_group_library_positions_up_conn(
-                        conn, target_pos, start_pos,
+                        &conn, target_pos, start_pos,
                     )?;
                     server_repo::shift_server_library_positions_up_scoped_conn(
-                        conn, default_id, target_pos, start_pos,
+                        &conn, default_id, target_pos, start_pos,
                     )?;
                     server_repo::set_server_group_library_position_conn(
-                        conn,
+                        &conn,
                         group_val,
                         Some(target_pos),
                     )?;
@@ -2655,7 +2653,7 @@ impl ManagerRef<'_, ServerManager> {
             .db
             .write(move |conn| {
                 for (idx, g) in all_groups.iter().enumerate() {
-                    server_repo::set_server_group_index_conn(conn, g.id, idx as i32)?;
+                    server_repo::set_server_group_index_conn(&conn, g.id, idx as i32)?;
                 }
                 Ok(())
             })
@@ -2696,17 +2694,17 @@ impl ManagerRef<'_, ServerManager> {
 
         let default_group_id = self.get_default_group().await?;
 
-        // Calculate next libraryPosition. Both reads run back-to-back on one
-        // reader connection; each SELECT autocommits its own read txn, so this
-        // is not a single snapshot. `_conn` forms.
+        // Calculate next libraryPosition.
         let default_id = default_group_id.0;
         let (max_server_pos, max_group_pos) = self
             .app
             .db
             .read(move |conn| {
-                let srv = server_repo::max_library_position_server_in_group_conn(conn, default_id)?
+                // reads share one WAL snapshot
+                let snap = conn.snapshot()?;
+                let srv = server_repo::max_library_position_server_in_group_conn(&snap, default_id)?
                     .and_then(|s| s.library_position);
-                let grp = server_repo::max_library_position_server_group_conn(conn)?
+                let grp = server_repo::max_library_position_server_group_conn(&snap)?
                     .and_then(|g| g.library_position);
                 Ok((srv, grp))
             })
@@ -2746,16 +2744,16 @@ impl ManagerRef<'_, ServerManager> {
             .db
             .write(move |conn| {
                 server_repo::shift_server_library_positions_up_in_group_conn(
-                    conn,
+                    &conn,
                     default_id,
                     target_position,
                 )?;
                 server_repo::shift_all_server_group_library_positions_up_from_conn(
-                    conn,
+                    &conn,
                     target_position,
                 )?;
                 let id = server_repo::insert_server_group_conn(
-                    conn,
+                    &conn,
                     &name,
                     group_count,
                     Some(target_position),

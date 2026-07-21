@@ -470,7 +470,7 @@ async fn seed_init_db(
     }
 
     if let Some(query) = patch.build() {
-        db.write(move |conn| Ok(query.execute(conn)?)).await?;
+        db.write(move |conn| Ok(query.execute(&conn)?)).await?;
     }
 
     JavaManager::ensure_profiles_in_db(db)
@@ -721,7 +721,7 @@ mod test {
                     terms_and_privacy_accepted_checksum: Some(checksum_to_set),
                     ..Default::default()
                 };
-                Ok(patch.build().map(|q| q.execute(conn)).transpose()?)
+                Ok(patch.build().map(|q| q.execute(&conn)).transpose()?)
             })
             .await
             .unwrap();

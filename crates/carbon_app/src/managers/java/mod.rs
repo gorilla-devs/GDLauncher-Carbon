@@ -54,7 +54,7 @@ impl JavaManager {
         // autocommits separately).
         db.write(|conn| {
             for profile in SystemJavaProfileName::iter() {
-                java_repo::upsert_profile_conn(conn, &profile.to_string(), true)?;
+                java_repo::upsert_profile_conn(&conn, &profile.to_string(), true)?;
             }
             Ok(())
         })
@@ -208,8 +208,8 @@ impl ManagerRef<'_, JavaManager> {
         self.app
             .db
             .write(move |conn| {
-                java_repo::upsert_profile_conn(conn, &profile_name, false)?;
-                java_repo::set_profile_java_conn(conn, &profile_name, Some(&java_id))?;
+                java_repo::upsert_profile_conn(&conn, &profile_name, false)?;
+                java_repo::set_profile_java_conn(&conn, &profile_name, Some(&java_id))?;
                 Ok(())
             })
             .await?;
@@ -380,9 +380,9 @@ impl ManagerRef<'_, JavaManager> {
                             .db
                             .write(move |conn| {
                                 for name in names_to_disconnect {
-                                    java_repo::set_profile_java_conn(conn, &name, None)?;
+                                    java_repo::set_profile_java_conn(&conn, &name, None)?;
                                 }
-                                java_repo::set_java_validity_conn(conn, &java_id, false)?;
+                                java_repo::set_java_validity_conn(&conn, &java_id, false)?;
                                 Ok(())
                             })
                             .await?;
@@ -494,7 +494,7 @@ impl ManagerRef<'_, JavaManager> {
                     .db
                     .write(move |conn| {
                         for name in names_to_connect {
-                            java_repo::set_profile_java_conn(conn, &name, Some(&id_for_connect))?;
+                            java_repo::set_profile_java_conn(&conn, &name, Some(&id_for_connect))?;
                         }
                         Ok(())
                     })
@@ -730,7 +730,7 @@ mod test {
                     auto_manage_java_system_profiles: Some(false),
                     ..Default::default()
                 };
-                Ok(patch.build().map(|q| q.execute(conn)).transpose()?)
+                Ok(patch.build().map(|q| q.execute(&conn)).transpose()?)
             })
             .await
             .unwrap();

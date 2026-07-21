@@ -1304,7 +1304,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                     .db
                     .write(move |conn| {
                         metarepo::insert_metadata_conn(
-                            conn,
+                            &conn,
                             &meta_id_owned,
                             murmur2,
                             &sha512,
@@ -1318,7 +1318,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                             DbDateTime(Utc::now().fixed_offset()),
                         )?;
                         if let Some(data) = logo_data {
-                            metarepo::insert_local_image_conn(conn, &meta_id_owned, &data)?;
+                            metarepo::insert_local_image_conn(&conn, &meta_id_owned, &data)?;
                         }
                         Ok(())
                     })

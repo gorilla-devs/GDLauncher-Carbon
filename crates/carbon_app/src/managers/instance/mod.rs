@@ -366,15 +366,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn list_groups(self) -> anyhow::Result<Vec<ListGroup>> {
-        // Both reads run back-to-back on one reader connection so groups and
-        // instances load together; each SELECT autocommits its own read txn,
-        // so this is not a single snapshot. Uses `_conn` forms inside.
         let (groups, all_instances) = self
             .app
             .db
             .read(|conn| {
-                let groups = instance_repo::get_all_groups_ordered_by_group_index_conn(conn)?;
-                let instances = instance_repo::get_all_instances_ordered_by_index_conn(conn)?;
+                // reads share one WAL snapshot
+                let snap = conn.snapshot()?;
+                let groups = instance_repo::get_all_groups_ordered_by_group_index_conn(&snap)?;
+                let instances = instance_repo::get_all_instances_ordered_by_index_conn(&snap)?;
                 Ok((groups, instances))
             })
             .await?;
@@ -547,16 +546,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // Find the maximum libraryPosition across ungrouped instances and groups.
                 // library_position is only set on default-group instances, so the
                 // filter alone is sufficient (no need to join against the default group).
-                // Both reads run back-to-back on one reader connection; each
-                // SELECT autocommits its own read txn, so this is not a single
-                // snapshot. Uses `_conn` forms inside.
                 let (max_instance_pos, max_group_pos) = self
                     .app
                     .db
                     .read(|conn| {
-                        let inst = instance_repo::max_library_position_instance_conn(conn)?
+                        // reads share one WAL snapshot
+                        let snap = conn.snapshot()?;
+                        let inst = instance_repo::max_library_position_instance_conn(&snap)?
                             .and_then(|i| i.library_position);
-                        let grp = instance_repo::max_library_position_group_conn(conn)?
+                        let grp = instance_repo::max_library_position_group_conn(&snap)?
                             .and_then(|g| g.library_position);
                         Ok((inst, grp))
                     })
@@ -589,9 +587,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             self.app
                 .db
                 .write(move |conn| {
-                    instance_repo::shift_group_library_positions_down_conn(conn, start_pos, target_pos - 1)?;
-                    instance_repo::shift_instance_library_positions_down_conn(conn, start_pos, target_pos - 1)?;
-                    instance_repo::set_group_library_position_conn(conn, group_id, Some(target_pos - 1))?;
+                    instance_repo::shift_group_library_positions_down_conn(&conn, start_pos, target_pos - 1)?;
+                    instance_repo::shift_instance_library_positions_down_conn(&conn, start_pos, target_pos - 1)?;
+                    instance_repo::set_group_library_position_conn(&conn, group_id, Some(target_pos - 1))?;
                     Ok(())
                 })
                 .await?;
@@ -605,9 +603,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             self.app
                 .db
                 .write(move |conn| {
-                    instance_repo::shift_group_library_positions_up_conn(conn, target_pos, start_pos)?;
-                    instance_repo::shift_instance_library_positions_up_conn(conn, target_pos, start_pos)?;
-                    instance_repo::set_group_library_position_conn(conn, group_id, Some(target_pos))?;
+                    instance_repo::shift_group_library_positions_up_conn(&conn, target_pos, start_pos)?;
+                    instance_repo::shift_instance_library_positions_up_conn(&conn, target_pos, start_pos)?;
+                    instance_repo::set_group_library_position_conn(&conn, group_id, Some(target_pos))?;
                     Ok(())
                 })
                 .await?;
@@ -625,7 +623,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .db
             .write(move |conn| {
                 for (idx, g) in all_groups.iter().enumerate() {
-                    instance_repo::set_group_index_conn(conn, g.id, idx as i32)?;
+                    instance_repo::set_group_index_conn(&conn, g.id, idx as i32)?;
                 }
                 Ok(())
             })
@@ -709,18 +707,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                 // If target is default group, find the maximum libraryPosition + 1
                 let lib_pos = if group == default_group_id {
-                    // Both reads run back-to-back on one reader connection; each
-                    // SELECT autocommits its own read txn, not a single snapshot.
-                    // Uses `_conn` forms inside.
                     let (max_instance_pos, max_group_pos) = self
                         .app
                         .db
                         .read(move |conn| {
+                            // reads share one WAL snapshot
+                            let snap = conn.snapshot()?;
                             let inst = instance_repo::max_library_position_instance_in_group_conn(
-                                conn, group_val,
+                                &snap, group_val,
                             )?
                             .and_then(|i| i.library_position);
-                            let grp = instance_repo::max_library_position_group_conn(conn)?
+                            let grp = instance_repo::max_library_position_group_conn(&snap)?
                                 .and_then(|g| g.library_position);
                             Ok((inst, grp))
                         })
@@ -817,13 +814,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                             // Shift libraryPosition of items at or after target_lib_pos
                             // (not the instance we're moving), and the groups too.
                             instance_repo::shift_instance_library_positions_up_in_group_except_conn(
-                                conn,
+                                &conn,
                                 default_id,
                                 target_lib_pos,
                                 instance_id,
                             )?;
                             instance_repo::shift_all_group_library_positions_up_from_conn(
-                                conn,
+                                &conn,
                                 target_lib_pos,
                             )?;
                             Ok(())
@@ -846,12 +843,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         // Decrement libraryPosition of items after start_lib_pos,
                         // groups included.
                         instance_repo::shift_instance_library_positions_down_in_group_conn(
-                            conn,
+                            &conn,
                             default_id,
                             start_lib_pos,
                         )?;
                         instance_repo::shift_all_group_library_positions_down_after_conn(
-                            conn,
+                            &conn,
                             start_lib_pos,
                         )?;
                         Ok(())
@@ -972,16 +969,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // so filtering by LibraryPosition IS NOT NULL avoids needing default_group_id
         // here — which would otherwise deadlock via get_default_group re-acquiring
         // index_lock on a fresh database.
-        // Both reads run back-to-back on one reader connection; each SELECT
-        // autocommits its own read txn, so this is not a single snapshot.
-        // Uses `_conn` forms inside.
         let (max_instance_pos, max_group_pos) = self
             .app
             .db
             .read(|conn| {
-                let inst = instance_repo::max_library_position_instance_conn(conn)?
+                // reads share one WAL snapshot
+                let snap = conn.snapshot()?;
+                let inst = instance_repo::max_library_position_instance_conn(&snap)?
                     .and_then(|i| i.library_position);
-                let grp = instance_repo::max_library_position_group_conn(conn)?
+                let grp = instance_repo::max_library_position_group_conn(&snap)?
                     .and_then(|g| g.library_position);
                 Ok((inst, grp))
             })
@@ -1022,11 +1018,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .app
             .db
             .write(move |conn| {
-                instance_repo::shift_all_instance_library_positions_up_conn(conn, target_position)?;
-                instance_repo::shift_all_group_library_positions_up_from_conn(conn, target_position)?;
+                instance_repo::shift_all_instance_library_positions_up_conn(&conn, target_position)?;
+                instance_repo::shift_all_group_library_positions_up_from_conn(&conn, target_position)?;
                 // Create the group at the target position
                 let id = instance_repo::insert_group_conn(
-                    conn,
+                    &conn,
                     &name,
                     index_value,
                     Some(target_position),
@@ -1349,18 +1345,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             // Pick a value strictly smaller than every existing
             // library_position across both ungrouped instances and groups.
             let default_id = *default_group_id;
-            // Both reads run back-to-back on one reader connection; each SELECT
-            // autocommits its own read txn, so this is not a single snapshot.
-            // Uses `_conn` forms inside.
             let (min_instance_pos, min_group_pos) = self
                 .app
                 .db
                 .read(move |conn| {
+                    // reads share one WAL snapshot
+                    let snap = conn.snapshot()?;
                     let inst = instance_repo::min_library_position_instance_in_group_conn(
-                        conn, default_id,
+                        &snap, default_id,
                     )?
                     .and_then(|i| i.library_position);
-                    let grp = instance_repo::min_library_position_group_conn(conn)?
+                    let grp = instance_repo::min_library_position_group_conn(&snap)?
                         .and_then(|g| g.library_position);
                     Ok((inst, grp))
                 })
@@ -3382,7 +3377,13 @@ mod test {
         async fn count(db: &carbon_repos::db_exec::Db, table: &'static str) -> anyhow::Result<i64> {
             Ok(db
                 .read(move |conn| {
-                    Ok(conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))?)
+                    // Runtime table name: a dynamic-SQL read through the read guard.
+                    Ok(carbon_repos::db_exec::ReadAccess::query_row(
+                        &conn,
+                        &format!("SELECT COUNT(*) FROM {table}"),
+                        [],
+                        |r| r.get(0),
+                    )?)
                 })
                 .await?)
         }

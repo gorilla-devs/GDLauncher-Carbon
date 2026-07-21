@@ -212,7 +212,7 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(query) = patch.build() {
             self.app
                 .db
-                .write(move |conn| Ok(query.execute(conn)?))
+                .write(move |conn| Ok(query.execute(&conn)?))
                 .await?;
             self.app.invalidate(GET_SETTINGS, None);
 
@@ -239,7 +239,7 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(query) = patch.build() {
             self.app
                 .db
-                .write(move |conn| Ok(query.execute(conn)?))
+                .write(move |conn| Ok(query.execute(&conn)?))
                 .await?;
         }
 
@@ -477,7 +477,7 @@ impl ManagerRef<'_, SettingsManager> {
                             sql: sql.clone(),
                             params: vec![],
                         };
-                        match app.db.write(move |conn| Ok(dq.execute(conn)?)).await {
+                        match app.db.write(move |conn| Ok(dq.execute(&conn)?)).await {
                             Ok(0) => break,
                             Ok(n) => {
                                 let new =
@@ -498,7 +498,11 @@ impl ManagerRef<'_, SettingsManager> {
                 if let Some(vs) = vacuum_subtask.as_ref() {
                     vs.start_opaque();
                 }
-                if let Err(e) = app.db.write(|conn| Ok(conn.execute_batch("VACUUM")?)).await {
+                if let Err(e) = app
+                    .db
+                    .write(|conn| Ok(carbon_repos::db_exec::WriteAccess::execute_batch(&conn, "VACUUM")?))
+                    .await
+                {
                     error!("VACUUM failed: {e}");
                     task.fail(anyhow!("Failed to reclaim cache space: {e}"))
                         .await;
@@ -531,7 +535,7 @@ async fn count_table(db: &carbon_repos::db_exec::Db, table: &str) -> u64 {
         sql,
         params: vec![],
     };
-    match db.read(move |conn| Ok(dq.query_scalar_i64(conn)?)).await {
+    match db.read(move |conn| Ok(dq.query_scalar_i64(&conn)?)).await {
         Ok(n) => n.max(0) as u64,
         Err(e) => {
             warn!("Failed to count `{table}`: {e}");
