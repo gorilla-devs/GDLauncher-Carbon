@@ -32,10 +32,7 @@ use carbon_platforms::{
         search::{ProjectID, VersionID},
     },
 };
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
-};
+use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_rt_path::InstancePath;
 use futures::future::Future;
 use std::{ops::Deref, path::PathBuf, pin::Pin, sync::Arc, time::Duration};
@@ -723,16 +720,16 @@ impl ResourceInstaller for CurseforgeModInstaller {
             if let curseforge::FileRelationType::RequiredDependency = dep.relation_type {
                 installers.push(Box::new(move || {
                     Box::pin(async move {
+                        let instance_id_val = *instance_id;
                         let existing = app_clone
-                            .prisma_client
-                            .mod_file_cache()
-                            .find_first(vec![
-                                fcdb::instance_id::equals(*instance_id),
-                                fcdb::metadata::is(vec![metadb::curseforge::is(vec![
-                                    cfdb::project_id::equals(mod_id),
-                                ])]),
-                            ])
-                            .exec()
+                            .db
+                            .read(move |conn| {
+                                Ok(mfcdb::instance_mod_exists_by_cf_project(
+                                    conn,
+                                    instance_id_val,
+                                    mod_id as i32,
+                                )?)
+                            })
                             .await;
 
                         if let Ok(Some(_)) = existing {
@@ -845,17 +842,18 @@ impl ResourceInstaller for CurseforgeModInstaller {
         app: &Arc<AppInner>,
         instance_id: InstanceId,
     ) -> anyhow::Result<bool> {
-        use carbon_repos::db::mod_file_cache as fcdb;
-
         // TODO: check with fingerprint?
+        let instance_id_val = *instance_id;
+        let filename = self.file.file_name.clone();
         let is_installed = app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                *instance_id,
-                self.file.file_name.clone(),
-            ))
-            .exec()
+            .db
+            .read(move |conn| {
+                Ok(mfcdb::get_mod_file_cache_by_instance_filename(
+                    conn,
+                    instance_id_val,
+                    &filename,
+                )?)
+            })
             .await?
             .is_some();
 
@@ -1036,16 +1034,17 @@ impl ResourceInstaller for ModrinthModInstaller {
                 if let Some(project_id) = project_id {
                     installers.push(Box::new(move || {
                         Box::pin(async move {
+                            let instance_id_val = *instance_id;
+                            let project_id_owned = project_id.clone();
                             let existing = app_clone
-                                .prisma_client
-                                .mod_file_cache()
-                                .find_first(vec![
-                                    fcdb::instance_id::equals(*instance_id),
-                                    fcdb::metadata::is(vec![metadb::modrinth::is(vec![
-                                        mrdb::project_id::equals(project_id.clone()),
-                                    ])]),
-                                ])
-                                .exec()
+                                .db
+                                .read(move |conn| {
+                                    Ok(mfcdb::instance_mod_exists_by_mr_project(
+                                        conn,
+                                        instance_id_val,
+                                        &project_id_owned,
+                                    )?)
+                                })
                                 .await;
 
                             if let Ok(Some(_)) = existing {
@@ -1178,17 +1177,18 @@ impl ResourceInstaller for ModrinthModInstaller {
         app: &Arc<AppInner>,
         instance_id: InstanceId,
     ) -> anyhow::Result<bool> {
-        use carbon_repos::db::mod_file_cache as fcdb;
-
         // TODO: check with fingerprint?
+        let instance_id_val = *instance_id;
+        let filename = self.file.filename.clone();
         let is_installed = app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                *instance_id,
-                self.file.filename.clone(),
-            ))
-            .exec()
+            .db
+            .read(move |conn| {
+                Ok(mfcdb::get_mod_file_cache_by_instance_filename(
+                    conn,
+                    instance_id_val,
+                    &filename,
+                )?)
+            })
             .await?
             .is_some();
 

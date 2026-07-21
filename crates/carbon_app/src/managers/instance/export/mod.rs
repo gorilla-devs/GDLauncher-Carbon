@@ -16,9 +16,9 @@ use zip::{
 };
 
 use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
+    curse_forge_mod_cache as cfdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
 };
+use carbon_repos::repos::mod_file_cache as mfcdb;
 
 use crate::{
     api::translation::Translation,
@@ -101,19 +101,10 @@ async fn build_shared_mods_from_cache(
     instance_id: InstanceId,
 ) -> Vec<SharedMod> {
     // Query ModFileCache for all mods in this instance with their platform metadata
+    let instance_id_val = *instance_id;
     let cached_files = app
-        .prisma_client
-        .mod_file_cache()
-        .find_many(vec![
-            fcdb::instance_id::equals(*instance_id),
-            fcdb::addon_type::equals("mods".to_string()),
-        ])
-        .with(
-            fcdb::metadata::fetch()
-                .with(metadb::curseforge::fetch())
-                .with(metadb::modrinth::fetch()),
-        )
-        .exec()
+        .db
+        .read(move |conn| Ok(mfcdb::get_instance_export_mods(conn, instance_id_val)?))
         .await;
 
     let Ok(cached_files) = cached_files else {
@@ -123,37 +114,30 @@ async fn build_shared_mods_from_cache(
 
     let mut mods = Vec::new();
 
-    for cached_file in cached_files {
-        let Some(metadata) = cached_file.metadata else {
-            continue;
-        };
-
-        let metadata = *metadata;
-
-        // Try to build SharedMod from CurseForge or Modrinth data
-        let curseforge = metadata.curseforge.flatten();
-        let modrinth = metadata.modrinth.flatten();
+    for row in cached_files {
+        let cf_present = row.cf_project_id.is_some();
+        let mr_present = row.mr_project_id.is_some();
 
         // Skip files that have no platform data
-        if curseforge.is_none() && modrinth.is_none() {
+        if !cf_present && !mr_present {
             continue;
         }
 
-        let name = curseforge
-            .as_ref()
-            .map(|cf| cf.name.clone())
-            .or_else(|| modrinth.as_ref().map(|mr| mr.title.clone()))
-            .or_else(|| metadata.name.clone())
-            .unwrap_or_else(|| cached_file.filename.clone());
+        let name = row
+            .cf_name
+            .clone()
+            .or_else(|| row.mr_title.clone())
+            .or_else(|| row.meta_name.clone())
+            .unwrap_or_else(|| row.filename.clone());
 
         mods.push(SharedMod {
             name,
-            curseforge_project_id: curseforge.as_ref().map(|cf| cf.project_id),
-            curseforge_file_id: curseforge.as_ref().map(|cf| cf.file_id),
-            curseforge_slug: curseforge.as_ref().map(|cf| cf.urlslug.clone()),
-            modrinth_project_id: modrinth.as_ref().map(|mr| mr.project_id.clone()),
-            modrinth_version_id: modrinth.as_ref().map(|mr| mr.version_id.clone()),
-            modrinth_slug: modrinth.as_ref().map(|mr| mr.urlslug.clone()),
+            curseforge_project_id: row.cf_project_id,
+            curseforge_file_id: row.cf_file_id,
+            curseforge_slug: row.cf_urlslug.clone(),
+            modrinth_project_id: row.mr_project_id.clone(),
+            modrinth_version_id: row.mr_version_id.clone(),
+            modrinth_slug: row.mr_urlslug.clone(),
         });
     }
 

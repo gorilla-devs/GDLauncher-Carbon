@@ -19,10 +19,8 @@ use carbon_platforms::modrinth::version::VersionType;
 use carbon_platforms::{
     ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion, curseforge, modrinth,
 };
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
-};
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::mod_file_cache as mfcdb;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::Future;
 use std::borrow::Cow;
@@ -111,38 +109,29 @@ impl ManagerRef<'_, InstanceManager> {
                     .is_some()
             };
 
-        let mut query_filters = vec![fcdb::instance_id::equals(*instance_id)];
-
-        if let Some(addon_type) = addon_type {
-            query_filters.push(fcdb::addon_type::equals(
-                addon_type.to_db_string().to_string(),
-            ));
-        }
-
-        let mods = self
+        let instance_id_val = *instance_id;
+        let mut mods = self
             .app
-            .prisma_client
-            .mod_file_cache()
-            .find_many(query_filters)
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::logo_image::fetch())
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_instance_mods_full(conn, instance_id_val)?))
             .await?;
+
+        // Apply the optional addon-type filter in Rust BEFORE the duplicate
+        // detection pass, so the modid counts are computed over exactly the same
+        // set PCR's `addon_type` WHERE clause used to produce.
+        if let Some(addon_type) = addon_type {
+            let want = addon_type.to_db_string().to_string();
+            mods.retain(|m| m.addon_type == want);
+        }
 
         // Detect duplicated mods by grouping enabled mods by modid
         let mut modid_counts: std::collections::HashMap<String, u32> =
             std::collections::HashMap::new();
         for m in &mods {
-            // Only consider enabled mods with metadata and modid
+            // Only consider enabled mods with a modid
             if m.enabled {
-                if let Some(ref metadata) = m.metadata {
-                    if let Some(ref modid) = metadata.modid {
-                        *modid_counts.entry(modid.clone()).or_insert(0) += 1;
-                    }
+                if let Some(ref modid) = m.modid {
+                    *modid_counts.entry(modid.clone()).or_insert(0) += 1;
                 }
             }
         }
@@ -155,49 +144,85 @@ impl ManagerRef<'_, InstanceManager> {
             .collect();
 
         let mods = mods.into_iter().map(|m| {
-            let (mid, cf, mr) = m
-                .metadata
-                .clone()
-                .map(|m| (Some(m.id), m.curseforge.flatten(), m.modrinth.flatten()))
-                .unwrap_or((None, None, None));
-
-            let has_curseforge_update = cf
-                .as_ref()
-                .map(|cf| {
-                    let Ok(channel) = ModChannel::try_from(cf.release_type) else {
+            let has_curseforge_update = if m.cf_project_id.is_some() {
+                match ModChannel::try_from(m.cf_release_type.unwrap()) {
+                    Ok(channel) => {
+                        !mod_sources
+                            .platform_blacklist
+                            .contains(&ModPlatform::Curseforge)
+                            && has_update_for_paths(
+                                channel,
+                                &split_paths(m.cf_update_paths.as_deref().unwrap_or("")),
+                            )
+                    }
+                    Err(_) => {
                         tracing::error!(
                             "Invalid ModChannel in database for curseforge entry {}: {}",
-                            mid.as_ref().unwrap(),
-                            cf.release_type
+                            m.meta_id,
+                            m.cf_release_type.unwrap()
                         );
-                        return false;
-                    };
+                        false
+                    }
+                }
+            } else {
+                false
+            };
 
-                    !mod_sources
-                        .platform_blacklist
-                        .contains(&ModPlatform::Curseforge)
-                        && has_update_for_paths(channel, &split_paths(&cf.update_paths))
-                })
-                .unwrap_or(false);
-
-            let has_modrinth_update = mr
-                .as_ref()
-                .map(|mr| {
-                    let Ok(channel) = ModChannel::try_from(mr.release_type) else {
+            let has_modrinth_update = if m.mr_project_id.is_some() {
+                match ModChannel::try_from(m.mr_release_type.unwrap()) {
+                    Ok(channel) => {
+                        !mod_sources
+                            .platform_blacklist
+                            .contains(&ModPlatform::Modrinth)
+                            && has_update_for_paths(
+                                channel,
+                                &split_paths(m.mr_update_paths.as_deref().unwrap_or("")),
+                            )
+                    }
+                    Err(_) => {
                         tracing::error!(
                             "Invalid ModChannel in database for modrinth entry {}: {}",
-                            mid.as_ref().unwrap(),
-                            mr.release_type
+                            m.meta_id,
+                            m.mr_release_type.unwrap()
                         );
-                        return false;
-                    };
+                        false
+                    }
+                }
+            } else {
+                false
+            };
 
-                    !mod_sources
-                        .platform_blacklist
-                        .contains(&ModPlatform::Modrinth)
-                        && has_update_for_paths(channel, &split_paths(&mr.update_paths))
-                })
-                .unwrap_or(false);
+            let is_duplicate = m.enabled
+                && m
+                    .modid
+                    .as_ref()
+                    .map(|modid| duplicate_modids.contains(modid))
+                    .unwrap_or(false);
+
+            let curseforge = m.cf_project_id.map(|project_id| domain::CurseForgeModMetadata {
+                project_id: project_id as u32,
+                file_id: m.cf_file_id.unwrap() as u32,
+                name: m.cf_name.clone().unwrap(),
+                version: m.cf_version.clone().unwrap(),
+                urlslug: m.cf_urlslug.clone().unwrap(),
+                summary: m.cf_summary.clone().unwrap(),
+                authors: m.cf_authors.clone().unwrap(),
+                has_image: m.has_cf_image,
+            });
+
+            let modrinth = m
+                .mr_project_id
+                .clone()
+                .map(|project_id| domain::ModrinthModMetadata {
+                    project_id,
+                    version_id: m.mr_version_id.clone().unwrap(),
+                    title: m.mr_title.clone().unwrap(),
+                    version: m.mr_version.clone().unwrap(),
+                    urlslug: m.mr_urlslug.clone().unwrap(),
+                    description: m.mr_description.clone().unwrap(),
+                    authors: m.mr_authors.clone().unwrap(),
+                    has_image: m.has_mr_image,
+                });
 
             domain::Mod {
                 id: m.id,
@@ -205,68 +230,28 @@ impl ManagerRef<'_, InstanceManager> {
                 enabled: m.enabled,
                 addon_type: domain::AddonType::from_db_string(&m.addon_type)
                     .unwrap_or(domain::AddonType::Mods),
-                metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
-                    id: m.id.clone(),
-                    modid: m.modid.clone(),
-                    name: m.name.clone(),
-                    version: m.version.clone(),
-                    description: m.description.clone(),
-                    authors: m.authors.clone(),
+                metadata: Some(domain::ModFileMetadata {
+                    id: m.meta_id,
+                    modid: m.modid,
+                    name: m.meta_name,
+                    version: m.meta_version,
+                    description: m.meta_description,
+                    authors: m.meta_authors,
                     modloaders: m
                         .modloaders
                         .split(',')
                         // ignore unknown modloaders
                         .flat_map(|loader| ModLoaderType::try_from(loader).ok())
                         .collect::<Vec<_>>(),
-                    sha_512: m.sha_512.clone(),
-                    sha_1: m.sha_1.clone(),
-                    murmur_2: m.murmur_2,
-                    has_image: m
-                        .logo_image
-                        .as_ref()
-                        .map(|v| v.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
+                    sha_512: m.sha512,
+                    sha_1: m.sha1,
+                    murmur_2: m.murmur2,
+                    has_image: m.has_local_image,
                 }),
-                curseforge: cf.map(|m| domain::CurseForgeModMetadata {
-                    project_id: m.project_id as u32,
-                    file_id: m.file_id as u32,
-                    name: m.name,
-                    version: m.version,
-                    urlslug: m.urlslug,
-                    summary: m.summary,
-                    authors: m.authors,
-                    has_image: m
-                        .logo_image
-                        .flatten()
-                        .as_ref()
-                        .map(|row| row.data.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
-                }),
-                modrinth: mr.map(|m| domain::ModrinthModMetadata {
-                    project_id: m.project_id,
-                    version_id: m.version_id,
-                    title: m.title,
-                    version: m.version,
-                    urlslug: m.urlslug,
-                    description: m.description,
-                    authors: m.authors,
-                    has_image: m
-                        .logo_image
-                        .flatten()
-                        .as_ref()
-                        .map(|row| row.data.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
-                }),
+                curseforge,
+                modrinth,
                 has_update: has_curseforge_update || has_modrinth_update,
-                is_duplicate: m.enabled
-                    && m.metadata
-                        .as_ref()
-                        .and_then(|meta| meta.modid.as_ref())
-                        .map(|modid| duplicate_modids.contains(modid))
-                        .unwrap_or(false),
+                is_duplicate,
                 file_size: m.filesize as u64,
             }
         });
@@ -330,12 +315,11 @@ impl ManagerRef<'_, InstanceManager> {
 
         let shortpath = &instance.shortpath;
 
+        let lookup_id = id.clone();
         let m = self
             .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_mod_file_cache_by_id(conn, &lookup_id)?))
             .await?
             .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
 
@@ -381,13 +365,15 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         self.app
-            .prisma_client
-            .mod_file_cache()
-            .update(
-                fcdb::UniqueWhereParam::IdEquals(id),
-                vec![fcdb::SetParam::SetEnabled(enabled)],
-            )
-            .exec()
+            .db
+            .write(move |conn| {
+                Ok(mfcdb::update_mod_file_enabled(
+                    conn,
+                    &id,
+                    enabled,
+                    DbDateTime(Utc::now().fixed_offset()),
+                )?)
+            })
             .await?;
 
         self.app
@@ -405,12 +391,11 @@ impl ManagerRef<'_, InstanceManager> {
 
         let shortpath = &instance.shortpath;
 
+        let lookup_id = id.clone();
         let m = self
             .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_mod_file_cache_by_id(conn, &lookup_id)?))
             .await?
             .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
@@ -441,10 +426,8 @@ impl ManagerRef<'_, InstanceManager> {
 
         // Delete cache entry directly instead of re-scanning
         self.app
-            .prisma_client
-            .mod_file_cache()
-            .delete(fcdb::UniqueWhereParam::IdEquals(m.id))
-            .exec()
+            .db
+            .write(move |conn| Ok(mfcdb::delete_mod_file_cache_by_id(conn, &m.id)?))
             .await?;
 
         // GC orphaned metadata
@@ -668,37 +651,35 @@ impl ManagerRef<'_, InstanceManager> {
 
         let mod_sources = self.instance_cfg_mod_sources(&config).await?;
 
-        let m = self
+        struct CfIds {
+            project_id: i32,
+            file_id: i32,
+        }
+        struct MrIds {
+            project_id: String,
+            version_id: String,
+        }
+
+        let lookup_id = id.clone();
+        let row = self
             .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::curseforge::fetch())
-                    .with(metadb::modrinth::fetch()),
-            )
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_instance_mod_update_ids(conn, &lookup_id)?))
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let metadata = m.metadata.ok_or_else(|| {
-            anyhow!("metadata missing for ModFileCache entry {} on instance {instance_id} — cache row likely deleted concurrently", id)
-        })?;
+        let cf = row
+            .cf_project_id
+            .zip(row.cf_file_id)
+            .map(|(project_id, file_id)| CfIds { project_id, file_id });
 
-        let cf = metadata.curseforge.ok_or_else(|| {
-            anyhow!(
-                "curseforge metadata was queried but not returned for mod {}",
-                id
-            )
-        })?;
-
-        let mr = metadata.modrinth.ok_or_else(|| {
-            anyhow!(
-                "modrinth metadata was queried but not returned for mod {}",
-                id
-            )
-        })?;
+        let mr = match (row.mr_project_id, row.mr_version_id) {
+            (Some(project_id), Some(version_id)) => Some(MrIds {
+                project_id,
+                version_id,
+            }),
+            _ => None,
+        };
 
         let mut versions = Vec::new();
 
@@ -853,28 +834,27 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
-        let m = self
+        let lookup_id = id.clone();
+        let cf = self
             .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_instance_mod_cf_ids(conn, &lookup_id)?))
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let cf = m.metadata
-            .expect("metadata must be associated with a ModFileCache entry")
-            .curseforge
-            .expect("curseforge metadata was queried but not returned")
-            .ok_or_else(|| anyhow!("Attempted to use update_curseforge_mod to update a mod not availible on curseforge"))?;
+        let cf_project_id = cf.cf_project_id.ok_or_else(|| {
+            anyhow!("Attempted to use update_curseforge_mod to update a mod not availible on curseforge")
+        })?;
+        let cf_file_id = cf
+            .cf_file_id
+            .expect("cf fileId is present whenever cf projectId is");
 
         let mod_files = self
             .app
             .modplatforms_manager()
             .curseforge
             .get_mod_files(ModFilesParameters {
-                mod_id: cf.project_id,
+                mod_id: cf_project_id,
                 query: ModFilesParametersQuery {
                     game_version: Some(version.release),
                     game_version_type_id: None,
@@ -891,7 +871,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("unable to find newer mod version");
         };
 
-        if version.id == cf.file_id {
+        if version.id == cf_file_id {
             bail!("unable to find newer mod version");
         }
 
@@ -930,33 +910,27 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
-        let m = self
+        let lookup_id = id.clone();
+        let mr = self
             .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
-            .with(fcdb::metadata::fetch().with(metadb::modrinth::fetch()))
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_instance_mod_mr_ids(conn, &lookup_id)?))
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let mr = m
-            .metadata
-            .expect("metadata must be associated with a ModFileCache entry")
-            .modrinth
-            .expect("curseforge metadata was queried but not returned")
-            .ok_or_else(|| {
-                anyhow!(
-                    "Attempted to use update_modrinth_mod to update a mod not availible on modrinth"
-                )
-            })?;
+        let mr_project_id = mr.mr_project_id.ok_or_else(|| {
+            anyhow!("Attempted to use update_modrinth_mod to update a mod not availible on modrinth")
+        })?;
+        let mr_version_id = mr
+            .mr_version_id
+            .expect("mr versionId is present whenever mr projectId is");
 
         let mod_files = self
             .app
             .modplatforms_manager()
             .modrinth
             .get_project_versions(ProjectVersionsFilters {
-                project_id: ProjectID(mr.project_id),
+                project_id: ProjectID(mr_project_id),
                 game_versions: Some(vec![version.release]),
                 loaders: Some(
                     version
@@ -976,7 +950,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("unable to find newer mod version");
         };
 
-        if version.id == mr.version_id {
+        if version.id == mr_version_id {
             bail!("unable to find newer mod version");
         }
 
@@ -995,44 +969,18 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
+        let lookup_id = mod_id.clone();
         let r = self
             .app
-            .prisma_client
-            .mod_file_cache()
-            .find_unique(fcdb::UniqueWhereParam::IdEquals(mod_id.clone()))
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::logo_image::fetch())
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_instance_mod_icon_data(conn, &lookup_id)?))
             .await?
-            .ok_or(InvalidModIdError(mod_id))?
-            .metadata
-            .ok_or_else(|| anyhow!("broken db state"))?;
+            .ok_or(InvalidModIdError(mod_id))?;
 
         let logo_image = match platformid {
-            0 => r
-                .logo_image
-                .ok_or_else(|| anyhow!("broken db state"))?
-                .map(|m| m.data),
-            1 => r
-                .curseforge
-                .ok_or_else(|| anyhow!("broken db state"))?
-                .map(|cf| cf.logo_image.ok_or_else(|| anyhow!("broken db state")))
-                .transpose()?
-                .flatten()
-                .map(|img| img.data)
-                .flatten(),
-            2 => r
-                .modrinth
-                .ok_or_else(|| anyhow!("broken db state"))?
-                .map(|mr| mr.logo_image.ok_or_else(|| anyhow!("broken db state")))
-                .transpose()?
-                .flatten()
-                .map(|img| img.data)
-                .flatten(),
+            0 => r.local_data,
+            1 => r.cf_data,
+            2 => r.mr_data,
             _ => bail!("unsupported platform"),
         };
 

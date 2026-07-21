@@ -25,6 +25,7 @@ fn all_registered_queries() -> Vec<QueryCheck> {
     all.extend(carbon_repos::repos::instance::all_queries());
     all.extend(carbon_repos::repos::server::all_queries());
     all.extend(carbon_repos::repos::version_meta::all_queries());
+    all.extend(carbon_repos::repos::mod_file_cache::all_queries());
     all
 }
 

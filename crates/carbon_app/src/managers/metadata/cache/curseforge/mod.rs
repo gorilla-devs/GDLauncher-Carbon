@@ -15,12 +15,11 @@ use carbon_platforms::curseforge::filters::ModFilesParametersQuery;
 use carbon_platforms::curseforge::filters::ModParameters;
 use carbon_platforms::curseforge::filters::ModsParameters;
 use carbon_platforms::curseforge::filters::ModsParametersBody;
-use carbon_repos::db::read_filters::DateTimeFilter;
-use carbon_repos::db::read_filters::{IntFilter, StringFilter};
 use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
-    mod_metadata as metadb, server_mod_file_cache as sfcdb,
+    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_metadata as metadb,
 };
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::mod_file_cache as mfcdb;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -51,63 +50,33 @@ impl ModplatformCacher for CurseforgeModCacher {
         entity_id: CacheEntityId,
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()> {
+        // Worlds are directories with name-derived pseudo-hashes, so there is
+        // nothing to match on the platform (instance variant excludes them; the
+        // server table has no world addons). A file needs a refresh when its
+        // metadata has no CurseForge cache row, or one cached more than a day ago.
+        let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
         let modlist = match entity_id {
-            CacheEntityId::Instance(instance_id) => app
-                .prisma_client
-                .mod_file_cache()
-                .find_many(vec![
-                    fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                    // Worlds are directories with name-derived pseudo-hashes,
-                    // so there is nothing to match on the platform.
-                    fcdb::WhereParam::AddonType(StringFilter::Not(
-                        crate::domain::instance::AddonType::Worlds
-                            .to_db_string()
-                            .to_string(),
-                    )),
-                    fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIsNot(vec![
-                        cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                        )),
-                    ])]),
-                ])
-                .with(fcdb::metadata::fetch())
-                .exec()
-                .await?
-                .into_iter()
-                .map(|m| {
-                    let metadata = m
-                        .metadata
-                        .expect("metadata was queried with mod cache yet is not present");
-                    (
-                        metadata.murmur_2 as u32,
-                        (metadata.id, metadata.murmur_2 as u32),
-                    )
-                })
-                .collect::<Vec<_>>(),
+            CacheEntityId::Instance(instance_id) => {
+                let instance_id_val = *instance_id;
+                app.db
+                    .read(move |conn| {
+                        Ok(mfcdb::instance_mods_needing_cf_refresh(
+                            conn,
+                            instance_id_val,
+                            cutoff,
+                        )?)
+                    })
+                    .await?
+                    .into_iter()
+                    .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
+                    .collect::<Vec<_>>()
+            }
             CacheEntityId::Server(server_id) => app
-                .prisma_client
-                .server_mod_file_cache()
-                .find_many(vec![
-                    sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
-                    sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIsNot(vec![
-                        cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                        )),
-                    ])]),
-                ])
-                .with(sfcdb::metadata::fetch())
-                .exec()
+                .db
+                .read(move |conn| Ok(mfcdb::server_mods_needing_cf_refresh(conn, server_id, cutoff)?))
                 .await?
                 .into_iter()
-                .map(|m| {
-                    let metadata = m
-                        .metadata
-                        .expect("metadata was queried with server mod cache yet is not present");
-                    (
-                        metadata.murmur_2 as u32,
-                        (metadata.id, metadata.murmur_2 as u32),
-                    )
-                })
+                .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
                 .collect::<Vec<_>>(),
         };
 
@@ -265,101 +234,37 @@ impl ModplatformCacher for CurseforgeModCacher {
     }
 
     async fn cache_icons(app: &App, entity_id: CacheEntityId, update_notifier: &UpdateNotifier) {
-        // Collect (filename, project_id, file_id, image_row) for all mods needing icon updates.
-        // We query the appropriate file cache table depending on entity type.
-        let modlist: Vec<(String, i32, i32, _)> = match entity_id {
+        // Collect the files whose CurseForge logo is stale (upToDate = 0) for all
+        // mods needing icon updates, from the appropriate file cache table.
+        let result = match entity_id {
             CacheEntityId::Instance(instance_id) => {
-                let result = app
-                    .prisma_client
-                    .mod_file_cache()
-                    .find_many(vec![
-                        fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                        fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIs(vec![
-                            cfdb::WhereParam::LogoImageIs(vec![cfimgdb::WhereParam::UpToDate(
-                                IntFilter::Equals(0),
-                            )]),
-                        ])]),
-                    ])
-                    .with(
-                        fcdb::metadata::fetch()
-                            .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch())),
-                    )
-                    .exec()
-                    .await;
-
-                match result {
-                    Ok(list) => list
-                        .into_iter()
-                        .map(|file| {
-                            let meta = file
-                                .metadata
-                                .expect("metadata was ensured present but not returned");
-                            let cf = meta
-                                .curseforge
-                                .flatten()
-                                .expect("curseforge was ensured present but not returned");
-                            let row = cf
-                                .logo_image
-                                .flatten()
-                                .expect("mod image was ensured present but not returned");
-                            (file.filename, cf.project_id, cf.file_id, row)
-                        })
-                        .collect(),
-                    Err(e) => {
-                        error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
-                        return;
-                    }
-                }
+                let instance_id_val = *instance_id;
+                app.db
+                    .read(move |conn| Ok(mfcdb::instance_mods_stale_cf_logo(conn, instance_id_val)?))
+                    .await
             }
             CacheEntityId::Server(server_id) => {
-                let result = app
-                    .prisma_client
-                    .server_mod_file_cache()
-                    .find_many(vec![
-                        sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
-                        sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIs(
-                            vec![cfdb::WhereParam::LogoImageIs(vec![
-                                cfimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
-                            ])],
-                        )]),
-                    ])
-                    .with(
-                        sfcdb::metadata::fetch()
-                            .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch())),
-                    )
-                    .exec()
-                    .await;
+                app.db
+                    .read(move |conn| Ok(mfcdb::server_mods_stale_cf_logo(conn, server_id)?))
+                    .await
+            }
+        };
 
-                match result {
-                    Ok(list) => list
-                        .into_iter()
-                        .map(|file| {
-                            let meta = file
-                                .metadata
-                                .expect("metadata was ensured present but not returned");
-                            let cf = meta
-                                .curseforge
-                                .flatten()
-                                .expect("curseforge was ensured present but not returned");
-                            let row = cf
-                                .logo_image
-                                .flatten()
-                                .expect("mod image was ensured present but not returned");
-                            (file.filename, cf.project_id, cf.file_id, row)
-                        })
-                        .collect(),
-                    Err(e) => {
-                        error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
-                        return;
-                    }
-                }
+        let modlist: Vec<mfcdb::CfLogoRefreshRow> = match result {
+            Ok(list) => list,
+            Err(e) => {
+                error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
+                return;
             }
         };
 
         let app = &app;
         let futures = modlist
             .into_iter()
-            .map(|(filename, project_id, file_id, row)| async move {
+            .map(|row| async move {
+                let filename = row.filename;
+                let project_id = row.project_id;
+                let file_id = row.file_id;
                 let mcm = app.meta_cache_manager();
 
                 {

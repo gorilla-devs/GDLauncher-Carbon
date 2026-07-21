@@ -10,6 +10,7 @@ use crate::domain::server::{
 use crate::domain::vtask::VisualTaskId;
 use anyhow::{Context, anyhow, bail};
 use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_repos::repos::server::{self as server_repo, IndexShift, ServerPatch};
 use chrono::Utc;
 use dashmap::DashMap;
@@ -1737,11 +1738,6 @@ impl ManagerRef<'_, ServerManager> {
 
     /// List server addons from database cache. Triggers caching if needed.
     pub async fn list_server_addons(self, id: ServerId) -> anyhow::Result<Vec<ServerAddon>> {
-        use carbon_repos::db::{
-            curse_forge_mod_cache as cfdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-            server_mod_file_cache as sfcdb,
-        };
-
         let db_server = self
             .app
             .db
@@ -1753,33 +1749,14 @@ impl ManagerRef<'_, ServerManager> {
         // Caching is handled by the queue system (triggered on install, startup, and tab navigation)
         let cached_mods = self
             .app
-            .prisma_client
-            .server_mod_file_cache()
-            .find_many(vec![sfcdb::server_id::equals(id.0)])
-            .with(
-                sfcdb::metadata::fetch()
-                    .with(metadb::logo_image::fetch())
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_server_mods_full(conn, id.0)?))
             .await?;
 
         let mut addons: Vec<ServerAddon> = cached_mods
             .into_iter()
-            .filter_map(|entry| {
-                let metadata = match entry.metadata.as_ref() {
-                    Some(m) => m,
-                    None => {
-                        warn!(
-                            "ServerModFileCache entry {} has no metadata, skipping",
-                            entry.id
-                        );
-                        return None;
-                    }
-                };
-
-                let display_name = metadata.name.clone().unwrap_or_else(|| {
+            .map(|entry| {
+                let display_name = entry.meta_name.clone().unwrap_or_else(|| {
                     entry
                         .filename
                         .trim_end_matches(".jar")
@@ -1787,36 +1764,19 @@ impl ManagerRef<'_, ServerManager> {
                         .to_string()
                 });
 
-                let has_local_image = metadata
-                    .logo_image
-                    .as_ref()
-                    .and_then(|opt| opt.as_ref())
-                    .is_some();
-
-                let cf = metadata.curseforge.as_ref().and_then(|opt| opt.as_ref());
-                let mr = metadata.modrinth.as_ref().and_then(|opt| opt.as_ref());
-
-                let has_cf_image = cf
-                    .and_then(|c| c.logo_image.as_ref())
-                    .and_then(|opt| opt.as_ref())
-                    .is_some();
-
-                let has_mr_image = mr
-                    .and_then(|m| m.logo_image.as_ref())
-                    .and_then(|opt| opt.as_ref())
-                    .is_some();
-
-                Some(ServerAddon {
+                ServerAddon {
                     id: entry.id,
                     filename: entry.filename,
                     display_name,
                     enabled: entry.enabled,
                     addon_type: entry.addon_type,
                     file_size: entry.filesize,
-                    has_image: has_local_image || has_cf_image || has_mr_image,
-                    curseforge_project_id: cf.map(|c| c.project_id as u32),
-                    modrinth_project_id: mr.map(|m| m.project_id.clone()),
-                })
+                    has_image: entry.has_local_image
+                        || entry.has_cf_image
+                        || entry.has_mr_image,
+                    curseforge_project_id: entry.cf_project_id.map(|c| c as u32),
+                    modrinth_project_id: entry.mr_project_id,
+                }
             })
             .collect();
 
@@ -1833,8 +1793,6 @@ impl ManagerRef<'_, ServerManager> {
         addon_id: String,
         enabled: bool,
     ) -> anyhow::Result<()> {
-        use carbon_repos::db::server_mod_file_cache as sfcdb;
-
         let db_server = self
             .app
             .db
@@ -1843,12 +1801,11 @@ impl ManagerRef<'_, ServerManager> {
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Look up the cache entry to get the filename
+        let lookup_id = addon_id.clone();
         let cache_entry = self
             .app
-            .prisma_client
-            .server_mod_file_cache()
-            .find_unique(sfcdb::UniqueWhereParam::IdEquals(addon_id.clone()))
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_server_mod_file_cache_by_id(conn, &lookup_id)?))
             .await?
             .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
 
@@ -1906,13 +1863,15 @@ impl ManagerRef<'_, ServerManager> {
         // Update cache entry's enabled state directly (no re-hash needed)
         let _ = self
             .app
-            .prisma_client
-            .server_mod_file_cache()
-            .update(
-                sfcdb::UniqueWhereParam::IdEquals(addon_id),
-                vec![sfcdb::enabled::set(enabled)],
-            )
-            .exec()
+            .db
+            .write(move |conn| {
+                Ok(mfcdb::update_server_mod_file_enabled(
+                    conn,
+                    &addon_id,
+                    enabled,
+                    DbDateTime(Utc::now().fixed_offset()),
+                )?)
+            })
             .await;
 
         self.app.invalidate(GET_SERVER_ADDONS, None);
@@ -1922,8 +1881,6 @@ impl ManagerRef<'_, ServerManager> {
 
     /// Delete a server addon file
     pub async fn delete_server_addon(self, id: ServerId, addon_id: String) -> anyhow::Result<()> {
-        use carbon_repos::db::server_mod_file_cache as sfcdb;
-
         let db_server = self
             .app
             .db
@@ -1932,12 +1889,11 @@ impl ManagerRef<'_, ServerManager> {
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Look up the cache entry to get the filename
+        let lookup_id = addon_id.clone();
         let cache_entry = self
             .app
-            .prisma_client
-            .server_mod_file_cache()
-            .find_unique(sfcdb::UniqueWhereParam::IdEquals(addon_id.clone()))
-            .exec()
+            .db
+            .read(move |conn| Ok(mfcdb::get_server_mod_file_cache_by_id(conn, &lookup_id)?))
             .await?
             .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
 
@@ -1979,10 +1935,8 @@ impl ManagerRef<'_, ServerManager> {
         // Remove cache entry
         let _ = self
             .app
-            .prisma_client
-            .server_mod_file_cache()
-            .delete(sfcdb::UniqueWhereParam::IdEquals(addon_id))
-            .exec()
+            .db
+            .write(move |conn| Ok(mfcdb::delete_server_mod_file_cache_by_id(conn, &addon_id)?))
             .await;
 
         // GC orphaned metadata

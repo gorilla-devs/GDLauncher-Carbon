@@ -19,7 +19,7 @@ use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
 use tracing::trace;
 
-use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use carbon_repos::repos::mod_file_cache as mfcdb;
 
 pub async fn export_curseforge(
     app: Arc<AppInner>,
@@ -100,28 +100,25 @@ pub async fn export_curseforge(
                         .override_caching_and_wait(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), true, false)
                         .await?;
 
-                    let mods2 = app
-                        .prisma_client
-                        .mod_file_cache()
-                        .find_many(vec![fcdb::instance_id::equals(*instance_id)])
-                        .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
-                        .exec()
-                        .await?
-                        .into_iter()
-                        .filter_map(|m| {
-                            let Some(metadata) = m.metadata else {
-                                return None;
-                            };
+                    let instance_id_val = *instance_id;
+                    let cached = app
+                        .db
+                        .read(move |conn| {
+                            Ok(mfcdb::get_instance_cf_export_files(conn, instance_id_val)?)
+                        })
+                        .await?;
 
-                            let Some(Some(curseforge)) = metadata.curseforge else {
-                                return None;
-                            };
+                    let mods2 = cached.into_iter().filter_map(|row| {
+                        let (Some(project_id), Some(file_id)) = (row.cf_project_id, row.cf_file_id)
+                        else {
+                            return None;
+                        };
 
-                            match mods_filter.remove(&m.filename) {
-                                Some(_) => Some((curseforge.project_id, curseforge.file_id)),
-                                None => None,
-                            }
-                        });
+                        match mods_filter.remove(&row.filename) {
+                            Some(_) => Some((project_id, file_id)),
+                            None => None,
+                        }
+                    });
 
                     mods.extend(mods2);
                 }

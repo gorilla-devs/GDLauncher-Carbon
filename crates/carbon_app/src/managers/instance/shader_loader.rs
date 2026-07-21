@@ -4,7 +4,6 @@ use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::ManagerRef;
 use anyhow::{anyhow, bail};
-use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -209,23 +208,20 @@ impl ManagerRef<'_, InstanceManager> {
         self,
         instance_id: InstanceId,
     ) -> anyhow::Result<Option<ShaderLoaderKind>> {
+        let instance_id_val = *instance_id;
         let mods = self
             .app
-            .prisma_client
-            .mod_file_cache()
-            .find_many(vec![
-                fcdb::instance_id::equals(*instance_id),
-                fcdb::enabled::equals(true),
-            ])
-            .with(fcdb::metadata::fetch())
-            .exec()
+            .db
+            .read(move |conn| {
+                Ok(carbon_repos::repos::mod_file_cache::get_enabled_instance_mod_modids(
+                    conn,
+                    instance_id_val,
+                )?)
+            })
             .await?;
 
         for entry in mods {
-            let Some(metadata) = entry.metadata else {
-                continue;
-            };
-            let Some(modid) = metadata.modid else {
+            let Some(modid) = entry.modid else {
                 continue;
             };
 
