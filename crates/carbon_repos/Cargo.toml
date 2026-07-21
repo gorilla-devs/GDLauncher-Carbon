@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 carbon_macro = { path = "../carbon_macro" }
 serde = { workspace = true, features = ["derive", "rc"] }
-rusqlite = { version = "0.25.4", features = ["bundled"] }
-rusqlite_migration = "1.0.2"
+rusqlite = { version = "0.40.1", features = ["bundled", "hooks", "column_metadata"] }
+rusqlite_migration = "2.6.0"
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

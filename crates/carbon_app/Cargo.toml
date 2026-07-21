@@ -41,8 +41,8 @@ carbon_compression = { path = "../carbon_compression" }
 carbon_net = { path = "../carbon_net" }
 carbon_scheduler = { workspace = true }
 uuid = { workspace = true }
-rusqlite = { version = "0.25.4", features = ["bundled"] }
-rusqlite_migration = "1.0.2"
+rusqlite = { version = "0.40.1", features = ["bundled"] }
+rusqlite_migration = "2.6.0"
 strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
