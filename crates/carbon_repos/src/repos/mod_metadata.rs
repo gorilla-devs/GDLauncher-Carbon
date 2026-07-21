@@ -13,6 +13,8 @@
 //! `ModMetadata.lastUpdatedAt` is written explicitly on insert. `ModMetadata`
 //! is created once and never updated.
 
+use crate::db_error::DbResult;
+use crate::db_exec::Db;
 use crate::dbtypes::DbDateTime;
 use crate::queries;
 use chrono::{DateTime, FixedOffset};
@@ -203,7 +205,7 @@ const UPSERT_CF_MOD_CACHE_SQL: &str =
 /// Upserts a `CurseForgeModCache` row on the composite `(projectId, fileId)`
 /// key and returns the `metadataId` of the surviving row.
 #[allow(clippy::too_many_arguments)]
-pub fn upsert_cf_mod_cache(
+pub fn upsert_cf_mod_cache_conn(
     conn: &rusqlite::Connection,
     murmur2: i32,
     project_id: i32,
@@ -238,6 +240,43 @@ pub fn upsert_cf_mod_cache(
         MetadataIdRow::from_row,
     )?;
     Ok(row.metadata_id)
+}
+
+/// Pool-routing wrapper for [`upsert_cf_mod_cache_conn`].
+#[allow(clippy::too_many_arguments)]
+pub async fn upsert_cf_mod_cache(
+    db: &Db,
+    murmur2: i32,
+    project_id: i32,
+    file_id: i32,
+    name: String,
+    version: String,
+    urlslug: String,
+    summary: String,
+    authors: String,
+    release_type: i32,
+    update_paths: String,
+    cached_at: DbDateTime,
+    metadata_id: String,
+) -> DbResult<String> {
+    db.write(move |conn| {
+        Ok(upsert_cf_mod_cache_conn(
+            conn,
+            murmur2,
+            project_id,
+            file_id,
+            &name,
+            &version,
+            &urlslug,
+            &summary,
+            &authors,
+            release_type,
+            &update_paths,
+            cached_at,
+            &metadata_id,
+        )?)
+    })
+    .await
 }
 
 const UPSERT_CF_MOD_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::QueryCheck {
@@ -286,7 +325,7 @@ const UPSERT_MR_MOD_CACHE_SQL: &str =
 /// Upserts a `ModrinthModCache` row on the composite `(projectId, versionId)`
 /// key and returns the `metadataId` of the surviving row.
 #[allow(clippy::too_many_arguments)]
-pub fn upsert_mr_mod_cache(
+pub fn upsert_mr_mod_cache_conn(
     conn: &rusqlite::Connection,
     sha512: &str,
     project_id: &str,
@@ -325,6 +364,47 @@ pub fn upsert_mr_mod_cache(
         MetadataIdRow::from_row,
     )?;
     Ok(row.metadata_id)
+}
+
+/// Pool-routing wrapper for [`upsert_mr_mod_cache_conn`].
+#[allow(clippy::too_many_arguments)]
+pub async fn upsert_mr_mod_cache(
+    db: &Db,
+    sha512: String,
+    project_id: String,
+    version_id: String,
+    title: String,
+    version: String,
+    urlslug: String,
+    description: String,
+    authors: String,
+    release_type: i32,
+    update_paths: String,
+    filename: String,
+    file_url: String,
+    cached_at: DbDateTime,
+    metadata_id: String,
+) -> DbResult<String> {
+    db.write(move |conn| {
+        Ok(upsert_mr_mod_cache_conn(
+            conn,
+            &sha512,
+            &project_id,
+            &version_id,
+            &title,
+            &version,
+            &urlslug,
+            &description,
+            &authors,
+            release_type,
+            &update_paths,
+            &filename,
+            &file_url,
+            cached_at,
+            &metadata_id,
+        )?)
+    })
+    .await
 }
 
 const UPSERT_MR_MOD_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::QueryCheck {

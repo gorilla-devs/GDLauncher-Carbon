@@ -10,6 +10,8 @@
 //! freshness columns are written explicitly on every upsert/update — the
 //! freshness lint in `tests/query_checker.rs` guards this.
 
+use crate::db_error::DbResult;
+use crate::db_exec::Db;
 use crate::dbtypes::DbDateTime;
 use crate::queries;
 use chrono::{DateTime, FixedOffset};
@@ -496,7 +498,7 @@ const UPSERT_MOD_FILE_CACHE_SQL: &str =
 /// The `id` is a generated UUID used only for the initial INSERT; a conflicting
 /// row keeps its existing id.
 #[allow(clippy::too_many_arguments)]
-pub fn upsert_mod_file_cache(
+pub fn upsert_mod_file_cache_conn(
     conn: &rusqlite::Connection,
     instance_id: i32,
     filename: &str,
@@ -518,6 +520,33 @@ pub fn upsert_mod_file_cache(
         ":metadata_id": metadata_id,
         ":updated_at": updated_at,
     })
+}
+
+/// Pool-routing wrapper for [`upsert_mod_file_cache_conn`].
+#[allow(clippy::too_many_arguments)]
+pub async fn upsert_mod_file_cache(
+    db: &Db,
+    instance_id: i32,
+    filename: String,
+    filesize: i32,
+    enabled: bool,
+    addon_type: String,
+    metadata_id: String,
+    updated_at: DbDateTime,
+) -> DbResult<usize> {
+    db.write(move |conn| {
+        Ok(upsert_mod_file_cache_conn(
+            conn,
+            instance_id,
+            &filename,
+            filesize,
+            enabled,
+            &addon_type,
+            &metadata_id,
+            updated_at,
+        )?)
+    })
+    .await
 }
 
 const UPSERT_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::QueryCheck {
@@ -549,7 +578,7 @@ const UPSERT_SERVER_MOD_FILE_CACHE_SQL: &str =
 
 /// Upserts a `ServerModFileCache` row on the `(serverId, filename)` unique key.
 #[allow(clippy::too_many_arguments)]
-pub fn upsert_server_mod_file_cache(
+pub fn upsert_server_mod_file_cache_conn(
     conn: &rusqlite::Connection,
     server_id: i32,
     filename: &str,
@@ -571,6 +600,33 @@ pub fn upsert_server_mod_file_cache(
         ":metadata_id": metadata_id,
         ":updated_at": updated_at,
     })
+}
+
+/// Pool-routing wrapper for [`upsert_server_mod_file_cache_conn`].
+#[allow(clippy::too_many_arguments)]
+pub async fn upsert_server_mod_file_cache(
+    db: &Db,
+    server_id: i32,
+    filename: String,
+    filesize: i32,
+    enabled: bool,
+    addon_type: String,
+    metadata_id: String,
+    updated_at: DbDateTime,
+) -> DbResult<usize> {
+    db.write(move |conn| {
+        Ok(upsert_server_mod_file_cache_conn(
+            conn,
+            server_id,
+            &filename,
+            filesize,
+            enabled,
+            &addon_type,
+            &metadata_id,
+            updated_at,
+        )?)
+    })
+    .await
 }
 
 const UPSERT_SERVER_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::QueryCheck {

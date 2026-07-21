@@ -75,12 +75,18 @@ const INSERT_JAVA_SQL: &str =
 
 /// Inserts a `Java` row. Hand-written (not macro-generated) because the
 /// macro's arg list only takes scalar params, not a struct.
-pub fn insert_java(conn: &rusqlite::Connection, j: &JavaRow) -> Result<usize, rusqlite::Error> {
+pub fn insert_java_conn(conn: &rusqlite::Connection, j: &JavaRow) -> Result<usize, rusqlite::Error> {
     let mut st = conn.prepare_cached(INSERT_JAVA_SQL)?;
     st.execute(rusqlite::named_params! {
         ":id": j.id, ":path": j.path, ":major": j.major, ":fv": j.full_version,
         ":ty": j.r#type, ":os": j.os, ":arch": j.arch, ":vendor": j.vendor, ":valid": j.is_valid,
     })
+}
+
+/// Pool-routing wrapper for [`insert_java_conn`]: takes the row by value (the
+/// executor closure is `'static`) and routes to the writer.
+pub async fn insert_java(db: &crate::db_exec::Db, j: JavaRow) -> crate::db_error::DbResult<usize> {
+    db.write(move |conn| Ok(insert_java_conn(conn, &j)?)).await
 }
 
 /// `QueryCheck` entry for `insert_java`, covering the hand-written fn above so

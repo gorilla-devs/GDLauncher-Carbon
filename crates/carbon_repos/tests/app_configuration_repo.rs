@@ -13,10 +13,10 @@ fn migrated_db() -> (tempfile::TempDir, Connection) {
 fn singleton_insert_produces_id_0_with_ddl_defaults() {
     let (_d, conn) = migrated_db();
     assert_eq!(
-        ac::insert_app_configuration(&conn, "beta", 2048, Some("inst-123")).unwrap(),
+        ac::insert_app_configuration_conn(&conn, "beta", 2048, Some("inst-123")).unwrap(),
         1
     );
-    let row = ac::get_app_configuration(&conn).unwrap().unwrap();
+    let row = ac::get_app_configuration_conn(&conn).unwrap().unwrap();
     assert_eq!(row.id, 0);
     assert_eq!(row.release_channel, "beta");
     assert_eq!(row.xmx, 2048);
@@ -36,14 +36,14 @@ fn singleton_insert_produces_id_0_with_ddl_defaults() {
     assert_eq!(row.default_instance_group, None);
     assert_eq!(row.default_server_group, None);
     assert_eq!(row.instances_sort_by, None);
-    assert_eq!(ac::count_app_configuration(&conn).unwrap(), 1);
+    assert_eq!(ac::count_app_configuration_conn(&conn).unwrap(), 1);
 }
 
 #[test]
 fn singleton_insert_null_installation_id() {
     let (_d, conn) = migrated_db();
-    ac::insert_app_configuration(&conn, "stable", 4096, None).unwrap();
-    let row = ac::get_app_configuration(&conn).unwrap().unwrap();
+    ac::insert_app_configuration_conn(&conn, "stable", 4096, None).unwrap();
+    let row = ac::get_app_configuration_conn(&conn).unwrap().unwrap();
     assert_eq!(row.installation_id, None);
 }
 
@@ -82,7 +82,7 @@ fn patch_multi_field_sql() {
 #[test]
 fn patch_executes_and_persists_single_field() {
     let (_d, conn) = migrated_db();
-    ac::insert_app_configuration(&conn, "stable", 4096, None).unwrap();
+    ac::insert_app_configuration_conn(&conn, "stable", 4096, None).unwrap();
     let patch = ac::AppConfigurationPatch {
         theme: Some("dark".into()),
         xmx: Some(8192),
@@ -90,7 +90,7 @@ fn patch_executes_and_persists_single_field() {
     };
     let affected = patch.build().unwrap().execute(&conn).unwrap();
     assert_eq!(affected, 1);
-    let row = ac::get_app_configuration(&conn).unwrap().unwrap();
+    let row = ac::get_app_configuration_conn(&conn).unwrap().unwrap();
     assert_eq!(row.theme, "dark");
     assert_eq!(row.xmx, 8192);
     // untouched columns preserved
@@ -100,7 +100,7 @@ fn patch_executes_and_persists_single_field() {
 #[test]
 fn patch_nullable_set_to_null_persists() {
     let (_d, conn) = migrated_db();
-    ac::insert_app_configuration(&conn, "stable", 4096, None).unwrap();
+    ac::insert_app_configuration_conn(&conn, "stable", 4096, None).unwrap();
     // First set a non-null value.
     ac::AppConfigurationPatch {
         instances_sort_by: Some(Some("name".into())),
@@ -111,7 +111,7 @@ fn patch_nullable_set_to_null_persists() {
     .execute(&conn)
     .unwrap();
     assert_eq!(
-        ac::get_app_configuration(&conn)
+        ac::get_app_configuration_conn(&conn)
             .unwrap()
             .unwrap()
             .instances_sort_by
@@ -128,7 +128,7 @@ fn patch_nullable_set_to_null_persists() {
     .execute(&conn)
     .unwrap();
     assert_eq!(
-        ac::get_app_configuration(&conn)
+        ac::get_app_configuration_conn(&conn)
             .unwrap()
             .unwrap()
             .instances_sort_by,
@@ -139,7 +139,7 @@ fn patch_nullable_set_to_null_persists() {
 #[test]
 fn patch_persists_blob_column() {
     let (_d, conn) = migrated_db();
-    ac::insert_app_configuration(&conn, "stable", 4096, None).unwrap();
+    ac::insert_app_configuration_conn(&conn, "stable", 4096, None).unwrap();
     let blob = vec![1u8, 2, 3, 4];
     ac::AppConfigurationPatch {
         gdl_account_status: Some(Some(blob.clone())),
@@ -150,7 +150,7 @@ fn patch_persists_blob_column() {
     .execute(&conn)
     .unwrap();
     assert_eq!(
-        ac::get_app_configuration(&conn)
+        ac::get_app_configuration_conn(&conn)
             .unwrap()
             .unwrap()
             .gdl_account_status,

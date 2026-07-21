@@ -1,6 +1,9 @@
 //! Repository queries for the `HTTPCache` table, the HTTP response cache
 //! consumed by `cache_middleware`.
 
+use crate::db_error::DbResult;
+use crate::db_exec::Db;
+use crate::dbtypes::DbDateTime;
 use crate::queries;
 use crate::registry::QueryCheck;
 use chrono::{DateTime, FixedOffset};
@@ -30,30 +33,33 @@ const INSERT_HTTP_CACHE_SQL: &str = "INSERT INTO HTTPCache (url, status_code, da
 /// Replaces any cached response for `url` with a fresh one, in one
 /// transaction: a `DELETE` followed by an `INSERT`. The `DELETE` tolerates a
 /// missing row, so no existence check is needed before it.
-pub fn replace_cached(
-    conn: &mut rusqlite::Connection,
-    url: &str,
+pub async fn replace_cached(
+    db: &Db,
+    url: String,
     status_code: i32,
-    data: &[u8],
-    expires_at: Option<crate::dbtypes::DbDateTime>,
-    last_modified: Option<&str>,
-    etag: Option<&str>,
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    tx.execute(DELETE_HTTP_CACHE_SQL, rusqlite::named_params! { ":url": url })?;
-    tx.execute(
-        INSERT_HTTP_CACHE_SQL,
-        rusqlite::named_params! {
-            ":url": url,
-            ":status_code": status_code,
-            ":data": data,
-            ":expires_at": expires_at,
-            ":last_modified": last_modified,
-            ":etag": etag,
-        },
-    )?;
-    tx.commit()?;
-    Ok(())
+    data: Vec<u8>,
+    expires_at: Option<DbDateTime>,
+    last_modified: Option<String>,
+    etag: Option<String>,
+) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        tx.execute(DELETE_HTTP_CACHE_SQL, rusqlite::named_params! { ":url": url })?;
+        tx.execute(
+            INSERT_HTTP_CACHE_SQL,
+            rusqlite::named_params! {
+                ":url": url,
+                ":status_code": status_code,
+                ":data": data,
+                ":expires_at": expires_at,
+                ":last_modified": last_modified,
+                ":etag": etag,
+            },
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
 const DELETE_HTTP_CACHE_CHECK: QueryCheck = QueryCheck {

@@ -1,5 +1,7 @@
 //! Repository queries for the `Skin` table.
 
+use crate::db_error::DbResult;
+use crate::db_exec::Db;
 use crate::queries;
 use crate::registry::QueryCheck;
 
@@ -24,24 +26,27 @@ const UPDATE_ACCOUNT_SKIN_SQL: &str = "UPDATE Account SET skinId = :id WHERE uui
 /// `account_uuid`, in one transaction: a `DELETE`, then an `INSERT`, then the
 /// account `UPDATE`. The `DELETE` tolerates a missing row, so no existence
 /// check is needed before it.
-pub fn replace_skin_and_link_account(
-    conn: &mut rusqlite::Connection,
-    skin_id: &str,
-    skin_data: &[u8],
-    account_uuid: &str,
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    tx.execute(DELETE_SKIN_SQL, rusqlite::named_params! { ":id": skin_id })?;
-    tx.execute(
-        INSERT_SKIN_SQL,
-        rusqlite::named_params! { ":id": skin_id, ":skin": skin_data },
-    )?;
-    tx.execute(
-        UPDATE_ACCOUNT_SKIN_SQL,
-        rusqlite::named_params! { ":id": skin_id, ":uuid": account_uuid },
-    )?;
-    tx.commit()?;
-    Ok(())
+pub async fn replace_skin_and_link_account(
+    db: &Db,
+    skin_id: String,
+    skin_data: Vec<u8>,
+    account_uuid: String,
+) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        tx.execute(DELETE_SKIN_SQL, rusqlite::named_params! { ":id": skin_id })?;
+        tx.execute(
+            INSERT_SKIN_SQL,
+            rusqlite::named_params! { ":id": skin_id, ":skin": skin_data },
+        )?;
+        tx.execute(
+            UPDATE_ACCOUNT_SKIN_SQL,
+            rusqlite::named_params! { ":id": skin_id, ":uuid": account_uuid },
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
 const DELETE_SKIN_CHECK: QueryCheck = QueryCheck {

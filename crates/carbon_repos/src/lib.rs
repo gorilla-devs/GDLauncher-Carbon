@@ -2,6 +2,13 @@
 // inside this crate's own modules and in its `tests/` integration crates.
 extern crate self as carbon_repos;
 
+// Re-exported so the `#[macro_export]`ed `queries!` muncher can name `paste`
+// through `$crate::paste` — integration-test crates that invoke `queries!` see
+// only `carbon_repos`'s own items, not its private dependencies, so the path
+// must route through the crate itself.
+#[doc(hidden)]
+pub use paste;
+
 use compat::{MigrationDef, MigrationKind, MigrationSet};
 
 pub mod checker;

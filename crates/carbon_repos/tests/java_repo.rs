@@ -20,26 +20,26 @@ fn sample() -> j::JavaRow {
 #[test]
 fn java_crud_roundtrip() {
     let (_d, conn) = migrated_db();
-    assert_eq!(j::insert_java(&conn, &sample()).unwrap(), 1);
-    assert_eq!(j::get_all_java(&conn).unwrap(), vec![sample()]);
-    assert_eq!(j::get_java_by_id(&conn, "id-1").unwrap(), Some(sample()));
-    assert_eq!(j::get_java_by_path(&conn, "/usr/bin/java").unwrap(), Some(sample()));
-    assert_eq!(j::count_java(&conn).unwrap(), 1);
-    assert_eq!(j::set_java_validity(&conn, "id-1", false).unwrap(), 1);
-    assert!(!j::get_java_by_id(&conn, "id-1").unwrap().unwrap().is_valid);
-    assert_eq!(j::delete_java(&conn, "id-1").unwrap(), 1);
-    assert_eq!(j::count_java(&conn).unwrap(), 0);
+    assert_eq!(j::insert_java_conn(&conn, &sample()).unwrap(), 1);
+    assert_eq!(j::get_all_java_conn(&conn).unwrap(), vec![sample()]);
+    assert_eq!(j::get_java_by_id_conn(&conn, "id-1").unwrap(), Some(sample()));
+    assert_eq!(j::get_java_by_path_conn(&conn, "/usr/bin/java").unwrap(), Some(sample()));
+    assert_eq!(j::count_java_conn(&conn).unwrap(), 1);
+    assert_eq!(j::set_java_validity_conn(&conn, "id-1", false).unwrap(), 1);
+    assert!(!j::get_java_by_id_conn(&conn, "id-1").unwrap().unwrap().is_valid);
+    assert_eq!(j::delete_java_conn(&conn, "id-1").unwrap(), 1);
+    assert_eq!(j::count_java_conn(&conn).unwrap(), 0);
 }
 
 #[test]
 fn java_profile_crud_roundtrip() {
     let (_d, conn) = migrated_db();
-    j::insert_java(&conn, &sample()).unwrap();
-    assert_eq!(j::upsert_profile(&conn, "gaming", false).unwrap(), 1);
-    assert_eq!(j::set_profile_java(&conn, "gaming", Some("id-1")).unwrap(), 1);
-    let p = j::get_profile(&conn, "gaming").unwrap().unwrap();
+    j::insert_java_conn(&conn, &sample()).unwrap();
+    assert_eq!(j::upsert_profile_conn(&conn, "gaming", false).unwrap(), 1);
+    assert_eq!(j::set_profile_java_conn(&conn, "gaming", Some("id-1")).unwrap(), 1);
+    let p = j::get_profile_conn(&conn, "gaming").unwrap().unwrap();
     assert_eq!(p.java_id.as_deref(), Some("id-1"));
-    assert_eq!(j::get_all_profiles(&conn).unwrap().len(), 1);
-    assert_eq!(j::set_profile_java(&conn, "gaming", None).unwrap(), 1);
-    assert_eq!(j::get_profile(&conn, "gaming").unwrap().unwrap().java_id, None);
+    assert_eq!(j::get_all_profiles_conn(&conn).unwrap().len(), 1);
+    assert_eq!(j::set_profile_java_conn(&conn, "gaming", None).unwrap(), 1);
+    assert_eq!(j::get_profile_conn(&conn, "gaming").unwrap().unwrap().java_id, None);
 }

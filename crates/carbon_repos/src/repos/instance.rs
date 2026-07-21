@@ -7,6 +7,8 @@
 //! has to resolve the default group id (which would re-enter `get_default_group`
 //! and deadlock on `index_lock`).
 
+use crate::db_error::DbResult;
+use crate::db_exec::Db;
 use crate::queries;
 use crate::registry::QueryCheck;
 use rusqlite::{Connection, named_params};
@@ -189,7 +191,7 @@ pub struct InstanceArrange {
 
 /// Inserts a group and returns its new id. Hand-written to return
 /// `last_insert_rowid()`.
-pub fn insert_group(
+pub fn insert_group_conn(
     conn: &Connection,
     name: &str,
     group_index: i32,
@@ -202,132 +204,171 @@ pub fn insert_group(
     Ok(conn.last_insert_rowid())
 }
 
+/// Pool-routing wrapper for [`insert_group_conn`].
+pub async fn insert_group(
+    db: &Db,
+    name: String,
+    group_index: i32,
+    library_position: Option<i32>,
+) -> DbResult<i64> {
+    db.write(move |conn| Ok(insert_group_conn(conn, &name, group_index, library_position)?))
+        .await
+}
+
 /// Runs the conditional index shifts and the moved instance's final placement
-/// in one transaction.
-pub fn move_instance_tx(
-    conn: &mut Connection,
-    shifts: &[IndexShift],
+/// in one write-pool transaction.
+pub async fn move_instance_tx(
+    db: &Db,
+    shifts: Vec<IndexShift>,
     instance_id: i32,
     group_id: i32,
     index: i32,
     library_position: Option<i32>,
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    for shift in shifts {
-        match *shift {
-            IndexShift::DownExclusive { group_id, gt, lt } => {
-                shift_instance_indexes_down_exclusive(&tx, group_id, gt, lt)?;
-            }
-            IndexShift::UpRange { group_id, gte, lt } => {
-                shift_instance_indexes_up_range(&tx, group_id, gte, lt)?;
-            }
-            IndexShift::DownAfter { group_id, gt } => {
-                shift_instance_indexes_down_after(&tx, group_id, gt)?;
-            }
-            IndexShift::UpFrom { group_id, gte } => {
-                shift_instance_indexes_up_from(&tx, group_id, gte)?;
+) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        for shift in &shifts {
+            match *shift {
+                IndexShift::DownExclusive { group_id, gt, lt } => {
+                    shift_instance_indexes_down_exclusive_conn(&tx, group_id, gt, lt)?;
+                }
+                IndexShift::UpRange { group_id, gte, lt } => {
+                    shift_instance_indexes_up_range_conn(&tx, group_id, gte, lt)?;
+                }
+                IndexShift::DownAfter { group_id, gt } => {
+                    shift_instance_indexes_down_after_conn(&tx, group_id, gt)?;
+                }
+                IndexShift::UpFrom { group_id, gte } => {
+                    shift_instance_indexes_up_from_conn(&tx, group_id, gte)?;
+                }
             }
         }
-    }
-    set_instance_group_index_library_position(&tx, instance_id, group_id, index, library_position)?;
-    tx.commit()
+        set_instance_group_index_library_position_conn(
+            &tx,
+            instance_id,
+            group_id,
+            index,
+            library_position,
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
 /// Restamps folder/default-group `groupIndex`/`libraryPosition` and ungrouped
-/// instance `index`/`libraryPosition` in one transaction.
-pub fn arrange_library_tx(
-    conn: &mut Connection,
-    groups: &[GroupArrange],
-    instances: &[InstanceArrange],
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    for g in groups {
-        if g.set_library_position {
-            set_group_index_and_library_position(&tx, g.id, g.group_index, g.library_position)?;
-        } else {
-            set_group_index(&tx, g.id, g.group_index)?;
+/// instance `index`/`libraryPosition` in one write-pool transaction.
+pub async fn arrange_library_tx(
+    db: &Db,
+    groups: Vec<GroupArrange>,
+    instances: Vec<InstanceArrange>,
+) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        for g in &groups {
+            if g.set_library_position {
+                set_group_index_and_library_position_conn(
+                    &tx,
+                    g.id,
+                    g.group_index,
+                    g.library_position,
+                )?;
+            } else {
+                set_group_index_conn(&tx, g.id, g.group_index)?;
+            }
         }
-    }
-    for i in instances {
-        set_instance_index_and_library_position(&tx, i.id, i.index, i.library_position)?;
-    }
-    tx.commit()
+        for i in &instances {
+            set_instance_index_and_library_position_conn(&tx, i.id, i.index, i.library_position)?;
+        }
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
-/// Restamps every instance's `index` within a folder in one transaction.
-pub fn set_instance_indexes_tx(
-    conn: &mut Connection,
-    updates: &[(i32, i32)],
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    for (id, index) in updates {
-        set_instance_index(&tx, *id, *index)?;
-    }
-    tx.commit()
+/// Restamps every instance's `index` within a folder in one write-pool
+/// transaction.
+pub async fn set_instance_indexes_tx(db: &Db, updates: Vec<(i32, i32)>) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        for (id, index) in &updates {
+            set_instance_index_conn(&tx, *id, *index)?;
+        }
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
 /// Deletes any row at `shortpath` then inserts the new instance, returning its
-/// id, in one transaction.
-pub fn add_instance_tx(
-    conn: &mut Connection,
-    name: &str,
-    shortpath: &str,
+/// id, in one write-pool transaction.
+pub async fn add_instance_tx(
+    db: &Db,
+    name: String,
+    shortpath: String,
     index: i32,
     group_id: i32,
     library_position: Option<i32>,
-) -> Result<i64, rusqlite::Error> {
-    let tx = conn.transaction()?;
-    delete_instances_by_shortpath(&tx, shortpath)?;
-    {
-        let mut st = tx.prepare_cached(INSERT_INSTANCE_SQL)?;
-        st.execute(named_params! {
-            ":name": name, ":shortpath": shortpath, ":index": index,
-            ":group_id": group_id, ":library_position": library_position,
-        })?;
-    }
-    let id = tx.last_insert_rowid();
-    tx.commit()?;
-    Ok(id)
+) -> DbResult<i64> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        delete_instances_by_shortpath_conn(&tx, &shortpath)?;
+        {
+            let mut st = tx.prepare_cached(INSERT_INSTANCE_SQL)?;
+            st.execute(named_params! {
+                ":name": name, ":shortpath": shortpath, ":index": index,
+                ":group_id": group_id, ":library_position": library_position,
+            })?;
+        }
+        let id = tx.last_insert_rowid();
+        tx.commit()?;
+        Ok(id)
+    })
+    .await
 }
 
 /// Moves every instance of `group_id` into `default_group_id` (offsetting their
-/// index by `base_index`) then deletes the group, in one transaction.
+/// index by `base_index`) then deletes the group, in one write-pool transaction.
 ///
 /// `base_index` is computed by the caller (the instance-side oddity counts the
 /// group being deleted); this fn does not recompute it.
-pub fn delete_group_tx(
-    conn: &mut Connection,
+pub async fn delete_group_tx(
+    db: &Db,
     group_id: i32,
     default_group_id: i32,
     base_index: i32,
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    move_all_instances_to_group(&tx, group_id, default_group_id, base_index)?;
-    delete_group(&tx, group_id)?;
-    tx.commit()
+) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        move_all_instances_to_group_conn(&tx, group_id, default_group_id, base_index)?;
+        delete_group_conn(&tx, group_id)?;
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
 /// Creates the `"localize➽default"` group and points the singleton config row
-/// at it, in one transaction. Returns the new group id.
-pub fn create_default_group_tx(
-    conn: &mut Connection,
-    group_index: i32,
-) -> Result<i32, rusqlite::Error> {
-    let tx = conn.transaction()?;
-    {
-        let mut st = tx.prepare_cached(INSERT_GROUP_SQL)?;
-        st.execute(named_params! {
-            ":name": "localize➽default", ":group_index": group_index,
-            ":library_position": None::<i32>,
-        })?;
-    }
-    let id = tx.last_insert_rowid() as i32;
-    {
-        let mut st = tx.prepare_cached(UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_SQL)?;
-        st.execute(named_params! { ":group_id": id })?;
-    }
-    tx.commit()?;
-    Ok(id)
+/// at it, in one write-pool transaction. Returns the new group id.
+pub async fn create_default_group_tx(db: &Db, group_index: i32) -> DbResult<i32> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        {
+            let mut st = tx.prepare_cached(INSERT_GROUP_SQL)?;
+            st.execute(named_params! {
+                ":name": "localize➽default", ":group_index": group_index,
+                ":library_position": None::<i32>,
+            })?;
+        }
+        let id = tx.last_insert_rowid() as i32;
+        {
+            let mut st = tx.prepare_cached(UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_SQL)?;
+            st.execute(named_params! { ":group_id": id })?;
+        }
+        tx.commit()?;
+        Ok(id)
+    })
+    .await
 }
 
 const INSERT_INSTANCE_CHECK: QueryCheck = QueryCheck {

@@ -585,6 +585,7 @@ dependencies = [
  "carbon_macro",
  "chrono",
  "hex",
+ "paste",
  "rusqlite",
  "serde",
  "sha2",

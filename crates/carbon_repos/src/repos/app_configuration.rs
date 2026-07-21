@@ -1,5 +1,7 @@
 //! Repository queries for the `AppConfiguration` singleton (row `id = 0`).
 
+use crate::db_error::DbResult;
+use crate::db_exec::Db;
 use crate::queries;
 use crate::registry::DynamicQuery;
 
@@ -69,7 +71,7 @@ const INSERT_APP_CONFIGURATION_SQL: &str =
 /// Inserts the singleton `AppConfiguration` row (id = 0). Hand-written because
 /// the macro's arg list only takes scalar params and the remaining columns rely
 /// on their DDL defaults.
-pub fn insert_app_configuration(
+pub fn insert_app_configuration_conn(
     conn: &rusqlite::Connection,
     release_channel: &str,
     xmx: i32,
@@ -81,6 +83,24 @@ pub fn insert_app_configuration(
         ":xmx": xmx,
         ":installation_id": installation_id,
     })
+}
+
+/// Pool-routing wrapper for [`insert_app_configuration_conn`].
+pub async fn insert_app_configuration(
+    db: &Db,
+    release_channel: String,
+    xmx: i32,
+    installation_id: Option<String>,
+) -> DbResult<usize> {
+    db.write(move |conn| {
+        Ok(insert_app_configuration_conn(
+            conn,
+            &release_channel,
+            xmx,
+            installation_id.as_deref(),
+        )?)
+    })
+    .await
 }
 
 const INSERT_APP_CONFIGURATION_CHECK: crate::registry::QueryCheck = crate::registry::QueryCheck {

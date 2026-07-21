@@ -12,6 +12,8 @@
 //! `delete_server_group` computes `base_index` from the DEFAULT group (the
 //! instance side counts the group being deleted).
 
+use crate::db_error::DbResult;
+use crate::db_exec::Db;
 use crate::dbtypes::DbDateTime;
 use crate::queries;
 use crate::registry::{DynamicQuery, QueryCheck};
@@ -210,7 +212,7 @@ pub struct ServerArrange {
 /// Inserts a server and returns its new id. Hand-written to return
 /// `last_insert_rowid()` and to write `dateCreated` explicitly as millis.
 #[allow(clippy::too_many_arguments)]
-pub fn insert_server(
+pub fn insert_server_conn(
     conn: &Connection,
     name: &str,
     shortpath: &str,
@@ -247,9 +249,50 @@ pub fn insert_server(
     Ok(conn.last_insert_rowid())
 }
 
+/// Pool-routing wrapper for [`insert_server_conn`].
+#[allow(clippy::too_many_arguments)]
+pub async fn insert_server(
+    db: &Db,
+    name: String,
+    shortpath: String,
+    index: i32,
+    group_id: i32,
+    game_version: String,
+    port: i32,
+    server_type: String,
+    modloader_type: Option<String>,
+    modloader_version: Option<String>,
+    modpack_platform: Option<String>,
+    modpack_project_id: Option<String>,
+    modpack_file_id: Option<String>,
+    library_position: Option<i32>,
+    date_created: DbDateTime,
+) -> DbResult<i64> {
+    db.write(move |conn| {
+        Ok(insert_server_conn(
+            conn,
+            &name,
+            &shortpath,
+            index,
+            group_id,
+            &game_version,
+            port,
+            &server_type,
+            modloader_type.as_deref(),
+            modloader_version.as_deref(),
+            modpack_platform.as_deref(),
+            modpack_project_id.as_deref(),
+            modpack_file_id.as_deref(),
+            library_position,
+            date_created,
+        )?)
+    })
+    .await
+}
+
 /// Inserts a server group and returns its new id. Hand-written to return
 /// `last_insert_rowid()`.
-pub fn insert_server_group(
+pub fn insert_server_group_conn(
     conn: &Connection,
     name: &str,
     group_index: i32,
@@ -262,73 +305,114 @@ pub fn insert_server_group(
     Ok(conn.last_insert_rowid())
 }
 
+/// Pool-routing wrapper for [`insert_server_group_conn`].
+pub async fn insert_server_group(
+    db: &Db,
+    name: String,
+    group_index: i32,
+    library_position: Option<i32>,
+) -> DbResult<i64> {
+    db.write(move |conn| {
+        Ok(insert_server_group_conn(
+            conn,
+            &name,
+            group_index,
+            library_position,
+        )?)
+    })
+    .await
+}
+
 /// Runs the conditional index shifts and the moved server's final placement in
-/// one transaction.
-pub fn move_server_tx(
-    conn: &mut Connection,
-    shifts: &[IndexShift],
+/// one write-pool transaction.
+pub async fn move_server_tx(
+    db: &Db,
+    shifts: Vec<IndexShift>,
     server_id: i32,
     group_id: i32,
     index: i32,
     library_position: Option<i32>,
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    for shift in shifts {
-        match *shift {
-            IndexShift::DownExclusive { group_id, gt, lt } => {
-                shift_server_indexes_down_exclusive(&tx, group_id, gt, lt)?;
-            }
-            IndexShift::UpRange { group_id, gte, lt } => {
-                shift_server_indexes_up_range(&tx, group_id, gte, lt)?;
-            }
-            IndexShift::DownAfter { group_id, gt } => {
-                shift_server_indexes_down_after(&tx, group_id, gt)?;
-            }
-            IndexShift::UpFrom { group_id, gte } => {
-                shift_server_indexes_up_from(&tx, group_id, gte)?;
+) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        for shift in &shifts {
+            match *shift {
+                IndexShift::DownExclusive { group_id, gt, lt } => {
+                    shift_server_indexes_down_exclusive_conn(&tx, group_id, gt, lt)?;
+                }
+                IndexShift::UpRange { group_id, gte, lt } => {
+                    shift_server_indexes_up_range_conn(&tx, group_id, gte, lt)?;
+                }
+                IndexShift::DownAfter { group_id, gt } => {
+                    shift_server_indexes_down_after_conn(&tx, group_id, gt)?;
+                }
+                IndexShift::UpFrom { group_id, gte } => {
+                    shift_server_indexes_up_from_conn(&tx, group_id, gte)?;
+                }
             }
         }
-    }
-    set_server_group_index_library_position(&tx, server_id, group_id, index, library_position)?;
-    tx.commit()
+        set_server_group_index_library_position_conn(
+            &tx,
+            server_id,
+            group_id,
+            index,
+            library_position,
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
 /// Restamps folder/default-group `groupIndex`/`libraryPosition` and ungrouped
-/// server `index`/`libraryPosition` in one transaction.
-pub fn arrange_server_library_tx(
-    conn: &mut Connection,
-    groups: &[ServerGroupArrange],
-    servers: &[ServerArrange],
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    for g in groups {
-        if g.set_library_position {
-            set_server_group_index_and_library_position(&tx, g.id, g.group_index, g.library_position)?;
-        } else {
-            set_server_group_index(&tx, g.id, g.group_index)?;
+/// server `index`/`libraryPosition` in one write-pool transaction.
+pub async fn arrange_server_library_tx(
+    db: &Db,
+    groups: Vec<ServerGroupArrange>,
+    servers: Vec<ServerArrange>,
+) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        for g in &groups {
+            if g.set_library_position {
+                set_server_group_index_and_library_position_conn(
+                    &tx,
+                    g.id,
+                    g.group_index,
+                    g.library_position,
+                )?;
+            } else {
+                set_server_group_index_conn(&tx, g.id, g.group_index)?;
+            }
         }
-    }
-    for s in servers {
-        set_server_index_and_library_position(&tx, s.id, s.index, s.library_position)?;
-    }
-    tx.commit()
+        for s in &servers {
+            set_server_index_and_library_position_conn(&tx, s.id, s.index, s.library_position)?;
+        }
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
 /// Moves every server of `group_id` into `default_group_id` (offsetting their
-/// index by `base_index`) then deletes the group, in one transaction.
+/// index by `base_index`) then deletes the group, in one write-pool transaction.
 ///
 /// `base_index` is computed by the caller — the server-side oddity counts the
 /// DEFAULT group (not the group being deleted); this fn does not recompute it.
-pub fn delete_server_group_tx(
-    conn: &mut Connection,
+pub async fn delete_server_group_tx(
+    db: &Db,
     group_id: i32,
     default_group_id: i32,
     base_index: i32,
-) -> Result<(), rusqlite::Error> {
-    let tx = conn.transaction()?;
-    move_all_servers_to_group(&tx, group_id, default_group_id, base_index)?;
-    delete_server_group(&tx, group_id)?;
-    tx.commit()
+) -> DbResult<()> {
+    db.write(move |conn| {
+        let tx = conn.transaction()?;
+        move_all_servers_to_group_conn(&tx, group_id, default_group_id, base_index)?;
+        delete_server_group_conn(&tx, group_id)?;
+        tx.commit()?;
+        Ok(())
+    })
+    .await
 }
 
 /// A partial update to a single `Server` row. Each present field becomes one
