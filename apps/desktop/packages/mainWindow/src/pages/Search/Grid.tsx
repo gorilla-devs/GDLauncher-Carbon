@@ -5,6 +5,7 @@ import { Skeleton } from "@gd/ui"
 import {
   onMount,
   Show,
+  createEffect,
   createMemo,
   For,
   createSignal,
@@ -38,32 +39,34 @@ export function Grid() {
   const serverId = () => searchContext?.selectedServerId() || NaN
   const serverAddons = () => searchContext?.selectedServerAddons
 
-  const instance = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceDetails", instanceId()],
-    enabled: !isNaN(instanceId()) && instanceId() > 0
-  }))
+  // Landing tab for the current target (nothing / instance / server). Owned by
+  // the search context so the tab strip, this grid and the list agree.
+  const defaultFallbackType: () => FEUnifiedSearchType = () =>
+    searchContext?.defaultAddonType() ?? "modpack"
 
-  const defaultFallbackType: () => FEUnifiedSearchType = () => {
-    if (!instanceId()) {
-      return "modpack"
-    }
-
-    if (instance?.data?.modloaders?.length ?? 0 > 0) {
-      return "mod"
-    }
-
-    return "shader"
+  const type = () => {
+    // Explicit URL segment always wins.
+    if (params.type) return params.type as FEUnifiedSearchType
+    // When entering with an instance/server context (i.e. via "Add addons"),
+    // ignore the previous session's projectType — the user came here to add an
+    // addon to this target, not to resume browsing modpacks from earlier.
+    if (instanceId() || serverId()) return defaultFallbackType()
+    return searchContext?.searchQuery().projectType || defaultFallbackType()
   }
 
-  const type = () =>
-    (params.type || defaultFallbackType()) as FEUnifiedSearchType
-
-  if (type() !== searchContext?.searchQuery().projectType) {
-    searchContext?.setSearchQuery((prev) => ({
-      ...prev,
-      projectType: type()
-    }))
-  }
+  // Wrapped in createEffect because `type()` depends on the instance/server
+  // details query, which resolves asynchronously after mount — a one-shot
+  // evaluation in the component body would lock in the pre-load fallback and
+  // never re-sync once the modloader info arrives.
+  createEffect(() => {
+    const resolvedType = type()
+    if (resolvedType !== searchContext?.searchQuery().projectType) {
+      searchContext?.setSearchQuery((prev) => ({
+        ...prev,
+        projectType: resolvedType
+      }))
+    }
+  })
 
   onMount(() => {
     // Set up ResizeObserver to track container width
