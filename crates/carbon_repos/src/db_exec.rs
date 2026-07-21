@@ -47,27 +47,29 @@ pub struct Db {
     next_reader: AtomicUsize,
 }
 
-fn apply_runtime_pragmas(conn: &Connection) -> rusqlite::Result<()> {
+fn apply_runtime_pragmas(conn: &Connection, foreign_keys: bool) -> rusqlite::Result<()> {
     // Matches the PRAGMAs the app applied under PCR (spec §2.6).
-    // foreign_keys intentionally NOT set here — FK enablement is Plan 3 (spec §7).
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
          PRAGMA synchronous = NORMAL;
          PRAGMA temp_store = MEMORY;
          PRAGMA mmap_size = 268435456;
          PRAGMA busy_timeout = 5000;",
-    )
+    )?;
+    // FK enforcement is per-connection and decided by the startup sweep (spec
+    // §7): every runtime connection must agree, so the verdict is threaded in.
+    conn.pragma_update(None, "foreign_keys", &if foreign_keys { "ON" } else { "OFF" })
 }
 
 impl Db {
-    pub fn open(path: &Path, read_connections: usize) -> DbResult<Db> {
+    pub fn open(path: &Path, read_connections: usize, foreign_keys: bool) -> DbResult<Db> {
         let wconn = Connection::open(path)?;
-        apply_runtime_pragmas(&wconn)?;
+        apply_runtime_pragmas(&wconn, foreign_keys)?;
         let writer = Actor::spawn(wconn);
         let mut readers = Vec::with_capacity(read_connections);
         for _ in 0..read_connections.max(1) {
             let rconn = Connection::open(path)?;
-            apply_runtime_pragmas(&rconn)?;
+            apply_runtime_pragmas(&rconn, foreign_keys)?;
             readers.push(Actor::spawn(rconn));
         }
         Ok(Db { writer, readers, next_reader: AtomicUsize::new(0) })
@@ -97,7 +99,7 @@ mod tests {
 
     fn temp_db() -> (tempfile::TempDir, Db) {
         let dir = tempfile::tempdir().unwrap();
-        let db = Db::open(&dir.path().join("t.db"), 2).unwrap();
+        let db = Db::open(&dir.path().join("t.db"), 2, false).unwrap();
         (dir, db)
     }
 
@@ -143,5 +145,22 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(mode.to_lowercase(), "wal");
+    }
+
+    #[tokio::test]
+    async fn foreign_keys_pragma_reflects_open_flag() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = Db::open(&dir.path().join("on.db"), 1, true).unwrap();
+        let off = Db::open(&dir.path().join("off.db"), 1, false).unwrap();
+        let fk_on: i64 = on
+            .read(|c| Ok(c.query_row("PRAGMA foreign_keys", [], |r| r.get(0))?))
+            .await
+            .unwrap();
+        let fk_off: i64 = off
+            .read(|c| Ok(c.query_row("PRAGMA foreign_keys", [], |r| r.get(0))?))
+            .await
+            .unwrap();
+        assert_eq!(fk_on, 1, "open(foreign_keys=true) must enable enforcement");
+        assert_eq!(fk_off, 0, "open(foreign_keys=false) must leave it off");
     }
 }

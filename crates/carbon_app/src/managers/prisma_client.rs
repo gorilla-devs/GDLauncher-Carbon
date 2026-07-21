@@ -131,8 +131,15 @@ pub(super) async fn load_and_migrate(
     conn.close()
         .map_err(|(_, e)| anyhow::anyhow!("Failed to close migration DB connection: {e}"))?;
 
+    // Foreign keys have been OFF for the app's entire life (spec §2.3). Turn
+    // them ON behind a fail-safe sweep (spec §7): run it on a dedicated
+    // connection with FKs OFF (so repair deletes do not cascade), then open the
+    // runtime pools with FKs ON only if the DB is — or was repaired — clean.
+    // `GDL_DISABLE_FK_ENFORCEMENT=1` skips the sweep and forces FKs OFF.
+    let foreign_keys = decide_foreign_keys(&db_path)?;
+
     let db = std::sync::Arc::new(
-        carbon_repos::db_exec::Db::open(&db_path, 4)
+        carbon_repos::db_exec::Db::open(&db_path, 4, foreign_keys)
             .map_err(|e| anyhow::anyhow!("failed to open sqlite executor: {e}"))?,
     );
 
@@ -177,6 +184,49 @@ pub(super) async fn load_and_migrate(
         prisma_client: db_client,
         db,
     })
+}
+
+/// Runs the FK sweep (spec §7) and returns whether the runtime pools should
+/// enable foreign-key enforcement. Never fails startup on integrity grounds: an
+/// unrepairable violation or a sweep error falls back to FKs OFF (today's
+/// behavior) and reports to Sentry, and the app continues.
+fn decide_foreign_keys(db_path: &std::path::Path) -> Result<bool, anyhow::Error> {
+    if std::env::var("GDL_DISABLE_FK_ENFORCEMENT").as_deref() == Ok("1") {
+        tracing::warn!(
+            "GDL_DISABLE_FK_ENFORCEMENT=1 set; skipping FK sweep and leaving foreign keys OFF"
+        );
+        return Ok(false);
+    }
+
+    let mut sweep_conn = rusqlite::Connection::open(db_path)?;
+    // Match the migration connection: FKs OFF so repair deletes do not cascade
+    // under the sweep (`foreign_key_check` works regardless of this pragma).
+    sweep_conn.pragma_update(None, "foreign_keys", &"OFF")?;
+
+    let enforce = match carbon_repos::fk::sweep_and_decide(&mut sweep_conn) {
+        Ok(carbon_repos::fk::SweepOutcome::Enabled) => true,
+        Ok(carbon_repos::fk::SweepOutcome::DisabledFallback { violations }) => {
+            let msg = format!(
+                "FK sweep left {} unrepairable violation(s); running with foreign keys OFF for this session",
+                violations.len()
+            );
+            tracing::warn!("{msg}");
+            sentry::capture_message(&msg, sentry::Level::Warning);
+            false
+        }
+        Err(e) => {
+            let msg =
+                format!("FK sweep errored ({e}); running with foreign keys OFF for this session");
+            tracing::warn!("{msg}");
+            sentry::capture_message(&msg, sentry::Level::Warning);
+            false
+        }
+    };
+
+    sweep_conn
+        .close()
+        .map_err(|(_, e)| anyhow::anyhow!("Failed to close FK sweep connection: {e}"))?;
+    Ok(enforce)
 }
 
 async fn find_appropriate_default_xmx() -> i32 {

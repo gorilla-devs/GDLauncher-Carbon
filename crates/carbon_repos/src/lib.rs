@@ -12,6 +12,7 @@ pub mod db;
 pub mod db_error;
 pub mod db_exec;
 pub mod dbtypes;
+pub mod fk;
 pub mod from_row;
 pub mod pcr; // wip
 pub mod registry;
