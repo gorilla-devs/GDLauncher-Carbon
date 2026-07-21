@@ -21,9 +21,9 @@
 //! The runtime never runs this tool; it executes the reviewed, committed,
 //! CI-verified scripts.
 
-use carbon_repos::downgen::{
-    analyze_up, generate_down, verify_round_trip, GenError,
-};
+use carbon_repos::compat::MigrationKind;
+use carbon_repos::downgen::{analyze_up, generate_down, verify_round_trip, GenError};
+use carbon_repos::manifest::{derive_kind, seeded_lost_fields, DataDown};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -160,7 +160,7 @@ fn generate_or_verify(
         match verify_round_trip(prev, up, &down) {
             Ok(()) => {
                 println!("Hand-written down.sql verified: it round-trips the prior schema.");
-                print_list_entry(dir_name);
+                print_list_entry(dir_name, prev, up, &down);
                 Ok(ExitCode::SUCCESS)
             }
             Err(e) => {
@@ -188,7 +188,7 @@ fn generate_or_verify(
             Ok(down) => {
                 std::fs::write(&down_path, &down)?;
                 println!("Generated {} (verified round-trip).", down_path.display());
-                print_list_entry(dir_name);
+                print_list_entry(dir_name, prev, up, &down);
                 Ok(ExitCode::SUCCESS)
             }
             Err(GenError::RoundTripFailed { expected, actual }) => {
@@ -209,9 +209,34 @@ fn generate_or_verify(
 }
 
 /// Prints the `MigrationDef` list entry the developer pastes into
-/// `get_migrations()`. `kind` is left as a placeholder the developer confirms
-/// against the derivation tool (spec §10.2).
-fn print_list_entry(dir_name: &str) {
+/// `get_migrations()`, with `kind` and `data_down` **derived** from the up/down
+/// (spec §10.2-10.3), not left as placeholders: the same values the CI gate
+/// enforces are what the tool prints, so a correct paste passes by construction.
+fn print_list_entry(dir_name: &str, prev: &[&str], up: &str, down: &str) {
+    let (kind_expr, kind_note) = match derive_kind(prev, up) {
+        Ok(MigrationKind::Additive) => ("MigrationKind::Additive", String::new()),
+        Ok(MigrationKind::Breaking) => ("MigrationKind::Breaking", String::new()),
+        Err(e) => (
+            "MigrationKind::Breaking",
+            format!(" // could not derive kind ({e}); defaulting to Breaking — verify"),
+        ),
+    };
+
+    let (data_down, data_note) = match seeded_lost_fields(prev, up, down) {
+        Ok(lost) => {
+            let decl = if lost.is_empty() {
+                DataDown::Full
+            } else {
+                DataDown::Partial(lost)
+            };
+            (decl.to_declaration(), String::new())
+        }
+        Err(e) => (
+            "full".to_string(),
+            format!(" // could not seed round-trip ({e}); verify lossiness by hand"),
+        ),
+    };
+
     println!("\nAdd this entry to get_migrations() in crates/carbon_repos/src/lib.rs:\n");
     println!("        MigrationDef {{");
     println!("            name: \"{dir_name}\",");
@@ -221,8 +246,8 @@ fn print_list_entry(dir_name: &str) {
     println!(
         "            down_sql: Some(include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/prisma/migrations/{dir_name}/down.sql\"))),"
     );
-    println!("            kind: MigrationKind::Additive, // confirm via kind derivation (spec §10.2)");
-    println!("            data_down: \"full\",");
+    println!("            kind: {kind_expr},{kind_note}");
+    println!("            data_down: \"{data_down}\",{data_note}");
     println!("        }},");
 }
 

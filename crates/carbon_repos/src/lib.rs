@@ -12,6 +12,7 @@ pub mod dbtypes;
 pub mod downgen;
 pub mod fk;
 pub mod from_row;
+pub mod manifest;
 pub mod registry;
 pub mod repos;
 pub mod schema_dump;

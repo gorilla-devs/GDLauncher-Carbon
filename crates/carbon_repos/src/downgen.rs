@@ -134,7 +134,12 @@ struct Schema {
 /// Applies `ups` in order to a fresh in-memory connection with foreign keys
 /// OFF (matching the migration connection's semantics, spec §7.1), so the
 /// resulting schema is exactly what the runner would produce.
-fn build(ups: &[&str]) -> DbResult<Connection> {
+///
+/// Shared with [`crate::manifest`], which builds the same surrounding schemas
+/// to derive migration kind and seed boundary-value data for the lossiness
+/// round-trip — one builder, identical connection semantics everywhere a
+/// scratch schema is constructed.
+pub(crate) fn build(ups: &[&str]) -> DbResult<Connection> {
     let conn = Connection::open_in_memory()?;
     conn.pragma_update(None, "foreign_keys", "OFF")?;
     for up in ups {
