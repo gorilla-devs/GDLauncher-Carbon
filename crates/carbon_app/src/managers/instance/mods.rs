@@ -110,10 +110,7 @@ impl ManagerRef<'_, InstanceManager> {
             };
 
         let instance_id_val = *instance_id;
-        let mut mods = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_instance_mods_full(conn, instance_id_val)?))
+        let mut mods = mfcdb::get_instance_mods_full(&self.app.db, instance_id_val)
             .await?;
 
         // Apply the optional addon-type filter in Rust BEFORE the duplicate
@@ -316,10 +313,7 @@ impl ManagerRef<'_, InstanceManager> {
         let shortpath = &instance.shortpath;
 
         let lookup_id = id.clone();
-        let m = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_mod_file_cache_by_id(conn, &lookup_id)?))
+        let m = mfcdb::get_mod_file_cache_by_id(&self.app.db, &lookup_id)
             .await?
             .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
 
@@ -364,16 +358,7 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::rename(enabled_path, disabled_path).await?;
         }
 
-        self.app
-            .db
-            .write(move |conn| {
-                Ok(mfcdb::update_mod_file_enabled(
-                    conn,
-                    &id,
-                    enabled,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?)
-            })
+        mfcdb::update_mod_file_enabled(&self.app.db, &id, enabled, DbDateTime(Utc::now().fixed_offset()))
             .await?;
 
         self.app
@@ -392,10 +377,7 @@ impl ManagerRef<'_, InstanceManager> {
         let shortpath = &instance.shortpath;
 
         let lookup_id = id.clone();
-        let m = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_mod_file_cache_by_id(conn, &lookup_id)?))
+        let m = mfcdb::get_mod_file_cache_by_id(&self.app.db, &lookup_id)
             .await?
             .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
@@ -425,9 +407,7 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         // Delete cache entry directly instead of re-scanning
-        self.app
-            .db
-            .write(move |conn| Ok(mfcdb::delete_mod_file_cache_by_id(conn, &m.id)?))
+        mfcdb::delete_mod_file_cache_by_id(&self.app.db, &m.id)
             .await?;
 
         // GC orphaned metadata
@@ -661,10 +641,7 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         let lookup_id = id.clone();
-        let row = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_instance_mod_update_ids(conn, &lookup_id)?))
+        let row = mfcdb::get_instance_mod_update_ids(&self.app.db, &lookup_id)
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
@@ -835,10 +812,7 @@ impl ManagerRef<'_, InstanceManager> {
         drop(instances);
 
         let lookup_id = id.clone();
-        let cf = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_instance_mod_cf_ids(conn, &lookup_id)?))
+        let cf = mfcdb::get_instance_mod_cf_ids(&self.app.db, &lookup_id)
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
@@ -911,10 +885,7 @@ impl ManagerRef<'_, InstanceManager> {
         drop(instances);
 
         let lookup_id = id.clone();
-        let mr = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_instance_mod_mr_ids(conn, &lookup_id)?))
+        let mr = mfcdb::get_instance_mod_mr_ids(&self.app.db, &lookup_id)
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
@@ -970,10 +941,7 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let lookup_id = mod_id.clone();
-        let r = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_instance_mod_icon_data(conn, &lookup_id)?))
+        let r = mfcdb::get_instance_mod_icon_data(&self.app.db, &lookup_id)
             .await?
             .ok_or(InvalidModIdError(mod_id))?;
 

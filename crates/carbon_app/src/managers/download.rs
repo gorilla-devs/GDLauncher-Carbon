@@ -86,14 +86,7 @@ impl ManagerRef<'_, DownloadManager> {
 
         tokio::fs::remove_file(path).await?;
 
-        self.app
-            .db
-            .write(move |conn| {
-                Ok(active_downloads::delete_active_download_by_file_id(
-                    conn, &handle.id,
-                )?)
-            })
-            .await?;
+        active_downloads::delete_active_download_by_file_id(&self.app.db, &handle.id).await?;
 
         Ok(())
     }
@@ -126,14 +119,7 @@ impl ManagerRef<'_, DownloadManager> {
             // not just an IO error
             .map_err(DownloadCompleteError::RenameError)?;
 
-        self.app
-            .db
-            .write(move |conn| {
-                Ok(active_downloads::delete_active_download_by_file_id(
-                    conn, &handle.id,
-                )?)
-            })
-            .await?;
+        active_downloads::delete_active_download_by_file_id(&self.app.db, &handle.id).await?;
 
         Ok(())
     }
@@ -151,28 +137,15 @@ impl ManagerRef<'_, DownloadManager> {
             return Err(DownloadStartError::AlreadyActive);
         }
 
-        let active_download = self
-            .app
-            .db
-            .read({
-                let url = url.clone();
-                move |conn| Ok(active_downloads::find_active_download_by_url(conn, &url)?)
-            })
-            .await?;
+        let active_download =
+            active_downloads::find_active_download_by_url(&self.app.db, &url).await?;
 
         let id = match active_download {
             Some(download) => download.file_id,
             None => {
                 let id = Uuid::new_v4().to_string();
 
-                self.app
-                    .db
-                    .write({
-                        let url = url.clone();
-                        let id = id.clone();
-                        move |conn| Ok(active_downloads::insert_active_download(conn, &url, &id)?)
-                    })
-                    .await?;
+                active_downloads::insert_active_download(&self.app.db, &url, &id).await?;
 
                 id
             }

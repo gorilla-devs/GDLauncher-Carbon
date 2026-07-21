@@ -829,22 +829,13 @@ impl ManagerRef<'_, MetaCacheManager> {
         );
 
         let instance_id_val = *instance_id;
-        let _ = self
-            .app
-            .db
-            .write(move |conn| {
-                Ok(mfcdb::delete_mod_file_cache_by_instance(conn, instance_id_val)?)
-            })
-            .await;
+        let _ = mfcdb::delete_mod_file_cache_by_instance(&self.app.db, instance_id_val).await;
 
         self.gc_mod_metadata().await;
     }
 
     pub async fn gc_mod_metadata(self) {
-        let _ = self
-            .app
-            .db
-            .write(move |conn| Ok(metarepo::gc_orphan_metadata(conn)?))
+        let _ = metarepo::gc_orphan_metadata(&self.app.db)
             .await;
     }
 
@@ -1249,14 +1240,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         let sha512 = Vec::from(result.sha512);
         let murmur2 = result.murmur2 as i32;
 
-        let lookup_sha512 = sha512.clone();
-        let dbmeta = self
-            .app
-            .db
-            .read(move |conn| {
-                Ok(metarepo::find_metadata_by_hashes(conn, &lookup_sha512, murmur2)?)
-            })
-            .await?;
+        let dbmeta = metarepo::find_metadata_by_hashes(&self.app.db, &sha512, murmur2).await?;
 
         let meta_id = match dbmeta {
             Some(meta) => meta.id,
@@ -1312,10 +1296,14 @@ impl ManagerRef<'_, MetaCacheManager> {
                 };
 
                 let meta_id_owned = meta_id.clone();
+                // Interleaved app logic: insert the metadata row and, only when
+                // a logo was scaled, its local image. Runs in one writer
+                // dispatch, so no other write interleaves; not one transaction
+                // (each autocommits). Uses `_conn` forms inside the closure.
                 self.app
                     .db
                     .write(move |conn| {
-                        metarepo::insert_metadata(
+                        metarepo::insert_metadata_conn(
                             conn,
                             &meta_id_owned,
                             murmur2,
@@ -1330,7 +1318,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                             DbDateTime(Utc::now().fixed_offset()),
                         )?;
                         if let Some(data) = logo_data {
-                            metarepo::insert_local_image(conn, &meta_id_owned, &data)?;
+                            metarepo::insert_local_image_conn(conn, &meta_id_owned, &data)?;
                         }
                         Ok(())
                     })
@@ -1369,21 +1357,17 @@ impl ManagerRef<'_, MetaCacheManager> {
         let filesize = result.content_len as i32;
         let addon_type_owned = addon_type.clone();
         let meta_id_owned = meta_id.clone();
-        self.app
-            .db
-            .write(move |conn| {
-                Ok(mfcdb::upsert_mod_file_cache(
-                    conn,
-                    instance_id_val,
-                    &filename_owned,
-                    filesize,
-                    enabled,
-                    &addon_type_owned,
-                    &meta_id_owned,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?)
-            })
-            .await?;
+        mfcdb::upsert_mod_file_cache(
+            &self.app.db,
+            instance_id_val,
+            filename_owned,
+            filesize,
+            enabled,
+            addon_type_owned,
+            meta_id_owned,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
 
         Ok(meta_id)
     }
@@ -1406,21 +1390,17 @@ impl ManagerRef<'_, MetaCacheManager> {
         let filesize = result.content_len as i32;
         let addon_type_owned = addon_type.clone();
         let meta_id_owned = meta_id.clone();
-        self.app
-            .db
-            .write(move |conn| {
-                Ok(mfcdb::upsert_server_mod_file_cache(
-                    conn,
-                    server_id,
-                    &filename_owned,
-                    filesize,
-                    enabled,
-                    &addon_type_owned,
-                    &meta_id_owned,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?)
-            })
-            .await?;
+        mfcdb::upsert_server_mod_file_cache(
+            &self.app.db,
+            server_id,
+            filename_owned,
+            filesize,
+            enabled,
+            addon_type_owned,
+            meta_id_owned,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
 
         Ok(meta_id)
     }
@@ -1436,10 +1416,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         let server_path = runtime_path.get_servers().get_server_path(server_shortpath);
 
         // Get existing cache entries
-        let cached = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_server_mod_files_by_server(conn, server_id)?))
+        let cached = mfcdb::get_server_mod_files_by_server(&self.app.db, server_id)
             .await?;
 
         let cached_map: HashMap<String, (i32, bool)> = cached
@@ -1487,10 +1464,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         for entry in &stale {
             let entry_id = entry.id.clone();
-            let _ = self
-                .app
-                .db
-                .write(move |conn| Ok(mfcdb::delete_server_mod_file_cache_by_id(conn, &entry_id)?))
+            let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &entry_id)
                 .await;
         }
 
@@ -1600,9 +1574,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             let app2 = app.clone();
             let cached_entries = tokio::spawn(async move {
                 let instance_id_val = *instance_id;
-                app2.db
-                    .read(move |conn| Ok(mfcdb::get_mod_files_by_instance(conn, instance_id_val)?))
-                    .await
+                mfcdb::get_mod_files_by_instance(&app2.db, instance_id_val).await
             });
 
             let instance_manager = app.instance_manager();
@@ -1759,16 +1731,12 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                         }
                     } else {
                         let instance_id_val = *instance_id;
-                        let entry_filename = entry.filename.clone();
-                        app.db
-                            .write(move |conn| {
-                                Ok(mfcdb::delete_mod_file_cache_by_instance_filename(
-                                    conn,
-                                    instance_id_val,
-                                    &entry_filename,
-                                )?)
-                            })
-                            .await?;
+                        mfcdb::delete_mod_file_cache_by_instance_filename(
+                            &app.db,
+                            instance_id_val,
+                            &entry.filename,
+                        )
+                        .await?;
                     }
 
                     has_outdated_entries = true;
@@ -1909,8 +1877,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                                 cache_instance(instance_id).await
                             }
                             CacheEntityId::Server(server_id) => {
-                                let db_server = app.db
-                                    .read(move |conn| Ok(carbon_repos::repos::server::get_server(conn, server_id)?))
+                                let db_server = carbon_repos::repos::server::get_server(&app.db, server_id)
                                     .await?
                                     .ok_or_else(|| anyhow!("Server {} not found", server_id))?;
                                 app.meta_cache_manager()

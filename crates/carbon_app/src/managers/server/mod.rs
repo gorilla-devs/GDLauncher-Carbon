@@ -135,10 +135,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     async fn load_servers(self) -> anyhow::Result<()> {
-        let db_servers = self
-            .app
-            .db
-            .read(|conn| Ok(server_repo::get_all_servers(conn)?))
+        let db_servers = server_repo::get_all_servers(&self.app.db)
             .await?;
 
         let mut servers = self.servers.write().await;
@@ -165,12 +162,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn get_default_group(self) -> anyhow::Result<ServerGroupId> {
-        let config = self
-            .app
-            .db
-            .read(|conn| {
-                Ok(carbon_repos::repos::app_configuration::get_app_configuration(conn)?)
-            })
+        let config = carbon_repos::repos::app_configuration::get_app_configuration(&self.app.db)
             .await?
             .ok_or_else(|| anyhow!("App configuration not found"))?;
 
@@ -178,12 +170,7 @@ impl ManagerRef<'_, ServerManager> {
             Some(id) => Ok(ServerGroupId(id)),
             None => {
                 // Find the first group
-                let group = self
-                    .app
-                    .db
-                    .read(|conn| {
-                        Ok(server_repo::first_server_group_ordered_by_group_index(conn)?)
-                    })
+                let group = server_repo::first_server_group_ordered_by_group_index(&self.app.db)
                     .await?
                     .ok_or_else(|| anyhow!("No server group found"))?;
 
@@ -193,12 +180,15 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn list_groups(self) -> anyhow::Result<Vec<server::ServerGroup>> {
+        // Both reads run back-to-back on one reader connection so groups and
+        // servers load together; each SELECT autocommits its own read txn, so
+        // this is not a single snapshot. Uses `_conn` forms inside.
         let (groups, all_servers) = self
             .app
             .db
             .read(|conn| {
-                let groups = server_repo::get_all_server_groups_ordered_by_group_index(conn)?;
-                let servers = server_repo::get_all_servers_ordered_by_index(conn)?;
+                let groups = server_repo::get_all_server_groups_ordered_by_group_index_conn(conn)?;
+                let servers = server_repo::get_all_servers_ordered_by_index_conn(conn)?;
                 Ok((groups, servers))
             })
             .await?;
@@ -290,10 +280,7 @@ impl ManagerRef<'_, ServerManager> {
         // index strictly smaller than the current minimum so ascending
         // sort on `index` puts the new row first.
         let group_id_val = group_id.0;
-        let min_index: Option<i32> = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::min_index_server_in_group(conn, group_id_val)?))
+        let min_index: Option<i32> = server_repo::min_index_server_in_group(&self.app.db, group_id_val)
             .await?
             .map(|s| s.index);
         let next_index = min_index.map(|n| n - 1).unwrap_or(0);
@@ -304,13 +291,16 @@ impl ManagerRef<'_, ServerManager> {
         let default_group_id = self.clone().get_default_group().await?;
         let library_position = if group_id == default_group_id {
             let default_id = default_group_id.0;
+            // Both reads run back-to-back on one reader connection; each SELECT
+            // autocommits its own read txn, so this is not a single snapshot.
+            // Uses `_conn` forms inside the closure.
             let (min_server_pos, min_group_pos) = self
                 .app
                 .db
                 .read(move |conn| {
-                    let srv = server_repo::min_library_position_server_in_group(conn, default_id)?
+                    let srv = server_repo::min_library_position_server_in_group_conn(conn, default_id)?
                         .and_then(|s| s.library_position);
-                    let grp = server_repo::min_library_position_server_group(conn)?
+                    let grp = server_repo::min_library_position_server_group_conn(conn)?
                         .and_then(|g| g.library_position);
                     Ok((srv, grp))
                 })
@@ -340,29 +330,24 @@ impl ManagerRef<'_, ServerManager> {
             modloader_type.clone(),
             modloader_version.clone(),
         );
-        let new_id = self
-            .app
-            .db
-            .write(move |conn| {
-                Ok(server_repo::insert_server(
-                    conn,
-                    &name_c,
-                    &shortpath_c,
-                    next_index,
-                    group_id_val,
-                    &game_version_c,
-                    port,
-                    &server_type,
-                    modloader_type_c.as_deref(),
-                    modloader_version_c.as_deref(),
-                    None,
-                    None,
-                    None,
-                    library_position,
-                    DbDateTime(Utc::now().into()),
-                )?)
-            })
-            .await?;
+        let new_id = server_repo::insert_server(
+            &self.app.db,
+            name_c,
+            shortpath_c,
+            next_index,
+            group_id_val,
+            game_version_c,
+            port,
+            server_type,
+            modloader_type_c,
+            modloader_version_c,
+            None,
+            None,
+            None,
+            library_position,
+            DbDateTime(Utc::now().into()),
+        )
+        .await?;
 
         drop(_index_guard);
 
@@ -549,10 +534,7 @@ impl ManagerRef<'_, ServerManager> {
 
         // Top-of-group insertion: pick an index smaller than the current min
         let group_id_val = group_id.0;
-        let min_index: Option<i32> = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::min_index_server_in_group(conn, group_id_val)?))
+        let min_index: Option<i32> = server_repo::min_index_server_in_group(&self.app.db, group_id_val)
             .await?
             .map(|s| s.index);
         let next_index = min_index.map(|n| n - 1).unwrap_or(0);
@@ -562,13 +544,16 @@ impl ManagerRef<'_, ServerManager> {
         let default_group_id = self.clone().get_default_group().await?;
         let library_position = if group_id == default_group_id {
             let default_id = default_group_id.0;
+            // Both reads run back-to-back on one reader connection; each SELECT
+            // autocommits its own read txn, so this is not a single snapshot.
+            // Uses `_conn` forms inside the closure.
             let (min_server_pos, min_group_pos) = self
                 .app
                 .db
                 .read(move |conn| {
-                    let srv = server_repo::min_library_position_server_in_group(conn, default_id)?
+                    let srv = server_repo::min_library_position_server_in_group_conn(conn, default_id)?
                         .and_then(|s| s.library_position);
-                    let grp = server_repo::min_library_position_server_group(conn)?
+                    let grp = server_repo::min_library_position_server_group_conn(conn)?
                         .and_then(|g| g.library_position);
                     Ok((srv, grp))
                 })
@@ -587,29 +572,24 @@ impl ManagerRef<'_, ServerManager> {
 
         // Create DB record with a placeholder game_version — will be updated after processing
         let (name_c, shortpath_c) = (name.clone(), shortpath.clone());
-        let new_id = self
-            .app
-            .db
-            .write(move |conn| {
-                Ok(server_repo::insert_server(
-                    conn,
-                    &name_c,
-                    &shortpath_c,
-                    next_index,
-                    group_id_val,
-                    "unknown",
-                    port,
-                    "modded",
-                    None,
-                    None,
-                    Some(&modpack_platform),
-                    Some(&modpack_project_id),
-                    Some(&modpack_file_id),
-                    library_position,
-                    DbDateTime(Utc::now().into()),
-                )?)
-            })
-            .await?;
+        let new_id = server_repo::insert_server(
+            &self.app.db,
+            name_c,
+            shortpath_c,
+            next_index,
+            group_id_val,
+            "unknown".to_string(),
+            port,
+            "modded".to_string(),
+            None,
+            None,
+            Some(modpack_platform),
+            Some(modpack_project_id),
+            Some(modpack_file_id),
+            library_position,
+            DbDateTime(Utc::now().into()),
+        )
+        .await?;
 
         drop(_index_guard);
 
@@ -643,16 +623,7 @@ impl ManagerRef<'_, ServerManager> {
                                 warn!("Failed to write server icon: {}", e);
                             } else {
                                 let sid = server_id.0;
-                                let _ = self
-                                    .app
-                                    .db
-                                    .write(move |conn| {
-                                        Ok(server_repo::set_server_icon_revision(
-                                            conn,
-                                            sid,
-                                            Some(1),
-                                        )?)
-                                    })
+                                let _ = server_repo::set_server_icon_revision(&self.app.db, sid, Some(1))
                                     .await;
                             }
                         }
@@ -838,18 +809,14 @@ impl ManagerRef<'_, ServerManager> {
 
                 // Update DB with detected versions
                 let sid = server_id.0;
-                let _ = app
-                    .db
-                    .write(move |conn| {
-                        Ok(server_repo::set_server_game_version_and_modloader(
-                            conn,
-                            sid,
-                            &pack_result.game_version,
-                            pack_result.modloader_type.as_deref(),
-                            pack_result.modloader_version.as_deref(),
-                        )?)
-                    })
-                    .await;
+                let _ = server_repo::set_server_game_version_and_modloader(
+                    &app.db,
+                    sid,
+                    &pack_result.game_version,
+                    pack_result.modloader_type.as_deref(),
+                    pack_result.modloader_version.as_deref(),
+                )
+                .await;
 
                 Ok(())
             }
@@ -907,10 +874,7 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Pull the modpack info we stored at create time.
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -1047,9 +1011,7 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_SERVER_DETAILS, None);
 
         // Delete from DB
-        self.app
-            .db
-            .write(move |conn| Ok(server_repo::delete_server(conn, id.0)?))
+        server_repo::delete_server(&self.app.db, id.0)
             .await?;
 
         // Delete files
@@ -1113,10 +1075,7 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Get server info from DB
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -1227,17 +1186,12 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Update last_started in DB
-        let _ = self
-            .app
-            .db
-            .write(move |conn| {
-                Ok(server_repo::set_server_last_started(
-                    conn,
-                    id.0,
-                    Some(DbDateTime(Utc::now().into())),
-                )?)
-            })
-            .await;
+        let _ = server_repo::set_server_last_started(
+            &self.app.db,
+            id.0,
+            Some(DbDateTime(Utc::now().into())),
+        )
+        .await;
 
         // Pre-warm CPU metrics tracking so the first WebSocket poll gets non-zero values.
         // sysinfo needs two refresh calls to compute cpu_usage delta.
@@ -1272,8 +1226,7 @@ impl ManagerRef<'_, ServerManager> {
                 server.state = ServerState::Stopped { failed_task: None };
 
                 // Check auto_restart setting from DB
-                app.db
-                    .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+                server_repo::get_server(&app.db, id.0)
                     .await
                     .ok()
                     .flatten()
@@ -1429,10 +1382,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn accept_eula(self, id: ServerId) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1465,10 +1415,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn server_details(self, id: ServerId) -> anyhow::Result<ServerDetails> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1555,10 +1502,7 @@ impl ManagerRef<'_, ServerManager> {
         self,
         id: ServerId,
     ) -> anyhow::Result<std::collections::BTreeMap<String, String>> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1581,10 +1525,7 @@ impl ManagerRef<'_, ServerManager> {
         id: ServerId,
         updates: std::collections::HashMap<String, String>,
     ) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1651,10 +1592,7 @@ impl ManagerRef<'_, ServerManager> {
         id: ServerId,
         list: PlayerListFile,
     ) -> anyhow::Result<Vec<T>> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1738,19 +1676,13 @@ impl ManagerRef<'_, ServerManager> {
 
     /// List server addons from database cache. Triggers caching if needed.
     pub async fn list_server_addons(self, id: ServerId) -> anyhow::Result<Vec<ServerAddon>> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Query from cache with metadata joins
         // Caching is handled by the queue system (triggered on install, startup, and tab navigation)
-        let cached_mods = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_server_mods_full(conn, id.0)?))
+        let cached_mods = mfcdb::get_server_mods_full(&self.app.db, id.0)
             .await?;
 
         let mut addons: Vec<ServerAddon> = cached_mods
@@ -1793,19 +1725,13 @@ impl ManagerRef<'_, ServerManager> {
         addon_id: String,
         enabled: bool,
     ) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Look up the cache entry to get the filename
         let lookup_id = addon_id.clone();
-        let cache_entry = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_server_mod_file_cache_by_id(conn, &lookup_id)?))
+        let cache_entry = mfcdb::get_server_mod_file_cache_by_id(&self.app.db, &lookup_id)
             .await?
             .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
 
@@ -1861,18 +1787,13 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Update cache entry's enabled state directly (no re-hash needed)
-        let _ = self
-            .app
-            .db
-            .write(move |conn| {
-                Ok(mfcdb::update_server_mod_file_enabled(
-                    conn,
-                    &addon_id,
-                    enabled,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?)
-            })
-            .await;
+        let _ = mfcdb::update_server_mod_file_enabled(
+            &self.app.db,
+            &addon_id,
+            enabled,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await;
 
         self.app.invalidate(GET_SERVER_ADDONS, None);
 
@@ -1881,19 +1802,13 @@ impl ManagerRef<'_, ServerManager> {
 
     /// Delete a server addon file
     pub async fn delete_server_addon(self, id: ServerId, addon_id: String) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Look up the cache entry to get the filename
         let lookup_id = addon_id.clone();
-        let cache_entry = self
-            .app
-            .db
-            .read(move |conn| Ok(mfcdb::get_server_mod_file_cache_by_id(conn, &lookup_id)?))
+        let cache_entry = mfcdb::get_server_mod_file_cache_by_id(&self.app.db, &lookup_id)
             .await?
             .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
 
@@ -1933,10 +1848,7 @@ impl ManagerRef<'_, ServerManager> {
         tokio::fs::remove_file(&file_path).await?;
 
         // Remove cache entry
-        let _ = self
-            .app
-            .db
-            .write(move |conn| Ok(mfcdb::delete_server_mod_file_cache_by_id(conn, &addon_id)?))
+        let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &addon_id)
             .await;
 
         // GC orphaned metadata
@@ -1959,10 +1871,7 @@ impl ManagerRef<'_, ServerManager> {
         use carbon_net::{Checksum, DownloadOptions, Downloadable};
         use carbon_platforms::curseforge::filters::ModFileParameters;
 
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2048,10 +1957,7 @@ impl ManagerRef<'_, ServerManager> {
     ) -> anyhow::Result<VisualTaskId> {
         use carbon_platforms::curseforge::filters::{ModFilesParameters, ModFilesParametersQuery};
 
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2102,10 +2008,7 @@ impl ManagerRef<'_, ServerManager> {
         use carbon_net::{Checksum, DownloadOptions, Downloadable};
         use carbon_platforms::modrinth::search::VersionID;
 
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2182,10 +2085,7 @@ impl ManagerRef<'_, ServerManager> {
         use carbon_platforms::modrinth::project::ProjectVersionsFilters;
         use carbon_platforms::modrinth::search::ProjectID;
 
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2220,10 +2120,7 @@ impl ManagerRef<'_, ServerManager> {
         list: PlayerListFile,
         entries: &[T],
     ) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2239,9 +2136,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn set_favorite(self, id: ServerId, favorite: bool) -> anyhow::Result<()> {
-        self.app
-            .db
-            .write(move |conn| Ok(server_repo::set_server_favorite(conn, id.0, favorite)?))
+        server_repo::set_server_favorite(&self.app.db, id.0, favorite)
             .await?;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -2307,10 +2202,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn open_folder(self, id: ServerId) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -2372,25 +2264,13 @@ impl ManagerRef<'_, ServerManager> {
             .context("Failed to write server icon")?;
 
         // Bump iconRevision
-        let db_server = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server(conn, id.0)?))
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found in database"))?;
 
         let new_revision = db_server.icon_revision.unwrap_or(0) + 1;
 
-        self.app
-            .db
-            .write(move |conn| {
-                Ok(server_repo::set_server_icon_revision(
-                    conn,
-                    id.0,
-                    Some(new_revision),
-                )?)
-            })
-            .await?;
+        server_repo::set_server_icon_revision(&self.app.db, id.0, Some(new_revision)).await?;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -2431,10 +2311,7 @@ impl ManagerRef<'_, ServerManager> {
         let default_group_id = self.get_default_group().await?;
 
         let (start_group, start_idx, start_library_pos) = {
-            let server = self
-                .app
-                .db
-                .read(move |conn| Ok(server_repo::get_server(conn, server_id.0)?))
+            let server = server_repo::get_server(&self.app.db, server_id.0)
                 .await?
                 .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -2447,10 +2324,7 @@ impl ManagerRef<'_, ServerManager> {
 
         let (target_group, target_idx, target_library_pos) = match target {
             ServerMoveTarget::BeforeServer(target_id) => {
-                let srv = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(server_repo::get_server(conn, target_id.0)?))
+                let srv = server_repo::get_server(&self.app.db, target_id.0)
                     .await?
                     .ok_or_else(|| anyhow!("Target server not found in database"))?;
 
@@ -2458,21 +2332,21 @@ impl ManagerRef<'_, ServerManager> {
             }
             ServerMoveTarget::EndOfGroup(group) => {
                 let group_val = group.0;
-                let target_idx = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(server_repo::count_servers_in_group(conn, group_val)?))
+                let target_idx = server_repo::count_servers_in_group(&self.app.db, group_val)
                     .await? as i32;
 
                 let lib_pos = if group == default_group_id {
+                    // Both reads run back-to-back on one reader connection; each
+                    // SELECT autocommits its own read txn, not a single snapshot.
+                    // Uses `_conn` forms inside.
                     let (max_server_pos, max_group_pos) = self
                         .app
                         .db
                         .read(move |conn| {
                             let srv =
-                                server_repo::max_library_position_server_in_group(conn, group_val)?
+                                server_repo::max_library_position_server_in_group_conn(conn, group_val)?
                                     .and_then(|s| s.library_position);
-                            let grp = server_repo::max_library_position_server_group(conn)?
+                            let grp = server_repo::max_library_position_server_group_conn(conn)?
                                 .and_then(|g| g.library_position);
                             Ok((srv, grp))
                         })
@@ -2488,10 +2362,7 @@ impl ManagerRef<'_, ServerManager> {
             }
             ServerMoveTarget::BeforeGroup(group_id) => {
                 let folder_id = group_id.0;
-                let target_folder = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(server_repo::get_server_group(conn, folder_id)?))
+                let target_folder = server_repo::get_server_group(&self.app.db, folder_id)
                     .await?
                     .ok_or_else(|| anyhow!("Server group not found in database"))?;
 
@@ -2500,10 +2371,7 @@ impl ManagerRef<'_, ServerManager> {
                     .ok_or_else(|| anyhow!("Target folder has no libraryPosition"))?;
 
                 let default_id = default_group_id.0;
-                let target_idx = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(server_repo::count_servers_in_group(conn, default_id)?))
+                let target_idx = server_repo::count_servers_in_group(&self.app.db, default_id)
                     .await? as i32;
 
                 (default_group_id, target_idx, Some(lib_pos))
@@ -2555,16 +2423,20 @@ impl ManagerRef<'_, ServerManager> {
             if let Some(target_lib_pos) = target_library_pos {
                 if start_library_pos != Some(target_lib_pos) {
                     let sid = server_id.0;
+                    // Two shifts run in one writer dispatch so no other write
+                    // interleaves; not one transaction (each autocommits), so a
+                    // reader can observe the gap between them. Uses `_conn`
+                    // forms inside the closure.
                     self.app
                         .db
                         .write(move |conn| {
-                            server_repo::shift_server_library_positions_up_in_group_except(
+                            server_repo::shift_server_library_positions_up_in_group_except_conn(
                                 conn,
                                 default_id,
                                 target_lib_pos,
                                 sid,
                             )?;
-                            server_repo::shift_all_server_group_library_positions_up_from(
+                            server_repo::shift_all_server_group_library_positions_up_from_conn(
                                 conn,
                                 target_lib_pos,
                             )?;
@@ -2578,15 +2450,19 @@ impl ManagerRef<'_, ServerManager> {
         // If moving FROM default group, shift library positions to fill the gap
         if start_group == default_group_id && target_group != default_group_id {
             if let Some(start_lib_pos) = start_library_pos {
+                // Two shifts run in one writer dispatch so no other write
+                // interleaves; not one transaction (each autocommits), so a
+                // reader can observe the intermediate state between them. Uses
+                // `_conn` forms inside the closure.
                 self.app
                     .db
                     .write(move |conn| {
-                        server_repo::shift_server_library_positions_down_in_group(
+                        server_repo::shift_server_library_positions_down_in_group_conn(
                             conn,
                             default_id,
                             start_lib_pos,
                         )?;
-                        server_repo::shift_all_server_group_library_positions_down_after(
+                        server_repo::shift_all_server_group_library_positions_down_after_conn(
                             conn,
                             start_lib_pos,
                         )?;
@@ -2597,20 +2473,15 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         let final_group = target_group.0;
-        self.app
-            .db
-            .write(move |conn| {
-                server_repo::move_server_tx(
-                    conn,
-                    &index_shifts,
-                    server_id.0,
-                    final_group,
-                    final_idx,
-                    new_library_pos,
-                )?;
-                Ok(())
-            })
-            .await?;
+        server_repo::move_server_tx(
+            &self.app.db,
+            index_shifts,
+            server_id.0,
+            final_group,
+            final_idx,
+            new_library_pos,
+        )
+        .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -2620,23 +2491,15 @@ impl ManagerRef<'_, ServerManager> {
         // so its last server also returns to the default group.
         if start_group != default_group_id && start_group != target_group {
             let start_group_id = start_group.0;
-            let remaining_count = self
-                .app
-                .db
-                .read(move |conn| Ok(server_repo::count_servers_in_group(conn, start_group_id)?))
+            let remaining_count = server_repo::count_servers_in_group(&self.app.db, start_group_id)
                 .await?;
 
             if remaining_count == 0 {
-                self.app
-                    .db
-                    .write(move |conn| Ok(server_repo::delete_server_group(conn, start_group_id)?))
+                server_repo::delete_server_group(&self.app.db, start_group_id)
                     .await?;
                 self.app.invalidate(GET_GROUPS, None);
             } else if remaining_count == 1 {
-                if let Some(last) = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(server_repo::first_server_in_group(conn, start_group_id)?))
+                if let Some(last) = server_repo::first_server_in_group(&self.app.db, start_group_id)
                     .await?
                 {
                     // Moving the last server out empties the group, which the
@@ -2665,10 +2528,7 @@ impl ManagerRef<'_, ServerManager> {
         let default_group_id = self.get_default_group().await?;
 
         let group_val = group.0;
-        let moving_group = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_server_group(conn, group_val)?))
+        let moving_group = server_repo::get_server_group(&self.app.db, group_val)
             .await?
             .ok_or_else(|| anyhow!("Server group not found in database"))?;
 
@@ -2677,10 +2537,7 @@ impl ManagerRef<'_, ServerManager> {
         let target_pos = match target {
             ServerGroupMoveTarget::BeforeGroup(target_group_id) => {
                 let target_id = target_group_id.0;
-                let target_group = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(server_repo::get_server_group(conn, target_id)?))
+                let target_group = server_repo::get_server_group(&self.app.db, target_id)
                     .await?
                     .ok_or_else(|| anyhow!("Target server group not found in database"))?;
 
@@ -2689,10 +2546,7 @@ impl ManagerRef<'_, ServerManager> {
                 })?
             }
             ServerGroupMoveTarget::BeforeServer(server_id) => {
-                let server = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(server_repo::get_server(conn, server_id.0)?))
+                let server = server_repo::get_server(&self.app.db, server_id.0)
                     .await?
                     .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -2708,14 +2562,17 @@ impl ManagerRef<'_, ServerManager> {
             }
             ServerGroupMoveTarget::EndOfLibrary => {
                 let default_id = default_group_id.0;
+                // Both reads run back-to-back on one reader connection; each
+                // SELECT autocommits its own read txn, so this is not a single
+                // snapshot. Uses `_conn` forms inside.
                 let (max_server_pos, max_group_pos) = self
                     .app
                     .db
                     .read(move |conn| {
                         let srv =
-                            server_repo::max_library_position_server_in_group(conn, default_id)?
+                            server_repo::max_library_position_server_in_group_conn(conn, default_id)?
                                 .and_then(|s| s.library_position);
-                        let grp = server_repo::max_library_position_server_group(conn)?
+                        let grp = server_repo::max_library_position_server_group_conn(conn)?
                             .and_then(|g| g.library_position);
                         Ok((srv, grp))
                     })
@@ -2738,21 +2595,24 @@ impl ManagerRef<'_, ServerManager> {
         if start_pos < target_pos {
             // Moving forward: shift items in (start, target] down by 1
             let target_upper = target_pos - 1;
+            // Three writes run in one writer dispatch so no other write
+            // interleaves; not one transaction (each autocommits), so a reader
+            // can observe an intermediate restamp. Uses `_conn` forms inside.
             self.app
                 .db
                 .write(move |conn| {
-                    server_repo::shift_server_group_library_positions_down(
+                    server_repo::shift_server_group_library_positions_down_conn(
                         conn,
                         start_pos,
                         target_upper,
                     )?;
-                    server_repo::shift_server_library_positions_down_scoped(
+                    server_repo::shift_server_library_positions_down_scoped_conn(
                         conn,
                         default_id,
                         start_pos,
                         target_upper,
                     )?;
-                    server_repo::set_server_group_library_position(
+                    server_repo::set_server_group_library_position_conn(
                         conn,
                         group_val,
                         Some(target_upper),
@@ -2762,16 +2622,19 @@ impl ManagerRef<'_, ServerManager> {
                 .await?;
         } else {
             // Moving backward: shift items in [target, start) up by 1
+            // Three writes run in one writer dispatch so no other write
+            // interleaves; not one transaction (each autocommits), so a reader
+            // can observe an intermediate restamp. Uses `_conn` forms inside.
             self.app
                 .db
                 .write(move |conn| {
-                    server_repo::shift_server_group_library_positions_up(
+                    server_repo::shift_server_group_library_positions_up_conn(
                         conn, target_pos, start_pos,
                     )?;
-                    server_repo::shift_server_library_positions_up_scoped(
+                    server_repo::shift_server_library_positions_up_scoped_conn(
                         conn, default_id, target_pos, start_pos,
                     )?;
-                    server_repo::set_server_group_library_position(
+                    server_repo::set_server_group_library_position_conn(
                         conn,
                         group_val,
                         Some(target_pos),
@@ -2782,17 +2645,17 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Keep groupIndex in sync
-        let all_groups = self
-            .app
-            .db
-            .read(|conn| Ok(server_repo::get_server_groups_with_library_position_ordered(conn)?))
+        let all_groups = server_repo::get_server_groups_with_library_position_ordered(&self.app.db)
             .await?;
 
+        // Interleaved app logic: restamp every group's index from the ordered
+        // in-memory list. Runs in one writer dispatch, so no other write
+        // interleaves; not one transaction (each autocommits). `_conn` forms.
         self.app
             .db
             .write(move |conn| {
                 for (idx, g) in all_groups.iter().enumerate() {
-                    server_repo::set_server_group_index(conn, g.id, idx as i32)?;
+                    server_repo::set_server_group_index_conn(conn, g.id, idx as i32)?;
                 }
                 Ok(())
             })
@@ -2806,10 +2669,7 @@ impl ManagerRef<'_, ServerManager> {
     /// Generate a unique folder name by appending (1), (2), etc. if needed.
     async fn generate_unique_folder_name(&self, base_name: &str) -> anyhow::Result<String> {
         let base = base_name.to_string();
-        let existing = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::find_server_group_by_name(conn, &base)?))
+        let existing = server_repo::find_server_group_by_name(&self.app.db, &base)
             .await?;
 
         if existing.is_none() {
@@ -2820,10 +2680,7 @@ impl ManagerRef<'_, ServerManager> {
         loop {
             let candidate = format!("{} ({})", base_name, counter);
             let candidate_q = candidate.clone();
-            let exists = self
-                .app
-                .db
-                .read(move |conn| Ok(server_repo::find_server_group_by_name(conn, &candidate_q)?))
+            let exists = server_repo::find_server_group_by_name(&self.app.db, &candidate_q)
                 .await?;
 
             if exists.is_none() {
@@ -2834,23 +2691,22 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn create_server_group(self, name: String) -> anyhow::Result<ServerGroupId> {
-        let group_count = self
-            .app
-            .db
-            .read(|conn| Ok(server_repo::count_server_groups(conn)?))
+        let group_count = server_repo::count_server_groups(&self.app.db)
             .await? as i32;
 
         let default_group_id = self.get_default_group().await?;
 
-        // Calculate next libraryPosition
+        // Calculate next libraryPosition. Both reads run back-to-back on one
+        // reader connection; each SELECT autocommits its own read txn, so this
+        // is not a single snapshot. `_conn` forms.
         let default_id = default_group_id.0;
         let (max_server_pos, max_group_pos) = self
             .app
             .db
             .read(move |conn| {
-                let srv = server_repo::max_library_position_server_in_group(conn, default_id)?
+                let srv = server_repo::max_library_position_server_in_group_conn(conn, default_id)?
                     .and_then(|s| s.library_position);
-                let grp = server_repo::max_library_position_server_group(conn)?
+                let grp = server_repo::max_library_position_server_group_conn(conn)?
                     .and_then(|g| g.library_position);
                 Ok((srv, grp))
             })
@@ -2858,18 +2714,9 @@ impl ManagerRef<'_, ServerManager> {
 
         let next_library_pos = max_server_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0)) + 1;
 
-        let group_id = self
-            .app
-            .db
-            .write(move |conn| {
-                Ok(server_repo::insert_server_group(
-                    conn,
-                    &name,
-                    group_count,
-                    Some(next_library_pos),
-                )?)
-            })
-            .await?;
+        let group_id =
+            server_repo::insert_server_group(&self.app.db, name, group_count, Some(next_library_pos))
+                .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -2882,10 +2729,7 @@ impl ManagerRef<'_, ServerManager> {
         name: String,
         target_position: i32,
     ) -> anyhow::Result<ServerGroupId> {
-        let group_count = self
-            .app
-            .db
-            .read(|conn| Ok(server_repo::count_server_groups(conn)?))
+        let group_count = server_repo::count_server_groups(&self.app.db)
             .await? as i32;
 
         let default_group_id = self.get_default_group().await?;
@@ -2894,20 +2738,23 @@ impl ManagerRef<'_, ServerManager> {
         // (the server shift is scoped to the default group), then create the
         // group at the target position.
         let default_id = default_group_id.0;
+        // Interleaved app logic: shift existing items up then insert the new
+        // group at the freed position. Runs in one writer dispatch, so no other
+        // write interleaves; not one transaction (each autocommits). `_conn` forms.
         let group_id = self
             .app
             .db
             .write(move |conn| {
-                server_repo::shift_server_library_positions_up_in_group(
+                server_repo::shift_server_library_positions_up_in_group_conn(
                     conn,
                     default_id,
                     target_position,
                 )?;
-                server_repo::shift_all_server_group_library_positions_up_from(
+                server_repo::shift_all_server_group_library_positions_up_from_conn(
                     conn,
                     target_position,
                 )?;
-                let id = server_repo::insert_server_group(
+                let id = server_repo::insert_server_group_conn(
                     conn,
                     &name,
                     group_count,
@@ -2936,10 +2783,7 @@ impl ManagerRef<'_, ServerManager> {
 
         let target_library_pos = if let Some(target_id) = target_server_id {
             let default_group_id = self.get_default_group().await?;
-            let target_server = self
-                .app
-                .db
-                .read(move |conn| Ok(server_repo::get_server(conn, target_id.0)?))
+            let target_server = server_repo::get_server(&self.app.db, target_id.0)
                 .await?;
 
             target_server
@@ -2972,10 +2816,7 @@ impl ManagerRef<'_, ServerManager> {
 
         // Get all servers in default group and sort by name
         let default_id = default_group_id.0;
-        let servers = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::get_servers_by_group(conn, default_id)?))
+        let servers = server_repo::get_servers_by_group(&self.app.db, default_id)
             .await?;
 
         let mut sortable_servers: Vec<(i32, String)> =
@@ -2984,10 +2825,7 @@ impl ManagerRef<'_, ServerManager> {
 
         // Non-default server groups, sorted by name — rendered after
         // ungrouped servers in the library.
-        let groups = self
-            .app
-            .db
-            .read(|conn| Ok(server_repo::get_all_server_groups(conn)?))
+        let groups = server_repo::get_all_server_groups(&self.app.db)
             .await?;
 
         let mut sortable_groups: Vec<(i32, String)> = groups
@@ -3030,13 +2868,7 @@ impl ManagerRef<'_, ServerManager> {
             });
         }
 
-        self.app
-            .db
-            .write(move |conn| {
-                server_repo::arrange_server_library_tx(conn, &group_updates, &server_updates)?;
-                Ok(())
-            })
-            .await?;
+        server_repo::arrange_server_library_tx(&self.app.db, group_updates, server_updates).await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -3049,9 +2881,7 @@ impl ManagerRef<'_, ServerManager> {
         group: ServerGroupId,
         name: String,
     ) -> anyhow::Result<()> {
-        self.app
-            .db
-            .write(move |conn| Ok(server_repo::set_server_group_name(conn, group.0, &name)?))
+        server_repo::set_server_group_name(&self.app.db, group.0, &name)
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
@@ -3064,10 +2894,7 @@ impl ManagerRef<'_, ServerManager> {
         let _index_lock = self.index_lock.lock().await;
 
         let group_id = group.0;
-        let any_servers = self
-            .app
-            .db
-            .read(move |conn| Ok(server_repo::count_servers_in_group(conn, group_id)?))
+        let any_servers = server_repo::count_servers_in_group(&self.app.db, group_id)
             .await?
             != 0;
 
@@ -3077,23 +2904,13 @@ impl ManagerRef<'_, ServerManager> {
             // Server-side oddity (preserved verbatim): base_index counts the
             // DEFAULT group, not the group being deleted.
             let default_id = default_group.0;
-            let base_index = self
-                .app
-                .db
-                .read(move |conn| Ok(server_repo::count_servers_in_group(conn, default_id)?))
+            let base_index = server_repo::count_servers_in_group(&self.app.db, default_id)
                 .await? as i32;
 
-            self.app
-                .db
-                .write(move |conn| {
-                    server_repo::delete_server_group_tx(conn, group_id, default_id, base_index)?;
-                    Ok(())
-                })
+            server_repo::delete_server_group_tx(&self.app.db, group_id, default_id, base_index)
                 .await?;
         } else {
-            self.app
-                .db
-                .write(move |conn| Ok(server_repo::delete_server_group(conn, group_id)?))
+            server_repo::delete_server_group(&self.app.db, group_id)
                 .await?;
         }
 

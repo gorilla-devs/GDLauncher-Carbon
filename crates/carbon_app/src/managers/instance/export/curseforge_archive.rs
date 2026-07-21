@@ -101,12 +101,8 @@ pub async fn export_curseforge(
                         .await?;
 
                     let instance_id_val = *instance_id;
-                    let cached = app
-                        .db
-                        .read(move |conn| {
-                            Ok(mfcdb::get_instance_cf_export_files(conn, instance_id_val)?)
-                        })
-                        .await?;
+                    let cached =
+                        mfcdb::get_instance_cf_export_files(&app.db, instance_id_val).await?;
 
                     let mods2 = cached.into_iter().filter_map(|row| {
                         let (Some(project_id), Some(file_id)) = (row.cf_project_id, row.cf_file_id)

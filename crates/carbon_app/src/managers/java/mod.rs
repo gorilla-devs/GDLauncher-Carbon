@@ -47,9 +47,14 @@ impl JavaManager {
 
     pub async fn ensure_profiles_in_db(db: &Db) -> anyhow::Result<()> {
         debug!("Ensuring system java profiles are in db");
+        // Interleaved app logic: iterates the SystemJavaProfileName domain enum
+        // (a carbon_app type) and seeds every profile, so it stays an explicit
+        // closure with `_conn` forms. The upserts run in one writer dispatch,
+        // so no other write interleaves; they are not one transaction (each
+        // autocommits separately).
         db.write(|conn| {
             for profile in SystemJavaProfileName::iter() {
-                java_repo::upsert_profile(conn, &profile.to_string(), true)?;
+                java_repo::upsert_profile_conn(conn, &profile.to_string(), true)?;
             }
             Ok(())
         })
@@ -104,10 +109,7 @@ impl JavaManager {
 
 impl ManagerRef<'_, JavaManager> {
     pub async fn get_available_javas(&self) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
-        let all_javas = self
-            .app
-            .db
-            .read(|conn| Ok(java_repo::get_all_java(conn)?))
+        let all_javas = java_repo::get_all_java(&self.app.db)
             .await?;
 
         let mut result = HashMap::new();
@@ -122,10 +124,7 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn get_java_profiles(&self) -> anyhow::Result<Vec<JavaProfile>> {
-        let all_profiles = self
-            .app
-            .db
-            .read(|conn| Ok(java_repo::get_all_profiles(conn)?))
+        let all_profiles = java_repo::get_all_profiles(&self.app.db)
             .await?
             .into_iter()
             .map(JavaProfile::try_from)
@@ -168,20 +167,9 @@ impl ManagerRef<'_, JavaManager> {
         }
 
         if let Some(java_id) = java_id {
-            self.app
-                .db
-                .write(move |conn| {
-                    Ok(java_repo::set_profile_java(
-                        conn,
-                        &profile_name,
-                        Some(&java_id),
-                    )?)
-                })
-                .await?;
+            java_repo::set_profile_java(&self.app.db, &profile_name, Some(&java_id)).await?;
         } else {
-            self.app
-                .db
-                .write(move |conn| Ok(java_repo::set_profile_java(conn, &profile_name, None)?))
+            java_repo::set_profile_java(&self.app.db, &profile_name, None)
                 .await?;
         }
 
@@ -206,21 +194,22 @@ impl ManagerRef<'_, JavaManager> {
         let java_id = java_id.ok_or_else(|| anyhow::anyhow!("java_id is required"))?;
 
         let name_for_lookup = profile_name.clone();
-        let exists = self
-            .app
-            .db
-            .read(move |conn| Ok(java_repo::get_profile(conn, &name_for_lookup)?))
+        let exists = java_repo::get_profile(&self.app.db, &name_for_lookup)
             .await?;
 
         if exists.is_some() {
             anyhow::bail!("Profile with name {} already exists", profile_name);
         }
 
+        // Two statements (create the profile, then link its java) run in one
+        // writer dispatch, so no other write interleaves. They are not one
+        // transaction: each autocommits separately, so a crash between them can
+        // persist a profile without its java link. Uses `_conn` forms inside.
         self.app
             .db
             .write(move |conn| {
-                java_repo::upsert_profile(conn, &profile_name, false)?;
-                java_repo::set_profile_java(conn, &profile_name, Some(&java_id))?;
+                java_repo::upsert_profile_conn(conn, &profile_name, false)?;
+                java_repo::set_profile_java_conn(conn, &profile_name, Some(&java_id))?;
                 Ok(())
             })
             .await?;
@@ -244,9 +233,7 @@ impl ManagerRef<'_, JavaManager> {
             anyhow::bail!("Auto manage java is enabled");
         }
 
-        self.app
-            .db
-            .write(move |conn| Ok(java_repo::delete_profile(conn, &profile_name)?))
+        java_repo::delete_profile(&self.app.db, &profile_name)
             .await?;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
@@ -263,10 +250,7 @@ impl ManagerRef<'_, JavaManager> {
         .await?;
 
         let path_for_lookup = path.clone();
-        let exists = self
-            .app
-            .db
-            .read(move |conn| Ok(java_repo::get_java_by_path(conn, &path_for_lookup)?))
+        let exists = java_repo::get_java_by_path(&self.app.db, &path_for_lookup)
             .await?;
 
         if exists.is_some() {
@@ -284,10 +268,7 @@ impl ManagerRef<'_, JavaManager> {
             vendor: java.vendor,
             is_valid: true,
         };
-        self.app
-            .db
-            .write(move |conn| Ok(java_repo::insert_java(conn, &row)?))
-            .await?;
+        java_repo::insert_java(&self.app.db, row).await?;
 
         self.app.invalidate(GET_AVAILABLE_JAVAS, None);
 
@@ -296,10 +277,7 @@ impl ManagerRef<'_, JavaManager> {
 
     pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
         let id_for_lookup = java_id.clone();
-        let java_from_db = self
-            .app
-            .db
-            .read(move |conn| Ok(java_repo::get_java_by_id(conn, &id_for_lookup)?))
+        let java_from_db = java_repo::get_java_by_id(&self.app.db, &id_for_lookup)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Java with id {} not found", java_id.clone()))?;
 
@@ -308,9 +286,7 @@ impl ManagerRef<'_, JavaManager> {
         match java_component_type {
             JavaComponentType::Custom => {
                 let id = java_id.clone();
-                self.app
-                    .db
-                    .write(move |conn| Ok(java_repo::delete_java(conn, &id)?))
+                java_repo::delete_java(&self.app.db, &id)
                     .await?;
             }
             JavaComponentType::Managed => {
@@ -335,9 +311,7 @@ impl ManagerRef<'_, JavaManager> {
                 }
 
                 let id = java_id.clone();
-                self.app
-                    .db
-                    .write(move |conn| Ok(java_repo::delete_java(conn, &id)?))
+                java_repo::delete_java(&self.app.db, &id)
                     .await?;
             }
             JavaComponentType::Local => {
@@ -357,19 +331,14 @@ impl ManagerRef<'_, JavaManager> {
         target_profile: SystemJavaProfileName,
     ) -> anyhow::Result<Option<JavaComponent>> {
         let target_name = target_profile.to_string();
-        let profile = self
-            .app
-            .db
-            .read(move |conn| Ok(java_repo::get_profile(conn, &target_name)?))
+        let profile = java_repo::get_profile(&self.app.db, &target_name)
             .await?
             .filter(|profile| profile.is_system_profile)
             .ok_or_else(|| anyhow::anyhow!("Profile not found"))?;
 
         let java = match profile.java_id {
             Some(java_id) => {
-                self.app
-                    .db
-                    .read(move |conn| Ok(java_repo::get_java_by_id(conn, &java_id)?))
+                java_repo::get_java_by_id(&self.app.db, &java_id)
                     .await?
             }
             None => None,
@@ -395,23 +364,25 @@ impl ManagerRef<'_, JavaManager> {
 
                         let java_id = java.id.clone();
                         let id_for_read = java_id.clone();
-                        let names_to_disconnect: Vec<String> = self
-                            .app
-                            .db
-                            .read(|conn| Ok(java_repo::get_all_profiles(conn)?))
+                        let names_to_disconnect: Vec<String> = java_repo::get_all_profiles(&self.app.db)
                             .await?
                             .into_iter()
                             .filter(|profile| profile.java_id.as_deref() == Some(id_for_read.as_str()))
                             .map(|profile| profile.name)
                             .collect();
 
+                        // Interleaved app logic: unlink the computed set of
+                        // profiles then flip the java's validity. Runs in one
+                        // writer dispatch, so no other write interleaves; not
+                        // one transaction (each autocommits). Uses `_conn`
+                        // forms inside the closure.
                         self.app
                             .db
                             .write(move |conn| {
                                 for name in names_to_disconnect {
-                                    java_repo::set_profile_java(conn, &name, None)?;
+                                    java_repo::set_profile_java_conn(conn, &name, None)?;
                                 }
-                                java_repo::set_java_validity(conn, &java_id, false)?;
+                                java_repo::set_java_validity_conn(conn, &java_id, false)?;
                                 Ok(())
                             })
                             .await?;
@@ -478,10 +449,7 @@ impl ManagerRef<'_, JavaManager> {
             .await?;
 
         let id_for_lookup = id.clone();
-        let java = self
-            .app
-            .db
-            .read(move |conn| Ok(java_repo::get_java_by_id(conn, &id_for_lookup)?))
+        let java = java_repo::get_java_by_id(&self.app.db, &id_for_lookup)
             .await?;
 
         let java = match java {
@@ -497,22 +465,9 @@ impl ManagerRef<'_, JavaManager> {
 
         if update_target_profile {
             let target_name = target_profile.to_string();
-            let id_for_target = id.clone();
-            self.app
-                .db
-                .write(move |conn| {
-                    Ok(java_repo::set_profile_java(
-                        conn,
-                        &target_name,
-                        Some(&id_for_target),
-                    )?)
-                })
-                .await?;
+            java_repo::set_profile_java(&self.app.db, &target_name, Some(&id)).await?;
 
-            let system_profiles_in_db = self
-                .app
-                .db
-                .read(|conn| Ok(java_repo::get_all_profiles(conn)?))
+            let system_profiles_in_db = java_repo::get_all_profiles(&self.app.db)
                 .await?
                 .into_iter()
                 .filter(|profile| profile.is_system_profile);
@@ -532,11 +487,14 @@ impl ManagerRef<'_, JavaManager> {
 
             if !names_to_connect.is_empty() {
                 let id_for_connect = id.clone();
+                // Interleaved app logic: link every compatible system profile to
+                // the freshly installed java in one writer dispatch, so no other
+                // write interleaves. Uses `_conn` forms inside the closure.
                 self.app
                     .db
                     .write(move |conn| {
                         for name in names_to_connect {
-                            java_repo::set_profile_java(conn, &name, Some(&id_for_connect))?;
+                            java_repo::set_profile_java_conn(conn, &name, Some(&id_for_connect))?;
                         }
                         Ok(())
                     })
@@ -696,9 +654,7 @@ mod test {
             .unwrap()
             .unwrap();
 
-        let profiles_in_db = app
-            .db
-            .read(|conn| Ok(carbon_repos::repos::java::get_all_profiles(conn)?))
+        let profiles_in_db = carbon_repos::repos::java::get_all_profiles(&app.db)
             .await
             .unwrap()
             .into_iter()
@@ -747,16 +703,12 @@ mod test {
             )
             .await
             .unwrap();
-        let count = app
-            .db
-            .read(|conn| Ok(carbon_repos::repos::java::count_java(conn)?))
+        let count = carbon_repos::repos::java::count_java(&app.db)
             .await
             .unwrap();
         assert_eq!(count, 1);
 
-        let from_db = app
-            .db
-            .read(|conn| Ok(carbon_repos::repos::java::get_all_java(conn)?))
+        let from_db = carbon_repos::repos::java::get_all_java(&app.db)
             .await
             .unwrap()
             .into_iter()
@@ -783,9 +735,7 @@ mod test {
             .await
             .unwrap();
 
-        let count = app
-            .db
-            .read(|conn| Ok(carbon_repos::repos::java::count_java(conn)?))
+        let count = carbon_repos::repos::java::count_java(&app.db)
             .await
             .unwrap();
         assert_eq!(count, 0);

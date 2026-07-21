@@ -10,8 +10,7 @@ use tracing::error;
 pub async fn get_modpack_icon(app: &App, curseforge: CurseforgeModpack) -> anyhow::Result<Vec<u8>> {
     let project_id = curseforge.project_id as i32;
     let file_id = curseforge.file_id as i32;
-    app.db
-        .read(move |conn| Ok(modpackdb::get_cf_modpack_logo(conn, project_id, file_id)?))
+    modpackdb::get_cf_modpack_logo(&app.db, project_id, file_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("No icon found for modpack"))?
         .data
@@ -24,9 +23,7 @@ pub async fn get_modpack_metadata(
 ) -> anyhow::Result<InstanceModpackInfo> {
     let project_id = curseforge.project_id as i32;
     let file_id = curseforge.file_id as i32;
-    let cache_entry = app
-        .db
-        .read(move |conn| Ok(modpackdb::get_cf_modpack(conn, project_id, file_id)?))
+    let cache_entry = modpackdb::get_cf_modpack(&app.db, project_id, file_id)
         .await?;
 
     let is_entry_up_to_date = cache_entry
@@ -104,37 +101,28 @@ pub async fn get_modpack_metadata(
 
             let icon_bytes_is_some = icon_bytes.is_some();
 
-            let modpack_name = name.clone();
-            let modpack_version_name = file_name.clone();
-            let modpack_url_slug = slug.clone();
-            app.db
-                .write(move |conn| {
-                    Ok(modpackdb::upsert_cf_modpack(
-                        conn,
-                        project_id,
-                        file_id,
-                        &modpack_name,
-                        &modpack_version_name,
-                        &modpack_url_slug,
-                        DbDateTime(chrono::Utc::now().fixed_offset()),
-                    )?)
-                })
-                .await?;
+            modpackdb::upsert_cf_modpack(
+                &app.db,
+                project_id,
+                file_id,
+                &name,
+                &file_name,
+                &slug,
+                DbDateTime(chrono::Utc::now().fixed_offset()),
+            )
+            .await?;
 
             if icon_bytes_is_some || has_cache_logo {
                 let image_url = url.clone().unwrap_or_default();
                 let image_data = icon_bytes.clone().map(|icon_bytes| icon_bytes.to_vec());
-                app.db
-                    .write(move |conn| {
-                        Ok(modpackdb::upsert_cf_modpack_image(
-                            conn,
-                            project_id,
-                            file_id,
-                            &image_url,
-                            image_data.as_deref(),
-                        )?)
-                    })
-                    .await?;
+                modpackdb::upsert_cf_modpack_image(
+                    &app.db,
+                    project_id,
+                    file_id,
+                    &image_url,
+                    image_data.as_deref(),
+                )
+                .await?;
             }
 
             Ok::<_, anyhow::Error>((addon, addon_file, icon_bytes_is_some))

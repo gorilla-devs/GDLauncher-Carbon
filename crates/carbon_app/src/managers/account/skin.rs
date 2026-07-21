@@ -12,13 +12,7 @@ impl ManagerRef<'_, SkinManager> {
     pub async fn get_skin(self, uuid: String) -> anyhow::Result<Skin> {
         use carbon_repos::repos::{account as account_repo, skin as skin_repo};
 
-        let account = self
-            .app
-            .db
-            .read({
-                let uuid = uuid.clone();
-                move |conn| Ok(account_repo::get_account(conn, &uuid)?)
-            })
+        let account = account_repo::get_account(&self.app.db, &uuid)
             .await?
             .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
 
@@ -27,14 +21,7 @@ impl ManagerRef<'_, SkinManager> {
             None => DefaultSkin::from_uuid(uuid.clone()).skin_id().to_string(),
         };
 
-        let cached_skin = self
-            .app
-            .db
-            .read({
-                let skin_id = skin_id.clone();
-                move |conn| Ok(skin_repo::get_skin(conn, &skin_id)?)
-            })
-            .await?;
+        let cached_skin = skin_repo::get_skin(&self.app.db, &skin_id).await?;
 
         Ok(match cached_skin {
             Some(skin) => Skin { data: skin.skin },
@@ -61,21 +48,13 @@ impl ManagerRef<'_, SkinManager> {
                     .bytes()
                     .await?;
 
-                self.app
-                    .db
-                    .write({
-                        let skin_id = skin.id.clone();
-                        let skin_bytes = skin_data.to_vec();
-                        move |conn| {
-                            Ok(skin_repo::replace_skin_and_link_account(
-                                conn,
-                                &skin_id,
-                                &skin_bytes,
-                                &uuid,
-                            )?)
-                        }
-                    })
-                    .await?;
+                skin_repo::replace_skin_and_link_account(
+                    &self.app.db,
+                    skin.id.clone(),
+                    skin_data.to_vec(),
+                    uuid,
+                )
+                .await?;
 
                 Skin {
                     data: skin_data.to_vec(),

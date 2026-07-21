@@ -107,14 +107,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         use carbon_repos::repos::app_configuration::AppConfigurationPatch;
 
         if let Some(uuid) = uuid.clone() {
-            let account_entry = self
-                .app
-                .db
-                .read({
-                    let uuid = uuid.clone();
-                    move |conn| Ok(account_repo::get_account(conn, &uuid)?)
-                })
-                .await?;
+            let account_entry = account_repo::get_account(&self.app.db, &uuid).await?;
 
             // Setting the active account to one not in the DB does not make sense.
             ensure!(
@@ -144,13 +137,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// The GDL token can be exchanged again later.
     pub async fn exchange_gdl_token(self, uuid: &str) -> anyhow::Result<String> {
         // Get the account's MS id_token
-        let account = self
-            .app
-            .db
-            .read({
-                let uuid = uuid.to_string();
-                move |conn| Ok(account_repo::get_account(conn, &uuid)?)
-            })
+        let account = account_repo::get_account(&self.app.db, &uuid)
             .await?
             .ok_or_else(|| anyhow!("Account not found: {}", uuid))?;
 
@@ -173,18 +160,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let token = response.access_token.clone();
 
         // Store the GDL token in the database
-        self.app
-            .db
-            .write({
-                let uuid = uuid.to_string();
-                move |conn| {
-                    Ok(account_repo::set_account_gdl_token(
-                        conn,
-                        &uuid,
-                        Some(&response.access_token),
-                    )?)
-                }
-            })
+        account_repo::set_account_gdl_token(&self.app.db, &uuid, Some(&response.access_token))
             .await?;
 
         self.app
@@ -344,13 +320,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
                 // Re-read first: the call above may have refreshed the account,
                 // and deciding off the stale snapshot would repeat that work.
-                let account = self
-                    .app
-                    .db
-                    .read({
-                        let uuid = account.uuid.clone();
-                        move |conn| Ok(account_repo::get_account(conn, &uuid)?)
-                    })
+                let account = account_repo::get_account(&self.app.db, &account.uuid)
                     .await?
                     .ok_or_else(|| anyhow!("Account not found: {}", account.uuid))?;
 
@@ -457,10 +427,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             return Ok(None);
         };
 
-        let account = self
-            .app
-            .db
-            .read(move |conn| Ok(account_repo::get_account(conn, &uuid)?))
+        let account = account_repo::get_account(&self.app.db, &uuid)
             .await?
             .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
 
@@ -468,10 +435,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     async fn get_account_entries(self) -> anyhow::Result<Vec<account_repo::AccountRow>> {
-        Ok(self
-            .app
-            .db
-            .read(|conn| Ok(account_repo::get_accounts_by_last_used(conn)?))
+        Ok(account_repo::get_accounts_by_last_used(&self.app.db)
             .await?)
     }
 
@@ -490,10 +454,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     async fn get_account(self, uuid: String) -> anyhow::Result<Option<AccountWithStatus>> {
-        let account = self
-            .app
-            .db
-            .read(move |conn| Ok(account_repo::get_account(conn, &uuid)?))
+        let account = account_repo::get_account(&self.app.db, &uuid)
             .await?;
 
         let Some(account) = account else {
@@ -1236,14 +1197,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// Add or update an account
     async fn add_account(self, account: FullAccount) -> anyhow::Result<()> {
         let uuid = account.uuid.clone();
-        let db_account = self
-            .app
-            .db
-            .read({
-                let uuid = uuid.clone();
-                move |conn| Ok(account_repo::get_account(conn, &uuid)?)
-            })
-            .await?;
+        let db_account = account_repo::get_account(&self.app.db, &uuid).await?;
 
         if db_account.is_some() {
             // don't change lastUsed
@@ -1251,16 +1205,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
             match account.type_ {
                 FullAccountType::Offline => {
-                    self.app
-                        .db
-                        .write(move |conn| {
-                            Ok(account_repo::update_account_offline(
-                                conn,
-                                &account.uuid,
-                                &account.username,
-                            )?)
-                        })
-                        .await?;
+                    account_repo::update_account_offline(
+                        &self.app.db,
+                        &account.uuid,
+                        &account.username,
+                    )
+                    .await?;
                 }
                 FullAccountType::Microsoft {
                     access_token,
@@ -1273,22 +1223,18 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 } => {
                     let token_expires =
                         DbDateTime(token_expires.with_timezone(&FixedOffset::east(0)));
-                    self.app
-                        .db
-                        .write(move |conn| {
-                            Ok(account_repo::update_account_microsoft(
-                                conn,
-                                &account.uuid,
-                                &account.username,
-                                &access_token,
-                                Some(token_expires),
-                                refresh_token.as_deref(),
-                                id_token.as_deref(),
-                                gdl_token.as_deref(),
-                                skin_id.as_deref(),
-                            )?)
-                        })
-                        .await?;
+                    account_repo::update_account_microsoft(
+                        &self.app.db,
+                        &account.uuid,
+                        &account.username,
+                        &access_token,
+                        Some(token_expires),
+                        refresh_token.as_deref(),
+                        id_token.as_deref(),
+                        gdl_token.as_deref(),
+                        skin_id.as_deref(),
+                    )
+                    .await?;
                 }
             }
 
@@ -1299,18 +1245,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
             let last_used = DbDateTime(Utc::now().into());
             match account.type_ {
                 FullAccountType::Offline => {
-                    self.app
-                        .db
-                        .write(move |conn| {
-                            Ok(account_repo::insert_account_offline(
-                                conn,
-                                &account.uuid,
-                                &account.username,
-                                last_used,
-                                None,
-                            )?)
-                        })
-                        .await?;
+                    account_repo::insert_account_offline(
+                        &self.app.db,
+                        &account.uuid,
+                        &account.username,
+                        last_used,
+                        None,
+                    )
+                    .await?;
                 }
                 FullAccountType::Microsoft {
                     access_token,
@@ -1323,23 +1265,19 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 } => {
                     let token_expires =
                         DbDateTime(token_expires.with_timezone(&FixedOffset::east(0)));
-                    self.app
-                        .db
-                        .write(move |conn| {
-                            Ok(account_repo::insert_account_microsoft(
-                                conn,
-                                &account.uuid,
-                                &account.username,
-                                last_used,
-                                &access_token,
-                                Some(token_expires),
-                                refresh_token.as_deref(),
-                                id_token.as_deref(),
-                                gdl_token.as_deref(),
-                                skin_id.as_deref(),
-                            )?)
-                        })
-                        .await?;
+                    account_repo::insert_account_microsoft(
+                        &self.app.db,
+                        &account.uuid,
+                        &account.username,
+                        last_used,
+                        &access_token,
+                        Some(token_expires),
+                        refresh_token.as_deref(),
+                        id_token.as_deref(),
+                        gdl_token.as_deref(),
+                        skin_id.as_deref(),
+                    )
+                    .await?;
                 }
             }
 
@@ -1355,13 +1293,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     ) -> anyhow::Result<tokio::task::JoinHandle<Result<(), futures::future::Aborted>>> {
         info!("Refreshing account {uuid}");
 
-        let account = self
-            .app
-            .db
-            .read({
-                let uuid = uuid.clone();
-                move |conn| Ok(account_repo::get_account(conn, &uuid)?)
-            })
+        let account = account_repo::get_account(&self.app.db, &uuid)
             .await?
             .ok_or(RefreshAccountError::NoAccount)?;
 
@@ -1490,13 +1422,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         if let Some(active_account) = active_account {
             if active_account == uuid {
-                let next_account = self
-                    .app
-                    .db
-                    .read({
-                        let uuid = uuid.clone();
-                        move |conn| Ok(account_repo::get_next_active_account(conn, &uuid)?)
-                    })
+                let next_account = account_repo::get_next_active_account(&self.app.db, &uuid)
                     .await?
                     .map(|row| row.uuid);
 
@@ -1518,14 +1444,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         // A plain `DELETE` reports affected rows instead of erroring on a
         // missing row; `rows_affected == 0` detects the not-found case.
-        let rows_affected = self
-            .app
-            .db
-            .write({
-                let uuid = uuid.clone();
-                move |conn| Ok(account_repo::delete_account(conn, &uuid)?)
-            })
-            .await?;
+        let rows_affected = account_repo::delete_account(&self.app.db, &uuid).await?;
 
         if rows_affected == 0 {
             bail!(DeleteAccountError::AccountDoesNotExist(uuid))
@@ -1838,13 +1757,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 info!("Auth token was invalid");
                 // the account was expired prematurely
                 let now = DbDateTime(Utc::now().into());
-                self.app
-                    .db
-                    .write({
-                        let uuid = uuid.clone();
-                        move |conn| Ok(account_repo::expire_account_token_now(conn, &uuid, now)?)
-                    })
-                    .await?;
+                account_repo::expire_account_token_now(&self.app.db, &uuid, now).await?;
 
                 self.app.invalidate(GET_ACCOUNTS, None);
                 return Ok(());
@@ -1860,22 +1773,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
             != profile.skin.as_ref().map(|skin| &skin.id as &str);
 
         let new_skin_id = profile.skin.map(|skin| skin.id);
-        self.app
-            .db
-            .write({
-                let uuid = uuid.clone();
-                let username = profile.username;
-                let new_skin_id = new_skin_id;
-                move |conn| {
-                    Ok(account_repo::update_account_profile(
-                        conn,
-                        &uuid,
-                        &username,
-                        new_skin_id.as_deref(),
-                    )?)
-                }
-            })
-            .await?;
+        account_repo::update_account_profile(
+            &self.app.db,
+            &uuid,
+            &profile.username,
+            new_skin_id.as_deref(),
+        )
+        .await?;
 
         if skin_changed {
             self.app.invalidate(GET_HEAD, Some(uuid.clone().into()));
@@ -2426,30 +2330,22 @@ mod gdl_token_tests {
         let app = crate::setup_managers_for_test().await;
         let expired = jwt_with_exp(Utc::now().timestamp() - 3600);
 
-        app.db
-            .write({
-                let expired = expired.clone();
-                move |conn| {
-                    Ok(account_repo::insert_account_microsoft(
-                        conn,
-                        "test-uuid",
-                        "test-user",
-                        DbDateTime(Utc::now().into()),
-                        "unused-access-token",
-                        None,
-                        None,
-                        Some(&expired),
-                        Some(&expired),
-                        None,
-                    )?)
-                }
-            })
-            .await
-            .unwrap();
+        account_repo::insert_account_microsoft(
+            &app.db,
+            "test-uuid",
+            "test-user",
+            DbDateTime(Utc::now().into()),
+            "unused-access-token",
+            None,
+            None,
+            Some(&expired),
+            Some(&expired),
+            None,
+        )
+        .await
+        .unwrap();
 
-        let account = app
-            .db
-            .read(|conn| Ok(account_repo::get_account(conn, "test-uuid")?))
+        let account = account_repo::get_account(&app.db, "test-uuid")
             .await
             .unwrap()
             .unwrap();

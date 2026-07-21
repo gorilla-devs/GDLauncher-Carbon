@@ -81,16 +81,12 @@ pub async fn get_version(
                 )
             })?;
 
-        let db_entry_name_owned = db_entry_name.clone();
-        let version_bytes_owned = version_bytes.to_vec();
-        db.write(move |conn| {
-            Ok(version_meta::upsert_partial_version_info(
-                conn,
-                &db_entry_name_owned,
-                &version_bytes_owned,
-                DbDateTime(Utc::now().fixed_offset()),
-            )?)
-        })
+        version_meta::upsert_partial_version_info(
+            db,
+            &db_entry_name,
+            &version_bytes,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
         .await?;
 
         Ok(parsed)
@@ -99,14 +95,7 @@ pub async fn get_version(
     match update_cache().await {
         Ok(parsed) => Ok(parsed),
         Err(err) => {
-            let db_entry_name_owned = db_entry_name.clone();
-            let db_cache = db
-                .read(move |conn| {
-                    Ok(version_meta::get_partial_version_info(
-                        conn,
-                        &db_entry_name_owned,
-                    )?)
-                })
+            let db_cache = version_meta::get_partial_version_info(db, &db_entry_name)
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 

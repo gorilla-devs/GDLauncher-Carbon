@@ -43,14 +43,8 @@ mod preference_keys {
 pub async fn is_memory_warning_dismissed(
     db: &carbon_repos::db_exec::Db,
 ) -> anyhow::Result<bool> {
-    let pref = db
-        .read(|conn| {
-            Ok(frontend_preference::get_preference(
-                conn,
-                preference_keys::MEMORY_WARNING_DISMISSED,
-            )?)
-        })
-        .await?;
+    let pref =
+        frontend_preference::get_preference(db, preference_keys::MEMORY_WARNING_DISMISSED).await?;
 
     Ok(pref.map(|p| p.value == "true").unwrap_or(false))
 }
@@ -139,11 +133,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // First Launch endpoints
         query IS_FIRST_LAUNCH[app, _args: ()] {
-            let pref = app.db
-                .read(|conn| Ok(frontend_preference::get_preference(
-                    conn,
-                    preference_keys::FIRST_LAUNCH_COMPLETED,
-                )?))
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::FIRST_LAUNCH_COMPLETED,)
                 .await?;
 
             // First launch is true if the key is absent (not completed yet)
@@ -151,13 +141,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation COMPLETE_FIRST_LAUNCH[app, _args: ()] {
-            app.db
-                .write(|conn| Ok(frontend_preference::upsert_preference(
-                    conn,
-                    preference_keys::FIRST_LAUNCH_COMPLETED,
+            frontend_preference::upsert_preference(&app.db, preference_keys::FIRST_LAUNCH_COMPLETED,
                     "true",
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?))
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             // Invalidate related queries
@@ -169,11 +155,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // Changelog endpoints
         query SHOULD_SHOW_CHANGELOG[app, _args: ()] {
-            let pref = app.db
-                .read(|conn| Ok(frontend_preference::get_preference(
-                    conn,
-                    preference_keys::LAST_SEEN_VERSION,
-                )?))
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::LAST_SEEN_VERSION,)
                 .await?;
 
             // Show changelog if no version stored or version differs from current
@@ -184,13 +166,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation MARK_CHANGELOG_SEEN[app, _args: ()] {
-            app.db
-                .write(|conn| Ok(frontend_preference::upsert_preference(
-                    conn,
-                    preference_keys::LAST_SEEN_VERSION,
+            frontend_preference::upsert_preference(&app.db, preference_keys::LAST_SEEN_VERSION,
                     APP_VERSION,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?))
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             // Invalidate so the query returns fresh data
@@ -204,25 +182,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
             let config = app.settings_manager().get_settings().await?;
 
             // Load preferences from database
-            let first_launch_pref = app.db
-                .read(|conn| Ok(frontend_preference::get_preference(
-                    conn,
-                    preference_keys::FIRST_LAUNCH_COMPLETED,
-                )?))
+            let first_launch_pref = frontend_preference::get_preference(&app.db, preference_keys::FIRST_LAUNCH_COMPLETED,)
                 .await?;
 
-            let dismissed_pref = app.db
-                .read(|conn| Ok(frontend_preference::get_preference(
-                    conn,
-                    preference_keys::BETA_PROMPT_DISMISSED,
-                )?))
+            let dismissed_pref = frontend_preference::get_preference(&app.db, preference_keys::BETA_PROMPT_DISMISSED,)
                 .await?;
 
-            let last_shown_pref = app.db
-                .read(|conn| Ok(frontend_preference::get_preference(
-                    conn,
-                    preference_keys::BETA_PROMPT_LAST_SHOWN,
-                )?))
+            let last_shown_pref = frontend_preference::get_preference(&app.db, preference_keys::BETA_PROMPT_LAST_SHOWN,)
                 .await?;
 
             // Build state for decision logic
@@ -244,13 +210,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation DISMISS_BETA_PROMPT_PERMANENTLY[app, _args: ()] {
-            app.db
-                .write(|conn| Ok(frontend_preference::upsert_preference(
-                    conn,
-                    preference_keys::BETA_PROMPT_DISMISSED,
+            frontend_preference::upsert_preference(&app.db, preference_keys::BETA_PROMPT_DISMISSED,
                     "true",
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?))
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             Ok(())
@@ -259,13 +221,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation REMIND_BETA_PROMPT_LATER[app, _args: ()] {
             let now = Utc::now().to_rfc3339();
 
-            app.db
-                .write(move |conn| Ok(frontend_preference::upsert_preference(
-                    conn,
-                    preference_keys::BETA_PROMPT_LAST_SHOWN,
+            frontend_preference::upsert_preference(&app.db, preference_keys::BETA_PROMPT_LAST_SHOWN,
                     &now,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?))
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             Ok(())
@@ -273,11 +231,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // Onboarding Tips endpoints
         query GET_SEEN_ONBOARDING_TIPS[app, _args: ()] {
-            let pref = app.db
-                .read(|conn| Ok(frontend_preference::get_preference(
-                    conn,
-                    preference_keys::ONBOARDING_TIPS_SEEN,
-                )?))
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::ONBOARDING_TIPS_SEEN,)
                 .await?;
 
             match pref {
@@ -288,11 +242,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         mutation MARK_ONBOARDING_TIP_SEEN[app, tip_id: String] {
             // Get existing tips
-            let pref = app.db
-                .read(|conn| Ok(frontend_preference::get_preference(
-                    conn,
-                    preference_keys::ONBOARDING_TIPS_SEEN,
-                )?))
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::ONBOARDING_TIPS_SEEN,)
                 .await?;
 
             let mut tips: Vec<String> = match pref {
@@ -307,13 +257,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             let value = serde_json::to_string(&tips)?;
 
-            app.db
-                .write(move |conn| Ok(frontend_preference::upsert_preference(
-                    conn,
-                    preference_keys::ONBOARDING_TIPS_SEEN,
+            frontend_preference::upsert_preference(&app.db, preference_keys::ONBOARDING_TIPS_SEEN,
                     &value,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?))
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             // Invalidate so the query returns fresh data
@@ -323,11 +269,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation RESET_ONBOARDING_TIPS[app, _args: ()] {
-            app.db
-                .write(|conn| Ok(frontend_preference::delete_preference(
-                    conn,
-                    preference_keys::ONBOARDING_TIPS_SEEN,
-                )?))
+            frontend_preference::delete_preference(&app.db, preference_keys::ONBOARDING_TIPS_SEEN,)
                 .await
                 .ok(); // Ignore if not found
 
@@ -353,11 +295,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // Search sidebar docked state
         query GET_SEARCH_SIDEBAR_DOCKED[app, _args: ()] {
-            let pref = app.db
-                .read(|conn| Ok(frontend_preference::get_preference(
-                    conn,
-                    preference_keys::SEARCH_SIDEBAR_DOCKED,
-                )?))
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::SEARCH_SIDEBAR_DOCKED,)
                 .await?;
 
             // Default to true (docked) if no preference stored
@@ -370,13 +308,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation SET_SEARCH_SIDEBAR_DOCKED[app, docked: bool] {
             let value = if docked { "true" } else { "false" }.to_string();
 
-            app.db
-                .write(move |conn| Ok(frontend_preference::upsert_preference(
-                    conn,
-                    preference_keys::SEARCH_SIDEBAR_DOCKED,
+            frontend_preference::upsert_preference(&app.db, preference_keys::SEARCH_SIDEBAR_DOCKED,
                     &value,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?))
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             app.invalidate(GET_SEARCH_SIDEBAR_DOCKED, None);
@@ -391,13 +325,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation SET_MEMORY_WARNING_DISMISSED[app, dismissed: bool] {
             let value = if dismissed { "true" } else { "false" }.to_string();
 
-            app.db
-                .write(move |conn| Ok(frontend_preference::upsert_preference(
-                    conn,
-                    preference_keys::MEMORY_WARNING_DISMISSED,
+            frontend_preference::upsert_preference(&app.db, preference_keys::MEMORY_WARNING_DISMISSED,
                     &value,
-                    DbDateTime(Utc::now().fixed_offset()),
-                )?))
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             app.invalidate(GET_MEMORY_WARNING_DISMISSED, None);

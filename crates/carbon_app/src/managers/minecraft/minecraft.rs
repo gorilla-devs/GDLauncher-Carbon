@@ -112,16 +112,12 @@ pub async fn get_version(
         let parsed = serde_json::from_slice::<VersionInfo>(&version_meta)
             .with_context(|| format!("Failed to parse minecraft version from `{}`", url.clone()))?;
 
-        let mc_version_owned = mc_version.to_string();
-        let version_meta_owned = version_meta.to_vec();
-        db.write(move |conn| {
-            Ok(version_meta::upsert_version_info(
-                conn,
-                &mc_version_owned,
-                &version_meta_owned,
-                DbDateTime(Utc::now().fixed_offset()),
-            )?)
-        })
+        version_meta::upsert_version_info(
+            db,
+            &mc_version.to_string(),
+            &version_meta,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
         .await?;
 
         Ok(parsed)
@@ -131,8 +127,7 @@ pub async fn get_version(
         Ok(parsed) => Ok(parsed),
         Err(err) => {
             let mc_version_owned = mc_version.to_string();
-            let db_cache = db
-                .read(move |conn| Ok(version_meta::get_version_info(conn, &mc_version_owned)?))
+            let db_cache = version_meta::get_version_info(db, &mc_version_owned)
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
@@ -224,16 +219,12 @@ pub async fn get_lwjgl_meta(
 
         let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
-        let lwjgl_owned = lwjgl.to_vec();
-        let db_entry_name_owned = db_entry_name.clone();
-        db.write(move |conn| {
-            Ok(version_meta::upsert_lwjgl_meta(
-                conn,
-                &db_entry_name_owned,
-                &lwjgl_owned,
-                DbDateTime(Utc::now().fixed_offset()),
-            )?)
-        })
+        version_meta::upsert_lwjgl_meta(
+            db,
+            &db_entry_name,
+            &lwjgl,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
         .await?;
 
         Ok(parsed)
@@ -243,8 +234,7 @@ pub async fn get_lwjgl_meta(
         Ok(parsed) => Ok(parsed),
         Err(err) => {
             let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
-            let db_cache = db
-                .read(move |conn| Ok(version_meta::get_lwjgl_meta(conn, &db_entry_name)?))
+            let db_cache = version_meta::get_lwjgl_meta(db, &db_entry_name)
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 

@@ -171,10 +171,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     pub async fn scan_instances(self) -> anyhow::Result<()> {
         let scan_start = std::time::Instant::now();
-        let instance_cache = self
-            .app
-            .db
-            .read(|conn| Ok(instance_repo::get_all_instances(conn)?))
+        let instance_cache = instance_repo::get_all_instances(&self.app.db)
             .await?;
         tracing::debug!(
             "[startup-timing] scan_instances: loaded {} cached instance row(s) from DB in {:.2}s",
@@ -369,12 +366,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn list_groups(self) -> anyhow::Result<Vec<ListGroup>> {
+        // Both reads run back-to-back on one reader connection so groups and
+        // instances load together; each SELECT autocommits its own read txn,
+        // so this is not a single snapshot. Uses `_conn` forms inside.
         let (groups, all_instances) = self
             .app
             .db
             .read(|conn| {
-                let groups = instance_repo::get_all_groups_ordered_by_group_index(conn)?;
-                let instances = instance_repo::get_all_instances_ordered_by_index(conn)?;
+                let groups = instance_repo::get_all_groups_ordered_by_group_index_conn(conn)?;
+                let instances = instance_repo::get_all_instances_ordered_by_index_conn(conn)?;
                 Ok((groups, instances))
             })
             .await?;
@@ -511,10 +511,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Get the group we're moving
         let group_id = *group;
-        let moving_group = self
-            .app
-            .db
-            .read(move |conn| Ok(instance_repo::get_group(conn, group_id)?))
+        let moving_group = instance_repo::get_group(&self.app.db, group_id)
             .await?
             .ok_or_else(|| anyhow!("GroupId is not in database, this should never happen"))?;
 
@@ -524,10 +521,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let target_pos = match target {
             GroupMoveTarget::BeforeGroup(target_group_id) => {
                 let target_group_id = *target_group_id;
-                let target_group = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(instance_repo::get_group(conn, target_group_id)?))
+                let target_group = instance_repo::get_group(&self.app.db, target_group_id)
                     .await?
                     .ok_or_else(|| anyhow!("Target GroupId is not in database"))?;
 
@@ -539,10 +533,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // Instance must be in the default group (ungrouped) — detected via
                 // library_position being set (only default-group instances have one).
                 let instance_id = *instance_id;
-                let instance = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(instance_repo::get_instance(conn, instance_id)?))
+                let instance = instance_repo::get_instance(&self.app.db, instance_id)
                     .await?
                     .ok_or_else(|| anyhow!("InstanceId is not in database"))?;
 
@@ -556,13 +547,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // Find the maximum libraryPosition across ungrouped instances and groups.
                 // library_position is only set on default-group instances, so the
                 // filter alone is sufficient (no need to join against the default group).
+                // Both reads run back-to-back on one reader connection; each
+                // SELECT autocommits its own read txn, so this is not a single
+                // snapshot. Uses `_conn` forms inside.
                 let (max_instance_pos, max_group_pos) = self
                     .app
                     .db
                     .read(|conn| {
-                        let inst = instance_repo::max_library_position_instance(conn)?
+                        let inst = instance_repo::max_library_position_instance_conn(conn)?
                             .and_then(|i| i.library_position);
-                        let grp = instance_repo::max_library_position_group(conn)?
+                        let grp = instance_repo::max_library_position_group_conn(conn)?
                             .and_then(|g| g.library_position);
                         Ok((inst, grp))
                     })
@@ -588,24 +582,32 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         if start_pos < target_pos {
             // Moving forward: shift items in (start, target] down by 1 (groups
             // and ungrouped instances), then place the group at target - 1.
+            // Three writes run in one writer dispatch so no other write
+            // interleaves; they are not one transaction (each autocommits), so
+            // a reader can observe an intermediate restamp and a crash mid-way
+            // persists a partial shift. Uses `_conn` forms inside the closure.
             self.app
                 .db
                 .write(move |conn| {
-                    instance_repo::shift_group_library_positions_down(conn, start_pos, target_pos - 1)?;
-                    instance_repo::shift_instance_library_positions_down(conn, start_pos, target_pos - 1)?;
-                    instance_repo::set_group_library_position(conn, group_id, Some(target_pos - 1))?;
+                    instance_repo::shift_group_library_positions_down_conn(conn, start_pos, target_pos - 1)?;
+                    instance_repo::shift_instance_library_positions_down_conn(conn, start_pos, target_pos - 1)?;
+                    instance_repo::set_group_library_position_conn(conn, group_id, Some(target_pos - 1))?;
                     Ok(())
                 })
                 .await?;
         } else {
             // Moving backward: shift items in [target, start) up by 1, then
             // place the group at target.
+            // Three writes run in one writer dispatch so no other write
+            // interleaves; they are not one transaction (each autocommits), so
+            // a reader can observe an intermediate restamp and a crash mid-way
+            // persists a partial shift. Uses `_conn` forms inside the closure.
             self.app
                 .db
                 .write(move |conn| {
-                    instance_repo::shift_group_library_positions_up(conn, target_pos, start_pos)?;
-                    instance_repo::shift_instance_library_positions_up(conn, target_pos, start_pos)?;
-                    instance_repo::set_group_library_position(conn, group_id, Some(target_pos))?;
+                    instance_repo::shift_group_library_positions_up_conn(conn, target_pos, start_pos)?;
+                    instance_repo::shift_instance_library_positions_up_conn(conn, target_pos, start_pos)?;
+                    instance_repo::set_group_library_position_conn(conn, group_id, Some(target_pos))?;
                     Ok(())
                 })
                 .await?;
@@ -613,17 +615,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Also keep groupIndex in sync for backwards compatibility
         // (This maintains the old ordering system while we transition)
-        let all_groups = self
-            .app
-            .db
-            .read(|conn| Ok(instance_repo::get_groups_with_library_position_ordered(conn)?))
+        let all_groups = instance_repo::get_groups_with_library_position_ordered(&self.app.db)
             .await?;
 
+        // Interleaved app logic: restamp every group's index from the ordered
+        // in-memory list. Runs in one writer dispatch, so no other write
+        // interleaves; not one transaction (each autocommits). `_conn` forms.
         self.app
             .db
             .write(move |conn| {
                 for (idx, g) in all_groups.iter().enumerate() {
-                    instance_repo::set_group_index(conn, g.id, idx as i32)?;
+                    instance_repo::set_group_index_conn(conn, g.id, idx as i32)?;
                 }
                 Ok(())
             })
@@ -650,10 +652,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let instance_id = *instance;
         let (start_group, start_idx, start_library_pos) = {
-            let instance = self
-                .app
-                .db
-                .read(move |conn| Ok(instance_repo::get_instance(conn, instance_id)?))
+            let instance = instance_repo::get_instance(&self.app.db, instance_id)
                 .await?
                 .ok_or_else(|| {
                     anyhow!("InstanceId is not in database, this should never happen")
@@ -669,10 +668,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let (target_group, target_idx, target_library_pos) = match target {
             InstanceMoveTarget::Before(target) => {
                 let target_id = *target;
-                let inst = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(instance_repo::get_instance(conn, target_id)?))
+                let inst = instance_repo::get_instance(&self.app.db, target_id)
                     .await?
                     .ok_or_else(|| {
                         anyhow!("InstanceId is not in database, this should never happen")
@@ -684,16 +680,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let group_val = *group;
                 // If target is default group, find the minimum libraryPosition
                 let lib_pos = if group == default_group_id {
-                    let min_pos = self
-                        .app
-                        .db
-                        .read(move |conn| {
-                            Ok(instance_repo::min_library_position_instance_in_group(
-                                conn, group_val,
-                            )?)
-                        })
-                        .await?
-                        .and_then(|i| i.library_position);
+                    let min_pos =
+                        instance_repo::min_library_position_instance_in_group(&self.app.db, group_val)
+                            .await?
+                            .and_then(|i| i.library_position);
 
                     // If no instances with libraryPosition, start at 0
                     Some(min_pos.unwrap_or(0))
@@ -704,37 +694,33 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // Indices are prepend-allocated (see `next_instance_index`), so
                 // the "beginning" is strictly less than the current minimum, not
                 // a fixed 0.
-                let min_idx: Option<i32> = self
-                    .app
-                    .db
-                    .read(move |conn| {
-                        Ok(instance_repo::min_index_instance_in_group(conn, group_val)?)
-                    })
-                    .await?
-                    .map(|i| i.index);
+                let min_idx: Option<i32> =
+                    instance_repo::min_index_instance_in_group(&self.app.db, group_val)
+                        .await?
+                        .map(|i| i.index);
 
                 let target_idx = min_idx.map(|n| n - 1).unwrap_or(0);
                 (group, target_idx, lib_pos)
             }
             InstanceMoveTarget::EndOfGroup(group) => {
                 let group_val = *group;
-                let target_idx = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(instance_repo::count_instances_in_group(conn, group_val)?))
+                let target_idx = instance_repo::count_instances_in_group(&self.app.db, group_val)
                     .await? as i32;
 
                 // If target is default group, find the maximum libraryPosition + 1
                 let lib_pos = if group == default_group_id {
+                    // Both reads run back-to-back on one reader connection; each
+                    // SELECT autocommits its own read txn, not a single snapshot.
+                    // Uses `_conn` forms inside.
                     let (max_instance_pos, max_group_pos) = self
                         .app
                         .db
                         .read(move |conn| {
-                            let inst = instance_repo::max_library_position_instance_in_group(
+                            let inst = instance_repo::max_library_position_instance_in_group_conn(
                                 conn, group_val,
                             )?
                             .and_then(|i| i.library_position);
-                            let grp = instance_repo::max_library_position_group(conn)?
+                            let grp = instance_repo::max_library_position_group_conn(conn)?
                                 .and_then(|g| g.library_position);
                             Ok((inst, grp))
                         })
@@ -754,10 +740,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // Position instance before a folder (at library root level)
                 // Get the folder's libraryPosition
                 let folder_id = *group_id;
-                let target_folder = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(instance_repo::get_group(conn, folder_id)?))
+                let target_folder = instance_repo::get_group(&self.app.db, folder_id)
                     .await?
                     .ok_or_else(|| anyhow!("GroupId is not in database"))?;
 
@@ -767,10 +750,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                 // The instance will be moved to the default group with target libraryPosition
                 let default_id = *default_group_id;
-                let target_idx = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(instance_repo::count_instances_in_group(conn, default_id)?))
+                let target_idx = instance_repo::count_instances_in_group(&self.app.db, default_id)
                     .await? as i32;
 
                 (default_group_id, target_idx, Some(lib_pos))
@@ -827,18 +807,22 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             if let Some(target_lib_pos) = target_library_pos {
                 // Only shift if we have a target position (not end of group with no items)
                 if start_library_pos != Some(target_lib_pos) {
+                    // Two shifts run in one writer dispatch so no other write
+                    // interleaves; not one transaction (each autocommits), so a
+                    // reader can observe the gap between them. Uses `_conn`
+                    // forms inside the closure.
                     self.app
                         .db
                         .write(move |conn| {
                             // Shift libraryPosition of items at or after target_lib_pos
                             // (not the instance we're moving), and the groups too.
-                            instance_repo::shift_instance_library_positions_up_in_group_except(
+                            instance_repo::shift_instance_library_positions_up_in_group_except_conn(
                                 conn,
                                 default_id,
                                 target_lib_pos,
                                 instance_id,
                             )?;
-                            instance_repo::shift_all_group_library_positions_up_from(
+                            instance_repo::shift_all_group_library_positions_up_from_conn(
                                 conn,
                                 target_lib_pos,
                             )?;
@@ -852,17 +836,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // If moving FROM default group, shift library positions to fill the gap
         if start_group == default_group_id && target_group != default_group_id {
             if let Some(start_lib_pos) = start_library_pos {
+                // Two shifts run in one writer dispatch so no other write
+                // interleaves; not one transaction (each autocommits), so a
+                // reader can observe the intermediate state between them. Uses
+                // `_conn` forms inside the closure.
                 self.app
                     .db
                     .write(move |conn| {
                         // Decrement libraryPosition of items after start_lib_pos,
                         // groups included.
-                        instance_repo::shift_instance_library_positions_down_in_group(
+                        instance_repo::shift_instance_library_positions_down_in_group_conn(
                             conn,
                             default_id,
                             start_lib_pos,
                         )?;
-                        instance_repo::shift_all_group_library_positions_down_after(
+                        instance_repo::shift_all_group_library_positions_down_after_conn(
                             conn,
                             start_lib_pos,
                         )?;
@@ -873,20 +861,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         let final_group = *target_group;
-        self.app
-            .db
-            .write(move |conn| {
-                instance_repo::move_instance_tx(
-                    conn,
-                    &index_shifts,
-                    instance_id,
-                    final_group,
-                    final_idx,
-                    new_library_pos,
-                )?;
-                Ok(())
-            })
-            .await?;
+        instance_repo::move_instance_tx(
+            &self.app.db,
+            index_shifts,
+            instance_id,
+            final_group,
+            final_idx,
+            new_library_pos,
+        )
+        .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -896,25 +879,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // so its last instance also returns to the default group.
         if start_group != default_group_id && start_group != target_group {
             let start_group_id = *start_group;
-            let remaining_count = self
-                .app
-                .db
-                .read(move |conn| Ok(instance_repo::count_instances_in_group(conn, start_group_id)?))
+            let remaining_count = instance_repo::count_instances_in_group(&self.app.db, start_group_id)
                 .await?;
 
             if remaining_count == 0 {
                 // Delete the now-empty group
-                self.app
-                    .db
-                    .write(move |conn| Ok(instance_repo::delete_group(conn, start_group_id)?))
+                instance_repo::delete_group(&self.app.db, start_group_id)
                     .await?;
                 // GET_GROUPS already invalidated above, but invalidate again after deletion
                 self.app.invalidate(GET_GROUPS, None);
             } else if remaining_count == 1 {
-                if let Some(last) = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(instance_repo::first_instance_in_group(conn, start_group_id)?))
+                if let Some(last) = instance_repo::first_instance_in_group(&self.app.db, start_group_id)
                     .await?
                 {
                     // Moving the last instance out empties the group, which the
@@ -946,10 +921,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             match groupid {
                 Some(groupid) => {
-                    let group = self
-                        .app
-                        .db
-                        .read(move |conn| Ok(instance_repo::get_group(conn, groupid)?))
+                    let group = instance_repo::get_group(&self.app.db, groupid)
                         .await?;
 
                     match group {
@@ -965,13 +937,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                             let index = self.next_group_index().await?;
                             let index_value = index.value;
 
-                            let group_id = self
-                                .app
-                                .db
-                                .write(move |conn| {
-                                    Ok(instance_repo::create_default_group_tx(conn, index_value)?)
-                                })
-                                .await?;
+                            let group_id =
+                                instance_repo::create_default_group_tx(&self.app.db, index_value)
+                                    .await?;
 
                             Ok(GroupId(group_id))
                         }
@@ -992,9 +960,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let existing = {
             let name = name.clone();
-            self.app
-                .db
-                .read(move |conn| Ok(instance_repo::find_group_by_name(conn, &name)?))
+            instance_repo::find_group_by_name(&self.app.db, &name)
                 .await?
         };
 
@@ -1006,13 +972,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // so filtering by LibraryPosition IS NOT NULL avoids needing default_group_id
         // here — which would otherwise deadlock via get_default_group re-acquiring
         // index_lock on a fresh database.
+        // Both reads run back-to-back on one reader connection; each SELECT
+        // autocommits its own read txn, so this is not a single snapshot.
+        // Uses `_conn` forms inside.
         let (max_instance_pos, max_group_pos) = self
             .app
             .db
             .read(|conn| {
-                let inst = instance_repo::max_library_position_instance(conn)?
+                let inst = instance_repo::max_library_position_instance_conn(conn)?
                     .and_then(|i| i.library_position);
-                let grp = instance_repo::max_library_position_group(conn)?
+                let grp = instance_repo::max_library_position_group_conn(conn)?
                     .and_then(|g| g.library_position);
                 Ok((inst, grp))
             })
@@ -1024,13 +993,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             + 1;
 
         let index_value = index.value;
-        let group_id = self
-            .app
-            .db
-            .write(move |conn| {
-                Ok(instance_repo::insert_group(conn, &name, index_value, Some(next_library_pos))?)
-            })
-            .await?;
+        let group_id =
+            instance_repo::insert_group(&self.app.db, name, index_value, Some(next_library_pos))
+                .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -1050,14 +1015,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // (library_position is only set on default-group instances, so no need to filter by group_id
         // — which would require materializing the default group and re-acquiring index_lock.)
         let index_value = index.value;
+        // Interleaved app logic: shift existing items up then insert the new
+        // group at the freed position. Runs in one writer dispatch, so no other
+        // write interleaves; not one transaction (each autocommits). `_conn` forms.
         let group_id = self
             .app
             .db
             .write(move |conn| {
-                instance_repo::shift_all_instance_library_positions_up(conn, target_position)?;
-                instance_repo::shift_all_group_library_positions_up_from(conn, target_position)?;
+                instance_repo::shift_all_instance_library_positions_up_conn(conn, target_position)?;
+                instance_repo::shift_all_group_library_positions_up_from_conn(conn, target_position)?;
                 // Create the group at the target position
-                let id = instance_repo::insert_group(
+                let id = instance_repo::insert_group_conn(
                     conn,
                     &name,
                     index_value,
@@ -1075,9 +1043,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     pub async fn rename_group(self, group: GroupId, name: String) -> anyhow::Result<()> {
         let group_id = *group;
-        self.app
-            .db
-            .write(move |conn| Ok(instance_repo::set_group_name(conn, group_id, &name)?))
+        instance_repo::set_group_name(&self.app.db, group_id, &name)
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
@@ -1091,9 +1057,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // Check if base name exists
         let existing = {
             let base_name = base_name.to_string();
-            self.app
-                .db
-                .read(move |conn| Ok(instance_repo::find_group_by_name(conn, &base_name)?))
+            instance_repo::find_group_by_name(&self.app.db, &base_name)
                 .await?
         };
 
@@ -1107,9 +1071,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let candidate = format!("{} ({})", base_name, counter);
             let exists = {
                 let candidate = candidate.clone();
-                self.app
-                    .db
-                    .read(move |conn| Ok(instance_repo::find_group_by_name(conn, &candidate)?))
+                instance_repo::find_group_by_name(&self.app.db, &candidate)
                     .await?
             };
 
@@ -1140,10 +1102,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let target_library_pos = if let Some(target_id) = target_instance_id {
             let default_group_id = self.get_default_group().await?;
             let target_id = *target_id;
-            let target_instance = self
-                .app
-                .db
-                .read(move |conn| Ok(instance_repo::get_instance(conn, target_id)?))
+            let target_instance = instance_repo::get_instance(&self.app.db, target_id)
                 .await?;
 
             // Only use position if instance exists, is in default group, and has a library_position
@@ -1180,10 +1139,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Get all instances in the default group (ungrouped instances)
         let default_id = *default_group_id;
-        let instances = self
-            .app
-            .db
-            .read(move |conn| Ok(instance_repo::get_instances_by_group(conn, default_id)?))
+        let instances = instance_repo::get_instances_by_group(&self.app.db, default_id)
             .await?;
 
         // Get instance data for sorting
@@ -1236,10 +1192,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Fetch and sort non-default groups (folders) by name. They appear
         // after ungrouped instances in the library listing.
-        let groups = self
-            .app
-            .db
-            .read(|conn| Ok(instance_repo::get_all_groups(conn)?))
+        let groups = instance_repo::get_all_groups(&self.app.db)
             .await?;
 
         let mut sortable_groups: Vec<(i32, String)> = groups
@@ -1289,13 +1242,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             });
         }
 
-        self.app
-            .db
-            .write(move |conn| {
-                instance_repo::arrange_library_tx(conn, &group_updates, &instance_updates)?;
-                Ok(())
-            })
-            .await?;
+        instance_repo::arrange_library_tx(&self.app.db, group_updates, instance_updates).await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -1316,10 +1263,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Get all instances in the specified group
         let group_id_val = *group_id;
-        let instances = self
-            .app
-            .db
-            .read(move |conn| Ok(instance_repo::get_instances_by_group(conn, group_id_val)?))
+        let instances = instance_repo::get_instances_by_group(&self.app.db, group_id_val)
             .await?;
 
         // Get instance data for sorting
@@ -1378,13 +1322,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .collect();
 
         if !updates.is_empty() {
-            self.app
-                .db
-                .write(move |conn| {
-                    instance_repo::set_instance_indexes_tx(conn, &updates)?;
-                    Ok(())
-                })
-                .await?;
+            instance_repo::set_instance_indexes_tx(&self.app.db, updates).await?;
         }
 
         self.app.invalidate(GET_GROUPS, None);
@@ -1411,15 +1349,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             // Pick a value strictly smaller than every existing
             // library_position across both ungrouped instances and groups.
             let default_id = *default_group_id;
+            // Both reads run back-to-back on one reader connection; each SELECT
+            // autocommits its own read txn, so this is not a single snapshot.
+            // Uses `_conn` forms inside.
             let (min_instance_pos, min_group_pos) = self
                 .app
                 .db
                 .read(move |conn| {
-                    let inst = instance_repo::min_library_position_instance_in_group(
+                    let inst = instance_repo::min_library_position_instance_in_group_conn(
                         conn, default_id,
                     )?
                     .and_then(|i| i.library_position);
-                    let grp = instance_repo::min_library_position_group(conn)?
+                    let grp = instance_repo::min_library_position_group_conn(conn)?
                         .and_then(|g| g.library_position);
                     Ok((inst, grp))
                 })
@@ -1439,20 +1380,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let index_value = index.value;
         let group_id = *group;
-        let new_id = self
-            .app
-            .db
-            .write(move |conn| {
-                Ok(instance_repo::add_instance_tx(
-                    conn,
-                    &name,
-                    &shortpath,
-                    index_value,
-                    group_id,
-                    library_position,
-                )?)
-            })
-            .await?;
+        let new_id = instance_repo::add_instance_tx(
+            &self.app.db,
+            name,
+            shortpath,
+            index_value,
+            group_id,
+            library_position,
+        )
+        .await?;
 
         Ok(InstanceId(new_id as i32))
     }
@@ -1461,9 +1397,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     /// Does not invalidate.
     async fn remove_instance(self, instance: InstanceId) -> anyhow::Result<()> {
         let instance_id = *instance;
-        self.app
-            .db
-            .write(move |conn| Ok(instance_repo::delete_instance(conn, instance_id)?))
+        instance_repo::delete_instance(&self.app.db, instance_id)
             .await?;
 
         self.app.meta_cache_manager().gc_mod_metadata().await;
@@ -1508,9 +1442,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Update database for target instance
         let id = *instance_id;
-        self.app
-            .db
-            .write(move |conn| Ok(instance_repo::set_instance_favorite(conn, id, favorite)?))
+        instance_repo::set_instance_favorite(&self.app.db, id, favorite)
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
@@ -1957,17 +1889,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 tokio::fs::rename(&path, &new_path).await?;
 
                 let id = *update.instance_id;
-                let new_shortpath_db = new_shortpath.clone();
-                self.app
-                    .db
-                    .write(move |conn| {
-                        Ok(instance_repo::set_instance_name_and_shortpath(
-                            conn,
-                            id,
-                            &name,
-                            &new_shortpath_db,
-                        )?)
-                    })
+                instance_repo::set_instance_name_and_shortpath(&self.app.db, id, &name, &new_shortpath)
                     .await?;
 
                 shortpath = new_shortpath;
@@ -2188,10 +2110,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Get the instance's group_id before deleting, so we can check if the group becomes empty
         let id = *instance_id;
-        let group_id = self
-            .app
-            .db
-            .read(move |conn| Ok(instance_repo::get_instance(conn, id)?))
+        let group_id = instance_repo::get_instance(&self.app.db, id)
             .await?
             .map(|inst| GroupId(inst.group_id));
 
@@ -2211,16 +2130,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             if group_id != default_group_id {
                 let gid = *group_id;
-                let remaining_count = self
-                    .app
-                    .db
-                    .read(move |conn| Ok(instance_repo::count_instances_in_group(conn, gid)?))
+                let remaining_count = instance_repo::count_instances_in_group(&self.app.db, gid)
                     .await?;
 
                 if remaining_count == 0 {
-                    self.app
-                        .db
-                        .write(move |conn| Ok(instance_repo::delete_group(conn, gid)?))
+                    instance_repo::delete_group(&self.app.db, gid)
                         .await?;
                     self.app.invalidate(GET_GROUPS, None);
                 }
@@ -2251,10 +2165,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let id = *instance_id;
-        let group_id = self
-            .app
-            .db
-            .read(move |conn| Ok(instance_repo::get_instance(conn, id)?))
+        let group_id = instance_repo::get_instance(&self.app.db, id)
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -2396,10 +2307,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let _index_lock = self.index_lock.lock().await;
 
         let group_id = *group;
-        let any_instances = self
-            .app
-            .db
-            .read(move |conn| Ok(instance_repo::count_instances_in_group(conn, group_id)?))
+        let any_instances = instance_repo::count_instances_in_group(&self.app.db, group_id)
             .await?
             != 0;
 
@@ -2412,24 +2320,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             // next_instance_index can't be used due to _index_lock, and dropping it
             // first would be a race condition. base_index counts the group BEING
             // DELETED here (the instance-side oddity — preserved verbatim).
-            let base_index = self
-                .app
-                .db
-                .read(move |conn| Ok(instance_repo::count_instances_in_group(conn, group_id)?))
+            let base_index = instance_repo::count_instances_in_group(&self.app.db, group_id)
                 .await? as i32;
 
             let default_id = *default_group;
-            self.app
-                .db
-                .write(move |conn| {
-                    instance_repo::delete_group_tx(conn, group_id, default_id, base_index)?;
-                    Ok(())
-                })
-                .await?;
+            instance_repo::delete_group_tx(&self.app.db, group_id, default_id, base_index).await?;
         } else {
-            self.app
-                .db
-                .write(move |conn| Ok(instance_repo::delete_group(conn, group_id)?))
+            instance_repo::delete_group(&self.app.db, group_id)
                 .await?;
         }
 
@@ -2442,10 +2339,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn delete_group_with_instances(self, group: GroupId) -> anyhow::Result<()> {
         // Get all instances in the group
         let group_id = *group;
-        let instances_in_group = self
-            .app
-            .db
-            .read(move |conn| Ok(instance_repo::get_instances_by_group(conn, group_id)?))
+        let instances_in_group = instance_repo::get_instances_by_group(&self.app.db, group_id)
             .await?;
 
         // Refuse the whole operation if any contained instance is preparing or running, before
@@ -2504,9 +2398,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // after deleting its last instance, so the row may already be gone here; a plain DELETE
         // is idempotent (no error on zero rows), so a group already removed on the happy path
         // does not surface a spurious error toast on a successful deletion.
-        self.app
-            .db
-            .write(move |conn| Ok(instance_repo::delete_group(conn, group_id)?))
+        instance_repo::delete_group(&self.app.db, group_id)
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
@@ -2711,10 +2603,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     async fn next_group_index(self) -> anyhow::Result<IdLock<'s, i32>> {
         let guard = self.manager.index_lock.lock().await;
 
-        let count = self
-            .app
-            .db
-            .read(|conn| Ok(instance_repo::count_groups(conn)?))
+        let count = instance_repo::count_groups(&self.app.db)
             .await?;
 
         Ok(IdLock {
@@ -2730,10 +2619,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // pick an index strictly smaller than the current minimum. Sort is
         // ascending on `index`, so a smaller value sorts first.
         let group_id = *group;
-        let min_index: Option<i32> = self
-            .app
-            .db
-            .read(move |conn| Ok(instance_repo::min_index_instance_in_group(conn, group_id)?))
+        let min_index: Option<i32> = instance_repo::min_index_instance_in_group(&self.app.db, group_id)
             .await?
             .map(|i| i.index);
 
@@ -2984,10 +2870,7 @@ mod test {
         let app = crate::setup_managers_for_test().await;
 
         async fn get_ordered_groups(db: &Db) -> anyhow::Result<Vec<GroupId>> {
-            Ok(db
-                .read(|conn| {
-                    Ok(instance_repo::get_all_groups_ordered_by_group_index(conn)?)
-                })
+            Ok(instance_repo::get_all_groups_ordered_by_group_index(db)
                 .await?
                 .into_iter()
                 .map(|group| GroupId(group.id))
@@ -3073,16 +2956,13 @@ mod test {
             group: GroupId,
         ) -> anyhow::Result<Vec<InstanceId>> {
             let group_id = *group;
-            Ok(db
-                .read(move |conn| {
-                    Ok(instance_repo::get_instances_by_group_ordered_by_index(
-                        conn, group_id,
-                    )?)
-                })
-                .await?
-                .into_iter()
-                .map(|instance| InstanceId(instance.id))
-                .collect())
+            Ok(
+                instance_repo::get_instances_by_group_ordered_by_index(db, group_id)
+                    .await?
+                    .into_iter()
+                    .map(|instance| InstanceId(instance.id))
+                    .collect(),
+            )
         }
 
         let [group0, group1] = [
@@ -3284,9 +3164,7 @@ mod test {
             .add_instance(String::from("bar"), String::from("bar"), group)
             .await?;
 
-        let instance = app
-            .db
-            .read(|conn| Ok(instance_repo::get_instance_by_shortpath(conn, "bar")?))
+        let instance = instance_repo::get_instance_by_shortpath(&app.db, "bar")
             .await?
             .unwrap();
 
@@ -3295,9 +3173,7 @@ mod test {
 
         app.instance_manager().delete_group(group).await?;
 
-        let instance = app
-            .db
-            .read(|conn| Ok(instance_repo::get_instance_by_shortpath(conn, "bar")?))
+        let instance = instance_repo::get_instance_by_shortpath(&app.db, "bar")
             .await?
             .unwrap();
 
@@ -3315,9 +3191,7 @@ mod test {
     async fn delete_group_empty() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
-        let group_count = app
-            .db
-            .read(|conn| Ok(instance_repo::count_groups(conn)?))
+        let group_count = instance_repo::count_groups(&app.db)
             .await?;
 
         // assert no default group exists
@@ -3328,9 +3202,7 @@ mod test {
             .create_group(String::from("foo"))
             .await?;
 
-        let group_count = app
-            .db
-            .read(|conn| Ok(instance_repo::count_groups(conn)?))
+        let group_count = instance_repo::count_groups(&app.db)
             .await?;
 
         // assert only the created group exists
@@ -3338,9 +3210,7 @@ mod test {
 
         app.instance_manager().delete_group(group).await?;
 
-        let group_count = app
-            .db
-            .read(|conn| Ok(instance_repo::count_groups(conn)?))
+        let group_count = instance_repo::count_groups(&app.db)
             .await?;
 
         // assert the default group was not created while deleting the new group

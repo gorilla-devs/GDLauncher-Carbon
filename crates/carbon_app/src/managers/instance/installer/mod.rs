@@ -721,16 +721,12 @@ impl ResourceInstaller for CurseforgeModInstaller {
                 installers.push(Box::new(move || {
                     Box::pin(async move {
                         let instance_id_val = *instance_id;
-                        let existing = app_clone
-                            .db
-                            .read(move |conn| {
-                                Ok(mfcdb::instance_mod_exists_by_cf_project(
-                                    conn,
-                                    instance_id_val,
-                                    mod_id as i32,
-                                )?)
-                            })
-                            .await;
+                        let existing = mfcdb::instance_mod_exists_by_cf_project(
+                            &app_clone.db,
+                            instance_id_val,
+                            mod_id as i32,
+                        )
+                        .await;
 
                         if let Ok(Some(_)) = existing {
                             return None;
@@ -845,17 +841,10 @@ impl ResourceInstaller for CurseforgeModInstaller {
         // TODO: check with fingerprint?
         let instance_id_val = *instance_id;
         let filename = self.file.file_name.clone();
-        let is_installed = app
-            .db
-            .read(move |conn| {
-                Ok(mfcdb::get_mod_file_cache_by_instance_filename(
-                    conn,
-                    instance_id_val,
-                    &filename,
-                )?)
-            })
-            .await?
-            .is_some();
+        let is_installed =
+            mfcdb::get_mod_file_cache_by_instance_filename(&app.db, instance_id_val, &filename)
+                .await?
+                .is_some();
 
         Ok(is_installed)
     }
@@ -1036,16 +1025,12 @@ impl ResourceInstaller for ModrinthModInstaller {
                         Box::pin(async move {
                             let instance_id_val = *instance_id;
                             let project_id_owned = project_id.clone();
-                            let existing = app_clone
-                                .db
-                                .read(move |conn| {
-                                    Ok(mfcdb::instance_mod_exists_by_mr_project(
-                                        conn,
-                                        instance_id_val,
-                                        &project_id_owned,
-                                    )?)
-                                })
-                                .await;
+                            let existing = mfcdb::instance_mod_exists_by_mr_project(
+                                &app_clone.db,
+                                instance_id_val,
+                                &project_id_owned,
+                            )
+                            .await;
 
                             if let Ok(Some(_)) = existing {
                                 return None;
@@ -1180,17 +1165,10 @@ impl ResourceInstaller for ModrinthModInstaller {
         // TODO: check with fingerprint?
         let instance_id_val = *instance_id;
         let filename = self.file.filename.clone();
-        let is_installed = app
-            .db
-            .read(move |conn| {
-                Ok(mfcdb::get_mod_file_cache_by_instance_filename(
-                    conn,
-                    instance_id_val,
-                    &filename,
-                )?)
-            })
-            .await?
-            .is_some();
+        let is_installed =
+            mfcdb::get_mod_file_cache_by_instance_filename(&app.db, instance_id_val, &filename)
+                .await?
+                .is_some();
 
         Ok(is_installed)
     }

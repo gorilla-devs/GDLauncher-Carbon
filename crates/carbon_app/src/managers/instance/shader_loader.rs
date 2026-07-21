@@ -209,16 +209,11 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
     ) -> anyhow::Result<Option<ShaderLoaderKind>> {
         let instance_id_val = *instance_id;
-        let mods = self
-            .app
-            .db
-            .read(move |conn| {
-                Ok(carbon_repos::repos::mod_file_cache::get_enabled_instance_mod_modids(
-                    conn,
-                    instance_id_val,
-                )?)
-            })
-            .await?;
+        let mods = carbon_repos::repos::mod_file_cache::get_enabled_instance_mod_modids(
+            &self.app.db,
+            instance_id_val,
+        )
+        .await?;
 
         for entry in mods {
             let Some(modid) = entry.modid else {

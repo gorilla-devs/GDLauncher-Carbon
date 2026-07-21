@@ -162,12 +162,8 @@ pub async fn export_gdlauncher(
 
                         // Query ModFileCache for tracked files
                         let instance_id_val = *instance_id;
-                        let cached_files = app
-                            .db
-                            .read(move |conn| {
-                                Ok(mfcdb::get_instance_gdl_export_files(conn, instance_id_val)?)
-                            })
-                            .await?;
+                        let cached_files =
+                            mfcdb::get_instance_gdl_export_files(&app.db, instance_id_val).await?;
 
                         for row in cached_files {
                             // Check if in filter

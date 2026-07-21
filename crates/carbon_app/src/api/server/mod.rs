@@ -1005,9 +1005,7 @@ pub fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                     use carbon_repos::repos::mod_file_cache as mfcdb;
 
                     let mod_id = query.mod_id.clone();
-                    let entry = app
-                        .db
-                        .read(move |conn| Ok(mfcdb::get_server_mod_icon_data(conn, &mod_id)?))
+                    let entry = mfcdb::get_server_mod_icon_data(&app.db, &mod_id)
                         .await
                         .map_err(|e| FeError::from_anyhow(&e.into()).make_axum())?
                         .ok_or_else(|| FeError::from_anyhow(

@@ -59,16 +59,12 @@ pub async fn get_meta(
             )
         })?;
 
-        let id_owned = version_asset_index.id.clone();
-        let asset_index_owned = asset_index.to_vec();
-        db.write(move |conn| {
-            Ok(version_meta::upsert_assets_meta(
-                conn,
-                &id_owned,
-                &asset_index_owned,
-                DbDateTime(Utc::now().fixed_offset()),
-            )?)
-        })
+        version_meta::upsert_assets_meta(
+            db,
+            &version_asset_index.id,
+            &asset_index,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
         .await?;
 
         Ok((parsed, asset_index.to_vec()))
@@ -78,8 +74,7 @@ pub async fn get_meta(
         Ok(result) => Ok(result),
         Err(err) => {
             let id_owned = version_asset_index.id.clone();
-            let db_cache = db
-                .read(move |conn| Ok(version_meta::get_assets_meta(conn, &id_owned)?))
+            let db_cache = version_meta::get_assets_meta(db, &id_owned)
                 .await?;
 
             if let Some(db_cache) = db_cache {

@@ -389,29 +389,21 @@ async fn seed_init_db(
     .to_string();
 
     // Create base app config
-    if db.read(|conn| Ok(app_config_repo::count_app_configuration(conn)?)).await? == 0 {
+    if app_config_repo::count_app_configuration(db).await? == 0 {
         trace!("No app configuration found. Creating default one");
 
         let installation_id = Uuid::new_v4().to_string();
         let release_channel = release_channel.clone();
         let xmx = find_appropriate_default_xmx().await;
 
-        db.write(move |conn| {
-            Ok(app_config_repo::insert_app_configuration(
-                conn,
-                &release_channel,
-                xmx,
-                Some(&installation_id),
-            )?)
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to create default app configuration: {e}"))?;
+        app_config_repo::insert_app_configuration(db, release_channel, xmx, Some(installation_id))
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create default app configuration: {e}"))?;
 
         trace!("Created default app configuration");
     }
 
-    let app_config = db
-        .read(|conn| Ok(app_config_repo::get_app_configuration(conn)?))
+    let app_config = app_config_repo::get_app_configuration(db)
         .await?
         .expect("It's unreasonable to expect that the app configuration doesn't exist");
 
@@ -430,8 +422,7 @@ async fn seed_init_db(
     }
 
     // Check last seen version from FrontendPreference
-    let last_seen_version = db
-        .read(|conn| Ok(frontend_pref_repo::get_preference(conn, "last_seen_version")?))
+    let last_seen_version = frontend_pref_repo::get_preference(db, "last_seen_version")
         .await?
         .map(|pref| pref.value);
 
@@ -703,9 +694,7 @@ mod test {
         let db_client = load_and_migrate(temp_path, new_checksum).await.unwrap();
 
         assert_eq!(
-            db_client
-                .db
-                .read(|conn| Ok(app_config_repo::get_app_configuration(conn)?))
+            app_config_repo::get_app_configuration(&db_client.db)
                 .await
                 .unwrap()
                 .unwrap()
@@ -743,9 +732,7 @@ mod test {
         let db_client = load_and_migrate(temp_path, new_checksum).await.unwrap();
 
         assert_eq!(
-            db_client
-                .db
-                .read(|conn| Ok(app_config_repo::get_app_configuration(conn)?))
+            app_config_repo::get_app_configuration(&db_client.db)
                 .await
                 .unwrap()
                 .unwrap()

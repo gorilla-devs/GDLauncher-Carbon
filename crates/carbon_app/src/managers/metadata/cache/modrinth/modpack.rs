@@ -14,14 +14,7 @@ use carbon_repos::repos::modpack_cache as modpackdb;
 use tracing::error;
 
 pub async fn get_modpack_icon(app: &App, modrinth: ModrinthModpack) -> anyhow::Result<Vec<u8>> {
-    app.db
-        .read(move |conn| {
-            Ok(modpackdb::get_mr_modpack_logo(
-                conn,
-                &modrinth.project_id,
-                &modrinth.version_id,
-            )?)
-        })
+    modpackdb::get_mr_modpack_logo(&app.db, &modrinth.project_id, &modrinth.version_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("No icon found for modpack"))?
         .data
@@ -34,9 +27,7 @@ pub async fn get_modpack_metadata(
 ) -> anyhow::Result<InstanceModpackInfo> {
     let project_id_read = modrinth.project_id.clone();
     let version_id_read = modrinth.version_id.clone();
-    let cache_entry = app
-        .db
-        .read(move |conn| Ok(modpackdb::get_mr_modpack(conn, &project_id_read, &version_id_read)?))
+    let cache_entry = modpackdb::get_mr_modpack(&app.db, &project_id_read, &version_id_read)
         .await?;
 
     let is_entry_up_to_date = cache_entry
@@ -111,41 +102,28 @@ pub async fn get_modpack_metadata(
 
             let icon_bytes_is_some = icon_bytes.is_some();
 
-            let project_id_write = modrinth.project_id.clone();
-            let version_id_write = modrinth.version_id.clone();
-            let modpack_name = name.clone();
-            let modpack_version_name = file_name.clone();
-            let modpack_url_slug = slug.clone();
-            app.db
-                .write(move |conn| {
-                    Ok(modpackdb::upsert_mr_modpack(
-                        conn,
-                        &project_id_write,
-                        &version_id_write,
-                        &modpack_name,
-                        &modpack_version_name,
-                        &modpack_url_slug,
-                        DbDateTime(chrono::Utc::now().fixed_offset()),
-                    )?)
-                })
-                .await?;
+            modpackdb::upsert_mr_modpack(
+                &app.db,
+                &modrinth.project_id,
+                &modrinth.version_id,
+                &name,
+                &file_name,
+                &slug,
+                DbDateTime(chrono::Utc::now().fixed_offset()),
+            )
+            .await?;
 
             if icon_bytes_is_some || has_cached_logo {
-                let project_id_image = modrinth.project_id.clone();
-                let version_id_image = modrinth.version_id.clone();
                 let image_url = url.clone().unwrap_or_default();
                 let image_data = icon_bytes.clone().map(|icon_bytes| icon_bytes.to_vec());
-                app.db
-                    .write(move |conn| {
-                        Ok(modpackdb::upsert_mr_modpack_image(
-                            conn,
-                            &project_id_image,
-                            &version_id_image,
-                            &image_url,
-                            image_data.as_deref(),
-                        )?)
-                    })
-                    .await?;
+                modpackdb::upsert_mr_modpack_image(
+                    &app.db,
+                    &modrinth.project_id,
+                    &modrinth.version_id,
+                    &image_url,
+                    image_data.as_deref(),
+                )
+                .await?;
             }
 
             Ok::<_, anyhow::Error>((modpack, version, icon_bytes_is_some))

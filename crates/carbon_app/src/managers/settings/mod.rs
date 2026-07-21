@@ -48,11 +48,7 @@ impl SettingsManager {
 
 impl ManagerRef<'_, SettingsManager> {
     pub async fn get_settings(self) -> anyhow::Result<AppConfigurationRow> {
-        self.app
-            .db
-            .read(|conn| {
-                Ok(carbon_repos::repos::app_configuration::get_app_configuration(conn)?)
-            })
+        carbon_repos::repos::app_configuration::get_app_configuration(&self.app.db)
             .await?
             .ok_or(anyhow!("Can't find this key"))
     }

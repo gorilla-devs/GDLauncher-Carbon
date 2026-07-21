@@ -56,22 +56,13 @@ impl ModplatformCacher for CurseforgeModCacher {
         let modlist = match entity_id {
             CacheEntityId::Instance(instance_id) => {
                 let instance_id_val = *instance_id;
-                app.db
-                    .read(move |conn| {
-                        Ok(mfcdb::instance_mods_needing_cf_refresh(
-                            conn,
-                            instance_id_val,
-                            cutoff,
-                        )?)
-                    })
+                mfcdb::instance_mods_needing_cf_refresh(&app.db, instance_id_val, cutoff)
                     .await?
                     .into_iter()
                     .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
                     .collect::<Vec<_>>()
             }
-            CacheEntityId::Server(server_id) => app
-                .db
-                .read(move |conn| Ok(mfcdb::server_mods_needing_cf_refresh(conn, server_id, cutoff)?))
+            CacheEntityId::Server(server_id) => mfcdb::server_mods_needing_cf_refresh(&app.db, server_id, cutoff)
                 .await?
                 .into_iter()
                 .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
@@ -237,13 +228,11 @@ impl ModplatformCacher for CurseforgeModCacher {
         let result = match entity_id {
             CacheEntityId::Instance(instance_id) => {
                 let instance_id_val = *instance_id;
-                app.db
-                    .read(move |conn| Ok(mfcdb::instance_mods_stale_cf_logo(conn, instance_id_val)?))
+                mfcdb::instance_mods_stale_cf_logo(&app.db, instance_id_val)
                     .await
             }
             CacheEntityId::Server(server_id) => {
-                app.db
-                    .read(move |conn| Ok(mfcdb::server_mods_stale_cf_logo(conn, server_id)?))
+                mfcdb::server_mods_stale_cf_logo(&app.db, server_id)
                     .await
             }
         };
@@ -310,12 +299,7 @@ impl ModplatformCacher for CurseforgeModCacher {
 
                     drop(scale_guard);
 
-                    let image_metadata_id = row.metadata_id.clone();
-                    app.db
-                        .write(move |conn| {
-                            Ok(metarepo::mark_cf_image_downloaded(conn, &image_metadata_id, &image)?)
-                        })
-                        .await?;
+                    metarepo::mark_cf_image_downloaded(&app.db, &row.metadata_id, &image).await?;
 
 
                     let _ = update_notifier.send(entity_id);
@@ -421,9 +405,7 @@ async fn cache_curseforge_meta_unchecked(
 
     {
         let metadata_id = metadata_id.clone();
-        if let Ok(Some(existing_entry)) = app
-            .db
-            .read(move |conn| Ok(metarepo::get_cf_cache_by_metadata(conn, &metadata_id)?))
+        if let Ok(Some(existing_entry)) = metarepo::get_cf_cache_by_metadata(&app.db, &metadata_id)
             .await
         {
             if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
@@ -447,33 +429,27 @@ async fn cache_curseforge_meta_unchecked(
     // The composite `(projectId, fileId)` conflict may land on a row that owns
     // a different `metadataId`; the upsert returns the surviving one so the
     // image row attaches to the correct metadata.
-    let result_metadata_id = app
-        .db
-        .write(move |conn| {
-            Ok(metarepo::upsert_cf_mod_cache(
-                conn,
-                murmur2,
-                project_id,
-                file_id,
-                &name,
-                &version,
-                &urlslug,
-                &summary,
-                &authors,
-                release_type,
-                &update_paths,
-                DbDateTime(chrono::Utc::now().fixed_offset()),
-                &metadata_id_owned,
-            )?)
-        })
-        .await?;
+    let result_metadata_id = metarepo::upsert_cf_mod_cache(
+        &app.db,
+        murmur2,
+        project_id,
+        file_id,
+        name,
+        version,
+        urlslug,
+        summary,
+        authors,
+        release_type,
+        update_paths,
+        DbDateTime(chrono::Utc::now().fixed_offset()),
+        metadata_id_owned,
+    )
+    .await?;
 
     if let Some(logo) = &modinfo.logo {
         let url = logo.url.clone();
         let image_metadata_id = result_metadata_id.clone();
-        if let Err(e) = app
-            .db
-            .write(move |conn| Ok(metarepo::upsert_cf_image(conn, &image_metadata_id, &url)?))
+        if let Err(e) = metarepo::upsert_cf_image(&app.db, &image_metadata_id, &url)
             .await
         {
             warn!(

@@ -30,13 +30,9 @@ impl ManagerRef<'_, MetricsManager> {
     pub async fn track_event(&self, event: GDLMetricsEvent) -> anyhow::Result<()> {
         let endpoint = format!("{}/v1/metrics/event", self.gdl_base_api);
 
-        let Some(metrics_user_id) = self
-            .app
-            .db
-            .read(|conn| {
-                Ok(carbon_repos::repos::app_configuration::get_app_configuration(conn)?)
-            })
-            .await?
+        let Some(metrics_user_id) =
+            carbon_repos::repos::app_configuration::get_app_configuration(&self.app.db)
+                .await?
             .and_then(|data| {
                 // TODO: Keep a backlog of events if the user has not accepted the terms yet
                 if !data.terms_and_privacy_accepted {

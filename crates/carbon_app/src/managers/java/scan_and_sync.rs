@@ -13,8 +13,7 @@ use tracing::{info, trace, warn};
 /// to, used to decide whether a broken java may be deleted or must be kept and
 /// marked invalid.
 async fn java_paths_used_in_profiles(db: &Db) -> anyhow::Result<HashSet<String>> {
-    let paths = db
-        .read(|conn| Ok(java_repo::get_profile_linked_java_paths(conn)?))
+    let paths = java_repo::get_profile_linked_java_paths(db)
         .await?
         .into_iter()
         .map(|row| row.path)
@@ -28,8 +27,7 @@ async fn get_java_component_from_db(
     db: &Db,
     path: String,
 ) -> anyhow::Result<Option<java_repo::JavaRow>> {
-    Ok(db
-        .read(move |conn| Ok(java_repo::get_java_by_path(conn, &path)?))
+    Ok(java_repo::get_java_by_path(db, &path)
         .await?)
 }
 
@@ -48,9 +46,7 @@ pub async fn upsert_java_component_to_db(
 
     if let Some((component, id)) = already_existing_component {
         if component == java_component {
-            let id_for_write = id.clone();
-            db.write(move |conn| Ok(java_repo::set_java_validity(conn, &id_for_write, true)?))
-                .await?;
+            java_repo::set_java_validity(db, &id, true).await?;
 
             Ok(id)
         } else {
@@ -58,23 +54,14 @@ pub async fn upsert_java_component_to_db(
             // upgraded at a fixed install path). `path` is unique and the row id is preserved,
             // so this replaces the stored metadata, including a changed major version, instead
             // of failing the scan.
-            let id_for_write = id.clone();
             let major = java_component.version.major as i32;
             let full_version = java_component.version.to_string();
             let arch = java_component.arch.to_string();
             let os = java_component.os.to_string();
             let vendor = java_component.vendor;
-            db.write(move |conn| {
-                Ok(java_repo::update_java_component(
-                    conn,
-                    &id_for_write,
-                    major,
-                    &full_version,
-                    &arch,
-                    &os,
-                    &vendor,
-                )?)
-            })
+            java_repo::update_java_component(
+                db, &id, major, &full_version, &arch, &os, &vendor,
+            )
             .await?;
 
             Ok(id)
@@ -92,8 +79,7 @@ pub async fn upsert_java_component_to_db(
             is_valid: true,
         };
         let id = row.id.clone();
-        db.write(move |conn| Ok(java_repo::insert_java(conn, &row)?))
-            .await?;
+        java_repo::insert_java(db, row).await?;
 
         Ok(id)
     }
@@ -101,7 +87,7 @@ pub async fn upsert_java_component_to_db(
 
 #[tracing::instrument(level = "trace", skip(db))]
 async fn update_java_component_in_db_to_invalid(db: &Db, path: String) -> anyhow::Result<()> {
-    db.write(move |conn| Ok(java_repo::set_java_validity_by_path(conn, &path, false)?))
+    java_repo::set_java_validity_by_path(db, &path, false)
         .await?;
 
     Ok(())
@@ -186,7 +172,7 @@ where
                         .await?;
                     } else {
                         let path = resolved_java_path.display().to_string();
-                        db.write(move |conn| Ok(java_repo::delete_java_by_path(conn, &path)?))
+                        java_repo::delete_java_by_path(db, &path)
                             .await?;
                     }
                 }
@@ -196,8 +182,7 @@ where
 
     // Cleanup unscanned local javas (if they are not default)
     let local_type = JavaComponentType::Local.to_string();
-    let local_javas_from_db = db
-        .read(move |conn| Ok(java_repo::get_java_by_type(conn, &local_type)?))
+    let local_javas_from_db = java_repo::get_java_by_type(db, &local_type)
         .await?;
 
     for local_java_from_db in local_javas_from_db {
@@ -219,7 +204,7 @@ where
             update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
         } else {
             let path = local_java_from_db.path;
-            db.write(move |conn| Ok(java_repo::delete_java_by_path(conn, &path)?))
+            java_repo::delete_java_by_path(db, &path)
                 .await?;
         }
     }
@@ -233,8 +218,7 @@ where
     G: JavaChecker,
 {
     let custom_type = JavaComponentType::Custom.to_string();
-    let custom_javas = db
-        .read(move |conn| Ok(java_repo::get_java_by_type(conn, &custom_type)?))
+    let custom_javas = java_repo::get_java_by_type(db, &custom_type)
         .await?;
 
     for custom_java in custom_javas {
@@ -264,8 +248,7 @@ where
     G: JavaChecker,
 {
     let managed_type = JavaComponentType::Managed.to_string();
-    let managed_javas = db
-        .read(move |conn| Ok(java_repo::get_java_by_type(conn, &managed_type)?))
+    let managed_javas = java_repo::get_java_by_type(db, &managed_type)
         .await?;
 
     let used_java_paths = java_paths_used_in_profiles(db).await?;
@@ -295,14 +278,14 @@ where
                     update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
                 } else {
                     let path = managed_java.path.clone();
-                    db.write(move |conn| Ok(java_repo::delete_java_by_path(conn, &path)?))
+                    java_repo::delete_java_by_path(db, &path)
                         .await?;
                 }
             }
             (Err(_), false) => {
                 if !is_java_used_in_profile {
                     let path = managed_java.path.clone();
-                    db.write(move |conn| Ok(java_repo::delete_java_by_path(conn, &path)?))
+                    java_repo::delete_java_by_path(db, &path)
                         .await?;
                 }
             }
@@ -330,8 +313,7 @@ where
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub async fn sync_system_java_profiles(db: &Db) -> anyhow::Result<()> {
-    let all_javas = db
-        .read(|conn| Ok(java_repo::get_all_java(conn)?))
+    let all_javas = java_repo::get_all_java(db)
         .await?;
 
     let is32bit = std::env::consts::ARCH == "x86" || std::env::consts::ARCH == "arm";
@@ -340,8 +322,7 @@ pub async fn sync_system_java_profiles(db: &Db) -> anyhow::Result<()> {
         trace!("Syncing system java profile: {}", profile.to_string());
         let profile_name = profile.to_string();
         let name_for_lookup = profile_name.clone();
-        let java_in_profile = db
-            .read(move |conn| Ok(java_repo::get_profile(conn, &name_for_lookup)?))
+        let java_in_profile = java_repo::get_profile(db, &name_for_lookup)
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -382,11 +363,7 @@ pub async fn sync_system_java_profiles(db: &Db) -> anyhow::Result<()> {
                     profile.to_string()
                 );
                 let name = profile.to_string();
-                let java_id = java.id.clone();
-                db.write(move |conn| {
-                    Ok(java_repo::set_profile_java(conn, &name, Some(&java_id))?)
-                })
-                .await?;
+                java_repo::set_profile_java(db, &name, Some(&java.id)).await?;
                 break;
             }
         }
@@ -417,7 +394,7 @@ mod test {
     use carbon_repos::repos::java as java_repo;
 
     async fn all_javas(db: &carbon_repos::db_exec::Db) -> Vec<java_repo::JavaRow> {
-        db.read(|conn| Ok(java_repo::get_all_java(conn)?))
+        java_repo::get_all_java(db)
             .await
             .unwrap()
     }
@@ -449,12 +426,9 @@ mod test {
         assert_eq!(java_components[0].path, "/usr/bin/java2");
         assert!(java_components[0].is_valid);
 
-        let invalidate_path = java_path.clone();
-        db.write(move |conn| {
-            Ok(java_repo::set_java_validity_by_path(conn, &invalidate_path, false)?)
-        })
-        .await
-        .unwrap();
+        java_repo::set_java_validity_by_path(db, &java_path, false)
+            .await
+            .unwrap();
 
         let java_components = all_javas(db).await;
         assert_eq!(java_components.len(), 1);
@@ -570,7 +544,7 @@ mod test {
             .unwrap();
 
         let profile_name = SystemJavaProfileName::Legacy.to_string();
-        db.write(move |conn| Ok(java_repo::set_profile_java(conn, &profile_name, Some(&java_id))?))
+        java_repo::set_profile_java(db, &profile_name, Some(&java_id))
             .await
             .unwrap();
 
@@ -617,7 +591,7 @@ mod test {
             .unwrap();
 
         let profile_name = SystemJavaProfileName::Legacy.to_string();
-        db.write(move |conn| Ok(java_repo::set_profile_java(conn, &profile_name, Some(&java_id))?))
+        java_repo::set_profile_java(db, &profile_name, Some(&java_id))
             .await
             .unwrap();
 
@@ -663,7 +637,7 @@ mod test {
             .unwrap();
 
         let profile_name = SystemJavaProfileName::Legacy.to_string();
-        db.write(move |conn| Ok(java_repo::set_profile_java(conn, &profile_name, Some(&java_id))?))
+        java_repo::set_profile_java(db, &profile_name, Some(&java_id))
             .await
             .unwrap();
 
@@ -706,7 +680,7 @@ mod test {
 
         // manually set one of the profiles to non-system to make sure it gets updated to system
         let legacy_name = SystemJavaProfileName::Legacy.to_string();
-        db.write(move |conn| Ok(java_repo::upsert_profile(conn, &legacy_name, false)?))
+        java_repo::upsert_profile(db, &legacy_name, false)
             .await
             .unwrap();
 
@@ -745,28 +719,21 @@ mod test {
                 is_valid: false,
             },
         ];
-        db.write(move |conn| {
-            for java in &seed_javas {
-                java_repo::insert_java(conn, java)?;
-            }
-            Ok(())
-        })
-        .await
-        .unwrap();
+        for java in seed_javas {
+            java_repo::insert_java(db, java).await.unwrap();
+        }
 
         JavaManager::ensure_profiles_in_db(db).await.unwrap();
         sync_system_java_profiles(db).await.unwrap();
 
-        let all_profiles = db
-            .read(|conn| Ok(java_repo::get_all_profiles(conn)?))
+        let all_profiles = java_repo::get_all_profiles(db)
             .await
             .unwrap();
         assert!(all_profiles.iter().all(|profile| profile.is_system_profile));
 
         // Expect 8 and 17 to be there, but not 14 since it's invalid and 16 because not provided
         let legacy_name = SystemJavaProfileName::Legacy.to_string();
-        let legacy_profile = db
-            .read(move |conn| Ok(java_repo::get_profile(conn, &legacy_name)?))
+        let legacy_profile = java_repo::get_profile(db, &legacy_name)
             .await
             .unwrap()
             .unwrap();
@@ -776,8 +743,7 @@ mod test {
         assert!(legacy_profile.java_id.is_some());
 
         let alpha_name = SystemJavaProfileName::Alpha.to_string();
-        let alpha_profile = db
-            .read(move |conn| Ok(java_repo::get_profile(conn, &alpha_name)?))
+        let alpha_profile = java_repo::get_profile(db, &alpha_name)
             .await
             .unwrap()
             .unwrap();
@@ -785,8 +751,7 @@ mod test {
         assert!(alpha_profile.java_id.is_none());
 
         let beta_name = SystemJavaProfileName::Beta.to_string();
-        let beta_profile = db
-            .read(move |conn| Ok(java_repo::get_profile(conn, &beta_name)?))
+        let beta_profile = java_repo::get_profile(db, &beta_name)
             .await
             .unwrap()
             .unwrap();
@@ -794,8 +759,7 @@ mod test {
         assert!(beta_profile.java_id.is_some());
 
         let gamma_name = SystemJavaProfileName::Gamma.to_string();
-        let gamma_profile = db
-            .read(move |conn| Ok(java_repo::get_profile(conn, &gamma_name)?))
+        let gamma_profile = java_repo::get_profile(db, &gamma_name)
             .await
             .unwrap()
             .unwrap();
@@ -803,8 +767,7 @@ mod test {
         assert!(gamma_profile.java_id.is_some());
 
         let minecraft_exe_name = SystemJavaProfileName::MinecraftJavaExe.to_string();
-        let minecraft_exe_profile = db
-            .read(move |conn| Ok(java_repo::get_profile(conn, &minecraft_exe_name)?))
+        let minecraft_exe_profile = java_repo::get_profile(db, &minecraft_exe_name)
             .await
             .unwrap()
             .unwrap();

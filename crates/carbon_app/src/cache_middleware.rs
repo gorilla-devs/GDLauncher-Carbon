@@ -84,8 +84,7 @@ impl Middleware for CacheMiddleware {
             None
         } else {
             let url_for_read = req_url_str.clone();
-            app.db
-                .read(move |conn| Ok(http_cache_repo::get_cached(conn, &url_for_read)?))
+            http_cache_repo::get_cached(&app.db, &url_for_read)
                 .await
                 .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?
         };
@@ -228,20 +227,16 @@ impl Middleware for CacheMiddleware {
             if body.len() <= MAX_CACHEABLE_BODY_BYTES {
                 let body_for_write = body.to_vec();
                 let expires_at = expires.map(|e| DbDateTime(e.into()));
-                let _ = app
-                    .db
-                    .write(move |conn| {
-                        Ok(http_cache_repo::replace_cached(
-                            conn,
-                            &url_str,
-                            status,
-                            &body_for_write,
-                            expires_at,
-                            last_modified.as_deref(),
-                            etag.as_deref(),
-                        )?)
-                    })
-                    .await;
+                let _ = http_cache_repo::replace_cached(
+                    &app.db,
+                    url_str,
+                    status,
+                    body_for_write,
+                    expires_at,
+                    last_modified,
+                    etag,
+                )
+                .await;
             }
 
             match build_cached(status, body.to_vec(), &response_headers, &url, false) {
