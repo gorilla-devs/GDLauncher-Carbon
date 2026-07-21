@@ -25,9 +25,17 @@ fn normalize_whitespace(sql: &str) -> String {
 /// including SQLite's own auto-indexes, whose `sql` column is `NULL`) as one
 /// normalized line per object: `type|name|tbl_name|sql`. Ordered by `type`
 /// then `name` so the output is stable regardless of creation order.
+///
+/// The migration bookkeeping tables (`_migrations`, written by the runner, and
+/// the legacy `_prisma_migrations` shim) are excluded: they carry runner state,
+/// not the logical schema, so schema comparisons — the committed snapshot and
+/// the down-run verification in [`crate::compat`] alike — must not see them.
 pub fn dump_schema(conn: &Connection) -> DbResult<String> {
-    let mut stmt =
-        conn.prepare("SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name")?;
+    let mut stmt = conn.prepare(
+        "SELECT type, name, tbl_name, sql FROM sqlite_master
+         WHERE tbl_name NOT IN ('_migrations', '_prisma_migrations')
+         ORDER BY type, name",
+    )?;
     let rows = stmt.query_map([], |row| {
         let type_: String = row.get(0)?;
         let name: String = row.get(1)?;

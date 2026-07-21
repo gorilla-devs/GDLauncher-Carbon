@@ -7,8 +7,9 @@ edition = "2024"
 carbon_macro = { path = "../carbon_macro" }
 serde = { workspace = true, features = ["derive", "rc"] }
 rusqlite = { version = "0.40.1", features = ["bundled", "hooks", "column_metadata"] }
-rusqlite_migration = "2.6.0"
 chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

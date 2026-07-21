@@ -13,15 +13,17 @@ pub enum DatabaseError {
     #[error("error while trying to migrate the database")]
     MigrationConn(#[from] rusqlite::Error),
     #[error("error while trying to migrate the database")]
-    Migration(#[from] rusqlite_migration::Error),
-    #[error("error while trying to query db")]
-    Query(#[from] carbon_repos::db_error::DbError),
+    Migration(#[from] carbon_repos::db_error::DbError),
     #[error("error while ensuring java profiles in db")]
     EnsureProfiles(anyhow::Error),
     #[error("error while fetching latest terms and privacy checksum")]
     TermsAndPrivacy(anyhow::Error),
     #[error("database version is newer than app version (backwards migration)")]
     BackwardsMigration,
+    #[error("database history diverged from this build at migration {0}")]
+    Diverged(i32),
+    #[error("database downgrade failed; a snapshot was preserved at {0}")]
+    DowngradeFailed(String),
 }
 
 /// The rusqlite-backed executor, opened against the migrated on-disk database.
@@ -38,7 +40,7 @@ pub(super) async fn load_and_migrate(
 
     let db_path = runtime_path.join("gdl_conf.db");
 
-    let (migrations, migration_count) = carbon_repos::get_migrations();
+    let (migration_set, migration_count) = carbon_repos::get_migrations();
 
     debug!("db path: {}", db_path.display());
 
@@ -94,23 +96,52 @@ pub(super) async fn load_and_migrate(
 
     let _ = conn.execute("DROP TABLE IF EXISTS _prisma_migrations", []);
 
-    // Check for backwards migration before attempting to migrate
-    let user_version: i32 = conn
-        .pragma_query_value(None, "user_version", |row| row.get(0))
-        .unwrap_or(0);
+    debug!("Running bidirectional migration runner");
 
-    if user_version > migration_count {
-        debug!(
-            "Backwards migration detected: database version {} > app migrations {}",
-            user_version, migration_count
-        );
-        println!("_STATUS_:BACKWARDS_MIGRATION");
-        return Err(DatabaseError::BackwardsMigration.into());
+    // The runner (spec §9) either applies pending migrations forward, overlays a
+    // newer additive schema, or steps a newer breaking schema back down under a
+    // verified snapshot. Every fatal outcome funnels through a single
+    // `_STATUS_:` line before returning (spec §13). `BACKWARDS_MIGRATION` keeps
+    // its exact meaning: a database ahead of this build with no downgrade
+    // metadata (a pre-floor database).
+    match migration_set.open(&mut conn, &db_path) {
+        Ok(carbon_repos::compat::OpenVerdict::Proceed) => {}
+        Ok(carbon_repos::compat::OpenVerdict::Downgraded) => {
+            // A newer schema was stepped back to this build's version and
+            // verified against ground truth. Non-fatal: startup continues.
+            println!("_STATUS_:DB_DOWNGRADED");
+        }
+        Ok(carbon_repos::compat::OpenVerdict::Refuse(
+            carbon_repos::compat::RefusalKind::BackwardsMigration,
+        )) => {
+            debug!(
+                "Backwards migration detected: database is ahead of this build's {} migrations with no downgrade metadata",
+                migration_count
+            );
+            println!("_STATUS_:BACKWARDS_MIGRATION");
+            return Err(DatabaseError::BackwardsMigration.into());
+        }
+        Ok(carbon_repos::compat::OpenVerdict::Refuse(
+            carbon_repos::compat::RefusalKind::Diverged { version },
+        )) => {
+            error!("Database history diverged from this build at migration {version}");
+            println!("_STATUS_:DB_DIVERGED");
+            return Err(DatabaseError::Diverged(version).into());
+        }
+        Ok(carbon_repos::compat::OpenVerdict::Refuse(
+            carbon_repos::compat::RefusalKind::DowngradeFailed { snapshot_path },
+        )) => {
+            let snapshot = snapshot_path.display().to_string();
+            error!("Database downgrade failed; snapshot preserved at {snapshot}");
+            println!("_STATUS_:DB_DOWNGRADE_FAILED|{snapshot}");
+            return Err(DatabaseError::DowngradeFailed(snapshot).into());
+        }
+        Err(e) => {
+            error!("Database migration failed: {e}");
+            println!("_STATUS_:DB_MIGRATION_FAILED");
+            return Err(DatabaseError::from(e).into());
+        }
     }
-
-    debug!("Migrating database");
-
-    migrations.to_latest(&mut conn)?;
 
     debug!("Closing migration connection");
 
