@@ -15,7 +15,7 @@ use carbon_platforms::modrinth::{
 use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter, StringFilter};
 use carbon_repos::db::{
     mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-    modrinth_mod_image_cache as mrimgdb, server as serverdb, server_mod_file_cache as sfcdb,
+    modrinth_mod_image_cache as mrimgdb, server_mod_file_cache as sfcdb,
 };
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -57,10 +57,8 @@ async fn target_compatibility(
         }
         CacheEntityId::Server(server_id) => {
             let server = app
-                .prisma_client
-                .server()
-                .find_unique(serverdb::UniqueWhereParam::IdEquals(server_id))
-                .exec()
+                .db
+                .read(move |conn| Ok(carbon_repos::repos::server::get_server(conn, server_id)?))
                 .await
                 .ok()??;
 

@@ -1931,12 +1931,9 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                                 cache_instance(instance_id).await
                             }
                             CacheEntityId::Server(server_id) => {
-                                let db_server = app.prisma_client
-                                    .server()
-                                    .find_unique(carbon_repos::db::server::UniqueWhereParam::IdEquals(server_id))
-                                    .exec()
-                                    .await
-                                    .map_err(anyhow::Error::from)?
+                                let db_server = app.db
+                                    .read(move |conn| Ok(carbon_repos::repos::server::get_server(conn, server_id)?))
+                                    .await?
                                     .ok_or_else(|| anyhow!("Server {} not found", server_id))?;
                                 app.meta_cache_manager()
                                     .cache_server_local(server_id, &db_server.shortpath)

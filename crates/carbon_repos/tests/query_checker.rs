@@ -33,6 +33,10 @@ fn all_registered_queries_pass_against_migrated_schema() {
         &conn,
         &carbon_repos::repos::instance::all_queries(),
     ));
+    all.extend(check_module(
+        &conn,
+        &carbon_repos::repos::server::all_queries(),
+    ));
     assert!(all.is_empty(), "query checker violations:\n{}", all.join("\n"));
 }
 
