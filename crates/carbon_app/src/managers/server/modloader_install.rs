@@ -132,10 +132,7 @@ async fn install_fabric(
 
     Ok(LaunchConfig {
         jar_path: Some("fabric-server-launch.jar".to_string()),
-        main_class: None,
-        classpath: Vec::new(),
-        extra_jvm_args: Vec::new(),
-        extra_game_args: Vec::new(),
+        ..LaunchConfig::vanilla()
     })
 }
 
@@ -236,10 +233,7 @@ async fn install_quilt(
 
     Ok(LaunchConfig {
         jar_path: Some("quilt-server-launch.jar".to_string()),
-        main_class: None,
-        classpath: Vec::new(),
-        extra_jvm_args: Vec::new(),
-        extra_game_args: Vec::new(),
+        ..LaunchConfig::vanilla()
     })
 }
 
@@ -362,61 +356,33 @@ async fn install_forge(
 
     info!("Forge server installed successfully");
 
-    // Modern Forge (1.17+) uses a run script / @libraries approach.
-    // The installer creates various files. We look for the forge server jar or run args.
-    // Check for run.sh/run.bat or forge-*-server.jar
-    let args_file = data_path
-        .join("libraries")
-        .join("net")
-        .join("minecraftforge");
-
-    // For modern Forge, check if there are unix_args.txt or win_args.txt
-    let unix_args_path = data_path.join("unix_args.txt");
-    let win_args_path = data_path.join("win_args.txt");
-
-    if unix_args_path.exists() || win_args_path.exists() {
-        // Modern Forge: parse the args file to get classpath and main class
-        let args_path = if cfg!(unix) {
-            &unix_args_path
-        } else {
-            &win_args_path
-        };
-
-        if args_path.exists() {
-            let content = tokio::fs::read_to_string(args_path).await?;
-            return parse_forge_args(&content);
-        }
-    }
-
-    // Legacy Forge (pre-1.17): look for forge-*-server.jar
-    let mut forge_jar = None;
-    let mut entries = tokio::fs::read_dir(&data_path).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with("forge-") && name.ends_with(".jar") && !name.contains("installer") {
-            forge_jar = Some(name);
-            break;
-        }
-    }
-
-    if let Some(jar) = forge_jar {
+    // Forge ships a self-contained launcher jar (the "shim" on modern versions,
+    // the universal jar on pre-1.17) that knows how to bootstrap itself. Prefer
+    // it when present — it needs no argument-file handling at all.
+    if let Some(jar) = find_forge_launcher_jar(&data_path).await {
+        info!("Using Forge launcher jar {}", jar);
         return Ok(LaunchConfig {
             jar_path: Some(jar),
-            main_class: None,
-            classpath: Vec::new(),
-            extra_jvm_args: Vec::new(),
-            extra_game_args: Vec::new(),
+            ..LaunchConfig::vanilla()
         });
     }
 
-    // Fallback: assume the installer set things up with default naming
-    Ok(LaunchConfig {
-        jar_path: None,
-        main_class: None,
-        classpath: Vec::new(),
-        extra_jvm_args: Vec::new(),
-        extra_game_args: Vec::new(),
-    })
+    // Modern Forge (1.17+) without a shim jar: launch through the argument file
+    // the installer wrote under libraries/.
+    if let Some(args_file) =
+        find_loader_args_file(&data_path, "net/minecraftforge/forge", None).await
+    {
+        info!("Using Forge argument file {}", args_file);
+        return Ok(LaunchConfig::from_args_file(args_file));
+    }
+
+    // A vanilla fallback here would boot the server without Forge and leave
+    // clients unable to join, so surface the failure instead.
+    bail!(
+        "Forge {} installer completed but produced neither a launcher jar nor a {}",
+        forge_version,
+        platform_args_file_name()
+    )
 }
 
 /// Install NeoForge server.
@@ -471,23 +437,22 @@ async fn install_neoforge(
 
     info!("NeoForge server installed successfully");
 
-    // NeoForge also uses unix_args.txt / win_args.txt for modern versions
-    let unix_args_path = data_path.join("unix_args.txt");
-    let win_args_path = data_path.join("win_args.txt");
-
-    let args_path = if cfg!(unix) {
-        &unix_args_path
-    } else {
-        &win_args_path
-    };
-
-    if args_path.exists() {
-        let content = tokio::fs::read_to_string(args_path).await?;
-        return parse_forge_args(&content);
+    // NeoForge always launches through an argument file under libraries/.
+    if let Some(args_file) =
+        find_loader_args_file(&data_path, "net/neoforged/neoforge", Some(neoforge_version)).await
+    {
+        info!("Using NeoForge argument file {}", args_file);
+        return Ok(LaunchConfig::from_args_file(args_file));
     }
 
-    // Fallback
-    Ok(LaunchConfig::vanilla())
+    // Falling back to a vanilla config here would silently boot the server
+    // without NeoForge, which clients then fail to join with a confusing
+    // "server is not running NeoForge" error. Fail the install instead.
+    bail!(
+        "NeoForge {} installer completed but produced no {} — cannot determine how to launch the server",
+        neoforge_version,
+        platform_args_file_name()
+    )
 }
 
 /// Run a Forge/NeoForge installer jar with --installServer, streaming stdout to track
@@ -610,54 +575,128 @@ async fn run_installer_with_progress(
     Ok(())
 }
 
-/// Parse Forge/NeoForge unix_args.txt or win_args.txt into a LaunchConfig.
-/// The format is typically lines with JVM args, then @libraries/..., then main class.
-fn parse_forge_args(content: &str) -> Result<LaunchConfig> {
-    let mut jvm_args = Vec::new();
-    let mut classpath = Vec::new();
-    let mut main_class = None;
-    let mut game_args = Vec::new();
-    let mut past_main_class = false;
-
-    for line in content.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
+/// Find Forge's self-contained launcher jar at the data root — the "shim" jar on
+/// modern versions, the universal jar on pre-1.17. Excludes the installer jar,
+/// which is a different thing that must be *run*, not launched.
+async fn find_forge_launcher_jar(data_path: &Path) -> Option<String> {
+    let mut entries = tokio::fs::read_dir(data_path).await.ok()?;
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with("forge-") && name.ends_with(".jar") && !name.contains("installer") {
+            return Some(name);
         }
+    }
+    None
+}
 
-        if line.starts_with("@") {
-            // @libraries file reference - this is the classpath file
-            // Read it if it exists, or treat as a JVM arg
-            jvm_args.push(line.to_string());
-            continue;
-        }
+/// Name of the Forge/NeoForge argument file for the current platform.
+fn platform_args_file_name() -> &'static str {
+    if cfg!(windows) {
+        "win_args.txt"
+    } else {
+        "unix_args.txt"
+    }
+}
 
-        if line.starts_with("-") {
-            if past_main_class {
-                game_args.push(line.to_string());
-            } else {
-                jvm_args.push(line.to_string());
+/// Locate a Forge/NeoForge argument file, returning its path relative to the
+/// server data dir with forward slashes — portable across platforms and safe to
+/// hand to the JVM as `@<path>`.
+///
+/// Modern installers (Forge 1.17+, every NeoForge) write this file under
+/// `libraries/<vendor_path>/<loader_version>/`, not at the data root. Callers
+/// pass `preferred_version` when the loader version is known so a data dir
+/// holding more than one installed version resolves unambiguously.
+async fn find_loader_args_file(
+    data_path: &Path,
+    vendor_path: &str,
+    preferred_version: Option<&str>,
+) -> Option<String> {
+    let file_name = platform_args_file_name();
+
+    let vendor_dir = vendor_path
+        .split('/')
+        .fold(data_path.join("libraries"), |acc, segment| {
+            acc.join(segment)
+        });
+
+    let mut versions: Vec<String> = Vec::new();
+    if let Ok(mut entries) = tokio::fs::read_dir(&vendor_dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if !entry.path().join(file_name).exists() {
+                continue;
             }
-            continue;
-        }
-
-        // If it looks like a class name (contains dots, no dashes)
-        if line.contains('.') && !line.starts_with('-') && main_class.is_none() {
-            main_class = Some(line.to_string());
-            past_main_class = true;
-            continue;
-        }
-
-        if past_main_class {
-            game_args.push(line.to_string());
+            if let Some(version) = entry.file_name().to_str() {
+                versions.push(version.to_string());
+            }
         }
     }
 
-    Ok(LaunchConfig {
-        jar_path: None, // Forge/NeoForge use -cp + main class, not -jar
-        main_class,
-        classpath,
-        extra_jvm_args: jvm_args,
-        extra_game_args: game_args,
-    })
+    let chosen = match preferred_version {
+        Some(wanted) if versions.iter().any(|v| v == wanted) => Some(wanted.to_string()),
+        _ => {
+            versions.sort();
+            versions.pop()
+        }
+    };
+
+    if let Some(version) = chosen {
+        return Some(format!("libraries/{vendor_path}/{version}/{file_name}"));
+    }
+
+    // Legacy layout: some old installers dropped the file at the data root.
+    if data_path.join(file_name).exists() {
+        return Some(file_name.to_string());
+    }
+
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build the directory layout that `neoforge-<ver>-installer.jar
+    /// --installServer` actually produces: the argument files live under
+    /// `libraries/net/neoforged/neoforge/<ver>/`, never at the data root.
+    fn write_neoforge_install(data_path: &Path, version: &str) {
+        let loader_dir = data_path
+            .join("libraries/net/neoforged/neoforge")
+            .join(version);
+        std::fs::create_dir_all(&loader_dir).unwrap();
+        std::fs::write(loader_dir.join("unix_args.txt"), "-p libraries/a.jar").unwrap();
+        std::fs::write(loader_dir.join("win_args.txt"), "-p libraries/a.jar").unwrap();
+    }
+
+    #[tokio::test]
+    async fn finds_neoforge_args_file_under_libraries() {
+        // Regression: this lookup used to check only the data root, so it never
+        // matched and the server silently fell back to a vanilla launch config.
+        let dir = tempfile::tempdir().unwrap();
+        write_neoforge_install(dir.path(), "21.1.77");
+
+        let found = find_loader_args_file(dir.path(), "net/neoforged/neoforge", Some("21.1.77"))
+            .await
+            .expect("argument file should be found under libraries/");
+
+        assert_eq!(
+            found,
+            format!(
+                "libraries/net/neoforged/neoforge/21.1.77/{}",
+                platform_args_file_name()
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn args_file_lookup_prefers_the_requested_version() {
+        let dir = tempfile::tempdir().unwrap();
+        write_neoforge_install(dir.path(), "21.1.77");
+        write_neoforge_install(dir.path(), "21.1.80");
+
+        let found = find_loader_args_file(dir.path(), "net/neoforged/neoforge", Some("21.1.77"))
+            .await
+            .unwrap();
+
+        assert!(found.contains("21.1.77"), "got {found}");
+    }
 }

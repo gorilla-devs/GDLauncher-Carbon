@@ -44,7 +44,19 @@ impl ServerProvider for LocalServerProvider {
             }
         }
 
-        if let Some(main_class) = &launch_config.main_class {
+        if let Some(args_file) = &launch_config.args_file {
+            // Modern Forge/NeoForge: hand the argument file to the JVM and let
+            // it expand the tokens, exactly as the installer's own run.sh does.
+            // The file supplies the module path, main class and game args.
+            let args_file_path = data_path.join(args_file);
+            if !args_file_path.exists() {
+                anyhow::bail!(
+                    "Modloader argument file not found at {}. The server install may be incomplete — try reinstalling it.",
+                    args_file_path.display()
+                );
+            }
+            cmd.arg(format!("@{}", args_file));
+        } else if let Some(main_class) = &launch_config.main_class {
             // Modded: use classpath + main class (Forge/NeoForge pattern)
             if !launch_config.classpath.is_empty() {
                 let separator = if cfg!(windows) { ";" } else { ":" };
