@@ -1,8 +1,11 @@
 use super::{java::JavaManager, settings::terms_and_privacy::TermsAndPrivacy};
 use crate::app_version::APP_VERSION;
+use carbon_repos::compat::{MigrationSet, OpenVerdict, RefusalKind};
+use carbon_repos::db_error::{DbError, DbResult};
 use carbon_repos::repos::app_configuration::{self as app_config_repo, AppConfigurationPatch};
 use carbon_repos::repos::frontend_preference as frontend_pref_repo;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 use sysinfo::System;
 use thiserror::Error;
 use tracing::{debug, error, instrument, trace};
@@ -10,10 +13,6 @@ use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
-    #[error("error while trying to migrate the database")]
-    MigrationConn(#[from] rusqlite::Error),
-    #[error("error while trying to migrate the database")]
-    Migration(#[from] carbon_repos::db_error::DbError),
     #[error("error while ensuring java profiles in db")]
     EnsureProfiles(anyhow::Error),
     #[error("error while fetching latest terms and privacy checksum")]
@@ -24,6 +23,150 @@ pub enum DatabaseError {
     Diverged(i32),
     #[error("database downgrade failed; a snapshot was preserved at {0}")]
     DowngradeFailed(String),
+    #[error("database file is corrupt or not a database")]
+    Corrupt,
+    #[error("database migration failed")]
+    MigrationFailed,
+}
+
+impl DatabaseError {
+    /// True for the fatal DB outcomes whose `_STATUS_:` line the runner already
+    /// emitted through the funnel (spec §13). The caller exits cleanly on these:
+    /// the status line is the single signal Electron consumes, so panicking
+    /// after a clean emission would double-signal and bury it under a backtrace.
+    pub fn is_emitted_db_status(&self) -> bool {
+        matches!(
+            self,
+            DatabaseError::BackwardsMigration
+                | DatabaseError::Diverged(_)
+                | DatabaseError::DowngradeFailed(_)
+                | DatabaseError::Corrupt
+                | DatabaseError::MigrationFailed
+        )
+    }
+}
+
+/// The terminal DB status funnel (spec §13). Every fatal outcome of the
+/// migration runner converts to one of these, and [`emit_status`] writes exactly
+/// one `_STATUS_:` line — the single place that formats them, so the emittable
+/// set is enumerable and test-locked. `Downgraded` is a non-fatal info line;
+/// every other variant is fatal and aborts startup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DbStatus {
+    Downgraded,
+    BackwardsMigration,
+    Diverged(i32),
+    DowngradeFailed(String),
+    Corrupt,
+    MigrationFailed,
+}
+
+impl DbStatus {
+    /// The exact status line, format-locked to the existing protocol
+    /// (`_STATUS_:<EVENT>[|payload]`). `BACKWARDS_MIGRATION` keeps its spelling
+    /// so pre-floor Electron builds still parse it.
+    fn status_line(&self) -> String {
+        match self {
+            DbStatus::Downgraded => "_STATUS_:DB_DOWNGRADED".to_string(),
+            DbStatus::BackwardsMigration => "_STATUS_:BACKWARDS_MIGRATION".to_string(),
+            DbStatus::Diverged(_) => "_STATUS_:DB_DIVERGED".to_string(),
+            DbStatus::DowngradeFailed(path) => format!("_STATUS_:DB_DOWNGRADE_FAILED|{path}"),
+            DbStatus::Corrupt => "_STATUS_:DB_CORRUPT".to_string(),
+            DbStatus::MigrationFailed => "_STATUS_:DB_MIGRATION_FAILED".to_string(),
+        }
+    }
+
+    /// The `DatabaseError` a fatal status returns so the caller can downcast it
+    /// (`is_emitted_db_status`) and exit cleanly. `Downgraded` is non-fatal and
+    /// never reaches this path.
+    fn into_error(self) -> anyhow::Error {
+        match self {
+            DbStatus::BackwardsMigration => DatabaseError::BackwardsMigration.into(),
+            DbStatus::Diverged(v) => DatabaseError::Diverged(v).into(),
+            DbStatus::DowngradeFailed(p) => DatabaseError::DowngradeFailed(p).into(),
+            DbStatus::Corrupt => DatabaseError::Corrupt.into(),
+            DbStatus::MigrationFailed | DbStatus::Downgraded => {
+                DatabaseError::MigrationFailed.into()
+            }
+        }
+    }
+}
+
+/// The single stdout funnel point (spec §13): every DB status line passes
+/// through here so no fatal path can bypass emission.
+fn emit_status(status: &DbStatus) {
+    println!("{}", status.status_line());
+}
+
+/// Maps the runner outcome to the funnel. `Ok(None)` proceeds silently;
+/// `Ok(Some(_))` is a non-fatal info line to emit; `Err(_)` is a fatal status to
+/// emit before aborting. Pure over its input, so the mapping is unit-tested per
+/// class — the "emission per class" assertion (spec §12 T10, §13 funnel).
+fn classify_open(result: DbResult<OpenVerdict>) -> Result<Option<DbStatus>, DbStatus> {
+    match result {
+        Ok(OpenVerdict::Proceed) => Ok(None),
+        Ok(OpenVerdict::Downgraded) => Ok(Some(DbStatus::Downgraded)),
+        Ok(OpenVerdict::Refuse(RefusalKind::BackwardsMigration)) => {
+            Err(DbStatus::BackwardsMigration)
+        }
+        Ok(OpenVerdict::Refuse(RefusalKind::Diverged { version })) => {
+            Err(DbStatus::Diverged(version))
+        }
+        Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path })) => {
+            Err(DbStatus::DowngradeFailed(snapshot_path.display().to_string()))
+        }
+        Err(e) if is_corruption(&e) => Err(DbStatus::Corrupt),
+        Err(_) => Err(DbStatus::MigrationFailed),
+    }
+}
+
+/// True when a rusqlite error is SQLite reporting a corrupt file or a
+/// non-database file — the only errors that map to `DB_CORRUPT` rather than the
+/// generic `DB_MIGRATION_FAILED`.
+fn is_corruption(err: &DbError) -> bool {
+    matches!(
+        err,
+        DbError::Sqlite(rusqlite::Error::SqliteFailure(e, _))
+            if matches!(
+                e.code,
+                rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase
+            )
+    )
+}
+
+/// The pre-downgrade snapshot path beside the database file (matching
+/// `carbon_repos::compat`): `<stem>.pre-downgrade.db`.
+fn snapshot_path_for(db_path: &Path) -> PathBuf {
+    let stem = db_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("gdl_conf");
+    db_path.with_file_name(format!("{stem}.pre-downgrade.db"))
+}
+
+/// Snapshot retention (spec §13): keep the single most recent pre-downgrade
+/// snapshot, delete it after the next fully-successful launch. Called once this
+/// build has opened the database cleanly; a snapshot older than `session_start`
+/// is from an earlier session and is now safe to drop, while one created during
+/// this session's own down-run is newer and kept so the user can still roll back
+/// to it.
+fn cleanup_stale_snapshot(db_path: &Path, session_start: SystemTime) {
+    let snapshot = snapshot_path_for(db_path);
+    let Ok(modified) = std::fs::metadata(&snapshot).and_then(|m| m.modified()) else {
+        return;
+    };
+    if modified < session_start {
+        match std::fs::remove_file(&snapshot) {
+            Ok(()) => debug!(
+                "Removed stale pre-downgrade snapshot {}",
+                snapshot.display()
+            ),
+            Err(e) => tracing::warn!(
+                "Failed to remove stale pre-downgrade snapshot {}: {e}",
+                snapshot.display()
+            ),
+        }
+    }
 }
 
 /// The rusqlite-backed executor, opened against the migrated on-disk database.
@@ -36,117 +179,41 @@ pub(super) async fn load_and_migrate(
     runtime_path: PathBuf,
     latest_consent_sha: Option<String>,
 ) -> Result<LoadedDb, anyhow::Error> {
+    // Captured before the runner can take a pre-downgrade snapshot, so
+    // `cleanup_stale_snapshot` can tell a snapshot made during THIS session
+    // (keep — the user may still roll back to it) from one left by an earlier
+    // session (delete now that the database opens cleanly).
+    let session_start = SystemTime::now();
+
     let runtime_path = dunce::simplified(&runtime_path);
 
     let db_path = runtime_path.join("gdl_conf.db");
 
-    let (migration_set, migration_count) = carbon_repos::get_migrations();
+    let (migration_set, _migration_count) = carbon_repos::get_migrations();
 
     debug!("db path: {}", db_path.display());
 
     debug!("Starting migration procedure");
 
-    let mut conn = rusqlite::Connection::open(&db_path)?;
-
-    // On Unix, restrict the DB (and -wal/-shm sidecars) to 0600 since they
-    // contain MS access/refresh tokens.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        for sidecar in [
-            db_path.clone(),
-            db_path.with_extension("db-wal"),
-            db_path.with_extension("db-shm"),
-        ] {
-            if sidecar.exists() {
-                let _ = std::fs::set_permissions(&sidecar, std::fs::Permissions::from_mode(0o600));
+    // The runner (spec §9) applies pending migrations forward, overlays a newer
+    // additive schema, or steps a newer breaking schema back down under a
+    // verified snapshot. Every outcome funnels through `classify_open` into a
+    // single `_STATUS_:` line (spec §13): a fatal outcome emits and aborts; a
+    // successful down-run emits the non-fatal `DB_DOWNGRADED` info line and
+    // continues. `BACKWARDS_MIGRATION` keeps its exact meaning — a database
+    // ahead of this build with no downgrade metadata (a pre-floor database).
+    match classify_open(migrate_db(&db_path, &migration_set)) {
+        Ok(info) => {
+            if let Some(status) = info {
+                emit_status(&status);
             }
         }
-        if let Some(parent) = db_path.parent() {
-            let _ = std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700));
+        Err(status) => {
+            emit_status(&status);
+            error!("Fatal database error: {}", status.status_line());
+            return Err(status.into_error());
         }
     }
-
-    // Installs created before the switch to rusqlite_migration recorded their
-    // applied migrations in a `_prisma_migrations` table and left
-    // `user_version` at 0. Read that count so it can seed `user_version`,
-    // letting the migration runner resume from where the legacy install left
-    // off instead of replaying every migration against a populated database.
-    let results: Result<i32, _> =
-        conn.query_row("SELECT COUNT(*) FROM _prisma_migrations", [], |row| {
-            row.get(0)
-        });
-
-    let already_existing_migration_count = match results {
-        Ok(value) => Some(value),
-        Err(err) => None,
-    };
-
-    debug!(
-        "Found {:?} applied migrations in the legacy migration table. Converting them",
-        already_existing_migration_count
-    );
-
-    conn.pragma_update(None, "journal_mode", &"WAL")
-        .map_err(|e| anyhow::anyhow!("Failed to set journal_mode=WAL: {e}"))?;
-
-    if let Some(already_existing_migration_count) = already_existing_migration_count {
-        conn.pragma_update(None, "user_version", &already_existing_migration_count)?;
-    }
-
-    let _ = conn.execute("DROP TABLE IF EXISTS _prisma_migrations", []);
-
-    debug!("Running bidirectional migration runner");
-
-    // The runner (spec §9) either applies pending migrations forward, overlays a
-    // newer additive schema, or steps a newer breaking schema back down under a
-    // verified snapshot. Every fatal outcome funnels through a single
-    // `_STATUS_:` line before returning (spec §13). `BACKWARDS_MIGRATION` keeps
-    // its exact meaning: a database ahead of this build with no downgrade
-    // metadata (a pre-floor database).
-    match migration_set.open(&mut conn, &db_path) {
-        Ok(carbon_repos::compat::OpenVerdict::Proceed) => {}
-        Ok(carbon_repos::compat::OpenVerdict::Downgraded) => {
-            // A newer schema was stepped back to this build's version and
-            // verified against ground truth. Non-fatal: startup continues.
-            println!("_STATUS_:DB_DOWNGRADED");
-        }
-        Ok(carbon_repos::compat::OpenVerdict::Refuse(
-            carbon_repos::compat::RefusalKind::BackwardsMigration,
-        )) => {
-            debug!(
-                "Backwards migration detected: database is ahead of this build's {} migrations with no downgrade metadata",
-                migration_count
-            );
-            println!("_STATUS_:BACKWARDS_MIGRATION");
-            return Err(DatabaseError::BackwardsMigration.into());
-        }
-        Ok(carbon_repos::compat::OpenVerdict::Refuse(
-            carbon_repos::compat::RefusalKind::Diverged { version },
-        )) => {
-            error!("Database history diverged from this build at migration {version}");
-            println!("_STATUS_:DB_DIVERGED");
-            return Err(DatabaseError::Diverged(version).into());
-        }
-        Ok(carbon_repos::compat::OpenVerdict::Refuse(
-            carbon_repos::compat::RefusalKind::DowngradeFailed { snapshot_path },
-        )) => {
-            let snapshot = snapshot_path.display().to_string();
-            error!("Database downgrade failed; snapshot preserved at {snapshot}");
-            println!("_STATUS_:DB_DOWNGRADE_FAILED|{snapshot}");
-            return Err(DatabaseError::DowngradeFailed(snapshot).into());
-        }
-        Err(e) => {
-            error!("Database migration failed: {e}");
-            println!("_STATUS_:DB_MIGRATION_FAILED");
-            return Err(DatabaseError::from(e).into());
-        }
-    }
-
-    debug!("Closing migration connection");
-
-    conn.close()
-        .map_err(|(_, e)| anyhow::anyhow!("Failed to close migration DB connection: {e}"))?;
 
     // Foreign keys have been OFF for the app's entire life (spec §2.3). Turn
     // them ON behind a fail-safe sweep (spec §7): run it on a dedicated
@@ -162,7 +229,76 @@ pub(super) async fn load_and_migrate(
 
     seed_init_db(&db, latest_consent_sha).await?;
 
+    // Reached the successful-open point (spec §13 retention): drop a snapshot
+    // left by an earlier session now that this build has opened the database
+    // cleanly. A snapshot from this session's own down-run is newer than
+    // `session_start` and is kept.
+    cleanup_stale_snapshot(&db_path, session_start);
+
     Ok(LoadedDb { db })
+}
+
+/// Runs the migration runner behind the status funnel: opens the migration
+/// connection, hardens sidecar permissions, applies the legacy
+/// `_prisma_migrations` shim, then hands off to the bidirectional runner (spec
+/// §9). Every step returns through `DbResult` so corruption or a runner refusal
+/// is classified into a single `_STATUS_:` line by the caller — no fatal step
+/// bypasses the funnel.
+fn migrate_db(db_path: &Path, migration_set: &MigrationSet) -> DbResult<OpenVerdict> {
+    let mut conn = rusqlite::Connection::open(db_path)?;
+
+    // On Unix, restrict the DB (and -wal/-shm sidecars) to 0600 since they
+    // contain MS access/refresh tokens.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for sidecar in [
+            db_path.to_path_buf(),
+            db_path.with_extension("db-wal"),
+            db_path.with_extension("db-shm"),
+        ] {
+            if sidecar.exists() {
+                let _ = std::fs::set_permissions(&sidecar, std::fs::Permissions::from_mode(0o600));
+            }
+        }
+        if let Some(parent) = db_path.parent() {
+            let _ = std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700));
+        }
+    }
+
+    // Installs created before the switch to the owned runner recorded their
+    // applied migrations in a `_prisma_migrations` table and left `user_version`
+    // at 0. Read that count to seed `user_version` so the runner resumes where
+    // the legacy install left off instead of replaying every migration against a
+    // populated database. A missing table (the normal case) errors and yields
+    // `None`.
+    let already_existing_migration_count: Option<i32> = conn
+        .query_row("SELECT COUNT(*) FROM _prisma_migrations", [], |row| {
+            row.get(0)
+        })
+        .ok();
+
+    debug!(
+        "Found {:?} applied migrations in the legacy migration table",
+        already_existing_migration_count
+    );
+
+    conn.pragma_update(None, "journal_mode", &"WAL")?;
+
+    if let Some(count) = already_existing_migration_count {
+        conn.pragma_update(None, "user_version", &count)?;
+    }
+
+    let _ = conn.execute("DROP TABLE IF EXISTS _prisma_migrations", []);
+
+    debug!("Running bidirectional migration runner");
+
+    let verdict = migration_set.open(&mut conn, db_path)?;
+
+    debug!("Closing migration connection");
+    conn.close().map_err(|(_, e)| DbError::Sqlite(e))?;
+
+    Ok(verdict)
 }
 
 /// Runs the FK sweep (spec §7) and returns whether the runtime pools should
@@ -356,6 +492,200 @@ async fn seed_init_db(
 #[cfg(test)]
 mod test {
     use super::*;
+
+    // --- Status funnel (spec §13 / CI T10): every fatal DB class maps to
+    // exactly one `_STATUS_:` line. `emit_status` is a single `println!` of
+    // `status_line`, so locking the classification and the line text per class
+    // is the "emission per class" assertion, verified in-process without
+    // capturing stdout.
+
+    fn corrupt_sqlite_error(code: rusqlite::ErrorCode) -> DbError {
+        DbError::Sqlite(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error {
+                code,
+                extended_code: 0,
+            },
+            Some("simulated".to_string()),
+        ))
+    }
+
+    #[test]
+    fn status_lines_are_format_locked_per_class() {
+        assert_eq!(DbStatus::Downgraded.status_line(), "_STATUS_:DB_DOWNGRADED");
+        assert_eq!(
+            DbStatus::BackwardsMigration.status_line(),
+            "_STATUS_:BACKWARDS_MIGRATION"
+        );
+        assert_eq!(DbStatus::Diverged(7).status_line(), "_STATUS_:DB_DIVERGED");
+        assert_eq!(
+            DbStatus::DowngradeFailed("/tmp/gdl_conf.pre-downgrade.db".to_string()).status_line(),
+            "_STATUS_:DB_DOWNGRADE_FAILED|/tmp/gdl_conf.pre-downgrade.db"
+        );
+        assert_eq!(DbStatus::Corrupt.status_line(), "_STATUS_:DB_CORRUPT");
+        assert_eq!(
+            DbStatus::MigrationFailed.status_line(),
+            "_STATUS_:DB_MIGRATION_FAILED"
+        );
+    }
+
+    #[test]
+    fn downgrade_failed_line_carries_a_windows_path_verbatim() {
+        // The snapshot payload can contain a drive-letter colon; Electron parses
+        // it by stripping the `_STATUS_:` prefix, so the path travels intact.
+        let path = "C:\\Users\\gd\\gdl_conf.pre-downgrade.db";
+        assert_eq!(
+            DbStatus::DowngradeFailed(path.to_string()).status_line(),
+            format!("_STATUS_:DB_DOWNGRADE_FAILED|{path}")
+        );
+    }
+
+    #[test]
+    fn classify_open_maps_each_class() {
+        assert_eq!(classify_open(Ok(OpenVerdict::Proceed)), Ok(None));
+        assert_eq!(
+            classify_open(Ok(OpenVerdict::Downgraded)),
+            Ok(Some(DbStatus::Downgraded))
+        );
+        assert_eq!(
+            classify_open(Ok(OpenVerdict::Refuse(RefusalKind::BackwardsMigration))),
+            Err(DbStatus::BackwardsMigration)
+        );
+        assert_eq!(
+            classify_open(Ok(OpenVerdict::Refuse(RefusalKind::Diverged { version: 3 }))),
+            Err(DbStatus::Diverged(3))
+        );
+        assert_eq!(
+            classify_open(Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed {
+                snapshot_path: PathBuf::from("/tmp/snap.db"),
+            }))),
+            Err(DbStatus::DowngradeFailed("/tmp/snap.db".to_string()))
+        );
+        assert_eq!(
+            classify_open(Err(corrupt_sqlite_error(
+                rusqlite::ErrorCode::DatabaseCorrupt
+            ))),
+            Err(DbStatus::Corrupt)
+        );
+        assert_eq!(
+            classify_open(Err(corrupt_sqlite_error(rusqlite::ErrorCode::NotADatabase))),
+            Err(DbStatus::Corrupt)
+        );
+        assert_eq!(
+            classify_open(Err(DbError::Conversion("boom".to_string()))),
+            Err(DbStatus::MigrationFailed)
+        );
+        // A non-corruption sqlite failure is a generic migration failure.
+        assert_eq!(
+            classify_open(Err(corrupt_sqlite_error(
+                rusqlite::ErrorCode::ConstraintViolation
+            ))),
+            Err(DbStatus::MigrationFailed)
+        );
+    }
+
+    #[test]
+    fn is_corruption_only_flags_corrupt_and_notadb() {
+        assert!(is_corruption(&corrupt_sqlite_error(
+            rusqlite::ErrorCode::DatabaseCorrupt
+        )));
+        assert!(is_corruption(&corrupt_sqlite_error(
+            rusqlite::ErrorCode::NotADatabase
+        )));
+        assert!(!is_corruption(&corrupt_sqlite_error(
+            rusqlite::ErrorCode::ConstraintViolation
+        )));
+        assert!(!is_corruption(&DbError::Conversion("boom".to_string())));
+    }
+
+    #[test]
+    fn fatal_statuses_round_trip_to_a_downcastable_database_error() {
+        for status in [
+            DbStatus::BackwardsMigration,
+            DbStatus::Diverged(2),
+            DbStatus::DowngradeFailed("/tmp/s.db".to_string()),
+            DbStatus::Corrupt,
+            DbStatus::MigrationFailed,
+        ] {
+            let err = status.into_error();
+            let db_err = err
+                .downcast_ref::<DatabaseError>()
+                .expect("fatal status must carry a DatabaseError");
+            assert!(
+                db_err.is_emitted_db_status(),
+                "{db_err:?} must be recognised as an emitted DB status so mod.rs exits cleanly"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn corrupt_db_file_reports_corrupt_status() {
+        // A garbage file is opened lazily; the first header read (journal_mode
+        // or the runner's sqlite_master scan) surfaces NOTADB/CORRUPT, funneling
+        // to `DB_CORRUPT` rather than the generic failure.
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
+        std::fs::write(
+            temp_path.join("gdl_conf.db"),
+            b"this is definitely not a sqlite database file",
+        )
+        .unwrap();
+
+        let err = load_and_migrate(temp_path, None)
+            .await
+            .err()
+            .expect("a corrupt db file must abort startup");
+        let db_err = err
+            .downcast_ref::<DatabaseError>()
+            .expect("corrupt db must surface a DatabaseError");
+        assert!(
+            matches!(db_err, DatabaseError::Corrupt),
+            "expected Corrupt, got {db_err:?}"
+        );
+    }
+
+    #[test]
+    fn cleanup_removes_a_previous_sessions_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("gdl_conf.db");
+        let snapshot = snapshot_path_for(&db_path);
+        std::fs::write(&snapshot, b"old snapshot").unwrap();
+
+        // The session started well after this snapshot was written: it is stale
+        // and must be removed on a clean open.
+        let session_start = SystemTime::now() + std::time::Duration::from_secs(3600);
+        cleanup_stale_snapshot(&db_path, session_start);
+
+        assert!(
+            !snapshot.exists(),
+            "a snapshot older than the session must be deleted"
+        );
+    }
+
+    #[test]
+    fn cleanup_keeps_a_snapshot_from_this_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("gdl_conf.db");
+        let snapshot = snapshot_path_for(&db_path);
+        std::fs::write(&snapshot, b"fresh snapshot").unwrap();
+
+        // The session started before this snapshot was written (as a down-run
+        // during startup would): it is the user's rollback point and must stay.
+        let session_start = SystemTime::now() - std::time::Duration::from_secs(3600);
+        cleanup_stale_snapshot(&db_path, session_start);
+
+        assert!(
+            snapshot.exists(),
+            "a snapshot newer than the session must be kept"
+        );
+    }
+
+    #[test]
+    fn cleanup_is_a_noop_without_a_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("gdl_conf.db");
+        // No snapshot file present; must not panic or error.
+        cleanup_stale_snapshot(&db_path, SystemTime::now());
+    }
 
     #[tokio::test]
     async fn test_migrate_tos_privacy_should_reset_status_200() {

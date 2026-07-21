@@ -82,7 +82,11 @@ render(() => {
             "CoreModule errored",
             JSON.stringify(coreModule, null, 2)
           )
-          window.fatalError(coreModule.logs, "CoreModule")
+          window.fatalError(
+            coreModule.logs,
+            "CoreModule",
+            coreModule.snapshotPath
+          )
         } else {
           console.error("CoreModule errored with no logs", coreModule)
           window.fatalError("Unknown error", "CoreModule")

@@ -18,7 +18,11 @@ function pathJoin(...paths: string[]) {
 let oDiv: HTMLDivElement
 function useLoading() {
   return {
-    async fatalError(error: string | Log[], moduleName: string) {
+    async fatalError(
+      error: string | Log[],
+      moduleName: string,
+      snapshotPath?: string
+    ) {
       const runtimePath = await ipcRenderer.invoke("getRuntimePath")
       const isString = typeof error === "string"
 
@@ -32,6 +36,27 @@ function useLoading() {
 
       const _fontSize = isString ? "1.3rem" : "1rem"
       const dbPath = pathJoin(runtimePath, "gdl_conf.db")
+
+      // The "Restore snapshot" rung of the recovery ladder (spec §13) is only
+      // offered when the core preserved a pre-downgrade snapshot: it rolls the
+      // database back to just before the failed update, losing only changes
+      // made after it.
+      const restoreStepHtml = snapshotPath
+        ? `
+          <!-- Step: Restore Previous Database -->
+          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--green-600)); text-align: left;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Recommended</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div style="text-align: left;">
+                <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 2px;">Restore Previous Database</div>
+                <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400));">Roll back to the database from just before the update. Only changes made after the update are lost; accounts and settings are kept.</div>
+              </div>
+              <button id="restore-snapshot-btn" style="padding: 8px 16px; background: rgb(var(--green-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+                Restore
+              </button>
+            </div>
+          </div>`
+        : ""
 
       oDiv.innerHTML = `
       <div style="height: 100vh; overflow-y: auto; padding: 16px 20px; text-align: left;">
@@ -98,6 +123,7 @@ function useLoading() {
           <div id="update-status-subtext" style="display: none;"></div>
           <div id="update-progress-text" style="display: none;"></div>
           <button id="update-action-btn" style="display: none;"></button>
+          ${restoreStepHtml}
 
           <!-- Step 3: Reset Database (Highlighted) -->
           <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--amber-600)); text-align: left;">
@@ -106,7 +132,7 @@ function useLoading() {
               <span style="font-size: 0.65rem; font-weight: 600; color: rgb(var(--amber-400)); background: rgba(251, 191, 36, 0.15); padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Most common fix</span>
             </div>
             <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 4px;">Reset Database</div>
-            <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400)); margin-bottom: 12px;">This fixes most launch issues. Your settings will be reset but <strong style="color: rgb(var(--lightSlate-200));">instances are NOT affected</strong>.</div>
+            <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400)); margin-bottom: 12px;">This fixes most launch issues. You'll need to sign in again and your settings return to defaults, but <strong style="color: rgb(var(--lightSlate-200));">your instances and their files on disk are NOT affected</strong>.</div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <code style="flex: 1; min-width: 180px; background: rgb(var(--darkSlate-800)); padding: 8px 10px; border-radius: 6px; font-size: 0.7rem; font-family: 'Ubuntu Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-400)); text-align: left;">
                 ${dbPath}
@@ -339,6 +365,23 @@ function useLoading() {
         resetDbBtn.style.opacity = "0.6"
         await ipcRenderer.invoke("deleteDbAndRestart")
       })
+
+      if (snapshotPath) {
+        const restoreSnapshotBtn: HTMLButtonElement | null =
+          document.querySelector("#restore-snapshot-btn")
+        if (restoreSnapshotBtn) {
+          addHoverEffect(restoreSnapshotBtn)
+          restoreSnapshotBtn.addEventListener("click", async () => {
+            restoreSnapshotBtn.textContent = "Restoring..."
+            restoreSnapshotBtn.disabled = true
+            restoreSnapshotBtn.style.opacity = "0.6"
+            await ipcRenderer.invoke(
+              "restoreDbSnapshotAndRestart",
+              snapshotPath
+            )
+          })
+        }
+      }
 
       copyErrorDetailBtn.addEventListener("click", async () => {
         const errorDetail = error

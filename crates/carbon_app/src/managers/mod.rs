@@ -117,13 +117,16 @@ mod app {
             {
                 Ok(loaded_db) => loaded_db,
                 Err(e) => {
-                    // Check if this is a backwards migration error
+                    // Fatal DB outcomes already emitted their `_STATUS_:` line
+                    // through the funnel (spec §13); Electron shows the recovery
+                    // ladder from that line. Exit cleanly so the status line is
+                    // the single signal rather than burying it under a panic
+                    // backtrace.
                     if e.downcast_ref::<DatabaseError>()
-                        .map(|e| matches!(e, DatabaseError::BackwardsMigration))
+                        .map(|e| e.is_emitted_db_status())
                         .unwrap_or(false)
                     {
-                        // Exit gracefully - the status message was already printed
-                        error!("Backwards migration detected, exiting gracefully");
+                        error!("Fatal database error; status already emitted, exiting gracefully");
                         std::process::exit(2);
                     }
                     error!("Database migration failed: {}", e);
