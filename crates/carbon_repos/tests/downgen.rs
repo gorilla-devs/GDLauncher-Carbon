@@ -9,8 +9,8 @@
 //! walks every committed migration that carries a down and round-trips it.
 
 use carbon_repos::downgen::{
-    analyze_up, detect_dml_on_existing_tables, detect_rename, generate_down, verify_round_trip,
-    HumanAction,
+    analyze_up, detect_dml_on_existing_tables, detect_rename, full_schema_dump, generate_down,
+    verify_round_trip, HumanAction,
 };
 use carbon_repos::schema_dump::dump_schema;
 use rusqlite::Connection;
@@ -224,4 +224,26 @@ fn every_committed_migration_with_a_down_round_trips() {
                 .unwrap_or_else(|e| panic!("migration {} down does not round-trip: {e}", def.name));
         }
     }
+}
+
+#[test]
+fn full_schema_dump_matches_the_committed_baseline() {
+    // `new_migration` writes exactly this (spec §11: baseline regenerated on
+    // every new migration) after the newest migration in the chain. Against
+    // the real 25-migration chain this must equal the committed
+    // `baseline/baseline.sql` byte-for-byte, or the two have drifted apart.
+    let (set, _n) = carbon_repos::get_migrations();
+    let prev: Vec<&str> = set.migrations[..set.migrations.len() - 1]
+        .iter()
+        .map(|d| d.up_sql)
+        .collect();
+    let last = set.migrations.last().unwrap().up_sql;
+
+    let dump = full_schema_dump(&prev, last).unwrap();
+    let committed = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/baseline/baseline.sql"
+    ))
+    .expect("committed baseline/baseline.sql must exist");
+    assert_eq!(dump, committed, "full_schema_dump drifted from the committed baseline");
 }

@@ -22,12 +22,15 @@
 //! CI-verified scripts.
 
 use carbon_repos::compat::MigrationKind;
-use carbon_repos::downgen::{analyze_up, generate_down, verify_round_trip, GenError};
+use carbon_repos::downgen::{
+    analyze_up, full_schema_dump, generate_down, verify_round_trip, GenError,
+};
 use carbon_repos::manifest::{derive_kind, seeded_lost_fields, DataDown};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const MIGRATIONS_SUBDIR: &str = "prisma/migrations";
+const BASELINE_PATH: &str = "baseline/baseline.sql";
 
 const TEMPLATE: &str = "-- Write the forward (up) SQL for this migration here, then rerun\n\
 -- `cargo run -p carbon_repos --bin new_migration -- <name>` to generate down.sql.\n";
@@ -160,6 +163,7 @@ fn generate_or_verify(
         match verify_round_trip(prev, up, &down) {
             Ok(()) => {
                 println!("Hand-written down.sql verified: it round-trips the prior schema.");
+                regenerate_baseline(prev, up)?;
                 print_list_entry(dir_name, prev, up, &down);
                 Ok(ExitCode::SUCCESS)
             }
@@ -188,6 +192,7 @@ fn generate_or_verify(
             Ok(down) => {
                 std::fs::write(&down_path, &down)?;
                 println!("Generated {} (verified round-trip).", down_path.display());
+                regenerate_baseline(prev, up)?;
                 print_list_entry(dir_name, prev, up, &down);
                 Ok(ExitCode::SUCCESS)
             }
@@ -206,6 +211,23 @@ fn generate_or_verify(
             }
         }
     }
+}
+
+/// Regenerates the committed fresh-install baseline (spec §11) from `prev`
+/// (every earlier migration's `up`) plus this migration's `up`. `new_migration`
+/// only ever operates on the newest migration in the chain, so `prev + up` is
+/// always the full chain's schema at this point — the exact content
+/// `baseline/baseline.sql` must hold. Called after a down is generated or a
+/// hand-written one verifies, so the committed baseline never lags behind a
+/// successfully authored migration.
+fn regenerate_baseline(prev: &[&str], up: &str) -> std::io::Result<()> {
+    let baseline_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(BASELINE_PATH);
+    let dump = full_schema_dump(prev, up).map_err(|e| {
+        std::io::Error::other(format!("failed to build schema for baseline regeneration: {e}"))
+    })?;
+    std::fs::write(&baseline_path, dump)?;
+    println!("Regenerated {}", baseline_path.display());
+    Ok(())
 }
 
 /// Prints the `MigrationDef` list entry the developer pastes into

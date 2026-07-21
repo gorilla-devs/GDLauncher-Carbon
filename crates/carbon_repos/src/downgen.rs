@@ -422,6 +422,18 @@ pub fn verify_round_trip(prev_ups: &[&str], up: &str, down: &str) -> Result<(), 
     }
 }
 
+/// Builds the schema that results from applying `prev_ups` then `up`, dumped
+/// through the shared normalizer. When `up` is the newest migration in the
+/// chain, this is the full chain's schema — what `new_migration` writes to
+/// `baseline/baseline.sql` after generating or verifying each migration's down
+/// (spec §11: the baseline is regenerated on every new migration).
+pub fn full_schema_dump(prev_ups: &[&str], up: &str) -> DbResult<String> {
+    let mut ups: Vec<&str> = prev_ups.to_vec();
+    ups.push(up);
+    let conn = build(&ups)?;
+    dump_schema(&conn)
+}
+
 /// Analyses `up` (applied after `prev_ups`) for the touchpoints the schema diff
 /// cannot resolve: renames and DML on pre-existing tables.
 pub fn analyze_up(prev_ups: &[&str], up: &str) -> DbResult<UpAnalysis> {
