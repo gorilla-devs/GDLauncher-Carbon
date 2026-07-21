@@ -2,15 +2,13 @@
 //!
 //! These caches track the mod/addon files installed on an instance or server,
 //! linking each to a `ModMetadata` row (and, through it, to the CurseForge /
-//! Modrinth platform caches and their images). PCR expressed the reads as
-//! relation-condition filters and `.with(...)` trees; here the filters become
-//! JOIN/EXISTS SQL and each `.with` tree becomes ONE flat LEFT JOIN row.
+//! Modrinth platform caches and their images). Relation filters are expressed
+//! as JOIN/EXISTS SQL and each related tree is read as ONE flat LEFT JOIN row.
 //!
-//! Both `id` columns were `@default(uuid())` (PCR generated them client-side),
-//! so the upsert fns generate `uuid::Uuid::new_v4()` themselves. Both
-//! `lastUpdatedAt` freshness columns (`@updatedAt` under PCR) are written
-//! explicitly on every upsert/update — the freshness lint in
-//! `tests/query_checker.rs` guards this.
+//! Both `id` columns are UUID primary keys with no DB-side default, so the
+//! upsert fns generate `uuid::Uuid::new_v4()` themselves. Both `lastUpdatedAt`
+//! freshness columns are written explicitly on every upsert/update — the
+//! freshness lint in `tests/query_checker.rs` guards this.
 
 use crate::dbtypes::DbDateTime;
 use crate::queries;
@@ -489,8 +487,8 @@ const UPSERT_MOD_FILE_CACHE_SQL: &str =
        lastUpdatedAt = excluded.lastUpdatedAt";
 
 /// Upserts a `ModFileCache` row on the `(instanceId, filename)` unique key.
-/// The `id` is generated here (`@default(uuid())` under PCR) and only used for
-/// the initial INSERT; a conflicting row keeps its existing id.
+/// The `id` is a generated UUID used only for the initial INSERT; a conflicting
+/// row keeps its existing id.
 #[allow(clippy::too_many_arguments)]
 pub fn upsert_mod_file_cache(
     conn: &rusqlite::Connection,

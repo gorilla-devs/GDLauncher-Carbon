@@ -5,8 +5,7 @@
 //! `libraryPosition`. `libraryPosition IS NOT NULL` is used as a deliberate
 //! proxy for "belongs to the default group / library root" so a query never
 //! has to resolve the default group id (which would re-enter `get_default_group`
-//! and deadlock on `index_lock`). None of these queries add or remove an
-//! `ORDER BY` relative to the prisma-client-rust originals.
+//! and deadlock on `index_lock`).
 
 use crate::queries;
 use crate::registry::QueryCheck;
@@ -143,8 +142,7 @@ queries! {
 }
 
 /// `INSERT` shared by `add_instance_tx` and its `QueryCheck`. `favorite` and
-/// `hasPackUpdate` are omitted so they take their DDL `DEFAULT false`, matching
-/// PCR's `create(name, shortpath, index, group, [libraryPosition?])`.
+/// `hasPackUpdate` are omitted so they take their DDL `DEFAULT false`.
 const INSERT_INSTANCE_SQL: &str =
     "INSERT INTO Instance (name, shortpath, \"index\", groupId, libraryPosition)
          VALUES (:name, :shortpath, :index, :group_id, :library_position)";
@@ -160,8 +158,8 @@ const UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_SQL: &str =
     "UPDATE AppConfiguration SET defaultInstanceGroup = :group_id WHERE id = 0";
 
 /// One index shift to run inside `move_instance_tx`, mapping to a registered
-/// `shift_instance_indexes_*` query. Mirrors the conditional `index_shifts`
-/// vector PCR batched with the final instance update.
+/// `shift_instance_indexes_*` query. Encodes the conditional index shift
+/// applied alongside the final instance update.
 #[derive(Debug, Clone, Copy)]
 pub enum IndexShift {
     DownExclusive { group_id: i32, gt: i32, lt: i32 },
@@ -205,7 +203,7 @@ pub fn insert_group(
 }
 
 /// Runs the conditional index shifts and the moved instance's final placement
-/// in one transaction (PCR `_batch((index_shifts, instance.update(...)))`).
+/// in one transaction.
 pub fn move_instance_tx(
     conn: &mut Connection,
     shifts: &[IndexShift],
@@ -236,8 +234,7 @@ pub fn move_instance_tx(
 }
 
 /// Restamps folder/default-group `groupIndex`/`libraryPosition` and ungrouped
-/// instance `index`/`libraryPosition` in one transaction (PCR ran the group and
-/// instance `_batch`es separately).
+/// instance `index`/`libraryPosition` in one transaction.
 pub fn arrange_library_tx(
     conn: &mut Connection,
     groups: &[GroupArrange],
@@ -257,8 +254,7 @@ pub fn arrange_library_tx(
     tx.commit()
 }
 
-/// Restamps every instance's `index` within a folder in one transaction
-/// (PCR `_batch(Vec<instance.update[index]>)`).
+/// Restamps every instance's `index` within a folder in one transaction.
 pub fn set_instance_indexes_tx(
     conn: &mut Connection,
     updates: &[(i32, i32)],
@@ -271,7 +267,7 @@ pub fn set_instance_indexes_tx(
 }
 
 /// Deletes any row at `shortpath` then inserts the new instance, returning its
-/// id (PCR `_batch((delete_many[shortpath], create))`).
+/// id, in one transaction.
 pub fn add_instance_tx(
     conn: &mut Connection,
     name: &str,
@@ -295,11 +291,10 @@ pub fn add_instance_tx(
 }
 
 /// Moves every instance of `group_id` into `default_group_id` (offsetting their
-/// index by `base_index`) then deletes the group, in one transaction
-/// (PCR `_batch((update_many[SetGroupId, IncrementIndex], group.delete))`).
+/// index by `base_index`) then deletes the group, in one transaction.
 ///
-/// `base_index` is computed by the caller exactly as PCR did (the instance-side
-/// oddity counts the group being deleted); this fn does not recompute it.
+/// `base_index` is computed by the caller (the instance-side oddity counts the
+/// group being deleted); this fn does not recompute it.
 pub fn delete_group_tx(
     conn: &mut Connection,
     group_id: i32,
@@ -313,8 +308,7 @@ pub fn delete_group_tx(
 }
 
 /// Creates the `"localize➽default"` group and points the singleton config row
-/// at it, in one transaction (PCR's only interactive `_transaction`). Returns
-/// the new group id.
+/// at it, in one transaction. Returns the new group id.
 pub fn create_default_group_tx(
     conn: &mut Connection,
     group_index: i32,

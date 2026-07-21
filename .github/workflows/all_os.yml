@@ -35,10 +35,6 @@ jobs:
           chmod -R a+x node_modules
       - name: Iridium patchfix
         run: node iridium_patchfix.js
-      - name: Prisma codegen
-        env:
-          CARGO_INCREMENTAL: 0
-        run: pnpm prisma:generate
       - name: Build
         run: pnpm build:mac-universal
         env:
@@ -118,10 +114,6 @@ jobs:
           chmod -R a+x node_modules
       - name: Iridium patchfix
         run: node iridium_patchfix.js
-      - name: Prisma codegen
-        env:
-          CARGO_INCREMENTAL: 0
-        run: pnpm prisma:generate:linux-x64
       - name: Build
         run: pnpm build:linux-x64
         env:
@@ -216,12 +208,6 @@ jobs:
       - name: Iridium patchfix
         shell: bash
         run: node iridium_patchfix.js
-      - name: Prisma codegen
-        shell: bash
-        env:
-          CARGO_INCREMENTAL: 0
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: pnpm prisma:generate:win-x64
       - name: Build
         shell: bash
         run: pnpm build:win-x64

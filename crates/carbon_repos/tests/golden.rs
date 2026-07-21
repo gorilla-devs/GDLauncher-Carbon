@@ -1,63 +1,14 @@
 use carbon_repos::dbtypes::from_millis;
 use rusqlite::Connection;
 
+// `test-assets/golden_pcr.db` is a frozen artifact: it was written by
+// prisma-client-rust (via quaint) while that dependency still existed, capturing
+// the exact on-disk encoding the app shipped with. It can no longer be
+// regenerated — that is the point. The test below reads it back through the
+// rusqlite repository layer to prove the two encodings agree, so it stays as a
+// permanent regression guard against the codec drifting away from real data.
 const GOLDEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-assets/golden_pcr.db");
 const KNOWN_MS: i64 = 1_784_557_692_104;
-
-/// Regenerates the golden DB THROUGH PCR. Run manually while PCR still exists:
-/// `cargo test -p carbon_repos --test golden -- --ignored regenerate`
-#[tokio::test]
-#[ignore]
-async fn regenerate() {
-    let _ = std::fs::remove_file(GOLDEN);
-    // migrate first with the production runner
-    let mut conn = Connection::open(GOLDEN).unwrap();
-    let (migrations, _n) = carbon_repos::get_migrations();
-    migrations.to_latest(&mut conn).unwrap();
-    drop(conn);
-
-    // write rows through PCR so the on-disk encoding is quaint's, not ours
-    let client = carbon_repos::db::new_client_with_url(&format!("file:{GOLDEN}"))
-        .await
-        .unwrap();
-    // Java's `id` is `@default(uuid())`, so it is not a positional create argument;
-    // pin it to a known value through the optional-params vec.
-    client
-        .java()
-        .create(
-            "/golden/java".into(),
-            17,
-            "17.0.2".into(),
-            "Local".into(),
-            "linux".into(),
-            "x64".into(),
-            "Azul".into(),
-            vec![carbon_repos::db::java::id::set("golden-java-id".into())],
-        )
-        .exec()
-        .await
-        .unwrap();
-    client
-        .account()
-        .create(
-            "golden-uuid".into(),
-            "GoldenUser".into(),
-            from_millis(KNOWN_MS).unwrap(),
-            vec![carbon_repos::db::account::token_expires::set(Some(
-                from_millis(KNOWN_MS).unwrap(),
-            ))],
-        )
-        .exec()
-        .await
-        .unwrap();
-    drop(client);
-
-    // Collapse the WAL back into the main file so only golden_pcr.db needs committing.
-    let conn = Connection::open(GOLDEN).unwrap();
-    conn.pragma_update(None, "wal_checkpoint", &"TRUNCATE")
-        .unwrap();
-    drop(conn);
-}
 
 #[test]
 fn golden_db_reads_back_exact_values_through_new_layer() {

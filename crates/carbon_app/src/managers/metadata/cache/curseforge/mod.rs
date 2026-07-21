@@ -446,7 +446,7 @@ async fn cache_curseforge_meta_unchecked(
 
     // The composite `(projectId, fileId)` conflict may land on a row that owns
     // a different `metadataId`; the upsert returns the surviving one so the
-    // image row attaches to the correct metadata (mirrors PCR).
+    // image row attaches to the correct metadata.
     let result_metadata_id = app
         .db
         .write(move |conn| {

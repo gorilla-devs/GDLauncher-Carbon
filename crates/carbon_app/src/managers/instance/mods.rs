@@ -117,8 +117,8 @@ impl ManagerRef<'_, InstanceManager> {
             .await?;
 
         // Apply the optional addon-type filter in Rust BEFORE the duplicate
-        // detection pass, so the modid counts are computed over exactly the same
-        // set PCR's `addon_type` WHERE clause used to produce.
+        // detection pass, so the modid counts are computed over exactly the
+        // rows matching the requested addon type.
         if let Some(addon_type) = addon_type {
             let want = addon_type.to_db_string().to_string();
             mods.retain(|m| m.addon_type == want);

@@ -10,10 +10,9 @@ use crate::{
     },
 };
 use anyhow::Context;
-use carbon_repos::db::{PrismaClient, app_configuration::pre_launch_hook};
+use carbon_repos::db_error::DbError;
 use carbon_repos::db_exec::Db;
 use carbon_repos::dbtypes::DbDateTime;
-use carbon_repos::pcr::QueryError;
 use carbon_repos::repos::version_meta;
 use carbon_rt_path::{InstancePath, RuntimePath};
 use chrono::Utc;
@@ -40,7 +39,7 @@ pub enum VersionError {
     #[error("Could not fetch version meta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Could not execute db query: {0}")]
-    QueryError(#[from] QueryError),
+    QueryError(#[from] DbError),
 }
 
 #[derive(Error, Debug)]
@@ -48,7 +47,7 @@ pub enum MinecraftManifestError {
     #[error("Could not fetch minecraft manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Manifest database query error: {0}")]
-    DBQueryError(#[from] QueryError),
+    DBQueryError(#[from] DbError),
 }
 
 pub async fn get_manifest(

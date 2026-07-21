@@ -196,10 +196,9 @@ impl ManagerRef<'_, SettingsManager> {
         }
 
         if let Some(terms_and_privacy_accepted) = incoming_settings.terms_and_privacy_accepted {
-            // PCR ran two sequential updates here; their net effect on the
-            // singleton row is `termsAndPrivacyAccepted = true` plus the
-            // checksum, regardless of the incoming value (the second update
-            // overwrote the first). Preserve that net effect atomically.
+            // The net effect on the singleton row is `termsAndPrivacyAccepted =
+            // true` plus the checksum, regardless of the incoming value. Apply
+            // that net effect atomically.
             let _ = terms_and_privacy_accepted.inner();
 
             // We default to empty value in case our APIs fail so we don't block the user.

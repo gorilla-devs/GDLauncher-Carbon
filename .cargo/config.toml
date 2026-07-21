@@ -1,7 +1,5 @@
 
 
-[alias]
-prisma = "run -p prisma-cli --"
 [net]
 git-fetch-with-cli = true
 

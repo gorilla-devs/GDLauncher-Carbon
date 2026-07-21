@@ -13,7 +13,6 @@ pub use app::AppInner;
 use crate::api::InvalidationEvent;
 use crate::api::keys::Key;
 use crate::managers::settings::SettingsManager;
-use carbon_repos::db::PrismaClient;
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
@@ -31,7 +30,7 @@ pub(crate) mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;
-pub(crate) mod prisma_client;
+pub(crate) mod db_bootstrap;
 pub mod rich_presence;
 pub mod server;
 mod settings;
@@ -55,7 +54,7 @@ mod app {
         api::{CoreModuleStatus, update_core_module_status},
         cache_middleware, domain,
         iridium_client::get_client,
-        managers::{prisma_client::DatabaseError, settings::terms_and_privacy::TermsAndPrivacy},
+        managers::{db_bootstrap::DatabaseError, settings::terms_and_privacy::TermsAndPrivacy},
     };
 
     use self::java::{
@@ -81,7 +80,6 @@ mod app {
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
-        pub(crate) prisma_client: Arc<PrismaClient>,
         pub(crate) db: Arc<carbon_repos::db_exec::Db>,
         task_manager: VisualTaskManager,
         system_info_manager: SystemInfoManager,
@@ -111,7 +109,7 @@ mod app {
                     .map_err(DatabaseError::TermsAndPrivacy)
                     .ok();
 
-            let loaded_db = match prisma_client::load_and_migrate(
+            let loaded_db = match db_bootstrap::load_and_migrate(
                 runtime_path.clone(),
                 latest_tos_privacy_checksum.clone(),
             )
@@ -132,7 +130,6 @@ mod app {
                     panic!("Database migration failed: {}", e);
                 }
             };
-            let db_client = Arc::new(loaded_db.prisma_client);
             let db = loaded_db.db;
 
             update_core_module_status(CoreModuleStatus::LoadAndMigrate);
@@ -171,13 +168,11 @@ mod app {
                     server_manager: ServerManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
                     metrics_manager: MetricsManager::new(
-                        Arc::clone(&db_client),
                         http_client.clone(),
                         gdl_base_api.clone(),
                     ),
                     invalidation_channel,
                     reqwest_client: http_client.clone(),
-                    prisma_client: Arc::clone(&db_client),
                     db,
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),

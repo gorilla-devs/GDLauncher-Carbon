@@ -69,7 +69,6 @@ fn generate_logs_filters() -> String {
         "hyper::proto::h1::conn=warn",
         "hyper::proto::h1::io=warn",
         "hyper::proto::h1::decode=warn",
-        "quaint::connector::metrics=warn",
         "hyper_util::client::legacy::pool=warn",
         "hyper_util::client::legacy::connect::http=warn",
         "hyper_util::client::legacy::connect::dns=warn",
@@ -77,9 +76,6 @@ fn generate_logs_filters() -> String {
         "reqwest::async_impl::client=warn",
         "hyper::client::connect::http=warn",
         "hyper::client::connect::dns=warn",
-        "quaint::pooled::manager=warn",
-        "query_core::interactive_transactions::actors=warn",
-        "query_core::executor::interpreting_executor=warn",
         "rustls::client::hs=warn",
         "rustls::client::tls13=warn",
         "h2::client=warn",
@@ -88,7 +84,6 @@ fn generate_logs_filters() -> String {
         "h2::codec::framed_write=warn",
         "h2::proto::settings=warn",
         "tungstenite::protocol=warn",
-        "mobc=trace",
     ];
 
     filters.to_vec().join(",")

@@ -3,16 +3,15 @@
 //! (`LocalModImageCache`, `CurseForgeModImageCache`, `ModrinthModImageCache`).
 //!
 //! `ModMetadata` is the hash-keyed hub every mod file links to; the platform
-//! caches hang off it 1:1 by `metadataId`. PCR expressed the platform-cache
-//! writes as `upsert(...)` on the *composite* unique keys (`(projectId, fileId)`
-//! for CurseForge, `(projectId, versionId)` for Modrinth) — NOT the `metadataId`
-//! primary key. That composite conflict target is preserved here verbatim: on a
-//! conflict the existing row keeps its own `metadataId`, so the two upsert fns
-//! return the surviving `metadataId` (via `RETURNING`) for the caller to attach
-//! the image row to — mirroring PCR's `cache_result.metadata_id`.
+//! caches hang off it 1:1 by `metadataId`. The platform-cache writes upsert on
+//! the *composite* unique keys (`(projectId, fileId)` for CurseForge,
+//! `(projectId, versionId)` for Modrinth) — NOT the `metadataId` primary key.
+//! On a conflict the existing row keeps its own `metadataId`, so the two upsert
+//! fns return the surviving `metadataId` (via `RETURNING`) for the caller to
+//! attach the image row to.
 //!
-//! `ModMetadata.lastUpdatedAt` (PCR `@updatedAt`) is written explicitly on
-//! insert. `ModMetadata` is created once and never updated.
+//! `ModMetadata.lastUpdatedAt` is written explicitly on insert. `ModMetadata`
+//! is created once and never updated.
 
 use crate::dbtypes::DbDateTime;
 use crate::queries;
@@ -179,9 +178,9 @@ queries! {
 
 /// SQL executed by `upsert_cf_mod_cache`, shared with its `QueryCheck`. The
 /// conflict target is the composite `(projectId, fileId)` unique key — NOT the
-/// `metadataId` PK — exactly as PCR compiled it. `metadataId` is deliberately
-/// absent from the `DO UPDATE SET` list, so a conflicting row keeps its own
-/// `metadataId`, which `RETURNING` reads back.
+/// `metadataId` PK. `metadataId` is deliberately absent from the `DO UPDATE
+/// SET` list, so a conflicting row keeps its own `metadataId`, which
+/// `RETURNING` reads back.
 const UPSERT_CF_MOD_CACHE_SQL: &str =
     "INSERT INTO CurseForgeModCache
        (metadataId, murmur2, projectId, fileId, name, version, urlslug, summary, authors, releaseType, updatePaths, cachedAt)

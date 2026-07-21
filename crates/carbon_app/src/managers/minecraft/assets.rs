@@ -1,8 +1,8 @@
 use crate::domain::minecraft::minecraft::asset_object_location;
 use anyhow::Context;
+use carbon_repos::db_error::DbError;
 use carbon_repos::db_exec::Db;
 use carbon_repos::dbtypes::DbDateTime;
-use carbon_repos::pcr::QueryError;
 use carbon_repos::repos::version_meta;
 use carbon_rt_path::AssetsPath;
 use chrono::Utc;
@@ -17,7 +17,7 @@ pub enum AssetsError {
     #[error("Can't fetch assets index manifest: {0}")]
     FetchAssetsIndexManifest(#[from] reqwest::Error),
     #[error("Can't execute db query: {0}")]
-    QueryError(#[from] QueryError),
+    QueryError(#[from] DbError),
 }
 
 pub async fn get_meta(

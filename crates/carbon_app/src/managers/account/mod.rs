@@ -1517,8 +1517,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
 
         // A plain `DELETE` reports affected rows instead of erroring on a
-        // missing row (PCR's `RecordNotFound`); `rows_affected == 0` is the
-        // equivalent check.
+        // missing row; `rows_affected == 0` detects the not-found case.
         let rows_affected = self
             .app
             .db

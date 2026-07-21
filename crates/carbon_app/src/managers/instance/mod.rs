@@ -380,7 +380,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         // Nest instances under their group, preserving the index-asc order the
-        // query returned them in (mirrors PCR's `.with(instances::fetch(...))`).
+        // query returned them in.
         let mut instances_by_group: HashMap<i32, Vec<CachedInstance>> = HashMap::new();
         for instance in all_instances {
             instances_by_group
@@ -2502,9 +2502,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Delete the group record. _delete_instance auto-removes an emptied non-default group
         // after deleting its last instance, so the row may already be gone here; a plain DELETE
-        // is idempotent (no error on zero rows), whereas PCR's delete() would fail with
-        // RecordNotFound on the happy path and surface a spurious error toast on a successful
-        // deletion.
+        // is idempotent (no error on zero rows), so a group already removed on the happy path
+        // does not surface a spurious error toast on a successful deletion.
         self.app
             .db
             .write(move |conn| Ok(instance_repo::delete_group(conn, group_id)?))

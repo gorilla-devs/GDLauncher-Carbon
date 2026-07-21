@@ -16,7 +16,7 @@ use crate::{
         router::router,
     },
     app_version::APP_VERSION,
-    managers::{App, prisma_client::is_in_beta_prompt_cohort},
+    managers::{App, db_bootstrap::is_in_beta_prompt_cohort},
     mirror_into,
 };
 use carbon_repos::dbtypes::DbDateTime;

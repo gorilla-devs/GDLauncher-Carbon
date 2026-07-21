@@ -5,15 +5,14 @@
 //! integer/uuid PK) and hang a 1:1 optional image row off that same
 //! composite key.
 //!
-//! `updatedAt` (PCR `@updatedAt`) is the 7-day freshness column these caches
-//! exist for; it is written explicitly on every upsert, in both the insert
-//! and the `DO UPDATE SET` branch — the freshness lint in
-//! `tests/query_checker.rs` guards this. The 7-day compare itself
-//! (`updated_at + 7d > now`) stays in the manager, in Rust, exactly as PCR's
-//! call sites did it — `updated_at` here is just a plain `DateTime<FixedOffset>`.
+//! `updatedAt` is the 7-day freshness column these caches exist for; it is
+//! written explicitly on every upsert, in both the insert and the `DO UPDATE
+//! SET` branch — the freshness lint in `tests/query_checker.rs` guards this.
+//! The 7-day compare itself (`updated_at + 7d > now`) lives in the manager, in
+//! Rust — `updated_at` here is just a plain `DateTime<FixedOffset>`.
 //!
-//! The joined "with logo" read replaces PCR's `.with(logo_image::fetch())`:
-//! one `LEFT JOIN` row exposes the (possibly absent) image's `data` blob
+//! The joined "with logo" read uses a `LEFT JOIN`:
+//! one row exposes the (possibly absent) image's `data` blob
 //! flattened to `Option<Vec<u8>>`, plus a separate `has_logo` flag (the image
 //! *row* exists, independent of whether its `data` was ever downloaded) — the
 //! two are different questions call sites ask: "do we have image bytes to

@@ -1,8 +1,9 @@
 //! Foreign-key enablement sweep (spec §7).
 //!
-//! Foreign keys have been OFF for the app's entire life: quaint set no pragmas,
-//! SQLite defaults FKs off per connection, and referential integrity was kept
-//! manually by manager code. This module turns FKs ON behind a fail-safe sweep.
+//! Foreign keys have been OFF for the app's entire life: SQLite defaults FKs
+//! off per connection, no pragma ever turned them on, and referential integrity
+//! was kept manually by manager code. This module turns FKs ON behind a
+//! fail-safe sweep.
 //!
 //! [`sweep_and_decide`] runs after migrations, on a dedicated connection whose
 //! FKs are OFF (so repair deletes do not themselves cascade). It runs

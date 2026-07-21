@@ -14,8 +14,8 @@ pub struct FrontendPreferenceRow {
 queries! {
     fn get_preference(key: &str) -> Option<FrontendPreferenceRow> =
         "SELECT key, value, updatedAt FROM FrontendPreference WHERE key = :key";
-    // `updatedAt` is written explicitly on every upsert (PCR's `@updatedAt`
-    // wrote it automatically; the freshness lint guards this column).
+    // `updatedAt` is written explicitly on every upsert (the freshness lint
+    // guards this column).
     fn upsert_preference(key: &str, value: &str, updated_at: DbDateTime) -> usize =
         "INSERT INTO FrontendPreference (key, value, updatedAt) VALUES (:key, :value, :updated_at)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt";

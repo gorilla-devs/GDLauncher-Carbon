@@ -1,16 +1,7 @@
 use super::{java::JavaManager, settings::terms_and_privacy::TermsAndPrivacy};
 use crate::app_version::APP_VERSION;
-use carbon_repos::db::PrismaClient;
-use carbon_repos::db::{
-    self,
-    http_cache::{SetParam, WhereParam},
-    read_filters::StringFilter,
-};
-use carbon_repos::pcr::raw;
 use carbon_repos::repos::app_configuration::{self as app_config_repo, AppConfigurationPatch};
 use carbon_repos::repos::frontend_preference as frontend_pref_repo;
-use ring::rand::SecureRandom;
-use serde::Deserialize;
 use std::path::PathBuf;
 use sysinfo::System;
 use thiserror::Error;
@@ -19,14 +10,12 @@ use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
-    #[error("error raised while trying to build the client for DB: {0}")]
-    Client(#[from] carbon_repos::pcr::NewClientError),
     #[error("error while trying to migrate the database")]
     MigrationConn(#[from] rusqlite::Error),
     #[error("error while trying to migrate the database")]
     Migration(#[from] rusqlite_migration::Error),
     #[error("error while trying to query db")]
-    Query(#[from] carbon_repos::pcr::QueryError),
+    Query(#[from] carbon_repos::db_error::DbError),
     #[error("error while ensuring java profiles in db")]
     EnsureProfiles(anyhow::Error),
     #[error("error while fetching latest terms and privacy checksum")]
@@ -35,10 +24,8 @@ pub enum DatabaseError {
     BackwardsMigration,
 }
 
-/// PCR client alongside the rusqlite-backed executor, opened against the
-/// same on-disk database.
+/// The rusqlite-backed executor, opened against the migrated on-disk database.
 pub(super) struct LoadedDb {
-    pub prisma_client: PrismaClient,
     pub db: std::sync::Arc<carbon_repos::db_exec::Db>,
 }
 
@@ -50,20 +37,14 @@ pub(super) async fn load_and_migrate(
     let runtime_path = dunce::simplified(&runtime_path);
 
     let db_path = runtime_path.join("gdl_conf.db");
-    let db_uri = format!(
-        "file:{}?connection_limit=1",
-        db_path
-            .to_str()
-            .ok_or_else(|| anyhow::anyhow!("DB path is not valid UTF-8: {:?}", db_path))?
-    );
 
     let (migrations, migration_count) = carbon_repos::get_migrations();
 
-    debug!("db uri: {}", db_uri);
+    debug!("db path: {}", db_path.display());
 
     debug!("Starting migration procedure");
 
-    let mut conn = rusqlite::Connection::open(&db_uri)?;
+    let mut conn = rusqlite::Connection::open(&db_path)?;
 
     // On Unix, restrict the DB (and -wal/-shm sidecars) to 0600 since they
     // contain MS access/refresh tokens.
@@ -84,6 +65,11 @@ pub(super) async fn load_and_migrate(
         }
     }
 
+    // Installs created before the switch to rusqlite_migration recorded their
+    // applied migrations in a `_prisma_migrations` table and left
+    // `user_version` at 0. Read that count so it can seed `user_version`,
+    // letting the migration runner resume from where the legacy install left
+    // off instead of replaying every migration against a populated database.
     let results: Result<i32, _> =
         conn.query_row("SELECT COUNT(*) FROM _prisma_migrations", [], |row| {
             row.get(0)
@@ -95,7 +81,7 @@ pub(super) async fn load_and_migrate(
     };
 
     debug!(
-        "Found {:?} migrations from prisma. Converting them",
+        "Found {:?} applied migrations in the legacy migration table. Converting them",
         already_existing_migration_count
     );
 
@@ -143,47 +129,9 @@ pub(super) async fn load_and_migrate(
             .map_err(|e| anyhow::anyhow!("failed to open sqlite executor: {e}"))?,
     );
 
-    debug!("Starting prisma connection");
+    seed_init_db(&db, latest_consent_sha).await?;
 
-    let db_client = db::new_client_with_url(&db_uri)
-        .await
-        .map_err(DatabaseError::Client)?;
-
-    #[derive(Deserialize)]
-    struct Whatever {}
-
-    let _: Vec<Whatever> = db_client
-        ._query_raw(raw!("PRAGMA journal_mode=WAL;"))
-        .exec()
-        .await
-        .map_err(|e| anyhow::anyhow!("PRAGMA journal_mode failed: {e}"))?;
-    let _: Vec<Whatever> = db_client
-        ._query_raw(raw!("PRAGMA synchronous=normal;"))
-        .exec()
-        .await
-        .map_err(|e| anyhow::anyhow!("PRAGMA synchronous failed: {e}"))?;
-    let _: Vec<Whatever> = db_client
-        ._query_raw(raw!("PRAGMA temp_store=MEMORY;"))
-        .exec()
-        .await
-        .map_err(|e| anyhow::anyhow!("PRAGMA temp_store failed: {e}"))?;
-    // Cap the mmap window at 256 MiB: mapped DB pages sit in the process
-    // working set (not reclaimable cache), so a window sized beyond the hot
-    // page set turns a bloated DB directly into launcher RAM pressure. Reads
-    // past the window go through the OS page cache, which stays reclaimable
-    // "available" memory.
-    let _: Vec<Whatever> = db_client
-        ._query_raw(raw!("PRAGMA mmap_size = 268435456;"))
-        .exec()
-        .await
-        .map_err(|e| anyhow::anyhow!("PRAGMA mmap_size failed: {e}"))?;
-
-    seed_init_db(&db_client, &db, latest_consent_sha).await?;
-
-    Ok(LoadedDb {
-        prisma_client: db_client,
-        db,
-    })
+    Ok(LoadedDb { db })
 }
 
 /// Runs the FK sweep (spec §7) and returns whether the runtime pools should
@@ -263,7 +211,6 @@ pub fn is_in_beta_prompt_cohort(installation_id: &str, percentage: f64) -> bool 
 }
 
 async fn seed_init_db(
-    db_client: &PrismaClient,
     db: &carbon_repos::db_exec::Db,
     latest_consent_sha: Option<String>,
 ) -> Result<(), anyhow::Error> {

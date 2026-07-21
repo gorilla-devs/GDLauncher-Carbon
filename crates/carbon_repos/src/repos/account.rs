@@ -1,9 +1,8 @@
 //! Repository queries for the `Account` table.
 //!
-//! The account writes PCR expressed as a dynamic `Vec<SetParam>` are actually
-//! driven by a fixed enum (`FullAccountType::{Offline, Microsoft}`), so each
-//! variant gets its own static, checker-verified query rather than routing
-//! through `DynamicQuery`.
+//! Account writes are driven by a fixed enum
+//! (`FullAccountType::{Offline, Microsoft}`), so each variant gets its own
+//! static, checker-verified query rather than routing through `DynamicQuery`.
 
 use crate::dbtypes::DbDateTime;
 use crate::queries;
@@ -32,8 +31,8 @@ queries! {
 
     // Offline account: only uuid/username/lastUsed are meaningful; skinId is
     // passed through for interface symmetry with `insert_account_microsoft`
-    // but is always `None` at today's only call site (matching PCR, which
-    // never set it for an offline `create`).
+    // but is always `None` at today's only call site (an offline account is
+    // never created with a skin).
     fn insert_account_offline(uuid: &str, username: &str, last_used: DbDateTime, skin_id: Option<&str>) -> usize =
         "INSERT INTO Account (uuid, username, lastUsed, skinId) VALUES (:uuid, :username, :last_used, :skin_id)";
     fn insert_account_microsoft(
@@ -51,7 +50,7 @@ queries! {
          VALUES (:uuid, :username, :last_used, :access_token, :token_expires, :ms_refresh_token, :id_token, :gdl_token, :skin_id)";
 
     // Updating an existing account never touches `lastUsed` (see comment at
-    // the call site — preserved verbatim from PCR).
+    // the call site).
     fn update_account_offline(uuid: &str, username: &str) -> usize =
         "UPDATE Account SET username = :username, accessToken = NULL, msRefreshToken = NULL, tokenExpires = NULL WHERE uuid = :uuid";
     fn update_account_microsoft(
@@ -73,8 +72,6 @@ queries! {
         "UPDATE Account SET tokenExpires = :now WHERE uuid = :uuid";
     fn update_account_profile(uuid: &str, username: &str, skin_id: Option<&str>) -> usize =
         "UPDATE Account SET username = :username, skinId = :skin_id WHERE uuid = :uuid";
-    fn set_account_skin_id(uuid: &str, skin_id: Option<&str>) -> usize =
-        "UPDATE Account SET skinId = :skin_id WHERE uuid = :uuid";
     fn delete_account(uuid: &str) -> usize =
         "DELETE FROM Account WHERE uuid = :uuid";
 }

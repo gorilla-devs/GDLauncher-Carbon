@@ -1,5 +1,5 @@
 //! Datetime codec for the on-disk format: INTEGER unix-epoch milliseconds.
-//! Prisma's quaint wrote `timestamp_millis()`; every decoder that assumes
+//! The datetime columns store `timestamp_millis()`; every decoder that assumes
 //! epoch-seconds (sqlx chrono, rusqlite's `chrono` feature) produces garbage
 //! dates. All datetime traffic goes through this type.
 

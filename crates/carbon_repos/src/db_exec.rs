@@ -48,7 +48,8 @@ pub struct Db {
 }
 
 fn apply_runtime_pragmas(conn: &Connection, foreign_keys: bool) -> rusqlite::Result<()> {
-    // Matches the PRAGMAs the app applied under PCR (spec §2.6).
+    // The connection-level PRAGMAs the app runs against every pool connection
+    // (spec §2.6).
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
          PRAGMA synchronous = NORMAL;

@@ -28,11 +28,8 @@ const INSERT_HTTP_CACHE_SQL: &str = "INSERT INTO HTTPCache (url, status_code, da
      VALUES (:url, :status_code, :data, :expires_at, :last_modified, :etag)";
 
 /// Replaces any cached response for `url` with a fresh one, in one
-/// transaction. Mirrors the PCR `_batch` tuple (`delete_many`, `create`)
-/// which relied on `_batch` only to avoid a "no rows deleted" error on the
-/// first op when no cached row exists yet -- a plain `DELETE` already
-/// tolerates that, so the transaction is a straight sequence of the two
-/// statements.
+/// transaction: a `DELETE` followed by an `INSERT`. The `DELETE` tolerates a
+/// missing row, so no existence check is needed before it.
 pub fn replace_cached(
     conn: &mut rusqlite::Connection,
     url: &str,

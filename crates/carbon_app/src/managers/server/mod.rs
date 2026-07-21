@@ -204,7 +204,7 @@ impl ManagerRef<'_, ServerManager> {
             .await?;
 
         // Nest servers under their group, preserving the index-asc order the
-        // query returned them in (mirrors PCR's `.with(servers::fetch(...))`).
+        // query returned them in.
         let mut servers_by_group: HashMap<i32, Vec<server_repo::ServerRow>> = HashMap::new();
         for s in all_servers {
             servers_by_group.entry(s.group_id).or_default().push(s);

@@ -18,7 +18,7 @@ accepted = [
     "BUSL-1.1",
 ]
 
-# Ignore unpublished workspace crates (carbon_*, prisma-cli, etc.)
+# Ignore unpublished workspace crates (carbon_*, etc.)
 private = { ignore = true }
 
 # Use built-in workarounds for crates with known issues
@@ -30,170 +30,6 @@ ignore-dev-dependencies = true
 # ============================================================================
 # CLARIFICATIONS FOR EXTERNAL CRATES WITHOUT LICENSE FIELDS
 # ============================================================================
-
-# prisma-client-rust (Apache-2.0)
-# https://github.com/Brendonovich/prisma-client-rust/blob/main/LICENSE
-[prisma-client-rust]
-accepted = ["Apache-2.0"]
-[prisma-client-rust.clarify]
-license = "Apache-2.0"
-
-[prisma-client-rust-cli]
-accepted = ["Apache-2.0"]
-[prisma-client-rust-cli.clarify]
-license = "Apache-2.0"
-
-[prisma-client-rust-macros]
-accepted = ["Apache-2.0"]
-[prisma-client-rust-macros.clarify]
-license = "Apache-2.0"
-
-[prisma-client-rust-sdk]
-accepted = ["Apache-2.0"]
-[prisma-client-rust-sdk.clarify]
-license = "Apache-2.0"
-
-# Prisma engine crates (Apache-2.0)
-# https://github.com/prisma/prisma-engines/blob/main/LICENSE
-[builtin-psl-connectors]
-accepted = ["Apache-2.0"]
-[builtin-psl-connectors.clarify]
-license = "Apache-2.0"
-
-[datamodel-renderer]
-accepted = ["Apache-2.0"]
-[datamodel-renderer.clarify]
-license = "Apache-2.0"
-
-[diagnostics]
-accepted = ["Apache-2.0"]
-[diagnostics.clarify]
-license = "Apache-2.0"
-
-[dml]
-accepted = ["Apache-2.0"]
-[dml.clarify]
-license = "Apache-2.0"
-
-[dmmf]
-accepted = ["Apache-2.0"]
-[dmmf.clarify]
-license = "Apache-2.0"
-
-[introspection-connector]
-accepted = ["Apache-2.0"]
-[introspection-connector.clarify]
-license = "Apache-2.0"
-
-[json-rpc-api-build]
-accepted = ["Apache-2.0"]
-[json-rpc-api-build.clarify]
-license = "Apache-2.0"
-
-[migration-connector]
-accepted = ["Apache-2.0"]
-[migration-connector.clarify]
-license = "Apache-2.0"
-
-[migration-core]
-accepted = ["Apache-2.0"]
-[migration-core.clarify]
-license = "Apache-2.0"
-
-[parser-database]
-accepted = ["Apache-2.0"]
-[parser-database.clarify]
-license = "Apache-2.0"
-
-[prisma-models]
-accepted = ["Apache-2.0"]
-[prisma-models.clarify]
-license = "Apache-2.0"
-
-[prisma-value]
-accepted = ["Apache-2.0"]
-[prisma-value.clarify]
-license = "Apache-2.0"
-
-[psl]
-accepted = ["Apache-2.0"]
-[psl.clarify]
-license = "Apache-2.0"
-
-[psl-core]
-accepted = ["Apache-2.0"]
-[psl-core.clarify]
-license = "Apache-2.0"
-
-[query-connector]
-accepted = ["Apache-2.0"]
-[query-connector.clarify]
-license = "Apache-2.0"
-
-[query-core]
-accepted = ["Apache-2.0"]
-[query-core.clarify]
-license = "Apache-2.0"
-
-[query-engine-metrics]
-accepted = ["Apache-2.0"]
-[query-engine-metrics.clarify]
-license = "Apache-2.0"
-
-[request-handlers]
-accepted = ["Apache-2.0"]
-[request-handlers.clarify]
-license = "Apache-2.0"
-
-[schema]
-accepted = ["Apache-2.0"]
-[schema.clarify]
-license = "Apache-2.0"
-
-[schema-ast]
-accepted = ["Apache-2.0"]
-[schema-ast.clarify]
-license = "Apache-2.0"
-
-[schema-builder]
-accepted = ["Apache-2.0"]
-[schema-builder.clarify]
-license = "Apache-2.0"
-
-[sql-ddl]
-accepted = ["Apache-2.0"]
-[sql-ddl.clarify]
-license = "Apache-2.0"
-
-[sql-introspection-connector]
-accepted = ["Apache-2.0"]
-[sql-introspection-connector.clarify]
-license = "Apache-2.0"
-
-[sql-migration-connector]
-accepted = ["Apache-2.0"]
-[sql-migration-connector.clarify]
-license = "Apache-2.0"
-
-[sql-query-connector]
-accepted = ["Apache-2.0"]
-[sql-query-connector.clarify]
-license = "Apache-2.0"
-
-[sql-schema-describer]
-accepted = ["Apache-2.0"]
-[sql-schema-describer.clarify]
-license = "Apache-2.0"
-
-[user-facing-error-macros]
-accepted = ["Apache-2.0"]
-[user-facing-error-macros.clarify]
-license = "Apache-2.0"
-
-[user-facing-errors]
-accepted = ["Apache-2.0"]
-[user-facing-errors.clarify]
-license = "Apache-2.0"
 
 # fuchsia-cprng (BSD-3-Clause)
 [fuchsia-cprng]
@@ -256,9 +92,4 @@ license = "BUSL-1.1"
 [carbon_rt_path]
 accepted = ["BUSL-1.1"]
 [carbon_rt_path.clarify]
-license = "BUSL-1.1"
-
-[prisma-cli]
-accepted = ["BUSL-1.1"]
-[prisma-cli.clarify]
 license = "BUSL-1.1"

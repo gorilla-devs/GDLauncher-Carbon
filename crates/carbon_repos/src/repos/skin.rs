@@ -21,11 +21,9 @@ const INSERT_SKIN_SQL: &str = "INSERT INTO Skin (id, skin) VALUES (:id, :skin)";
 const UPDATE_ACCOUNT_SKIN_SQL: &str = "UPDATE Account SET skinId = :id WHERE uuid = :uuid";
 
 /// Replaces the cached skin `skin_id` with `skin_data` and links it to
-/// `account_uuid`, in one transaction. Mirrors the PCR `_batch` tuple
-/// (delete_many, create, account.update) which relied on `_batch` only to
-/// avoid a "no rows deleted" error on the first op — a plain `DELETE`
-/// already tolerates that, so the transaction is a straight sequence of the
-/// three statements.
+/// `account_uuid`, in one transaction: a `DELETE`, then an `INSERT`, then the
+/// account `UPDATE`. The `DELETE` tolerates a missing row, so no existence
+/// check is needed before it.
 pub fn replace_skin_and_link_account(
     conn: &mut rusqlite::Connection,
     skin_id: &str,

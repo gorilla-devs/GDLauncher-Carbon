@@ -1,10 +1,8 @@
 use crate::{domain::metrics::GDLMetricsEvent, iridium_client::get_client};
-use carbon_repos::db::PrismaClient;
 use display_info::DisplayInfo;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
 use serde_json::json;
-use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -12,22 +10,16 @@ use super::ManagerRef;
 
 pub(crate) struct MetricsManager {
     client: ClientWithMiddleware,
-    prisma_client: Arc<PrismaClient>,
     gdl_base_api: String,
     random_session_uuid: Uuid,
 }
 
 impl MetricsManager {
-    pub fn new(
-        prisma_client: Arc<PrismaClient>,
-        http_client: ClientWithMiddleware,
-        gdl_base_api: String,
-    ) -> Self {
+    pub fn new(http_client: ClientWithMiddleware, gdl_base_api: String) -> Self {
         let random_session_uuid = Uuid::new_v4();
 
         Self {
             client: http_client,
-            prisma_client,
             gdl_base_api,
             random_session_uuid,
         }

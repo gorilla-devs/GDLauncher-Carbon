@@ -5,11 +5,6 @@ edition = "2024"
 
 [dependencies]
 carbon_macro = { path = "../carbon_macro" }
-prisma-client-rust = { workspace = true, features = [
-  "sqlite-create-many",
-  "sqlite",
-  "migrations",
-], default-features = false }
 serde = { workspace = true, features = ["derive", "rc"] }
 rusqlite = { version = "0.25.4", features = ["bundled"] }
 rusqlite_migration = "1.0.2"

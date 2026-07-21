@@ -1,9 +1,8 @@
 //! Repository queries for the four version-meta KV-blob caches:
 //! `VersionInfoCache`, `PartialVersionInfoCache`, `LwjglMetaCache`,
 //! `AssetsMetaCache`. All four share the same shape: a `String` id (PK), a
-//! `Bytes` payload, and a `lastUpdatedAt` freshness column that PCR's
-//! `@updatedAt` used to write automatically — every upsert here sets it
-//! explicitly instead (the freshness lint in `tests/query_checker.rs` guards
+//! `Bytes` payload, and a `lastUpdatedAt` freshness column that every upsert
+//! here sets explicitly (the freshness lint in `tests/query_checker.rs` guards
 //! this).
 
 use crate::dbtypes::DbDateTime;

@@ -3,7 +3,7 @@ use crate::managers::java::utils::PATH_SEPARATOR;
 use anyhow::{Context, bail};
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::version_meta;
-use carbon_repos::{db_exec::Db, pcr::QueryError};
+use carbon_repos::{db_error::DbError, db_exec::Db};
 use carbon_rt_path::{InstancePath, LibrariesPath};
 use chrono::Utc;
 use daedalus::{
@@ -25,7 +25,7 @@ pub enum NeoForgeManifestError {
     #[error("Could not fetch neoforge manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Manifest database query error: {0}")]
-    DBQueryError(#[from] QueryError),
+    DBQueryError(#[from] DbError),
 }
 
 pub async fn get_manifest(

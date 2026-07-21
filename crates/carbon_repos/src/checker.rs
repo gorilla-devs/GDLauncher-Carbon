@@ -50,10 +50,9 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
     violations
 }
 
-/// Tables whose freshness column PCR wrote automatically (`@updatedAt`) and
-/// that we must now set explicitly on every create/update/upsert. Missing one
-/// of these breaks cache-expiry reads silently (the two modpack `updatedAt`
-/// columns feed a 7-day freshness gate).
+/// Tables whose freshness column must be set explicitly on every
+/// create/update/upsert. Missing one of these breaks cache-expiry reads
+/// silently (the two modpack `updatedAt` columns feed a 7-day freshness gate).
 pub const FRESHNESS: &[(&str, &str)] = &[
     ("VersionInfoCache", "lastUpdatedAt"),
     ("PartialVersionInfoCache", "lastUpdatedAt"),
@@ -71,7 +70,7 @@ pub const FRESHNESS: &[(&str, &str)] = &[
 /// any statement that `UPDATE`s a freshness table, or `INSERT`s into one with
 /// a `DO UPDATE SET` upsert clause, must mention that table's freshness
 /// column somewhere in its SQL text. Catches the class of bug where a repo
-/// fn forgets to carry the freshness column PCR used to write for free.
+/// fn forgets to carry the freshness column on a write.
 pub fn check_freshness(queries: &[QueryCheck]) -> Vec<String> {
     let mut violations = Vec::new();
     for q in queries {

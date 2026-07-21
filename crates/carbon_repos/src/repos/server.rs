@@ -4,10 +4,9 @@
 //! (`groupIndex`/`index` and the nullable `libraryPosition`) are kept in sync,
 //! and `libraryPosition IS NOT NULL` is used as a deliberate proxy for
 //! "belongs to the default group / library root" so a query never has to
-//! resolve the default group id. None of these queries add or remove an
-//! `ORDER BY` relative to the prisma-client-rust originals.
+//! resolve the default group id.
 //!
-//! Two behaviors differ from the instance side and are preserved verbatim:
+//! Two behaviors differ from the instance side:
 //! the library-position shifts during a group move are scoped to the default
 //! group on the `Server` table (the instance side shifts across all rows), and
 //! `delete_server_group` computes `base_index` from the DEFAULT group (the
@@ -167,9 +166,8 @@ queries! {
 /// `INSERT` shared by `insert_server` and its `QueryCheck`. The columns not
 /// listed (motd, maxPlayers, onlineMode, xmx, xms, extraJavaArgs, autoRestart,
 /// providerType, hostedServerId, iconRevision, lastStarted) take their DDL
-/// defaults, matching PCR's partial `create`. `dateCreated` is written
-/// explicitly as epoch-millis (PCR's `@default(now())` was client-generated as
-/// millis, not the SQL `CURRENT_TIMESTAMP` text default).
+/// defaults. `dateCreated` is written explicitly as epoch-millis (not the SQL
+/// `CURRENT_TIMESTAMP` text default).
 const INSERT_SERVER_SQL: &str =
     "INSERT INTO Server (name, shortpath, \"index\", groupId, gameVersion, port, serverType, modloaderType, modloaderVersion, modpackPlatform, modpackProjectId, modpackFileId, libraryPosition, dateCreated)
          VALUES (:name, :shortpath, :index, :group_id, :game_version, :port, :server_type, :modloader_type, :modloader_version, :modpack_platform, :modpack_project_id, :modpack_file_id, :library_position, :date_created)";
@@ -180,8 +178,8 @@ const INSERT_SERVER_GROUP_SQL: &str =
          VALUES (:name, :group_index, :library_position)";
 
 /// One index shift to run inside `move_server_tx`, mapping to a registered
-/// `shift_server_indexes_*` query. Mirrors the conditional `index_shifts`
-/// vector PCR batched with the final server update.
+/// `shift_server_indexes_*` query. Encodes the conditional index shift applied
+/// alongside the final server update.
 #[derive(Debug, Clone, Copy)]
 pub enum IndexShift {
     DownExclusive { group_id: i32, gt: i32, lt: i32 },
@@ -265,7 +263,7 @@ pub fn insert_server_group(
 }
 
 /// Runs the conditional index shifts and the moved server's final placement in
-/// one transaction (PCR `_batch((index_shifts, server.update(...)))`).
+/// one transaction.
 pub fn move_server_tx(
     conn: &mut Connection,
     shifts: &[IndexShift],
@@ -296,8 +294,7 @@ pub fn move_server_tx(
 }
 
 /// Restamps folder/default-group `groupIndex`/`libraryPosition` and ungrouped
-/// server `index`/`libraryPosition` in one transaction (PCR ran the group and
-/// server `_batch`es separately).
+/// server `index`/`libraryPosition` in one transaction.
 pub fn arrange_server_library_tx(
     conn: &mut Connection,
     groups: &[ServerGroupArrange],
@@ -318,12 +315,10 @@ pub fn arrange_server_library_tx(
 }
 
 /// Moves every server of `group_id` into `default_group_id` (offsetting their
-/// index by `base_index`) then deletes the group, in one transaction
-/// (PCR `_batch((update_many[SetGroupId, IncrementIndex], group.delete))`).
+/// index by `base_index`) then deletes the group, in one transaction.
 ///
-/// `base_index` is computed by the caller exactly as PCR did — the server-side
-/// oddity counts the DEFAULT group (not the group being deleted); this fn does
-/// not recompute it.
+/// `base_index` is computed by the caller — the server-side oddity counts the
+/// DEFAULT group (not the group being deleted); this fn does not recompute it.
 pub fn delete_server_group_tx(
     conn: &mut Connection,
     group_id: i32,
@@ -338,7 +333,7 @@ pub fn delete_server_group_tx(
 
 /// A partial update to a single `Server` row. Each present field becomes one
 /// `SET col = :param` clause; absent fields are left untouched. All targeted
-/// columns are `NOT NULL`, so a plain `Option<T>` suffices. Covers both PCR
+/// columns are `NOT NULL`, so a plain `Option<T>` suffices. Covers both
 /// partial-update sites (`update_server` and `update_server_properties`).
 #[derive(Debug, Default, Clone)]
 pub struct ServerPatch {
