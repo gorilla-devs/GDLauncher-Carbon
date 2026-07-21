@@ -21,6 +21,15 @@ fn normalize_whitespace(sql: &str) -> String {
     spaced.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Public entry to the same whitespace normalizer [`dump_schema`] applies to
+/// each object's stored DDL. The down generator ([`crate::downgen`]) compares a
+/// single table's before/after DDL through this so it uses the identical
+/// canonical form the schema snapshot and down-run verification do — one
+/// normalizer, every schema comparison.
+pub fn normalize_ddl(sql: &str) -> String {
+    normalize_whitespace(sql)
+}
+
 /// Dumps every `sqlite_master` row (tables, indexes, triggers, views —
 /// including SQLite's own auto-indexes, whose `sql` column is `NULL`) as one
 /// normalized line per object: `type|name|tbl_name|sql`. Ordered by `type`
