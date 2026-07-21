@@ -2,6 +2,7 @@ use carbon_repos::db_exec::Db;
 use carbon_repos::dbtypes::{DbDateTime, from_millis};
 use carbon_repos::repos::{account as a, active_downloads as ad, skin as s};
 use rusqlite::Connection;
+use carbon_repos::db_exec::test_support::wg;
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -342,6 +343,3 @@ fn active_downloads_crud_roundtrip() {
     );
 }
 
-fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
-    carbon_repos::db_exec::WriteGuard::new(c)
-}

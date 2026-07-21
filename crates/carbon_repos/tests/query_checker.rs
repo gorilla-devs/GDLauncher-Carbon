@@ -463,3 +463,32 @@ fn handwritten_sql_census_catches_planted_failures() {
         "fn f() { let mut st = conn.prepare_cached(X_SQL)?; st.execute(rusqlite::named_params! {})?; }\nconst X_SQL: &str = \"\";\n// sql: X_SQL".to_string());
     assert!(check_handwritten_sql(&[statement_receiver]).is_empty(), "st.execute is a params call, not SQL");
 }
+
+/// CENSUS-SELFTEST: checker.sql-ascii-leading
+#[test]
+fn ascii_leading_rule_catches_unicode_whitespace_prefix() {
+    let (_d, conn) = migrated_db();
+    let planted = [QueryCheck {
+        name: "unicode_prefixed",
+        sql: "\u{00A0}SELECT id FROM Java",
+        params: &[],
+        columns: None,
+        class: carbon_repos::registry::QueryClass::Read,
+    }];
+    let v = check_module(&conn, &planted);
+    assert!(
+        v.iter().any(|m| m.contains("non-ASCII whitespace")),
+        "unicode-prefixed SQL must be flagged: {v:?}"
+    );
+    let clean = [QueryCheck {
+        name: "ascii_prefixed",
+        sql: "  \n\tSELECT id FROM Java",
+        params: &[],
+        columns: None,
+        class: carbon_repos::registry::QueryClass::Read,
+    }];
+    assert!(
+        !check_module(&conn, &clean).iter().any(|m| m.contains("non-ASCII")),
+        "ASCII-prefixed SQL must pass the leading-whitespace rule"
+    );
+}

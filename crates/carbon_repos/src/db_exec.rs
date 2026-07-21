@@ -488,3 +488,20 @@ mod tests {
         assert_eq!(fk_off, 0, "open(foreign_keys=false) must leave it off");
     }
 }
+
+/// Guard constructors for integration tests. Tests exercise `_conn` fns
+/// against raw migrated connections and need real guards to satisfy the
+/// access-trait bounds; production code receives guards from `Db::read`/
+/// `Db::write` and never constructs them directly.
+#[doc(hidden)]
+pub mod test_support {
+    use super::{Connection, ReadGuard, WriteGuard};
+
+    pub fn wg(c: &mut Connection) -> WriteGuard<'_> {
+        WriteGuard::new(c)
+    }
+
+    pub fn rg(c: &Connection) -> ReadGuard<'_> {
+        ReadGuard::new(c)
+    }
+}

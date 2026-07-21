@@ -1,6 +1,7 @@
 use carbon_repos::dbtypes::{from_millis, DbDateTime};
 use carbon_repos::repos::frontend_preference as fp;
 use rusqlite::Connection;
+use carbon_repos::db_exec::test_support::wg;
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -54,6 +55,3 @@ fn delete_removes_row() {
     assert_eq!(fp::delete_preference_conn(&wg(&mut conn), "onboarding_tips_seen").unwrap(), 0);
 }
 
-fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
-    carbon_repos::db_exec::WriteGuard::new(c)
-}

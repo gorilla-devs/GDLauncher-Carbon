@@ -6,13 +6,8 @@
 use carbon_repos::db_exec::{ReadGuard, WriteGuard};
 use carbon_repos::registry::DynamicQuery;
 use rusqlite::Connection;
+use carbon_repos::db_exec::test_support::{rg, wg};
 
-fn wg(c: &mut Connection) -> WriteGuard<'_> {
-    WriteGuard::new(c)
-}
-fn rg(c: &Connection) -> ReadGuard<'_> {
-    ReadGuard::new(c)
-}
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();

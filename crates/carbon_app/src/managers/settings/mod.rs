@@ -500,7 +500,10 @@ impl ManagerRef<'_, SettingsManager> {
                 }
                 if let Err(e) = app
                     .db
-                    .write(|conn| Ok(carbon_repos::db_exec::WriteAccess::execute_batch(&conn, "VACUUM")?))
+                    .write(|conn| {
+                        use carbon_repos::db_exec::WriteAccess;
+                        Ok(conn.execute_batch("VACUUM")?)
+                    })
                     .await
                 {
                     error!("VACUUM failed: {e}");

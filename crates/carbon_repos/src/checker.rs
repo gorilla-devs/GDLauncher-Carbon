@@ -38,6 +38,19 @@ use std::sync::{Arc, Mutex};
 pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
     let mut violations = Vec::new();
     for q in queries {
+        // 0. leading whitespace must be ASCII: `is_write_sql` (which drives
+        // pool routing) skips only ASCII whitespace as a const fn, falling
+        // back conservatively to Write on anything else. Registered SQL with
+        // leading Unicode whitespace would classify Write regardless of verb;
+        // this rule makes that state unrepresentable instead of merely rare.
+        // CENSUS-RULE: checker.sql-ascii-leading
+        let ascii_trimmed = q.sql.trim_start_matches([' ', '\t', '\n', '\r']);
+        if ascii_trimmed.len() != q.sql.trim_start().len() {
+            violations.push(format!(
+                "{}: SQL has leading non-ASCII whitespace — the const classifier cannot skip it",
+                q.name
+            ));
+        }
         // 1. prepare: syntax, tables, columns, params must exist
         // CENSUS-RULE: checker.prepare
         let st = match conn.prepare(q.sql) {

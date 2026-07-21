@@ -1,6 +1,7 @@
 use carbon_repos::dbtypes::{from_millis, DbDateTime};
 use carbon_repos::repos::version_meta as vm;
 use rusqlite::Connection;
+use carbon_repos::db_exec::test_support::wg;
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -104,6 +105,3 @@ fn assets_meta_get_missing_returns_none() {
     assert!(vm::get_assets_meta_conn(&wg(&mut conn), "nope").unwrap().is_none());
 }
 
-fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
-    carbon_repos::db_exec::WriteGuard::new(c)
-}

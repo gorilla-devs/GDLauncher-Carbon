@@ -1,5 +1,6 @@
 use carbon_repos::repos::app_configuration as ac;
 use rusqlite::Connection;
+use carbon_repos::db_exec::test_support::wg;
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -158,6 +159,3 @@ fn patch_persists_blob_column() {
     );
 }
 
-fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
-    carbon_repos::db_exec::WriteGuard::new(c)
-}

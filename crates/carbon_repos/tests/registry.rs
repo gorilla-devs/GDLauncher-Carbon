@@ -1,4 +1,5 @@
 use rusqlite::Connection;
+use carbon_repos::db_exec::test_support::wg;
 
 mod q {
     use carbon_repos::queries;
@@ -66,6 +67,3 @@ async fn async_wrappers_route_reads_to_read_pool_and_writes_to_write_pool() {
     assert_eq!(q::get_by_id(&db, "a").await.unwrap().unwrap().major, 22);
 }
 
-fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
-    carbon_repos::db_exec::WriteGuard::new(c)
-}

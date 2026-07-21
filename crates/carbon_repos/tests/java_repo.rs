@@ -1,5 +1,6 @@
 use carbon_repos::repos::java as j;
 use rusqlite::Connection;
+use carbon_repos::db_exec::test_support::{rg, wg};
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -44,6 +45,16 @@ fn java_profile_crud_roundtrip() {
     assert_eq!(j::get_profile_conn(&wg(&mut conn), "gaming").unwrap().unwrap().java_id, None);
 }
 
-fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
-    carbon_repos::db_exec::WriteGuard::new(c)
+
+/// Read-class `_conn` fns accept `ReadAccess`-only guards — exercised at the
+/// suite level, not just by the compile_fail doctests.
+#[test]
+fn read_class_fns_accept_read_guards() {
+    let (_d, mut conn) = migrated_db();
+    j::insert_java_conn(&wg(&mut conn), &sample()).unwrap();
+    assert_eq!(j::get_all_java_conn(&rg(&conn)).unwrap().len(), 1);
+    assert_eq!(j::get_java_by_id_conn(&rg(&conn), "id-1").unwrap(), Some(sample()));
+    assert_eq!(j::get_java_by_path_conn(&rg(&conn), "/usr/bin/java").unwrap(), Some(sample()));
+    assert_eq!(j::count_java_conn(&rg(&conn)).unwrap(), 1);
+    assert_eq!(j::get_all_profiles_conn(&rg(&conn)).unwrap().len(), 0);
 }

@@ -3377,13 +3377,9 @@ mod test {
         async fn count(db: &carbon_repos::db_exec::Db, table: &'static str) -> anyhow::Result<i64> {
             Ok(db
                 .read(move |conn| {
+                    use carbon_repos::db_exec::ReadAccess;
                     // Runtime table name: a dynamic-SQL read through the read guard.
-                    Ok(carbon_repos::db_exec::ReadAccess::query_row(
-                        &conn,
-                        &format!("SELECT COUNT(*) FROM {table}"),
-                        [],
-                        |r| r.get(0),
-                    )?)
+                    Ok(conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))?)
                 })
                 .await?)
         }

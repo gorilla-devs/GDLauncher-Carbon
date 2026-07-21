@@ -1,6 +1,7 @@
 use carbon_repos::dbtypes::{from_millis, DbDateTime};
 use carbon_repos::repos::mod_file_cache as mfc;
 use rusqlite::Connection;
+use carbon_repos::db_exec::test_support::wg;
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -453,6 +454,3 @@ fn export_queries_shape() {
     assert_eq!((a.cf_project_id, a.cf_file_id), (Some(1), Some(2)));
 }
 
-fn wg(c: &mut Connection) -> carbon_repos::db_exec::WriteGuard<'_> {
-    carbon_repos::db_exec::WriteGuard::new(c)
-}
