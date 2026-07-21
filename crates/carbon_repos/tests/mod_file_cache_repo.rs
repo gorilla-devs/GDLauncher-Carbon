@@ -454,3 +454,174 @@ fn export_queries_shape() {
     assert_eq!((a.cf_project_id, a.cf_file_id), (Some(1), Some(2)));
 }
 
+
+// --- id-keyed deletes --------------------------------------------------------
+
+#[test]
+fn delete_cache_rows_by_id() {
+    let (_d, mut conn) = migrated_db();
+    insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 3, "s.jar", 1, true, "mods", "m", ts(1))
+        .unwrap();
+    let inst_id = mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 1).unwrap().remove(0).id;
+    let srv_id = mfc::get_server_mod_files_by_server_conn(&wg(&mut conn), 3).unwrap().remove(0).id;
+
+    assert_eq!(mfc::delete_mod_file_cache_by_id_conn(&wg(&mut conn), &inst_id).unwrap(), 1);
+    assert_eq!(mfc::delete_mod_file_cache_by_id_conn(&wg(&mut conn), &inst_id).unwrap(), 0);
+    // The server-side row is untouched by the instance-side delete.
+    assert_eq!(mfc::get_server_mod_files_by_server_conn(&wg(&mut conn), 3).unwrap().len(), 1);
+
+    assert_eq!(mfc::delete_server_mod_file_cache_by_id_conn(&wg(&mut conn), &srv_id).unwrap(), 1);
+    assert_eq!(mfc::delete_server_mod_file_cache_by_id_conn(&wg(&mut conn), &srv_id).unwrap(), 0);
+}
+
+// --- server icon data --------------------------------------------------------
+
+#[test]
+fn server_mod_icon_data_left_joins_all_image_caches() {
+    let (_d, mut conn) = migrated_db();
+    insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 3, "s.jar", 1, true, "mods", "m", ts(1))
+        .unwrap();
+    let id = mfc::get_server_mod_files_by_server_conn(&wg(&mut conn), 3).unwrap().remove(0).id;
+
+    // No image rows yet: LEFT JOINs produce a row of Nones.
+    let icon = mfc::get_server_mod_icon_data_conn(&wg(&mut conn), &id).unwrap().unwrap();
+    assert_eq!((icon.local_data, icon.cf_data, icon.mr_data), (None, None, None));
+
+    conn.execute_batch(
+        "INSERT INTO LocalModImageCache (metadataId, data) VALUES ('m', X'01');
+         INSERT INTO CurseForgeModImageCache (metadataId, url, data, upToDate) VALUES ('m', 'cfu', X'02', 1);
+         INSERT INTO ModrinthModImageCache (metadataId, url, data, upToDate) VALUES ('m', 'mru', X'03', 1);",
+    )
+    .unwrap();
+    let icon = mfc::get_server_mod_icon_data_conn(&wg(&mut conn), &id).unwrap().unwrap();
+    assert_eq!(icon.local_data.as_deref(), Some(&[0x01u8][..]));
+    assert_eq!(icon.cf_data.as_deref(), Some(&[0x02u8][..]));
+    assert_eq!(icon.mr_data.as_deref(), Some(&[0x03u8][..]));
+
+    assert!(mfc::get_server_mod_icon_data_conn(&wg(&mut conn), "missing").unwrap().is_none());
+}
+
+// --- refresh selectors -------------------------------------------------------
+
+#[test]
+fn refresh_selectors_pick_missing_and_stale_platform_caches() {
+    let (_d, mut conn) = migrated_db();
+    // Three metadata rows: no platform cache / stale cache / fresh cache.
+    insert_metadata(&conn, "m-none", 1, b"n", b"n1", None, None);
+    insert_metadata(&conn, "m-stale", 2, b"s", b"s1", None, None);
+    insert_metadata(&conn, "m-fresh", 3, b"f", b"f1", None, None);
+
+    // Instance side (Modrinth): cutoff sits between stale and fresh cachedAt.
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "none.jar", 1, true, "mods", "m-none", ts(1))
+        .unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "stale.jar", 1, true, "mods", "m-stale", ts(1))
+        .unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "fresh.jar", 1, true, "mods", "m-fresh", ts(1))
+        .unwrap();
+    insert_mr(&conn, "m-stale", "p1", "v1", "t", "slug", "u", 1_000);
+    insert_mr(&conn, "m-fresh", "p2", "v2", "t", "slug", "u", 9_000);
+
+    let mut ids: Vec<String> = mfc::instance_mods_needing_mr_refresh_conn(&wg(&mut conn), 1, ts(5_000))
+        .unwrap()
+        .into_iter()
+        .map(|r| r.metadata_id)
+        .collect();
+    ids.sort();
+    assert_eq!(ids, vec!["m-none".to_string(), "m-stale".to_string()]);
+
+    // The instance variant excludes worlds even when their cache is missing.
+    insert_metadata(&conn, "m-world", 4, b"w", b"w1", None, None);
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "w.zip", 1, true, "worlds", "m-world", ts(1))
+        .unwrap();
+    let ids: Vec<String> = mfc::instance_mods_needing_mr_refresh_conn(&wg(&mut conn), 1, ts(5_000))
+        .unwrap()
+        .into_iter()
+        .map(|r| r.metadata_id)
+        .collect();
+    assert!(!ids.contains(&"m-world".to_string()), "worlds rows must be excluded");
+
+    // Server side (CurseForge): same three-way split, no addonType filter.
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 7, "none.jar", 1, true, "mods", "m-none", ts(1))
+        .unwrap();
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 7, "stale.jar", 1, true, "worlds", "m-stale", ts(1))
+        .unwrap();
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 7, "fresh.jar", 1, true, "mods", "m-fresh", ts(1))
+        .unwrap();
+    insert_cf(&conn, "m-stale", 10, 11, "n", "slug", 2, "", 1_000);
+    insert_cf(&conn, "m-fresh", 20, 21, "n", "slug", 2, "", 9_000);
+
+    let mut ids: Vec<String> = mfc::server_mods_needing_cf_refresh_conn(&wg(&mut conn), 7, ts(5_000))
+        .unwrap()
+        .into_iter()
+        .map(|r| r.metadata_id)
+        .collect();
+    ids.sort();
+    assert_eq!(
+        ids,
+        vec!["m-none".to_string(), "m-stale".to_string()],
+        "server variant includes worlds rows and stale/missing caches"
+    );
+}
+
+// --- stale logo selectors ----------------------------------------------------
+
+#[test]
+fn stale_logo_selectors_follow_up_to_date_flag() {
+    let (_d, mut conn) = migrated_db();
+    insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    mfc::upsert_server_mod_file_cache_conn(&wg(&mut conn), 7, "s.jar", 1, true, "mods", "m", ts(1))
+        .unwrap();
+    insert_cf(&conn, "m", 10, 11, "n", "slug", 2, "", 1_000);
+    insert_mr(&conn, "m", "mrp", "mrv", "t", "slug", "u", 1_000);
+    conn.execute_batch(
+        "INSERT INTO CurseForgeModImageCache (metadataId, url, data, upToDate) VALUES ('m', 'cf-url', NULL, 0);
+         INSERT INTO ModrinthModImageCache (metadataId, url, data, upToDate) VALUES ('m', 'mr-url', NULL, 0);",
+    )
+    .unwrap();
+
+    let rows = mfc::instance_mods_stale_mr_logo_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].filename, "a.jar");
+    assert_eq!(rows[0].project_id, "mrp");
+    assert_eq!(rows[0].version_id, "mrv");
+    assert_eq!(rows[0].url, "mr-url");
+
+    let rows = mfc::server_mods_stale_mr_logo_conn(&wg(&mut conn), 7).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].filename, "s.jar");
+
+    let rows = mfc::server_mods_stale_cf_logo_conn(&wg(&mut conn), 7).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!((rows[0].project_id, rows[0].file_id), (10, 11));
+    assert_eq!(rows[0].url, "cf-url");
+
+    // Marking the images fresh empties every selector.
+    conn.execute_batch(
+        "UPDATE CurseForgeModImageCache SET upToDate = 1;
+         UPDATE ModrinthModImageCache SET upToDate = 1;",
+    )
+    .unwrap();
+    assert!(mfc::instance_mods_stale_mr_logo_conn(&wg(&mut conn), 1).unwrap().is_empty());
+    assert!(mfc::server_mods_stale_mr_logo_conn(&wg(&mut conn), 7).unwrap().is_empty());
+    assert!(mfc::server_mods_stale_cf_logo_conn(&wg(&mut conn), 7).unwrap().is_empty());
+}
+
+// --- installer existence check -----------------------------------------------
+
+#[test]
+fn instance_mod_exists_by_mr_project_matches_scope() {
+    let (_d, mut conn) = migrated_db();
+    insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1)).unwrap();
+    insert_mr(&conn, "m", "proj", "ver", "t", "slug", "u", 1_000);
+
+    let hit = mfc::instance_mod_exists_by_mr_project_conn(&wg(&mut conn), 1, "proj").unwrap();
+    assert!(hit.is_some());
+    // Wrong project or wrong instance: no match.
+    assert!(mfc::instance_mod_exists_by_mr_project_conn(&wg(&mut conn), 1, "other").unwrap().is_none());
+    assert!(mfc::instance_mod_exists_by_mr_project_conn(&wg(&mut conn), 2, "proj").unwrap().is_none());
+}
