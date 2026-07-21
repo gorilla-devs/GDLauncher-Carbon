@@ -9,12 +9,10 @@ use anyhow::{Context, ensure};
 use anyhow::{anyhow, bail};
 use async_trait::async_trait;
 use axum::extract;
-use carbon_repos::db::app_configuration;
-use carbon_repos::db::{self, read_filters::StringFilter};
-use carbon_repos::pcr::{
-    Direction, QueryError, chrono::DateTime, prisma_errors::query_engine::RecordNotFound,
-};
-use chrono::{FixedOffset, Utc};
+use carbon_repos::db_error::DbError;
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::account as account_repo;
+use chrono::{DateTime, FixedOffset, Utc};
 use gdl_account::{
     CancelGDLAccountDeletionError, ChangeDisplayNameError, DisplayNameHistoryEntry,
     GDLAccountStatus, GDLAccountTask, GDLUser, GetAccountError, GetPresignedUploadUrlResponse,
@@ -107,15 +105,15 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
     pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
         use carbon_repos::repos::app_configuration::AppConfigurationPatch;
-        use db::account::WhereParam::Uuid;
 
         if let Some(uuid) = uuid.clone() {
             let account_entry = self
                 .app
-                .prisma_client
-                .account()
-                .find_first(vec![Uuid(StringFilter::Equals(uuid.clone()))])
-                .exec()
+                .db
+                .read({
+                    let uuid = uuid.clone();
+                    move |conn| Ok(account_repo::get_account(conn, &uuid)?)
+                })
                 .await?;
 
             // Setting the active account to one not in the DB does not make sense.
@@ -145,15 +143,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// If the exchange fails (e.g., network error), it logs a warning but doesn't fail.
     /// The GDL token can be exchanged again later.
     pub async fn exchange_gdl_token(self, uuid: &str) -> anyhow::Result<String> {
-        use db::account::{SetParam, UniqueWhereParam};
-
         // Get the account's MS id_token
         let account = self
             .app
-            .prisma_client
-            .account()
-            .find_unique(UniqueWhereParam::UuidEquals(uuid.to_string()))
-            .exec()
+            .db
+            .read({
+                let uuid = uuid.to_string();
+                move |conn| Ok(account_repo::get_account(conn, &uuid)?)
+            })
             .await?
             .ok_or_else(|| anyhow!("Account not found: {}", uuid))?;
 
@@ -177,13 +174,17 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         // Store the GDL token in the database
         self.app
-            .prisma_client
-            .account()
-            .update(
-                UniqueWhereParam::UuidEquals(uuid.to_string()),
-                vec![SetParam::SetGdlToken(Some(response.access_token))],
-            )
-            .exec()
+            .db
+            .write({
+                let uuid = uuid.to_string();
+                move |conn| {
+                    Ok(account_repo::set_account_gdl_token(
+                        conn,
+                        &uuid,
+                        Some(&response.access_token),
+                    )?)
+                }
+            })
             .await?;
 
         self.app
@@ -207,7 +208,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// that still looked locally valid.
     async fn ensure_gdl_auth_token(
         self,
-        account: &db::account::Data,
+        account: &account_repo::AccountRow,
         force: bool,
     ) -> anyhow::Result<String> {
         let uuid = &account.uuid;
@@ -328,7 +329,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// 401 here is treated as "this token is dead" rather than surfaced to the
     /// user — otherwise the stored token wedges every future call and only
     /// deleting the database clears it.
-    async fn fetch_gdl_user(self, account: &db::account::Data) -> anyhow::Result<Option<GDLUser>> {
+    async fn fetch_gdl_user(
+        self,
+        account: &account_repo::AccountRow,
+    ) -> anyhow::Result<Option<GDLUser>> {
         let token = self.ensure_gdl_auth_token(account, false).await?;
 
         match self.gdl_account_task.get_account(token).await {
@@ -342,12 +346,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 // and deciding off the stale snapshot would repeat that work.
                 let account = self
                     .app
-                    .prisma_client
-                    .account()
-                    .find_unique(db::account::UniqueWhereParam::UuidEquals(
-                        account.uuid.clone(),
-                    ))
-                    .exec()
+                    .db
+                    .read({
+                        let uuid = account.uuid.clone();
+                        move |conn| Ok(account_repo::get_account(conn, &uuid)?)
+                    })
                     .await?
                     .ok_or_else(|| anyhow!("Account not found: {}", account.uuid))?;
 
@@ -410,7 +413,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn refresh_all_gdl_tokens(self) -> anyhow::Result<()> {
         let accounts = self.get_account_entries().await?;
 
-        let is_eligible = |account: &db::account::Data| {
+        let is_eligible = |account: &account_repo::AccountRow| {
             account
                 .id_token
                 .as_deref()
@@ -450,34 +453,25 @@ impl<'s> ManagerRef<'s, AccountManager> {
     ///
     /// Not exposed to the frontend on purpose. Will NOT be invalidated.
     pub async fn get_active_account(&self) -> anyhow::Result<Option<FullAccount>> {
-        use db::account::WhereParam::Uuid;
-
         let Some(uuid) = self.get_active_uuid().await? else {
             return Ok(None);
         };
 
         let account = self
             .app
-            .prisma_client
-            .account()
-            .find_first(vec![Uuid(StringFilter::Equals(uuid))])
-            .exec()
+            .db
+            .read(move |conn| Ok(account_repo::get_account(conn, &uuid)?))
             .await?
             .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
 
         Ok(Some(account.try_into()?))
     }
 
-    async fn get_account_entries(self) -> anyhow::Result<Vec<db::account::Data>> {
-        use db::account::OrderByParam;
-
+    async fn get_account_entries(self) -> anyhow::Result<Vec<account_repo::AccountRow>> {
         Ok(self
             .app
-            .prisma_client
-            .account()
-            .find_many(Vec::new())
-            .order_by(OrderByParam::LastUsed(Direction::Desc))
-            .exec()
+            .db
+            .read(|conn| Ok(account_repo::get_accounts_by_last_used(conn)?))
             .await?)
     }
 
@@ -496,14 +490,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     async fn get_account(self, uuid: String) -> anyhow::Result<Option<AccountWithStatus>> {
-        use db::account::UniqueWhereParam;
-
         let account = self
             .app
-            .prisma_client
-            .account()
-            .find_unique(UniqueWhereParam::UuidEquals(uuid))
-            .exec()
+            .db
+            .read(move |conn| Ok(account_repo::get_account(conn, &uuid)?))
             .await?;
 
         let Some(account) = account else {
@@ -1245,95 +1235,113 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
     /// Add or update an account
     async fn add_account(self, account: FullAccount) -> anyhow::Result<()> {
-        use db::account::{SetParam, UniqueWhereParam};
-
+        let uuid = account.uuid.clone();
         let db_account = self
             .app
-            .prisma_client
-            .account()
-            .find_unique(UniqueWhereParam::UuidEquals(account.uuid.clone()))
-            .exec()
+            .db
+            .read({
+                let uuid = uuid.clone();
+                move |conn| Ok(account_repo::get_account(conn, &uuid)?)
+            })
             .await?;
 
         if db_account.is_some() {
             // don't change lastUsed
-            let mut set_params = vec![SetParam::SetUsername(account.username)];
-
-            match account.type_ {
-                FullAccountType::Offline => set_params.extend([
-                    SetParam::SetAccessToken(None),
-                    SetParam::SetMsRefreshToken(None),
-                    SetParam::SetTokenExpires(None),
-                ]),
-                FullAccountType::Microsoft {
-                    access_token,
-                    refresh_token,
-                    token_expires,
-                    id_token,
-                    gdl_token,
-                    email,
-                    skin_id,
-                } => set_params.extend([
-                    SetParam::SetAccessToken(Some(access_token)),
-                    SetParam::SetMsRefreshToken(refresh_token),
-                    SetParam::SetTokenExpires(Some(
-                        token_expires.with_timezone(&FixedOffset::east(0)),
-                    )),
-                    SetParam::SetIdToken(id_token),
-                    SetParam::SetGdlToken(gdl_token),
-                    SetParam::SetSkinId(skin_id),
-                ]),
-            }
-
             info!("Updating account information for {:?}", &account.uuid);
 
-            self.app
-                .prisma_client
-                .account()
-                .update(
-                    UniqueWhereParam::UuidEquals(account.uuid.clone()),
-                    set_params,
-                )
-                .exec()
-                .await?;
-
-            self.app.invalidate(GET_ACCOUNTS, Some(account.uuid.into()));
-        } else {
-            let set_params = match account.type_ {
-                FullAccountType::Offline => Vec::new(),
+            match account.type_ {
+                FullAccountType::Offline => {
+                    self.app
+                        .db
+                        .write(move |conn| {
+                            Ok(account_repo::update_account_offline(
+                                conn,
+                                &account.uuid,
+                                &account.username,
+                            )?)
+                        })
+                        .await?;
+                }
                 FullAccountType::Microsoft {
                     access_token,
                     refresh_token,
                     token_expires,
                     id_token,
                     gdl_token,
-                    email,
+                    email: _,
                     skin_id,
-                } => vec![
-                    SetParam::SetAccessToken(Some(access_token)),
-                    SetParam::SetMsRefreshToken(refresh_token),
-                    SetParam::SetTokenExpires(Some(
-                        token_expires.with_timezone(&FixedOffset::east(0)),
-                    )),
-                    SetParam::SetIdToken(id_token),
-                    SetParam::SetGdlToken(gdl_token),
-                    SetParam::SetSkinId(skin_id),
-                ],
-            };
+                } => {
+                    let token_expires =
+                        DbDateTime(token_expires.with_timezone(&FixedOffset::east(0)));
+                    self.app
+                        .db
+                        .write(move |conn| {
+                            Ok(account_repo::update_account_microsoft(
+                                conn,
+                                &account.uuid,
+                                &account.username,
+                                &access_token,
+                                Some(token_expires),
+                                refresh_token.as_deref(),
+                                id_token.as_deref(),
+                                gdl_token.as_deref(),
+                                skin_id.as_deref(),
+                            )?)
+                        })
+                        .await?;
+                }
+            }
 
+            self.app.invalidate(GET_ACCOUNTS, Some(uuid.into()));
+        } else {
             info!("Creating account {:?}", &account.uuid);
 
-            self.app
-                .prisma_client
-                .account()
-                .create(
-                    account.uuid,
-                    account.username,
-                    Utc::now().into(),
-                    set_params,
-                )
-                .exec()
-                .await?;
+            let last_used = DbDateTime(Utc::now().into());
+            match account.type_ {
+                FullAccountType::Offline => {
+                    self.app
+                        .db
+                        .write(move |conn| {
+                            Ok(account_repo::insert_account_offline(
+                                conn,
+                                &account.uuid,
+                                &account.username,
+                                last_used,
+                                None,
+                            )?)
+                        })
+                        .await?;
+                }
+                FullAccountType::Microsoft {
+                    access_token,
+                    refresh_token,
+                    token_expires,
+                    id_token,
+                    gdl_token,
+                    email: _,
+                    skin_id,
+                } => {
+                    let token_expires =
+                        DbDateTime(token_expires.with_timezone(&FixedOffset::east(0)));
+                    self.app
+                        .db
+                        .write(move |conn| {
+                            Ok(account_repo::insert_account_microsoft(
+                                conn,
+                                &account.uuid,
+                                &account.username,
+                                last_used,
+                                &access_token,
+                                Some(token_expires),
+                                refresh_token.as_deref(),
+                                id_token.as_deref(),
+                                gdl_token.as_deref(),
+                                skin_id.as_deref(),
+                            )?)
+                        })
+                        .await?;
+                }
+            }
 
             self.app.invalidate(GET_ACCOUNTS, None);
         }
@@ -1345,16 +1353,15 @@ impl<'s> ManagerRef<'s, AccountManager> {
         self,
         uuid: String,
     ) -> anyhow::Result<tokio::task::JoinHandle<Result<(), futures::future::Aborted>>> {
-        use db::account::UniqueWhereParam;
-
         info!("Refreshing account {uuid}");
 
         let account = self
             .app
-            .prisma_client
-            .account()
-            .find_unique(UniqueWhereParam::UuidEquals(uuid.clone()))
-            .exec()
+            .db
+            .read({
+                let uuid = uuid.clone();
+                move |conn| Ok(account_repo::get_account(conn, &uuid)?)
+            })
             .await?
             .ok_or(RefreshAccountError::NoAccount)?;
 
@@ -1476,8 +1483,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
-        use db::account::{OrderByParam, UniqueWhereParam};
-
         let settings = self.app.settings_manager().get_settings().await?;
 
         let active_account = settings.active_account_uuid;
@@ -1487,13 +1492,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
             if active_account == uuid {
                 let next_account = self
                     .app
-                    .prisma_client
-                    .account()
-                    .find_first(vec![db::account::uuid::not(uuid.clone())])
-                    .order_by(OrderByParam::LastUsed(Direction::Desc))
-                    .exec()
+                    .db
+                    .read({
+                        let uuid = uuid.clone();
+                        move |conn| Ok(account_repo::get_next_active_account(conn, &uuid)?)
+                    })
                     .await?
-                    .map(|data| data.uuid);
+                    .map(|row| row.uuid);
 
                 self.set_active_uuid(next_account).await?;
             }
@@ -1511,37 +1516,34 @@ impl<'s> ManagerRef<'s, AccountManager> {
             _ => {}
         }
 
-        let result = self
+        // A plain `DELETE` reports affected rows instead of erroring on a
+        // missing row (PCR's `RecordNotFound`); `rows_affected == 0` is the
+        // equivalent check.
+        let rows_affected = self
             .app
-            .prisma_client
-            .account()
-            .delete(UniqueWhereParam::UuidEquals(uuid.clone()))
-            .exec()
-            .await;
+            .db
+            .write({
+                let uuid = uuid.clone();
+                move |conn| Ok(account_repo::delete_account(conn, &uuid)?)
+            })
+            .await?;
 
-        match result {
-            Ok(_) => {
-                info!("Deleted account {uuid}");
-
-                // Clean up backoff state for deleted account
-                self.manager
-                    .gdl_token_exchange_backoff
-                    .lock()
-                    .await
-                    .remove(&uuid);
-
-                self.app.invalidate(GET_ACCOUNTS, None);
-
-                Ok(())
-            }
-            Err(e) => {
-                if e.is_prisma_error::<RecordNotFound>() {
-                    bail!(DeleteAccountError::AccountDoesNotExist(uuid))
-                } else {
-                    bail!(e)
-                }
-            }
+        if rows_affected == 0 {
+            bail!(DeleteAccountError::AccountDoesNotExist(uuid))
         }
+
+        info!("Deleted account {uuid}");
+
+        // Clean up backoff state for deleted account
+        self.manager
+            .gdl_token_exchange_backoff
+            .lock()
+            .await
+            .remove(&uuid);
+
+        self.app.invalidate(GET_ACCOUNTS, None);
+
+        Ok(())
     }
 
     pub async fn begin_enrollment(self) -> anyhow::Result<()> {
@@ -1800,8 +1802,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
         uuid: String,
         lock_refresh: bool,
     ) -> anyhow::Result<()> {
-        use db::account::{SetParam, UniqueWhereParam};
-
         debug!("Checking account status");
 
         let mut refresh_lock = match lock_refresh {
@@ -1838,14 +1838,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
             Ok(Err(GetProfileError::AuthTokenInvalid)) => {
                 info!("Auth token was invalid");
                 // the account was expired prematurely
+                let now = DbDateTime(Utc::now().into());
                 self.app
-                    .prisma_client
-                    .account()
-                    .update(
-                        UniqueWhereParam::UuidEquals(uuid.clone()),
-                        vec![SetParam::SetTokenExpires(Some(Utc::now().into()))],
-                    )
-                    .exec()
+                    .db
+                    .write({
+                        let uuid = uuid.clone();
+                        move |conn| Ok(account_repo::expire_account_token_now(conn, &uuid, now)?)
+                    })
                     .await?;
 
                 self.app.invalidate(GET_ACCOUNTS, None);
@@ -1861,17 +1860,22 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let skin_changed = account.account.skin_id.as_ref().map(|s| s as &str)
             != profile.skin.as_ref().map(|skin| &skin.id as &str);
 
+        let new_skin_id = profile.skin.map(|skin| skin.id);
         self.app
-            .prisma_client
-            .account()
-            .update(
-                UniqueWhereParam::UuidEquals(uuid.clone()),
-                vec![
-                    SetParam::SetUsername(profile.username),
-                    SetParam::SetSkinId(profile.skin.map(|skin| skin.id)),
-                ],
-            )
-            .exec()
+            .db
+            .write({
+                let uuid = uuid.clone();
+                let username = profile.username;
+                let new_skin_id = new_skin_id;
+                move |conn| {
+                    Ok(account_repo::update_account_profile(
+                        conn,
+                        &uuid,
+                        &username,
+                        new_skin_id.as_deref(),
+                    )?)
+                }
+            })
             .await?;
 
         if skin_changed {
@@ -2136,7 +2140,7 @@ pub enum RefreshAccountError {
     DbLoad(#[from] FullAccountLoadError),
 
     #[error("query error")]
-    Query(#[from] QueryError),
+    Query(#[from] DbError),
 }
 
 #[derive(Error, Debug)]
@@ -2264,10 +2268,10 @@ fn is_jwt_expired(token: &str) -> bool {
     }
 }*/
 
-impl TryFrom<db::account::Data> for FullAccount {
+impl TryFrom<account_repo::AccountRow> for FullAccount {
     type Error = FullAccountLoadError;
 
-    fn try_from(value: db::account::Data) -> Result<Self, Self::Error> {
+    fn try_from(value: account_repo::AccountRow) -> Result<Self, Self::Error> {
         Ok(Self {
             type_: match value.access_token {
                 Some(access_token) => FullAccountType::Microsoft {
@@ -2423,28 +2427,30 @@ mod gdl_token_tests {
         let app = crate::setup_managers_for_test().await;
         let expired = jwt_with_exp(Utc::now().timestamp() - 3600);
 
-        app.prisma_client
-            .account()
-            .create(
-                "test-uuid".to_string(),
-                "test-user".to_string(),
-                Utc::now().into(),
-                vec![
-                    db::account::SetParam::SetGdlToken(Some(expired.clone())),
-                    db::account::SetParam::SetIdToken(Some(expired.clone())),
-                ],
-            )
-            .exec()
+        app.db
+            .write({
+                let expired = expired.clone();
+                move |conn| {
+                    Ok(account_repo::insert_account_microsoft(
+                        conn,
+                        "test-uuid",
+                        "test-user",
+                        DbDateTime(Utc::now().into()),
+                        "unused-access-token",
+                        None,
+                        None,
+                        Some(&expired),
+                        Some(&expired),
+                        None,
+                    )?)
+                }
+            })
             .await
             .unwrap();
 
         let account = app
-            .prisma_client
-            .account()
-            .find_unique(db::account::UniqueWhereParam::UuidEquals(
-                "test-uuid".to_string(),
-            ))
-            .exec()
+            .db
+            .read(|conn| Ok(account_repo::get_account(conn, "test-uuid")?))
             .await
             .unwrap()
             .unwrap();

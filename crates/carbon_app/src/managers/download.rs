@@ -7,8 +7,7 @@ use std::{
 };
 
 use anyhow::bail;
-use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::pcr::QueryError;
+use carbon_repos::db_error::DbError;
 use reqwest::Response;
 use reqwest_middleware::ClientWithMiddleware;
 use thiserror::Error;
@@ -68,7 +67,7 @@ impl ManagerRef<'_, DownloadManager> {
     ///
     /// If the download has already finished the files will be deleted anyway.
     pub async fn cancel_download(self, handle: DownloadHandle) -> Result<(), DownloadCancelError> {
-        use carbon_repos::db::active_downloads::UniqueWhereParam;
+        use carbon_repos::repos::active_downloads;
 
         // stop the handle's drop() from being called
         let mut handle = handle.into_inner();
@@ -88,10 +87,12 @@ impl ManagerRef<'_, DownloadManager> {
         tokio::fs::remove_file(path).await?;
 
         self.app
-            .prisma_client
-            .active_downloads()
-            .delete(UniqueWhereParam::FileIdEquals(handle.id))
-            .exec()
+            .db
+            .write(move |conn| {
+                Ok(active_downloads::delete_active_download_by_file_id(
+                    conn, &handle.id,
+                )?)
+            })
             .await?;
 
         Ok(())
@@ -102,7 +103,7 @@ impl ManagerRef<'_, DownloadManager> {
         handle: DownloadHandle,
         target: &Path,
     ) -> Result<(), DownloadCompleteError> {
-        use carbon_repos::db::active_downloads::UniqueWhereParam;
+        use carbon_repos::repos::active_downloads;
 
         let mut handle = handle.into_inner();
 
@@ -126,34 +127,37 @@ impl ManagerRef<'_, DownloadManager> {
             .map_err(DownloadCompleteError::RenameError)?;
 
         self.app
-            .prisma_client
-            .active_downloads()
-            .delete(UniqueWhereParam::FileIdEquals(handle.id))
-            .exec()
+            .db
+            .write(move |conn| {
+                Ok(active_downloads::delete_active_download_by_file_id(
+                    conn, &handle.id,
+                )?)
+            })
             .await?;
 
         Ok(())
     }
 
     pub async fn start_download(self, url: String) -> Result<DownloadHandle, DownloadStartError> {
-        use carbon_repos::db::active_downloads::WhereParam;
+        use carbon_repos::repos::active_downloads;
 
         // Lock active_downloads. Any future downloads will have to wait here.
         // active_downloads is locked to prevent two downloads attempting to start
         // for the same file. Whichever download gets here later must wait for the
         // first attempt to fail or add itself to the map.
-        let mut active_downloads = self.active_downloads.lock().await;
+        let mut active_downloads_guard = self.active_downloads.lock().await;
 
-        if active_downloads.contains(&url) {
+        if active_downloads_guard.contains(&url) {
             return Err(DownloadStartError::AlreadyActive);
         }
 
         let active_download = self
             .app
-            .prisma_client
-            .active_downloads()
-            .find_first(vec![WhereParam::Url(StringFilter::Equals(url.clone()))])
-            .exec()
+            .db
+            .read({
+                let url = url.clone();
+                move |conn| Ok(active_downloads::find_active_download_by_url(conn, &url)?)
+            })
             .await?;
 
         let id = match active_download {
@@ -162,10 +166,12 @@ impl ManagerRef<'_, DownloadManager> {
                 let id = Uuid::new_v4().to_string();
 
                 self.app
-                    .prisma_client
-                    .active_downloads()
-                    .create(url.clone(), id.clone(), Vec::new())
-                    .exec()
+                    .db
+                    .write({
+                        let url = url.clone();
+                        let id = id.clone();
+                        move |conn| Ok(active_downloads::insert_active_download(conn, &url, &id)?)
+                    })
                     .await?;
 
                 id
@@ -185,10 +191,10 @@ impl ManagerRef<'_, DownloadManager> {
         let (cancel_complete_send, cancel_complete_recv) = mpsc::channel::<()>(1);
         let (complete_send, complete_recv) = mpsc::channel::<()>(1);
 
-        active_downloads.insert(url.clone());
+        active_downloads_guard.insert(url.clone());
         // All failable operations have finished. If the task itself fails than
         // active_downloads will be updated accordingly.
-        drop(active_downloads);
+        drop(active_downloads_guard);
 
         let app = self.app.clone();
         let task = async move {
@@ -441,7 +447,7 @@ pub enum DownloadCancelError {
     NotStarted,
 
     #[error("query error: {0}")]
-    Query(#[from] QueryError),
+    Query(#[from] DbError),
 
     #[error("io error: {0}")]
     Io(#[from] io::Error),
@@ -453,7 +459,7 @@ pub enum DownloadStartError {
     AlreadyActive,
 
     #[error("query error")]
-    Query(#[from] QueryError),
+    Query(#[from] DbError),
 }
 
 #[derive(Error, Debug)]
@@ -482,7 +488,7 @@ impl Clone for ActiveDownloadError {
 #[derive(Error, Debug)]
 pub enum DownloadCompleteError {
     #[error("query error: {0}")]
-    Query(#[from] QueryError),
+    Query(#[from] DbError),
 
     #[error("download was not completed")]
     DownloadIncomplete,

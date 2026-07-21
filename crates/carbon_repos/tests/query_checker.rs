@@ -23,6 +23,12 @@ fn all_registered_queries_pass_against_migrated_schema() {
         &conn,
         &carbon_repos::repos::frontend_preference::all_queries(),
     ));
+    all.extend(check_module(&conn, &carbon_repos::repos::account::all_queries()));
+    all.extend(check_module(&conn, &carbon_repos::repos::skin::all_queries()));
+    all.extend(check_module(
+        &conn,
+        &carbon_repos::repos::active_downloads::all_queries(),
+    ));
     assert!(all.is_empty(), "query checker violations:\n{}", all.join("\n"));
 }
 
