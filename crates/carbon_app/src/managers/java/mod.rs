@@ -772,17 +772,14 @@ mod test {
 
         assert!(result_first_delete.is_ok());
 
-        app.prisma_client
-            .app_configuration()
-            .update(
-                carbon_repos::db::app_configuration::id::equals(0),
-                vec![
-                    carbon_repos::db::app_configuration::auto_manage_java_system_profiles::set(
-                        false,
-                    ),
-                ],
-            )
-            .exec()
+        app.db
+            .write(|conn| {
+                let patch = carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                    auto_manage_java_system_profiles: Some(false),
+                    ..Default::default()
+                };
+                Ok(patch.build().map(|q| q.execute(conn)).transpose()?)
+            })
             .await
             .unwrap();
 

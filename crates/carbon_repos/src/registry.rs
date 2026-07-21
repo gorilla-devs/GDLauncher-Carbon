@@ -14,6 +14,25 @@ pub struct QueryCheck {
     pub columns: Option<&'static [ColumnSpec]>,
 }
 
+/// Escape hatch for runtime-assembled SQL. Exempt from the static checker;
+/// every construction site must have a dedicated execution test.
+pub struct DynamicQuery {
+    pub sql: String,
+    pub params: Vec<(&'static str, Box<dyn rusqlite::types::ToSql + Send>)>,
+}
+
+impl DynamicQuery {
+    pub fn execute(&self, conn: &rusqlite::Connection) -> Result<usize, rusqlite::Error> {
+        let mut st = conn.prepare(&self.sql)?;
+        let bound: Vec<(&str, &dyn rusqlite::types::ToSql)> = self
+            .params
+            .iter()
+            .map(|(n, v)| (*n, v.as_ref() as &dyn rusqlite::types::ToSql))
+            .collect();
+        st.execute(&bound[..])
+    }
+}
+
 /// Emits a typed wrapper `fn` for each query and a `QUERIES` const covering them
 /// all.
 ///

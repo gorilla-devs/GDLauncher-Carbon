@@ -9,8 +9,8 @@ use crate::domain::vtask::VisualTaskId;
 use crate::managers::vtask::{Subtask, TaskState, VisualTask};
 use anyhow::{anyhow, bail};
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
-use carbon_repos::db::app_configuration;
 use carbon_repos::pcr::raw;
+use carbon_repos::repos::app_configuration::{AppConfigurationPatch, AppConfigurationRow};
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
 use std::path::{Path, PathBuf};
@@ -48,243 +48,129 @@ impl SettingsManager {
 }
 
 impl ManagerRef<'_, SettingsManager> {
-    pub async fn get_settings(self) -> anyhow::Result<carbon_repos::db::app_configuration::Data> {
+    pub async fn get_settings(self) -> anyhow::Result<AppConfigurationRow> {
         self.app
-            .prisma_client
-            .app_configuration()
-            .find_unique(app_configuration::id::equals(0))
-            .exec()
+            .db
+            .read(|conn| {
+                Ok(carbon_repos::repos::app_configuration::get_app_configuration(conn)?)
+            })
             .await?
             .ok_or(anyhow!("Can't find this key"))
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn set_settings(self, incoming_settings: FESettingsUpdate) -> anyhow::Result<()> {
-        let db = &self.app.prisma_client;
-        let mut queries = vec![];
+        let mut patch = AppConfigurationPatch::default();
 
         if let Some(theme) = incoming_settings.theme {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::theme::set(theme.inner())],
-            ));
+            patch.theme = Some(theme.inner());
         }
 
         if let Some(language) = incoming_settings.language {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::language::set(language.inner())],
-            ));
+            patch.language = Some(language.inner());
         }
 
         if let Some(reduced_motion) = incoming_settings.reduced_motion {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::reduced_motion::set(
-                    reduced_motion.inner(),
-                )],
-            ));
+            patch.reduced_motion = Some(reduced_motion.inner());
         }
 
         if let Some(discord_integration) = incoming_settings.discord_integration {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::discord_integration::set(
-                    discord_integration.inner(),
-                )],
-            ));
+            patch.discord_integration = Some(discord_integration.inner());
         }
 
         if let Some(release_channel) = incoming_settings.release_channel {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::release_channel::set(
-                    release_channel.inner().into(),
-                )],
-            ));
+            patch.release_channel = Some(release_channel.inner().into());
         }
 
         if let Some(launcher_action_on_game_launch) =
             incoming_settings.launcher_action_on_game_launch
         {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::launcher_action_on_game_launch::set(
-                    launcher_action_on_game_launch.inner().into(),
-                )],
-            ));
+            patch.launcher_action_on_game_launch =
+                Some(launcher_action_on_game_launch.inner().into());
         }
 
         if let Some(show_app_close_warning) = incoming_settings.show_app_close_warning.clone() {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::show_app_close_warning::set(
-                    show_app_close_warning.inner(),
-                )],
-            ));
+            patch.show_app_close_warning = Some(show_app_close_warning.inner());
         }
 
         if let Some(concurrent_downloads) = incoming_settings.concurrent_downloads {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::concurrent_downloads::set(
-                    concurrent_downloads.inner(),
-                )],
-            ));
+            patch.concurrent_downloads = Some(concurrent_downloads.inner());
         }
 
         if let Some(download_dependencies) = incoming_settings.download_dependencies {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::download_dependencies::set(
-                    download_dependencies.inner(),
-                )],
-            ));
+            patch.download_dependencies = Some(download_dependencies.inner());
         }
 
         if let Some(show_featured) = incoming_settings.show_featured {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::show_featured::set(show_featured.inner())],
-            ));
+            patch.show_featured = Some(show_featured.inner());
         }
 
         // instances_sort_by: Option<Option<InstancesSortBy>>
         // Outer Option = whether to update, Inner Option = null (manual order) or Some(sort criteria)
         if let Some(sort_by) = incoming_settings.instances_sort_by {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::instances_sort_by::set(
-                    sort_by.inner().map(Into::into),
-                )],
-            ));
+            patch.instances_sort_by = Some(sort_by.inner().map(Into::into));
         }
 
         if let Some(instances_sort_by_asc) = incoming_settings.instances_sort_by_asc {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::instances_sort_by_asc::set(
-                    instances_sort_by_asc.inner(),
-                )],
-            ));
+            patch.instances_sort_by_asc = Some(instances_sort_by_asc.inner());
         }
 
         // instances_group_by: Option<Option<InstancesGroupBy>>
         // Outer Option = whether to update, Inner Option = null (folders mode) or Some(group criteria)
         if let Some(instances_group_by) = incoming_settings.instances_group_by {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::instances_group_by::set(
-                    instances_group_by.inner().map(Into::into),
-                )],
-            ));
+            patch.instances_group_by = Some(instances_group_by.inner().map(Into::into));
         }
 
         if let Some(instances_group_by_asc) = incoming_settings.instances_group_by_asc {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::instances_group_by_asc::set(
-                    instances_group_by_asc.inner(),
-                )],
-            ));
+            patch.instances_group_by_asc = Some(instances_group_by_asc.inner());
         }
 
         if let Some(instances_duplicate_favorites) = incoming_settings.instances_duplicate_favorites
         {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::instances_duplicate_favorites::set(
-                    instances_duplicate_favorites.inner(),
-                )],
-            ));
+            patch.instances_duplicate_favorites = Some(instances_duplicate_favorites.inner());
         }
 
         if let Some(instances_tile_size) = incoming_settings.instances_tile_size {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::instances_tile_size::set(
-                    instances_tile_size.inner().into(),
-                )],
-            ));
+            patch.instances_tile_size = Some(instances_tile_size.inner().into());
         }
 
         if let Some(deletion_through_recycle_bin) = incoming_settings.deletion_through_recycle_bin {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::deletion_through_recycle_bin::set(
-                    deletion_through_recycle_bin.inner(),
-                )],
-            ));
+            patch.deletion_through_recycle_bin = Some(deletion_through_recycle_bin.inner());
         }
 
         if let Some(xmx) = incoming_settings.xmx {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::xmx::set(xmx.inner())],
-            ));
+            patch.xmx = Some(xmx.inner());
         }
 
         if let Some(xms) = incoming_settings.xms {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::xms::set(xms.inner())],
-            ));
+            patch.xms = Some(xms.inner());
         }
 
         if let Some(game_resolution) = incoming_settings.game_resolution {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::game_resolution::set(
-                    game_resolution.inner().map(Into::into),
-                )],
-            ));
+            patch.game_resolution = Some(game_resolution.inner().map(Into::into));
         }
 
         if let Some(java_custom_args) = incoming_settings.java_custom_args {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::java_custom_args::set(
-                    java_custom_args.inner(),
-                )],
-            ));
+            patch.java_custom_args = Some(java_custom_args.inner());
         }
 
         if let Some(pre_launch_hook) = incoming_settings.pre_launch_hook {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::pre_launch_hook::set(
-                    pre_launch_hook.inner(),
-                )],
-            ));
+            patch.pre_launch_hook = Some(pre_launch_hook.inner());
         }
 
         if let Some(post_exit_hook) = incoming_settings.post_exit_hook {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::post_exit_hook::set(
-                    post_exit_hook.inner(),
-                )],
-            ));
+            patch.post_exit_hook = Some(post_exit_hook.inner());
         }
 
         if let Some(wrapper_command) = incoming_settings.wrapper_command {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::wrapper_command::set(
-                    wrapper_command.inner(),
-                )],
-            ));
+            patch.wrapper_command = Some(wrapper_command.inner());
         }
 
         if let Some(auto_manage_java_system_profiles) =
             incoming_settings.auto_manage_java_system_profiles.as_ref()
         {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::auto_manage_java_system_profiles::set(
-                    auto_manage_java_system_profiles.clone().inner(),
-                )],
-            ));
+            patch.auto_manage_java_system_profiles =
+                Some(auto_manage_java_system_profiles.clone().inner());
         }
 
         if let Some(mod_sources) = incoming_settings.mod_sources {
@@ -306,23 +192,16 @@ impl ManagerRef<'_, SettingsManager> {
 
             let channels_str = ModChannelWithUsage::slice_to_str(&channels);
 
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![
-                    app_configuration::mod_platform_blacklist::set(platform_blacklist),
-                    app_configuration::mod_channels::set(channels_str),
-                ],
-            ));
+            patch.mod_platform_blacklist = Some(platform_blacklist);
+            patch.mod_channels = Some(channels_str);
         }
 
         if let Some(terms_and_privacy_accepted) = incoming_settings.terms_and_privacy_accepted {
-            let terms_and_privacy_accepted = terms_and_privacy_accepted.inner();
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::terms_and_privacy_accepted::set(
-                    terms_and_privacy_accepted,
-                )],
-            ));
+            // PCR ran two sequential updates here; their net effect on the
+            // singleton row is `termsAndPrivacyAccepted = true` plus the
+            // checksum, regardless of the incoming value (the second update
+            // overwrote the first). Preserve that net effect atomically.
+            let _ = terms_and_privacy_accepted.inner();
 
             // We default to empty value in case our APIs fail so we don't block the user.
             // We are gonna ask again on next run anyway once the APIs are back up
@@ -332,19 +211,15 @@ impl ManagerRef<'_, SettingsManager> {
                 .map(|v| v.to_string())
                 .unwrap_or_default();
 
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![
-                    app_configuration::terms_and_privacy_accepted::set(true),
-                    app_configuration::terms_and_privacy_accepted_checksum::set(Some(
-                        latest_consent_sha,
-                    )),
-                ],
-            ));
+            patch.terms_and_privacy_accepted = Some(true);
+            patch.terms_and_privacy_accepted_checksum = Some(Some(latest_consent_sha));
         }
 
-        if !queries.is_empty() {
-            db._batch(queries).await?;
+        if let Some(query) = patch.build() {
+            self.app
+                .db
+                .write(move |conn| Ok(query.execute(conn)?))
+                .await?;
             self.app.invalidate(GET_SETTINGS, None);
 
             if let Some(show_app_close_warning) = incoming_settings.show_app_close_warning {
@@ -366,13 +241,13 @@ impl ManagerRef<'_, SettingsManager> {
         Ok(())
     }
 
-    pub async fn set(self, value: app_configuration::SetParam) -> anyhow::Result<()> {
-        self.app
-            .prisma_client
-            .app_configuration()
-            .update(app_configuration::id::equals(0), vec![value])
-            .exec()
-            .await?;
+    pub async fn set(self, patch: AppConfigurationPatch) -> anyhow::Result<()> {
+        if let Some(query) = patch.build() {
+            self.app
+                .db
+                .write(move |conn| Ok(query.execute(conn)?))
+                .await?;
+        }
 
         Ok(())
     }

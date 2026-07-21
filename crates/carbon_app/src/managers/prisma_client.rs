@@ -1,12 +1,14 @@
 use super::{java::JavaManager, settings::terms_and_privacy::TermsAndPrivacy};
 use crate::app_version::APP_VERSION;
 use carbon_repos::db::PrismaClient;
-use carbon_repos::db::{self, app_configuration, frontend_preference};
 use carbon_repos::db::{
+    self,
     http_cache::{SetParam, WhereParam},
     read_filters::StringFilter,
 };
 use carbon_repos::pcr::raw;
+use carbon_repos::repos::app_configuration::{self as app_config_repo, AppConfigurationPatch};
+use carbon_repos::repos::frontend_preference as frontend_pref_repo;
 use ring::rand::SecureRandom;
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -223,35 +225,33 @@ async fn seed_init_db(
     .to_string();
 
     // Create base app config
-    if db_client.app_configuration().count(vec![]).exec().await? == 0 {
+    if db.read(|conn| Ok(app_config_repo::count_app_configuration(conn)?)).await? == 0 {
         trace!("No app configuration found. Creating default one");
 
         let installation_id = Uuid::new_v4().to_string();
+        let release_channel = release_channel.clone();
+        let xmx = find_appropriate_default_xmx().await;
 
-        db_client
-            .app_configuration()
-            .create(
-                release_channel.clone(),
-                find_appropriate_default_xmx().await,
-                vec![app_configuration::installation_id::set(Some(
-                    installation_id,
-                ))],
-            )
-            .exec()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create default app configuration: {e}"))?;
+        db.write(move |conn| {
+            Ok(app_config_repo::insert_app_configuration(
+                conn,
+                &release_channel,
+                xmx,
+                Some(&installation_id),
+            )?)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create default app configuration: {e}"))?;
 
         trace!("Created default app configuration");
     }
 
-    let app_config = db_client
-        .app_configuration()
-        .find_unique(db::app_configuration::id::equals(0))
-        .exec()
+    let app_config = db
+        .read(|conn| Ok(app_config_repo::get_app_configuration(conn)?))
         .await?
         .expect("It's unreasonable to expect that the app configuration doesn't exist");
 
-    let mut updates = vec![];
+    let mut patch = AppConfigurationPatch::default();
 
     // Ensure installation ID exists and is a valid UUID (migration path)
     let needs_new_installation_id = match &app_config.installation_id {
@@ -261,19 +261,13 @@ async fn seed_init_db(
 
     if needs_new_installation_id {
         let installation_id = Uuid::new_v4().to_string();
-        updates.push(app_configuration::installation_id::set(Some(
-            installation_id,
-        )));
+        patch.installation_id = Some(Some(installation_id));
         trace!("Generated installation ID for existing configuration");
     }
 
     // Check last seen version from FrontendPreference
-    let last_seen_version = db_client
-        .frontend_preference()
-        .find_unique(frontend_preference::key::equals(
-            "last_seen_version".to_string(),
-        ))
-        .exec()
+    let last_seen_version = db
+        .read(|conn| Ok(frontend_pref_repo::get_preference(conn, "last_seen_version")?))
         .await?
         .map(|pref| pref.value);
 
@@ -294,9 +288,7 @@ async fn seed_init_db(
         };
 
     if should_force_release_channel {
-        updates.push(app_configuration::release_channel::set(String::from(
-            release_channel,
-        )));
+        patch.release_channel = Some(String::from(release_channel));
     }
 
     // Emit status for frontend progress tracking
@@ -317,18 +309,14 @@ async fn seed_init_db(
         );
 
         if should_empty_tos_privacy {
-            updates.push(app_configuration::terms_and_privacy_accepted::set(false));
-            updates.push(app_configuration::terms_and_privacy_accepted_checksum::set(
-                None,
-            ));
+            patch.terms_and_privacy_accepted = Some(false);
+            patch.terms_and_privacy_accepted_checksum = Some(None);
         }
     }
 
-    db_client
-        .app_configuration()
-        .update(db::app_configuration::id::equals(0), updates)
-        .exec()
-        .await?;
+    if let Some(query) = patch.build() {
+        db.write(move |conn| Ok(query.execute(conn)?)).await?;
+    }
 
     JavaManager::ensure_profiles_in_db(db)
         .await
@@ -358,10 +346,8 @@ mod test {
 
         assert_eq!(
             db_client
-                .prisma_client
-                .app_configuration()
-                .find_unique(db::app_configuration::id::equals(0))
-                .exec()
+                .db
+                .read(|conn| Ok(app_config_repo::get_app_configuration(conn)?))
                 .await
                 .unwrap()
                 .unwrap()
@@ -380,18 +366,16 @@ mod test {
             .await
             .unwrap();
 
+        let checksum_to_set = initial_checksum.clone();
         db_client
-            .prisma_client
-            .app_configuration()
-            .update(
-                db::app_configuration::id::equals(0),
-                vec![
-                    db::app_configuration::terms_and_privacy_accepted_checksum::set(
-                        initial_checksum.clone(),
-                    ),
-                ],
-            )
-            .exec()
+            .db
+            .write(move |conn| {
+                let patch = AppConfigurationPatch {
+                    terms_and_privacy_accepted_checksum: Some(checksum_to_set),
+                    ..Default::default()
+                };
+                Ok(patch.build().map(|q| q.execute(conn)).transpose()?)
+            })
             .await
             .unwrap();
 
@@ -402,10 +386,8 @@ mod test {
 
         assert_eq!(
             db_client
-                .prisma_client
-                .app_configuration()
-                .find_unique(db::app_configuration::id::equals(0))
-                .exec()
+                .db
+                .read(|conn| Ok(app_config_repo::get_app_configuration(conn)?))
                 .await
                 .unwrap()
                 .unwrap()

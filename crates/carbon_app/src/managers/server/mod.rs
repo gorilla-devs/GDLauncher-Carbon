@@ -169,10 +169,10 @@ impl ManagerRef<'_, ServerManager> {
     pub async fn get_default_group(self) -> anyhow::Result<ServerGroupId> {
         let config = self
             .app
-            .prisma_client
-            .app_configuration()
-            .find_unique(db::app_configuration::id::equals(0))
-            .exec()
+            .db
+            .read(|conn| {
+                Ok(carbon_repos::repos::app_configuration::get_app_configuration(conn)?)
+            })
             .await?
             .ok_or_else(|| anyhow!("App configuration not found"))?;
 

@@ -1,5 +1,5 @@
 use crate::{domain::metrics::GDLMetricsEvent, iridium_client::get_client};
-use carbon_repos::db::{PrismaClient, app_configuration};
+use carbon_repos::db::PrismaClient;
 use display_info::DisplayInfo;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
@@ -39,10 +39,11 @@ impl ManagerRef<'_, MetricsManager> {
         let endpoint = format!("{}/v1/metrics/event", self.gdl_base_api);
 
         let Some(metrics_user_id) = self
-            .prisma_client
-            .app_configuration()
-            .find_unique(app_configuration::id::equals(0))
-            .exec()
+            .app
+            .db
+            .read(|conn| {
+                Ok(carbon_repos::repos::app_configuration::get_app_configuration(conn)?)
+            })
             .await?
             .and_then(|data| {
                 // TODO: Keep a backlog of events if the user has not accepted the terms yet

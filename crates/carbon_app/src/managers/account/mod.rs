@@ -106,8 +106,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
+        use carbon_repos::repos::app_configuration::AppConfigurationPatch;
         use db::account::WhereParam::Uuid;
-        use db::app_configuration::SetParam::SetActiveAccountUuid;
 
         if let Some(uuid) = uuid.clone() {
             let account_entry = self
@@ -129,7 +129,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         self.app
             .settings_manager()
-            .set(SetActiveAccountUuid(uuid))
+            .set(AppConfigurationPatch {
+                active_account_uuid: Some(uuid),
+                ..Default::default()
+            })
             .await?;
 
         self.app.invalidate(GET_ACTIVE_UUID, None);
@@ -661,12 +664,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn save_gdl_account(&self, uuid: Option<String>) -> anyhow::Result<()> {
-        use db::app_configuration::SetParam;
-        use db::app_configuration::UniqueWhereParam;
+        use carbon_repos::repos::app_configuration::AppConfigurationPatch;
 
         self.app
             .settings_manager()
-            .set(SetParam::SetGdlAccountUuid(uuid.clone()))
+            .set(AppConfigurationPatch {
+                gdl_account_uuid: Some(uuid.clone()),
+                ..Default::default()
+            })
             .await?;
 
         self.app.invalidate(GET_GDL_ACCOUNT, None);
@@ -1073,16 +1078,22 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn remove_gdl_account(self) -> anyhow::Result<()> {
-        use db::app_configuration::SetParam;
+        use carbon_repos::repos::app_configuration::AppConfigurationPatch;
 
         self.app
             .settings_manager()
-            .set(SetParam::SetGdlAccountUuid(None))
+            .set(AppConfigurationPatch {
+                gdl_account_uuid: Some(None),
+                ..Default::default()
+            })
             .await?;
 
         self.app
             .settings_manager()
-            .set(SetParam::SetGdlAccountStatus(None))
+            .set(AppConfigurationPatch {
+                gdl_account_status: Some(None),
+                ..Default::default()
+            })
             .await?;
 
         self.app.invalidate(GET_GDL_ACCOUNT, None);
