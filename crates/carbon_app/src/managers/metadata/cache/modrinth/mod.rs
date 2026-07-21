@@ -12,11 +12,9 @@ use carbon_platforms::modrinth::{
     search::{ProjectIDs, TeamIDs, VersionHashesQuery},
     version::{HashAlgorithm, LatestVersionsBody, VersionType},
 };
-use carbon_repos::db::{
-    mod_metadata as metadb, modrinth_mod_cache as mrdb, modrinth_mod_image_cache as mrimgdb,
-};
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::mod_file_cache as mfcdb;
+use carbon_repos::repos::mod_metadata as metarepo;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
@@ -458,15 +456,11 @@ impl ModplatformCacher for ModrinthModCacher {
 
                     drop(scale_guard);
 
-                    app.prisma_client.modrinth_mod_image_cache()
-                        .update(
-                            mrimgdb::UniqueWhereParam::MetadataIdEquals(row.metadata_id.clone()),
-                            vec![
-                                mrimgdb::SetParam::SetUpToDate(1),
-                                mrimgdb::SetParam::SetData(Some(image))
-                            ]
-                        )
-                        .exec()
+                    let image_metadata_id = row.metadata_id.clone();
+                    app.db
+                        .write(move |conn| {
+                            Ok(metarepo::mark_mr_image_downloaded(conn, &image_metadata_id, &image)?)
+                        })
                         .await?;
 
 
@@ -508,89 +502,70 @@ async fn cache_modrinth_meta_unchecked(
 ) -> anyhow::Result<()> {
     let update_paths = build_update_paths(version, &project.id, versions);
 
-    if let Ok(Some(existing_entry)) = app
-        .prisma_client
-        .modrinth_mod_cache()
-        .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
-            metadata_id.clone(),
-        ))
-        .exec()
-        .await
     {
-        if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
-            return Ok(());
+        let metadata_id = metadata_id.clone();
+        if let Ok(Some(existing_entry)) = app
+            .db
+            .read(move |conn| Ok(metarepo::get_mr_cache_by_metadata(conn, &metadata_id)?))
+            .await
+        {
+            if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
+                return Ok(());
+            }
         }
     }
 
-    let cache_result = app
-        .prisma_client
-        .modrinth_mod_cache()
-        .upsert(
-            mrdb::UniqueWhereParam::ProjectIdVersionIdEquals(
-                project.id.clone(),
-                version.id.clone(),
-            ),
-            mrdb::create(
-                sha512.clone(),
-                project.id.clone(),
-                version.id.clone(),
-                project.title.clone(),
-                version.name.clone(),
-                project.slug.clone(),
-                project.description.clone(),
-                authors.clone(),
-                ModChannel::from(version.version_type) as i32,
-                update_paths.clone(),
-                filename.clone(),
-                file_url.clone(),
-                chrono::Utc::now().into(),
-                metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
-                Vec::new(),
-            ),
-            vec![
-                mrdb::SetParam::SetSha512(sha512.clone()),
-                mrdb::SetParam::SetProjectId(project.id.clone()),
-                mrdb::SetParam::SetVersionId(version.id.clone()),
-                mrdb::SetParam::SetTitle(project.title.clone()),
-                mrdb::SetParam::SetVersion(version.name.clone()),
-                mrdb::SetParam::SetUrlslug(project.slug.clone()),
-                mrdb::SetParam::SetDescription(project.description.clone()),
-                mrdb::SetParam::SetAuthors(authors.clone()),
-                mrdb::SetParam::SetReleaseType(ModChannel::from(version.version_type) as i32),
-                mrdb::SetParam::SetUpdatePaths(update_paths.clone()),
-                mrdb::SetParam::SetFilename(filename.clone()),
-                mrdb::SetParam::SetFileUrl(file_url.clone()),
-                mrdb::SetParam::SetCachedAt(chrono::Utc::now().into()),
-            ],
-        )
-        .exec()
+    let release_type = ModChannel::from(version.version_type) as i32;
+    let project_id = project.id.clone();
+    let version_id = version.id.clone();
+    let title = project.title.clone();
+    let version_name = version.name.clone();
+    let urlslug = project.slug.clone();
+    let description = project.description.clone();
+    let sha512_owned = sha512.clone();
+    let authors_owned = authors.clone();
+    let update_paths_owned = update_paths.clone();
+    let filename_owned = filename.clone();
+    let file_url_owned = file_url.clone();
+    let metadata_id_owned = metadata_id.clone();
+
+    // The composite `(projectId, versionId)` conflict may land on a row that
+    // owns a different `metadataId`; the upsert returns the surviving one so the
+    // image row attaches to the correct metadata (mirrors PCR).
+    let result_metadata_id = app
+        .db
+        .write(move |conn| {
+            Ok(metarepo::upsert_mr_mod_cache(
+                conn,
+                &sha512_owned,
+                &project_id,
+                &version_id,
+                &title,
+                &version_name,
+                &urlslug,
+                &description,
+                &authors_owned,
+                release_type,
+                &update_paths_owned,
+                &filename_owned,
+                &file_url_owned,
+                DbDateTime(chrono::Utc::now().fixed_offset()),
+                &metadata_id_owned,
+            )?)
+        })
         .await?;
 
     if let Some(icon_url) = &project.icon_url {
+        let url = icon_url.clone();
+        let image_metadata_id = result_metadata_id.clone();
         if let Err(e) = app
-            .prisma_client
-            .modrinth_mod_image_cache()
-            .upsert(
-                mrimgdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
-                mrimgdb::create(
-                    icon_url.clone(),
-                    mrdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
-                    vec![
-                        mrimgdb::SetParam::SetUpToDate(0), // Mark as needing download
-                        mrimgdb::SetParam::SetData(None),
-                    ],
-                ),
-                vec![
-                    mrimgdb::SetParam::SetUrl(icon_url.clone()),
-                    mrimgdb::SetParam::SetUpToDate(0), // Mark as needing download on update
-                ],
-            )
-            .exec()
+            .db
+            .write(move |conn| Ok(metarepo::upsert_mr_image(conn, &image_metadata_id, &url)?))
             .await
         {
             warn!(
                 "Failed to upsert modrinth image for metadata_id {}: {:?}",
-                cache_result.metadata_id, e
+                result_metadata_id, e
             );
         }
     }

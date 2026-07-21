@@ -15,10 +15,8 @@ use zip::{
     write::{FileOptionExtension, FileOptions},
 };
 
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-};
 use carbon_repos::repos::mod_file_cache as mfcdb;
+use carbon_repos::repos::mod_metadata as metarepo;
 
 use crate::{
     api::translation::Translation,
@@ -157,13 +155,27 @@ async fn enrich_share_metadata(
         .collect();
 
     if !cf_project_ids.is_empty() {
-        let cf_cache_results = app
-            .prisma_client
-            .curse_forge_mod_cache()
-            .find_many(vec![cfdb::project_id::in_vec(cf_project_ids)])
-            .with(cfdb::metadata::fetch().with(metadb::modrinth::fetch()))
-            .exec()
-            .await;
+        // rusqlite 0.25.4 has no array-param binding, so the `IN (list)` read is
+        // fanned out into one registered per-project-id query; the results are
+        // then collapsed into the same `projectId -> row` map as before.
+        let mut cf_cache_results: anyhow::Result<Vec<metarepo::CfExportEnrichRow>> = Ok(Vec::new());
+        for project_id in cf_project_ids {
+            match app
+                .db
+                .read(move |conn| Ok(metarepo::get_cf_export_enrich_by_project(conn, project_id)?))
+                .await
+            {
+                Ok(rows) => {
+                    if let Ok(acc) = &mut cf_cache_results {
+                        acc.extend(rows);
+                    }
+                }
+                Err(e) => {
+                    cf_cache_results = Err(e.into());
+                    break;
+                }
+            }
+        }
 
         if let Ok(cf_entries) = cf_cache_results {
             let cf_map: HashMap<i32, _> = cf_entries
@@ -178,12 +190,14 @@ async fn enrich_share_metadata(
                         shared_mod.curseforge_slug = Some(cf_entry.urlslug.clone());
 
                         // Check for Modrinth cross-reference via metadata
-                        if let Some(Some(mr_data)) =
-                            cf_entry.metadata.as_ref().and_then(|m| m.modrinth.as_ref())
-                        {
-                            shared_mod.modrinth_project_id = Some(mr_data.project_id.clone());
-                            shared_mod.modrinth_version_id = Some(mr_data.version_id.clone());
-                            shared_mod.modrinth_slug = Some(mr_data.urlslug.clone());
+                        if let (Some(mr_project_id), Some(mr_version_id), Some(mr_urlslug)) = (
+                            cf_entry.mr_project_id.as_ref(),
+                            cf_entry.mr_version_id.as_ref(),
+                            cf_entry.mr_urlslug.as_ref(),
+                        ) {
+                            shared_mod.modrinth_project_id = Some(mr_project_id.clone());
+                            shared_mod.modrinth_version_id = Some(mr_version_id.clone());
+                            shared_mod.modrinth_slug = Some(mr_urlslug.clone());
                         }
                     }
                 }
@@ -200,12 +214,24 @@ async fn enrich_share_metadata(
         .collect();
 
     if !mr_project_ids.is_empty() {
-        let mr_cache_results = app
-            .prisma_client
-            .modrinth_mod_cache()
-            .find_many(vec![mrdb::project_id::in_vec(mr_project_ids)])
-            .exec()
-            .await;
+        let mut mr_cache_results: anyhow::Result<Vec<metarepo::MrExportEnrichRow>> = Ok(Vec::new());
+        for project_id in mr_project_ids {
+            match app
+                .db
+                .read(move |conn| Ok(metarepo::get_mr_export_enrich_by_project(conn, &project_id)?))
+                .await
+            {
+                Ok(rows) => {
+                    if let Ok(acc) = &mut mr_cache_results {
+                        acc.extend(rows);
+                    }
+                }
+                Err(e) => {
+                    mr_cache_results = Err(e.into());
+                    break;
+                }
+            }
+        }
 
         if let Ok(mr_entries) = mr_cache_results {
             let mr_map: HashMap<String, _> = mr_entries

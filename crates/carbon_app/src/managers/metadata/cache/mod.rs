@@ -6,12 +6,9 @@ use crate::managers::App;
 use crate::managers::ManagerRef;
 use crate::managers::vtask::VisualTask;
 use anyhow::anyhow;
-use carbon_repos::db::read_filters::BytesFilter;
-use carbon_repos::db::read_filters::IntFilter;
-use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::db::mod_metadata as metadb;
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::mod_file_cache as mfcdb;
+use carbon_repos::repos::mod_metadata as metarepo;
 use chrono::Utc;
 use carbon_rt_path::InstancesPath;
 use curseforge::CurseforgeModCacher;
@@ -846,13 +843,8 @@ impl ManagerRef<'_, MetaCacheManager> {
     pub async fn gc_mod_metadata(self) {
         let _ = self
             .app
-            .prisma_client
-            .mod_metadata()
-            .delete_many(vec![
-                metadb::WhereParam::CachedFilesNone(Vec::new()),
-                metadb::WhereParam::ServerCachedFilesNone(Vec::new()),
-            ])
-            .exec()
+            .db
+            .write(move |conn| Ok(metarepo::gc_orphan_metadata(conn)?))
             .await;
     }
 
@@ -1254,23 +1246,26 @@ impl ManagerRef<'_, MetaCacheManager> {
         result: &ModFileParseResult,
         mod_filename: &str,
     ) -> anyhow::Result<String> {
+        let sha512 = Vec::from(result.sha512);
+        let murmur2 = result.murmur2 as i32;
+
+        let lookup_sha512 = sha512.clone();
         let dbmeta = self
             .app
-            .prisma_client
-            .mod_metadata()
-            .find_first(vec![
-                metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(result.sha512))),
-                metadb::WhereParam::Murmur2(IntFilter::Equals(result.murmur2 as i32)),
-            ])
-            .exec()
+            .db
+            .read(move |conn| {
+                Ok(metarepo::find_metadata_by_hashes(conn, &lookup_sha512, murmur2)?)
+            })
             .await?;
 
-        let (meta_id, meta_insert, logo_insert) = match dbmeta {
-            Some(meta) => (meta.id, None, None),
+        let meta_id = match dbmeta {
+            Some(meta) => meta.id,
             None => {
                 let meta_id = Uuid::new_v4().to_string();
 
-                let logo_insert = match &result.image_data {
+                // Scale the icon (if any) before touching the database — the
+                // insert runs on the writer thread and cannot await.
+                let logo_data: Option<Vec<u8>> = match &result.image_data {
                     Some(image_data) => {
                         let permit = self
                             .image_scale_semaphore
@@ -1288,14 +1283,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                         drop(permit);
 
                         match logo {
-                            Ok(Some(data)) => {
-                                Some(self.app.prisma_client.local_mod_image_cache().create(
-                                    data,
-                                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                                    Vec::new(),
-                                ))
-                            }
-                            Ok(None) => None,
+                            Ok(scaled) => scaled,
                             Err(e) => {
                                 error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
                                 None
@@ -1305,46 +1293,52 @@ impl ManagerRef<'_, MetaCacheManager> {
                     None => None,
                 };
 
-                let meta_insert = self.app.prisma_client.mod_metadata().create(
-                    meta_id.clone(),
-                    result.murmur2 as i32,
-                    Vec::from(result.sha512),
-                    Vec::from(result.sha1),
-                    result
-                        .meta
-                        .as_ref()
-                        .map(|meta| &meta.modloaders)
-                        .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
-                        .unwrap_or(String::new()),
-                    match &result.meta {
-                        Some(meta) => vec![
-                            metadb::SetParam::SetName(meta.name.clone()),
-                            metadb::SetParam::SetModid(meta.modid.clone()),
-                            metadb::SetParam::SetVersion(meta.version.clone()),
-                            metadb::SetParam::SetDescription(meta.description.clone()),
-                            metadb::SetParam::SetAuthors(meta.authors.clone()),
-                        ],
-                        None => vec![
-                            metadb::SetParam::SetName(None),
-                            metadb::SetParam::SetModid(None),
-                            metadb::SetParam::SetVersion(None),
-                            metadb::SetParam::SetDescription(None),
-                            metadb::SetParam::SetAuthors(None),
-                        ],
-                    },
-                );
+                let sha1 = Vec::from(result.sha1);
+                let modloaders = result
+                    .meta
+                    .as_ref()
+                    .map(|meta| &meta.modloaders)
+                    .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
+                    .unwrap_or(String::new());
+                let (name, modid, version, description, authors) = match &result.meta {
+                    Some(meta) => (
+                        meta.name.clone(),
+                        meta.modid.clone(),
+                        meta.version.clone(),
+                        meta.description.clone(),
+                        meta.authors.clone(),
+                    ),
+                    None => (None, None, None, None, None),
+                };
 
-                (meta_id, Some(meta_insert), logo_insert)
+                let meta_id_owned = meta_id.clone();
+                self.app
+                    .db
+                    .write(move |conn| {
+                        metarepo::insert_metadata(
+                            conn,
+                            &meta_id_owned,
+                            murmur2,
+                            &sha512,
+                            &sha1,
+                            &modloaders,
+                            name.as_deref(),
+                            modid.as_deref(),
+                            version.as_deref(),
+                            description.as_deref(),
+                            authors.as_deref(),
+                            DbDateTime(Utc::now().fixed_offset()),
+                        )?;
+                        if let Some(data) = logo_data {
+                            metarepo::insert_local_image(conn, &meta_id_owned, &data)?;
+                        }
+                        Ok(())
+                    })
+                    .await?;
+
+                meta_id
             }
         };
-
-        if let Some(meta_insert) = meta_insert {
-            meta_insert.exec().await?;
-        }
-
-        if let Some(logo_insert) = logo_insert {
-            logo_insert.exec().await?;
-        }
 
         Ok(meta_id)
     }

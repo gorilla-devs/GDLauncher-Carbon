@@ -5,6 +5,7 @@ pub mod frontend_preference;
 pub mod instance;
 pub mod java;
 pub mod mod_file_cache;
+pub mod mod_metadata;
 pub mod server;
 pub mod skin;
 pub mod version_meta;
