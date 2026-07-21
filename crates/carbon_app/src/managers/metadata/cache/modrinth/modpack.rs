@@ -9,17 +9,19 @@ use carbon_platforms::{
     curseforge::filters::{ModFileParameters, ModParameters},
     modrinth::search::{ProjectID, VersionID},
 };
-use carbon_repos::db;
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::modpack_cache as modpackdb;
 use tracing::error;
 
 pub async fn get_modpack_icon(app: &App, modrinth: ModrinthModpack) -> anyhow::Result<Vec<u8>> {
-    app.prisma_client
-        .modrinth_modpack_image_cache()
-        .find_unique(db::modrinth_modpack_image_cache::project_id_version_id(
-            modrinth.project_id,
-            modrinth.version_id,
-        ))
-        .exec()
+    app.db
+        .read(move |conn| {
+            Ok(modpackdb::get_mr_modpack_logo(
+                conn,
+                &modrinth.project_id,
+                &modrinth.version_id,
+            )?)
+        })
         .await?
         .ok_or_else(|| anyhow::anyhow!("No icon found for modpack"))?
         .data
@@ -30,21 +32,12 @@ pub async fn get_modpack_metadata(
     app: &App,
     modrinth: ModrinthModpack,
 ) -> anyhow::Result<InstanceModpackInfo> {
+    let project_id_read = modrinth.project_id.clone();
+    let version_id_read = modrinth.version_id.clone();
     let cache_entry = app
-        .prisma_client
-        .modrinth_modpack_cache()
-        .find_unique(db::modrinth_modpack_cache::project_id_version_id(
-            modrinth.project_id.clone(),
-            modrinth.version_id.clone(),
-        ))
-        .with(db::modrinth_modpack_cache::logo_image::fetch())
-        .exec()
+        .db
+        .read(move |conn| Ok(modpackdb::get_mr_modpack(conn, &project_id_read, &version_id_read)?))
         .await?;
-
-    let logo = cache_entry
-        .as_ref()
-        .and_then(|cache_entry| cache_entry.logo_image.as_ref())
-        .and_then(|logo_image| logo_image.as_ref().map(|logo_image| logo_image));
 
     let is_entry_up_to_date = cache_entry
         .as_ref()
@@ -54,7 +47,7 @@ pub async fn get_modpack_metadata(
         .unwrap_or(false);
 
     let has_cached_entry = cache_entry.is_some();
-    let has_cached_logo = logo.is_some();
+    let has_cached_logo = cache_entry.as_ref().map(|e| e.has_logo).unwrap_or(false);
 
     if has_cached_entry && is_entry_up_to_date {
         let Some(cache_entry) = cache_entry else {
@@ -65,11 +58,7 @@ pub async fn get_modpack_metadata(
             name: cache_entry.modpack_name,
             version_name: cache_entry.version_name,
             url_slug: cache_entry.url_slug,
-            has_image: cache_entry
-                .logo_image
-                .flatten()
-                .map(|logo| logo.data.is_some())
-                .unwrap_or(false),
+            has_image: cache_entry.logo_data.is_some(),
         });
     } else {
         let app = app.clone();
@@ -122,56 +111,40 @@ pub async fn get_modpack_metadata(
 
             let icon_bytes_is_some = icon_bytes.is_some();
 
-            app.prisma_client
-                .modrinth_modpack_cache()
-                .upsert(
-                    db::modrinth_modpack_cache::project_id_version_id(
-                        modrinth.project_id.clone(),
-                        modrinth.version_id.clone(),
-                    ),
-                    db::modrinth_modpack_cache::create(
-                        modrinth.project_id.clone(),
-                        modrinth.version_id.clone(),
-                        name.clone(),
-                        file_name.clone(),
-                        slug.clone(),
-                        vec![],
-                    ),
-                    vec![
-                        db::modrinth_modpack_cache::modpack_name::set(name.clone()),
-                        db::modrinth_modpack_cache::version_name::set(file_name.clone()),
-                        db::modrinth_modpack_cache::url_slug::set(slug.clone()),
-                    ],
-                )
-                .exec()
+            let project_id_write = modrinth.project_id.clone();
+            let version_id_write = modrinth.version_id.clone();
+            let modpack_name = name.clone();
+            let modpack_version_name = file_name.clone();
+            let modpack_url_slug = slug.clone();
+            app.db
+                .write(move |conn| {
+                    Ok(modpackdb::upsert_mr_modpack(
+                        conn,
+                        &project_id_write,
+                        &version_id_write,
+                        &modpack_name,
+                        &modpack_version_name,
+                        &modpack_url_slug,
+                        DbDateTime(chrono::Utc::now().fixed_offset()),
+                    )?)
+                })
                 .await?;
 
             if icon_bytes_is_some || has_cached_logo {
-                app.prisma_client
-                    .modrinth_modpack_image_cache()
-                    .upsert(
-                        db::modrinth_modpack_image_cache::project_id_version_id(
-                            modrinth.project_id.clone(),
-                            modrinth.version_id.clone(),
-                        ),
-                        db::modrinth_modpack_image_cache::create(
-                            url.clone().unwrap_or_default(),
-                            db::modrinth_modpack_cache::project_id_version_id(
-                                modrinth.project_id.clone(),
-                                modrinth.version_id.clone(),
-                            ),
-                            vec![db::modrinth_modpack_image_cache::data::set(
-                                icon_bytes.clone().map(|icon_bytes| icon_bytes.to_vec()),
-                            )],
-                        ),
-                        vec![
-                            db::modrinth_modpack_image_cache::url::set(url.unwrap_or_default()),
-                            db::modrinth_modpack_image_cache::data::set(
-                                icon_bytes.map(|icon_bytes| icon_bytes.to_vec()),
-                            ),
-                        ],
-                    )
-                    .exec()
+                let project_id_image = modrinth.project_id.clone();
+                let version_id_image = modrinth.version_id.clone();
+                let image_url = url.clone().unwrap_or_default();
+                let image_data = icon_bytes.clone().map(|icon_bytes| icon_bytes.to_vec());
+                app.db
+                    .write(move |conn| {
+                        Ok(modpackdb::upsert_mr_modpack_image(
+                            conn,
+                            &project_id_image,
+                            &version_id_image,
+                            &image_url,
+                            image_data.as_deref(),
+                        )?)
+                    })
                     .await?;
             }
 
@@ -189,11 +162,7 @@ pub async fn get_modpack_metadata(
                         name: cache_entry.modpack_name,
                         version_name: cache_entry.version_name,
                         url_slug: cache_entry.url_slug,
-                        has_image: cache_entry
-                            .logo_image
-                            .flatten()
-                            .map(|logo| logo.data.is_some())
-                            .unwrap_or(false),
+                        has_image: cache_entry.logo_data.is_some(),
                     });
                 }
 

@@ -3510,25 +3510,16 @@ mod test {
             )
             .await?;
 
-        assert_eq!(
-            app.prisma_client
-                .curse_forge_modpack_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
-            0
-        );
+        async fn count(db: &carbon_repos::db_exec::Db, table: &'static str) -> anyhow::Result<i64> {
+            Ok(db
+                .read(move |conn| {
+                    Ok(conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))?)
+                })
+                .await?)
+        }
 
-        assert_eq!(
-            app.prisma_client
-                .modrinth_modpack_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
-            0
-        );
+        assert_eq!(count(&app.db, "CurseForgeModpackCache").await?, 0);
+        assert_eq!(count(&app.db, "ModrinthModpackCache").await?, 0);
 
         app.instance_manager()
             .get_modpack_info(curseforge_instance_id)
@@ -3538,45 +3529,10 @@ mod test {
             .get_modpack_info(modrinth_instance_id)
             .await?;
 
-        assert_eq!(
-            app.prisma_client
-                .curse_forge_modpack_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
-            1
-        );
-
-        assert_eq!(
-            app.prisma_client
-                .modrinth_modpack_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
-            1
-        );
-
-        assert_eq!(
-            app.prisma_client
-                .curse_forge_modpack_image_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
-            1
-        );
-
-        assert_eq!(
-            app.prisma_client
-                .modrinth_modpack_image_cache()
-                .find_many(vec![])
-                .exec()
-                .await?
-                .len(),
-            1
-        );
+        assert_eq!(count(&app.db, "CurseForgeModpackCache").await?, 1);
+        assert_eq!(count(&app.db, "ModrinthModpackCache").await?, 1);
+        assert_eq!(count(&app.db, "CurseForgeModpackImageCache").await?, 1);
+        assert_eq!(count(&app.db, "ModrinthModpackImageCache").await?, 1);
 
         Ok(())
     }
