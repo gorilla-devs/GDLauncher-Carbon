@@ -16,9 +16,9 @@ use chrono::{DateTime, FixedOffset, Utc};
 use gdl_account::{
     CancelGDLAccountDeletionError, ChangeDisplayNameError, DisplayNameHistoryEntry,
     GDLAccountStatus, GDLAccountTask, GDLUser, GetAccountError, GetPresignedUploadUrlResponse,
-    PaginatedShares, QuotaInfo, RegisterAccountBody, RequestGDLAccountDeletionError,
-    RequestNewEmailChangeError, RequestNewVerificationTokenError, ShareInfo, ShareMetadata,
-    SharePreview, WaitForShareInstanceResponse,
+    InstanceShareError, PaginatedShares, QuotaInfo, RegisterAccountBody,
+    RequestGDLAccountDeletionError, RequestNewEmailChangeError, RequestNewVerificationTokenError,
+    ShareInfo, ShareMetadata, SharePreview, WaitForShareInstanceResponse,
 };
 use jwt::{Header, Token};
 use reqwest::Client;
@@ -754,21 +754,43 @@ impl<'s> ManagerRef<'s, AccountManager> {
         uuid: String,
         file_key: String,
     ) -> anyhow::Result<WaitForShareInstanceResponse> {
-        let account = self
-            .get_account_entries()
-            .await?
-            .into_iter()
-            .find(|account| account.uuid == uuid)
-            .ok_or(anyhow::anyhow!(
-                "attempted to upload a share instance for an account that does not exist"
-            ))?;
+        // The server endpoint is a long poll: each call holds until the share
+        // is ready or the poll window expires (typed UPLOAD_TIMEOUT, or a bare
+        // 408 from infrastructure timeouts). A window expiry is not a failure
+        // — the upload may still be processing — so re-poll until an overall
+        // deadline. Each fresh call re-checks the share row server-side, which
+        // also recovers from a lost completion event. The account and token
+        // are re-resolved per cycle so a token expiring mid-wait refreshes.
+        const WAIT_DEADLINE: Duration = Duration::from_secs(10 * 60);
+        let deadline = Instant::now() + WAIT_DEADLINE;
 
-        let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
+        loop {
+            let account = self
+                .get_account_entries()
+                .await?
+                .into_iter()
+                .find(|account| account.uuid == uuid)
+                .ok_or(anyhow::anyhow!(
+                    "attempted to wait for a share instance for an account that does not exist"
+                ))?;
 
-        self.gdl_account_task
-            .wait_for_share_instance(file_key, auth_token)
-            .await
-            .map_err(Into::into)
+            let auth_token = self.ensure_gdl_auth_token(&account, false).await?;
+
+            match self
+                .gdl_account_task
+                .wait_for_share_instance(file_key.clone(), auth_token)
+                .await
+            {
+                Ok(response) => return Ok(response),
+                Err(InstanceShareError::UploadTimeout) if Instant::now() < deadline => {
+                    info!(
+                        "share wait poll window expired for file_key={file_key}, re-polling"
+                    );
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+                Err(err) => return Err(err.into()),
+            }
+        }
     }
 
     /// Get paginated list of user's shares

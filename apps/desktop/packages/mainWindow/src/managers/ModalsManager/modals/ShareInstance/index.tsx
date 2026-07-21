@@ -42,7 +42,11 @@ const PERMANENT_SHARE_ERROR_CODES = new Set([
   "QUOTA_EXCEEDED",
   "TOO_MANY_ACTIVE_SHARES",
   "USER_NOT_VERIFIED",
-  "ACCOUNT_BANNED"
+  "ACCOUNT_BANNED",
+  // The core re-polls the share wait internally for up to 10 minutes before
+  // surfacing UPLOAD_TIMEOUT, so by the time it reaches us it is final —
+  // re-issuing the query would just start another 10-minute wait.
+  "UPLOAD_TIMEOUT"
 ])
 
 // Map error codes to translation keys for share instance errors
