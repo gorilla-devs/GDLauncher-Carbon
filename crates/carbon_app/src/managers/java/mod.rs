@@ -50,12 +50,15 @@ impl JavaManager {
         // Interleaved app logic: iterates the SystemJavaProfileName domain enum
         // (a carbon_app type) and seeds every profile, so it stays an explicit
         // closure with `_conn` forms. The upserts run in one writer dispatch,
-        // so no other write interleaves; they are not one transaction (each
-        // autocommits separately).
-        db.write(|conn| {
+        // so no other write interleaves; they run in ONE transaction —
+        // all-or-nothing: a failure rolls the whole group back and readers
+        // never observe an intermediate state. `_conn` forms on the tx guard.
+        db.write(|mut conn| {
+            let tx = conn.transaction()?;
             for profile in SystemJavaProfileName::iter() {
-                java_repo::upsert_profile_conn(&conn, &profile.to_string(), true)?;
+                java_repo::upsert_profile_conn(&tx, &profile.to_string(), true)?;
             }
+            tx.commit()?;
             Ok(())
         })
         .await?;
@@ -202,14 +205,16 @@ impl ManagerRef<'_, JavaManager> {
         }
 
         // Two statements (create the profile, then link its java) run in one
-        // writer dispatch, so no other write interleaves. They are not one
-        // transaction: each autocommits separately, so a crash between them can
-        // persist a profile without its java link. Uses `_conn` forms inside.
+        // writer dispatch and ONE transaction — all-or-nothing: the profile and
+        // its java link land together or not at all, and readers never observe
+        // an intermediate state. `_conn` forms on the tx guard.
         self.app
             .db
-            .write(move |conn| {
-                java_repo::upsert_profile_conn(&conn, &profile_name, false)?;
-                java_repo::set_profile_java_conn(&conn, &profile_name, Some(&java_id))?;
+            .write(move |mut conn| {
+                let tx = conn.transaction()?;
+                java_repo::upsert_profile_conn(&tx, &profile_name, false)?;
+                java_repo::set_profile_java_conn(&tx, &profile_name, Some(&java_id))?;
+                tx.commit()?;
                 Ok(())
             })
             .await?;
@@ -373,16 +378,18 @@ impl ManagerRef<'_, JavaManager> {
 
                         // Interleaved app logic: unlink the computed set of
                         // profiles then flip the java's validity. Runs in one
-                        // writer dispatch, so no other write interleaves; not
-                        // one transaction (each autocommits). Uses `_conn`
-                        // forms inside the closure.
+                        // writer dispatch and ONE transaction — all-or-nothing:
+                        // a failure rolls the whole group back and readers never
+                        // observe an intermediate state. `_conn` forms on the tx guard.
                         self.app
                             .db
-                            .write(move |conn| {
+                            .write(move |mut conn| {
+                                let tx = conn.transaction()?;
                                 for name in names_to_disconnect {
-                                    java_repo::set_profile_java_conn(&conn, &name, None)?;
+                                    java_repo::set_profile_java_conn(&tx, &name, None)?;
                                 }
-                                java_repo::set_java_validity_conn(&conn, &java_id, false)?;
+                                java_repo::set_java_validity_conn(&tx, &java_id, false)?;
+                                tx.commit()?;
                                 Ok(())
                             })
                             .await?;

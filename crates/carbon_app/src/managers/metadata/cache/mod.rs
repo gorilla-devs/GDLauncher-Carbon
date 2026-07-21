@@ -1298,13 +1298,15 @@ impl ManagerRef<'_, MetaCacheManager> {
                 let meta_id_owned = meta_id.clone();
                 // Interleaved app logic: insert the metadata row and, only when
                 // a logo was scaled, its local image. Runs in one writer
-                // dispatch, so no other write interleaves; not one transaction
-                // (each autocommits). Uses `_conn` forms inside the closure.
+                // dispatch, so no other write interleaves; they run in ONE transaction —
+                // all-or-nothing: a failure rolls the whole group back and readers
+                // never observe an intermediate state. `_conn` forms on the tx guard.
                 self.app
                     .db
-                    .write(move |conn| {
+                    .write(move |mut conn| {
+                        let tx = conn.transaction()?;
                         metarepo::insert_metadata_conn(
-                            &conn,
+                            &tx,
                             &meta_id_owned,
                             murmur2,
                             &sha512,
@@ -1318,8 +1320,9 @@ impl ManagerRef<'_, MetaCacheManager> {
                             DbDateTime(Utc::now().fixed_offset()),
                         )?;
                         if let Some(data) = logo_data {
-                            metarepo::insert_local_image_conn(&conn, &meta_id_owned, &data)?;
+                            metarepo::insert_local_image_conn(&tx, &meta_id_owned, &data)?;
                         }
+                        tx.commit()?;
                         Ok(())
                     })
                     .await?;

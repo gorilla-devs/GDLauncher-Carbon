@@ -581,15 +581,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             // Moving forward: shift items in (start, target] down by 1 (groups
             // and ungrouped instances), then place the group at target - 1.
             // Three writes run in one writer dispatch so no other write
-            // interleaves; they are not one transaction (each autocommits), so
-            // a reader can observe an intermediate restamp and a crash mid-way
-            // persists a partial shift. Uses `_conn` forms inside the closure.
+            // interleaves; they run in ONE transaction —
+            // all-or-nothing: a failure rolls the whole group back and readers
+            // never observe an intermediate state. `_conn` forms on the tx guard.
             self.app
                 .db
-                .write(move |conn| {
-                    instance_repo::shift_group_library_positions_down_conn(&conn, start_pos, target_pos - 1)?;
-                    instance_repo::shift_instance_library_positions_down_conn(&conn, start_pos, target_pos - 1)?;
-                    instance_repo::set_group_library_position_conn(&conn, group_id, Some(target_pos - 1))?;
+                .write(move |mut conn| {
+                    let tx = conn.transaction()?;
+                    instance_repo::shift_group_library_positions_down_conn(&tx, start_pos, target_pos - 1)?;
+                    instance_repo::shift_instance_library_positions_down_conn(&tx, start_pos, target_pos - 1)?;
+                    instance_repo::set_group_library_position_conn(&tx, group_id, Some(target_pos - 1))?;
+                    tx.commit()?;
                     Ok(())
                 })
                 .await?;
@@ -597,15 +599,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             // Moving backward: shift items in [target, start) up by 1, then
             // place the group at target.
             // Three writes run in one writer dispatch so no other write
-            // interleaves; they are not one transaction (each autocommits), so
-            // a reader can observe an intermediate restamp and a crash mid-way
-            // persists a partial shift. Uses `_conn` forms inside the closure.
+            // interleaves; they run in ONE transaction —
+            // all-or-nothing: a failure rolls the whole group back and readers
+            // never observe an intermediate state. `_conn` forms on the tx guard.
             self.app
                 .db
-                .write(move |conn| {
-                    instance_repo::shift_group_library_positions_up_conn(&conn, target_pos, start_pos)?;
-                    instance_repo::shift_instance_library_positions_up_conn(&conn, target_pos, start_pos)?;
-                    instance_repo::set_group_library_position_conn(&conn, group_id, Some(target_pos))?;
+                .write(move |mut conn| {
+                    let tx = conn.transaction()?;
+                    instance_repo::shift_group_library_positions_up_conn(&tx, target_pos, start_pos)?;
+                    instance_repo::shift_instance_library_positions_up_conn(&tx, target_pos, start_pos)?;
+                    instance_repo::set_group_library_position_conn(&tx, group_id, Some(target_pos))?;
+                    tx.commit()?;
                     Ok(())
                 })
                 .await?;
@@ -618,13 +622,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Interleaved app logic: restamp every group's index from the ordered
         // in-memory list. Runs in one writer dispatch, so no other write
-        // interleaves; not one transaction (each autocommits). `_conn` forms.
+        // interleaves; they run in ONE transaction —
+        // all-or-nothing: a failure rolls the whole group back and readers
+        // never observe an intermediate state. `_conn` forms on the tx guard.
         self.app
             .db
-            .write(move |conn| {
+            .write(move |mut conn| {
+                let tx = conn.transaction()?;
                 for (idx, g) in all_groups.iter().enumerate() {
-                    instance_repo::set_group_index_conn(&conn, g.id, idx as i32)?;
+                    instance_repo::set_group_index_conn(&tx, g.id, idx as i32)?;
                 }
+                tx.commit()?;
                 Ok(())
             })
             .await?;
@@ -805,24 +813,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // Only shift if we have a target position (not end of group with no items)
                 if start_library_pos != Some(target_lib_pos) {
                     // Two shifts run in one writer dispatch so no other write
-                    // interleaves; not one transaction (each autocommits), so a
-                    // reader can observe the gap between them. Uses `_conn`
-                    // forms inside the closure.
+                    // interleaves; they run in ONE transaction —
+                    // all-or-nothing: a failure rolls the whole group back and readers
+                    // never observe an intermediate state. `_conn` forms on the tx guard.
                     self.app
                         .db
-                        .write(move |conn| {
+                        .write(move |mut conn| {
+                            let tx = conn.transaction()?;
                             // Shift libraryPosition of items at or after target_lib_pos
                             // (not the instance we're moving), and the groups too.
                             instance_repo::shift_instance_library_positions_up_in_group_except_conn(
-                                &conn,
+                                &tx,
                                 default_id,
                                 target_lib_pos,
                                 instance_id,
                             )?;
                             instance_repo::shift_all_group_library_positions_up_from_conn(
-                                &conn,
+                                &tx,
                                 target_lib_pos,
                             )?;
+                            tx.commit()?;
                             Ok(())
                         })
                         .await?;
@@ -834,23 +844,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         if start_group == default_group_id && target_group != default_group_id {
             if let Some(start_lib_pos) = start_library_pos {
                 // Two shifts run in one writer dispatch so no other write
-                // interleaves; not one transaction (each autocommits), so a
-                // reader can observe the intermediate state between them. Uses
-                // `_conn` forms inside the closure.
+                // interleaves; they run in ONE transaction —
+                // all-or-nothing: a failure rolls the whole group back and readers
+                // never observe an intermediate state. `_conn` forms on the tx guard.
                 self.app
                     .db
-                    .write(move |conn| {
+                    .write(move |mut conn| {
+                        let tx = conn.transaction()?;
                         // Decrement libraryPosition of items after start_lib_pos,
                         // groups included.
                         instance_repo::shift_instance_library_positions_down_in_group_conn(
-                            &conn,
+                            &tx,
                             default_id,
                             start_lib_pos,
                         )?;
                         instance_repo::shift_all_group_library_positions_down_after_conn(
-                            &conn,
+                            &tx,
                             start_lib_pos,
                         )?;
+                        tx.commit()?;
                         Ok(())
                     })
                     .await?;
@@ -1013,20 +1025,24 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let index_value = index.value;
         // Interleaved app logic: shift existing items up then insert the new
         // group at the freed position. Runs in one writer dispatch, so no other
-        // write interleaves; not one transaction (each autocommits). `_conn` forms.
+        // write interleaves; they run in ONE transaction —
+        // all-or-nothing: a failure rolls the whole group back and readers
+        // never observe an intermediate state. `_conn` forms on the tx guard.
         let group_id = self
             .app
             .db
-            .write(move |conn| {
-                instance_repo::shift_all_instance_library_positions_up_conn(&conn, target_position)?;
-                instance_repo::shift_all_group_library_positions_up_from_conn(&conn, target_position)?;
+            .write(move |mut conn| {
+                let tx = conn.transaction()?;
+                instance_repo::shift_all_instance_library_positions_up_conn(&tx, target_position)?;
+                instance_repo::shift_all_group_library_positions_up_from_conn(&tx, target_position)?;
                 // Create the group at the target position
                 let id = instance_repo::insert_group_conn(
-                    &conn,
+                    &tx,
                     &name,
                     index_value,
                     Some(target_position),
                 )?;
+                tx.commit()?;
                 Ok(id)
             })
             .await?;
