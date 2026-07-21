@@ -11,8 +11,12 @@ use crate::{
 };
 use anyhow::Context;
 use carbon_repos::db::{PrismaClient, app_configuration::pre_launch_hook};
+use carbon_repos::db_exec::Db;
+use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::pcr::QueryError;
+use carbon_repos::repos::version_meta;
 use carbon_rt_path::{InstancePath, RuntimePath};
+use chrono::Utc;
 use daedalus::minecraft::{
     Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
     VersionManifest,
@@ -68,7 +72,7 @@ pub async fn get_manifest(
 }
 
 pub async fn get_version(
-    db_client: Arc<PrismaClient>,
+    db: &Db,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     mc_version: &str,
     meta_base_url: &Url,
@@ -109,21 +113,17 @@ pub async fn get_version(
         let parsed = serde_json::from_slice::<VersionInfo>(&version_meta)
             .with_context(|| format!("Failed to parse minecraft version from `{}`", url.clone()))?;
 
-        db_client
-            .version_info_cache()
-            .upsert(
-                carbon_repos::db::version_info_cache::id::equals(mc_version.to_string()),
-                carbon_repos::db::version_info_cache::create(
-                    mc_version.to_string(),
-                    version_meta.to_vec(),
-                    vec![],
-                ),
-                vec![carbon_repos::db::version_info_cache::version_info::set(
-                    version_meta.to_vec(),
-                )],
-            )
-            .exec()
-            .await?;
+        let mc_version_owned = mc_version.to_string();
+        let version_meta_owned = version_meta.to_vec();
+        db.write(move |conn| {
+            Ok(version_meta::upsert_version_info(
+                conn,
+                &mc_version_owned,
+                &version_meta_owned,
+                DbDateTime(Utc::now().fixed_offset()),
+            )?)
+        })
+        .await?;
 
         Ok(parsed)
     };
@@ -131,12 +131,9 @@ pub async fn get_version(
     match update_cache().await {
         Ok(parsed) => Ok(parsed),
         Err(err) => {
-            let db_cache = db_client
-                .version_info_cache()
-                .find_unique(carbon_repos::db::version_info_cache::id::equals(
-                    mc_version.to_string(),
-                ))
-                .exec()
+            let mc_version_owned = mc_version.to_string();
+            let db_cache = db
+                .read(move |conn| Ok(version_meta::get_version_info(conn, &mc_version_owned)?))
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
@@ -164,7 +161,7 @@ pub async fn get_version(
 }
 
 pub async fn get_lwjgl_meta(
-    db_client: Arc<PrismaClient>,
+    db: &Db,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     version_info: &VersionInfo,
     meta_base_url: &Url,
@@ -228,21 +225,17 @@ pub async fn get_lwjgl_meta(
 
         let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
-        db_client
-            .lwjgl_meta_cache()
-            .upsert(
-                carbon_repos::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
-                carbon_repos::db::lwjgl_meta_cache::create(
-                    db_entry_name.clone(),
-                    lwjgl.to_vec(),
-                    vec![],
-                ),
-                vec![carbon_repos::db::lwjgl_meta_cache::lwjgl::set(
-                    lwjgl.to_vec(),
-                )],
-            )
-            .exec()
-            .await?;
+        let lwjgl_owned = lwjgl.to_vec();
+        let db_entry_name_owned = db_entry_name.clone();
+        db.write(move |conn| {
+            Ok(version_meta::upsert_lwjgl_meta(
+                conn,
+                &db_entry_name_owned,
+                &lwjgl_owned,
+                DbDateTime(Utc::now().fixed_offset()),
+            )?)
+        })
+        .await?;
 
         Ok(parsed)
     };
@@ -250,13 +243,9 @@ pub async fn get_lwjgl_meta(
     match update_cache().await {
         Ok(parsed) => Ok(parsed),
         Err(err) => {
-            let db_cache = db_client
-                .lwjgl_meta_cache()
-                .find_unique(carbon_repos::db::lwjgl_meta_cache::id::equals(format!(
-                    "{}-{}",
-                    version_info_lwjgl_requirement.uid, lwjgl_suggest
-                )))
-                .exec()
+            let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
+            let db_cache = db
+                .read(move |conn| Ok(version_meta::get_lwjgl_meta(conn, &db_entry_name)?))
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
@@ -982,7 +971,7 @@ mod tests {
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            app.prisma_client.clone(),
+            &app.db,
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version,
             &app.minecraft_manager().meta_base_url,
@@ -1011,7 +1000,7 @@ mod tests {
             .unwrap();
 
         let assets_dir = crate::managers::minecraft::assets::get_assets_dir(
-            app.prisma_client.clone(),
+            &app.db,
             reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version.asset_index,
             runtime_path.get_assets(),
@@ -1116,7 +1105,7 @@ mod tests {
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            app.prisma_client.clone(),
+            &app.db,
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version,
             &app.minecraft_manager().meta_base_url,

@@ -49,3 +49,43 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
     }
     violations
 }
+
+/// Tables whose freshness column PCR wrote automatically (`@updatedAt`) and
+/// that we must now set explicitly on every create/update/upsert. Missing one
+/// of these breaks cache-expiry reads silently (the two modpack `updatedAt`
+/// columns feed a 7-day freshness gate).
+pub const FRESHNESS: &[(&str, &str)] = &[
+    ("VersionInfoCache", "lastUpdatedAt"),
+    ("PartialVersionInfoCache", "lastUpdatedAt"),
+    ("LwjglMetaCache", "lastUpdatedAt"),
+    ("AssetsMetaCache", "lastUpdatedAt"),
+    ("ModFileCache", "lastUpdatedAt"),
+    ("ServerModFileCache", "lastUpdatedAt"),
+    ("ModMetadata", "lastUpdatedAt"),
+    ("FrontendPreference", "updatedAt"),
+    ("CurseForgeModpackCache", "updatedAt"),
+    ("ModrinthModpackCache", "updatedAt"),
+];
+
+/// Text-level freshness lint (v1 — an authorizer-based upgrade is Plan 3):
+/// any statement that `UPDATE`s a freshness table, or `INSERT`s into one with
+/// a `DO UPDATE SET` upsert clause, must mention that table's freshness
+/// column somewhere in its SQL text. Catches the class of bug where a repo
+/// fn forgets to carry the freshness column PCR used to write for free.
+pub fn check_freshness(queries: &[QueryCheck]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for q in queries {
+        for (table, col) in FRESHNESS {
+            let touches_table = q.sql.contains(&format!("UPDATE {table} SET"))
+                || (q.sql.contains(&format!("INSERT INTO {table}"))
+                    && q.sql.contains("DO UPDATE SET"));
+            if touches_table && !q.sql.contains(col) {
+                violations.push(format!(
+                    "{}: statement touches {} but is missing freshness column '{}'",
+                    q.name, table, col
+                ));
+            }
+        }
+    }
+    violations
+}

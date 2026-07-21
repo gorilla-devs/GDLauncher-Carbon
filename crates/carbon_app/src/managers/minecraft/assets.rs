@@ -1,10 +1,13 @@
 use crate::domain::minecraft::minecraft::asset_object_location;
 use anyhow::Context;
-use carbon_repos::db::PrismaClient;
+use carbon_repos::db_exec::Db;
+use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::pcr::QueryError;
+use carbon_repos::repos::version_meta;
 use carbon_rt_path::AssetsPath;
+use chrono::Utc;
 use daedalus::minecraft::{AssetIndex, AssetsIndex};
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, path::PathBuf};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tracing::trace;
@@ -18,7 +21,7 @@ pub enum AssetsError {
 }
 
 pub async fn get_meta(
-    db_client: Arc<PrismaClient>,
+    db: &Db,
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     version_asset_index: &AssetIndex,
     asset_indexes_path: PathBuf,
@@ -56,21 +59,17 @@ pub async fn get_meta(
             )
         })?;
 
-        db_client
-            .assets_meta_cache()
-            .upsert(
-                carbon_repos::db::assets_meta_cache::id::equals(version_asset_index.id.clone()),
-                carbon_repos::db::assets_meta_cache::create(
-                    version_asset_index.id.clone(),
-                    asset_index.to_vec(),
-                    vec![],
-                ),
-                vec![carbon_repos::db::assets_meta_cache::assets_index::set(
-                    asset_index.to_vec(),
-                )],
-            )
-            .exec()
-            .await?;
+        let id_owned = version_asset_index.id.clone();
+        let asset_index_owned = asset_index.to_vec();
+        db.write(move |conn| {
+            Ok(version_meta::upsert_assets_meta(
+                conn,
+                &id_owned,
+                &asset_index_owned,
+                DbDateTime(Utc::now().fixed_offset()),
+            )?)
+        })
+        .await?;
 
         Ok((parsed, asset_index.to_vec()))
     };
@@ -78,12 +77,9 @@ pub async fn get_meta(
     let asset_index = match update_cache().await {
         Ok(result) => Ok(result),
         Err(err) => {
-            let db_cache = db_client
-                .assets_meta_cache()
-                .find_unique(carbon_repos::db::assets_meta_cache::id::equals(
-                    version_asset_index.id.clone(),
-                ))
-                .exec()
+            let id_owned = version_asset_index.id.clone();
+            let db_cache = db
+                .read(move |conn| Ok(version_meta::get_assets_meta(conn, &id_owned)?))
                 .await?;
 
             if let Some(db_cache) = db_cache {
@@ -126,14 +122,14 @@ impl AssetsDir {
 }
 
 pub async fn get_assets_dir(
-    db_client: Arc<PrismaClient>,
+    db: &Db,
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     version_assets_index: &AssetIndex,
     assets_path: AssetsPath,
     resources_dir: PathBuf,
 ) -> anyhow::Result<AssetsDir> {
     let (assets_index, _) = get_meta(
-        db_client,
+        db,
         reqwest_client,
         version_assets_index,
         assets_path.get_indexes_path(),
@@ -154,14 +150,14 @@ pub async fn get_assets_dir(
 }
 
 pub async fn reconstruct_assets(
-    db_client: Arc<PrismaClient>,
+    db: &Db,
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     version_asset_index: &AssetIndex,
     assets_path: AssetsPath,
     resources_dir: PathBuf,
 ) -> anyhow::Result<()> {
     let (assets_index, assets_index_bytes) = get_meta(
-        db_client,
+        db,
         reqwest_client,
         version_asset_index,
         assets_path.get_indexes_path(),

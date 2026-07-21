@@ -6,3 +6,4 @@ pub mod instance;
 pub mod java;
 pub mod server;
 pub mod skin;
+pub mod version_meta;

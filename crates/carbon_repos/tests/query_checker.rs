@@ -1,4 +1,4 @@
-use carbon_repos::checker::check_module;
+use carbon_repos::checker::{check_freshness, check_module};
 use carbon_repos::registry::QueryCheck;
 use rusqlite::Connection;
 
@@ -10,34 +10,53 @@ fn migrated_db() -> (tempfile::TempDir, Connection) {
     (dir, conn)
 }
 
+/// Every registered `QueryCheck` across every repo module. One line per
+/// module; java is first, later tasks extend this list — both the schema
+/// checker and the freshness lint run over this same aggregated set, so
+/// every later task is covered automatically.
+fn all_registered_queries() -> Vec<QueryCheck> {
+    let mut all: Vec<QueryCheck> = Vec::new();
+    all.extend(carbon_repos::repos::java::all_queries());
+    all.extend(carbon_repos::repos::app_configuration::all_queries());
+    all.extend(carbon_repos::repos::frontend_preference::all_queries());
+    all.extend(carbon_repos::repos::account::all_queries());
+    all.extend(carbon_repos::repos::skin::all_queries());
+    all.extend(carbon_repos::repos::active_downloads::all_queries());
+    all.extend(carbon_repos::repos::instance::all_queries());
+    all.extend(carbon_repos::repos::server::all_queries());
+    all.extend(carbon_repos::repos::version_meta::all_queries());
+    all
+}
+
 #[test]
 fn all_registered_queries_pass_against_migrated_schema() {
     let (_d, conn) = migrated_db();
-    // one line per repo module; java is first, later plans extend this list
-    let mut all: Vec<String> = check_module(&conn, &carbon_repos::repos::java::all_queries());
-    all.extend(check_module(
-        &conn,
-        &carbon_repos::repos::app_configuration::all_queries(),
-    ));
-    all.extend(check_module(
-        &conn,
-        &carbon_repos::repos::frontend_preference::all_queries(),
-    ));
-    all.extend(check_module(&conn, &carbon_repos::repos::account::all_queries()));
-    all.extend(check_module(&conn, &carbon_repos::repos::skin::all_queries()));
-    all.extend(check_module(
-        &conn,
-        &carbon_repos::repos::active_downloads::all_queries(),
-    ));
-    all.extend(check_module(
-        &conn,
-        &carbon_repos::repos::instance::all_queries(),
-    ));
-    all.extend(check_module(
-        &conn,
-        &carbon_repos::repos::server::all_queries(),
-    ));
+    let all = check_module(&conn, &all_registered_queries());
     assert!(all.is_empty(), "query checker violations:\n{}", all.join("\n"));
+}
+
+#[test]
+fn freshness_lint_passes_for_all_registered_queries() {
+    let v = check_freshness(&all_registered_queries());
+    assert!(v.is_empty(), "freshness lint violations:\n{}", v.join("\n"));
+}
+
+#[test]
+fn freshness_lint_catches_planted_failure() {
+    // The fence is fence-tested: a fake UPDATE on VersionInfoCache that
+    // never sets lastUpdatedAt must be flagged.
+    let planted = [QueryCheck {
+        name: "bad_freshness_update",
+        sql: "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
+        params: &[":v", ":id"],
+        columns: None,
+    }];
+    let v = check_freshness(&planted);
+    assert_eq!(
+        v.len(),
+        1,
+        "freshness lint must flag missing lastUpdatedAt, got: {v:?}"
+    );
 }
 
 #[test]
