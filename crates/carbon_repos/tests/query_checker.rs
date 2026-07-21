@@ -278,3 +278,49 @@ fn query_plan_lint_catches_planted_full_scan() {
         "must flag a full scan of a guarded table, got: {v:?}"
     );
 }
+
+/// Every hand-written SQL statement in the repos modules is registered: the
+/// SQL travels through a shared const that a QueryCheck also references.
+#[test]
+fn all_handwritten_repo_sql_is_registered() {
+    let dir = format!("{}/src/repos", env!("CARGO_MANIFEST_DIR"));
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "rs") {
+            files.push((
+                path.file_name().unwrap().to_string_lossy().into_owned(),
+                std::fs::read_to_string(&path).unwrap(),
+            ));
+        }
+    }
+    assert!(!files.is_empty(), "repos dir scan found no sources");
+    let v = carbon_repos::checker::check_handwritten_sql(&files);
+    assert!(v.is_empty(), "hand-written SQL census violations:\n{}", v.join("\n"));
+}
+
+/// CENSUS-SELFTEST: checker.handwritten-sql-registered
+#[test]
+fn handwritten_sql_census_catches_planted_failures() {
+    use carbon_repos::checker::check_handwritten_sql;
+    let inline = ("a.rs".to_string(), "fn f() { conn.prepare_cached(\"SELECT 1\") }".to_string());
+    let v = check_handwritten_sql(&[inline]);
+    assert_eq!(v.len(), 1, "inline literal must be flagged: {v:?}");
+
+    let dynamic = ("b.rs".to_string(), "fn f() { conn.execute_batch(format!(\"DELETE FROM {t}\")) }".to_string());
+    let v = check_handwritten_sql(&[dynamic]);
+    assert_eq!(v.len(), 1, "format!-built SQL must be flagged: {v:?}");
+
+    let unreferenced = ("c.rs".to_string(),
+        "const X_SQL: &str = \"SELECT 1\";\nfn f() { conn.prepare_cached(X_SQL)?; }".to_string());
+    let v = check_handwritten_sql(&[unreferenced]);
+    assert_eq!(v.len(), 1, "const without a QueryCheck reference must be flagged: {v:?}");
+
+    let conforming = ("d.rs".to_string(),
+        "const X_SQL: &str = \"SELECT 1\";\nfn f() { conn.prepare_cached(X_SQL)?; }\nconst CHECK: QueryCheck = QueryCheck { sql: X_SQL };".to_string());
+    assert!(check_handwritten_sql(&[conforming]).is_empty(), "conforming const must pass");
+
+    let statement_receiver = ("e.rs".to_string(),
+        "fn f() { let mut st = conn.prepare_cached(X_SQL)?; st.execute(rusqlite::named_params! {})?; }\nconst X_SQL: &str = \"\";\n// sql: X_SQL".to_string());
+    assert!(check_handwritten_sql(&[statement_receiver]).is_empty(), "st.execute is a params call, not SQL");
+}

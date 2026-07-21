@@ -359,3 +359,77 @@ fn plan_full_scans_table(detail: &str, table: &str) -> bool {
     let object = rest.split_whitespace().next().unwrap_or("");
     object == table && !rest.contains("USING")
 }
+
+/// CENSUS-RULE: checker.handwritten-sql-registered — every hand-written SQL
+/// statement in a repos module must receive its SQL through an UPPER_SNAKE
+/// const that a `QueryCheck` in the same file also references (`sql: CONST`),
+/// so the checker provably validates the exact string the code executes.
+/// Inline string literals, `format!` expressions, and other non-const
+/// arguments are violations. Receivers `st`/`stmt` are prepared-statement
+/// method calls (their first argument is params, not SQL) and are skipped.
+pub fn check_handwritten_sql(files: &[(String, String)]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (name, src) in files {
+        let mut used_consts: Vec<String> = Vec::new();
+        for (token, receiver_sensitive) in [
+            ("prepare_cached(", false),
+            (".prepare(", false),
+            ("execute_batch(", false),
+            (".execute(", true),
+            (".query_row(", true),
+            (".query_map(", true),
+        ] {
+            let mut from = 0;
+            while let Some(pos) = src[from..].find(token) {
+                let at = from + pos;
+                from = at + token.len();
+                if receiver_sensitive {
+                    let recv: String = src[..at]
+                        .chars()
+                        .rev()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_')
+                        .collect::<String>()
+                        .chars()
+                        .rev()
+                        .collect();
+                    if recv == "st" || recv == "stmt" {
+                        continue;
+                    }
+                }
+                let arg = src[at + token.len()..]
+                    .trim_start_matches(|c: char| c.is_whitespace())
+                    .trim_start_matches('&');
+                let line_no = src[..at].lines().count();
+                if arg.starts_with('"') || arg.starts_with("r\"") || arg.starts_with("r#\"") {
+                    violations.push(format!(
+                        "{name}:{line_no}: inline SQL literal at `{token}` — extract an UPPER_SNAKE const shared with a QueryCheck"
+                    ));
+                } else if arg.starts_with("format!") {
+                    violations.push(format!(
+                        "{name}:{line_no}: format!-built SQL at `{token}` — dynamic SQL must go through DynamicQuery"
+                    ));
+                } else {
+                    let ident: String = arg
+                        .chars()
+                        .take_while(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || *c == '_')
+                        .collect();
+                    if ident.len() >= 2 && arg[ident.len()..].starts_with([',', ')']) {
+                        used_consts.push(ident);
+                    } else {
+                        violations.push(format!(
+                            "{name}:{line_no}: non-const SQL argument at `{token}` — pass an UPPER_SNAKE const shared with a QueryCheck"
+                        ));
+                    }
+                }
+            }
+        }
+        for c in used_consts {
+            if !src.contains(&format!("sql: {c}")) {
+                violations.push(format!(
+                    "{name}: const `{c}` is executed but no QueryCheck references it (`sql: {c}` missing) — the checker cannot vouch for it"
+                ));
+            }
+        }
+    }
+    violations
+}
