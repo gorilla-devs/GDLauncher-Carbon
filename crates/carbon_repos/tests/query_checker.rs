@@ -19,6 +19,7 @@ fn all_registered_queries() -> Vec<QueryCheck> {
     all.extend(carbon_repos::repos::java::all_queries());
     all.extend(carbon_repos::repos::app_configuration::all_queries());
     all.extend(carbon_repos::repos::frontend_preference::all_queries());
+    all.extend(carbon_repos::repos::http_cache::all_queries());
     all.extend(carbon_repos::repos::account::all_queries());
     all.extend(carbon_repos::repos::skin::all_queries());
     all.extend(carbon_repos::repos::active_downloads::all_queries());

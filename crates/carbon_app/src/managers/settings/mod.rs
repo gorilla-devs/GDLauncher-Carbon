@@ -9,7 +9,6 @@ use crate::domain::vtask::VisualTaskId;
 use crate::managers::vtask::{Subtask, TaskState, VisualTask};
 use anyhow::{anyhow, bail};
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
-use carbon_repos::pcr::raw;
 use carbon_repos::repos::app_configuration::{AppConfigurationPatch, AppConfigurationRow};
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
@@ -506,7 +505,7 @@ impl ManagerRef<'_, SettingsManager> {
                 if let Some(vs) = vacuum_subtask.as_ref() {
                     vs.start_opaque();
                 }
-                if let Err(e) = app.prisma_client._execute_raw(raw!("VACUUM")).exec().await {
+                if let Err(e) = app.db.write(|conn| Ok(conn.execute_batch("VACUUM")?)).await {
                     error!("VACUUM failed: {e}");
                     task.fail(anyhow!("Failed to reclaim cache space: {e}"))
                         .await;
