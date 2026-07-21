@@ -589,6 +589,48 @@ async fn find_forge_launcher_jar(data_path: &Path) -> Option<String> {
     None
 }
 
+/// Build a launch config for a modloader that a server pack already ships
+/// pre-installed, letting us skip downloading and running the installer
+/// entirely. Returns `None` when the loader still has to be installed.
+///
+/// CurseForge server packs are usually distributed with the loader already
+/// unpacked (that is what makes them "server packs" rather than client
+/// modpacks), so this is the common path for modpack-created servers.
+pub async fn existing_install_launch_config(
+    server_path: &ServerPath,
+    modloader_type: &str,
+    modloader_version: Option<&str>,
+) -> Option<LaunchConfig> {
+    let data_path = server_path.get_data_path();
+
+    match modloader_type {
+        "neoforge" => {
+            find_loader_args_file(&data_path, "net/neoforged/neoforge", modloader_version)
+                .await
+                .map(LaunchConfig::from_args_file)
+        }
+        "forge" => {
+            if let Some(jar) = find_forge_launcher_jar(&data_path).await {
+                return Some(LaunchConfig {
+                    jar_path: Some(jar),
+                    ..LaunchConfig::vanilla()
+                });
+            }
+            find_loader_args_file(&data_path, "net/minecraftforge/forge", modloader_version)
+                .await
+                .map(LaunchConfig::from_args_file)
+        }
+        "fabric" | "quilt" => {
+            let jar = format!("{modloader_type}-server-launch.jar");
+            data_path.join(&jar).exists().then(|| LaunchConfig {
+                jar_path: Some(jar),
+                ..LaunchConfig::vanilla()
+            })
+        }
+        _ => None,
+    }
+}
+
 /// Name of the Forge/NeoForge argument file for the current platform.
 fn platform_args_file_name() -> &'static str {
     if cfg!(windows) {
@@ -698,5 +740,65 @@ mod tests {
             .unwrap();
 
         assert!(found.contains("21.1.77"), "got {found}");
+    }
+
+    #[tokio::test]
+    async fn preinstalled_neoforge_pack_skips_the_installer() {
+        let dir = tempfile::tempdir().unwrap();
+        let server_path = ServerPath::new(dir.path().to_path_buf());
+        std::fs::create_dir_all(server_path.get_data_path()).unwrap();
+        write_neoforge_install(&server_path.get_data_path(), "21.1.77");
+
+        let config = existing_install_launch_config(&server_path, "neoforge", Some("21.1.77"))
+            .await
+            .expect("a pre-installed pack should yield a launch config");
+
+        assert_eq!(
+            config.args_file.as_deref(),
+            Some(
+                format!(
+                    "libraries/net/neoforged/neoforge/21.1.77/{}",
+                    platform_args_file_name()
+                )
+                .as_str()
+            )
+        );
+        // Nothing else should be set — the argument file supplies main class,
+        // module path and game args on its own.
+        assert_eq!(config.jar_path, None);
+        assert_eq!(config.main_class, None);
+    }
+
+    #[tokio::test]
+    async fn bare_pack_reports_nothing_preinstalled() {
+        let dir = tempfile::tempdir().unwrap();
+        let server_path = ServerPath::new(dir.path().to_path_buf());
+        std::fs::create_dir_all(server_path.get_data_path()).unwrap();
+
+        assert!(
+            existing_install_launch_config(&server_path, "neoforge", Some("21.1.77"))
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn preinstalled_forge_prefers_its_launcher_jar() {
+        let dir = tempfile::tempdir().unwrap();
+        let server_path = ServerPath::new(dir.path().to_path_buf());
+        let data_path = server_path.get_data_path();
+        std::fs::create_dir_all(&data_path).unwrap();
+        std::fs::write(data_path.join("forge-1.20.1-47.4.10-shim.jar"), b"jar").unwrap();
+        // The installer jar must never be picked as the thing to launch.
+        std::fs::write(data_path.join("forge-1.20.1-47.4.10-installer.jar"), b"jar").unwrap();
+
+        let config = existing_install_launch_config(&server_path, "forge", Some("1.20.1-47.4.10"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            config.jar_path.as_deref(),
+            Some("forge-1.20.1-47.4.10-shim.jar")
+        );
     }
 }

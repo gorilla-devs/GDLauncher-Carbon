@@ -778,31 +778,64 @@ impl ManagerRef<'_, ServerManager> {
                     t_download_jar.complete_opaque();
                 }
 
-                // Install modloader only if detected. Complete the pre-created subtask
-                // either way to reach 100%.
-                if let (Some(ml_type), Some(ml_version)) =
-                    (&pack_result.modloader_type, &pack_result.modloader_version)
-                {
-                    let java_path = app
-                        .java_manager()
-                        .find_java_for_server_version(
-                            &pack_result.game_version,
-                            Some(ml_type.as_str()),
-                        )
-                        .await
-                        .context("Cannot install modloader: no Java available")?;
+                // Install the modloader if one was detected. Complete the
+                // pre-created subtask either way to reach 100%.
+                if let Some(ml_type) = &pack_result.modloader_type {
+                    let ml_version = pack_result.modloader_version.as_deref();
 
-                    let launch_config = modloader_install::install_modloader(
-                        &app.reqwest_client,
+                    // Most server packs arrive with the loader already unpacked.
+                    // Reuse it rather than re-downloading and re-running the
+                    // installer over the top of it.
+                    let existing = modloader_install::existing_install_launch_config(
                         &server_path,
-                        &pack_result.game_version,
                         ml_type,
                         ml_version,
-                        &java_path,
-                        Some(&t_install_modloader),
                     )
-                    .await
-                    .context(format!("Failed to install {} {}", ml_type, ml_version))?;
+                    .await;
+
+                    let launch_config = match existing {
+                        Some(config) => {
+                            info!(
+                                "Server pack ships {} pre-installed, skipping installer",
+                                ml_type
+                            );
+                            t_install_modloader.complete_opaque();
+                            config
+                        }
+                        None => {
+                            // Not pre-installed, so we have to run the installer —
+                            // which needs an exact version. Failing here is much
+                            // better than booting a vanilla server that modded
+                            // clients cannot join.
+                            let ml_version = ml_version.ok_or_else(|| {
+                                anyhow!(
+                                    "Server pack requires {} but ships neither an installed copy nor a version to install",
+                                    ml_type
+                                )
+                            })?;
+
+                            let java_path = app
+                                .java_manager()
+                                .find_java_for_server_version(
+                                    &pack_result.game_version,
+                                    Some(ml_type.as_str()),
+                                )
+                                .await
+                                .context("Cannot install modloader: no Java available")?;
+
+                            modloader_install::install_modloader(
+                                &app.reqwest_client,
+                                &server_path,
+                                &pack_result.game_version,
+                                ml_type,
+                                ml_version,
+                                &java_path,
+                                Some(&t_install_modloader),
+                            )
+                            .await
+                            .context(format!("Failed to install {} {}", ml_type, ml_version))?
+                        }
+                    };
 
                     modloader_launch::save_launch_config(&server_path, &launch_config).await?;
                 } else {
