@@ -515,3 +515,24 @@ pub fn all_queries() -> Vec<QueryCheck> {
     all.push(INSERT_SERVER_GROUP_CHECK);
     all
 }
+
+/// Deletes a server together with the mod-file cache rows that belong to it, in
+/// one write-pool transaction.
+///
+/// The `ON DELETE CASCADE` edge does this itself whenever foreign keys are
+/// enforced, but `fk::sweep_and_decide` falls back to leaving them off for the
+/// whole session when it meets a violation it cannot repair, and
+/// `GDL_DISABLE_FK_ENFORCEMENT=1` selects the same state. Issuing the delete
+/// here rather than leaving it to the caller keeps the two halves together:
+/// server ids are `AUTOINCREMENT` so orphaned rows are never adopted by a later
+/// server, but nothing else would ever reclaim them.
+pub async fn delete_server_tx(db: &Db, id: i32) -> DbResult<usize> {
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        crate::repos::mod_file_cache::delete_server_mod_file_cache_by_server_conn(&tx, id)?;
+        let removed = delete_server_conn(&tx, id)?;
+        tx.commit()?;
+        Ok(removed)
+    })
+    .await
+}

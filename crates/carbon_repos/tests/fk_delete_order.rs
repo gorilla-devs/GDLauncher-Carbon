@@ -13,6 +13,7 @@ use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::instance as inst;
 use carbon_repos::repos::mod_file_cache as mfc;
 use carbon_repos::repos::mod_metadata as meta;
+use carbon_repos::repos::server as srv;
 use rusqlite::Connection;
 
 fn now() -> DbDateTime {
@@ -29,6 +30,23 @@ async fn migrated_fk_on() -> (tempfile::TempDir, Db) {
         m.to_latest(&mut conn).unwrap();
     }
     let db = Db::open(&path, 2, true).unwrap();
+    (dir, db)
+}
+
+/// A migrated `Db` with FK enforcement OFF — the state `sweep_and_decide`
+/// falls back to for the whole session when it finds a violation it cannot
+/// repair, and what `GDL_DISABLE_FK_ENFORCEMENT=1` selects. No referential
+/// action fires here, so every cleanup a delete depends on has to be issued by
+/// the code itself.
+async fn migrated_fk_off() -> (tempfile::TempDir, Db) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("t.db");
+    {
+        let mut conn = Connection::open(&path).unwrap();
+        let (m, _n) = carbon_repos::get_migrations();
+        m.to_latest(&mut conn).unwrap();
+    }
+    let db = Db::open(&path, 2, false).unwrap();
     (dir, db)
 }
 
@@ -158,5 +176,61 @@ async fn gc_orphan_metadata_keeps_referenced_rows_under_fk_on() {
     assert!(
         err.is_err(),
         "RESTRICT edge must reject deleting a referenced parent"
+    );
+}
+
+#[tokio::test]
+async fn deleting_a_server_clears_its_file_cache_without_fk_enforcement() {
+    // The instance path issues its own cleanup alongside the cascade; the server
+    // path relied on the cascade alone, so on an FK-OFF session the rows were
+    // left behind. Server ids are AUTOINCREMENT, so these can never be adopted
+    // by a later server — they simply accumulate.
+    let (_d, db) = migrated_fk_off().await;
+    let g = srv::insert_server_group(&db, "g".into(), 0, None)
+        .await
+        .unwrap() as i32;
+    let sid = srv::insert_server(
+        &db,
+        "s".into(),
+        "sp".into(),
+        0,
+        g,
+        "1.20.1".into(),
+        25565,
+        "vanilla".into(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        now(),
+    )
+    .await
+    .unwrap() as i32;
+    seed_metadata(&db, "meta1").await;
+    mfc::upsert_server_mod_file_cache(
+        &db,
+        sid,
+        "a.jar".into(),
+        1,
+        true,
+        "mods".into(),
+        "meta1".into(),
+        now(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        count(&db, "SELECT COUNT(*) FROM ServerModFileCache").await,
+        1
+    );
+
+    srv::delete_server_tx(&db, sid).await.unwrap();
+
+    assert_eq!(
+        count(&db, "SELECT COUNT(*) FROM ServerModFileCache").await,
+        0,
+        "the server's cache rows must be cleared without relying on the cascade"
     );
 }
