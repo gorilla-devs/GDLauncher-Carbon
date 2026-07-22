@@ -44,9 +44,9 @@ export function normalizeEmail(email: string): string {
  * Hash formats required by Overwolf's setUserEmailHashes API
  */
 export interface EmailHashes {
-  SHA1: string
-  SHA256: string
-  MD5: string
+  sha1: string
+  sha256: string
+  md5: string
 }
 
 /**
@@ -56,15 +56,18 @@ export interface EmailHashes {
  * - Normalized email (lowercase, trimmed, Gmail rules applied)
  * - Hex-encoded (lowercase)
  *
+ * The key names are read verbatim by `setUserEmailHashes` and are case
+ * sensitive, so they must match `overwolf.EmailHashes` exactly.
+ *
  * @param email - Raw email address
- * @returns Object with SHA1, SHA256, and MD5 hex hashes
+ * @returns Object with sha1, sha256, and md5 hex hashes
  */
 export function hashEmailForOverwolf(email: string): EmailHashes {
   const normalized = normalizeEmail(email)
 
   return {
-    SHA1: crypto.createHash("sha1").update(normalized).digest("hex"),
-    SHA256: crypto.createHash("sha256").update(normalized).digest("hex"),
-    MD5: crypto.createHash("md5").update(normalized).digest("hex")
+    sha1: crypto.createHash("sha1").update(normalized).digest("hex"),
+    sha256: crypto.createHash("sha256").update(normalized).digest("hex"),
+    md5: crypto.createHash("md5").update(normalized).digest("hex")
   }
 }
