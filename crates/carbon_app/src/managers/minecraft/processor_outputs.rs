@@ -127,6 +127,57 @@ fn upsert(out: &mut Vec<RequiredFile>, path: PathBuf, expected_sha1: Option<Stri
     }
 }
 
+/// Whether an existing output looks complete rather than half-written.
+///
+/// Processors stream their target out of a JVM subprocess, so an interruption
+/// leaves a zero-byte or truncated file at exactly the path an existence check
+/// accepts. Hashes cannot stand in for this on a normal launch — generated jars
+/// legitimately hash differently across environments — so the test is confined
+/// to what is unambiguous: a file with no bytes, or an archive with no
+/// end-of-central-directory record, cannot be a finished output.
+fn is_structurally_complete(path: &Path) -> bool {
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return false;
+    };
+    if metadata.len() == 0 {
+        return false;
+    }
+
+    let is_archive = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("jar") || e.eq_ignore_ascii_case("zip"));
+    if !is_archive {
+        return true;
+    }
+
+    has_zip_end_of_central_directory(path, metadata.len())
+}
+
+/// Scans the tail of `path` for the ZIP end-of-central-directory signature,
+/// which a complete archive always carries within its last 64KiB (22 bytes of
+/// record plus a comment of at most `u16::MAX`).
+fn has_zip_end_of_central_directory(path: &Path, len: u64) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
+
+    const EOCD_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
+    const MAX_EOCD_SPAN: u64 = 22 + u16::MAX as u64;
+
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let span = len.min(MAX_EOCD_SPAN);
+    if file.seek(SeekFrom::End(-(span as i64))).is_err() {
+        return false;
+    }
+    let mut tail = Vec::with_capacity(span as usize);
+    if file.take(span).read_to_end(&mut tail).is_err() {
+        return false;
+    }
+    tail.windows(EOCD_SIGNATURE.len())
+        .any(|w| w == EOCD_SIGNATURE)
+}
+
 /// Returns the required files that are not on disk. With `verify_hashes`
 /// (deep-check / repair only), files whose known SHA-1 does not match are
 /// deleted and reported as missing so the caller regenerates them. Normal
@@ -139,6 +190,14 @@ pub async fn missing_files(required: &[RequiredFile], verify_hashes: bool) -> Ve
         let mut missing = Vec::new();
         for file in &owned {
             if !file.path.is_file() {
+                missing.push(file.path.clone());
+                continue;
+            }
+            if !is_structurally_complete(&file.path) {
+                tracing::info!(
+                    "Processor output is empty or truncated, regenerating: {:?}",
+                    file.path
+                );
                 missing.push(file.path.clone());
                 continue;
             }
@@ -387,10 +446,22 @@ mod tests {
         path
     }
 
+    /// End-of-central-directory record of an empty archive.
+    const EOCD: &[u8] =
+        b"PK\x05\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+
+    /// A structurally complete archive whose leading bytes callers vary to
+    /// control its hash.
+    fn write_jar(dir: &Path, rel: &str, body: &[u8]) -> PathBuf {
+        let mut contents = body.to_vec();
+        contents.extend_from_slice(EOCD);
+        write_file(dir, rel, &contents)
+    }
+
     #[tokio::test]
     async fn missing_files_reports_absent_and_keeps_present() {
         let dir = tempfile::tempdir().unwrap();
-        let present = write_file(dir.path(), "a/b/1/b-1.jar", b"hello");
+        let present = write_jar(dir.path(), "a/b/1/b-1.jar", b"hello");
         let absent = dir.path().join("a/c/1/c-1.jar");
 
         let required = vec![
@@ -410,13 +481,69 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn empty_output_counts_as_missing_on_a_normal_launch() {
+        // A processor writes its target incrementally; an interruption after the
+        // file is created leaves a zero-byte jar at the path existence alone
+        // accepts, and the launch then fails with a missing-dependency error
+        // that never regenerates it.
+        let dir = tempfile::tempdir().unwrap();
+        let empty = write_file(dir.path(), "a/b/1/b-1.jar", b"");
+        let required = vec![RequiredFile {
+            path: empty.clone(),
+            expected_sha1: None,
+        }];
+
+        assert_eq!(missing_files(&required, false).await, vec![empty]);
+    }
+
+    #[tokio::test]
+    async fn truncated_jar_counts_as_missing_on_a_normal_launch() {
+        // Non-empty but cut short: no end-of-central-directory record, so the
+        // JVM cannot open it as an archive.
+        let dir = tempfile::tempdir().unwrap();
+        let truncated = write_file(dir.path(), "a/b/1/b-1.jar", b"PK\x03\x04 partial...");
+        let required = vec![RequiredFile {
+            path: truncated.clone(),
+            expected_sha1: None,
+        }];
+
+        assert_eq!(missing_files(&required, false).await, vec![truncated]);
+    }
+
+    #[tokio::test]
+    async fn intact_jar_is_kept_on_a_normal_launch() {
+        // A minimal but valid archive: empty central directory + EOCD record.
+        let dir = tempfile::tempdir().unwrap();
+        let intact = write_jar(dir.path(), "a/b/1/b-1.jar", b"");
+        let required = vec![RequiredFile {
+            path: intact,
+            expected_sha1: None,
+        }];
+
+        assert!(missing_files(&required, false).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn non_jar_output_is_only_checked_for_emptiness() {
+        // Processors also emit plain files; only archives get the EOCD check.
+        let dir = tempfile::tempdir().unwrap();
+        let txt = write_file(dir.path(), "a/b/1/b-1.txt", b"not an archive");
+        let required = vec![RequiredFile {
+            path: txt,
+            expected_sha1: None,
+        }];
+
+        assert!(missing_files(&required, false).await.is_empty());
+    }
+
+    #[tokio::test]
     async fn hash_mismatch_ignored_on_normal_launch() {
         let dir = tempfile::tempdir().unwrap();
-        let path = write_file(dir.path(), "a/b/1/b-1.jar", b"wrong contents");
+        let path = write_jar(dir.path(), "a/b/1/b-1.jar", b"wrong contents");
         let required = vec![RequiredFile {
             path: path.clone(),
-            // SHA-1 of "hello"
-            expected_sha1: Some("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d".into()),
+            // SHA-1 of a different archive
+            expected_sha1: Some("fe0d5cde59fd57282571f339e0a9aedd85dbfb54".into()),
         }];
 
         let missing = missing_files(&required, false).await;
@@ -427,18 +554,19 @@ mod tests {
     #[tokio::test]
     async fn deep_check_deletes_mismatched_and_reports_missing() {
         let dir = tempfile::tempdir().unwrap();
-        let bad = write_file(dir.path(), "a/b/1/b-1.jar", b"wrong contents");
-        let good = write_file(dir.path(), "a/g/1/g-1.jar", b"hello");
-        let unhashed = write_file(dir.path(), "a/u/1/u-1.jar", b"anything");
+        let bad = write_jar(dir.path(), "a/b/1/b-1.jar", b"wrong contents");
+        let good = write_jar(dir.path(), "a/g/1/g-1.jar", b"hello");
+        let unhashed = write_jar(dir.path(), "a/u/1/u-1.jar", b"anything");
 
         let required = vec![
             RequiredFile {
                 path: bad.clone(),
-                expected_sha1: Some("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d".into()),
+                // SHA-1 of `good`, so `bad` mismatches.
+                expected_sha1: Some("fe0d5cde59fd57282571f339e0a9aedd85dbfb54".into()),
             },
             RequiredFile {
                 path: good.clone(),
-                expected_sha1: Some("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d".into()),
+                expected_sha1: Some("fe0d5cde59fd57282571f339e0a9aedd85dbfb54".into()),
             },
             RequiredFile {
                 path: unhashed.clone(),
