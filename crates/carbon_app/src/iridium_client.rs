@@ -51,7 +51,24 @@ pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
                     return result;
                 }
 
-                let delay = std::time::Duration::from_millis(500u64 << attempt);
+                // A 429 that names its window is obeyed rather than guessed at:
+                // both platforms limit per minute, so the plain backoff below
+                // retries inside the same window and is refused again.
+                let declared_wait = match &result {
+                    Ok(response) if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+                        rate_limit_wait(response.headers())
+                    }
+                    _ => None,
+                };
+                if declared_wait.is_some_and(|wait| wait > MAX_HONOURED_RATE_LIMIT_WAIT) {
+                    tracing::warn!(
+                        "rate limited by {} for longer than we will wait; returning the response",
+                        req.url()
+                    );
+                    return result;
+                }
+                let delay = declared_wait
+                    .unwrap_or_else(|| std::time::Duration::from_millis(500u64 << attempt));
                 match &result {
                     Ok(response) => tracing::warn!(
                         "transient {} from {}, retrying in {:?}",
@@ -233,5 +250,85 @@ mod test {
 
         assert_eq!(response.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
         mock.assert_async().await;
+    }
+}
+
+/// How long a server-declared rate-limit window may be before the request is
+/// handed back instead of waited out. Beyond this, holding the caller is worse
+/// than surfacing the 429.
+const MAX_HONOURED_RATE_LIMIT_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// The wait a 429 response asks for, from `Retry-After` (delta-seconds) or
+/// Modrinth's `X-Ratelimit-Reset` (seconds until the window rolls over).
+///
+/// Both platforms rate-limit on a per-minute window, so a fixed sub-second
+/// backoff lands inside the same window and is spent for nothing: the retry is
+/// refused too, the caller still ends up with a 429, and the extra traffic
+/// pushes the window further out. `Retry-After` in its HTTP-date form is not
+/// parsed and reads as absent, leaving the caller on plain backoff.
+fn rate_limit_wait(headers: &reqwest::header::HeaderMap) -> Option<std::time::Duration> {
+    ["retry-after", "x-ratelimit-reset"]
+        .iter()
+        .find_map(|name| headers.get(*name))
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(std::time::Duration::from_secs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::header::HeaderMap;
+    use std::time::Duration;
+
+    fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+        let mut map = HeaderMap::new();
+        for (name, value) in pairs {
+            map.insert(
+                reqwest::header::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+                value.parse().unwrap(),
+            );
+        }
+        map
+    }
+
+    #[test]
+    fn reads_retry_after_seconds() {
+        assert_eq!(
+            rate_limit_wait(&headers(&[("retry-after", "12")])),
+            Some(Duration::from_secs(12))
+        );
+    }
+
+    #[test]
+    fn reads_the_modrinth_reset_header() {
+        assert_eq!(
+            rate_limit_wait(&headers(&[("x-ratelimit-reset", "45")])),
+            Some(Duration::from_secs(45))
+        );
+    }
+
+    #[test]
+    fn retry_after_wins_over_the_reset_header() {
+        assert_eq!(
+            rate_limit_wait(&headers(&[
+                ("x-ratelimit-reset", "45"),
+                ("retry-after", "5")
+            ])),
+            Some(Duration::from_secs(5))
+        );
+    }
+
+    #[test]
+    fn absent_or_unparseable_values_read_as_no_declared_wait() {
+        assert_eq!(rate_limit_wait(&HeaderMap::new()), None);
+        // The HTTP-date form is not parsed.
+        assert_eq!(
+            rate_limit_wait(&headers(&[(
+                "retry-after",
+                "Wed, 21 Oct 2015 07:28:00 GMT"
+            )])),
+            None
+        );
     }
 }
