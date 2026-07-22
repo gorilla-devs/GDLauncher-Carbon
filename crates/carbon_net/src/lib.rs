@@ -228,6 +228,23 @@ impl Progress {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Builds a report whose `current_size` never exceeds `total_size`.
+    ///
+    /// The two figures live in separate atomics and cannot be read as a pair, so
+    /// a reader can always catch the window between a resumed file's prefix
+    /// landing in the downloaded counter and the matching contribution reaching
+    /// the total a round trip later. Ordering the writes narrows that window but
+    /// cannot close it, so the invariant is enforced here, where the value is
+    /// built and both figures are finally in hand.
+    pub fn sized(total_count: u64, current_count: u64, total_size: u64, current_size: u64) -> Self {
+        Self {
+            total_count,
+            current_count,
+            total_size,
+            current_size: current_size.min(total_size),
+        }
+    }
 }
 
 struct FilePathLock {
@@ -357,12 +374,12 @@ pub async fn download_multiple(
     );
 
     if let Some(sender) = &options.progress_sender {
-        let _ = sender.send(Progress {
-            total_count: total_files_count,
-            current_count: 0,
-            total_size: total_files_size.load(Ordering::SeqCst),
-            current_size: 0,
-        });
+        let _ = sender.send(Progress::sized(
+            total_files_count,
+            0,
+            total_files_size.load(Ordering::SeqCst),
+            0,
+        ));
     }
 
     let tasks = create_download_tasks(
@@ -489,12 +506,12 @@ async fn process_file(
             }
             current_files_count.fetch_add(1, Ordering::SeqCst);
             if let Some(sender) = &options.progress_sender {
-                let progress = Progress {
-                    total_count: total_files_count,
-                    current_count: current_files_count.load(Ordering::SeqCst),
-                    total_size: total_files_size.load(Ordering::SeqCst),
-                    current_size: total_downloaded_size.load(Ordering::SeqCst),
-                };
+                let progress = Progress::sized(
+                    total_files_count,
+                    current_files_count.load(Ordering::SeqCst),
+                    total_files_size.load(Ordering::SeqCst),
+                    total_downloaded_size.load(Ordering::SeqCst),
+                );
 
                 let _ = sender.send(progress);
             }
@@ -563,12 +580,12 @@ async fn download_file(
     .await;
 
     if let Some(sender) = progress {
-        let _ = sender.send(Progress {
-            total_count: total_files_count,
-            current_count: current_files_count.load(Ordering::SeqCst),
-            total_size: total_files_size.load(Ordering::SeqCst),
-            current_size: total_downloaded_size.load(Ordering::SeqCst),
-        });
+        let _ = sender.send(Progress::sized(
+            total_files_count,
+            current_files_count.load(Ordering::SeqCst),
+            total_files_size.load(Ordering::SeqCst),
+            total_downloaded_size.load(Ordering::SeqCst),
+        ));
     }
 
     match outcome {
@@ -585,12 +602,12 @@ async fn download_file(
 
             current_files_count.fetch_add(1, Ordering::SeqCst);
             if let Some(sender) = progress {
-                let _ = sender.send(Progress {
-                    total_count: total_files_count,
-                    current_count: current_files_count.load(Ordering::SeqCst),
-                    total_size: total_files_size.load(Ordering::SeqCst),
-                    current_size: total_downloaded_size.load(Ordering::SeqCst),
-                });
+                let _ = sender.send(Progress::sized(
+                    total_files_count,
+                    current_files_count.load(Ordering::SeqCst),
+                    total_files_size.load(Ordering::SeqCst),
+                    total_downloaded_size.load(Ordering::SeqCst),
+                ));
             }
 
             Ok(())
@@ -613,12 +630,12 @@ async fn download_file(
             );
 
             if let Some(sender) = progress {
-                let _ = sender.send(Progress {
-                    total_count: total_files_count,
-                    current_count: current_files_count.load(Ordering::SeqCst),
-                    total_size: total_files_size.load(Ordering::SeqCst),
-                    current_size: total_downloaded_size.load(Ordering::SeqCst),
-                });
+                let _ = sender.send(Progress::sized(
+                    total_files_count,
+                    current_files_count.load(Ordering::SeqCst),
+                    total_files_size.load(Ordering::SeqCst),
+                    total_downloaded_size.load(Ordering::SeqCst),
+                ));
             }
 
             let (part_file_path, mut file, headers, mut hasher, _) = prepare_download(
@@ -665,12 +682,12 @@ async fn download_file(
 
                     current_files_count.fetch_add(1, Ordering::SeqCst);
                     if let Some(sender) = progress {
-                        let _ = sender.send(Progress {
-                            total_count: total_files_count,
-                            current_count: current_files_count.load(Ordering::SeqCst),
-                            total_size: total_files_size.load(Ordering::SeqCst),
-                            current_size: total_downloaded_size.load(Ordering::SeqCst),
-                        });
+                        let _ = sender.send(Progress::sized(
+                            total_files_count,
+                            current_files_count.load(Ordering::SeqCst),
+                            total_files_size.load(Ordering::SeqCst),
+                            total_downloaded_size.load(Ordering::SeqCst),
+                        ));
                     }
 
                     Ok(())
@@ -918,12 +935,12 @@ async fn prepare_download(
             processed_bytes += bytes_read as u64;
 
             if let Some(progress) = progress {
-                let _progress = Progress {
-                    total_count: total_files_count,
-                    current_count: current_files_count.load(Ordering::SeqCst),
-                    total_size: total_files_size.load(Ordering::SeqCst),
-                    current_size: total_downloaded_size.load(Ordering::SeqCst),
-                };
+                let _progress = Progress::sized(
+                    total_files_count,
+                    current_files_count.load(Ordering::SeqCst),
+                    total_files_size.load(Ordering::SeqCst),
+                    total_downloaded_size.load(Ordering::SeqCst),
+                );
 
                 let _ = progress.send(_progress);
             }
@@ -1003,12 +1020,12 @@ async fn download_content(
         file_processed_bytes.fetch_add(chunk.len() as u64, Ordering::SeqCst);
 
         if let Some(sender) = &options.progress_sender {
-            let progress = Progress {
+            let progress = Progress::sized(
                 total_count,
-                current_count: current_files_count.load(Ordering::SeqCst),
-                total_size: total_size.load(Ordering::SeqCst),
-                current_size: total_downloaded_size.load(Ordering::SeqCst),
-            };
+                current_files_count.load(Ordering::SeqCst),
+                total_size.load(Ordering::SeqCst),
+                total_downloaded_size.load(Ordering::SeqCst),
+            );
 
             let _ = sender.send(progress);
         }
@@ -1840,6 +1857,19 @@ mod tests {
 
         mock1.assert();
         mock2.assert();
+    }
+
+    #[test]
+    fn progress_never_reports_more_downloaded_than_total() {
+        // A resumed file's prefix reaches the downloaded counter a full HTTP
+        // round trip before it reaches the total, and every other in-flight
+        // download reports from both counters during that window.
+        let p = Progress::sized(2, 1, 100, 140);
+        assert_eq!(p.current_size, 100);
+        assert_eq!(p.total_size, 100);
+
+        let ordinary = Progress::sized(2, 1, 100, 40);
+        assert_eq!(ordinary.current_size, 40);
     }
 
     // Files with an unknown size used to contribute bytes to current_size but nothing to
