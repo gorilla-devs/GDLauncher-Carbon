@@ -16,9 +16,61 @@ use rusqlite::Connection;
 /// spacing is canonical too. Line breaks, indentation, and paren/comma
 /// spacing baked into the stored DDL text never affect the dump while any
 /// real schema change still does.
+///
+/// Single-quoted string literals are copied through byte for byte. Their
+/// contents are column data — a `DEFAULT 'a,b'` means the literal three-token
+/// string, not DDL punctuation — and this dump is replayed as executable DDL by
+/// [`executable_statements`], so rewriting inside a literal changes the schema
+/// rather than its formatting. `''` is SQLite's escape for an embedded quote
+/// and does not close the literal.
 fn normalize_whitespace(sql: &str) -> String {
-    let spaced = sql.replace('(', " ( ").replace(')', " ) ").replace(',', " , ");
-    spaced.split_whitespace().collect::<Vec<_>>().join(" ")
+    let mut out = String::with_capacity(sql.len());
+    let mut chars = sql.chars().peekable();
+    // Set once a separator is due, so runs of whitespace and the padding around
+    // punctuation collapse into a single space instead of accumulating.
+    let mut pending_space = false;
+
+    while let Some(c) = chars.next() {
+        if c == '\'' {
+            if pending_space && !out.is_empty() {
+                out.push(' ');
+            }
+            pending_space = false;
+            out.push('\'');
+            while let Some(inner) = chars.next() {
+                out.push(inner);
+                if inner == '\'' {
+                    match chars.peek() {
+                        Some('\'') => out.push(chars.next().expect("peeked")),
+                        _ => break,
+                    }
+                }
+            }
+            continue;
+        }
+
+        if c.is_whitespace() {
+            pending_space = true;
+            continue;
+        }
+
+        if matches!(c, '(' | ')' | ',') {
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push(c);
+            pending_space = true;
+            continue;
+        }
+
+        if pending_space && !out.is_empty() {
+            out.push(' ');
+        }
+        pending_space = false;
+        out.push(c);
+    }
+
+    out
 }
 
 /// Public entry to the same whitespace normalizer [`dump_schema`] applies to
@@ -154,6 +206,72 @@ mod tests {
             .unwrap();
 
         assert_eq!(dump_schema(&conn_a).unwrap(), dump_schema(&conn_b).unwrap());
+    }
+
+    #[test]
+    fn normalizer_leaves_string_literals_untouched() {
+        // `AppConfiguration.modChannels` ships this exact default. Punctuation
+        // inside a quoted literal is data, not DDL punctuation, so spacing it
+        // changes the column's value rather than its formatting.
+        let sql = "CREATE TABLE \"T\" (\"c\" TEXT NOT NULL DEFAULT 'stable:true,beta:true,alpha:true')";
+        let normalized = normalize_ddl(sql);
+        assert!(
+            normalized.contains("'stable:true,beta:true,alpha:true'"),
+            "literal must survive normalization, got:\n{normalized}"
+        );
+    }
+
+    #[test]
+    fn normalizer_leaves_parens_inside_literals_untouched() {
+        let sql = "CREATE TABLE \"T\" (\"c\" TEXT DEFAULT 'a (b) c')";
+        assert!(
+            normalize_ddl(sql).contains("'a (b) c'"),
+            "parens inside a literal must survive: {}",
+            normalize_ddl(sql)
+        );
+    }
+
+    #[test]
+    fn normalizer_handles_doubled_quote_escapes() {
+        // '' is SQLite's escape for a literal quote; the scanner must not treat
+        // it as the end of the literal and start normalizing the rest as DDL.
+        let sql = "CREATE TABLE \"T\" (\"c\" TEXT DEFAULT 'it''s,fine')";
+        let normalized = normalize_ddl(sql);
+        assert!(
+            normalized.contains("'it''s,fine'"),
+            "escaped quote must not terminate the literal, got:\n{normalized}"
+        );
+    }
+
+    #[test]
+    fn normalizer_still_canonicalizes_punctuation_outside_literals() {
+        let a = normalize_ddl("CREATE TABLE T (id INTEGER,name TEXT)");
+        let b = normalize_ddl("CREATE TABLE T\n(\n  id INTEGER ,\n  name TEXT\n)");
+        assert_eq!(a, b, "DDL punctuation outside literals is still canonical");
+    }
+
+    #[test]
+    fn replayed_baseline_preserves_literal_defaults() {
+        // The fresh-install path replays `executable_statements(dump)` as real
+        // DDL, so a mangled literal becomes the column's actual default.
+        let source = Connection::open_in_memory().unwrap();
+        source
+            .execute_batch(
+                "CREATE TABLE \"T\" (\"c\" TEXT NOT NULL DEFAULT 'stable:true,beta:true,alpha:true')",
+            )
+            .unwrap();
+
+        let dump = dump_schema(&source).unwrap();
+        let replayed = Connection::open_in_memory().unwrap();
+        replayed
+            .execute_batch(&executable_statements(&dump).join("\n"))
+            .unwrap();
+        replayed.execute_batch("INSERT INTO \"T\" DEFAULT VALUES").unwrap();
+
+        let stored: String = replayed
+            .query_row("SELECT c FROM \"T\"", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(stored, "stable:true,beta:true,alpha:true");
     }
 
     #[test]
