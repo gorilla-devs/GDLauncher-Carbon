@@ -46,10 +46,10 @@ let overwolfReady = false
 let pendingEmail: string | null | undefined = null
 
 function setOverwolfEmail(email: string) {
-  if (overwolfReady && (app as any).overwolf) {
+  if (overwolfReady && app.overwolf) {
     try {
       const hashes = hashEmailForOverwolf(email)
-      ;(app as any).overwolf.setUserEmailHashes(hashes)
+      app.overwolf.setUserEmailHashes(hashes)
       console.log("GDL account email hashes sent to Overwolf")
     } catch (error) {
       console.error("Failed to set email hashes:", error)
@@ -60,9 +60,9 @@ function setOverwolfEmail(email: string) {
 }
 
 function clearOverwolfEmail() {
-  if (overwolfReady && (app as any).overwolf) {
+  if (overwolfReady && app.overwolf) {
     try {
-      ;(app as any).overwolf.setUserEmailHashes({})
+      app.overwolf.setUserEmailHashes({})
       console.log("GDL account email hashes cleared")
     } catch (error) {
       console.error("Failed to clear email hashes:", error)
@@ -642,8 +642,8 @@ const loadCoreModule: CoreModule = () =>
 
 const coreModule = loadCoreModule()
 
-if ((app as any).overwolf) {
-  ;(app as any).overwolf.disableAnonymousAnalytics()
+if (app.overwolf) {
+  app.overwolf.disableAnonymousAnalytics()
   console.log("Overwolf anonymous analytics disabled")
 }
 
@@ -1086,8 +1086,8 @@ ipcMain.handle("openFolder", async (_, path) => {
 })
 
 ipcMain.handle("openCMPWindow", async () => {
-  if ((app as any).overwolf?.openCMPWindow) {
-    ;(app as any).overwolf.openCMPWindow()
+  if (app.overwolf?.openCMPWindow) {
+    app.overwolf.openCMPWindow()
     return true
   }
   return false
@@ -1098,7 +1098,7 @@ ipcMain.handle("isCMPWindowAvailable", async () => {
   // build with the overwolf API injected). Deliberately NOT `isCMPRequired()`:
   // that is country-dependent, and users outside CMP-required regions must
   // still be able to manage their consent.
-  return !!(app as any).overwolf?.openCMPWindow
+  return !!app.overwolf?.openCMPWindow
 })
 
 ipcMain.handle("closeWindow", async () => {
@@ -1372,7 +1372,7 @@ app.whenReady().then(async () => {
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID)
 
   // Mark Overwolf as ready and apply any pending email
-  if ((app as any).overwolf && process.env.OVERWOLF_APP_UID) {
+  if (app.overwolf && process.env.OVERWOLF_APP_UID) {
     overwolfReady = true
     applyPendingEmail()
   }
