@@ -8,6 +8,7 @@
  * - All files have the same keys as English
  * - Keys are in the same order as English
  * - No extra keys in non-English languages
+ * - Every {{placeholder}} English supplies is present in the translation
  *
  * Optional language filter:
  *   node scripts/validateTranslationSync.mjs --language french
@@ -30,6 +31,24 @@ import {
 } from "./translation-utils.mjs"
 
 /**
+ * The `{{name}}` interpolation tokens in a translation value.
+ */
+function placeholdersIn(value) {
+  if (typeof value !== "string") return []
+  return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map((m) => m[1])
+}
+
+/**
+ * Placeholders English supplies that the translation never uses. The reverse
+ * direction is not reported: an extra placeholder renders literally and is
+ * obvious on sight, whereas a dropped one silently omits a value.
+ */
+function missingPlaceholders(sourceValue, targetValue) {
+  const target = new Set(placeholdersIn(targetValue))
+  return [...new Set(placeholdersIn(sourceValue))].filter((p) => !target.has(p))
+}
+
+/**
  * Validate translations for specified languages
  */
 function validateTranslations(languages) {
@@ -46,7 +65,8 @@ function validateTranslations(languages) {
     extraFiles: [],
     missingKeys: [],
     extraKeys: [],
-    wrongOrder: []
+    wrongOrder: [],
+    missingPlaceholders: []
   }
 
   // Get source files
@@ -119,6 +139,26 @@ function validateTranslations(languages) {
         }
       }
 
+      // Check interpolation placeholders. A translation that keeps the key but
+      // drops a {{placeholder}} still renders as a grammatical sentence, so
+      // nothing downstream fails — the value the placeholder carried is simply
+      // never shown.
+      for (const key of sourceKeys) {
+        if (!(key in targetData)) continue
+        const missing = missingPlaceholders(sourceData[key], targetData[key])
+        if (missing.length === 0) continue
+        issues.missingPlaceholders.push({
+          language,
+          file: filename,
+          key,
+          missing
+        })
+        print(
+          `  ❌ ${filename}: ${key} drops ${missing.join(", ")}`,
+          colors.red
+        )
+      }
+
       // Check key order (only if no missing/extra keys)
       if (missingKeys.length === 0 && extraKeys.length === 0) {
         if (!arraysEqual(sourceKeys, targetKeys)) {
@@ -134,7 +174,8 @@ function validateTranslations(languages) {
       issues.extraFiles.some((i) => i.language === language) ||
       issues.missingKeys.some((i) => i.language === language) ||
       issues.extraKeys.some((i) => i.language === language) ||
-      issues.wrongOrder.some((i) => i.language === language)
+      issues.wrongOrder.some((i) => i.language === language) ||
+      issues.missingPlaceholders.some((i) => i.language === language)
 
     if (!hasIssues) {
       print(`  ✅ All files valid`, colors.green)
@@ -155,7 +196,8 @@ function printSummary(issues) {
     issues.extraFiles.length +
     issues.missingKeys.length +
     issues.extraKeys.length +
-    issues.wrongOrder.length
+    issues.wrongOrder.length +
+    issues.missingPlaceholders.length
 
   if (totalIssues === 0) {
     print("\n✅ All translations are valid!", colors.bold + colors.green)
@@ -187,6 +229,12 @@ function printSummary(issues) {
     )
     print(
       `   - ${totalExtra} extra keys across ${issues.extraKeys.length} files`,
+      colors.red
+    )
+  }
+  if (issues.missingPlaceholders.length > 0) {
+    print(
+      `   - ${issues.missingPlaceholders.length} values dropping a placeholder`,
       colors.red
     )
   }

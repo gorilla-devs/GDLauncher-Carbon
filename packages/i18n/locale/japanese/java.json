@@ -65,7 +65,7 @@
   "_trn_add_custom_java_path": "カスタムパスを追加",
   "_trn_ram_warning_high_allocation": "システムRAMの80%以上を割り当てると、Minecraftのクラッシュやシステムの不安定化を招く可能性があります。",
   "_trn_insufficient_memory_title": "メモリ不足",
-  "_trn_insufficient_memory_body": "Minecraftに {{requested}} MB のRAMが割り当てられていますが、現在利用可能なのは {{available}} MB のみです。Javaは内部処理にさらに約1.5 GBのメモリを必要とします。ゲームがクラッシュする可能性が高いです。",
+  "_trn_insufficient_memory_body": "Minecraftは {{requested}} MB のRAMを使用するよう設定されており、Javaは内部処理にさらに約1.5 GBを必要とします（合計で約 {{needed}} MB）が、現在利用可能なのは {{available}} MB のみです。ゲームがクラッシュする可能性が高いです。",
   "_trn_launch_anyway": "起動",
   "_trn_adjust_memory": "メモリを調整",
   "_trn_insufficient_memory_dont_show_again": "今後この警告を表示しない",
