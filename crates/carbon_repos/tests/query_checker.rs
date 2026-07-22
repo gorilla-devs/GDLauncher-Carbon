@@ -172,6 +172,40 @@ fn checker_does_not_flag_question_mark_in_string_literal() {
 }
 
 #[test]
+fn checker_flags_a_positional_param_in_a_single_param_query() {
+    // CENSUS-SELFTEST: checker.positional-param
+    // The generated wrappers bind by name only, so a positional placeholder is
+    // never bound and silently reads as NULL at runtime — independent of how
+    // many named params the query also declares.
+    let (_d, conn) = migrated_db();
+    for (name, sql, params) in [
+        (
+            "positional_one_param",
+            "SELECT id FROM Java WHERE major = :major AND arch = ?",
+            &[":major"][..],
+        ),
+        (
+            "positional_no_params",
+            "SELECT id FROM Java WHERE arch = ?",
+            &[][..],
+        ),
+    ] {
+        let planted = [QueryCheck {
+            name,
+            sql,
+            params,
+            columns: None,
+            class: carbon_repos::registry::class_of(sql),
+        }];
+        let v = check_module(&conn, &planted);
+        assert!(
+            v.iter().any(|m| m.contains("positional")),
+            "must flag the bare '?' in {sql:?}, got: {v:?}"
+        );
+    }
+}
+
+#[test]
 fn checker_flags_real_positional_param_in_multiparam_query() {
     // CENSUS-SELFTEST: checker.positional-param
     let (_d, conn) = migrated_db();
@@ -330,6 +364,32 @@ fn query_plan_lint_catches_planted_full_scan() {
             .any(|m| m.contains("scan_mod_metadata") && m.contains("ModMetadata")),
         "must flag a full scan of a guarded table, got: {v:?}"
     );
+}
+
+#[test]
+fn query_plan_lint_catches_a_full_scan_behind_a_table_alias() {
+    // CENSUS-SELFTEST: checker.query-plan-full-scan
+    // The plan names the alias, not the table, so matching the plan's object
+    // against the guarded table name alone lets an aliased scan through — and
+    // aliasing is exactly what a join-shaped query does.
+    let (_d, conn) = migrated_db();
+    for sql in [
+        "SELECT m.id FROM ModMetadata m WHERE m.name = :name",
+        "SELECT m.id FROM ModMetadata AS m WHERE m.name = :name",
+    ] {
+        let planted = [QueryCheck {
+            name: "scan_mod_metadata_aliased",
+            sql,
+            params: &[":name"],
+            columns: None,
+            class: carbon_repos::registry::class_of(sql),
+        }];
+        let v = check_query_plans(&conn, &planted);
+        assert!(
+            v.iter().any(|m| m.contains("scan_mod_metadata_aliased")),
+            "must flag an aliased full scan of a guarded table for {sql:?}, got: {v:?}"
+        );
+    }
 }
 
 #[test]
