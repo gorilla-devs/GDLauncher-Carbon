@@ -132,9 +132,14 @@ pub enum RefusalKind {
     /// the same number). Never assume; refuse.
     Diverged { version: i32 },
     /// A breaking down-run could not restore the binary's own schema. The
-    /// database is left untouched (rolled back) and the pre-downgrade snapshot
-    /// is preserved for recovery.
-    DowngradeFailed { snapshot_path: PathBuf },
+    /// database is left untouched (rolled back).
+    ///
+    /// `snapshot_path` carries the pre-downgrade snapshot only when restoring it
+    /// would actually change the database. The down-run is atomic, so the usual
+    /// outcome is that the rollback already left the file in the state a restore
+    /// would produce; offering one then would loop the recovery screen forever
+    /// on its own recommended action.
+    DowngradeFailed { snapshot_path: Option<PathBuf> },
 }
 
 const CREATE_MIGRATIONS_TABLE: &str = "CREATE TABLE IF NOT EXISTS _migrations (\
@@ -373,7 +378,7 @@ impl MigrationSet {
                 );
                 drop(tx);
                 return Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed {
-                    snapshot_path,
+                    snapshot_path: snapshot_if_restorable(db_path, snapshot_path),
                 }));
             };
             // CENSUS-RULE: compat.downgrade-corrupt-down
@@ -381,7 +386,7 @@ impl MigrationSet {
                 tracing::error!("down-run of migration {version} failed: {e}");
                 drop(tx); // rollback: the whole down-run is atomic
                 return Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed {
-                    snapshot_path,
+                    snapshot_path: snapshot_if_restorable(db_path, snapshot_path),
                 }));
             }
             tx.execute(
@@ -404,7 +409,7 @@ impl MigrationSet {
             );
             drop(tx); // rollback: never leave a half-downgraded schema
             Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed {
-                snapshot_path,
+                snapshot_path: snapshot_if_restorable(db_path, snapshot_path),
             }))
         }
     }
@@ -472,6 +477,35 @@ fn read_user_version(conn: &Connection) -> DbResult<i32> {
 fn sqlite_master_is_empty(conn: &Connection) -> DbResult<bool> {
     let count: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| row.get(0))?;
     Ok(count == 0)
+}
+
+/// Decides whether the snapshot taken before a down-run is worth offering.
+///
+/// The down-run runs in one transaction, so a failure rolls the database back to
+/// exactly the bytes the snapshot holds. Restoring it would then be a no-op, and
+/// because the recovery screen presents restore as its recommended action the
+/// user would loop on it until taking the rung that deletes the database. The
+/// snapshot is only reported when it actually differs, and is removed otherwise
+/// so no stale copy accumulates beside the database.
+fn snapshot_if_restorable(db_path: &Path, snapshot_path: PathBuf) -> Option<PathBuf> {
+    let differs = match (std::fs::read(db_path), std::fs::read(&snapshot_path)) {
+        (Ok(db), Ok(snap)) => db != snap,
+        // Unreadable either side: keep the snapshot rather than discard the only
+        // copy of data we cannot compare.
+        _ => true,
+    };
+
+    if differs {
+        return Some(snapshot_path);
+    }
+
+    if let Err(e) = std::fs::remove_file(&snapshot_path) {
+        tracing::warn!(
+            "could not remove the redundant pre-downgrade snapshot at {}: {e}",
+            snapshot_path.display()
+        );
+    }
+    None
 }
 
 /// The pre-downgrade snapshot path beside the database file: `<stem>.pre-downgrade.db`

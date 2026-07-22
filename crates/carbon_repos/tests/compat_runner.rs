@@ -239,6 +239,48 @@ fn breaking_ahead_down_runs_and_restores_byte_identical_schema() {
 }
 
 #[test]
+fn a_rolled_back_down_run_offers_no_snapshot() {
+    // The down-run is atomic, so every failure path leaves the database exactly
+    // as it was. A snapshot of it is then byte-identical to it, and the recovery
+    // screen offers restoring one as the Recommended action — which changes
+    // nothing, fails identically, and funnels the user to Reset Database, the
+    // rung that deletes both the database and the snapshot.
+    let (_d, path) = temp_db();
+    let bad_down = MigrationDef {
+        name: "27_bad_down",
+        up_sql: "CREATE TABLE Gizmo (id INTEGER PRIMARY KEY);",
+        down_sql: Some("THIS IS NOT VALID SQL;"),
+        kind: MigrationKind::Breaking,
+        data_down: "full",
+    };
+    let l26 = extend(&base(), &[bad_down]);
+    let l25 = base();
+
+    {
+        let mut conn = open_db(&path);
+        l26.to_latest(&mut conn).unwrap();
+    }
+
+    let mut conn = open_db(&path);
+    let verdict = l25.open(&mut conn, &path).unwrap();
+    match verdict {
+        OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }) => {
+            assert!(
+                snapshot_path.is_none(),
+                "a rollback leaves nothing to restore, got {snapshot_path:?}"
+            );
+        }
+        other => panic!("expected DowngradeFailed, got {other:?}"),
+    }
+
+    let stray = path.with_extension("pre-downgrade.db");
+    assert!(
+        !stray.exists(),
+        "a snapshot identical to the database must not be left behind"
+    );
+}
+
+#[test]
 fn corrupt_down_rolls_back_and_leaves_the_database_intact() {
     // CENSUS-SELFTEST: compat.downgrade-corrupt-down
     let (_d, path) = temp_db();
@@ -263,7 +305,9 @@ fn corrupt_down_rolls_back_and_leaves_the_database_intact() {
         let verdict = l25.open(&mut conn, &path).unwrap();
         match verdict {
             OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }) => {
-                assert!(snapshot_path.exists(), "snapshot preserved on failure");
+                // The rollback below leaves the database as it was, so there is
+                // nothing a restore could change.
+                assert!(snapshot_path.is_none());
             }
             other => panic!("expected DowngradeFailed, got {other:?}"),
         }
@@ -403,10 +447,9 @@ fn breaking_ahead_without_a_stored_down_is_refused_and_snapshot_kept() {
         let verdict = l25.open(&mut conn, &path).unwrap();
         match verdict {
             OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }) => {
-                assert!(
-                    snapshot_path.exists(),
-                    "snapshot preserved when no down exists"
-                );
+                // Refused before any statement ran, so the database is
+                // untouched and a restore would be a no-op.
+                assert!(snapshot_path.is_none());
             }
             other => {
                 panic!("expected DowngradeFailed for a down-less breaking migration, got {other:?}")
