@@ -169,7 +169,8 @@ fn every_enforcement_rule_has_a_planted_failure_self_test() {
     // Tripwire: the discovered rule set must equal the documented canonical set.
     let expected: BTreeSet<String> = EXPECTED_RULES.iter().map(|s| s.to_string()).collect();
     assert_eq!(
-        rules, expected,
+        rules,
+        expected,
         "the set of CENSUS-RULE markers drifted from EXPECTED_RULES.\n\
          In source but not documented: {:?}\n\
          Documented but not in source: {:?}\n\
@@ -230,7 +231,10 @@ fn census_extractor_reads_marker_ids_from_comment_lines() {
     let text = "    // CENSUS-RULE: some.rule\n\
                 let x = 1; // CENSUS-SELFTEST: some.rule extra words ignored\n\
                 no marker here\n";
-    assert_eq!(extract_ids(RULE_MARKER, text), vec!["some.rule".to_string()]);
+    assert_eq!(
+        extract_ids(RULE_MARKER, text),
+        vec!["some.rule".to_string()]
+    );
     assert_eq!(
         extract_ids(SELFTEST_MARKER, text),
         vec!["some.rule".to_string()]

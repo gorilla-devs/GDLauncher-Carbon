@@ -74,8 +74,7 @@ pub async fn get_meta(
         Ok(result) => Ok(result),
         Err(err) => {
             let id_owned = version_asset_index.id.clone();
-            let db_cache = version_meta::get_assets_meta(db, &id_owned)
-                .await?;
+            let db_cache = version_meta::get_assets_meta(db, &id_owned).await?;
 
             if let Some(db_cache) = db_cache {
                 let asset_index = serde_json::from_slice(&db_cache.assets_index);

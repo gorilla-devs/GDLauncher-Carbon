@@ -1,5 +1,5 @@
-use rusqlite::Connection;
 use carbon_repos::db_exec::test_support::wg;
+use rusqlite::Connection;
 
 mod q {
     use carbon_repos::queries;
@@ -26,10 +26,22 @@ fn typed_wrappers_and_registry() {
     )
     .unwrap();
 
-    assert_eq!(q::get_by_id_conn(&wg(&mut conn), "a").unwrap().unwrap().major, 17);
+    assert_eq!(
+        q::get_by_id_conn(&wg(&mut conn), "a")
+            .unwrap()
+            .unwrap()
+            .major,
+        17
+    );
     assert_eq!(q::get_all_conn(&wg(&mut conn)).unwrap().len(), 2);
     assert_eq!(q::set_major_conn(&wg(&mut conn), "a", 22).unwrap(), 1);
-    assert_eq!(q::get_by_id_conn(&wg(&mut conn), "a").unwrap().unwrap().major, 22);
+    assert_eq!(
+        q::get_by_id_conn(&wg(&mut conn), "a")
+            .unwrap()
+            .unwrap()
+            .major,
+        22
+    );
     assert_eq!(q::get_by_id_conn(&wg(&mut conn), "zz").unwrap(), None);
 
     // registry captures every query with its param names and row metadata
@@ -66,4 +78,3 @@ async fn async_wrappers_route_reads_to_read_pool_and_writes_to_write_pool() {
     assert_eq!(q::set_major(&db, "a", 22).await.unwrap(), 1);
     assert_eq!(q::get_by_id(&db, "a").await.unwrap().unwrap().major, 22);
 }
-

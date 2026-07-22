@@ -630,22 +630,23 @@ pub async fn upsert_server_mod_file_cache(
     .await
 }
 
-const UPSERT_SERVER_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::QueryCheck {
-    name: "upsert_server_mod_file_cache",
-    sql: UPSERT_SERVER_MOD_FILE_CACHE_SQL,
-    params: &[
-        ":id",
-        ":server_id",
-        ":filename",
-        ":filesize",
-        ":enabled",
-        ":addon_type",
-        ":metadata_id",
-        ":updated_at",
-    ],
-    columns: None,
-    class: crate::registry::class_of(UPSERT_SERVER_MOD_FILE_CACHE_SQL),
-};
+const UPSERT_SERVER_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck =
+    crate::registry::QueryCheck {
+        name: "upsert_server_mod_file_cache",
+        sql: UPSERT_SERVER_MOD_FILE_CACHE_SQL,
+        params: &[
+            ":id",
+            ":server_id",
+            ":filename",
+            ":filesize",
+            ":enabled",
+            ":addon_type",
+            ":metadata_id",
+            ":updated_at",
+        ],
+        columns: None,
+        class: crate::registry::class_of(UPSERT_SERVER_MOD_FILE_CACHE_SQL),
+    };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the
 /// two hand-written upsert entries.

@@ -23,7 +23,9 @@ async fn write_tx_rolls_back_on_error_and_persists_on_commit() {
         .write(|mut conn| {
             let tx = conn.transaction()?;
             tx.execute("INSERT INTO t VALUES (1)", [])?;
-            Err::<(), _>(DbError::Conversion("injected failure after first insert".into()))
+            Err::<(), _>(DbError::Conversion(
+                "injected failure after first insert".into(),
+            ))
         })
         .await;
     assert!(r.is_err());

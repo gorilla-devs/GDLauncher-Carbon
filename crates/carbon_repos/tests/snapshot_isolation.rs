@@ -57,9 +57,16 @@ async fn snapshot_pins_one_world_across_a_concurrent_commit() {
         .unwrap();
 
     let (v1, v2) = interleaved_reads(&db, true).await;
-    assert_eq!((v1, v2), (1, 1), "snapshot reads must agree despite the concurrent commit");
+    assert_eq!(
+        (v1, v2),
+        (1, 1),
+        "snapshot reads must agree despite the concurrent commit"
+    );
 
     let (v1, v2) = interleaved_reads(&db, false).await;
     assert_eq!(v1, 2, "left over from the snapshot run's insert");
-    assert_eq!(v2, 3, "bare reads autocommit per statement and must observe the new commit");
+    assert_eq!(
+        v2, 3,
+        "bare reads autocommit per statement and must observe the new commit"
+    );
 }

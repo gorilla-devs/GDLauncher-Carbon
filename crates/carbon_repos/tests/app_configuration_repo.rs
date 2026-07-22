@@ -1,6 +1,6 @@
+use carbon_repos::db_exec::test_support::wg;
 use carbon_repos::repos::app_configuration as ac;
 use rusqlite::Connection;
-use carbon_repos::db_exec::test_support::wg;
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -17,7 +17,9 @@ fn singleton_insert_produces_id_0_with_ddl_defaults() {
         ac::insert_app_configuration_conn(&wg(&mut conn), "beta", 2048, Some("inst-123")).unwrap(),
         1
     );
-    let row = ac::get_app_configuration_conn(&wg(&mut conn)).unwrap().unwrap();
+    let row = ac::get_app_configuration_conn(&wg(&mut conn))
+        .unwrap()
+        .unwrap();
     assert_eq!(row.id, 0);
     assert_eq!(row.release_channel, "beta");
     assert_eq!(row.xmx, 2048);
@@ -44,7 +46,9 @@ fn singleton_insert_produces_id_0_with_ddl_defaults() {
 fn singleton_insert_null_installation_id() {
     let (_d, mut conn) = migrated_db();
     ac::insert_app_configuration_conn(&wg(&mut conn), "stable", 4096, None).unwrap();
-    let row = ac::get_app_configuration_conn(&wg(&mut conn)).unwrap().unwrap();
+    let row = ac::get_app_configuration_conn(&wg(&mut conn))
+        .unwrap()
+        .unwrap();
     assert_eq!(row.installation_id, None);
 }
 
@@ -61,7 +65,10 @@ fn patch_single_field_sql() {
         ..Default::default()
     };
     let q = patch.build().unwrap();
-    assert_eq!(q.sql, "UPDATE AppConfiguration SET theme = :theme WHERE id = 0");
+    assert_eq!(
+        q.sql,
+        "UPDATE AppConfiguration SET theme = :theme WHERE id = 0"
+    );
     assert_eq!(q.params.len(), 1);
 }
 
@@ -91,7 +98,9 @@ fn patch_executes_and_persists_single_field() {
     };
     let affected = patch.build().unwrap().execute(&wg(&mut conn)).unwrap();
     assert_eq!(affected, 1);
-    let row = ac::get_app_configuration_conn(&wg(&mut conn)).unwrap().unwrap();
+    let row = ac::get_app_configuration_conn(&wg(&mut conn))
+        .unwrap()
+        .unwrap();
     assert_eq!(row.theme, "dark");
     assert_eq!(row.xmx, 8192);
     // untouched columns preserved
@@ -158,4 +167,3 @@ fn patch_persists_blob_column() {
         Some(blob)
     );
 }
-

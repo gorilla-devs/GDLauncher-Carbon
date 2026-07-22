@@ -487,14 +487,23 @@ pub fn insert_migration_entry(lib_src: &str, entry: &str) -> Result<String, Inse
         return Err(InsertError::AnchorDuplicated);
     }
 
-    if let Some(name_line) = entry.lines().map(str::trim).find(|l| l.starts_with("name:")) {
+    if let Some(name_line) = entry
+        .lines()
+        .map(str::trim)
+        .find(|l| l.starts_with("name:"))
+    {
         if lib_src.lines().any(|l| l.trim() == name_line) {
             return Ok(lib_src.to_string());
         }
     }
 
-    let anchor_pos = lib_src.find(MIGRATION_LIST_ANCHOR).expect("anchor_count == 1 checked above");
-    let line_start = lib_src[..anchor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let anchor_pos = lib_src
+        .find(MIGRATION_LIST_ANCHOR)
+        .expect("anchor_count == 1 checked above");
+    let line_start = lib_src[..anchor_pos]
+        .rfind('\n')
+        .map(|i| i + 1)
+        .unwrap_or(0);
 
     let mut out = String::with_capacity(lib_src.len() + entry.len() + 1);
     out.push_str(&lib_src[..line_start]);

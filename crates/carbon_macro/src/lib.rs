@@ -131,7 +131,9 @@ fn class_of(ty: &syn::Type) -> syn::Ident {
         "bool" => "Bool",
         "Vec" => {
             if !is_vec_u8(seg) {
-                panic!("FromRow: blob columns must be `Vec<u8>`; other `Vec<T>` element types are unsupported");
+                panic!(
+                    "FromRow: blob columns must be `Vec<u8>`; other `Vec<T>` element types are unsupported"
+                );
             }
             "Blob"
         }
@@ -145,7 +147,9 @@ fn class_of(ty: &syn::Type) -> syn::Ident {
 fn is_vec_u8(seg: &syn::PathSegment) -> bool {
     if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
         if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
-            return last_segment(inner).map(|s| s.ident == "u8").unwrap_or(false);
+            return last_segment(inner)
+                .map(|s| s.ident == "u8")
+                .unwrap_or(false);
         }
     }
     false
@@ -183,7 +187,9 @@ fn last_segment_ident(ty: &syn::Type) -> Option<&syn::Ident> {
 
 /// True when the type's last path segment is `DateTime`.
 fn is_datetime(ty: &syn::Type) -> bool {
-    last_segment_ident(ty).map(|i| i == "DateTime").unwrap_or(false)
+    last_segment_ident(ty)
+        .map(|i| i == "DateTime")
+        .unwrap_or(false)
 }
 
 #[proc_macro_attribute]

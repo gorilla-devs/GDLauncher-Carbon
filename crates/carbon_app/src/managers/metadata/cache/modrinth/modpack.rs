@@ -27,8 +27,8 @@ pub async fn get_modpack_metadata(
 ) -> anyhow::Result<InstanceModpackInfo> {
     let project_id_read = modrinth.project_id.clone();
     let version_id_read = modrinth.version_id.clone();
-    let cache_entry = modpackdb::get_mr_modpack(&app.db, &project_id_read, &version_id_read)
-        .await?;
+    let cache_entry =
+        modpackdb::get_mr_modpack(&app.db, &project_id_read, &version_id_read).await?;
 
     let is_entry_up_to_date = cache_entry
         .as_ref()

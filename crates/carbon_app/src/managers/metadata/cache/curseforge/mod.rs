@@ -62,11 +62,13 @@ impl ModplatformCacher for CurseforgeModCacher {
                     .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
                     .collect::<Vec<_>>()
             }
-            CacheEntityId::Server(server_id) => mfcdb::server_mods_needing_cf_refresh(&app.db, server_id, cutoff)
-                .await?
-                .into_iter()
-                .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
-                .collect::<Vec<_>>(),
+            CacheEntityId::Server(server_id) => {
+                mfcdb::server_mods_needing_cf_refresh(&app.db, server_id, cutoff)
+                    .await?
+                    .into_iter()
+                    .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
+                    .collect::<Vec<_>>()
+            }
         };
 
         let mcm = app.meta_cache_manager();
@@ -228,12 +230,10 @@ impl ModplatformCacher for CurseforgeModCacher {
         let result = match entity_id {
             CacheEntityId::Instance(instance_id) => {
                 let instance_id_val = *instance_id;
-                mfcdb::instance_mods_stale_cf_logo(&app.db, instance_id_val)
-                    .await
+                mfcdb::instance_mods_stale_cf_logo(&app.db, instance_id_val).await
             }
             CacheEntityId::Server(server_id) => {
-                mfcdb::server_mods_stale_cf_logo(&app.db, server_id)
-                    .await
+                mfcdb::server_mods_stale_cf_logo(&app.db, server_id).await
             }
         };
 
@@ -405,8 +405,8 @@ async fn cache_curseforge_meta_unchecked(
 
     {
         let metadata_id = metadata_id.clone();
-        if let Ok(Some(existing_entry)) = metarepo::get_cf_cache_by_metadata(&app.db, &metadata_id)
-            .await
+        if let Ok(Some(existing_entry)) =
+            metarepo::get_cf_cache_by_metadata(&app.db, &metadata_id).await
         {
             if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
                 return Ok(());
@@ -449,9 +449,7 @@ async fn cache_curseforge_meta_unchecked(
     if let Some(logo) = &modinfo.logo {
         let url = logo.url.clone();
         let image_metadata_id = result_metadata_id.clone();
-        if let Err(e) = metarepo::upsert_cf_image(&app.db, &image_metadata_id, &url)
-            .await
-        {
+        if let Err(e) = metarepo::upsert_cf_image(&app.db, &image_metadata_id, &url).await {
             warn!(
                 "Failed to upsert curseforge image for metadata_id {}: {:?}",
                 result_metadata_id, e

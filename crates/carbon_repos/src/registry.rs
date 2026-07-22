@@ -42,7 +42,10 @@ impl DynamicQuery {
     /// only run through a write guard; the runtime SQL is prepared through the
     /// guard's `raw()` escape (this is the `DynamicQuery` exemption the
     /// hand-written-SQL census carves out).
-    pub fn execute(&self, conn: &impl crate::db_exec::WriteAccess) -> Result<usize, rusqlite::Error> {
+    pub fn execute(
+        &self,
+        conn: &impl crate::db_exec::WriteAccess,
+    ) -> Result<usize, rusqlite::Error> {
         let mut st = conn.raw().prepare(&self.sql)?;
         let bound: Vec<(&str, &dyn rusqlite::types::ToSql)> = self
             .params
@@ -55,7 +58,10 @@ impl DynamicQuery {
     /// Reads a single scalar column-0 value, mirroring `queries!`'s `i64`
     /// return arm (no `FromRow` needed for a bare scalar). Takes `&impl
     /// ReadAccess` — the read path never needs write access.
-    pub fn query_scalar_i64(&self, conn: &impl crate::db_exec::ReadAccess) -> Result<i64, rusqlite::Error> {
+    pub fn query_scalar_i64(
+        &self,
+        conn: &impl crate::db_exec::ReadAccess,
+    ) -> Result<i64, rusqlite::Error> {
         let mut st = conn.raw().prepare(&self.sql)?;
         let bound: Vec<(&str, &dyn rusqlite::types::ToSql)> = self
             .params

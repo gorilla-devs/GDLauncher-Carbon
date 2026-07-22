@@ -9,8 +9,8 @@
 //! walks every committed migration that carries a down and round-trips it.
 
 use carbon_repos::downgen::{
-    analyze_up, detect_dml_on_existing_tables, detect_rename, full_schema_dump, generate_down,
-    insert_migration_entry, verify_round_trip, HumanAction, InsertError, MIGRATION_LIST_ANCHOR,
+    HumanAction, InsertError, MIGRATION_LIST_ANCHOR, analyze_up, detect_dml_on_existing_tables,
+    detect_rename, full_schema_dump, generate_down, insert_migration_entry, verify_round_trip,
 };
 use carbon_repos::schema_dump::dump_schema;
 use rusqlite::Connection;
@@ -48,14 +48,16 @@ fn gen_ok(prev: &[&str], up: &str) -> String {
     down
 }
 
-const BASE: &str =
-    "CREATE TABLE \"A\" (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\
+const BASE: &str = "CREATE TABLE \"A\" (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\
      CREATE TABLE \"B\" (id INTEGER PRIMARY KEY, aid INTEGER, note TEXT);\
      CREATE INDEX \"idx_b_aid\" ON \"B\" (aid);";
 
 #[test]
 fn created_table_is_dropped() {
-    let down = gen_ok(&[BASE], "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, v TEXT);");
+    let down = gen_ok(
+        &[BASE],
+        "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, v TEXT);",
+    );
     assert!(down.to_uppercase().contains("DROP TABLE"), "down: {down}");
 }
 
@@ -64,7 +66,10 @@ fn dropped_table_is_recreated_from_old_ddl() {
     let down = gen_ok(&[BASE], "DROP INDEX \"idx_b_aid\"; DROP TABLE \"B\";");
     let up = down.to_uppercase();
     assert!(up.contains("CREATE TABLE"), "must recreate B: {down}");
-    assert!(up.contains("CREATE INDEX"), "must recreate B's index: {down}");
+    assert!(
+        up.contains("CREATE INDEX"),
+        "must recreate B's index: {down}"
+    );
 }
 
 #[test]
@@ -164,8 +169,8 @@ fn rename_keyword_inside_a_string_literal_is_not_flagged() {
 fn dml_on_existing_table_is_flagged_but_rebuild_temp_writes_are_not() {
     // CENSUS-SELFTEST: downgen.dml-flag
     // Direct DML on a pre-existing table is flagged.
-    let dml =
-        detect_dml_on_existing_tables(&[BASE], "UPDATE \"A\" SET name = 'x' WHERE id = 1;").unwrap();
+    let dml = detect_dml_on_existing_tables(&[BASE], "UPDATE \"A\" SET name = 'x' WHERE id = 1;")
+        .unwrap();
     assert_eq!(dml, vec!["UPDATE A".to_string()]);
 
     let ins =
@@ -253,9 +258,16 @@ const FIXTURE_ENTRY: &str = "        MigrationDef {\n\
 #[test]
 fn insert_migration_entry_places_entry_directly_above_the_anchor() {
     let updated = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
-    let anchor_pos = updated.find(MIGRATION_LIST_ANCHOR).expect("anchor must survive the edit");
-    let entry_pos = updated.find("20260501000000_add_widget").expect("entry must be inserted");
-    assert!(entry_pos < anchor_pos, "entry must be inserted above the anchor:\n{updated}");
+    let anchor_pos = updated
+        .find(MIGRATION_LIST_ANCHOR)
+        .expect("anchor must survive the edit");
+    let entry_pos = updated
+        .find("20260501000000_add_widget")
+        .expect("entry must be inserted");
+    assert!(
+        entry_pos < anchor_pos,
+        "entry must be inserted above the anchor:\n{updated}"
+    );
     assert!(
         updated.contains("20240120134904_init"),
         "the pre-existing entry must be preserved:\n{updated}"
@@ -282,9 +294,14 @@ fn insert_migration_entry_fails_when_anchor_is_duplicated() {
 fn insert_migration_entry_is_idempotent_on_rerun_for_the_same_migration() {
     let once = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
     let twice = insert_migration_entry(&once, FIXTURE_ENTRY).unwrap();
-    assert_eq!(once, twice, "rerunning for the same migration must not duplicate the entry");
     assert_eq!(
-        twice.matches("name: \"20260501000000_add_widget\",").count(),
+        once, twice,
+        "rerunning for the same migration must not duplicate the entry"
+    );
+    assert_eq!(
+        twice
+            .matches("name: \"20260501000000_add_widget\",")
+            .count(),
         1,
         "the entry must appear exactly once after a rerun:\n{twice}"
     );
@@ -309,5 +326,8 @@ fn full_schema_dump_matches_the_committed_baseline() {
         "/baseline/baseline.sql"
     ))
     .expect("committed baseline/baseline.sql must exist");
-    assert_eq!(dump, committed, "full_schema_dump drifted from the committed baseline");
+    assert_eq!(
+        dump, committed,
+        "full_schema_dump drifted from the committed baseline"
+    );
 }

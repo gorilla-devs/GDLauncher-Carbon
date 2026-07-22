@@ -30,8 +30,10 @@ use std::path::{Path, PathBuf};
 /// snapshot test byte-compares it as text (`tests/schema_snapshot.rs`), and
 /// [`MigrationSet::install_baseline`] replays it as executable DDL
 /// ([`executable_statements`]) here.
-const BASELINE_DUMP: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/baseline/baseline.sql"));
+const BASELINE_DUMP: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/baseline/baseline.sql"
+));
 
 /// Literal row data historical migrations write, replayed after `baseline.sql`
 /// on a fresh install so the baseline path is behaviorally identical to the
@@ -144,8 +146,7 @@ const CREATE_MIGRATIONS_TABLE: &str = "CREATE TABLE IF NOT EXISTS _migrations (\
     data_down TEXT NOT NULL DEFAULT 'full', \
     applied_at INTEGER NOT NULL)";
 
-const MIGRATION_ROW_COLUMNS: &str =
-    "_migrations (version, name, checksum, kind, down_sql, data_down, applied_at) \
+const MIGRATION_ROW_COLUMNS: &str = "_migrations (version, name, checksum, kind, down_sql, data_down, applied_at) \
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
 
 impl MigrationSet {
@@ -356,9 +357,8 @@ impl MigrationSet {
         // -wal contents are folded into the main file the copy captures.
         conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
         let snapshot_path = snapshot_path_for(db_path);
-        std::fs::copy(db_path, &snapshot_path).map_err(|e| {
-            DbError::Conversion(format!("pre-downgrade snapshot copy failed: {e}"))
-        })?;
+        std::fs::copy(db_path, &snapshot_path)
+            .map_err(|e| DbError::Conversion(format!("pre-downgrade snapshot copy failed: {e}")))?;
 
         let reference = self.reference_schema(count)?;
 
@@ -372,15 +372,22 @@ impl MigrationSet {
                     "down-run refused: migration {version} is breaking but has no stored down"
                 );
                 drop(tx);
-                return Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }));
+                return Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed {
+                    snapshot_path,
+                }));
             };
             // CENSUS-RULE: compat.downgrade-corrupt-down
             if let Err(e) = tx.execute_batch(sql) {
                 tracing::error!("down-run of migration {version} failed: {e}");
                 drop(tx); // rollback: the whole down-run is atomic
-                return Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }));
+                return Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed {
+                    snapshot_path,
+                }));
             }
-            tx.execute("DELETE FROM _migrations WHERE version = ?1", params![version])?;
+            tx.execute(
+                "DELETE FROM _migrations WHERE version = ?1",
+                params![version],
+            )?;
         }
         tx.pragma_update(None, "user_version", count)?;
 
@@ -396,7 +403,9 @@ impl MigrationSet {
                 "down-run verification failed: resulting schema does not match this build's schema at version {count}"
             );
             drop(tx); // rollback: never leave a half-downgraded schema
-            Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }))
+            Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed {
+                snapshot_path,
+            }))
         }
     }
 

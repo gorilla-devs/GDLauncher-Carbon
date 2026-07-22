@@ -27,8 +27,7 @@ async fn get_java_component_from_db(
     db: &Db,
     path: String,
 ) -> anyhow::Result<Option<java_repo::JavaRow>> {
-    Ok(java_repo::get_java_by_path(db, &path)
-        .await?)
+    Ok(java_repo::get_java_by_path(db, &path).await?)
 }
 
 #[tracing::instrument(level = "trace", skip(db))]
@@ -41,7 +40,9 @@ pub async fn upsert_java_component_to_db(
 
     let already_existing_component = already_existing_component.and_then(|row| {
         let id = row.id.clone();
-        JavaComponent::try_from(row).ok().map(|component| (component, id))
+        JavaComponent::try_from(row)
+            .ok()
+            .map(|component| (component, id))
     });
 
     if let Some((component, id)) = already_existing_component {
@@ -59,10 +60,8 @@ pub async fn upsert_java_component_to_db(
             let arch = java_component.arch.to_string();
             let os = java_component.os.to_string();
             let vendor = java_component.vendor;
-            java_repo::update_java_component(
-                db, &id, major, &full_version, &arch, &os, &vendor,
-            )
-            .await?;
+            java_repo::update_java_component(db, &id, major, &full_version, &arch, &os, &vendor)
+                .await?;
 
             Ok(id)
         }
@@ -87,8 +86,7 @@ pub async fn upsert_java_component_to_db(
 
 #[tracing::instrument(level = "trace", skip(db))]
 async fn update_java_component_in_db_to_invalid(db: &Db, path: String) -> anyhow::Result<()> {
-    java_repo::set_java_validity_by_path(db, &path, false)
-        .await?;
+    java_repo::set_java_validity_by_path(db, &path, false).await?;
 
     Ok(())
 }
@@ -172,8 +170,7 @@ where
                         .await?;
                     } else {
                         let path = resolved_java_path.display().to_string();
-                        java_repo::delete_java_by_path(db, &path)
-                            .await?;
+                        java_repo::delete_java_by_path(db, &path).await?;
                     }
                 }
             }
@@ -182,8 +179,7 @@ where
 
     // Cleanup unscanned local javas (if they are not default)
     let local_type = JavaComponentType::Local.to_string();
-    let local_javas_from_db = java_repo::get_java_by_type(db, &local_type)
-        .await?;
+    let local_javas_from_db = java_repo::get_java_by_type(db, &local_type).await?;
 
     for local_java_from_db in local_javas_from_db {
         trace!(
@@ -204,8 +200,7 @@ where
             update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
         } else {
             let path = local_java_from_db.path;
-            java_repo::delete_java_by_path(db, &path)
-                .await?;
+            java_repo::delete_java_by_path(db, &path).await?;
         }
     }
 
@@ -218,8 +213,7 @@ where
     G: JavaChecker,
 {
     let custom_type = JavaComponentType::Custom.to_string();
-    let custom_javas = java_repo::get_java_by_type(db, &custom_type)
-        .await?;
+    let custom_javas = java_repo::get_java_by_type(db, &custom_type).await?;
 
     for custom_java in custom_javas {
         let java_bin_info = java_checker
@@ -248,8 +242,7 @@ where
     G: JavaChecker,
 {
     let managed_type = JavaComponentType::Managed.to_string();
-    let managed_javas = java_repo::get_java_by_type(db, &managed_type)
-        .await?;
+    let managed_javas = java_repo::get_java_by_type(db, &managed_type).await?;
 
     let used_java_paths = java_paths_used_in_profiles(db).await?;
 
@@ -278,15 +271,13 @@ where
                     update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
                 } else {
                     let path = managed_java.path.clone();
-                    java_repo::delete_java_by_path(db, &path)
-                        .await?;
+                    java_repo::delete_java_by_path(db, &path).await?;
                 }
             }
             (Err(_), false) => {
                 if !is_java_used_in_profile {
                     let path = managed_java.path.clone();
-                    java_repo::delete_java_by_path(db, &path)
-                        .await?;
+                    java_repo::delete_java_by_path(db, &path).await?;
                 }
             }
         }
@@ -313,8 +304,7 @@ where
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub async fn sync_system_java_profiles(db: &Db) -> anyhow::Result<()> {
-    let all_javas = java_repo::get_all_java(db)
-        .await?;
+    let all_javas = java_repo::get_all_java(db).await?;
 
     let is32bit = std::env::consts::ARCH == "x86" || std::env::consts::ARCH == "arm";
 
@@ -394,9 +384,7 @@ mod test {
     use carbon_repos::repos::java as java_repo;
 
     async fn all_javas(db: &carbon_repos::db_exec::Db) -> Vec<java_repo::JavaRow> {
-        java_repo::get_all_java(db)
-            .await
-            .unwrap()
+        java_repo::get_all_java(db).await.unwrap()
     }
 
     #[tokio::test]
@@ -726,9 +714,7 @@ mod test {
         JavaManager::ensure_profiles_in_db(db).await.unwrap();
         sync_system_java_profiles(db).await.unwrap();
 
-        let all_profiles = java_repo::get_all_profiles(db)
-            .await
-            .unwrap();
+        let all_profiles = java_repo::get_all_profiles(db).await.unwrap();
         assert!(all_profiles.iter().all(|profile| profile.is_system_profile));
 
         // Expect 8 and 17 to be there, but not 14 since it's invalid and 16 because not provided

@@ -48,9 +48,7 @@ macro_rules! historical_migration {
 pub fn get_migrations() -> (MigrationSet, i32) {
     let migrations = vec![
         historical_migration!("20240120134904_init"),
-        historical_migration!(
-            "20240123180711_launcher_action_on_game_launch_game_resolution"
-        ),
+        historical_migration!("20240123180711_launcher_action_on_game_launch_game_resolution"),
         historical_migration!("20240126072544_update_modpacks"),
         historical_migration!("20240127230211_add_meta_cache"),
         historical_migration!("20240204033019_add_instances_settings"),

@@ -37,7 +37,11 @@ fn all_registered_queries() -> Vec<QueryCheck> {
 fn all_registered_queries_pass_against_migrated_schema() {
     let (_d, conn) = migrated_db();
     let all = check_module(&conn, &all_registered_queries());
-    assert!(all.is_empty(), "query checker violations:\n{}", all.join("\n"));
+    assert!(
+        all.is_empty(),
+        "query checker violations:\n{}",
+        all.join("\n")
+    );
 }
 
 #[test]
@@ -51,28 +55,44 @@ fn manifest_freshness_lint_passes_for_all_registered_queries() {
 fn nullability_lint_passes_for_all_registered_queries() {
     let (_d, conn) = migrated_db();
     let v = check_nullability(&conn, &all_registered_queries());
-    assert!(v.is_empty(), "nullability lint violations:\n{}", v.join("\n"));
+    assert!(
+        v.is_empty(),
+        "nullability lint violations:\n{}",
+        v.join("\n")
+    );
 }
 
 #[test]
 fn query_plan_lint_passes_for_all_registered_queries() {
     let (_d, conn) = migrated_db();
     let v = check_query_plans(&conn, &all_registered_queries());
-    assert!(v.is_empty(), "query plan lint violations:\n{}", v.join("\n"));
+    assert!(
+        v.is_empty(),
+        "query plan lint violations:\n{}",
+        v.join("\n")
+    );
 }
 
 #[test]
 fn insert_datetime_lint_passes_for_all_registered_queries() {
     let (_d, conn) = migrated_db();
     let v = check_insert_datetime_columns(&conn, &all_registered_queries());
-    assert!(v.is_empty(), "insert datetime lint violations:\n{}", v.join("\n"));
+    assert!(
+        v.is_empty(),
+        "insert datetime lint violations:\n{}",
+        v.join("\n")
+    );
 }
 
 #[test]
 fn classification_lint_passes_for_all_registered_queries() {
     let (_d, conn) = migrated_db();
     let v = check_classification(&conn, &all_registered_queries());
-    assert!(v.is_empty(), "read-class-no-writes violations:\n{}", v.join("\n"));
+    assert!(
+        v.is_empty(),
+        "read-class-no-writes violations:\n{}",
+        v.join("\n")
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +158,9 @@ fn checker_does_not_flag_question_mark_in_string_literal() {
         sql: "SELECT id FROM Java WHERE major = :major OR os = 'what?'",
         params: &[":major", ":unused_but_present"],
         columns: None,
-        class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE major = :major OR os = 'what?'"),
+        class: carbon_repos::registry::class_of(
+            "SELECT id FROM Java WHERE major = :major OR os = 'what?'",
+        ),
     }];
     // The '?'-in-literal rule must not fire; only the param-set mismatch for the
     // deliberately-unused declared name should show up.
@@ -158,7 +180,9 @@ fn checker_flags_real_positional_param_in_multiparam_query() {
         sql: "SELECT id FROM Java WHERE major = :major AND arch = ?",
         params: &[":major", ":arch"],
         columns: None,
-        class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE major = :major AND arch = ?"),
+        class: carbon_repos::registry::class_of(
+            "SELECT id FROM Java WHERE major = :major AND arch = ?",
+        ),
     }];
     let v = check_module(&conn, &planted);
     assert!(
@@ -206,7 +230,9 @@ fn manifest_freshness_lint_catches_planted_failure() {
         sql: "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
         params: &[":v", ":id"],
         columns: None,
-        class: carbon_repos::registry::class_of("UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id"),
+        class: carbon_repos::registry::class_of(
+            "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
+        ),
     }];
     let v = check_manifests(&conn, &planted);
     assert_eq!(
@@ -267,7 +293,8 @@ fn nullability_lint_catches_nullable_source_declared_non_null() {
     let (_d, conn) = migrated_db();
     let v = check_nullability(&conn, planted_rows::QUERIES);
     assert!(
-        v.iter().any(|m| m.contains("bad_nullable") && m.contains("access")),
+        v.iter()
+            .any(|m| m.contains("bad_nullable") && m.contains("access")),
         "must flag a nullable source column declared non-null, got: {v:?}"
     );
 }
@@ -278,7 +305,8 @@ fn nullability_lint_catches_unmarked_expression_column() {
     let (_d, conn) = migrated_db();
     let v = check_nullability(&conn, planted_rows::QUERIES);
     assert!(
-        v.iter().any(|m| m.contains("bad_expr") && m.contains("expression")),
+        v.iter()
+            .any(|m| m.contains("bad_expr") && m.contains("expression")),
         "must flag an expression column that is neither Option nor overridden, got: {v:?}"
     );
 }
@@ -298,7 +326,8 @@ fn query_plan_lint_catches_planted_full_scan() {
     }];
     let v = check_query_plans(&conn, &planted);
     assert!(
-        v.iter().any(|m| m.contains("scan_mod_metadata") && m.contains("ModMetadata")),
+        v.iter()
+            .any(|m| m.contains("scan_mod_metadata") && m.contains("ModMetadata")),
         "must flag a full scan of a guarded table, got: {v:?}"
     );
 }
@@ -314,7 +343,9 @@ fn insert_datetime_lint_catches_planted_failures() {
             sql: "INSERT INTO VersionInfoCache (id, versionInfo) VALUES (:id, :v)",
             params: &[":id", ":v"],
             columns: None,
-            class: carbon_repos::registry::class_of("INSERT INTO VersionInfoCache (id, versionInfo) VALUES (:id, :v)"),
+            class: carbon_repos::registry::class_of(
+                "INSERT INTO VersionInfoCache (id, versionInfo) VALUES (:id, :v)",
+            ),
         },
         // No column list at all — flagged outright regardless of the table.
         QueryCheck {
@@ -322,12 +353,15 @@ fn insert_datetime_lint_catches_planted_failures() {
             sql: "INSERT INTO VersionInfoCache VALUES (:id, :v, :t)",
             params: &[":id", ":v", ":t"],
             columns: None,
-            class: carbon_repos::registry::class_of("INSERT INTO VersionInfoCache VALUES (:id, :v, :t)"),
+            class: carbon_repos::registry::class_of(
+                "INSERT INTO VersionInfoCache VALUES (:id, :v, :t)",
+            ),
         },
     ];
     let v = check_insert_datetime_columns(&conn, &planted);
     assert!(
-        v.iter().any(|m| m.contains("bad_insert_missing_datetime") && m.contains("lastUpdatedAt")),
+        v.iter()
+            .any(|m| m.contains("bad_insert_missing_datetime") && m.contains("lastUpdatedAt")),
         "must flag an INSERT that omits a DATETIME column, got: {v:?}"
     );
     assert!(
@@ -341,7 +375,9 @@ fn insert_datetime_lint_catches_planted_failures() {
         sql: "INSERT INTO VersionInfoCache (id, versionInfo, lastUpdatedAt) VALUES (:id, :v, :t)",
         params: &[":id", ":v", ":t"],
         columns: None,
-        class: carbon_repos::registry::class_of("INSERT INTO VersionInfoCache (id, versionInfo, lastUpdatedAt) VALUES (:id, :v, :t)"),
+        class: carbon_repos::registry::class_of(
+            "INSERT INTO VersionInfoCache (id, versionInfo, lastUpdatedAt) VALUES (:id, :v, :t)",
+        ),
     }];
     assert!(
         check_insert_datetime_columns(&conn, &ok).is_empty(),
@@ -355,7 +391,9 @@ fn insert_datetime_lint_catches_planted_failures() {
         sql: "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
         params: &[":v", ":id"],
         columns: None,
-        class: carbon_repos::registry::class_of("UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id"),
+        class: carbon_repos::registry::class_of(
+            "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
+        ),
     }];
     assert!(
         check_insert_datetime_columns(&conn, &non_insert).is_empty(),
@@ -435,33 +473,55 @@ fn all_handwritten_repo_sql_is_registered() {
     }
     assert!(!files.is_empty(), "repos dir scan found no sources");
     let v = carbon_repos::checker::check_handwritten_sql(&files);
-    assert!(v.is_empty(), "hand-written SQL census violations:\n{}", v.join("\n"));
+    assert!(
+        v.is_empty(),
+        "hand-written SQL census violations:\n{}",
+        v.join("\n")
+    );
 }
 
 /// CENSUS-SELFTEST: checker.handwritten-sql-registered
 #[test]
 fn handwritten_sql_census_catches_planted_failures() {
     use carbon_repos::checker::check_handwritten_sql;
-    let inline = ("a.rs".to_string(), "fn f() { conn.prepare_cached(\"SELECT 1\") }".to_string());
+    let inline = (
+        "a.rs".to_string(),
+        "fn f() { conn.prepare_cached(\"SELECT 1\") }".to_string(),
+    );
     let v = check_handwritten_sql(&[inline]);
     assert_eq!(v.len(), 1, "inline literal must be flagged: {v:?}");
 
-    let dynamic = ("b.rs".to_string(), "fn f() { conn.execute_batch(format!(\"DELETE FROM {t}\")) }".to_string());
+    let dynamic = (
+        "b.rs".to_string(),
+        "fn f() { conn.execute_batch(format!(\"DELETE FROM {t}\")) }".to_string(),
+    );
     let v = check_handwritten_sql(&[dynamic]);
     assert_eq!(v.len(), 1, "format!-built SQL must be flagged: {v:?}");
 
-    let unreferenced = ("c.rs".to_string(),
-        "const X_SQL: &str = \"SELECT 1\";\nfn f() { conn.prepare_cached(X_SQL)?; }".to_string());
+    let unreferenced = (
+        "c.rs".to_string(),
+        "const X_SQL: &str = \"SELECT 1\";\nfn f() { conn.prepare_cached(X_SQL)?; }".to_string(),
+    );
     let v = check_handwritten_sql(&[unreferenced]);
-    assert_eq!(v.len(), 1, "const without a QueryCheck reference must be flagged: {v:?}");
+    assert_eq!(
+        v.len(),
+        1,
+        "const without a QueryCheck reference must be flagged: {v:?}"
+    );
 
     let conforming = ("d.rs".to_string(),
         "const X_SQL: &str = \"SELECT 1\";\nfn f() { conn.prepare_cached(X_SQL)?; }\nconst CHECK: QueryCheck = QueryCheck { sql: X_SQL };".to_string());
-    assert!(check_handwritten_sql(&[conforming]).is_empty(), "conforming const must pass");
+    assert!(
+        check_handwritten_sql(&[conforming]).is_empty(),
+        "conforming const must pass"
+    );
 
     let statement_receiver = ("e.rs".to_string(),
         "fn f() { let mut st = conn.prepare_cached(X_SQL)?; st.execute(rusqlite::named_params! {})?; }\nconst X_SQL: &str = \"\";\n// sql: X_SQL".to_string());
-    assert!(check_handwritten_sql(&[statement_receiver]).is_empty(), "st.execute is a params call, not SQL");
+    assert!(
+        check_handwritten_sql(&[statement_receiver]).is_empty(),
+        "st.execute is a params call, not SQL"
+    );
 }
 
 /// CENSUS-SELFTEST: checker.sql-ascii-leading
@@ -488,7 +548,9 @@ fn ascii_leading_rule_catches_unicode_whitespace_prefix() {
         class: carbon_repos::registry::QueryClass::Read,
     }];
     assert!(
-        !check_module(&conn, &clean).iter().any(|m| m.contains("non-ASCII")),
+        !check_module(&conn, &clean)
+            .iter()
+            .any(|m| m.contains("non-ASCII")),
         "ASCII-prefixed SQL must pass the leading-whitespace rule"
     );
 }

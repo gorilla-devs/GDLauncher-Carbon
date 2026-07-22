@@ -112,9 +112,9 @@ fn classify_open(result: DbResult<OpenVerdict>) -> Result<Option<DbStatus>, DbSt
         Ok(OpenVerdict::Refuse(RefusalKind::Diverged { version })) => {
             Err(DbStatus::Diverged(version))
         }
-        Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path })) => {
-            Err(DbStatus::DowngradeFailed(snapshot_path.display().to_string()))
-        }
+        Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path })) => Err(
+            DbStatus::DowngradeFailed(snapshot_path.display().to_string()),
+        ),
         Err(e) if is_corruption(&e) => Err(DbStatus::Corrupt),
         Err(_) => Err(DbStatus::MigrationFailed),
     }
@@ -542,7 +542,9 @@ mod test {
             Err(DbStatus::BackwardsMigration)
         );
         assert_eq!(
-            classify_open(Ok(OpenVerdict::Refuse(RefusalKind::Diverged { version: 3 }))),
+            classify_open(Ok(OpenVerdict::Refuse(RefusalKind::Diverged {
+                version: 3
+            }))),
             Err(DbStatus::Diverged(3))
         );
         assert_eq!(

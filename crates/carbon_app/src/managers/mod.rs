@@ -23,6 +23,7 @@ use self::server::ServerManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
+pub(crate) mod db_bootstrap;
 pub mod download;
 pub mod instance;
 pub mod java;
@@ -30,7 +31,6 @@ pub(crate) mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;
-pub(crate) mod db_bootstrap;
 pub mod rich_presence;
 pub mod server;
 mod settings;
@@ -170,10 +170,7 @@ mod app {
                     instance_manager: InstanceManager::new(),
                     server_manager: ServerManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
-                    metrics_manager: MetricsManager::new(
-                        http_client.clone(),
-                        gdl_base_api.clone(),
-                    ),
+                    metrics_manager: MetricsManager::new(http_client.clone(), gdl_base_api.clone()),
                     invalidation_channel,
                     reqwest_client: http_client.clone(),
                     db,

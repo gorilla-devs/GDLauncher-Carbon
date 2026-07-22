@@ -178,7 +178,13 @@ async fn shift_library_positions_scoped_to_group() {
 
     let mut pos = Vec::new();
     for &id in &ids {
-        pos.push(s::get_server(&db, id).await.unwrap().unwrap().library_position);
+        pos.push(
+            s::get_server(&db, id)
+                .await
+                .unwrap()
+                .unwrap()
+                .library_position,
+        );
     }
     assert_eq!(pos[0], Some(0));
     assert_eq!(pos[1], Some(1)); // unchanged (not > 1)
@@ -186,7 +192,11 @@ async fn shift_library_positions_scoped_to_group() {
     assert_eq!(pos[3], Some(2)); // 3 -> 2
     assert_eq!(pos[4], Some(4)); // unchanged (not <= 3)
     assert_eq!(
-        s::get_server(&db, other_srv).await.unwrap().unwrap().library_position,
+        s::get_server(&db, other_srv)
+            .await
+            .unwrap()
+            .unwrap()
+            .library_position,
         Some(2)
     ); // other group untouched
 }
@@ -249,7 +259,11 @@ async fn move_all_servers_to_group_preserves_relative_order() {
 
     assert!(s::get_servers_by_group(&db, src).await.unwrap().is_empty());
     let layout = indexes_in_group(&db, dst).await;
-    let m: Vec<(i32, i32)> = layout.iter().filter(|(id, _)| moved.contains(id)).copied().collect();
+    let m: Vec<(i32, i32)> = layout
+        .iter()
+        .filter(|(id, _)| moved.contains(id))
+        .copied()
+        .collect();
     assert_eq!(m, vec![(moved[0], 2), (moved[1], 3), (moved[2], 4)]);
 }
 
@@ -267,7 +281,9 @@ async fn delete_server_group_tx_uses_default_group_base_index() {
 
     let base_index = s::count_servers_in_group(&db, def).await.unwrap() as i32;
     assert_eq!(base_index, 2);
-    s::delete_server_group_tx(&db, grp, def, base_index).await.unwrap();
+    s::delete_server_group_tx(&db, grp, def, base_index)
+        .await
+        .unwrap();
 
     assert!(s::get_server_group(&db, grp).await.unwrap().is_none());
     let row = s::get_server(&db, moved).await.unwrap().unwrap();
@@ -284,13 +300,22 @@ async fn move_server_tx_runs_shifts_then_final_update() {
         ids.push(seed_server(&db, &format!("n{p}"), &format!("sp{p}"), p, g, None).await);
     }
 
-    let shifts = vec![IndexShift::DownExclusive { group_id: g, gt: 0, lt: 2 }];
-    s::move_server_tx(&db, shifts, ids[0], g, 1, None).await.unwrap();
+    let shifts = vec![IndexShift::DownExclusive {
+        group_id: g,
+        gt: 0,
+        lt: 2,
+    }];
+    s::move_server_tx(&db, shifts, ids[0], g, 1, None)
+        .await
+        .unwrap();
 
     assert_eq!(idx_of(&db, ids[1]).await, 0);
     assert_eq!(idx_of(&db, ids[0]).await, 1);
     assert_eq!(idx_of(&db, ids[2]).await, 2);
-    assert_eq!(indexes_in_group(&db, g).await, vec![(ids[1], 0), (ids[0], 1), (ids[2], 2)]);
+    assert_eq!(
+        indexes_in_group(&db, g).await,
+        vec![(ids[1], 0), (ids[0], 1), (ids[2], 2)]
+    );
 }
 
 #[tokio::test]
@@ -302,14 +327,34 @@ async fn arrange_server_library_tx_stamps_groups_and_servers() {
     let s1 = seed_server(&db, "a", "a", 1, def, Some(1)).await;
 
     let groups = vec![
-        s::ServerGroupArrange { id: def, group_index: 0, library_position: None, set_library_position: false },
-        s::ServerGroupArrange { id: folder, group_index: 1, library_position: Some(0), set_library_position: true },
+        s::ServerGroupArrange {
+            id: def,
+            group_index: 0,
+            library_position: None,
+            set_library_position: false,
+        },
+        s::ServerGroupArrange {
+            id: folder,
+            group_index: 1,
+            library_position: Some(0),
+            set_library_position: true,
+        },
     ];
     let servers = vec![
-        s::ServerArrange { id: s1, index: 1, library_position: Some(1) },
-        s::ServerArrange { id: s0, index: 2, library_position: Some(2) },
+        s::ServerArrange {
+            id: s1,
+            index: 1,
+            library_position: Some(1),
+        },
+        s::ServerArrange {
+            id: s0,
+            index: 2,
+            library_position: Some(2),
+        },
     ];
-    s::arrange_server_library_tx(&db, groups, servers).await.unwrap();
+    s::arrange_server_library_tx(&db, groups, servers)
+        .await
+        .unwrap();
 
     let dg = s::get_server_group(&db, def).await.unwrap().unwrap();
     assert_eq!(dg.group_index, 0);
@@ -319,7 +364,14 @@ async fn arrange_server_library_tx_stamps_groups_and_servers() {
     assert_eq!(fg.library_position, Some(0));
     assert_eq!(s::get_server(&db, s1).await.unwrap().unwrap().index, 1);
     assert_eq!(s::get_server(&db, s0).await.unwrap().unwrap().index, 2);
-    assert_eq!(s::get_server(&db, s0).await.unwrap().unwrap().library_position, Some(2));
+    assert_eq!(
+        s::get_server(&db, s0)
+            .await
+            .unwrap()
+            .unwrap()
+            .library_position,
+        Some(2)
+    );
 }
 
 #[test]
@@ -369,7 +421,10 @@ async fn server_patch_properties_subset_updates_only_present_fields() {
         ..Default::default()
     };
     let q = patch.build(id).unwrap();
-    assert_eq!(db.write(move |conn| Ok(q.execute(&conn)?)).await.unwrap(), 1);
+    assert_eq!(
+        db.write(move |conn| Ok(q.execute(&conn)?)).await.unwrap(),
+        1
+    );
 
     let row = s::get_server(&db, id).await.unwrap().unwrap();
     assert_eq!(row.port, 25599);
@@ -393,7 +448,9 @@ async fn set_game_version_and_modloader_writes_nullables() {
     assert_eq!(row.modloader_type.as_deref(), Some("fabric"));
     assert_eq!(row.modloader_version.as_deref(), Some("0.15"));
     // clearing back to NULL
-    s::set_server_game_version_and_modloader(&db, id, "1.21", None, None).await.unwrap();
+    s::set_server_game_version_and_modloader(&db, id, "1.21", None, None)
+        .await
+        .unwrap();
     let row = s::get_server(&db, id).await.unwrap().unwrap();
     assert_eq!(row.modloader_type, None);
     assert_eq!(row.modloader_version, None);
@@ -403,9 +460,17 @@ async fn set_game_version_and_modloader_writes_nullables() {
 async fn group_by_name_and_default_first_ordering() {
     let (_d, db) = migrated_db().await;
     // migration seeds a 'Default' group at groupIndex 0
-    let first = s::first_server_group_ordered_by_group_index(&db).await.unwrap().unwrap();
+    let first = s::first_server_group_ordered_by_group_index(&db)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(first.name, "Default");
     let by_name = s::find_server_group_by_name(&db, "Default").await.unwrap();
     assert!(by_name.is_some());
-    assert!(s::find_server_group_by_name(&db, "nope").await.unwrap().is_none());
+    assert!(
+        s::find_server_group_by_name(&db, "nope")
+            .await
+            .unwrap()
+            .is_none()
+    );
 }

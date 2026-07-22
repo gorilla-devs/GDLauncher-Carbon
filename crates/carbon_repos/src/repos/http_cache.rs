@@ -27,7 +27,8 @@ queries! {
 /// The two statements executed by `replace_cached`, kept as consts so the
 /// checker validates the exact SQL the fn runs.
 const DELETE_HTTP_CACHE_SQL: &str = "DELETE FROM HTTPCache WHERE url = :url";
-const INSERT_HTTP_CACHE_SQL: &str = "INSERT INTO HTTPCache (url, status_code, data, expiresAt, lastModified, etag)
+const INSERT_HTTP_CACHE_SQL: &str =
+    "INSERT INTO HTTPCache (url, status_code, data, expiresAt, lastModified, etag)
      VALUES (:url, :status_code, :data, :expires_at, :last_modified, :etag)";
 
 /// Replaces any cached response for `url` with a fresh one, in one
@@ -44,7 +45,10 @@ pub async fn replace_cached(
 ) -> DbResult<()> {
     db.write(move |mut conn| {
         let tx = conn.transaction()?;
-        tx.execute(DELETE_HTTP_CACHE_SQL, rusqlite::named_params! { ":url": url })?;
+        tx.execute(
+            DELETE_HTTP_CACHE_SQL,
+            rusqlite::named_params! { ":url": url },
+        )?;
         tx.execute(
             INSERT_HTTP_CACHE_SQL,
             rusqlite::named_params! {

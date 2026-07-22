@@ -40,9 +40,7 @@ mod preference_keys {
 
 /// Returns true if the user has permanently dismissed the insufficient
 /// memory warning shown when launching an instance.
-pub async fn is_memory_warning_dismissed(
-    db: &carbon_repos::db_exec::Db,
-) -> anyhow::Result<bool> {
+pub async fn is_memory_warning_dismissed(db: &carbon_repos::db_exec::Db) -> anyhow::Result<bool> {
     let pref =
         frontend_preference::get_preference(db, preference_keys::MEMORY_WARNING_DISMISSED).await?;
 

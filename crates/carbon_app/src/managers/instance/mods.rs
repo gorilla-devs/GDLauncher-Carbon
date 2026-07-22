@@ -110,8 +110,7 @@ impl ManagerRef<'_, InstanceManager> {
             };
 
         let instance_id_val = *instance_id;
-        let mut mods = mfcdb::get_instance_mods_full(&self.app.db, instance_id_val)
-            .await?;
+        let mut mods = mfcdb::get_instance_mods_full(&self.app.db, instance_id_val).await?;
 
         // Apply the optional addon-type filter in Rust BEFORE the duplicate
         // detection pass, so the modid counts are computed over exactly the
@@ -190,22 +189,23 @@ impl ManagerRef<'_, InstanceManager> {
             };
 
             let is_duplicate = m.enabled
-                && m
-                    .modid
+                && m.modid
                     .as_ref()
                     .map(|modid| duplicate_modids.contains(modid))
                     .unwrap_or(false);
 
-            let curseforge = m.cf_project_id.map(|project_id| domain::CurseForgeModMetadata {
-                project_id: project_id as u32,
-                file_id: m.cf_file_id.unwrap() as u32,
-                name: m.cf_name.clone().unwrap(),
-                version: m.cf_version.clone().unwrap(),
-                urlslug: m.cf_urlslug.clone().unwrap(),
-                summary: m.cf_summary.clone().unwrap(),
-                authors: m.cf_authors.clone().unwrap(),
-                has_image: m.has_cf_image,
-            });
+            let curseforge = m
+                .cf_project_id
+                .map(|project_id| domain::CurseForgeModMetadata {
+                    project_id: project_id as u32,
+                    file_id: m.cf_file_id.unwrap() as u32,
+                    name: m.cf_name.clone().unwrap(),
+                    version: m.cf_version.clone().unwrap(),
+                    urlslug: m.cf_urlslug.clone().unwrap(),
+                    summary: m.cf_summary.clone().unwrap(),
+                    authors: m.cf_authors.clone().unwrap(),
+                    has_image: m.has_cf_image,
+                });
 
             let modrinth = m
                 .mr_project_id
@@ -358,8 +358,13 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::rename(enabled_path, disabled_path).await?;
         }
 
-        mfcdb::update_mod_file_enabled(&self.app.db, &id, enabled, DbDateTime(Utc::now().fixed_offset()))
-            .await?;
+        mfcdb::update_mod_file_enabled(
+            &self.app.db,
+            &id,
+            enabled,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
 
         self.app
             .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
@@ -407,8 +412,7 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         // Delete cache entry directly instead of re-scanning
-        mfcdb::delete_mod_file_cache_by_id(&self.app.db, &m.id)
-            .await?;
+        mfcdb::delete_mod_file_cache_by_id(&self.app.db, &m.id).await?;
 
         // GC orphaned metadata
         self.app.meta_cache_manager().gc_mod_metadata().await;
@@ -648,7 +652,10 @@ impl ManagerRef<'_, InstanceManager> {
         let cf = row
             .cf_project_id
             .zip(row.cf_file_id)
-            .map(|(project_id, file_id)| CfIds { project_id, file_id });
+            .map(|(project_id, file_id)| CfIds {
+                project_id,
+                file_id,
+            });
 
         let mr = match (row.mr_project_id, row.mr_version_id) {
             (Some(project_id), Some(version_id)) => Some(MrIds {
@@ -817,7 +824,9 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
         let cf_project_id = cf.cf_project_id.ok_or_else(|| {
-            anyhow!("Attempted to use update_curseforge_mod to update a mod not availible on curseforge")
+            anyhow!(
+                "Attempted to use update_curseforge_mod to update a mod not availible on curseforge"
+            )
         })?;
         let cf_file_id = cf
             .cf_file_id
@@ -890,7 +899,9 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
         let mr_project_id = mr.mr_project_id.ok_or_else(|| {
-            anyhow!("Attempted to use update_modrinth_mod to update a mod not availible on modrinth")
+            anyhow!(
+                "Attempted to use update_modrinth_mod to update a mod not availible on modrinth"
+            )
         })?;
         let mr_version_id = mr
             .mr_version_id

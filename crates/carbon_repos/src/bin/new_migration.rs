@@ -23,10 +23,10 @@
 
 use carbon_repos::compat::MigrationKind;
 use carbon_repos::downgen::{
-    analyze_up, full_schema_dump, generate_down, insert_migration_entry, verify_round_trip,
-    GenError,
+    GenError, analyze_up, full_schema_dump, generate_down, insert_migration_entry,
+    verify_round_trip,
 };
-use carbon_repos::manifest::{derive_kind, seeded_lost_fields, DataDown};
+use carbon_repos::manifest::{DataDown, derive_kind, seeded_lost_fields};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -79,7 +79,11 @@ fn run(migrations_root: &Path, name: &str, dml_reviewed: bool) -> std::io::Resul
     // A directory whose name ends in `_<name>` is this migration's home.
     let existing = dirs
         .iter()
-        .find(|d| dir_name(d).map(|n| n.ends_with(&format!("_{name}"))).unwrap_or(false))
+        .find(|d| {
+            dir_name(d)
+                .map(|n| n.ends_with(&format!("_{name}")))
+                .unwrap_or(false)
+        })
         .cloned();
 
     let Some(dir) = existing else {
@@ -223,7 +227,9 @@ fn generate_or_verify(
 fn regenerate_baseline(prev: &[&str], up: &str) -> std::io::Result<()> {
     let baseline_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(BASELINE_PATH);
     let dump = full_schema_dump(prev, up).map_err(|e| {
-        std::io::Error::other(format!("failed to build schema for baseline regeneration: {e}"))
+        std::io::Error::other(format!(
+            "failed to build schema for baseline regeneration: {e}"
+        ))
     })?;
     std::fs::write(&baseline_path, dump)?;
     println!("Regenerated {}", baseline_path.display());
@@ -269,7 +275,9 @@ fn build_list_entry(dir_name: &str, prev: &[&str], up: &str, down: &str) -> Stri
         "            down_sql: Some(include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/prisma/migrations/{dir_name}/down.sql\"))),\n"
     ));
     out.push_str(&format!("            kind: {kind_expr},{kind_note}\n"));
-    out.push_str(&format!("            data_down: \"{data_down}\",{data_note}\n"));
+    out.push_str(&format!(
+        "            data_down: \"{data_down}\",{data_note}\n"
+    ));
     out.push_str("        },\n");
     out
 }
@@ -306,7 +314,10 @@ fn apply_list_entry(
                 );
             } else {
                 std::fs::write(lib_path, &updated)?;
-                println!("\nInserted into get_migrations() in {}:\n", lib_path.display());
+                println!(
+                    "\nInserted into get_migrations() in {}:\n",
+                    lib_path.display()
+                );
             }
             print!("{entry}");
             Ok(ExitCode::SUCCESS)
@@ -411,7 +422,10 @@ mod tests {
         assert_eq!(code, ExitCode::SUCCESS);
         let twice = std::fs::read_to_string(&lib_path).unwrap();
 
-        assert_eq!(once, twice, "rerunning for the same migration must not duplicate the entry");
+        assert_eq!(
+            once, twice,
+            "rerunning for the same migration must not duplicate the entry"
+        );
     }
 
     #[test]
@@ -425,7 +439,11 @@ mod tests {
         std::fs::write(&lib_path, &no_anchor).unwrap();
 
         let code = apply_list_entry(&lib_path, "20260501000000_add_widget", &[], UP, DOWN).unwrap();
-        assert_eq!(code, ExitCode::FAILURE, "a missing anchor must fail loudly, not silently skip");
+        assert_eq!(
+            code,
+            ExitCode::FAILURE,
+            "a missing anchor must fail loudly, not silently skip"
+        );
         // The file is left untouched — no partial/corrupt write.
         assert_eq!(std::fs::read_to_string(&lib_path).unwrap(), no_anchor);
     }

@@ -65,22 +65,44 @@ async fn delete_instance_with_mods_cascades_and_manual_cleanup_is_idempotent() {
         .await
         .unwrap() as i32;
     seed_metadata(&db, "meta1").await;
-    mfc::upsert_mod_file_cache(&db, iid, "a.jar".into(), 1, true, "mods".into(), "meta1".into(), now())
-        .await
-        .unwrap();
+    mfc::upsert_mod_file_cache(
+        &db,
+        iid,
+        "a.jar".into(),
+        1,
+        true,
+        "mods".into(),
+        "meta1".into(),
+        now(),
+    )
+    .await
+    .unwrap();
     assert_eq!(count(&db, "SELECT COUNT(*) FROM ModFileCache").await, 1);
 
     // Deleting the instance cascades its ModFileCache rows (instanceId edge is
     // ON DELETE CASCADE); the RESTRICT metadataId edge is never the delete
     // target so it does not fire.
     inst::delete_instance(&db, iid).await.unwrap();
-    assert_eq!(count(&db, "SELECT COUNT(*) FROM ModFileCache").await, 0, "cascade must clear cache");
-    assert_eq!(count(&db, "SELECT COUNT(*) FROM ModMetadata").await, 1, "metadata survives (RESTRICT)");
+    assert_eq!(
+        count(&db, "SELECT COUNT(*) FROM ModFileCache").await,
+        0,
+        "cascade must clear cache"
+    );
+    assert_eq!(
+        count(&db, "SELECT COUNT(*) FROM ModMetadata").await,
+        1,
+        "metadata survives (RESTRICT)"
+    );
 
     // The manual cleanup managers still run is now a no-op — and must not error
     // under FK enforcement.
-    let removed = mfc::delete_mod_file_cache_by_instance(&db, iid).await.unwrap();
-    assert_eq!(removed, 0, "manual cleanup after cascade is an idempotent no-op");
+    let removed = mfc::delete_mod_file_cache_by_instance(&db, iid)
+        .await
+        .unwrap();
+    assert_eq!(
+        removed, 0,
+        "manual cleanup after cascade is an idempotent no-op"
+    );
 
     // Orphaned metadata is then reclaimable without tripping RESTRICT.
     let gced = meta::gc_orphan_metadata(&db).await.unwrap();
@@ -115,13 +137,26 @@ async fn gc_orphan_metadata_keeps_referenced_rows_under_fk_on() {
     // no error is raised.
     let gced = meta::gc_orphan_metadata(&db).await.unwrap();
     assert_eq!(gced, 1, "only the unreferenced metadata is collected");
-    assert_eq!(count(&db, "SELECT COUNT(*) FROM ModMetadata WHERE id = 'referenced'").await, 1);
-    assert_eq!(count(&db, "SELECT COUNT(*) FROM ModMetadata WHERE id = 'orphan'").await, 0);
+    assert_eq!(
+        count(
+            &db,
+            "SELECT COUNT(*) FROM ModMetadata WHERE id = 'referenced'"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(&db, "SELECT COUNT(*) FROM ModMetadata WHERE id = 'orphan'").await,
+        0
+    );
 
     // Sanity: directly deleting a still-referenced metadata DOES trip RESTRICT,
     // confirming enforcement is actually on for this connection.
     let err = db
         .write(|conn| Ok(conn.execute("DELETE FROM ModMetadata WHERE id = 'referenced'", [])?))
         .await;
-    assert!(err.is_err(), "RESTRICT edge must reject deleting a referenced parent");
+    assert!(
+        err.is_err(),
+        "RESTRICT edge must reject deleting a referenced parent"
+    );
 }

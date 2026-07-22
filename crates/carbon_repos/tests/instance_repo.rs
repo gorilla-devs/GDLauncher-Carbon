@@ -21,7 +21,9 @@ async fn migrated_db() -> (tempfile::TempDir, Db) {
 
 /// Seed a group and return its id.
 async fn seed_group(db: &Db, name: &str, group_index: i32) -> i32 {
-    i::insert_group(db, name.to_owned(), group_index, None).await.unwrap() as i32
+    i::insert_group(db, name.to_owned(), group_index, None)
+        .await
+        .unwrap() as i32
 }
 
 async fn seed_instance(
@@ -32,9 +34,16 @@ async fn seed_instance(
     group_id: i32,
     lib_pos: Option<i32>,
 ) -> i32 {
-    i::add_instance_tx(db, name.to_owned(), shortpath.to_owned(), index, group_id, lib_pos)
-        .await
-        .unwrap() as i32
+    i::add_instance_tx(
+        db,
+        name.to_owned(),
+        shortpath.to_owned(),
+        index,
+        group_id,
+        lib_pos,
+    )
+    .await
+    .unwrap() as i32
 }
 
 async fn idx_of(db: &Db, id: i32) -> i32 {
@@ -76,7 +85,10 @@ async fn add_instance_tx_replaces_same_shortpath() {
     assert_ne!(first, second);
     // only the second row survives at that shortpath
     assert!(i::get_instance(&db, first).await.unwrap().is_none());
-    let row = i::get_instance_by_shortpath(&db, "dup").await.unwrap().unwrap();
+    let row = i::get_instance_by_shortpath(&db, "dup")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(row.id, second);
     assert_eq!(row.name, "b");
 }
@@ -105,7 +117,13 @@ async fn shift_library_positions_down_exact_layout() {
 
     let mut pos = Vec::new();
     for &id in &ids {
-        pos.push(i::get_instance(&db, id).await.unwrap().unwrap().library_position);
+        pos.push(
+            i::get_instance(&db, id)
+                .await
+                .unwrap()
+                .unwrap()
+                .library_position,
+        );
     }
     assert_eq!(pos[0], Some(0));
     assert_eq!(pos[1], Some(1)); // unchanged (not > 1)
@@ -176,9 +194,18 @@ async fn move_all_instances_to_group_preserves_relative_order() {
     .unwrap();
 
     // src is empty, dst holds all five with the moved ones after the originals
-    assert!(i::get_instances_by_group(&db, src).await.unwrap().is_empty());
+    assert!(
+        i::get_instances_by_group(&db, src)
+            .await
+            .unwrap()
+            .is_empty()
+    );
     let layout = indexes_in_group(&db, dst).await;
-    let moved: Vec<(i32, i32)> = layout.iter().filter(|(id, _)| s.contains(id)).copied().collect();
+    let moved: Vec<(i32, i32)> = layout
+        .iter()
+        .filter(|(id, _)| s.contains(id))
+        .copied()
+        .collect();
     assert_eq!(moved, vec![(s[0], 2), (s[1], 3), (s[2], 4)]);
 }
 
@@ -206,7 +233,9 @@ async fn delete_group_tx_moves_then_deletes() {
 async fn create_default_group_tx_points_config_at_new_group() {
     let (_d, db) = migrated_db().await;
     // AppConfiguration singleton must exist for the UPDATE to hit a row
-    ac::insert_app_configuration(&db, "stable".into(), 2048, None).await.unwrap();
+    ac::insert_app_configuration(&db, "stable".into(), 2048, None)
+        .await
+        .unwrap();
 
     let gid = i::create_default_group_tx(&db, 0).await.unwrap();
     let group = i::get_group(&db, gid).await.unwrap().unwrap();
@@ -242,10 +271,15 @@ async fn move_instance_tx_runs_shifts_then_final_update() {
         gt: 0,
         lt: 2,
     }];
-    i::move_instance_tx(&db, shifts, ids[0], g, 1, None).await.unwrap();
+    i::move_instance_tx(&db, shifts, ids[0], g, 1, None)
+        .await
+        .unwrap();
 
     assert_eq!(idx_of(&db, ids[1]).await, 0); // was 1 -> 0
     assert_eq!(idx_of(&db, ids[0]).await, 1); // moved to target - 1
     assert_eq!(idx_of(&db, ids[2]).await, 2); // unchanged
-    assert_eq!(indexes_in_group(&db, g).await, vec![(ids[1], 0), (ids[0], 1), (ids[2], 2)]);
+    assert_eq!(
+        indexes_in_group(&db, g).await,
+        vec![(ids[1], 0), (ids[0], 1), (ids[2], 2)]
+    );
 }

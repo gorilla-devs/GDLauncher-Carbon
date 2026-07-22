@@ -73,11 +73,13 @@ fn table_data_dump(conn: &Connection) -> Vec<(String, Vec<String>)> {
     names
         .into_iter()
         .map(|name| {
-            let mut stmt =
-                conn.prepare(&format!("SELECT * FROM \"{name}\" ORDER BY rowid")).unwrap();
+            let mut stmt = conn
+                .prepare(&format!("SELECT * FROM \"{name}\" ORDER BY rowid"))
+                .unwrap();
             let col_count = stmt.column_count();
-            let col_names: Vec<String> =
-                (0..col_count).map(|i| stmt.column_name(i).unwrap().to_string()).collect();
+            let col_names: Vec<String> = (0..col_count)
+                .map(|i| stmt.column_name(i).unwrap().to_string())
+                .collect();
             let rows = stmt
                 .query_map([], |row| {
                     let cells: Vec<String> = (0..col_count)
@@ -114,13 +116,19 @@ fn baseline_path_equals_chain_path() {
     let verdict = set.open(&mut baseline_conn, &baseline_path).unwrap();
     let baseline_elapsed = baseline_started.elapsed();
 
-    assert_eq!(verdict, OpenVerdict::Proceed, "a fresh install must proceed, not refuse");
+    assert_eq!(
+        verdict,
+        OpenVerdict::Proceed,
+        "a fresh install must proceed, not refuse"
+    );
 
     // user_version: both land at the binary's full migration count.
-    let chain_uv: i32 =
-        chain_conn.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
-    let baseline_uv: i32 =
-        baseline_conn.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
+    let chain_uv: i32 = chain_conn
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .unwrap();
+    let baseline_uv: i32 = baseline_conn
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .unwrap();
     assert_eq!(chain_uv, count);
     assert_eq!(baseline_uv, count);
 
@@ -154,7 +162,11 @@ fn baseline_path_equals_chain_path() {
     );
     for (table, rows) in &chain_data {
         if table == "ServerGroup" {
-            assert_eq!(rows.len(), 1, "ServerGroup must hold the one documented default seed row");
+            assert_eq!(
+                rows.len(),
+                1,
+                "ServerGroup must hold the one documented default seed row"
+            );
         } else {
             assert!(rows.is_empty(), "{table} must be empty on a fresh install");
         }
@@ -183,7 +195,9 @@ fn reopening_a_baselined_db_is_a_pure_no_op() {
 
     let mut conn = Connection::open(&path).unwrap();
     assert_eq!(set.open(&mut conn, &path).unwrap(), OpenVerdict::Proceed);
-    let uv: i32 = conn.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
+    let uv: i32 = conn
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .unwrap();
     assert_eq!(uv, count);
     assert_eq!(migration_rows(&conn).len(), count as usize);
 }
@@ -212,7 +226,11 @@ fn a_stale_baseline_dump_is_caught_by_the_equivalence_check() {
         .filter(|line| line.splitn(4, '|').nth(2) != Some("Java"))
         .map(|line| format!("{line}\n"))
         .collect();
-    assert_ne!(stale_dump.lines().count(), real_dump.lines().count(), "must actually drop a line");
+    assert_ne!(
+        stale_dump.lines().count(),
+        real_dump.lines().count(),
+        "must actually drop a line"
+    );
 
     let stale_conn = Connection::open_in_memory().unwrap();
     let statements = executable_statements(&stale_dump);

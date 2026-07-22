@@ -177,8 +177,7 @@ const INSERT_SERVER_SQL: &str =
          VALUES (:name, :shortpath, :index, :group_id, :game_version, :port, :server_type, :modloader_type, :modloader_version, :modpack_platform, :modpack_project_id, :modpack_file_id, :library_position, :date_created, NULL)";
 
 /// `INSERT` shared by `insert_server_group` and its `QueryCheck`.
-const INSERT_SERVER_GROUP_SQL: &str =
-    "INSERT INTO ServerGroup (name, groupIndex, libraryPosition)
+const INSERT_SERVER_GROUP_SQL: &str = "INSERT INTO ServerGroup (name, groupIndex, libraryPosition)
          VALUES (:name, :group_index, :library_position)";
 
 /// One index shift to run inside `move_server_tx`, mapping to a registered
@@ -453,8 +452,16 @@ impl ServerPatch {
         push!(self.name, "name = :name", ":name");
         push!(self.xmx, "xmx = :xmx", ":xmx");
         push!(self.xms, "xms = :xms", ":xms");
-        push!(self.extra_java_args, "extraJavaArgs = :extraJavaArgs", ":extraJavaArgs");
-        push!(self.auto_restart, "autoRestart = :autoRestart", ":autoRestart");
+        push!(
+            self.extra_java_args,
+            "extraJavaArgs = :extraJavaArgs",
+            ":extraJavaArgs"
+        );
+        push!(
+            self.auto_restart,
+            "autoRestart = :autoRestart",
+            ":autoRestart"
+        );
         push!(self.port, "port = :port", ":port");
         push!(self.motd, "motd = :motd", ":motd");
         push!(self.max_players, "maxPlayers = :maxPlayers", ":maxPlayers");
@@ -474,9 +481,20 @@ const INSERT_SERVER_CHECK: QueryCheck = QueryCheck {
     name: "insert_server",
     sql: INSERT_SERVER_SQL,
     params: &[
-        ":name", ":shortpath", ":index", ":group_id", ":game_version", ":port", ":server_type",
-        ":modloader_type", ":modloader_version", ":modpack_platform", ":modpack_project_id",
-        ":modpack_file_id", ":library_position", ":date_created",
+        ":name",
+        ":shortpath",
+        ":index",
+        ":group_id",
+        ":game_version",
+        ":port",
+        ":server_type",
+        ":modloader_type",
+        ":modloader_version",
+        ":modpack_platform",
+        ":modpack_project_id",
+        ":modpack_file_id",
+        ":library_position",
+        ":date_created",
     ],
     columns: None,
     class: crate::registry::class_of(INSERT_SERVER_SQL),

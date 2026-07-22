@@ -1442,7 +1442,8 @@ mod tests {
 
     #[test]
     fn typed_upload_timeout_body_maps_to_upload_timeout() {
-        let body = r#"{"error":{"code":"UPLOAD_TIMEOUT","message":"Upload did not complete in time"}}"#;
+        let body =
+            r#"{"error":{"code":"UPLOAD_TIMEOUT","message":"Upload did not complete in time"}}"#;
         let err = InstanceShareError::from_response(StatusCode::REQUEST_TIMEOUT, body);
         assert!(
             matches!(err, InstanceShareError::UploadTimeout),

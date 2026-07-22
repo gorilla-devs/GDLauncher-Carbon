@@ -3,11 +3,10 @@
 //! table name (an identifier cannot be a bound `:param`, so this is exempt
 //! from the static checker per registry.rs's `DynamicQuery` doc comment).
 
+use carbon_repos::db_exec::test_support::{rg, wg};
 use carbon_repos::db_exec::{ReadGuard, WriteGuard};
 use carbon_repos::registry::DynamicQuery;
 use rusqlite::Connection;
-use carbon_repos::db_exec::test_support::{rg, wg};
-
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();

@@ -150,8 +150,7 @@ const INSERT_INSTANCE_SQL: &str =
          VALUES (:name, :shortpath, :index, :group_id, :library_position)";
 
 /// `INSERT` shared by `insert_group`/`create_default_group_tx` and its `QueryCheck`.
-const INSERT_GROUP_SQL: &str =
-    "INSERT INTO InstanceGroup (name, groupIndex, libraryPosition)
+const INSERT_GROUP_SQL: &str = "INSERT INTO InstanceGroup (name, groupIndex, libraryPosition)
          VALUES (:name, :group_index, :library_position)";
 
 /// Point-writes the default instance group into the singleton config row, run
@@ -211,8 +210,15 @@ pub async fn insert_group(
     group_index: i32,
     library_position: Option<i32>,
 ) -> DbResult<i64> {
-    db.write(move |conn| Ok(insert_group_conn(&conn, &name, group_index, library_position)?))
-        .await
+    db.write(move |conn| {
+        Ok(insert_group_conn(
+            &conn,
+            &name,
+            group_index,
+            library_position,
+        )?)
+    })
+    .await
 }
 
 /// Runs the conditional index shifts and the moved instance's final placement
@@ -374,7 +380,13 @@ pub async fn create_default_group_tx(db: &Db, group_index: i32) -> DbResult<i32>
 const INSERT_INSTANCE_CHECK: QueryCheck = QueryCheck {
     name: "add_instance_tx::insert_instance",
     sql: INSERT_INSTANCE_SQL,
-    params: &[":name", ":shortpath", ":index", ":group_id", ":library_position"],
+    params: &[
+        ":name",
+        ":shortpath",
+        ":index",
+        ":group_id",
+        ":library_position",
+    ],
     columns: None,
     class: crate::registry::class_of(INSERT_INSTANCE_SQL),
 };

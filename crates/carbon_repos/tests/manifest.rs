@@ -12,7 +12,7 @@
 use carbon_repos::compat::MigrationKind;
 use carbon_repos::downgen::generate_down;
 use carbon_repos::manifest::{
-    derive_kind, seeded_lost_fields, verify_data_down, verify_kind, DataDown, VerifyError,
+    DataDown, VerifyError, derive_kind, seeded_lost_fields, verify_data_down, verify_kind,
 };
 use std::collections::BTreeSet;
 
@@ -30,7 +30,11 @@ fn fields(items: &[&str]) -> BTreeSet<String> {
 
 #[test]
 fn new_table_is_additive() {
-    let kind = derive_kind(&[BASE], "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, v TEXT);").unwrap();
+    let kind = derive_kind(
+        &[BASE],
+        "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, v TEXT);",
+    )
+    .unwrap();
     assert_eq!(kind, MigrationKind::Additive);
 }
 
@@ -57,9 +61,11 @@ fn new_table_with_a_unique_index_is_additive() {
 
 #[test]
 fn not_null_column_on_existing_table_is_breaking() {
-    let kind =
-        derive_kind(&[BASE], "ALTER TABLE \"A\" ADD COLUMN flag INTEGER NOT NULL DEFAULT 0;")
-            .unwrap();
+    let kind = derive_kind(
+        &[BASE],
+        "ALTER TABLE \"A\" ADD COLUMN flag INTEGER NOT NULL DEFAULT 0;",
+    )
+    .unwrap();
     assert_eq!(kind, MigrationKind::Breaking);
 }
 
@@ -67,7 +73,11 @@ fn not_null_column_on_existing_table_is_breaking() {
 fn unique_index_on_existing_column_is_breaking() {
     // The canonical spec example: an addition that diffs as additive but can
     // reject an old binary's duplicate write.
-    let kind = derive_kind(&[BASE], "CREATE UNIQUE INDEX \"idx_a_name\" ON \"A\" (name);").unwrap();
+    let kind = derive_kind(
+        &[BASE],
+        "CREATE UNIQUE INDEX \"idx_a_name\" ON \"A\" (name);",
+    )
+    .unwrap();
     assert_eq!(kind, MigrationKind::Breaking);
 }
 
@@ -126,8 +136,12 @@ fn dropped_index_is_breaking() {
 
 #[test]
 fn verify_kind_accepts_matching_declaration() {
-    verify_kind(&[BASE], "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY);", MigrationKind::Additive)
-        .unwrap();
+    verify_kind(
+        &[BASE],
+        "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY);",
+        MigrationKind::Additive,
+    )
+    .unwrap();
     verify_kind(&[BASE], "DROP TABLE \"B\";", MigrationKind::Breaking).unwrap();
 }
 
@@ -216,7 +230,10 @@ fn dml_transform_without_inverse_is_lossy() {
     let up = "UPDATE \"A\" SET note = 'overwritten';";
     let down = ""; // no inverse DML
     let lost = seeded_lost_fields(&[BASE], up, down).unwrap();
-    assert!(lost.contains("A.note"), "note overwrite must be detected: {lost:?}");
+    assert!(
+        lost.contains("A.note"),
+        "note overwrite must be detected: {lost:?}"
+    );
     assert!(verify_data_down(&[BASE], up, down, "full").is_err());
 }
 
@@ -230,7 +247,10 @@ fn dml_transform_with_inverse_down_round_trips_losslessly() {
     let up = "UPDATE \"N\" SET v = v || '<<';";
     let down = "UPDATE \"N\" SET v = substr(v, 1, length(v) - 2);";
     let lost = seeded_lost_fields(&[prev], up, down).unwrap();
-    assert!(lost.is_empty(), "reversible transform must lose nothing: {lost:?}");
+    assert!(
+        lost.is_empty(),
+        "reversible transform must lose nothing: {lost:?}"
+    );
     verify_data_down(&[prev], up, down, "full").unwrap();
 }
 
@@ -246,7 +266,11 @@ fn dropped_integer_and_blob_columns_are_both_detected_lost() {
               ALTER TABLE \"T_new\" RENAME TO \"T\";";
     let down = generate_down(&[prev], up).unwrap();
     let lost = seeded_lost_fields(&[prev], up, &down).unwrap();
-    assert_eq!(lost, fields(&["T.b", "T.n"]), "both non-id columns are lost: {lost:?}");
+    assert_eq!(
+        lost,
+        fields(&["T.b", "T.n"]),
+        "both non-id columns are lost: {lost:?}"
+    );
 }
 
 // ------------------------------------------------------------------------
@@ -276,7 +300,10 @@ fn planted_undeclared_lossy_drop_fails() {
     let err = verify_data_down(&[BASE], up, &down, "full").unwrap_err();
     match err {
         VerifyError::DataDownMismatch { missing, .. } => {
-            assert!(missing.contains("A.note"), "undeclared lost field must be reported: {missing:?}");
+            assert!(
+                missing.contains("A.note"),
+                "undeclared lost field must be reported: {missing:?}"
+            );
         }
         other => panic!("expected DataDownMismatch, got {other}"),
     }
@@ -292,7 +319,10 @@ fn planted_stale_partial_declaration_fails() {
     let err = verify_data_down(&[BASE], up, &down, "partial:A.name").unwrap_err();
     match err {
         VerifyError::DataDownMismatch { stale, .. } => {
-            assert!(stale.contains("A.name"), "stale declared field must be reported: {stale:?}");
+            assert!(
+                stale.contains("A.name"),
+                "stale declared field must be reported: {stale:?}"
+            );
         }
         other => panic!("expected DataDownMismatch, got {other}"),
     }
@@ -311,14 +341,21 @@ fn seeds_and_round_trips_the_real_schema_losslessly_under_a_noop() {
     let (set, _n) = carbon_repos::get_migrations();
     let prev: Vec<&str> = set.migrations.iter().map(|d| d.up_sql).collect();
     let lost = seeded_lost_fields(&prev, "", "").unwrap();
-    assert!(lost.is_empty(), "a no-op over the real schema must lose nothing: {lost:?}");
+    assert!(
+        lost.is_empty(),
+        "a no-op over the real schema must lose nothing: {lost:?}"
+    );
 }
 
 #[test]
 fn derives_additive_for_a_nullable_add_on_the_real_schema() {
     let (set, _n) = carbon_repos::get_migrations();
     let prev: Vec<&str> = set.migrations.iter().map(|d| d.up_sql).collect();
-    let kind = derive_kind(&prev, "ALTER TABLE \"Server\" ADD COLUMN experimentalFlag TEXT;").unwrap();
+    let kind = derive_kind(
+        &prev,
+        "ALTER TABLE \"Server\" ADD COLUMN experimentalFlag TEXT;",
+    )
+    .unwrap();
     assert_eq!(kind, MigrationKind::Additive);
 }
 

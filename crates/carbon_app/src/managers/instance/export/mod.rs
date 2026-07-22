@@ -100,8 +100,7 @@ async fn build_shared_mods_from_cache(
 ) -> Vec<SharedMod> {
     // Query ModFileCache for all mods in this instance with their platform metadata
     let instance_id_val = *instance_id;
-    let cached_files = mfcdb::get_instance_export_mods(&app.db, instance_id_val)
-        .await;
+    let cached_files = mfcdb::get_instance_export_mods(&app.db, instance_id_val).await;
 
     let Ok(cached_files) = cached_files else {
         tracing::warn!("Failed to query ModFileCache for instance {}", *instance_id);
@@ -158,9 +157,7 @@ async fn enrich_share_metadata(
         // then collapsed into the same `projectId -> row` map as before.
         let mut cf_cache_results: anyhow::Result<Vec<metarepo::CfExportEnrichRow>> = Ok(Vec::new());
         for project_id in cf_project_ids {
-            match metarepo::get_cf_export_enrich_by_project(&app.db, project_id)
-                .await
-            {
+            match metarepo::get_cf_export_enrich_by_project(&app.db, project_id).await {
                 Ok(rows) => {
                     if let Ok(acc) = &mut cf_cache_results {
                         acc.extend(rows);
@@ -212,9 +209,7 @@ async fn enrich_share_metadata(
     if !mr_project_ids.is_empty() {
         let mut mr_cache_results: anyhow::Result<Vec<metarepo::MrExportEnrichRow>> = Ok(Vec::new());
         for project_id in mr_project_ids {
-            match metarepo::get_mr_export_enrich_by_project(&app.db, &project_id)
-                .await
-            {
+            match metarepo::get_mr_export_enrich_by_project(&app.db, &project_id).await {
                 Ok(rows) => {
                     if let Ok(acc) = &mut mr_cache_results {
                         acc.extend(rows);

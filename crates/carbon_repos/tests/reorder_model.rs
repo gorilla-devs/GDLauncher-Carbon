@@ -11,7 +11,7 @@
 //! carries `(seed, step, op)`.
 
 use carbon_repos::db_exec::Db;
-use carbon_repos::dbtypes::{from_millis, DbDateTime};
+use carbon_repos::dbtypes::{DbDateTime, from_millis};
 use carbon_repos::repos::instance as inst;
 use carbon_repos::repos::server as srv;
 use rusqlite::Connection;
@@ -183,7 +183,11 @@ async fn instance_reordering_matches_model() {
                 grps[rng.below(grps.len() as u64) as usize].id
             };
             // Occasionally target a group id that does not exist.
-            let scope_group = if rng.below(10) == 0 { 999_999 } else { some_group };
+            let scope_group = if rng.below(10) == 0 {
+                999_999
+            } else {
+                some_group
+            };
             let some_inst_id = if insts.is_empty() {
                 999_999
             } else if rng.below(10) == 0 {
@@ -197,9 +201,20 @@ async fn instance_reordering_matches_model() {
                 0 => {
                     let name = format!("g{}", rng.below(5));
                     let gidx = rng.int(0, 6);
-                    let lib = if rng.flag() { Some(rng.int(0, glib_hi)) } else { None };
-                    let id = inst::insert_group(&db, name.clone(), gidx, lib).await.unwrap() as i32;
-                    grps.push(MGrp { id, name, gidx, lib });
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, glib_hi))
+                    } else {
+                        None
+                    };
+                    let id = inst::insert_group(&db, name.clone(), gidx, lib)
+                        .await
+                        .unwrap() as i32;
+                    grps.push(MGrp {
+                        id,
+                        name,
+                        gidx,
+                        lib,
+                    });
                 }
                 1 => {
                     let name = format!("n{}", rng.below(1000));
@@ -208,10 +223,21 @@ async fn instance_reordering_matches_model() {
                     // multi-row cases.
                     let sp = format!("sp{}", rng.below(6));
                     let index = rng.int(0, idx_hi);
-                    let lib = if rng.flag() { Some(rng.int(0, lib_hi)) } else { None };
-                    let id = inst::add_instance_tx(&db, name.clone(), sp.clone(), index, some_group, lib)
-                        .await
-                        .unwrap() as i32;
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, lib_hi))
+                    } else {
+                        None
+                    };
+                    let id = inst::add_instance_tx(
+                        &db,
+                        name.clone(),
+                        sp.clone(),
+                        index,
+                        some_group,
+                        lib,
+                    )
+                    .await
+                    .unwrap() as i32;
                     insts.retain(|r| r.shortpath != sp);
                     insts.push(MInst {
                         id,
@@ -229,7 +255,9 @@ async fn instance_reordering_matches_model() {
                 2 => {
                     let gt = rng.int(-1, lib_hi);
                     let lte = rng.int(-1, lib_hi);
-                    let n = inst::shift_instance_library_positions_down(&db, gt, lte).await.unwrap();
+                    let n = inst::shift_instance_library_positions_down(&db, gt, lte)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in insts.iter_mut() {
                         if let Some(p) = r.lib {
@@ -244,7 +272,9 @@ async fn instance_reordering_matches_model() {
                 3 => {
                     let gte = rng.int(-1, lib_hi);
                     let lt = rng.int(-1, lib_hi);
-                    let n = inst::shift_instance_library_positions_up(&db, gte, lt).await.unwrap();
+                    let n = inst::shift_instance_library_positions_up(&db, gte, lt)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in insts.iter_mut() {
                         if let Some(p) = r.lib {
@@ -258,7 +288,9 @@ async fn instance_reordering_matches_model() {
                 }
                 4 => {
                     let gte = rng.int(-1, lib_hi);
-                    let n = inst::shift_all_instance_library_positions_up(&db, gte).await.unwrap();
+                    let n = inst::shift_all_instance_library_positions_up(&db, gte)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in insts.iter_mut() {
                         if let Some(p) = r.lib {
@@ -272,9 +304,10 @@ async fn instance_reordering_matches_model() {
                 }
                 5 => {
                     let gt = rng.int(-1, lib_hi);
-                    let n = inst::shift_instance_library_positions_down_in_group(&db, scope_group, gt)
-                        .await
-                        .unwrap();
+                    let n =
+                        inst::shift_instance_library_positions_down_in_group(&db, scope_group, gt)
+                            .await
+                            .unwrap();
                     let mut want = 0;
                     for r in insts.iter_mut() {
                         if r.group == scope_group {
@@ -345,7 +378,9 @@ async fn instance_reordering_matches_model() {
                 }
                 9 => {
                     let gt = rng.int(-1, idx_hi);
-                    let n = inst::shift_instance_indexes_down_after(&db, scope_group, gt).await.unwrap();
+                    let n = inst::shift_instance_indexes_down_after(&db, scope_group, gt)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in insts.iter_mut() {
                         if r.group == scope_group && r.index > gt {
@@ -357,7 +392,9 @@ async fn instance_reordering_matches_model() {
                 }
                 10 => {
                     let gte = rng.int(-1, idx_hi);
-                    let n = inst::shift_instance_indexes_up_from(&db, scope_group, gte).await.unwrap();
+                    let n = inst::shift_instance_indexes_up_from(&db, scope_group, gte)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in insts.iter_mut() {
                         if r.group == scope_group && r.index >= gte {
@@ -372,7 +409,9 @@ async fn instance_reordering_matches_model() {
                 11 => {
                     let gt = rng.int(-1, glib_hi);
                     let lte = rng.int(-1, glib_hi);
-                    let n = inst::shift_group_library_positions_down(&db, gt, lte).await.unwrap();
+                    let n = inst::shift_group_library_positions_down(&db, gt, lte)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if let Some(p) = g.lib {
@@ -387,7 +426,9 @@ async fn instance_reordering_matches_model() {
                 12 => {
                     let gte = rng.int(-1, glib_hi);
                     let lt = rng.int(-1, glib_hi);
-                    let n = inst::shift_group_library_positions_up(&db, gte, lt).await.unwrap();
+                    let n = inst::shift_group_library_positions_up(&db, gte, lt)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if let Some(p) = g.lib {
@@ -401,7 +442,9 @@ async fn instance_reordering_matches_model() {
                 }
                 13 => {
                     let gte = rng.int(-1, glib_hi);
-                    let n = inst::shift_all_group_library_positions_up_from(&db, gte).await.unwrap();
+                    let n = inst::shift_all_group_library_positions_up_from(&db, gte)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if let Some(p) = g.lib {
@@ -415,7 +458,9 @@ async fn instance_reordering_matches_model() {
                 }
                 14 => {
                     let gt = rng.int(-1, glib_hi);
-                    let n = inst::shift_all_group_library_positions_down_after(&db, gt).await.unwrap();
+                    let n = inst::shift_all_group_library_positions_down_after(&db, gt)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if let Some(p) = g.lib {
@@ -431,7 +476,9 @@ async fn instance_reordering_matches_model() {
                 // ---- single-row updates ----
                 15 => {
                     let fav = rng.flag();
-                    let n = inst::set_instance_favorite(&db, some_inst_id, fav).await.unwrap();
+                    let n = inst::set_instance_favorite(&db, some_inst_id, fav)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in insts.iter_mut() {
                         if r.id == some_inst_id {
@@ -461,10 +508,19 @@ async fn instance_reordering_matches_model() {
                 }
                 17 => {
                     let index = rng.int(0, idx_hi);
-                    let lib = if rng.flag() { Some(rng.int(0, lib_hi)) } else { None };
-                    let n = inst::set_instance_index_and_library_position(&db, some_inst_id, index, lib)
-                        .await
-                        .unwrap();
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, lib_hi))
+                    } else {
+                        None
+                    };
+                    let n = inst::set_instance_index_and_library_position(
+                        &db,
+                        some_inst_id,
+                        index,
+                        lib,
+                    )
+                    .await
+                    .unwrap();
                     let mut want = 0;
                     for r in insts.iter_mut() {
                         if r.id == some_inst_id {
@@ -478,7 +534,11 @@ async fn instance_reordering_matches_model() {
                 18 => {
                     // FK: the target group must exist, like the managers guarantee.
                     let index = rng.int(0, idx_hi);
-                    let lib = if rng.flag() { Some(rng.int(0, lib_hi)) } else { None };
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, lib_hi))
+                    } else {
+                        None
+                    };
                     let n = inst::set_instance_group_index_library_position(
                         &db,
                         some_inst_id,
@@ -524,8 +584,14 @@ async fn instance_reordering_matches_model() {
                     assert_eq!(n, want, "{ctx}");
                 }
                 21 => {
-                    let lib = if rng.flag() { Some(rng.int(0, glib_hi)) } else { None };
-                    let n = inst::set_group_library_position(&db, some_group, lib).await.unwrap();
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, glib_hi))
+                    } else {
+                        None
+                    };
+                    let n = inst::set_group_library_position(&db, some_group, lib)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if g.id == some_group {
@@ -537,7 +603,11 @@ async fn instance_reordering_matches_model() {
                 }
                 22 => {
                     let gidx = rng.int(0, 8);
-                    let lib = if rng.flag() { Some(rng.int(0, glib_hi)) } else { None };
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, glib_hi))
+                    } else {
+                        None
+                    };
                     let n = inst::set_group_index_and_library_position(&db, some_group, gidx, lib)
                         .await
                         .unwrap();
@@ -589,7 +659,11 @@ async fn instance_reordering_matches_model() {
                     for g in grps.iter_mut() {
                         if rng.flag() {
                             let gidx = rng.int(0, 8);
-                            let lib = if rng.flag() { Some(rng.int(0, glib_hi)) } else { None };
+                            let lib = if rng.flag() {
+                                Some(rng.int(0, glib_hi))
+                            } else {
+                                None
+                            };
                             let set_lib = rng.flag();
                             garr.push(inst::GroupArrange {
                                 id: g.id,
@@ -607,7 +681,11 @@ async fn instance_reordering_matches_model() {
                     for r in insts.iter_mut() {
                         if rng.flag() {
                             let index = rng.int(0, idx_hi);
-                            let lib = if rng.flag() { Some(rng.int(0, lib_hi)) } else { None };
+                            let lib = if rng.flag() {
+                                Some(rng.int(0, lib_hi))
+                            } else {
+                                None
+                            };
                             iarr.push(inst::InstanceArrange {
                                 id: r.id,
                                 index,
@@ -643,9 +721,10 @@ async fn instance_reordering_matches_model() {
                     let got = inst::find_group_by_name(&db, &name).await.unwrap();
                     match got {
                         Some(row) => {
-                            let m = grps.iter().find(|g| g.id == row.id).unwrap_or_else(|| {
-                                panic!("unknown group id {} at {ctx}", row.id)
-                            });
+                            let m = grps
+                                .iter()
+                                .find(|g| g.id == row.id)
+                                .unwrap_or_else(|| panic!("unknown group id {} at {ctx}", row.id));
                             assert_eq!(m.name, name, "{ctx}");
                         }
                         None => {
@@ -654,7 +733,9 @@ async fn instance_reordering_matches_model() {
                     }
                 }
                 28 => {
-                    let got = inst::first_instance_in_group(&db, scope_group).await.unwrap();
+                    let got = inst::first_instance_in_group(&db, scope_group)
+                        .await
+                        .unwrap();
                     match got {
                         Some(row) => {
                             let m = insts.iter().find(|r| r.id == row.id).unwrap_or_else(|| {
@@ -666,19 +747,27 @@ async fn instance_reordering_matches_model() {
                             assert!(!insts.iter().any(|r| r.group == scope_group), "{ctx}");
                         }
                     }
-                    let got = inst::min_index_instance_in_group(&db, scope_group).await.unwrap();
-                    let want = insts.iter().filter(|r| r.group == scope_group).map(|r| r.index).min();
+                    let got = inst::min_index_instance_in_group(&db, scope_group)
+                        .await
+                        .unwrap();
+                    let want = insts
+                        .iter()
+                        .filter(|r| r.group == scope_group)
+                        .map(|r| r.index)
+                        .min();
                     assert_eq!(got.map(|r| r.index), want, "{ctx}");
-                    let got_min =
-                        inst::min_library_position_instance_in_group(&db, scope_group).await.unwrap();
+                    let got_min = inst::min_library_position_instance_in_group(&db, scope_group)
+                        .await
+                        .unwrap();
                     let want_min = insts
                         .iter()
                         .filter(|r| r.group == scope_group)
                         .filter_map(|r| r.lib)
                         .min();
                     assert_eq!(got_min.and_then(|r| r.library_position), want_min, "{ctx}");
-                    let got_max =
-                        inst::max_library_position_instance_in_group(&db, scope_group).await.unwrap();
+                    let got_max = inst::max_library_position_instance_in_group(&db, scope_group)
+                        .await
+                        .unwrap();
                     let want_max = insts
                         .iter()
                         .filter(|r| r.group == scope_group)
@@ -705,20 +794,26 @@ async fn instance_reordering_matches_model() {
                         rows.windows(2).all(|w| w[0].index <= w[1].index),
                         "index order violated at {ctx}"
                     );
-                    let rows = inst::get_all_groups_ordered_by_group_index(&db).await.unwrap();
+                    let rows = inst::get_all_groups_ordered_by_group_index(&db)
+                        .await
+                        .unwrap();
                     assert_eq!(rows.len(), grps.len(), "{ctx}");
                     assert!(
-                        rows.windows(2).all(|w| w[0].group_index <= w[1].group_index),
+                        rows.windows(2)
+                            .all(|w| w[0].group_index <= w[1].group_index),
                         "group index order violated at {ctx}"
                     );
-                    let rows = inst::get_groups_with_library_position_ordered(&db).await.unwrap();
+                    let rows = inst::get_groups_with_library_position_ordered(&db)
+                        .await
+                        .unwrap();
                     assert_eq!(
                         rows.len(),
                         grps.iter().filter(|g| g.lib.is_some()).count(),
                         "{ctx}"
                     );
                     assert!(
-                        rows.windows(2).all(|w| w[0].library_position <= w[1].library_position),
+                        rows.windows(2)
+                            .all(|w| w[0].library_position <= w[1].library_position),
                         "group library order violated at {ctx}"
                     );
                 }
@@ -843,7 +938,11 @@ async fn server_reordering_matches_model() {
             } else {
                 grps[rng.below(grps.len() as u64) as usize].id
             };
-            let scope_group = if rng.below(10) == 0 { 999_999 } else { some_group };
+            let scope_group = if rng.below(10) == 0 {
+                999_999
+            } else {
+                some_group
+            };
             let some_srv_id = if servers.is_empty() {
                 999_999
             } else if rng.below(10) == 0 {
@@ -857,9 +956,20 @@ async fn server_reordering_matches_model() {
                 0 => {
                     let name = format!("sg{}", rng.below(5));
                     let gidx = rng.int(0, 6);
-                    let lib = if rng.flag() { Some(rng.int(0, glib_hi)) } else { None };
-                    let id = srv::insert_server_group(&db, name.clone(), gidx, lib).await.unwrap() as i32;
-                    grps.push(MGrp { id, name, gidx, lib });
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, glib_hi))
+                    } else {
+                        None
+                    };
+                    let id = srv::insert_server_group(&db, name.clone(), gidx, lib)
+                        .await
+                        .unwrap() as i32;
+                    grps.push(MGrp {
+                        id,
+                        name,
+                        gidx,
+                        lib,
+                    });
                 }
                 1 => {
                     let name = format!("sv{}", rng.below(1000));
@@ -867,7 +977,11 @@ async fn server_reordering_matches_model() {
                     // delete-first, so shortpaths are step-unique.
                     let sp = format!("svp{seed}_{step}");
                     let index = rng.int(0, idx_hi);
-                    let lib = if rng.flag() { Some(rng.int(0, lib_hi)) } else { None };
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, lib_hi))
+                    } else {
+                        None
+                    };
                     let id = srv::insert_server(
                         &db,
                         name.clone(),
@@ -918,7 +1032,9 @@ async fn server_reordering_matches_model() {
                 3 => {
                     let gte = rng.int(-1, idx_hi);
                     let lt = rng.int(-1, idx_hi);
-                    let n = srv::shift_server_indexes_up_range(&db, scope_group, gte, lt).await.unwrap();
+                    let n = srv::shift_server_indexes_up_range(&db, scope_group, gte, lt)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in servers.iter_mut() {
                         if r.group == scope_group && r.index >= gte && r.index < lt {
@@ -930,7 +1046,9 @@ async fn server_reordering_matches_model() {
                 }
                 4 => {
                     let gt = rng.int(-1, idx_hi);
-                    let n = srv::shift_server_indexes_down_after(&db, scope_group, gt).await.unwrap();
+                    let n = srv::shift_server_indexes_down_after(&db, scope_group, gt)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in servers.iter_mut() {
                         if r.group == scope_group && r.index > gt {
@@ -942,7 +1060,9 @@ async fn server_reordering_matches_model() {
                 }
                 5 => {
                     let gte = rng.int(-1, idx_hi);
-                    let n = srv::shift_server_indexes_up_from(&db, scope_group, gte).await.unwrap();
+                    let n = srv::shift_server_indexes_up_from(&db, scope_group, gte)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in servers.iter_mut() {
                         if r.group == scope_group && r.index >= gte {
@@ -1016,9 +1136,10 @@ async fn server_reordering_matches_model() {
                 9 => {
                     let gt = rng.int(-1, lib_hi);
                     let lte = rng.int(-1, lib_hi);
-                    let n = srv::shift_server_library_positions_down_scoped(&db, scope_group, gt, lte)
-                        .await
-                        .unwrap();
+                    let n =
+                        srv::shift_server_library_positions_down_scoped(&db, scope_group, gt, lte)
+                            .await
+                            .unwrap();
                     let mut want = 0;
                     for r in servers.iter_mut() {
                         if r.group == scope_group {
@@ -1035,9 +1156,10 @@ async fn server_reordering_matches_model() {
                 10 => {
                     let gte = rng.int(-1, lib_hi);
                     let lt = rng.int(-1, lib_hi);
-                    let n = srv::shift_server_library_positions_up_scoped(&db, scope_group, gte, lt)
-                        .await
-                        .unwrap();
+                    let n =
+                        srv::shift_server_library_positions_up_scoped(&db, scope_group, gte, lt)
+                            .await
+                            .unwrap();
                     let mut want = 0;
                     for r in servers.iter_mut() {
                         if r.group == scope_group {
@@ -1056,7 +1178,9 @@ async fn server_reordering_matches_model() {
                 11 => {
                     let gt = rng.int(-1, glib_hi);
                     let lte = rng.int(-1, glib_hi);
-                    let n = srv::shift_server_group_library_positions_down(&db, gt, lte).await.unwrap();
+                    let n = srv::shift_server_group_library_positions_down(&db, gt, lte)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if let Some(p) = g.lib {
@@ -1071,7 +1195,9 @@ async fn server_reordering_matches_model() {
                 12 => {
                     let gte = rng.int(-1, glib_hi);
                     let lt = rng.int(-1, glib_hi);
-                    let n = srv::shift_server_group_library_positions_up(&db, gte, lt).await.unwrap();
+                    let n = srv::shift_server_group_library_positions_up(&db, gte, lt)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if let Some(p) = g.lib {
@@ -1119,7 +1245,9 @@ async fn server_reordering_matches_model() {
                 // ---- single-row updates ----
                 15 => {
                     let fav = rng.flag();
-                    let n = srv::set_server_favorite(&db, some_srv_id, fav).await.unwrap();
+                    let n = srv::set_server_favorite(&db, some_srv_id, fav)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in servers.iter_mut() {
                         if r.id == some_srv_id {
@@ -1130,8 +1258,14 @@ async fn server_reordering_matches_model() {
                     assert_eq!(n, want, "{ctx}");
                 }
                 16 => {
-                    let rev = if rng.flag() { Some(rng.int(0, 9)) } else { None };
-                    let n = srv::set_server_icon_revision(&db, some_srv_id, rev).await.unwrap();
+                    let rev = if rng.flag() {
+                        Some(rng.int(0, 9))
+                    } else {
+                        None
+                    };
+                    let n = srv::set_server_icon_revision(&db, some_srv_id, rev)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for r in servers.iter_mut() {
                         if r.id == some_srv_id {
@@ -1143,10 +1277,15 @@ async fn server_reordering_matches_model() {
                 }
                 17 => {
                     let index = rng.int(0, idx_hi);
-                    let lib = if rng.flag() { Some(rng.int(0, lib_hi)) } else { None };
-                    let n = srv::set_server_index_and_library_position(&db, some_srv_id, index, lib)
-                        .await
-                        .unwrap();
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, lib_hi))
+                    } else {
+                        None
+                    };
+                    let n =
+                        srv::set_server_index_and_library_position(&db, some_srv_id, index, lib)
+                            .await
+                            .unwrap();
                     let mut want = 0;
                     for r in servers.iter_mut() {
                         if r.id == some_srv_id {
@@ -1159,7 +1298,11 @@ async fn server_reordering_matches_model() {
                 }
                 18 => {
                     let index = rng.int(0, idx_hi);
-                    let lib = if rng.flag() { Some(rng.int(0, lib_hi)) } else { None };
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, lib_hi))
+                    } else {
+                        None
+                    };
                     let n = srv::set_server_group_index_library_position(
                         &db,
                         some_srv_id,
@@ -1182,7 +1325,9 @@ async fn server_reordering_matches_model() {
                 }
                 19 => {
                     let gidx = rng.int(0, 8);
-                    let n = srv::set_server_group_index(&db, some_group, gidx).await.unwrap();
+                    let n = srv::set_server_group_index(&db, some_group, gidx)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if g.id == some_group {
@@ -1194,7 +1339,9 @@ async fn server_reordering_matches_model() {
                 }
                 20 => {
                     let name = format!("sg{}", rng.below(5));
-                    let n = srv::set_server_group_name(&db, some_group, &name).await.unwrap();
+                    let n = srv::set_server_group_name(&db, some_group, &name)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if g.id == some_group {
@@ -1205,8 +1352,14 @@ async fn server_reordering_matches_model() {
                     assert_eq!(n, want, "{ctx}");
                 }
                 21 => {
-                    let lib = if rng.flag() { Some(rng.int(0, glib_hi)) } else { None };
-                    let n = srv::set_server_group_library_position(&db, some_group, lib).await.unwrap();
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, glib_hi))
+                    } else {
+                        None
+                    };
+                    let n = srv::set_server_group_library_position(&db, some_group, lib)
+                        .await
+                        .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if g.id == some_group {
@@ -1218,10 +1371,16 @@ async fn server_reordering_matches_model() {
                 }
                 22 => {
                     let gidx = rng.int(0, 8);
-                    let lib = if rng.flag() { Some(rng.int(0, glib_hi)) } else { None };
-                    let n = srv::set_server_group_index_and_library_position(&db, some_group, gidx, lib)
-                        .await
-                        .unwrap();
+                    let lib = if rng.flag() {
+                        Some(rng.int(0, glib_hi))
+                    } else {
+                        None
+                    };
+                    let n = srv::set_server_group_index_and_library_position(
+                        &db, some_group, gidx, lib,
+                    )
+                    .await
+                    .unwrap();
                     let mut want = 0;
                     for g in grps.iter_mut() {
                         if g.id == some_group {
@@ -1282,29 +1441,37 @@ async fn server_reordering_matches_model() {
                     let got = srv::first_server_in_group(&db, scope_group).await.unwrap();
                     match got {
                         Some(row) => {
-                            let m = servers.iter().find(|r| r.id == row.id).unwrap_or_else(|| {
-                                panic!("unknown server id {} at {ctx}", row.id)
-                            });
+                            let m = servers
+                                .iter()
+                                .find(|r| r.id == row.id)
+                                .unwrap_or_else(|| panic!("unknown server id {} at {ctx}", row.id));
                             assert_eq!(m.group, scope_group, "{ctx}");
                         }
                         None => {
                             assert!(!servers.iter().any(|r| r.group == scope_group), "{ctx}");
                         }
                     }
-                    let got = srv::min_index_server_in_group(&db, scope_group).await.unwrap();
-                    let want =
-                        servers.iter().filter(|r| r.group == scope_group).map(|r| r.index).min();
+                    let got = srv::min_index_server_in_group(&db, scope_group)
+                        .await
+                        .unwrap();
+                    let want = servers
+                        .iter()
+                        .filter(|r| r.group == scope_group)
+                        .map(|r| r.index)
+                        .min();
                     assert_eq!(got.map(|r| r.index), want, "{ctx}");
-                    let got =
-                        srv::min_library_position_server_in_group(&db, scope_group).await.unwrap();
+                    let got = srv::min_library_position_server_in_group(&db, scope_group)
+                        .await
+                        .unwrap();
                     let want = servers
                         .iter()
                         .filter(|r| r.group == scope_group)
                         .filter_map(|r| r.lib)
                         .min();
                     assert_eq!(got.and_then(|r| r.library_position), want, "{ctx}");
-                    let got =
-                        srv::max_library_position_server_in_group(&db, scope_group).await.unwrap();
+                    let got = srv::max_library_position_server_in_group(&db, scope_group)
+                        .await
+                        .unwrap();
                     let want = servers
                         .iter()
                         .filter(|r| r.group == scope_group)
@@ -1326,20 +1493,26 @@ async fn server_reordering_matches_model() {
                         rows.windows(2).all(|w| w[0].index <= w[1].index),
                         "server index order violated at {ctx}"
                     );
-                    let rows = srv::get_all_server_groups_ordered_by_group_index(&db).await.unwrap();
+                    let rows = srv::get_all_server_groups_ordered_by_group_index(&db)
+                        .await
+                        .unwrap();
                     assert_eq!(rows.len(), grps.len(), "{ctx}");
                     assert!(
-                        rows.windows(2).all(|w| w[0].group_index <= w[1].group_index),
+                        rows.windows(2)
+                            .all(|w| w[0].group_index <= w[1].group_index),
                         "server group index order violated at {ctx}"
                     );
-                    let rows = srv::get_server_groups_with_library_position_ordered(&db).await.unwrap();
+                    let rows = srv::get_server_groups_with_library_position_ordered(&db)
+                        .await
+                        .unwrap();
                     assert_eq!(
                         rows.len(),
                         grps.iter().filter(|g| g.lib.is_some()).count(),
                         "{ctx}"
                     );
                     assert!(
-                        rows.windows(2).all(|w| w[0].library_position <= w[1].library_position),
+                        rows.windows(2)
+                            .all(|w| w[0].library_position <= w[1].library_position),
                         "server group library order violated at {ctx}"
                     );
                 }

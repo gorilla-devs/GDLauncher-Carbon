@@ -31,8 +31,8 @@ use crate::compat::MigrationKind;
 use crate::db_error::{DbError, DbResult};
 use crate::downgen::{build, detect_dml_on_existing_tables};
 use crate::schema_dump::normalize_ddl;
-use rusqlite::types::Value;
 use rusqlite::Connection;
+use rusqlite::types::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 // ------------------------------------------------------------------------
@@ -108,15 +108,18 @@ fn read_columns(conn: &Connection, table: &str) -> DbResult<Vec<Col>> {
 /// `PRAGMA index_list` so implicit unique/primary-key indexes (whose
 /// `sqlite_master.sql` is `NULL`) are included with their `unique`/`origin`
 /// attested by the engine.
-fn read_indexes(conn: &Connection, tables: &BTreeMap<String, Tbl>) -> DbResult<BTreeMap<String, Idx>> {
+fn read_indexes(
+    conn: &Connection,
+    tables: &BTreeMap<String, Tbl>,
+) -> DbResult<BTreeMap<String, Idx>> {
     let mut out = BTreeMap::new();
     for table in tables.keys() {
         let mut stmt = conn.prepare(&format!("PRAGMA index_list({})", quote(table)))?;
         let rows = stmt.query_map([], |r| {
             Ok((
-                r.get::<_, String>(1)?,       // name
-                r.get::<_, i64>(2)? != 0,     // unique
-                r.get::<_, String>(3)?,       // origin
+                r.get::<_, String>(1)?,   // name
+                r.get::<_, i64>(2)? != 0, // unique
+                r.get::<_, String>(3)?,   // origin
             ))
         })?;
         for row in rows {
@@ -270,7 +273,9 @@ pub fn derive_kind_explained(prev_ups: &[&str], up: &str) -> DbResult<KindDeriva
     }
     for (name, (tbl, _)) in &new_trg {
         if !old_trg.contains_key(name) && old_tables.contains_key(tbl) {
-            reasons.push(format!("new trigger `{name}` on pre-existing table `{tbl}`"));
+            reasons.push(format!(
+                "new trigger `{name}` on pre-existing table `{tbl}`"
+            ));
         }
     }
 
@@ -302,7 +307,11 @@ fn is_pure_column_add(
     let old_names: BTreeSet<&str> = old_tbl.cols.iter().map(|c| c.name.as_str()).collect();
     // Any removed column rules out a pure add.
     let new_names: BTreeSet<&str> = new_tbl.cols.iter().map(|c| c.name.as_str()).collect();
-    if old_tbl.cols.iter().any(|c| !new_names.contains(c.name.as_str())) {
+    if old_tbl
+        .cols
+        .iter()
+        .any(|c| !new_names.contains(c.name.as_str()))
+    {
         return Ok(false);
     }
 
@@ -400,7 +409,10 @@ impl DataDown {
         match self {
             DataDown::Full => "full".to_string(),
             DataDown::Partial(fields) => {
-                format!("partial:{}", fields.iter().cloned().collect::<Vec<_>>().join(","))
+                format!(
+                    "partial:{}",
+                    fields.iter().cloned().collect::<Vec<_>>().join(",")
+                )
             }
         }
     }
@@ -800,9 +812,9 @@ fn read_fk_groups(conn: &Connection, table: &str) -> DbResult<Vec<FkGroup>> {
     let raw = stmt
         .query_map([], |r| {
             Ok((
-                r.get::<_, i64>(0)?,    // id
-                r.get::<_, String>(2)?, // parent table
-                r.get::<_, String>(3)?, // from
+                r.get::<_, i64>(0)?,            // id
+                r.get::<_, String>(2)?,         // parent table
+                r.get::<_, String>(3)?,         // from
                 r.get::<_, Option<String>>(4)?, // to (null => parent PK, but our schema names it)
             ))
         })?
@@ -956,7 +968,10 @@ fn insert_row(
         .map(|c| row.get(&c.name).unwrap() as &dyn rusqlite::ToSql)
         .collect();
     conn.execute(
-        &format!("INSERT INTO {} ({col_list}) VALUES ({placeholders})", quote(table)),
+        &format!(
+            "INSERT INTO {} ({col_list}) VALUES ({placeholders})",
+            quote(table)
+        ),
         values.as_slice(),
     )?;
     Ok(())

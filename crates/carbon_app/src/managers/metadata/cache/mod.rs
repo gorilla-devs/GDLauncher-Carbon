@@ -9,8 +9,8 @@ use anyhow::anyhow;
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_repos::repos::mod_metadata as metarepo;
-use chrono::Utc;
 use carbon_rt_path::InstancesPath;
+use chrono::Utc;
 use curseforge::CurseforgeModCacher;
 use futures::Future;
 use futures::join;
@@ -835,8 +835,7 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     pub async fn gc_mod_metadata(self) {
-        let _ = metarepo::gc_orphan_metadata(&self.app.db)
-            .await;
+        let _ = metarepo::gc_orphan_metadata(&self.app.db).await;
     }
 
     // this will need further refactoring. left for later.
@@ -1419,8 +1418,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         let server_path = runtime_path.get_servers().get_server_path(server_shortpath);
 
         // Get existing cache entries
-        let cached = mfcdb::get_server_mod_files_by_server(&self.app.db, server_id)
-            .await?;
+        let cached = mfcdb::get_server_mod_files_by_server(&self.app.db, server_id).await?;
 
         let cached_map: HashMap<String, (i32, bool)> = cached
             .iter()
@@ -1467,8 +1465,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         for entry in &stale {
             let entry_id = entry.id.clone();
-            let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &entry_id)
-                .await;
+            let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &entry_id).await;
         }
 
         // Cache new/changed files

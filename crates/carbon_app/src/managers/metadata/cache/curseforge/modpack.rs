@@ -23,8 +23,7 @@ pub async fn get_modpack_metadata(
 ) -> anyhow::Result<InstanceModpackInfo> {
     let project_id = curseforge.project_id as i32;
     let file_id = curseforge.file_id as i32;
-    let cache_entry = modpackdb::get_cf_modpack(&app.db, project_id, file_id)
-        .await?;
+    let cache_entry = modpackdb::get_cf_modpack(&app.db, project_id, file_id).await?;
 
     let is_entry_up_to_date = cache_entry
         .as_ref()

@@ -435,8 +435,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     async fn get_account_entries(self) -> anyhow::Result<Vec<account_repo::AccountRow>> {
-        Ok(account_repo::get_accounts_by_last_used(&self.app.db)
-            .await?)
+        Ok(account_repo::get_accounts_by_last_used(&self.app.db).await?)
     }
 
     pub async fn get_account_list(self) -> anyhow::Result<Vec<AccountWithStatus>> {
@@ -454,8 +453,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     async fn get_account(self, uuid: String) -> anyhow::Result<Option<AccountWithStatus>> {
-        let account = account_repo::get_account(&self.app.db, &uuid)
-            .await?;
+        let account = account_repo::get_account(&self.app.db, &uuid).await?;
 
         let Some(account) = account else {
             return Ok(None);
@@ -783,9 +781,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             {
                 Ok(response) => return Ok(response),
                 Err(InstanceShareError::UploadTimeout) if Instant::now() < deadline => {
-                    info!(
-                        "share wait poll window expired for file_key={file_key}, re-polling"
-                    );
+                    info!("share wait poll window expired for file_key={file_key}, re-polling");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
                 Err(err) => return Err(err.into()),

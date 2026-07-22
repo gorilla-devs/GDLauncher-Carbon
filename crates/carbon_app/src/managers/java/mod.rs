@@ -112,8 +112,7 @@ impl JavaManager {
 
 impl ManagerRef<'_, JavaManager> {
     pub async fn get_available_javas(&self) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
-        let all_javas = java_repo::get_all_java(&self.app.db)
-            .await?;
+        let all_javas = java_repo::get_all_java(&self.app.db).await?;
 
         let mut result = HashMap::new();
 
@@ -172,8 +171,7 @@ impl ManagerRef<'_, JavaManager> {
         if let Some(java_id) = java_id {
             java_repo::set_profile_java(&self.app.db, &profile_name, Some(&java_id)).await?;
         } else {
-            java_repo::set_profile_java(&self.app.db, &profile_name, None)
-                .await?;
+            java_repo::set_profile_java(&self.app.db, &profile_name, None).await?;
         }
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
@@ -197,8 +195,7 @@ impl ManagerRef<'_, JavaManager> {
         let java_id = java_id.ok_or_else(|| anyhow::anyhow!("java_id is required"))?;
 
         let name_for_lookup = profile_name.clone();
-        let exists = java_repo::get_profile(&self.app.db, &name_for_lookup)
-            .await?;
+        let exists = java_repo::get_profile(&self.app.db, &name_for_lookup).await?;
 
         if exists.is_some() {
             anyhow::bail!("Profile with name {} already exists", profile_name);
@@ -238,8 +235,7 @@ impl ManagerRef<'_, JavaManager> {
             anyhow::bail!("Auto manage java is enabled");
         }
 
-        java_repo::delete_profile(&self.app.db, &profile_name)
-            .await?;
+        java_repo::delete_profile(&self.app.db, &profile_name).await?;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
 
@@ -255,8 +251,7 @@ impl ManagerRef<'_, JavaManager> {
         .await?;
 
         let path_for_lookup = path.clone();
-        let exists = java_repo::get_java_by_path(&self.app.db, &path_for_lookup)
-            .await?;
+        let exists = java_repo::get_java_by_path(&self.app.db, &path_for_lookup).await?;
 
         if exists.is_some() {
             anyhow::bail!("Java with path {} already exists", path);
@@ -291,8 +286,7 @@ impl ManagerRef<'_, JavaManager> {
         match java_component_type {
             JavaComponentType::Custom => {
                 let id = java_id.clone();
-                java_repo::delete_java(&self.app.db, &id)
-                    .await?;
+                java_repo::delete_java(&self.app.db, &id).await?;
             }
             JavaComponentType::Managed => {
                 let root_managed_path = self
@@ -316,8 +310,7 @@ impl ManagerRef<'_, JavaManager> {
                 }
 
                 let id = java_id.clone();
-                java_repo::delete_java(&self.app.db, &id)
-                    .await?;
+                java_repo::delete_java(&self.app.db, &id).await?;
             }
             JavaComponentType::Local => {
                 anyhow::bail!("Java with id {} is local. Cannot delete.", java_id.clone());
@@ -342,10 +335,7 @@ impl ManagerRef<'_, JavaManager> {
             .ok_or_else(|| anyhow::anyhow!("Profile not found"))?;
 
         let java = match profile.java_id {
-            Some(java_id) => {
-                java_repo::get_java_by_id(&self.app.db, &java_id)
-                    .await?
-            }
+            Some(java_id) => java_repo::get_java_by_id(&self.app.db, &java_id).await?,
             None => None,
         };
 
@@ -369,12 +359,15 @@ impl ManagerRef<'_, JavaManager> {
 
                         let java_id = java.id.clone();
                         let id_for_read = java_id.clone();
-                        let names_to_disconnect: Vec<String> = java_repo::get_all_profiles(&self.app.db)
-                            .await?
-                            .into_iter()
-                            .filter(|profile| profile.java_id.as_deref() == Some(id_for_read.as_str()))
-                            .map(|profile| profile.name)
-                            .collect();
+                        let names_to_disconnect: Vec<String> =
+                            java_repo::get_all_profiles(&self.app.db)
+                                .await?
+                                .into_iter()
+                                .filter(|profile| {
+                                    profile.java_id.as_deref() == Some(id_for_read.as_str())
+                                })
+                                .map(|profile| profile.name)
+                                .collect();
 
                         // Interleaved app logic: unlink the computed set of
                         // profiles then flip the java's validity. Runs in one
@@ -456,8 +449,7 @@ impl ManagerRef<'_, JavaManager> {
             .await?;
 
         let id_for_lookup = id.clone();
-        let java = java_repo::get_java_by_id(&self.app.db, &id_for_lookup)
-            .await?;
+        let java = java_repo::get_java_by_id(&self.app.db, &id_for_lookup).await?;
 
         let java = match java {
             Some(java) => RealJavaChecker::get_bin_info(

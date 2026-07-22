@@ -79,7 +79,10 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
         for a in &actual {
             // CENSUS-RULE: checker.undeclared-param
             if !q.params.iter().any(|p| p == a) {
-                violations.push(format!("{}: SQL param {a} is not declared in the registry", q.name));
+                violations.push(format!(
+                    "{}: SQL param {a} is not declared in the registry",
+                    q.name
+                ));
             }
         }
         // 3. multi-param queries must use named params (no bare '?'), scanning
@@ -215,8 +218,12 @@ fn build_manifest(conn: &Connection, sql: &str) -> rusqlite::Result<WriteManifes
     conn.authorizer(Some(move |ctx: AuthContext<'_>| {
         if let Ok(mut m) = sink.lock() {
             match ctx.action {
-                AuthAction::Update { table_name, column_name } => {
-                    m.updates.push((table_name.to_string(), column_name.to_string()));
+                AuthAction::Update {
+                    table_name,
+                    column_name,
+                } => {
+                    m.updates
+                        .push((table_name.to_string(), column_name.to_string()));
                 }
                 AuthAction::Insert { table_name } => {
                     m.inserts.push(table_name.to_string());
@@ -556,7 +563,12 @@ fn parse_insert_target(sql: &str) -> Option<(String, Vec<String>)> {
 pub fn check_insert_datetime_columns(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
     let mut violations = Vec::new();
     for q in queries {
-        let first_word: String = q.sql.trim_start().chars().take_while(|c| c.is_ascii_alphabetic()).collect();
+        let first_word: String = q
+            .sql
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_ascii_alphabetic())
+            .collect();
         if !first_word.eq_ignore_ascii_case("INSERT") {
             continue;
         }

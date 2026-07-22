@@ -301,7 +301,10 @@ fn get_or_create_default_group(
     // Point the singleton config row at the chosen group (no-op if id != 0 row
     // is absent — a DB with orphaned instances always has one).
     tx.execute(
-        &format!("UPDATE AppConfiguration SET \"{col}\" = ?1 WHERE id = 0", col = config_col),
+        &format!(
+            "UPDATE AppConfiguration SET \"{col}\" = ?1 WHERE id = 0",
+            col = config_col
+        ),
         [id],
     )?;
     Ok(id)
@@ -312,7 +315,11 @@ fn apply_repair(tx: &Transaction, edge: &FkEdge) -> rusqlite::Result<usize> {
     let pred = orphan_predicate(edge);
     match edge.class {
         RepairClass::CacheDelete => tx.execute(
-            &format!("DELETE FROM \"{child}\" WHERE {pred}", child = edge.child, pred = pred),
+            &format!(
+                "DELETE FROM \"{child}\" WHERE {pred}",
+                child = edge.child,
+                pred = pred
+            ),
             [],
         ),
         RepairClass::SetNull => {
@@ -405,7 +412,9 @@ pub fn sweep_and_decide(conn: &mut Connection) -> DbResult<SweepOutcome> {
                 "foreign key violation survived repair sweep; disabling FK enforcement for this session",
             );
         }
-        Ok(SweepOutcome::DisabledFallback { violations: remaining })
+        Ok(SweepOutcome::DisabledFallback {
+            violations: remaining,
+        })
     }
 }
 
@@ -432,7 +441,11 @@ mod tests {
     /// violations, i.e. the runtime pools could open with FKs ON.
     fn assert_fk_on_consistent(conn: &Connection) {
         conn.pragma_update(None, "foreign_keys", &"ON").unwrap();
-        assert_eq!(fk_violations(conn), 0, "DB must be FK-consistent after the sweep");
+        assert_eq!(
+            fk_violations(conn),
+            0,
+            "DB must be FK-consistent after the sweep"
+        );
         conn.pragma_update(None, "foreign_keys", &"OFF").unwrap();
     }
 
@@ -440,7 +453,10 @@ mod tests {
     fn clean_db_enables_without_repair() {
         let (_d, mut conn) = migrated();
         assert_eq!(fk_violations(&conn), 0);
-        assert!(matches!(sweep_and_decide(&mut conn).unwrap(), SweepOutcome::Enabled));
+        assert!(matches!(
+            sweep_and_decide(&mut conn).unwrap(),
+            SweepOutcome::Enabled
+        ));
     }
 
     /// Every `(child table, parent table, child column)` foreign key the live
@@ -465,8 +481,11 @@ mod tests {
             let mut st = conn
                 .prepare(&format!("PRAGMA foreign_key_list('{table}')"))
                 .unwrap();
-            let cols: Vec<String> =
-                st.column_names().into_iter().map(|s| s.to_string()).collect();
+            let cols: Vec<String> = st
+                .column_names()
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect();
             let ti = |n: &str| cols.iter().position(|c| c == n).unwrap();
             let mut rows = st.query([]).unwrap();
             while let Some(r) = rows.next().unwrap() {
@@ -529,7 +548,11 @@ mod tests {
         let outcome = sweep_and_decide(&mut conn).unwrap();
         assert!(matches!(outcome, SweepOutcome::Enabled), "got {outcome:?}");
         let n: i64 = conn
-            .query_row("SELECT COUNT(*) FROM ModFileCache WHERE id = 'mfc1'", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM ModFileCache WHERE id = 'mfc1'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(n, 0, "orphaned cache row must be deleted");
         assert_fk_on_consistent(&conn);
@@ -544,13 +567,22 @@ mod tests {
         )
         .unwrap();
         assert!(fk_violations(&conn) > 0);
-        assert!(matches!(sweep_and_decide(&mut conn).unwrap(), SweepOutcome::Enabled));
+        assert!(matches!(
+            sweep_and_decide(&mut conn).unwrap(),
+            SweepOutcome::Enabled
+        ));
         let java_id: Option<String> = conn
-            .query_row("SELECT javaId FROM JavaProfile WHERE name = 'p'", [], |r| r.get(0))
+            .query_row("SELECT javaId FROM JavaProfile WHERE name = 'p'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(java_id, None, "javaId must be nulled");
         let exists: i64 = conn
-            .query_row("SELECT COUNT(*) FROM JavaProfile WHERE name = 'p'", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM JavaProfile WHERE name = 'p'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(exists, 1, "the profile itself must survive");
         assert_fk_on_consistent(&conn);
@@ -572,11 +604,16 @@ mod tests {
         )
         .unwrap();
         assert!(fk_violations(&conn) > 0);
-        assert!(matches!(sweep_and_decide(&mut conn).unwrap(), SweepOutcome::Enabled));
+        assert!(matches!(
+            sweep_and_decide(&mut conn).unwrap(),
+            SweepOutcome::Enabled
+        ));
         let active: Option<String> = conn
-            .query_row("SELECT activeAccountUuid FROM AppConfiguration WHERE id = 0", [], |r| {
-                r.get(0)
-            })
+            .query_row(
+                "SELECT activeAccountUuid FROM AppConfiguration WHERE id = 0",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(active, None);
         assert_fk_on_consistent(&conn);
@@ -612,9 +649,16 @@ mod tests {
         )
         .unwrap();
         assert!(fk_violations(&conn) > 0);
-        assert!(matches!(sweep_and_decide(&mut conn).unwrap(), SweepOutcome::Enabled));
+        assert!(matches!(
+            sweep_and_decide(&mut conn).unwrap(),
+            SweepOutcome::Enabled
+        ));
         let gid: i64 = conn
-            .query_row("SELECT groupId FROM Instance WHERE shortpath = 'sp'", [], |r| r.get(0))
+            .query_row(
+                "SELECT groupId FROM Instance WHERE shortpath = 'sp'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(gid, def, "instance must be reassigned to the default group");
         assert_fk_on_consistent(&conn);
@@ -636,19 +680,30 @@ mod tests {
             [],
         )
         .unwrap();
-        assert!(matches!(sweep_and_decide(&mut conn).unwrap(), SweepOutcome::Enabled));
+        assert!(matches!(
+            sweep_and_decide(&mut conn).unwrap(),
+            SweepOutcome::Enabled
+        ));
         // A default group was created and the instance points at it.
         let gid: i64 = conn
-            .query_row("SELECT groupId FROM Instance WHERE shortpath = 'sp'", [], |r| r.get(0))
+            .query_row(
+                "SELECT groupId FROM Instance WHERE shortpath = 'sp'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         let name: String = conn
-            .query_row("SELECT name FROM InstanceGroup WHERE id = ?1", [gid], |r| r.get(0))
+            .query_row("SELECT name FROM InstanceGroup WHERE id = ?1", [gid], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(name, "localize➽default");
         let cfg: Option<i64> = conn
-            .query_row("SELECT defaultInstanceGroup FROM AppConfiguration WHERE id = 0", [], |r| {
-                r.get(0)
-            })
+            .query_row(
+                "SELECT defaultInstanceGroup FROM AppConfiguration WHERE id = 0",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(cfg, Some(gid));
         assert_fk_on_consistent(&conn);
@@ -668,11 +723,17 @@ mod tests {
         let groups_before: i64 = conn
             .query_row("SELECT COUNT(*) FROM InstanceGroup", [], |r| r.get(0))
             .unwrap();
-        assert!(matches!(sweep_and_decide(&mut conn).unwrap(), SweepOutcome::Enabled));
+        assert!(matches!(
+            sweep_and_decide(&mut conn).unwrap(),
+            SweepOutcome::Enabled
+        ));
         let groups_after: i64 = conn
             .query_row("SELECT COUNT(*) FROM InstanceGroup", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(groups_before, groups_after, "no default group should be created");
+        assert_eq!(
+            groups_before, groups_after,
+            "no default group should be created"
+        );
     }
 
     #[test]
@@ -692,12 +753,17 @@ mod tests {
             [],
         )
         .unwrap();
-        assert!(matches!(sweep_and_decide(&mut conn).unwrap(), SweepOutcome::Enabled));
+        assert!(matches!(
+            sweep_and_decide(&mut conn).unwrap(),
+            SweepOutcome::Enabled
+        ));
         let modc: i64 = conn
             .query_row("SELECT COUNT(*) FROM CurseForgeModCache", [], |r| r.get(0))
             .unwrap();
         let imgc: i64 = conn
-            .query_row("SELECT COUNT(*) FROM CurseForgeModImageCache", [], |r| r.get(0))
+            .query_row("SELECT COUNT(*) FROM CurseForgeModImageCache", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(modc, 0);
         assert_eq!(imgc, 0, "grandchild image cache must be swept too");
@@ -737,7 +803,11 @@ mod tests {
         }
         // Repairs to the known edge were still committed.
         let mfc: i64 = conn
-            .query_row("SELECT COUNT(*) FROM ModFileCache WHERE id = 'mfc'", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM ModFileCache WHERE id = 'mfc'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(mfc, 0, "repairable orphan must be deleted even on fallback");
     }

@@ -33,14 +33,14 @@ impl ManagerRef<'_, MetricsManager> {
         let Some(metrics_user_id) =
             carbon_repos::repos::app_configuration::get_app_configuration(&self.app.db)
                 .await?
-            .and_then(|data| {
-                // TODO: Keep a backlog of events if the user has not accepted the terms yet
-                if !data.terms_and_privacy_accepted {
-                    None
-                } else {
-                    Some(self.random_session_uuid.to_string())
-                }
-            })
+                .and_then(|data| {
+                    // TODO: Keep a backlog of events if the user has not accepted the terms yet
+                    if !data.terms_and_privacy_accepted {
+                        None
+                    } else {
+                        Some(self.random_session_uuid.to_string())
+                    }
+                })
         else {
             return Ok(());
         };

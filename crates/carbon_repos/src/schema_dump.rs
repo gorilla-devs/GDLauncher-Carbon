@@ -154,7 +154,12 @@ pub fn executable_statements(dump: &str) -> Vec<String> {
             _ => {}
         }
     }
-    tables.into_iter().chain(indexes).chain(triggers).chain(views).collect()
+    tables
+        .into_iter()
+        .chain(indexes)
+        .chain(triggers)
+        .chain(views)
+        .collect()
 }
 
 #[cfg(test)]
@@ -175,7 +180,10 @@ mod tests {
         let a = dump_schema(&conn).unwrap();
         let b = dump_schema(&conn).unwrap();
         assert_eq!(a, b, "dump must be deterministic across calls");
-        assert!(a.contains("table|Account|Account|"), "must include known table:\n{a}");
+        assert!(
+            a.contains("table|Account|Account|"),
+            "must include known table:\n{a}"
+        );
 
         // type is non-decreasing and, within a type, name is non-decreasing.
         let mut prev: Option<(String, String)> = None;
@@ -213,7 +221,8 @@ mod tests {
         // `AppConfiguration.modChannels` ships this exact default. Punctuation
         // inside a quoted literal is data, not DDL punctuation, so spacing it
         // changes the column's value rather than its formatting.
-        let sql = "CREATE TABLE \"T\" (\"c\" TEXT NOT NULL DEFAULT 'stable:true,beta:true,alpha:true')";
+        let sql =
+            "CREATE TABLE \"T\" (\"c\" TEXT NOT NULL DEFAULT 'stable:true,beta:true,alpha:true')";
         let normalized = normalize_ddl(sql);
         assert!(
             normalized.contains("'stable:true,beta:true,alpha:true'"),
@@ -266,7 +275,9 @@ mod tests {
         replayed
             .execute_batch(&executable_statements(&dump).join("\n"))
             .unwrap();
-        replayed.execute_batch("INSERT INTO \"T\" DEFAULT VALUES").unwrap();
+        replayed
+            .execute_batch("INSERT INTO \"T\" DEFAULT VALUES")
+            .unwrap();
 
         let stored: String = replayed
             .query_row("SELECT c FROM \"T\"", [], |r| r.get(0))
@@ -288,7 +299,11 @@ mod tests {
         let statements = executable_statements(&dump);
         replayed.execute_batch(&statements.join("\n")).unwrap();
 
-        assert_eq!(dump_schema(&replayed).unwrap(), dump, "replayed schema must be byte-identical");
+        assert_eq!(
+            dump_schema(&replayed).unwrap(),
+            dump,
+            "replayed schema must be byte-identical"
+        );
     }
 
     #[test]
@@ -301,8 +316,14 @@ mod tests {
                      table|T|T|CREATE TABLE \"T\" ( \"id\" INTEGER PRIMARY KEY , \"name\" TEXT )\n";
         let statements = executable_statements(dump);
         assert_eq!(statements.len(), 2);
-        assert!(statements[0].starts_with("CREATE TABLE"), "table must come first: {statements:?}");
-        assert!(statements[1].starts_with("CREATE INDEX"), "index must come after its table");
+        assert!(
+            statements[0].starts_with("CREATE TABLE"),
+            "table must come first: {statements:?}"
+        );
+        assert!(
+            statements[1].starts_with("CREATE INDEX"),
+            "index must come after its table"
+        );
 
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(&statements.join("\n")).unwrap();
@@ -316,7 +337,10 @@ mod tests {
         let dump = "index|sqlite_autoindex_T_1|T|\n\
                      table|T|T|CREATE TABLE \"T\" ( \"id\" TEXT NOT NULL PRIMARY KEY )\n";
         let statements = executable_statements(dump);
-        assert_eq!(statements, vec!["CREATE TABLE \"T\" ( \"id\" TEXT NOT NULL PRIMARY KEY );"]);
+        assert_eq!(
+            statements,
+            vec!["CREATE TABLE \"T\" ( \"id\" TEXT NOT NULL PRIMARY KEY );"]
+        );
     }
 
     #[test]

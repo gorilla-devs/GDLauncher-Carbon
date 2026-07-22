@@ -59,7 +59,8 @@ fn open_db(path: &Path) -> Connection {
 }
 
 fn user_version(conn: &Connection) -> i32 {
-    conn.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap()
+    conn.pragma_query_value(None, "user_version", |r| r.get(0))
+        .unwrap()
 }
 
 fn table_exists(conn: &Connection, name: &str) -> bool {
@@ -123,7 +124,10 @@ fn upgrader_without_metadata_is_backfilled_then_reopen_is_noop() {
     }
     conn.pragma_update(None, "user_version", 25).unwrap();
 
-    assert!(matches!(set.open(&mut conn, &path).unwrap(), OpenVerdict::Proceed));
+    assert!(matches!(
+        set.open(&mut conn, &path).unwrap(),
+        OpenVerdict::Proceed
+    ));
     let rows: i64 = conn
         .query_row("SELECT COUNT(*) FROM _migrations", [], |r| r.get(0))
         .unwrap();
@@ -131,7 +135,10 @@ fn upgrader_without_metadata_is_backfilled_then_reopen_is_noop() {
     assert_eq!(user_version(&conn), 25);
 
     // Second open: rows present, checksums match, nothing pending.
-    assert!(matches!(set.open(&mut conn, &path).unwrap(), OpenVerdict::Proceed));
+    assert!(matches!(
+        set.open(&mut conn, &path).unwrap(),
+        OpenVerdict::Proceed
+    ));
 }
 
 #[test]
@@ -153,7 +160,11 @@ fn additive_ahead_overlays_and_leaves_schema_untouched() {
         let mut conn = open_db(&path);
         let verdict = l25.open(&mut conn, &path).unwrap();
         assert_eq!(verdict, OpenVerdict::Proceed);
-        assert_eq!(user_version(&conn), 26, "overlay leaves the newer version in place");
+        assert_eq!(
+            user_version(&conn),
+            26,
+            "overlay leaves the newer version in place"
+        );
         assert!(table_exists(&conn, "Widget"), "overlay touches nothing");
     }
 
@@ -192,13 +203,27 @@ fn breaking_ahead_down_runs_and_restores_byte_identical_schema() {
         let verdict = l25.open(&mut conn, &path).unwrap();
         assert_eq!(verdict, OpenVerdict::Downgraded);
         assert_eq!(user_version(&conn), 25);
-        assert!(!table_exists(&conn, "Widget"), "additive 26 was also stepped back");
-        assert_eq!(dump_schema(&conn).unwrap(), reference, "schema is byte-identical to own 25");
+        assert!(
+            !table_exists(&conn, "Widget"),
+            "additive 26 was also stepped back"
+        );
+        assert_eq!(
+            dump_schema(&conn).unwrap(),
+            reference,
+            "schema is byte-identical to own 25"
+        );
 
         let ahead: i64 = conn
-            .query_row("SELECT COUNT(*) FROM _migrations WHERE version > 25", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM _migrations WHERE version > 25",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
-        assert_eq!(ahead, 0, "stepped-back migrations' metadata rows are removed");
+        assert_eq!(
+            ahead, 0,
+            "stepped-back migrations' metadata rows are removed"
+        );
     }
 
     // The pre-downgrade snapshot is preserved.
@@ -246,9 +271,16 @@ fn corrupt_down_rolls_back_and_leaves_the_database_intact() {
         assert_eq!(user_version(&conn), 26);
         assert!(table_exists(&conn, "Gizmo"));
         let ahead: i64 = conn
-            .query_row("SELECT COUNT(*) FROM _migrations WHERE version = 26", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM _migrations WHERE version = 26",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
-        assert_eq!(ahead, 1, "the ahead metadata row must remain after rollback");
+        assert_eq!(
+            ahead, 1,
+            "the ahead metadata row must remain after rollback"
+        );
     }
 }
 
@@ -279,13 +311,19 @@ fn a_down_that_succeeds_into_the_wrong_schema_is_caught() {
         let mut conn = open_db(&path);
         let verdict = l25.open(&mut conn, &path).unwrap();
         assert!(
-            matches!(verdict, OpenVerdict::Refuse(RefusalKind::DowngradeFailed { .. })),
+            matches!(
+                verdict,
+                OpenVerdict::Refuse(RefusalKind::DowngradeFailed { .. })
+            ),
             "a mismatched post-down schema must be refused, got {verdict:?}"
         );
         // Rolled back: original schema intact, Bogus never committed.
         assert_eq!(user_version(&conn), 26);
         assert!(table_exists(&conn, "Gadget"));
-        assert!(!table_exists(&conn, "Bogus"), "the failed down must not persist");
+        assert!(
+            !table_exists(&conn, "Bogus"),
+            "the failed down must not persist"
+        );
     }
 }
 
@@ -297,8 +335,11 @@ fn tampered_checksum_is_refused_as_diverged() {
     {
         let mut conn = open_db(&path);
         set.to_latest(&mut conn).unwrap();
-        conn.execute("UPDATE _migrations SET checksum = 'deadbeef' WHERE version = 5", [])
-            .unwrap();
+        conn.execute(
+            "UPDATE _migrations SET checksum = 'deadbeef' WHERE version = 5",
+            [],
+        )
+        .unwrap();
     }
 
     let mut conn = open_db(&path);
@@ -319,7 +360,8 @@ fn missing_metadata_above_own_count_is_backwards_migration() {
         let mut conn = open_db(&path);
         l25.to_latest(&mut conn).unwrap();
         // Apply a synthetic 26 up and bump the version, but record no row.
-        conn.execute_batch("CREATE TABLE Orphan (id INTEGER PRIMARY KEY);").unwrap();
+        conn.execute_batch("CREATE TABLE Orphan (id INTEGER PRIMARY KEY);")
+            .unwrap();
         conn.pragma_update(None, "user_version", 26).unwrap();
     }
 
@@ -361,15 +403,24 @@ fn breaking_ahead_without_a_stored_down_is_refused_and_snapshot_kept() {
         let verdict = l25.open(&mut conn, &path).unwrap();
         match verdict {
             OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path }) => {
-                assert!(snapshot_path.exists(), "snapshot preserved when no down exists");
+                assert!(
+                    snapshot_path.exists(),
+                    "snapshot preserved when no down exists"
+                );
             }
-            other => panic!("expected DowngradeFailed for a down-less breaking migration, got {other:?}"),
+            other => {
+                panic!("expected DowngradeFailed for a down-less breaking migration, got {other:?}")
+            }
         }
         // Untouched: still at 26 with the table and its metadata row.
         assert_eq!(user_version(&conn), 26);
         assert!(table_exists(&conn, "Sprocket"));
         let ahead: i64 = conn
-            .query_row("SELECT COUNT(*) FROM _migrations WHERE version = 26", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM _migrations WHERE version = 26",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(ahead, 1, "the ahead metadata row must remain after refusal");
     }

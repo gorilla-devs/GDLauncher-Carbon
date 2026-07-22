@@ -179,38 +179,158 @@ impl AppConfigurationPatch {
 
         push!(self.theme, "theme = :theme", ":theme");
         push!(self.language, "language = :language", ":language");
-        push!(self.reduced_motion, "reducedMotion = :reducedMotion", ":reducedMotion");
-        push!(self.discord_integration, "discordIntegration = :discordIntegration", ":discordIntegration");
-        push!(self.release_channel, "releaseChannel = :releaseChannel", ":releaseChannel");
-        push!(self.launcher_action_on_game_launch, "launcherActionOnGameLaunch = :launcherActionOnGameLaunch", ":launcherActionOnGameLaunch");
-        push!(self.show_app_close_warning, "showAppCloseWarning = :showAppCloseWarning", ":showAppCloseWarning");
-        push!(self.concurrent_downloads, "concurrentDownloads = :concurrentDownloads", ":concurrentDownloads");
-        push!(self.download_dependencies, "downloadDependencies = :downloadDependencies", ":downloadDependencies");
-        push!(self.show_featured, "showFeatured = :showFeatured", ":showFeatured");
-        push!(self.instances_sort_by, "instancesSortBy = :instancesSortBy", ":instancesSortBy");
-        push!(self.instances_sort_by_asc, "instancesSortByAsc = :instancesSortByAsc", ":instancesSortByAsc");
-        push!(self.instances_group_by, "instancesGroupBy = :instancesGroupBy", ":instancesGroupBy");
-        push!(self.instances_group_by_asc, "instancesGroupByAsc = :instancesGroupByAsc", ":instancesGroupByAsc");
-        push!(self.instances_duplicate_favorites, "instancesDuplicateFavorites = :instancesDuplicateFavorites", ":instancesDuplicateFavorites");
-        push!(self.instances_tile_size, "instancesTileSize = :instancesTileSize", ":instancesTileSize");
-        push!(self.deletion_through_recycle_bin, "deletionThroughRecycleBin = :deletionThroughRecycleBin", ":deletionThroughRecycleBin");
+        push!(
+            self.reduced_motion,
+            "reducedMotion = :reducedMotion",
+            ":reducedMotion"
+        );
+        push!(
+            self.discord_integration,
+            "discordIntegration = :discordIntegration",
+            ":discordIntegration"
+        );
+        push!(
+            self.release_channel,
+            "releaseChannel = :releaseChannel",
+            ":releaseChannel"
+        );
+        push!(
+            self.launcher_action_on_game_launch,
+            "launcherActionOnGameLaunch = :launcherActionOnGameLaunch",
+            ":launcherActionOnGameLaunch"
+        );
+        push!(
+            self.show_app_close_warning,
+            "showAppCloseWarning = :showAppCloseWarning",
+            ":showAppCloseWarning"
+        );
+        push!(
+            self.concurrent_downloads,
+            "concurrentDownloads = :concurrentDownloads",
+            ":concurrentDownloads"
+        );
+        push!(
+            self.download_dependencies,
+            "downloadDependencies = :downloadDependencies",
+            ":downloadDependencies"
+        );
+        push!(
+            self.show_featured,
+            "showFeatured = :showFeatured",
+            ":showFeatured"
+        );
+        push!(
+            self.instances_sort_by,
+            "instancesSortBy = :instancesSortBy",
+            ":instancesSortBy"
+        );
+        push!(
+            self.instances_sort_by_asc,
+            "instancesSortByAsc = :instancesSortByAsc",
+            ":instancesSortByAsc"
+        );
+        push!(
+            self.instances_group_by,
+            "instancesGroupBy = :instancesGroupBy",
+            ":instancesGroupBy"
+        );
+        push!(
+            self.instances_group_by_asc,
+            "instancesGroupByAsc = :instancesGroupByAsc",
+            ":instancesGroupByAsc"
+        );
+        push!(
+            self.instances_duplicate_favorites,
+            "instancesDuplicateFavorites = :instancesDuplicateFavorites",
+            ":instancesDuplicateFavorites"
+        );
+        push!(
+            self.instances_tile_size,
+            "instancesTileSize = :instancesTileSize",
+            ":instancesTileSize"
+        );
+        push!(
+            self.deletion_through_recycle_bin,
+            "deletionThroughRecycleBin = :deletionThroughRecycleBin",
+            ":deletionThroughRecycleBin"
+        );
         push!(self.xmx, "xmx = :xmx", ":xmx");
         push!(self.xms, "xms = :xms", ":xms");
-        push!(self.game_resolution, "gameResolution = :gameResolution", ":gameResolution");
-        push!(self.java_custom_args, "javaCustomArgs = :javaCustomArgs", ":javaCustomArgs");
-        push!(self.pre_launch_hook, "preLaunchHook = :preLaunchHook", ":preLaunchHook");
-        push!(self.post_exit_hook, "postExitHook = :postExitHook", ":postExitHook");
-        push!(self.wrapper_command, "wrapperCommand = :wrapperCommand", ":wrapperCommand");
-        push!(self.auto_manage_java_system_profiles, "autoManageJavaSystemProfiles = :autoManageJavaSystemProfiles", ":autoManageJavaSystemProfiles");
-        push!(self.mod_platform_blacklist, "modPlatformBlacklist = :modPlatformBlacklist", ":modPlatformBlacklist");
-        push!(self.mod_channels, "modChannels = :modChannels", ":modChannels");
-        push!(self.terms_and_privacy_accepted, "termsAndPrivacyAccepted = :termsAndPrivacyAccepted", ":termsAndPrivacyAccepted");
-        push!(self.terms_and_privacy_accepted_checksum, "termsAndPrivacyAcceptedChecksum = :termsAndPrivacyAcceptedChecksum", ":termsAndPrivacyAcceptedChecksum");
-        push!(self.installation_id, "installationId = :installationId", ":installationId");
-        push!(self.active_account_uuid, "activeAccountUuid = :activeAccountUuid", ":activeAccountUuid");
-        push!(self.gdl_account_uuid, "gdlAccountUuid = :gdlAccountUuid", ":gdlAccountUuid");
-        push!(self.gdl_account_status, "gdlAccountStatus = :gdlAccountStatus", ":gdlAccountStatus");
-        push!(self.default_instance_group, "defaultInstanceGroup = :defaultInstanceGroup", ":defaultInstanceGroup");
+        push!(
+            self.game_resolution,
+            "gameResolution = :gameResolution",
+            ":gameResolution"
+        );
+        push!(
+            self.java_custom_args,
+            "javaCustomArgs = :javaCustomArgs",
+            ":javaCustomArgs"
+        );
+        push!(
+            self.pre_launch_hook,
+            "preLaunchHook = :preLaunchHook",
+            ":preLaunchHook"
+        );
+        push!(
+            self.post_exit_hook,
+            "postExitHook = :postExitHook",
+            ":postExitHook"
+        );
+        push!(
+            self.wrapper_command,
+            "wrapperCommand = :wrapperCommand",
+            ":wrapperCommand"
+        );
+        push!(
+            self.auto_manage_java_system_profiles,
+            "autoManageJavaSystemProfiles = :autoManageJavaSystemProfiles",
+            ":autoManageJavaSystemProfiles"
+        );
+        push!(
+            self.mod_platform_blacklist,
+            "modPlatformBlacklist = :modPlatformBlacklist",
+            ":modPlatformBlacklist"
+        );
+        push!(
+            self.mod_channels,
+            "modChannels = :modChannels",
+            ":modChannels"
+        );
+        push!(
+            self.terms_and_privacy_accepted,
+            "termsAndPrivacyAccepted = :termsAndPrivacyAccepted",
+            ":termsAndPrivacyAccepted"
+        );
+        push!(
+            self.terms_and_privacy_accepted_checksum,
+            "termsAndPrivacyAcceptedChecksum = :termsAndPrivacyAcceptedChecksum",
+            ":termsAndPrivacyAcceptedChecksum"
+        );
+        push!(
+            self.installation_id,
+            "installationId = :installationId",
+            ":installationId"
+        );
+        push!(
+            self.active_account_uuid,
+            "activeAccountUuid = :activeAccountUuid",
+            ":activeAccountUuid"
+        );
+        push!(
+            self.gdl_account_uuid,
+            "gdlAccountUuid = :gdlAccountUuid",
+            ":gdlAccountUuid"
+        );
+        push!(
+            self.gdl_account_status,
+            "gdlAccountStatus = :gdlAccountStatus",
+            ":gdlAccountStatus"
+        );
+        push!(
+            self.default_instance_group,
+            "defaultInstanceGroup = :defaultInstanceGroup",
+            ":defaultInstanceGroup"
+        );
 
         if sets.is_empty() {
             return None;

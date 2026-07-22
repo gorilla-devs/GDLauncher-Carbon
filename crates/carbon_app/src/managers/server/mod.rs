@@ -135,8 +135,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     async fn load_servers(self) -> anyhow::Result<()> {
-        let db_servers = server_repo::get_all_servers(&self.app.db)
-            .await?;
+        let db_servers = server_repo::get_all_servers(&self.app.db).await?;
 
         let mut servers = self.servers.write().await;
         for db_server in db_servers {
@@ -186,8 +185,7 @@ impl ManagerRef<'_, ServerManager> {
             .read(|conn| {
                 // reads share one WAL snapshot
                 let snap = conn.snapshot()?;
-                let groups =
-                    server_repo::get_all_server_groups_ordered_by_group_index_conn(&snap)?;
+                let groups = server_repo::get_all_server_groups_ordered_by_group_index_conn(&snap)?;
                 let servers = server_repo::get_all_servers_ordered_by_index_conn(&snap)?;
                 Ok((groups, servers))
             })
@@ -280,9 +278,10 @@ impl ManagerRef<'_, ServerManager> {
         // index strictly smaller than the current minimum so ascending
         // sort on `index` puts the new row first.
         let group_id_val = group_id.0;
-        let min_index: Option<i32> = server_repo::min_index_server_in_group(&self.app.db, group_id_val)
-            .await?
-            .map(|s| s.index);
+        let min_index: Option<i32> =
+            server_repo::min_index_server_in_group(&self.app.db, group_id_val)
+                .await?
+                .map(|s| s.index);
         let next_index = min_index.map(|n| n - 1).unwrap_or(0);
 
         // If the new server is in the default server group, also give it a
@@ -534,9 +533,10 @@ impl ManagerRef<'_, ServerManager> {
 
         // Top-of-group insertion: pick an index smaller than the current min
         let group_id_val = group_id.0;
-        let min_index: Option<i32> = server_repo::min_index_server_in_group(&self.app.db, group_id_val)
-            .await?
-            .map(|s| s.index);
+        let min_index: Option<i32> =
+            server_repo::min_index_server_in_group(&self.app.db, group_id_val)
+                .await?
+                .map(|s| s.index);
         let next_index = min_index.map(|n| n - 1).unwrap_or(0);
 
         // If placing in the default group, also bump library_position to
@@ -623,8 +623,12 @@ impl ManagerRef<'_, ServerManager> {
                                 warn!("Failed to write server icon: {}", e);
                             } else {
                                 let sid = server_id.0;
-                                let _ = server_repo::set_server_icon_revision(&self.app.db, sid, Some(1))
-                                    .await;
+                                let _ = server_repo::set_server_icon_revision(
+                                    &self.app.db,
+                                    sid,
+                                    Some(1),
+                                )
+                                .await;
                             }
                         }
                     }
@@ -1011,8 +1015,7 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_SERVER_DETAILS, None);
 
         // Delete from DB
-        server_repo::delete_server(&self.app.db, id.0)
-            .await?;
+        server_repo::delete_server(&self.app.db, id.0).await?;
 
         // Delete files
         let shortpath = {
@@ -1682,8 +1685,7 @@ impl ManagerRef<'_, ServerManager> {
 
         // Query from cache with metadata joins
         // Caching is handled by the queue system (triggered on install, startup, and tab navigation)
-        let cached_mods = mfcdb::get_server_mods_full(&self.app.db, id.0)
-            .await?;
+        let cached_mods = mfcdb::get_server_mods_full(&self.app.db, id.0).await?;
 
         let mut addons: Vec<ServerAddon> = cached_mods
             .into_iter()
@@ -1703,9 +1705,7 @@ impl ManagerRef<'_, ServerManager> {
                     enabled: entry.enabled,
                     addon_type: entry.addon_type,
                     file_size: entry.filesize,
-                    has_image: entry.has_local_image
-                        || entry.has_cf_image
-                        || entry.has_mr_image,
+                    has_image: entry.has_local_image || entry.has_cf_image || entry.has_mr_image,
                     curseforge_project_id: entry.cf_project_id.map(|c| c as u32),
                     modrinth_project_id: entry.mr_project_id,
                 }
@@ -1848,8 +1848,7 @@ impl ManagerRef<'_, ServerManager> {
         tokio::fs::remove_file(&file_path).await?;
 
         // Remove cache entry
-        let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &addon_id)
-            .await;
+        let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &addon_id).await;
 
         // GC orphaned metadata
         self.app.meta_cache_manager().gc_mod_metadata().await;
@@ -2136,8 +2135,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn set_favorite(self, id: ServerId, favorite: bool) -> anyhow::Result<()> {
-        server_repo::set_server_favorite(&self.app.db, id.0, favorite)
-            .await?;
+        server_repo::set_server_favorite(&self.app.db, id.0, favorite).await?;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -2332,8 +2330,8 @@ impl ManagerRef<'_, ServerManager> {
             }
             ServerMoveTarget::EndOfGroup(group) => {
                 let group_val = group.0;
-                let target_idx = server_repo::count_servers_in_group(&self.app.db, group_val)
-                    .await? as i32;
+                let target_idx =
+                    server_repo::count_servers_in_group(&self.app.db, group_val).await? as i32;
 
                 let lib_pos = if group == default_group_id {
                     let (max_server_pos, max_group_pos) = self
@@ -2342,9 +2340,10 @@ impl ManagerRef<'_, ServerManager> {
                         .read(move |conn| {
                             // reads share one WAL snapshot
                             let snap = conn.snapshot()?;
-                            let srv =
-                                server_repo::max_library_position_server_in_group_conn(&snap, group_val)?
-                                    .and_then(|s| s.library_position);
+                            let srv = server_repo::max_library_position_server_in_group_conn(
+                                &snap, group_val,
+                            )?
+                            .and_then(|s| s.library_position);
                             let grp = server_repo::max_library_position_server_group_conn(&snap)?
                                 .and_then(|g| g.library_position);
                             Ok((srv, grp))
@@ -2370,8 +2369,8 @@ impl ManagerRef<'_, ServerManager> {
                     .ok_or_else(|| anyhow!("Target folder has no libraryPosition"))?;
 
                 let default_id = default_group_id.0;
-                let target_idx = server_repo::count_servers_in_group(&self.app.db, default_id)
-                    .await? as i32;
+                let target_idx =
+                    server_repo::count_servers_in_group(&self.app.db, default_id).await? as i32;
 
                 (default_group_id, target_idx, Some(lib_pos))
             }
@@ -2494,16 +2493,15 @@ impl ManagerRef<'_, ServerManager> {
         // so its last server also returns to the default group.
         if start_group != default_group_id && start_group != target_group {
             let start_group_id = start_group.0;
-            let remaining_count = server_repo::count_servers_in_group(&self.app.db, start_group_id)
-                .await?;
+            let remaining_count =
+                server_repo::count_servers_in_group(&self.app.db, start_group_id).await?;
 
             if remaining_count == 0 {
-                server_repo::delete_server_group(&self.app.db, start_group_id)
-                    .await?;
+                server_repo::delete_server_group(&self.app.db, start_group_id).await?;
                 self.app.invalidate(GET_GROUPS, None);
             } else if remaining_count == 1 {
-                if let Some(last) = server_repo::first_server_in_group(&self.app.db, start_group_id)
-                    .await?
+                if let Some(last) =
+                    server_repo::first_server_in_group(&self.app.db, start_group_id).await?
                 {
                     // Moving the last server out empties the group, which the
                     // recursive call's branch above then deletes. Release the
@@ -2571,9 +2569,10 @@ impl ManagerRef<'_, ServerManager> {
                     .read(move |conn| {
                         // reads share one WAL snapshot
                         let snap = conn.snapshot()?;
-                        let srv =
-                            server_repo::max_library_position_server_in_group_conn(&snap, default_id)?
-                                .and_then(|s| s.library_position);
+                        let srv = server_repo::max_library_position_server_in_group_conn(
+                            &snap, default_id,
+                        )?
+                        .and_then(|s| s.library_position);
                         let grp = server_repo::max_library_position_server_group_conn(&snap)?
                             .and_then(|g| g.library_position);
                         Ok((srv, grp))
@@ -2653,8 +2652,8 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Keep groupIndex in sync
-        let all_groups = server_repo::get_server_groups_with_library_position_ordered(&self.app.db)
-            .await?;
+        let all_groups =
+            server_repo::get_server_groups_with_library_position_ordered(&self.app.db).await?;
 
         // Interleaved app logic: restamp every group's index from the ordered
         // in-memory list. Runs in one writer dispatch, so no other write
@@ -2681,8 +2680,7 @@ impl ManagerRef<'_, ServerManager> {
     /// Generate a unique folder name by appending (1), (2), etc. if needed.
     async fn generate_unique_folder_name(&self, base_name: &str) -> anyhow::Result<String> {
         let base = base_name.to_string();
-        let existing = server_repo::find_server_group_by_name(&self.app.db, &base)
-            .await?;
+        let existing = server_repo::find_server_group_by_name(&self.app.db, &base).await?;
 
         if existing.is_none() {
             return Ok(base_name.to_string());
@@ -2692,8 +2690,7 @@ impl ManagerRef<'_, ServerManager> {
         loop {
             let candidate = format!("{} ({})", base_name, counter);
             let candidate_q = candidate.clone();
-            let exists = server_repo::find_server_group_by_name(&self.app.db, &candidate_q)
-                .await?;
+            let exists = server_repo::find_server_group_by_name(&self.app.db, &candidate_q).await?;
 
             if exists.is_none() {
                 return Ok(candidate);
@@ -2703,8 +2700,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn create_server_group(self, name: String) -> anyhow::Result<ServerGroupId> {
-        let group_count = server_repo::count_server_groups(&self.app.db)
-            .await? as i32;
+        let group_count = server_repo::count_server_groups(&self.app.db).await? as i32;
 
         let default_group_id = self.get_default_group().await?;
 
@@ -2716,8 +2712,9 @@ impl ManagerRef<'_, ServerManager> {
             .read(move |conn| {
                 // reads share one WAL snapshot
                 let snap = conn.snapshot()?;
-                let srv = server_repo::max_library_position_server_in_group_conn(&snap, default_id)?
-                    .and_then(|s| s.library_position);
+                let srv =
+                    server_repo::max_library_position_server_in_group_conn(&snap, default_id)?
+                        .and_then(|s| s.library_position);
                 let grp = server_repo::max_library_position_server_group_conn(&snap)?
                     .and_then(|g| g.library_position);
                 Ok((srv, grp))
@@ -2726,9 +2723,13 @@ impl ManagerRef<'_, ServerManager> {
 
         let next_library_pos = max_server_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0)) + 1;
 
-        let group_id =
-            server_repo::insert_server_group(&self.app.db, name, group_count, Some(next_library_pos))
-                .await?;
+        let group_id = server_repo::insert_server_group(
+            &self.app.db,
+            name,
+            group_count,
+            Some(next_library_pos),
+        )
+        .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -2741,8 +2742,7 @@ impl ManagerRef<'_, ServerManager> {
         name: String,
         target_position: i32,
     ) -> anyhow::Result<ServerGroupId> {
-        let group_count = server_repo::count_server_groups(&self.app.db)
-            .await? as i32;
+        let group_count = server_repo::count_server_groups(&self.app.db).await? as i32;
 
         let default_group_id = self.get_default_group().await?;
 
@@ -2799,8 +2799,7 @@ impl ManagerRef<'_, ServerManager> {
 
         let target_library_pos = if let Some(target_id) = target_server_id {
             let default_group_id = self.get_default_group().await?;
-            let target_server = server_repo::get_server(&self.app.db, target_id.0)
-                .await?;
+            let target_server = server_repo::get_server(&self.app.db, target_id.0).await?;
 
             target_server
                 .filter(|s| s.group_id == default_group_id.0)
@@ -2832,8 +2831,7 @@ impl ManagerRef<'_, ServerManager> {
 
         // Get all servers in default group and sort by name
         let default_id = default_group_id.0;
-        let servers = server_repo::get_servers_by_group(&self.app.db, default_id)
-            .await?;
+        let servers = server_repo::get_servers_by_group(&self.app.db, default_id).await?;
 
         let mut sortable_servers: Vec<(i32, String)> =
             servers.iter().map(|s| (s.id, s.name.clone())).collect();
@@ -2841,8 +2839,7 @@ impl ManagerRef<'_, ServerManager> {
 
         // Non-default server groups, sorted by name — rendered after
         // ungrouped servers in the library.
-        let groups = server_repo::get_all_server_groups(&self.app.db)
-            .await?;
+        let groups = server_repo::get_all_server_groups(&self.app.db).await?;
 
         let mut sortable_groups: Vec<(i32, String)> = groups
             .iter()
@@ -2897,8 +2894,7 @@ impl ManagerRef<'_, ServerManager> {
         group: ServerGroupId,
         name: String,
     ) -> anyhow::Result<()> {
-        server_repo::set_server_group_name(&self.app.db, group.0, &name)
-            .await?;
+        server_repo::set_server_group_name(&self.app.db, group.0, &name).await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -2910,9 +2906,7 @@ impl ManagerRef<'_, ServerManager> {
         let _index_lock = self.index_lock.lock().await;
 
         let group_id = group.0;
-        let any_servers = server_repo::count_servers_in_group(&self.app.db, group_id)
-            .await?
-            != 0;
+        let any_servers = server_repo::count_servers_in_group(&self.app.db, group_id).await? != 0;
 
         if any_servers {
             let default_group = self.get_default_group().await?;
@@ -2920,14 +2914,13 @@ impl ManagerRef<'_, ServerManager> {
             // Server-side oddity (preserved verbatim): base_index counts the
             // DEFAULT group, not the group being deleted.
             let default_id = default_group.0;
-            let base_index = server_repo::count_servers_in_group(&self.app.db, default_id)
-                .await? as i32;
+            let base_index =
+                server_repo::count_servers_in_group(&self.app.db, default_id).await? as i32;
 
             server_repo::delete_server_group_tx(&self.app.db, group_id, default_id, base_index)
                 .await?;
         } else {
-            server_repo::delete_server_group(&self.app.db, group_id)
-                .await?;
+            server_repo::delete_server_group(&self.app.db, group_id).await?;
         }
 
         self.app.invalidate(GET_GROUPS, None);

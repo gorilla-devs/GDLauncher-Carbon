@@ -92,7 +92,12 @@ mod tests {
     #[test]
     fn from_millis_matches_chrono() {
         let dt = from_millis(0).unwrap();
-        assert_eq!(dt, Utc.timestamp_millis_opt(0).unwrap().with_timezone(&Utc.fix()));
+        assert_eq!(
+            dt,
+            Utc.timestamp_millis_opt(0)
+                .unwrap()
+                .with_timezone(&Utc.fix())
+        );
     }
 
     #[test]
@@ -148,7 +153,8 @@ mod tests {
         for (text, expected_ms) in cases {
             let conn = Connection::open_in_memory().unwrap();
             conn.execute_batch("CREATE TABLE t (d DATETIME)").unwrap();
-            conn.execute("INSERT INTO t (d) VALUES (?)", [text]).unwrap();
+            conn.execute("INSERT INTO t (d) VALUES (?)", [text])
+                .unwrap();
 
             let back: DbDateTime = conn.query_row("SELECT d FROM t", [], |r| r.get(0)).unwrap();
             assert_eq!(

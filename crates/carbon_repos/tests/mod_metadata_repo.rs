@@ -1,7 +1,7 @@
-use carbon_repos::dbtypes::{from_millis, DbDateTime};
+use carbon_repos::db_exec::test_support::wg;
+use carbon_repos::dbtypes::{DbDateTime, from_millis};
 use carbon_repos::repos::mod_metadata as mm;
 use rusqlite::Connection;
-use carbon_repos::db_exec::test_support::wg;
 
 fn migrated_db() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -41,7 +41,8 @@ fn insert_and_find_by_64_byte_hashes() {
     let s1 = vec![0x11; 20];
 
     assert_eq!(
-        mm::insert_metadata_conn(&wg(&mut conn),
+        mm::insert_metadata_conn(
+            &wg(&mut conn),
             "meta-1",
             42,
             &s512,
@@ -70,17 +71,40 @@ fn insert_and_find_by_64_byte_hashes() {
     assert_eq!(row.last_updated_at, ts(7000).0, "freshness column written");
 
     // Same sha512 but wrong murmur2 -> no match (AND semantics).
-    assert!(mm::find_metadata_by_hashes_conn(&wg(&mut conn), &s512, 99).unwrap().is_none());
+    assert!(
+        mm::find_metadata_by_hashes_conn(&wg(&mut conn), &s512, 99)
+            .unwrap()
+            .is_none()
+    );
     // Different sha512 -> no match.
-    assert!(mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(0x01), 42).unwrap().is_none());
+    assert!(
+        mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(0x01), 42)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
 fn insert_metadata_accepts_all_none_optionals() {
     let (_d, mut conn) = migrated_db();
-    mm::insert_metadata_conn(&wg(&mut conn), "m", 1, &sha512(1), &[1, 2], "", None, None, None, None, None, ts(1))
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "m",
+        1,
+        &sha512(1),
+        &[1, 2],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
+    let row = mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(1), 1)
+        .unwrap()
         .unwrap();
-    let row = mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(1), 1).unwrap().unwrap();
     assert_eq!(row.name, None);
     assert_eq!(row.modid, None);
     assert_eq!(row.authors, None);
@@ -92,11 +116,31 @@ fn insert_metadata_accepts_all_none_optionals() {
 #[test]
 fn insert_local_image_stores_blob() {
     let (_d, mut conn) = migrated_db();
-    mm::insert_metadata_conn(&wg(&mut conn), "m", 1, &sha512(1), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
-    assert_eq!(mm::insert_local_image_conn(&wg(&mut conn), "m", &[9, 8, 7]).unwrap(), 1);
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "m",
+        1,
+        &sha512(1),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
+    assert_eq!(
+        mm::insert_local_image_conn(&wg(&mut conn), "m", &[9, 8, 7]).unwrap(),
+        1
+    );
     let data: Vec<u8> = conn
-        .query_row("SELECT data FROM LocalModImageCache WHERE metadataId = 'm'", [], |r| r.get(0))
+        .query_row(
+            "SELECT data FROM LocalModImageCache WHERE metadataId = 'm'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(data, vec![9, 8, 7]);
 }
@@ -107,15 +151,54 @@ fn insert_local_image_stores_blob() {
 fn gc_removes_only_true_orphans() {
     let (_d, mut conn) = migrated_db();
     // orphan: no file cache references it
-    mm::insert_metadata_conn(&wg(&mut conn), "orphan", 1, &sha512(1), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "orphan",
+        1,
+        &sha512(1),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
     // referenced by an instance file cache
-    mm::insert_metadata_conn(&wg(&mut conn), "inst", 2, &sha512(2), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "inst",
+        2,
+        &sha512(2),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
     insert_mfc(&conn, 1, "a.jar", "inst");
     // referenced by a server file cache
-    mm::insert_metadata_conn(&wg(&mut conn), "srv", 3, &sha512(3), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "srv",
+        3,
+        &sha512(3),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
     conn.execute(
         "INSERT INTO ServerModFileCache (id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId)
          VALUES ('sid', 0, 5, 's.jar', 1, 1, 'mods', 'srv')",
@@ -123,17 +206,53 @@ fn gc_removes_only_true_orphans() {
     )
     .unwrap();
 
-    assert_eq!(mm::gc_orphan_metadata_conn(&wg(&mut conn)).unwrap(), 1, "only the orphan is deleted");
-    assert!(mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(1), 1).unwrap().is_none());
-    assert!(mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(2), 2).unwrap().is_some());
-    assert!(mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(3), 3).unwrap().is_some());
+    assert_eq!(
+        mm::gc_orphan_metadata_conn(&wg(&mut conn)).unwrap(),
+        1,
+        "only the orphan is deleted"
+    );
+    assert!(
+        mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(1), 1)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(2), 2)
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        mm::find_metadata_by_hashes_conn(&wg(&mut conn), &sha512(3), 3)
+            .unwrap()
+            .is_some()
+    );
 }
 
 // --- CurseForge cache upsert (composite conflict, mirror-of-PCR) ------------
 
 #[allow(clippy::too_many_arguments)]
-fn cf_upsert(conn: &impl carbon_repos::db_exec::WriteAccess, metadata_id: &str, project_id: i32, file_id: i32, name: &str, cached_at: i64) -> String {
-    mm::upsert_cf_mod_cache_conn(conn, 0, project_id, file_id, name, "v", "slug", "sum", "auth", 2, "paths", ts(cached_at), metadata_id,
+fn cf_upsert(
+    conn: &impl carbon_repos::db_exec::WriteAccess,
+    metadata_id: &str,
+    project_id: i32,
+    file_id: i32,
+    name: &str,
+    cached_at: i64,
+) -> String {
+    mm::upsert_cf_mod_cache_conn(
+        conn,
+        0,
+        project_id,
+        file_id,
+        name,
+        "v",
+        "slug",
+        "sum",
+        "auth",
+        2,
+        "paths",
+        ts(cached_at),
+        metadata_id,
     )
     .unwrap()
 }
@@ -141,10 +260,36 @@ fn cf_upsert(conn: &impl carbon_repos::db_exec::WriteAccess, metadata_id: &str, 
 #[test]
 fn cf_upsert_inserts_then_composite_conflict_keeps_original_metadata_id() {
     let (_d, mut conn) = migrated_db();
-    mm::insert_metadata_conn(&wg(&mut conn), "meta-A", 1, &sha512(1), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
-    mm::insert_metadata_conn(&wg(&mut conn), "meta-B", 2, &sha512(2), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "meta-A",
+        1,
+        &sha512(1),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "meta-B",
+        2,
+        &sha512(2),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
 
     // First insert under meta-A.
     let returned = cf_upsert(&wg(&mut conn), "meta-A", 500, 900, "first", 100);
@@ -154,13 +299,22 @@ fn cf_upsert_inserts_then_composite_conflict_keeps_original_metadata_id() {
     // PCR's DO UPDATE list never set metadataId, so the surviving row keeps
     // meta-A. The returned metadataId must be meta-A (NOT the passed meta-B).
     let returned = cf_upsert(&wg(&mut conn), "meta-B", 500, 900, "second", 200);
-    assert_eq!(returned, "meta-A", "composite conflict preserves the original metadataId");
+    assert_eq!(
+        returned, "meta-A",
+        "composite conflict preserves the original metadataId"
+    );
 
     // Exactly one CF row, keyed by meta-A, with the refreshed fields.
-    let row = mm::get_cf_cache_by_metadata_conn(&wg(&mut conn), "meta-A").unwrap().unwrap();
+    let row = mm::get_cf_cache_by_metadata_conn(&wg(&mut conn), "meta-A")
+        .unwrap()
+        .unwrap();
     assert_eq!(row.name, "second");
     assert_eq!(row.cached_at, ts(200).0);
-    assert!(mm::get_cf_cache_by_metadata_conn(&wg(&mut conn), "meta-B").unwrap().is_none());
+    assert!(
+        mm::get_cf_cache_by_metadata_conn(&wg(&mut conn), "meta-B")
+            .unwrap()
+            .is_none()
+    );
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM CurseForgeModCache", [], |r| r.get(0))
         .unwrap();
@@ -170,14 +324,33 @@ fn cf_upsert_inserts_then_composite_conflict_keeps_original_metadata_id() {
 #[test]
 fn cf_get_by_metadata_reads_cached_at() {
     let (_d, mut conn) = migrated_db();
-    mm::insert_metadata_conn(&wg(&mut conn), "m", 1, &sha512(1), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "m",
+        1,
+        &sha512(1),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
     cf_upsert(&wg(&mut conn), "m", 1, 2, "n", 12345);
-    let row = mm::get_cf_cache_by_metadata_conn(&wg(&mut conn), "m").unwrap().unwrap();
+    let row = mm::get_cf_cache_by_metadata_conn(&wg(&mut conn), "m")
+        .unwrap()
+        .unwrap();
     assert_eq!(row.project_id, 1);
     assert_eq!(row.file_id, 2);
     assert_eq!(row.cached_at, ts(12345).0);
-    assert!(mm::get_cf_cache_by_metadata_conn(&wg(&mut conn), "nope").unwrap().is_none());
+    assert!(
+        mm::get_cf_cache_by_metadata_conn(&wg(&mut conn), "nope")
+            .unwrap()
+            .is_none()
+    );
 }
 
 // --- Modrinth cache upsert --------------------------------------------------
@@ -185,22 +358,83 @@ fn cf_get_by_metadata_reads_cached_at() {
 #[test]
 fn mr_upsert_composite_conflict_keeps_original_metadata_id() {
     let (_d, mut conn) = migrated_db();
-    mm::insert_metadata_conn(&wg(&mut conn), "mA", 1, &sha512(1), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
-    mm::insert_metadata_conn(&wg(&mut conn), "mB", 2, &sha512(2), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "mA",
+        1,
+        &sha512(1),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "mB",
+        2,
+        &sha512(2),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
 
-    let r = mm::upsert_mr_mod_cache_conn(&wg(&mut conn), "sha", "proj", "ver", "t1", "v", "slug", "d", "a", 2, "", "f.jar", "http://u", ts(1), "mA",
+    let r = mm::upsert_mr_mod_cache_conn(
+        &wg(&mut conn),
+        "sha",
+        "proj",
+        "ver",
+        "t1",
+        "v",
+        "slug",
+        "d",
+        "a",
+        2,
+        "",
+        "f.jar",
+        "http://u",
+        ts(1),
+        "mA",
     )
     .unwrap();
     assert_eq!(r, "mA");
 
-    let r = mm::upsert_mr_mod_cache_conn(&wg(&mut conn), "sha", "proj", "ver", "t2", "v", "slug", "d", "a", 2, "", "f.jar", "http://u", ts(9), "mB",
+    let r = mm::upsert_mr_mod_cache_conn(
+        &wg(&mut conn),
+        "sha",
+        "proj",
+        "ver",
+        "t2",
+        "v",
+        "slug",
+        "d",
+        "a",
+        2,
+        "",
+        "f.jar",
+        "http://u",
+        ts(9),
+        "mB",
     )
     .unwrap();
-    assert_eq!(r, "mA", "composite (projectId, versionId) conflict preserves metadataId");
+    assert_eq!(
+        r, "mA",
+        "composite (projectId, versionId) conflict preserves metadataId"
+    );
 
-    let row = mm::get_mr_cache_by_metadata_conn(&wg(&mut conn), "mA").unwrap().unwrap();
+    let row = mm::get_mr_cache_by_metadata_conn(&wg(&mut conn), "mA")
+        .unwrap()
+        .unwrap();
     assert_eq!(row.title, "t2");
     assert_eq!(row.cached_at, ts(9).0);
 }
@@ -210,11 +444,27 @@ fn mr_upsert_composite_conflict_keeps_original_metadata_id() {
 #[test]
 fn cf_image_upsert_marks_stale_and_download_clears_it() {
     let (_d, mut conn) = migrated_db();
-    mm::insert_metadata_conn(&wg(&mut conn), "m", 1, &sha512(1), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "m",
+        1,
+        &sha512(1),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
 
     // First upsert: inserts stale (upToDate = 0, data NULL).
-    assert_eq!(mm::upsert_cf_image_conn(&wg(&mut conn), "m", "url-1").unwrap(), 1);
+    assert_eq!(
+        mm::upsert_cf_image_conn(&wg(&mut conn), "m", "url-1").unwrap(),
+        1
+    );
     let (url, data, up): (String, Option<Vec<u8>>, i32) = conn
         .query_row(
             "SELECT url, data, upToDate FROM CurseForgeModImageCache WHERE metadataId = 'm'",
@@ -227,7 +477,10 @@ fn cf_image_upsert_marks_stale_and_download_clears_it() {
     assert_eq!(up, 0);
 
     // Download stores the blob and marks it up to date.
-    assert_eq!(mm::mark_cf_image_downloaded_conn(&wg(&mut conn), "m", &[1, 2, 3]).unwrap(), 1);
+    assert_eq!(
+        mm::mark_cf_image_downloaded_conn(&wg(&mut conn), "m", &[1, 2, 3]).unwrap(),
+        1
+    );
     let (data, up): (Option<Vec<u8>>, i32) = conn
         .query_row(
             "SELECT data, upToDate FROM CurseForgeModImageCache WHERE metadataId = 'm'",
@@ -239,7 +492,10 @@ fn cf_image_upsert_marks_stale_and_download_clears_it() {
     assert_eq!(up, 1);
 
     // Re-upsert (url change) re-marks stale but preserves the existing blob.
-    assert_eq!(mm::upsert_cf_image_conn(&wg(&mut conn), "m", "url-2").unwrap(), 1);
+    assert_eq!(
+        mm::upsert_cf_image_conn(&wg(&mut conn), "m", "url-2").unwrap(),
+        1
+    );
     let (url, data, up): (String, Option<Vec<u8>>, i32) = conn
         .query_row(
             "SELECT url, data, upToDate FROM CurseForgeModImageCache WHERE metadataId = 'm'",
@@ -248,15 +504,32 @@ fn cf_image_upsert_marks_stale_and_download_clears_it() {
         )
         .unwrap();
     assert_eq!(url, "url-2");
-    assert_eq!(data, Some(vec![1, 2, 3]), "existing blob survives the stale re-mark");
+    assert_eq!(
+        data,
+        Some(vec![1, 2, 3]),
+        "existing blob survives the stale re-mark"
+    );
     assert_eq!(up, 0);
 }
 
 #[test]
 fn mr_image_upsert_and_download() {
     let (_d, mut conn) = migrated_db();
-    mm::insert_metadata_conn(&wg(&mut conn), "m", 1, &sha512(1), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "m",
+        1,
+        &sha512(1),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
     mm::upsert_mr_image_conn(&wg(&mut conn), "m", "u").unwrap();
     mm::mark_mr_image_downloaded_conn(&wg(&mut conn), "m", &[7]).unwrap();
     let (data, up): (Option<Vec<u8>>, i32) = conn
@@ -276,15 +549,56 @@ fn mr_image_upsert_and_download() {
 fn cf_export_enrich_includes_modrinth_cross_reference() {
     let (_d, mut conn) = migrated_db();
     // metadata with BOTH a CF and MR cache row -> cross-reference present.
-    mm::insert_metadata_conn(&wg(&mut conn), "both", 1, &sha512(1), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "both",
+        1,
+        &sha512(1),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
     cf_upsert(&wg(&mut conn), "both", 111, 222, "cf-name", 1);
-    mm::upsert_mr_mod_cache_conn(&wg(&mut conn), "sha", "mrproj", "mrver", "t", "v", "mrslug", "d", "a", 2, "", "f", "u", ts(1), "both",
+    mm::upsert_mr_mod_cache_conn(
+        &wg(&mut conn),
+        "sha",
+        "mrproj",
+        "mrver",
+        "t",
+        "v",
+        "mrslug",
+        "d",
+        "a",
+        2,
+        "",
+        "f",
+        "u",
+        ts(1),
+        "both",
     )
     .unwrap();
     // metadata with only a CF cache row -> mr_* columns NULL.
-    mm::insert_metadata_conn(&wg(&mut conn), "cfonly", 2, &sha512(2), &[1], "", None, None, None, None, None, ts(1))
-        .unwrap();
+    mm::insert_metadata_conn(
+        &wg(&mut conn),
+        "cfonly",
+        2,
+        &sha512(2),
+        &[1],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        ts(1),
+    )
+    .unwrap();
     cf_upsert(&wg(&mut conn), "cfonly", 333, 444, "cf2", 1);
 
     let both = mm::get_cf_export_enrich_by_project_conn(&wg(&mut conn), 111).unwrap();
@@ -304,4 +618,3 @@ fn cf_export_enrich_includes_modrinth_cross_reference() {
     assert_eq!(mr[0].title, "t");
     assert_eq!(mr[0].urlslug, "mrslug");
 }
-

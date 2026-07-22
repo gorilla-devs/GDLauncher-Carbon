@@ -24,7 +24,10 @@ impl Actor {
                 job(&mut conn);
             }
         });
-        Actor { tx, _handle: handle }
+        Actor {
+            tx,
+            _handle: handle,
+        }
     }
 
     async fn run<T, F>(&self, f: F) -> DbResult<T>
@@ -278,7 +281,11 @@ pub struct Db {
 /// silently return the current mode as a query result instead of executing,
 /// which `execute_batch` can't express. Skip it here and let the writer own
 /// journal-mode exclusively.
-fn apply_runtime_pragmas(conn: &Connection, foreign_keys: bool, read_only: bool) -> rusqlite::Result<()> {
+fn apply_runtime_pragmas(
+    conn: &Connection,
+    foreign_keys: bool,
+    read_only: bool,
+) -> rusqlite::Result<()> {
     if !read_only {
         conn.execute_batch("PRAGMA journal_mode = WAL;")?;
     }
@@ -290,7 +297,11 @@ fn apply_runtime_pragmas(conn: &Connection, foreign_keys: bool, read_only: bool)
     )?;
     // FK enforcement is per-connection and decided by the startup sweep (spec
     // §7): every runtime connection must agree, so the verdict is threaded in.
-    conn.pragma_update(None, "foreign_keys", &if foreign_keys { "ON" } else { "OFF" })
+    conn.pragma_update(
+        None,
+        "foreign_keys",
+        &if foreign_keys { "ON" } else { "OFF" },
+    )
 }
 
 impl Db {
@@ -311,7 +322,11 @@ impl Db {
             apply_runtime_pragmas(&rconn, foreign_keys, true)?;
             readers.push(Actor::spawn(rconn));
         }
-        Ok(Db { writer, readers, next_reader: AtomicUsize::new(0) })
+        Ok(Db {
+            writer,
+            readers,
+            next_reader: AtomicUsize::new(0),
+        })
     }
 
     /// Runs `f` on the write-pool connection, handing it a [`WriteGuard`]
@@ -463,8 +478,13 @@ mod tests {
         // is opened SQLITE_OPEN_READ_ONLY, so this cannot silently succeed. A
         // `ReadGuard` cannot even express a write, so this reaches for the raw
         // connection to prove the OS-level read-only flag still refuses it.
-        let err = db.read(|c| Ok(c.raw().execute_batch("CREATE TABLE nope (x)")?)).await;
-        assert!(err.is_err(), "write through the read pool must fail loudly, got {err:?}");
+        let err = db
+            .read(|c| Ok(c.raw().execute_batch("CREATE TABLE nope (x)")?))
+            .await;
+        assert!(
+            err.is_err(),
+            "write through the read pool must fail loudly, got {err:?}"
+        );
         // The same statement through the write pool succeeds.
         db.write(|c| Ok(c.execute_batch("CREATE TABLE nope (x)")?))
             .await
