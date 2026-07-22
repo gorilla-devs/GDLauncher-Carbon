@@ -1014,8 +1014,9 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
 
-        // Delete from DB
-        server_repo::delete_server(&self.app.db, id.0).await?;
+        // Delete from DB, together with the server's cached mod rows: the
+        // cascade only clears those while foreign keys are enforced.
+        server_repo::delete_server_tx(&self.app.db, id.0).await?;
 
         // Delete files
         let shortpath = {
