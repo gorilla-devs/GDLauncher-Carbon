@@ -70,9 +70,14 @@ fn probe_open(db_path: &Path) -> ExitCode {
             match kind {
                 RefusalKind::BackwardsMigration => println!("PROBE:REFUSE|BACKWARDS_MIGRATION"),
                 RefusalKind::Diverged { version } => println!("PROBE:REFUSE|DIVERGED|{version}"),
-                RefusalKind::DowngradeFailed { snapshot_path } => {
-                    println!("PROBE:REFUSE|DOWNGRADE_FAILED|{}", snapshot_path.display())
-                }
+                RefusalKind::DowngradeFailed { snapshot_path } => println!(
+                    "PROBE:REFUSE|DOWNGRADE_FAILED|{}",
+                    snapshot_path
+                        .as_deref()
+                        .map(Path::display)
+                        .map(|d| d.to_string())
+                        .unwrap_or_default()
+                ),
             }
             ExitCode::FAILURE
         }

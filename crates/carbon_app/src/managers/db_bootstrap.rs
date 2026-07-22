@@ -21,8 +21,8 @@ pub enum DatabaseError {
     BackwardsMigration,
     #[error("database history diverged from this build at migration {0}")]
     Diverged(i32),
-    #[error("database downgrade failed; a snapshot was preserved at {0}")]
-    DowngradeFailed(String),
+    #[error("database downgrade failed and was rolled back{}", .0.as_ref().map(|p| format!("; a snapshot was preserved at {p}")).unwrap_or_default())]
+    DowngradeFailed(Option<String>),
     #[error("database file is corrupt or not a database")]
     Corrupt,
     #[error("database migration failed")]
@@ -56,7 +56,9 @@ enum DbStatus {
     Downgraded,
     BackwardsMigration,
     Diverged(i32),
-    DowngradeFailed(String),
+    /// Carries the pre-downgrade snapshot only when restoring it would change
+    /// the database; the recovery screen hides its restore rung without one.
+    DowngradeFailed(Option<String>),
     Corrupt,
     MigrationFailed,
 }
@@ -70,7 +72,10 @@ impl DbStatus {
             DbStatus::Downgraded => "_STATUS_:DB_DOWNGRADED".to_string(),
             DbStatus::BackwardsMigration => "_STATUS_:BACKWARDS_MIGRATION".to_string(),
             DbStatus::Diverged(_) => "_STATUS_:DB_DIVERGED".to_string(),
-            DbStatus::DowngradeFailed(path) => format!("_STATUS_:DB_DOWNGRADE_FAILED|{path}"),
+            DbStatus::DowngradeFailed(Some(path)) => {
+                format!("_STATUS_:DB_DOWNGRADE_FAILED|{path}")
+            }
+            DbStatus::DowngradeFailed(None) => "_STATUS_:DB_DOWNGRADE_FAILED".to_string(),
             DbStatus::Corrupt => "_STATUS_:DB_CORRUPT".to_string(),
             DbStatus::MigrationFailed => "_STATUS_:DB_MIGRATION_FAILED".to_string(),
         }
@@ -113,7 +118,7 @@ fn classify_open(result: DbResult<OpenVerdict>) -> Result<Option<DbStatus>, DbSt
             Err(DbStatus::Diverged(version))
         }
         Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed { snapshot_path })) => Err(
-            DbStatus::DowngradeFailed(snapshot_path.display().to_string()),
+            DbStatus::DowngradeFailed(snapshot_path.map(|p| p.display().to_string())),
         ),
         Err(e) if is_corruption(&e) => Err(DbStatus::Corrupt),
         Err(_) => Err(DbStatus::MigrationFailed),
@@ -509,7 +514,8 @@ mod test {
         );
         assert_eq!(DbStatus::Diverged(7).status_line(), "_STATUS_:DB_DIVERGED");
         assert_eq!(
-            DbStatus::DowngradeFailed("/tmp/gdl_conf.pre-downgrade.db".to_string()).status_line(),
+            DbStatus::DowngradeFailed(Some("/tmp/gdl_conf.pre-downgrade.db".to_string()))
+                .status_line(),
             "_STATUS_:DB_DOWNGRADE_FAILED|/tmp/gdl_conf.pre-downgrade.db"
         );
         assert_eq!(DbStatus::Corrupt.status_line(), "_STATUS_:DB_CORRUPT");
@@ -520,12 +526,23 @@ mod test {
     }
 
     #[test]
+    fn downgrade_failed_line_omits_the_payload_when_there_is_no_snapshot() {
+        // The recovery screen keys its restore rung off the payload's presence,
+        // so a rolled-back down-run must emit the bare event: restoring a
+        // snapshot identical to the database loops on the recommended action.
+        assert_eq!(
+            DbStatus::DowngradeFailed(None).status_line(),
+            "_STATUS_:DB_DOWNGRADE_FAILED"
+        );
+    }
+
+    #[test]
     fn downgrade_failed_line_carries_a_windows_path_verbatim() {
         // The snapshot payload can contain a drive-letter colon; Electron parses
         // it by stripping the `_STATUS_:` prefix, so the path travels intact.
         let path = "C:\\Users\\gd\\gdl_conf.pre-downgrade.db";
         assert_eq!(
-            DbStatus::DowngradeFailed(path.to_string()).status_line(),
+            DbStatus::DowngradeFailed(Some(path.to_string())).status_line(),
             format!("_STATUS_:DB_DOWNGRADE_FAILED|{path}")
         );
     }
@@ -549,9 +566,9 @@ mod test {
         );
         assert_eq!(
             classify_open(Ok(OpenVerdict::Refuse(RefusalKind::DowngradeFailed {
-                snapshot_path: PathBuf::from("/tmp/snap.db"),
+                snapshot_path: Some(PathBuf::from("/tmp/snap.db")),
             }))),
-            Err(DbStatus::DowngradeFailed("/tmp/snap.db".to_string()))
+            Err(DbStatus::DowngradeFailed(Some("/tmp/snap.db".to_string())))
         );
         assert_eq!(
             classify_open(Err(corrupt_sqlite_error(
@@ -595,7 +612,7 @@ mod test {
         for status in [
             DbStatus::BackwardsMigration,
             DbStatus::Diverged(2),
-            DbStatus::DowngradeFailed("/tmp/s.db".to_string()),
+            DbStatus::DowngradeFailed(Some("/tmp/s.db".to_string())),
             DbStatus::Corrupt,
             DbStatus::MigrationFailed,
         ] {
