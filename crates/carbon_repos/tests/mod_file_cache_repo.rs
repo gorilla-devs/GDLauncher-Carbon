@@ -998,3 +998,173 @@ fn instance_mod_exists_by_mr_project_matches_scope() {
             .is_none()
     );
 }
+
+// --- export joins -----------------------------------------------------------
+//
+// The three archive exporters build their manifests from these rows, and a
+// drift here does not fail: it emits a modpack with mods missing or
+// misattributed, which the author only discovers after sharing it. The
+// properties the exporters depend on are that a file with no metadata is
+// dropped, a file whose platform cache is absent still comes back (so it can be
+// bundled as an override instead), and no join ever duplicates a file.
+
+/// A file plus its metadata, and optionally each platform's cache row.
+fn seed_export_file(
+    conn: &mut Connection,
+    instance_id: i32,
+    filename: &str,
+    metadata_id: &str,
+    cf_project: i32,
+    with_cf: bool,
+    with_mr: bool,
+) {
+    insert_metadata(conn, metadata_id, 7, b"sha512", b"sha1", None, None);
+    // CurseForgeModCache is UNIQUE on (projectId, fileId) and ModrinthModCache
+    // on its own ids, so each file needs its own; `cf_project` identifies the
+    // file across both platforms.
+    if with_cf {
+        insert_cf(
+            conn,
+            metadata_id,
+            cf_project,
+            cf_project + 1,
+            "n",
+            "s",
+            1,
+            "",
+            0,
+        );
+    }
+    if with_mr {
+        insert_mr(
+            conn,
+            metadata_id,
+            &format!("proj{cf_project}"),
+            &format!("ver{cf_project}"),
+            "t",
+            "s",
+            "https://f",
+            0,
+        );
+    }
+    mfc::upsert_mod_file_cache_conn(
+        &wg(conn),
+        instance_id,
+        filename,
+        1,
+        true,
+        "mods",
+        metadata_id,
+        ts(1),
+    )
+    .unwrap();
+}
+
+#[test]
+fn export_joins_drop_files_whose_metadata_is_missing() {
+    let (_d, mut conn) = migrated_db();
+    seed_export_file(&mut conn, 1, "kept.jar", "m1", 500, true, true);
+    // A cache row pointing at metadata that is not there: the inner join drops
+    // it, matching the `Some(metadata) else continue` the exporters had.
+    mfc::upsert_mod_file_cache_conn(
+        &wg(&mut conn),
+        1,
+        "orphan.jar",
+        1,
+        true,
+        "mods",
+        "does_not_exist",
+        ts(1),
+    )
+    .unwrap();
+
+    for names in [
+        mfc::get_instance_cf_export_files_conn(&wg(&mut conn), 1)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.filename)
+            .collect::<Vec<_>>(),
+        mfc::get_instance_mr_export_files_conn(&wg(&mut conn), 1)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.filename)
+            .collect(),
+        mfc::get_instance_gdl_export_files_conn(&wg(&mut conn), 1)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.filename)
+            .collect(),
+    ] {
+        assert_eq!(names, vec!["kept.jar".to_string()]);
+    }
+}
+
+#[test]
+fn export_joins_keep_files_with_no_platform_cache() {
+    // Such a file is not resolvable from a platform and must be bundled into
+    // the archive's overrides instead, so it has to reach the exporter at all.
+    let (_d, mut conn) = migrated_db();
+    seed_export_file(&mut conn, 1, "local.jar", "m1", 500, false, false);
+
+    let cf = mfc::get_instance_cf_export_files_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(cf.len(), 1);
+    assert_eq!(cf[0].cf_project_id, None);
+    assert_eq!(cf[0].cf_file_id, None);
+
+    let mr = mfc::get_instance_mr_export_files_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(mr.len(), 1);
+    assert_eq!(mr[0].mr_file_url, None);
+
+    let gdl = mfc::get_instance_gdl_export_files_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(gdl.len(), 1);
+    assert_eq!(gdl[0].cf_project_id, None);
+    assert_eq!(gdl[0].mr_project_id, None);
+}
+
+#[test]
+fn export_joins_carry_platform_ids_and_hashes_through() {
+    let (_d, mut conn) = migrated_db();
+    seed_export_file(&mut conn, 1, "both.jar", "m1", 500, true, true);
+
+    let cf = mfc::get_instance_cf_export_files_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(cf[0].cf_project_id, Some(500));
+    assert_eq!(cf[0].cf_file_id, Some(501));
+
+    let mr = mfc::get_instance_mr_export_files_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(mr[0].mr_file_url.as_deref(), Some("https://f"));
+    assert_eq!(mr[0].sha512, b"sha512");
+    assert_eq!(mr[0].sha1, b"sha1");
+
+    let gdl = mfc::get_instance_gdl_export_files_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(gdl[0].cf_project_id, Some(500));
+    assert_eq!(gdl[0].mr_project_id.as_deref(), Some("proj500"));
+    assert_eq!(gdl[0].murmur2, 7);
+}
+
+#[test]
+fn export_joins_never_duplicate_a_file() {
+    // Both platform caches are keyed by metadataId as a primary key, so neither
+    // left join can multiply a row. Pinned because a manifest built from
+    // duplicated rows would list the same mod twice.
+    let (_d, mut conn) = migrated_db();
+    seed_export_file(&mut conn, 1, "a.jar", "m1", 500, true, true);
+    seed_export_file(&mut conn, 1, "b.jar", "m2", 600, true, true);
+
+    assert_eq!(
+        mfc::get_instance_gdl_export_files_conn(&wg(&mut conn), 1)
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn export_joins_are_scoped_to_the_requested_instance() {
+    let (_d, mut conn) = migrated_db();
+    seed_export_file(&mut conn, 1, "mine.jar", "m1", 500, true, true);
+    seed_export_file(&mut conn, 2, "theirs.jar", "m2", 600, true, true);
+
+    let rows = mfc::get_instance_cf_export_files_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].filename, "mine.jar");
+}
