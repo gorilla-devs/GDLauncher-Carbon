@@ -1153,8 +1153,14 @@ impl ManagerRef<'_, ServerManager> {
             }
         });
 
-        // Load modloader launch config
-        let launch_config = modloader_launch::get_launch_config(&server_path).await?;
+        // Load modloader launch config, re-deriving a stale one that names
+        // nothing to launch from what is actually installed.
+        let launch_config = modloader_launch::resolve_launch_config(
+            &server_path,
+            db_server.modloader_type.as_deref(),
+            db_server.modloader_version.as_deref(),
+        )
+        .await?;
 
         // Start server via provider
         let provider = self.get_provider();
