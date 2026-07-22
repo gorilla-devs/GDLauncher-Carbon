@@ -85,12 +85,15 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
                 ));
             }
         }
-        // 3. multi-param queries must use named params (no bare '?'), scanning
-        // only outside string literals so a literal '?' in a text value is not
-        // mistaken for a positional placeholder.
+        // 3. every param must be named (no bare '?'), scanning only outside
+        // string literals so a literal '?' in a text value is not mistaken for a
+        // positional placeholder. The generated wrappers bind a name/value slice,
+        // which routes to rusqlite's named binding and never fills a positional
+        // slot — an unbound placeholder then reads as NULL rather than failing —
+        // so this holds however many named params the query also declares.
         // CENSUS-RULE: checker.positional-param
-        if q.params.len() > 1 && sql_has_positional_param(q.sql) {
-            violations.push(format!("{}: multi-param query uses positional '?'", q.name));
+        if sql_has_positional_param(q.sql) {
+            violations.push(format!("{}: query uses positional '?'", q.name));
         }
         // 4. result shape vs COLUMNS metadata
         if let Some(cols) = q.columns {
@@ -432,10 +435,22 @@ pub fn check_query_plans(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
             Ok(d) => d,
             Err(_) => continue,
         };
+        // The plan names whatever the FROM/JOIN clause bound the table to, so
+        // each guarded table is matched against its own name plus any alias the
+        // query gives it.
+        let guarded_names: Vec<(&str, Vec<String>)> = SCAN_GUARDED_TABLES
+            .iter()
+            .map(|table| {
+                let mut names = vec![(*table).to_string()];
+                names.extend(table_aliases(q.sql, table));
+                (*table, names)
+            })
+            .collect();
+
         for detail in &details {
-            for table in SCAN_GUARDED_TABLES {
+            for (table, names) in &guarded_names {
                 // CENSUS-RULE: checker.query-plan-full-scan
-                if plan_full_scans_table(detail, table) {
+                if names.iter().any(|n| plan_full_scans_table(detail, n)) {
                     violations.push(format!(
                         "{}: query plan full-scans guarded table '{}' ({}); add an index/PK filter or allowlist it",
                         q.name,
@@ -447,6 +462,129 @@ pub fn check_query_plans(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
         }
     }
     violations
+}
+
+/// Splits `sql` into identifier and single-character punctuation tokens,
+/// unwrapping quoted identifiers and dropping string literals. Enough structure
+/// to tell an alias from the keyword or punctuation that would otherwise follow
+/// a table name; not a SQL parser.
+fn sql_tokens(sql: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut chars = sql.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '"' | '`' | '[' => {
+                let close = if c == '[' { ']' } else { c };
+                let mut ident = String::new();
+                for n in chars.by_ref() {
+                    if n == close {
+                        break;
+                    }
+                    ident.push(n);
+                }
+                out.push(ident);
+            }
+            '\'' => {
+                // Skip the literal; '' is an embedded quote, not a terminator.
+                while let Some(n) = chars.next() {
+                    if n == '\'' {
+                        if chars.peek() == Some(&'\'') {
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            c if c.is_alphanumeric() || c == '_' => {
+                let mut ident = String::from(c);
+                while let Some(&n) = chars.peek() {
+                    if n.is_alphanumeric() || n == '_' {
+                        ident.push(n);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                out.push(ident);
+            }
+            c if c.is_whitespace() => {}
+            other => out.push(other.to_string()),
+        }
+    }
+    out
+}
+
+/// Names `sql` binds `table` to, so a plan naming the alias is still recognised
+/// as scanning the guarded table. Only a bare or `AS`-introduced identifier
+/// directly after the table name counts; a keyword or punctuation there means
+/// the table was not aliased.
+fn table_aliases(sql: &str, table: &str) -> Vec<String> {
+    /// Words that may legally follow a table reference without being an alias.
+    const NOT_AN_ALIAS: &[&str] = &[
+        "AS",
+        "ON",
+        "USING",
+        "WHERE",
+        "GROUP",
+        "ORDER",
+        "LIMIT",
+        "OFFSET",
+        "HAVING",
+        "JOIN",
+        "INNER",
+        "LEFT",
+        "RIGHT",
+        "FULL",
+        "CROSS",
+        "NATURAL",
+        "OUTER",
+        "UNION",
+        "EXCEPT",
+        "INTERSECT",
+        "SET",
+        "VALUES",
+        "RETURNING",
+        "WINDOW",
+        "AND",
+        "OR",
+        "NOT",
+        "SELECT",
+        "FROM",
+        "INDEXED",
+        "BY",
+        "WITH",
+    ];
+
+    let tokens = sql_tokens(sql);
+    let mut aliases = Vec::new();
+
+    for (i, token) in tokens.iter().enumerate() {
+        if !token.eq_ignore_ascii_case(table) {
+            continue;
+        }
+        let mut j = i + 1;
+        if tokens.get(j).is_some_and(|t| t.eq_ignore_ascii_case("AS")) {
+            j += 1;
+        }
+        let Some(candidate) = tokens.get(j) else {
+            continue;
+        };
+        let is_identifier = candidate
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphabetic() || c == '_');
+        if is_identifier
+            && !NOT_AN_ALIAS
+                .iter()
+                .any(|k| candidate.eq_ignore_ascii_case(k))
+        {
+            aliases.push(candidate.clone());
+        }
+    }
+
+    aliases
 }
 
 /// True when an EQP `detail` line describes a full table scan of `table` — a
