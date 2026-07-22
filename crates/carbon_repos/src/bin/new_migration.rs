@@ -76,15 +76,7 @@ fn main() -> ExitCode {
 fn run(migrations_root: &Path, name: &str, dml_reviewed: bool) -> std::io::Result<ExitCode> {
     let dirs = ordered_migration_dirs(migrations_root)?;
 
-    // A directory whose name ends in `_<name>` is this migration's home.
-    let existing = dirs
-        .iter()
-        .find(|d| {
-            dir_name(d)
-                .map(|n| n.ends_with(&format!("_{name}")))
-                .unwrap_or(false)
-        })
-        .cloned();
+    let existing = find_migration_dir(&dirs, name);
 
     let Some(dir) = existing else {
         return scaffold(migrations_root, name);
@@ -356,6 +348,26 @@ fn dir_name(path: &Path) -> Option<&str> {
     path.file_name().and_then(|n| n.to_str())
 }
 
+/// This migration's directory: the newest whose name portion — everything after
+/// the leading `<timestamp>_` — equals `name` exactly.
+///
+/// Both halves matter. A suffix match would treat `servers` as naming
+/// `20260223000000_add_servers`, and taking the first hit of an ascending list
+/// would pick the oldest when a name is reused. Either way the tool would then
+/// operate on a historical migration while every caller assumes it holds the
+/// newest: `regenerate_baseline` would rewrite the committed baseline from a
+/// truncated chain, silently dropping every later migration's objects.
+fn find_migration_dir(dirs: &[PathBuf], name: &str) -> Option<PathBuf> {
+    dirs.iter()
+        .filter(|d| {
+            dir_name(d)
+                .and_then(|n| n.split_once('_'))
+                .is_some_and(|(_timestamp, rest)| rest == name)
+        })
+        .next_back()
+        .cloned()
+}
+
 /// True when `sql` holds no statement — only whitespace and `--` comment lines
 /// (the scaffold template counts as empty).
 fn is_effectively_empty(sql: &str) -> bool {
@@ -388,6 +400,35 @@ mod tests {
         let path = dir.path().join("lib.rs");
         std::fs::write(&path, SCRATCH_LIB_SRC).unwrap();
         (dir, path)
+    }
+
+    fn dirs(names: &[&str]) -> Vec<PathBuf> {
+        names.iter().map(PathBuf::from).collect()
+    }
+
+    #[test]
+    fn migration_lookup_requires_the_whole_name_not_a_suffix() {
+        let all = dirs(&[
+            "20260223000000_add_servers",
+            "20260328000000_add_server_modloader_and_addons",
+        ]);
+        assert_eq!(find_migration_dir(&all, "servers"), None);
+        assert_eq!(find_migration_dir(&all, "addons"), None);
+        assert_eq!(
+            find_migration_dir(&all, "add_servers"),
+            Some(PathBuf::from("20260223000000_add_servers"))
+        );
+    }
+
+    #[test]
+    fn migration_lookup_picks_the_newest_when_a_name_is_reused() {
+        // Scaffolding a name that already exists must operate on the directory
+        // just created, not the historical one sorting before it.
+        let all = dirs(&["20240120134904_init", "20260701000000_init"]);
+        assert_eq!(
+            find_migration_dir(&all, "init"),
+            Some(PathBuf::from("20260701000000_init"))
+        );
     }
 
     #[test]

@@ -8,8 +8,8 @@
 //!
 //! - [`check_module`]: the SQL prepares (unknown tables/columns/syntax fail),
 //!   declared param names are exactly the statement's bound params (no extras,
-//!   none missing), a multi-param query never uses a positional `?`, and every
-//!   expected column appears in the result set.
+//!   none missing), no query uses a positional `?`, and every expected column
+//!   appears in the result set.
 //! - [`check_manifests`]: an authorizer records the write actions each statement
 //!   performs; a write to a freshness table must set that table's freshness
 //!   column.
