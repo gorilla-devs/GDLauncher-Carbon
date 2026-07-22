@@ -60,6 +60,77 @@ fn new_table_with_a_unique_index_is_additive() {
 }
 
 #[test]
+fn new_table_with_restricting_fk_to_existing_table_is_breaking() {
+    // RESTRICT on a new child table rejects the old binary's DELETE against the
+    // pre-existing parent, which is exactly the constraint class `Additive`
+    // promises is absent. The existing schema already uses RESTRICT.
+    let kind = derive_kind(
+        &[BASE],
+        "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, aid INTEGER NOT NULL, \
+         CONSTRAINT \"c_aid_fkey\" FOREIGN KEY (aid) REFERENCES \"A\" (id) ON DELETE RESTRICT);",
+    )
+    .unwrap();
+    assert_eq!(kind, MigrationKind::Breaking);
+}
+
+#[test]
+fn new_table_with_default_no_action_fk_to_existing_table_is_breaking() {
+    // Omitting ON DELETE leaves NO ACTION, which rejects the parent delete just
+    // as RESTRICT does at the point the statement completes.
+    let kind = derive_kind(
+        &[BASE],
+        "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, aid INTEGER NOT NULL, \
+         CONSTRAINT \"c_aid_fkey\" FOREIGN KEY (aid) REFERENCES \"A\" (id));",
+    )
+    .unwrap();
+    assert_eq!(kind, MigrationKind::Breaking);
+}
+
+#[test]
+fn restricting_on_update_alone_does_not_make_a_new_table_breaking() {
+    // Only ON DELETE is consulted. ON UPDATE restricts rewrites of the
+    // referenced key, which is always a synthetic primary key nothing updates,
+    // and SQLite reports an omitted clause as NO ACTION — so honouring it would
+    // classify nearly every foreign key as breaking.
+    let kind = derive_kind(
+        &[BASE],
+        "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, aid INTEGER NOT NULL, \
+         CONSTRAINT \"c_aid_fkey\" FOREIGN KEY (aid) REFERENCES \"A\" (id) \
+         ON UPDATE RESTRICT ON DELETE CASCADE);",
+    )
+    .unwrap();
+    assert_eq!(kind, MigrationKind::Additive);
+}
+
+#[test]
+fn new_table_with_non_restricting_fk_to_existing_table_is_additive() {
+    // CASCADE and SET NULL resolve the parent delete instead of rejecting it,
+    // so an old binary's writes still succeed.
+    for action in ["CASCADE", "SET NULL"] {
+        let up = format!(
+            "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, aid INTEGER, \
+             CONSTRAINT \"c_aid_fkey\" FOREIGN KEY (aid) REFERENCES \"A\" (id) ON DELETE {action});"
+        );
+        let kind = derive_kind(&[BASE], &up).unwrap();
+        assert_eq!(kind, MigrationKind::Additive, "ON DELETE {action}");
+    }
+}
+
+#[test]
+fn new_table_with_fk_to_another_new_table_is_additive() {
+    // Both tables are invisible to the old binary, so no constraint can reject
+    // a write it is capable of making.
+    let kind = derive_kind(
+        &[BASE],
+        "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY); \
+         CREATE TABLE \"D\" (id INTEGER PRIMARY KEY, cid INTEGER NOT NULL, \
+         CONSTRAINT \"d_cid_fkey\" FOREIGN KEY (cid) REFERENCES \"C\" (id) ON DELETE RESTRICT);",
+    )
+    .unwrap();
+    assert_eq!(kind, MigrationKind::Additive);
+}
+
+#[test]
 fn not_null_column_on_existing_table_is_breaking() {
     let kind = derive_kind(
         &[BASE],

@@ -183,6 +183,42 @@ pub fn derive_kind(prev_ups: &[&str], up: &str) -> DbResult<MigrationKind> {
     Ok(derive_kind_explained(prev_ups, up)?.kind)
 }
 
+/// One foreign key whose `ON DELETE` action rejects, rather than resolves, a
+/// delete of the parent row.
+struct RestrictingFk {
+    parent: String,
+    /// The declared action, as SQLite reports it.
+    action: String,
+}
+
+/// Reads `table`'s foreign keys and keeps those whose `ON DELETE` action refuses
+/// the parent delete. `CASCADE`, `SET NULL` and `SET DEFAULT` resolve it and so
+/// cannot reject an old binary; `RESTRICT` and `NO ACTION` (what SQLite reports
+/// when the clause is omitted) refuse it.
+///
+/// `ON UPDATE` is deliberately not consulted. It restricts updates to the
+/// *referenced key*, which here is always a synthetic primary key the app never
+/// rewrites, and SQLite reports an omitted clause as `NO ACTION` — so treating
+/// it as breaking would classify nearly every foreign key that way and route
+/// routine migrations down the down-run path for a write nothing performs.
+fn read_restricting_fks(conn: &Connection, table: &str) -> DbResult<Vec<RestrictingFk>> {
+    let mut stmt = conn.prepare(&format!("PRAGMA foreign_key_list({})", quote(table)))?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, String>(2)?, // parent table
+                r.get::<_, String>(6)?, // on_delete
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(rows
+        .into_iter()
+        .filter(|(_, on_delete)| matches!(on_delete.as_str(), "RESTRICT" | "NO ACTION"))
+        .map(|(parent, action)| RestrictingFk { parent, action })
+        .collect())
+}
+
 /// Kind derivation with the breaking reasons attached.
 pub fn derive_kind_explained(prev_ups: &[&str], up: &str) -> DbResult<KindDerivation> {
     let old_conn = build(prev_ups)?;
@@ -245,6 +281,26 @@ pub fn derive_kind_explained(prev_ups: &[&str], up: &str) -> DbResult<KindDeriva
             reasons.push(format!(
                 "table `{name}` altered beyond plain column additions (rebuild or new table-level constraint)"
             ));
+        }
+    }
+
+    // --- foreign keys introduced by brand-new tables ---
+    // A new table is invisible to an old binary, but a foreign key it declares
+    // against a pre-existing parent is not: a restricting action makes the
+    // engine reject the old binary's delete or key update on that parent. The
+    // loop above only walks `old_tables`, so this is the one constraint class a
+    // wholly-new object can impose on the old schema.
+    for name in new_tables.keys() {
+        if old_tables.contains_key(name) {
+            continue;
+        }
+        for fk in read_restricting_fks(&new_conn, name)? {
+            if old_tables.contains_key(&fk.parent) {
+                reasons.push(format!(
+                    "new table `{name}` declares ON DELETE {} against pre-existing table `{}`",
+                    fk.action, fk.parent
+                ));
+            }
         }
     }
 
