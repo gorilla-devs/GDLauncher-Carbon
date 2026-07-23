@@ -337,9 +337,40 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     const cleanupEula = listenServerEula((data) => {
       manager.openModal({ name: "serverEulaAcceptance" }, data)
     })
+
+    // Escape closes the top modal, mirroring a backdrop click: skipped when the
+    // modal opts out of closing (preventClose), and when an open
+    // dropdown/select/menu (a Kobalte dismissable layer) should consume the
+    // Escape itself so one press doesn't dismiss both.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) {
+        return
+      }
+      const stack = modalStack()
+      if (stack.length === 0) {
+        return
+      }
+      if (document.querySelector('[role="listbox"],[role="menu"]')) {
+        return
+      }
+      const top = stack[stack.length - 1]
+      const preventCloseRaw = (defaultModals as Hash)[top.name].preventClose
+      const shouldPrevent =
+        typeof preventCloseRaw === "function"
+          ? preventCloseRaw()
+          : preventCloseRaw === true
+      if (shouldPrevent) {
+        return
+      }
+      e.preventDefault()
+      closeModal()
+    }
+    document.addEventListener("keydown", onKeyDown)
+
     onCleanup(() => {
       cleanupMemory()
       cleanupEula()
+      document.removeEventListener("keydown", onKeyDown)
     })
   })
 
