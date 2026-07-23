@@ -260,11 +260,22 @@ fn success_page() -> String {
     include_str!("oauth_success.html").to_string()
 }
 
+/// Minimal HTML-escaping for untrusted text interpolated into a page body.
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
 /// HTML page shown on authentication error
 fn error_page(error: &str, description: &str) -> String {
+    // `error`/`error_description` come from the identity provider; escape them
+    // before substitution so they can't inject markup into the page.
     include_str!("oauth_error.html")
-        .replace("{ERROR_TYPE}", error)
-        .replace("{ERROR_DESCRIPTION}", description)
+        .replace("{ERROR_TYPE}", &html_escape(error))
+        .replace("{ERROR_DESCRIPTION}", &html_escape(description))
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
