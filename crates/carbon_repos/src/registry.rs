@@ -28,6 +28,22 @@ pub struct QueryCheck {
     pub columns: Option<&'static [ColumnSpec]>,
     /// Read/write class, derived from `sql`'s leading verb via [`class_of`].
     pub class: QueryClass,
+    /// Which pool the `queries!`-emitted async wrapper actually routes this
+    /// query to at runtime: `true` for the `usize`/`execute` arm (the writer),
+    /// `false` for every row-returning arm (the read pool) — hard-coded per
+    /// arm in the macro, independent of `class`. A hand-written `QueryCheck`
+    /// (never passed through a macro arm) carries whatever its own code
+    /// actually does, which is `class == Write` by construction, since a
+    /// hand-rolled statement needing its own `QueryCheck` is always run inside
+    /// a `db.write` transaction.
+    ///
+    /// This is deliberately a *second*, independently-set field rather than
+    /// derived from `class`: the whole point is to let a checker rule compare
+    /// the two and catch the one arm that can disagree with the SQL's own
+    /// verb — a row-returning arm (e.g. `-> i64`) wrapping a write statement
+    /// (e.g. `UPDATE … RETURNING x`), which routes to the read-only pool and
+    /// fails on every call.
+    pub routes_write: bool,
 }
 
 /// Escape hatch for runtime-assembled SQL. Exempt from the static checker;
@@ -294,6 +310,7 @@ macro_rules! queries {
             params: &[ $( concat!(":", stringify!($arg)) ),* ],
             columns: Some(<$row as $crate::from_row::FromRow>::COLUMNS),
             class: $crate::registry::class_of($sql),
+            routes_write: false,
         }, ] $($rest)*);
     };
 
@@ -323,6 +340,7 @@ macro_rules! queries {
             params: &[ $( concat!(":", stringify!($arg)) ),* ],
             columns: Some(<$row as $crate::from_row::FromRow>::COLUMNS),
             class: $crate::registry::class_of($sql),
+            routes_write: false,
         }, ] $($rest)*);
     };
 
@@ -350,6 +368,7 @@ macro_rules! queries {
             params: &[ $( concat!(":", stringify!($arg)) ),* ],
             columns: None,
             class: $crate::registry::class_of($sql),
+            routes_write: true,
         }, ] $($rest)*);
     };
 
@@ -380,6 +399,7 @@ macro_rules! queries {
             params: &[ $( concat!(":", stringify!($arg)) ),* ],
             columns: None,
             class: $crate::registry::class_of($sql),
+            routes_write: false,
         }, ] $($rest)*);
     };
 
@@ -408,6 +428,7 @@ macro_rules! queries {
             params: &[ $( concat!(":", stringify!($arg)) ),* ],
             columns: Some(<$row as $crate::from_row::FromRow>::COLUMNS),
             class: $crate::registry::class_of($sql),
+            routes_write: false,
         }, ] $($rest)*);
     };
 

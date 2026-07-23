@@ -493,3 +493,49 @@ fn breaking_only_range_down_runs_from_intermediate_version() {
     assert_eq!(user_version(&conn), 26);
     assert_eq!(dump_schema(&conn).unwrap(), reference_26);
 }
+
+#[test]
+fn stale_migrations_row_above_user_version_self_heals_on_reapply() {
+    // Simulates a file-level restore (e.g. a Time Machine / VSS snapshot of
+    // just the main database file, out of sync with its `-wal`) that rolls
+    // `user_version` back to N-1 while leaving the schema and the
+    // `_migrations` row for N exactly as they were — a state a plain `INSERT`
+    // in `apply_pending` cannot re-apply into: it would hit the existing row's
+    // `version` primary key and fail, rolling back an otherwise perfectly
+    // applicable (idempotent) migration and turning this self-healable state
+    // into a fatal migration failure.
+    const IDEMPOTENT_WIDGET: MigrationDef = MigrationDef {
+        name: "26_idempotent_widget",
+        up_sql: "CREATE TABLE IF NOT EXISTS Widget (id INTEGER PRIMARY KEY);",
+        down_sql: Some("DROP TABLE Widget;"),
+        kind: MigrationKind::Additive,
+        data_down: "full",
+    };
+    let (_d, path) = temp_db();
+    let l26 = extend(&base(), &[IDEMPOTENT_WIDGET]);
+
+    let mut conn = open_db(&path);
+    l26.to_latest(&mut conn).unwrap();
+    assert_eq!(user_version(&conn), 26);
+    assert!(table_exists(&conn, "Widget"));
+
+    // The restore: only the version counter regresses. The schema and the
+    // now-stale `_migrations` row for 26 are left untouched, exactly as a
+    // partial file-level restore would leave them.
+    conn.pragma_update(None, "user_version", 25).unwrap();
+
+    // Re-running the migration set must self-heal: version 26's up re-applies
+    // as a no-op (`IF NOT EXISTS`) and its metadata row is replaced, not
+    // rejected as a primary-key conflict.
+    l26.to_latest(&mut conn).unwrap();
+    assert_eq!(user_version(&conn), 26);
+
+    let rows: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM _migrations WHERE version = 26",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(rows, 1, "the stale row must be replaced, not duplicated");
+}

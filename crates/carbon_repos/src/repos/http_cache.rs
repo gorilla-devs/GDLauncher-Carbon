@@ -72,6 +72,7 @@ const DELETE_HTTP_CACHE_CHECK: QueryCheck = QueryCheck {
     params: &[":url"],
     columns: None,
     class: crate::registry::class_of(DELETE_HTTP_CACHE_SQL),
+    routes_write: true,
 };
 const INSERT_HTTP_CACHE_CHECK: QueryCheck = QueryCheck {
     name: "replace_cached::insert_http_cache",
@@ -86,6 +87,7 @@ const INSERT_HTTP_CACHE_CHECK: QueryCheck = QueryCheck {
     ],
     columns: None,
     class: crate::registry::class_of(INSERT_HTTP_CACHE_SQL),
+    routes_write: true,
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus

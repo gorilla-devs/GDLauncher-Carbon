@@ -389,6 +389,7 @@ const INSERT_INSTANCE_CHECK: QueryCheck = QueryCheck {
     ],
     columns: None,
     class: crate::registry::class_of(INSERT_INSTANCE_SQL),
+    routes_write: true,
 };
 const INSERT_GROUP_CHECK: QueryCheck = QueryCheck {
     name: "insert_group",
@@ -396,6 +397,7 @@ const INSERT_GROUP_CHECK: QueryCheck = QueryCheck {
     params: &[":name", ":group_index", ":library_position"],
     columns: None,
     class: crate::registry::class_of(INSERT_GROUP_SQL),
+    routes_write: true,
 };
 const UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_CHECK: QueryCheck = QueryCheck {
     name: "create_default_group_tx::set_default_instance_group",
@@ -403,6 +405,7 @@ const UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_CHECK: QueryCheck = QueryCheck {
     params: &[":group_id"],
     columns: None,
     class: crate::registry::class_of(UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_SQL),
+    routes_write: true,
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the
@@ -413,4 +416,27 @@ pub fn all_queries() -> Vec<QueryCheck> {
     all.push(INSERT_GROUP_CHECK);
     all.push(UPDATE_APP_CONFIG_DEFAULT_INSTANCE_GROUP_CHECK);
     all
+}
+
+/// Deletes an instance together with the mod-file cache rows that belong to
+/// it, in one write-pool transaction.
+///
+/// The `ON DELETE CASCADE` edge does this itself whenever foreign keys are
+/// enforced, but `fk::sweep_and_decide` falls back to leaving them off for the
+/// whole session when it meets a violation it cannot repair, and
+/// `GDL_DISABLE_FK_ENFORCEMENT=1` selects the same state. Issuing the delete
+/// here rather than leaving it to the caller keeps the two halves together —
+/// without it, an FK-off session leaks `ModFileCache` rows for every deleted
+/// instance, which in turn keeps their referenced `ModMetadata` rows (and
+/// transitively the CurseForge/Modrinth caches) alive, since
+/// `gc_orphan_metadata` only reclaims metadata nothing still references.
+pub async fn delete_instance_tx(db: &Db, id: i32) -> DbResult<usize> {
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        crate::repos::mod_file_cache::delete_mod_file_cache_by_instance_conn(&tx, id)?;
+        let removed = delete_instance_conn(&tx, id)?;
+        tx.commit()?;
+        Ok(removed)
+    })
+    .await
 }

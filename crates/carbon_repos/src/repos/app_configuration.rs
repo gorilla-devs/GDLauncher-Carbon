@@ -109,6 +109,7 @@ const INSERT_APP_CONFIGURATION_CHECK: crate::registry::QueryCheck = crate::regis
     params: &[":release_channel", ":xmx", ":installation_id"],
     columns: None,
     class: crate::registry::class_of(INSERT_APP_CONFIGURATION_SQL),
+    routes_write: true,
 };
 
 /// Every checkable query in this module.

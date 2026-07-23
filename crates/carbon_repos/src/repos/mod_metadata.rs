@@ -298,6 +298,7 @@ const UPSERT_CF_MOD_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::
     ],
     columns: None,
     class: crate::registry::class_of(UPSERT_CF_MOD_CACHE_SQL),
+    routes_write: true,
 };
 
 /// SQL executed by `upsert_mr_mod_cache`, shared with its `QueryCheck`. Conflict
@@ -429,6 +430,7 @@ const UPSERT_MR_MOD_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::
     ],
     columns: None,
     class: crate::registry::class_of(UPSERT_MR_MOD_CACHE_SQL),
+    routes_write: true,
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the

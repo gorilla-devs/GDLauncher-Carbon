@@ -652,3 +652,113 @@ async fn clear_dir_with_progress(
     .await
     .map_err(|e| std::io::Error::other(e.to_string()))?
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::vtask::Progress;
+
+    /// Every table `cleanup_caches`'s `gdlauncher` selection wipes, besides
+    /// `HTTPCache` (seeded and asserted separately below). Duplicated here
+    /// rather than shared with `cleanup_caches`'s own `TABLES` const (which is
+    /// local to its background task) so this test proves the behavior from
+    /// the outside, the same way a caller observes it.
+    const OTHER_WIPED_TABLES: &[&str] = &[
+        "CurseForgeModImageCache",
+        "ModrinthModImageCache",
+        "LocalModImageCache",
+        "CurseForgeModpackImageCache",
+        "ModrinthModpackImageCache",
+        "CurseForgeModCache",
+        "ModrinthModCache",
+        "CurseForgeModpackCache",
+        "ModrinthModpackCache",
+        "VersionInfoCache",
+        "PartialVersionInfoCache",
+        "LwjglMetaCache",
+        "AssetsMetaCache",
+    ];
+
+    /// Waits for `task_id` to finish, failing loudly if it errors or never
+    /// completes. `wait_with_log` returns as soon as it observes completion,
+    /// but the task-list removal that makes `get_task` start returning `None`
+    /// runs on a separate task listening to the same signal, so this polls
+    /// briefly afterward rather than racing it.
+    async fn wait_for_task(app: &crate::managers::App, task_id: VisualTaskId) {
+        app.task_manager().wait_with_log(task_id).await.unwrap();
+        for _ in 0..50 {
+            match app.task_manager().get_task(task_id).await {
+                None => return,
+                Some(t) => {
+                    if let Progress::Failed(e) = &t.progress {
+                        panic!("cache cleanup task failed: {e}");
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                }
+            }
+        }
+        panic!("cache cleanup task did not finish within the poll window");
+    }
+
+    /// Regression test for the cache-cleanup DB phase (dynamic chunked
+    /// `DELETE` + `count_table`, both checker-exempt `DynamicQuery` uses):
+    /// seeds a real cache table, runs `cleanup_caches`, and asserts the rows
+    /// are actually deleted and every count along the way is correct. No bug
+    /// is expected here — this closes a pure regression-protection gap.
+    #[tokio::test]
+    async fn cleanup_caches_deletes_seeded_rows_and_counts_match() {
+        let app = crate::setup_managers_for_test().await;
+
+        for i in 0..3u8 {
+            carbon_repos::repos::http_cache::replace_cached(
+                &app.db,
+                format!("https://example.test/{i}"),
+                200,
+                vec![i],
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        }
+        assert_eq!(
+            count_table(&app.db, "HTTPCache").await,
+            3,
+            "count_table must match the seeded row count before cleanup"
+        );
+        for table in OTHER_WIPED_TABLES {
+            assert_eq!(
+                count_table(&app.db, table).await,
+                0,
+                "{table} must start empty in a fresh test database"
+            );
+        }
+
+        let task_id = app
+            .settings_manager()
+            .cleanup_caches(CacheCleanupSelection {
+                gdlauncher: true,
+                minecraft: false,
+            })
+            .await
+            .unwrap();
+        wait_for_task(&app, task_id).await;
+
+        assert_eq!(
+            count_table(&app.db, "HTTPCache").await,
+            0,
+            "cleanup_caches must delete every seeded HTTPCache row"
+        );
+        // Every other wiped table stays empty: the chunked delete's fast path
+        // (COUNT = 0 => loop breaks without issuing a DELETE) must not error
+        // even though these tables were never seeded.
+        for table in OTHER_WIPED_TABLES {
+            assert_eq!(
+                count_table(&app.db, table).await,
+                0,
+                "{table} must remain empty after cleanup"
+            );
+        }
+    }
+}

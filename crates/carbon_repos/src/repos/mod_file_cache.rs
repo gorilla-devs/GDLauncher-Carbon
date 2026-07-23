@@ -566,6 +566,7 @@ const UPSERT_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck = crate::registry
     ],
     columns: None,
     class: crate::registry::class_of(UPSERT_MOD_FILE_CACHE_SQL),
+    routes_write: true,
 };
 
 /// SQL executed by `upsert_server_mod_file_cache`.
@@ -648,6 +649,7 @@ const UPSERT_SERVER_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck =
         ],
         columns: None,
         class: crate::registry::class_of(UPSERT_SERVER_MOD_FILE_CACHE_SQL),
+        routes_write: true,
     };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the
