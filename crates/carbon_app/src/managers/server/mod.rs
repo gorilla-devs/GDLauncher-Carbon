@@ -1266,8 +1266,12 @@ impl ManagerRef<'_, ServerManager> {
             }
         }
 
-        // Remove from memory
-        self.servers.write().await.remove(&id);
+        // Remove from memory, including the server's log-broadcast channel
+        // (keyed by its last log id) so it isn't leaked for the session.
+        let removed = self.servers.write().await.remove(&id);
+        if let Some(log_id) = removed.and_then(|server| server.last_log_id) {
+            self.server_logs.write().await.remove(&log_id);
+        }
         self.server_op_locks.remove(&id);
         self.crash_restart_state.remove(&id);
 
