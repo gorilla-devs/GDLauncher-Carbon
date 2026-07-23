@@ -911,6 +911,31 @@ async function createWindow(): Promise<BrowserWindow> {
       (details, callback) => {
         const { requestHeaders } = details
         upsertKeyValue(requestHeaders, "Access-Control-Allow-Origin", ["*"])
+
+        // YouTube's embedded player requires an HTTP Referer identifying the
+        // embedding site; packaged builds load from file://, which sends none,
+        // so the player refuses to play with error 153. Insert-only: when a
+        // real Referer exists (dev server pages, the player's own
+        // sub-requests) it is kept.
+        let hostname = ""
+        try {
+          hostname = new URL(details.url).hostname
+        } catch {
+          // ignore unparseable URLs
+        }
+        if (
+          hostname === "youtube.com" ||
+          hostname.endsWith(".youtube.com") ||
+          hostname === "youtube-nocookie.com" ||
+          hostname.endsWith(".youtube-nocookie.com")
+        ) {
+          upsertKeyValue(
+            requestHeaders,
+            "Referer",
+            "https://app.gdlauncher.com/"
+          )
+        }
+
         callback({ requestHeaders })
       }
     )
