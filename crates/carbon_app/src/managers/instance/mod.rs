@@ -2134,21 +2134,30 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let mut instances = self.instances.write().await;
-        let instance = instances
-            .get_mut(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
+        let Some(instance) = instances.get_mut(&instance_id) else {
+            // Already gone — e.g. a concurrent delete (double-clicked confirm)
+            // finished first. Deleting an absent instance is a no-op success,
+            // not a failure to surface to the user.
+            return Ok(());
+        };
 
         let InstanceType::Valid(data) = &mut instance.type_ else {
             return Err(anyhow!("Instance {instance_id} is not in a valid state"));
         };
 
-        // Refuse to delete an instance that is in use: tearing down a running or preparing
-        // instance would kill the game and remove its directory mid-session. It must be
-        // stopped first.
-        if !matches!(data.state, LaunchState::Inactive { .. }) {
-            return Err(anyhow!(
-                "Instance {instance_id} cannot be deleted while it is preparing or running; stop it first"
-            ));
+        // A running/preparing instance must be stopped first (tearing it down
+        // would kill the game and remove its directory mid-session). A second,
+        // redundant delete (double-clicked confirm) is a no-op — see
+        // `DeletePrecheck` — so it never resets the state the in-progress delete
+        // owns nor reports a spurious failure.
+        match delete_precheck(&data.state) {
+            DeletePrecheck::Proceed => {}
+            DeletePrecheck::AlreadyInProgress => return Ok(()),
+            DeletePrecheck::InUse => {
+                return Err(anyhow!(
+                    "Instance {instance_id} cannot be deleted while it is preparing or running; stop it first"
+                ));
+            }
         }
 
         data.state = LaunchState::Deleting;
@@ -3026,6 +3035,31 @@ async fn reap_orphaned_instances_under(instances_root: &Path) {
     }
 }
 
+/// Outcome of checking whether an instance may be deleted, given its launch state.
+#[derive(Debug, PartialEq, Eq)]
+enum DeletePrecheck {
+    /// Inactive — safe to delete.
+    Proceed,
+    /// Already being deleted. A double-clicked confirm spawns two delete tasks;
+    /// the second must be a no-op so it doesn't reset the `Deleting` state the
+    /// first task owns (which would open a window for a launch of a
+    /// being-deleted instance) or report a spurious failure.
+    AlreadyInProgress,
+    /// Queued/Preparing/Running — refuse; the instance must be stopped first,
+    /// otherwise the game is killed and its directory removed mid-session.
+    InUse,
+}
+
+fn delete_precheck(state: &LaunchState) -> DeletePrecheck {
+    match state {
+        LaunchState::Inactive { .. } => DeletePrecheck::Proceed,
+        LaunchState::Deleting => DeletePrecheck::AlreadyInProgress,
+        LaunchState::Queued(_) | LaunchState::Preparing(_) | LaunchState::Running(_) => {
+            DeletePrecheck::InUse
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::{collections::HashSet, time::Duration};
@@ -3044,6 +3078,31 @@ mod test {
     };
 
     use super::InstanceVersionSource;
+
+    #[test]
+    fn delete_precheck_classifies_launch_states() {
+        use super::{DeletePrecheck, LaunchState, delete_precheck};
+        use crate::domain::vtask::VisualTaskId;
+
+        assert_eq!(
+            delete_precheck(&LaunchState::Inactive { failed_task: None }),
+            DeletePrecheck::Proceed
+        );
+        // The fix: a delete already in progress is a no-op, not a refusal — so a
+        // double-clicked confirm can't reset the state the first task owns.
+        assert_eq!(
+            delete_precheck(&LaunchState::Deleting),
+            DeletePrecheck::AlreadyInProgress
+        );
+        assert_eq!(
+            delete_precheck(&LaunchState::Queued(VisualTaskId(1))),
+            DeletePrecheck::InUse
+        );
+        assert_eq!(
+            delete_precheck(&LaunchState::Preparing(VisualTaskId(1))),
+            DeletePrecheck::InUse
+        );
+    }
 
     #[tokio::test]
     async fn move_groups() -> anyhow::Result<()> {
