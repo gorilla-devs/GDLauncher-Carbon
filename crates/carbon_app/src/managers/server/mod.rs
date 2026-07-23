@@ -190,6 +190,39 @@ impl ServerManager {
             );
         }
     }
+
+    /// Waits until the server's process handle has been cleared or `timeout`
+    /// elapses. `stop_server_locked` clears the handle from its background task
+    /// only once the JVM has actually exited (force-killing it after its own
+    /// graceful budget), so a caller about to touch the server's files on disk
+    /// uses this to avoid `remove_dir_all`ing a directory the JVM still holds
+    /// open. Returns early the moment the handle is gone; the timeout is only a
+    /// backstop so a stuck process can't wedge the caller forever.
+    async fn wait_for_process_exit(&self, id: ServerId, timeout: std::time::Duration) {
+        let start = std::time::Instant::now();
+
+        loop {
+            {
+                let servers = self.servers.read().await;
+                match servers.get(&id) {
+                    Some(server) if server.handle.is_some() => {}
+                    // Handle cleared (process exited) or the server is gone.
+                    _ => return,
+                }
+            }
+
+            if start.elapsed() >= timeout {
+                warn!(
+                    "Server {} did not exit within {}s; proceeding without waiting",
+                    id.0,
+                    timeout.as_secs()
+                );
+                return;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+    }
 }
 
 impl ManagerRef<'_, ServerManager> {
@@ -1189,8 +1222,12 @@ impl ManagerRef<'_, ServerManager> {
                     // `stop_server` would re-lock the same non-reentrant
                     // per-id `Mutex` and deadlock.
                     self.stop_server_locked(id).await?;
-                    // Wait a moment for graceful shutdown
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    // The JVM holds the server directory's files open. Wait for
+                    // it to actually exit before deleting on disk, rather than
+                    // guessing with a fixed sleep — `stop_server_locked`
+                    // force-kills after ~35s, so wait a little past that.
+                    self.wait_for_process_exit(id, std::time::Duration::from_secs(45))
+                        .await;
                 }
             }
         }
@@ -3315,5 +3352,91 @@ mod tests {
         )
         .await
         .expect("shutdown_running must not hang with an empty server map");
+    }
+
+    // --- wait_for_process_exit ----------------------------------------
+
+    fn running_server_with_handle() -> ServerData {
+        let (kill_tx, _kill_rx) = mpsc::channel::<()>(1);
+        let (stdin_tx, _stdin_rx) = mpsc::channel::<String>(1);
+        // Leak the receivers so the channels stay open for the test's lifetime.
+        std::mem::forget(_kill_rx);
+        std::mem::forget(_stdin_rx);
+        ServerData {
+            shortpath: "test-server".to_string(),
+            state: ServerState::Running {
+                start_time: Utc::now(),
+                log_id: ServerLogId(1),
+                process_id: 4242,
+            },
+            handle: Some(ServerHandle {
+                process_id: 4242,
+                kill_tx,
+                stdin_tx,
+                exit_notify: Arc::new(tokio::sync::Notify::new()),
+            }),
+            last_log_id: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn wait_for_process_exit_blocks_while_the_process_is_running() {
+        let manager = ServerManager::new();
+        manager
+            .servers
+            .write()
+            .await
+            .insert(ServerId(1), running_server_with_handle());
+
+        // The handle is still present (the JVM hasn't exited). The whole point
+        // of the fix is that the caller must NOT proceed to delete files yet, so
+        // the wait must still be pending — the outer timeout must elapse.
+        let result = tokio::time::timeout(
+            std::time::Duration::from_millis(300),
+            manager.wait_for_process_exit(ServerId(1), std::time::Duration::from_secs(30)),
+        )
+        .await;
+
+        assert!(
+            result.is_err(),
+            "wait_for_process_exit returned while the process was still running"
+        );
+    }
+
+    #[tokio::test]
+    async fn wait_for_process_exit_returns_once_the_handle_is_cleared() {
+        let manager = ServerManager::new();
+        let mut stopped = running_server_with_handle();
+        stopped.handle = None;
+        stopped.state = ServerState::Stopped { failed_task: None };
+        manager.servers.write().await.insert(ServerId(1), stopped);
+
+        // Handle already cleared (process exited): must return promptly, not
+        // block for the full timeout.
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            manager.wait_for_process_exit(ServerId(1), std::time::Duration::from_secs(30)),
+        )
+        .await
+        .expect("must return promptly once the handle is cleared");
+    }
+
+    #[tokio::test]
+    async fn wait_for_process_exit_is_bounded_when_the_process_never_exits() {
+        let manager = ServerManager::new();
+        manager
+            .servers
+            .write()
+            .await
+            .insert(ServerId(1), running_server_with_handle());
+
+        // The handle never clears; the call must still return, bounded by its
+        // own timeout rather than blocking the delete forever.
+        tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            manager.wait_for_process_exit(ServerId(1), std::time::Duration::from_millis(300)),
+        )
+        .await
+        .expect("must be bounded by its own timeout");
     }
 }
