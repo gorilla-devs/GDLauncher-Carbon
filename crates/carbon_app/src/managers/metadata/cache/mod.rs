@@ -151,6 +151,10 @@ pub struct MetaCacheManager {
     watched_entity: watch::Sender<Option<CacheEntityId>>,
     pause_caching: watch::Sender<bool>,
     pub(crate) modrinth_throttle: ModrinthCacheThrottle,
+    /// Serializes `ensure_mod_metadata` per content hash. Without it two
+    /// concurrent scans of the same jar both miss the lookup and each insert a
+    /// `ModMetadata` row, since there is no unique constraint on the hash pair.
+    metadata_hash_locks: dashmap::DashMap<(Vec<u8>, i32), std::sync::Arc<tokio::sync::Mutex<()>>>,
 }
 
 impl MetaCacheManager {
@@ -172,6 +176,7 @@ impl MetaCacheManager {
             watched_entity: watch::channel(None).0,
             pause_caching: watch::channel(false).0,
             modrinth_throttle: ModrinthCacheThrottle::new(210, std::time::Duration::from_secs(60)),
+            metadata_hash_locks: dashmap::DashMap::new(),
         }
     }
 
@@ -1221,6 +1226,18 @@ impl ManagerRef<'_, MetaCacheManager> {
     ) -> anyhow::Result<String> {
         let sha512 = Vec::from(result.sha512);
         let murmur2 = result.murmur2 as i32;
+
+        // Serialize the lookup-then-insert for this hash: concurrent scans of the
+        // same jar (e.g. the same mod across instances) would otherwise both miss
+        // and each insert a duplicate `ModMetadata` row. Clone the Arc and drop
+        // the map guard before awaiting the lock so the DashMap shard isn't held
+        // across the await.
+        let hash_lock = self
+            .metadata_hash_locks
+            .entry((sha512.clone(), murmur2))
+            .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
+            .clone();
+        let _hash_guard = hash_lock.lock().await;
 
         let dbmeta = metarepo::find_metadata_by_hashes(&self.app.db, &sha512, murmur2).await?;
 
