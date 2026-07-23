@@ -868,11 +868,19 @@ pub async fn extract_natives(
     // mismatched natives.
     let extraction_marker = dest.join(".gdl_natives_extracted");
     let arch_tag = format!("{java_arch:?}");
-    if tokio::fs::read_to_string(&extraction_marker)
+    let marker_matches = tokio::fs::read_to_string(&extraction_marker)
         .await
         .map(|marker| marker == arch_tag)
-        .unwrap_or(false)
-    {
+        .unwrap_or(false);
+
+    // The marker alone is content-blind: an AV quarantine or an uneven cache wipe can
+    // remove some or all of the extracted native libraries while leaving this marker
+    // file untouched (it's an innocuous text file, not something quarantine scanners
+    // flag). Trusting the marker in that case leaves natives referenced but missing on
+    // disk, which only surfaces at launch as an opaque UnsatisfiedLinkError with nothing
+    // in the launcher's own logs pointing at it. Confirm real output still exists before
+    // taking the fast path.
+    if marker_matches && natives_dir_has_libraries(&dest).await {
         info!(
             "Natives for {} ({arch_tag}) already extracted; skipping",
             version.id
@@ -916,6 +924,31 @@ pub async fn extract_natives(
     }
 
     Ok(())
+}
+
+/// Cheap sentinel for "the natives directory still holds real output", not just its
+/// completion marker: at least one file with this platform's native library extension
+/// (`.dll` / `.so` / `.dylib`, via [`std::env::consts::DLL_EXTENSION`]). This doesn't
+/// verify every expected native is present -- that would mean re-deriving the exact
+/// expected file list from each native archive -- but it's enough to catch the
+/// directory having been emptied or partially wiped out from under an intact marker
+/// (the marker itself never has this extension, so its mere presence can't pass this
+/// check).
+async fn natives_dir_has_libraries(dest: &Path) -> bool {
+    let Ok(mut entries) = tokio::fs::read_dir(dest).await else {
+        return false;
+    };
+
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let is_native_library = entry.path().extension().and_then(|ext| ext.to_str())
+            == Some(std::env::consts::DLL_EXTENSION);
+
+        if is_native_library {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -1130,5 +1163,82 @@ mod tests {
         extract_natives(runtime_path, &version, &lwjgl_group, &JavaArch::X86_64)
             .await
             .unwrap();
+
+        // Regression check: delete the actual extracted libraries but leave the
+        // completion marker in place -- exactly what an AV quarantine or an uneven
+        // cache wipe leaves behind -- and confirm a second call re-extracts instead
+        // of silently trusting the now-stale marker.
+        let dest = runtime_path.get_natives().get_versioned(&version.id);
+        let native_ext = std::env::consts::DLL_EXTENSION;
+        let count_native_files = |dir: &Path| {
+            std::fs::read_dir(dir)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .filter(|entry| {
+                    entry.path().extension().and_then(|ext| ext.to_str()) == Some(native_ext)
+                })
+                .count()
+        };
+
+        let extracted_before = count_native_files(&dest);
+        assert!(
+            extracted_before > 0,
+            "expected at least one extracted native library"
+        );
+
+        for entry in std::fs::read_dir(&dest).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some(native_ext) {
+                std::fs::remove_file(&path).unwrap();
+            }
+        }
+        assert_eq!(count_native_files(&dest), 0);
+
+        extract_natives(runtime_path, &version, &lwjgl_group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            count_native_files(&dest),
+            extracted_before,
+            "natives must be re-extracted when the marker is present but the actual libraries are missing"
+        );
+    }
+
+    #[tokio::test]
+    async fn natives_dir_has_libraries_detects_missing_native_files() {
+        let native_ext = std::env::consts::DLL_EXTENSION;
+
+        // Directory doesn't exist at all.
+        let base = tempfile::tempdir().unwrap();
+        let missing_dir = base.path().join("does-not-exist");
+        assert!(!natives_dir_has_libraries(&missing_dir).await);
+
+        // Present but empty.
+        let empty = tempfile::tempdir().unwrap();
+        assert!(!natives_dir_has_libraries(empty.path()).await);
+
+        // Present with only the completion marker -- exactly what an AV quarantine
+        // or an uneven cache wipe leaves behind: the marker survives, the natives
+        // don't.
+        let marker_only = tempfile::tempdir().unwrap();
+        tokio::fs::write(marker_only.path().join(".gdl_natives_extracted"), b"X86_64")
+            .await
+            .unwrap();
+        assert!(!natives_dir_has_libraries(marker_only.path()).await);
+
+        // Present with an actual native library alongside the marker.
+        let healthy = tempfile::tempdir().unwrap();
+        tokio::fs::write(healthy.path().join(".gdl_natives_extracted"), b"X86_64")
+            .await
+            .unwrap();
+        tokio::fs::write(
+            healthy.path().join(format!("liblwjgl.{native_ext}")),
+            b"not a real library, just a sentinel-check fixture",
+        )
+        .await
+        .unwrap();
+        assert!(natives_dir_has_libraries(healthy.path()).await);
     }
 }

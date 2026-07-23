@@ -15,7 +15,9 @@ use std::sync::Arc;
 use tokio::sync::watch;
 use tracing::{debug, trace, warn};
 
-use super::modrinth::secure_path_join;
+use super::modrinth::{
+    MAX_EXTRACTED_OVERRIDE_BYTES, copy_bounded, is_symlink_mode, secure_path_join,
+};
 
 use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
 
@@ -333,9 +335,17 @@ pub async fn prepare_modpack_from_gdlpack(
                             continue;
                         }
 
-                        // Read file and compute SHA512
+                        // Read file and compute SHA512. Bounded per-entry (not
+                        // cumulative -- `contents` is dropped at the end of each
+                        // iteration, so there is nothing to accumulate): a
+                        // decompression bomb masquerading as an override must not
+                        // be read into memory without limit just to hash it, and an
+                        // entry over the limit can never legitimately be the small
+                        // unresolved file we are matching against anyway.
                         let mut contents = Vec::new();
-                        if entry.read_to_end(&mut contents).is_err() {
+                        if copy_bounded(&mut entry, &mut contents, MAX_EXTRACTED_OVERRIDE_BYTES)
+                            .is_err()
+                        {
                             continue;
                         }
 
@@ -419,6 +429,10 @@ pub async fn prepare_modpack_from_gdlpack(
                     .count() as u64;
 
                 let mut extracted = 0u64;
+                // Cumulative across the whole pass, not per entry: without this,
+                // many entries each just under a per-entry cap could still add up
+                // to an unbounded amount written to disk.
+                let mut extracted_bytes: u64 = 0;
 
                 // Extract main overrides
                 for i in 0..archive.len() {
@@ -445,6 +459,17 @@ pub async fn prepare_modpack_from_gdlpack(
                             continue;
                         }
 
+                        if is_symlink_mode(entry.unix_mode()) {
+                            // A symlink entry materialized as a regular file would end
+                            // up containing the link's target path text instead of
+                            // real data.
+                            tracing::warn!(
+                                "Skipping gdlpack override entry `{}`: symlinks are not extracted",
+                                rel_path
+                            );
+                            continue;
+                        }
+
                         let target = match secure_path_join(&instance_data_path, &rel_path) {
                             Ok(p) => p,
                             Err(e) => {
@@ -462,7 +487,10 @@ pub async fn prepare_modpack_from_gdlpack(
                         }
 
                         let mut outfile = std::fs::File::create(&target)?;
-                        std::io::copy(&mut entry, &mut outfile)?;
+                        let remaining_budget =
+                            MAX_EXTRACTED_OVERRIDE_BYTES.saturating_sub(extracted_bytes);
+                        extracted_bytes +=
+                            copy_bounded(&mut entry, &mut outfile, remaining_budget)?;
 
                         extracted += 1;
                         progress_sender.send_modify(|state| {

@@ -15,6 +15,7 @@ use tokio::task::spawn_blocking;
 use tracing::trace;
 
 use super::UpdateValue;
+use super::modrinth::{MAX_EXTRACTED_OVERRIDE_BYTES, copy_bounded, is_symlink_mode};
 
 // Download ZIP
 // Extract manifest - Parse manifest
@@ -272,6 +273,10 @@ pub async fn prepare_modpack_from_zip(
         tokio::fs::create_dir_all(&override_full_path).await?;
         spawn_blocking(move || {
             let total_archive_files = archive.len() as u64;
+            // Cumulative across the whole pass, not per entry: without this, many
+            // entries each just under a per-entry cap could still add up to an
+            // unbounded amount written to disk.
+            let mut extracted_bytes: u64 = 0;
             for i in 0..archive.len() {
                 let mut file = archive.by_index(i)?;
 
@@ -292,6 +297,14 @@ pub async fn prepare_modpack_from_zip(
 
                 if (*file.name()).ends_with('/') {
                     continue;
+                } else if is_symlink_mode(file.unix_mode()) {
+                    // A symlink entry materialized as a regular file would end up
+                    // containing the link's target path text instead of real data.
+                    tracing::warn!(
+                        "Skipping curseforge override entry `{}`: symlinks are not extracted",
+                        file.name()
+                    );
+                    continue;
                 } else {
                     if let Some(p) = outpath.parent() {
                         if !p.exists() {
@@ -300,7 +313,9 @@ pub async fn prepare_modpack_from_zip(
                     }
 
                     let mut outfile = std::fs::File::create(&outpath)?;
-                    std::io::copy(&mut file, &mut outfile)?;
+                    let remaining_budget =
+                        MAX_EXTRACTED_OVERRIDE_BYTES.saturating_sub(extracted_bytes);
+                    extracted_bytes += copy_bounded(&mut file, &mut outfile, remaining_budget)?;
                 }
 
                 progress_percentage_sender.send_modify(|progress| {
