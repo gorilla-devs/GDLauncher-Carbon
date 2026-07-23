@@ -251,6 +251,9 @@ pub(super) async fn load_and_migrate(
 /// bypasses the funnel.
 fn migrate_db(db_path: &Path, migration_set: &MigrationSet) -> DbResult<OpenVerdict> {
     let mut conn = rusqlite::Connection::open(db_path)?;
+    // Ride out a transient lock (an AV scan, a backup tool, or a just-exiting
+    // previous instance) rather than failing the migration instantly.
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
 
     // On Unix, restrict the DB (and -wal/-shm sidecars) to 0600 since they
     // contain MS access/refresh tokens.
@@ -319,6 +322,7 @@ fn decide_foreign_keys(db_path: &std::path::Path) -> Result<bool, anyhow::Error>
     }
 
     let mut sweep_conn = rusqlite::Connection::open(db_path)?;
+    sweep_conn.busy_timeout(std::time::Duration::from_secs(5))?;
     // Match the migration connection: FKs OFF so repair deletes do not cascade
     // under the sweep (`foreign_key_check` works regardless of this pragma).
     sweep_conn.pragma_update(None, "foreign_keys", &"OFF")?;

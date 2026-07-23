@@ -27,7 +27,7 @@ function useLoading() {
       const isString = typeof error === "string"
 
       if (Array.isArray(error)) {
-        error = error.map((log) => log.message).join("<br /><br />")
+        error = error.map((log) => log.message).join("\n\n")
       } else {
         error = error.toString()
       }
@@ -80,9 +80,7 @@ function useLoading() {
                 Copy
               </button>
             </div>
-            <div id="error-detail-content" style="font-size: 0.75rem; font-weight: 300; background: rgb(var(--darkSlate-900)); max-height: 120px; overflow-y: auto; padding: 10px; text-align: left; border-radius: 6px; overflow-wrap: break-word; font-family: 'Ubuntu Mono', monospace; border: 1px solid rgb(var(--darkSlate-600)); line-height: 1.4;">
-              ${error}
-            </div>
+            <div id="error-detail-content" style="font-size: 0.75rem; font-weight: 300; background: rgb(var(--darkSlate-900)); max-height: 120px; overflow-y: auto; padding: 10px; text-align: left; border-radius: 6px; overflow-wrap: break-word; white-space: pre-wrap; font-family: 'Ubuntu Mono', monospace; border: 1px solid rgb(var(--darkSlate-600)); line-height: 1.4;"></div>
           </div>
 
           <!-- Step 1: Restart -->
@@ -161,6 +159,15 @@ function useLoading() {
 
         </div>
       </div>`
+
+      // The core's log text is untrusted (it echoes external error strings), so
+      // it is written as text, never interpolated into the screen's HTML.
+      const errorDetailContent: HTMLElement | null = document.querySelector(
+        "#error-detail-content"
+      )
+      if (errorDetailContent) {
+        errorDetailContent.textContent = error
+      }
 
       const restartBtn: HTMLButtonElement =
         document.querySelector("#restart-btn")!
