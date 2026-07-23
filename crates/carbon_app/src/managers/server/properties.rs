@@ -2,6 +2,18 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use tracing::warn;
+
+/// Whether a server.properties key or value contains a raw newline. A `\n`
+/// embedded in a value turns one `key=value` pair into two lines once the
+/// file's lines are joined, letting an attacker-controlled value inject an
+/// arbitrary second property line (e.g. a hidden `online-mode=false`
+/// disabling Mojang auth). The API boundary (`update_server_properties`'s
+/// caller) is expected to reject these outright; this is the defensive,
+/// last-line-of-defense check for whatever reaches this file format.
+fn has_control_chars(s: &str) -> bool {
+    s.contains('\n') || s.contains('\r')
+}
 
 /// Generate a server.properties file content from server settings
 pub fn generate_properties(
@@ -61,7 +73,10 @@ pub fn parse_properties(content: &str) -> BTreeMap<String, String> {
     props
 }
 
-/// Update specific properties in an existing server.properties file
+/// Update specific properties in an existing server.properties file. Any key
+/// or value containing `\n`/`\r` is dropped rather than written — the API
+/// boundary is expected to reject these before they ever reach here, so a
+/// dropped entry means that boundary was bypassed.
 pub fn update_properties(existing_content: &str, updates: &BTreeMap<String, String>) -> String {
     let mut lines: Vec<String> = Vec::new();
     let mut updated_keys = std::collections::HashSet::new();
@@ -76,8 +91,15 @@ pub fn update_properties(existing_content: &str, updates: &BTreeMap<String, Stri
         if let Some((key, _)) = trimmed.split_once('=') {
             let key = key.trim();
             if let Some(new_value) = updates.get(key) {
-                lines.push(format!("{}={}", key, new_value));
-                updated_keys.insert(key.to_string());
+                if has_control_chars(key) || has_control_chars(new_value) {
+                    warn!(
+                        "Refusing to write server.properties key `{key}`: value contains a newline"
+                    );
+                    lines.push(line.to_string());
+                } else {
+                    lines.push(format!("{}={}", key, new_value));
+                    updated_keys.insert(key.to_string());
+                }
             } else {
                 lines.push(line.to_string());
             }
@@ -89,6 +111,10 @@ pub fn update_properties(existing_content: &str, updates: &BTreeMap<String, Stri
     // Append any new keys that weren't in the original file
     for (key, value) in updates {
         if !updated_keys.contains(key.as_str()) {
+            if has_control_chars(key) || has_control_chars(value) {
+                warn!("Refusing to write server.properties key `{key}`: value contains a newline");
+                continue;
+            }
             lines.push(format!("{}={}", key, value));
         }
     }
@@ -135,5 +161,74 @@ mod tests {
 
         let props = parse_properties(&generate_properties(25565, "motd", 20, true, "1.20.1"));
         assert_eq!(props.get("max-tick-time"), None);
+    }
+
+    #[test]
+    fn update_properties_rejects_newline_injection_in_an_existing_key() {
+        let existing = "#Minecraft server properties\nmotd=Hello\nonline-mode=true\n";
+        let mut updates = BTreeMap::new();
+        updates.insert(
+            "motd".to_string(),
+            "Hacked\r\nonline-mode=false".to_string(),
+        );
+
+        let updated = update_properties(existing, &updates);
+
+        // The malicious value must not have produced a second `online-mode`
+        // line — the original `online-mode=true` must be the only one.
+        let online_mode_lines: Vec<&str> = updated
+            .lines()
+            .filter(|l| l.trim_start().starts_with("online-mode"))
+            .collect();
+        assert_eq!(online_mode_lines, vec!["online-mode=true"]);
+        assert!(!updated.contains("online-mode=false"));
+
+        // The whole malicious update is dropped, not partially applied —
+        // motd is left at its previous value.
+        assert!(updated.contains("motd=Hello"));
+        assert!(!updated.contains("Hacked"));
+    }
+
+    #[test]
+    fn update_properties_rejects_newline_injection_in_a_new_key() {
+        let existing = "#Minecraft server properties\nmotd=Hello\n";
+        let mut updates = BTreeMap::new();
+        updates.insert(
+            "new-key".to_string(),
+            "value\nonline-mode=false".to_string(),
+        );
+
+        let updated = update_properties(existing, &updates);
+
+        assert!(!updated.contains("online-mode=false"));
+        assert!(!updated.contains("new-key="));
+    }
+
+    #[test]
+    fn update_properties_rejects_newline_in_the_key_itself() {
+        let existing = "#Minecraft server properties\nmotd=Hello\n";
+        let mut updates = BTreeMap::new();
+        updates.insert("evil\nonline-mode".to_string(), "false".to_string());
+
+        let updated = update_properties(existing, &updates);
+
+        assert!(!updated.contains("online-mode=false"));
+    }
+
+    #[test]
+    fn update_properties_still_applies_clean_values() {
+        let existing = "#Minecraft server properties\nmotd=Hello\n";
+        let mut updates = BTreeMap::new();
+        updates.insert("motd".to_string(), "A perfectly normal MOTD".to_string());
+        updates.insert("max-players".to_string(), "10".to_string());
+
+        let updated = update_properties(existing, &updates);
+        let props = parse_properties(&updated);
+
+        assert_eq!(
+            props.get("motd").map(String::as_str),
+            Some("A perfectly normal MOTD")
+        );
+        assert_eq!(props.get("max-players").map(String::as_str), Some("10"));
     }
 }

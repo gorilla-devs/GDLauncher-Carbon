@@ -211,7 +211,7 @@ pub async fn process_curseforge_server_pack(
         detect_game_version_from_files(&data_path, &file_info.data.game_versions).await;
 
     // Detect modloader from extracted files
-    let (modloader_type, modloader_version) = detect_modloader_from_files(&data_path).await;
+    let (modloader_type, modloader_version) = detect_modloader_from_files(&data_path).await?;
 
     info!(
         "CurseForge server pack processed: game_version={}, modloader={:?}",
@@ -479,6 +479,14 @@ pub async fn process_modrinth_server_pack(
                     }
                 };
 
+                // A pack's own eula.txt is never written, on a fresh install or a
+                // reinstall: only the app's own EULA-accept flow may write
+                // "eula=true", so a pack cannot pre-accept the EULA on the
+                // operator's behalf by shipping a pre-filled file.
+                if !entry.is_dir() && relative.eq_ignore_ascii_case("eula.txt") {
+                    continue;
+                }
+
                 if !entry.is_dir()
                     && is_preserved_config_file(relative)
                     && out_path.exists()
@@ -611,8 +619,17 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
             }
         };
 
+        // A pack's own eula.txt is never written, on a fresh install or a
+        // reinstall: only the app's own EULA-accept flow may write
+        // "eula=true", so a pack cannot pre-accept the EULA on the operator's
+        // behalf by shipping a pre-filled file. Unlike the other preserved
+        // config files below, this applies even when no local file exists yet.
+        if !entry.is_dir() && relative.eq_ignore_ascii_case("eula.txt") {
+            continue;
+        }
+
         // Don't clobber user-customized config files if they already exist
-        // (server.properties, eula.txt, op/whitelist/banned lists, icon).
+        // (server.properties, op/whitelist/banned lists, icon).
         if !entry.is_dir() && is_preserved_config_file(&relative) && out_path.exists() {
             continue;
         }
@@ -648,7 +665,10 @@ async fn detect_game_version_from_files(_data_path: &Path, cf_game_versions: &[S
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Read the newest loader version directory under `libraries/<vendor_path>/`.
+/// Read the newest loader version directory under `libraries/<vendor_path>/`
+/// that actually contains the platform argument file, mirroring
+/// `modloader_install::find_loader_args_file`'s own evidence requirement so
+/// pack-detection never accepts a version the launch-time lookup would not.
 ///
 /// Modern Forge (1.17+) and every NeoForge version install into a Maven-style
 /// tree with the loader version as the leaf directory
@@ -656,6 +676,8 @@ async fn detect_game_version_from_files(_data_path: &Path, cf_game_versions: &[S
 /// the data root at all. Server packs distributed pre-installed therefore have
 /// to be recognised from this path.
 async fn loader_version_from_libraries(data_path: &Path, vendor_path: &str) -> Option<String> {
+    let file_name = super::modloader_install::platform_args_file_name();
+
     let vendor_dir = vendor_path
         .split('/')
         .fold(data_path.join("libraries"), |acc, segment| {
@@ -666,6 +688,12 @@ async fn loader_version_from_libraries(data_path: &Path, vendor_path: &str) -> O
     let mut entries = tokio::fs::read_dir(&vendor_dir).await.ok()?;
     while let Ok(Some(entry)) = entries.next_entry().await {
         if !entry.path().is_dir() {
+            continue;
+        }
+        // A version directory can exist without the installer having
+        // finished (e.g. an interrupted extraction) — require the argfile
+        // itself, not just the directory, before accepting the version.
+        if !entry.path().join(file_name).exists() {
             continue;
         }
         if let Some(version) = entry.file_name().to_str() {
@@ -696,28 +724,36 @@ fn loader_version_from_jar_name(name: &str, prefix: &str) -> Option<String> {
 /// Handles both shapes a server pack arrives in: already installed (the loader
 /// unpacked under `libraries/`, or a self-contained Fabric/Quilt launcher jar),
 /// and bare (only the installer jar shipped at the root).
-async fn detect_modloader_from_files(data_path: &Path) -> (Option<String>, Option<String>) {
+///
+/// Errors if both a Forge and a NeoForge tree are present with a valid argfile:
+/// that is not a state any real install produces, and silently preferring one
+/// (NeoForge, previously) risks installing/launching the wrong loader entirely.
+async fn detect_modloader_from_files(
+    data_path: &Path,
+) -> anyhow::Result<(Option<String>, Option<String>)> {
     // Pre-installed Forge/NeoForge — check before the root-jar scan, since these
     // packs frequently ship no versioned jar at the root whatsoever.
-    if let Some(version) = loader_version_from_libraries(data_path, "net/neoforged/neoforge").await
-    {
-        return (Some("neoforge".to_string()), Some(version));
-    }
+    let neoforge = loader_version_from_libraries(data_path, "net/neoforged/neoforge").await;
+    let forge = loader_version_from_libraries(data_path, "net/minecraftforge/forge").await;
 
-    if let Some(version) =
-        loader_version_from_libraries(data_path, "net/minecraftforge/forge").await
-    {
-        return (Some("forge".to_string()), Some(version));
+    match (neoforge, forge) {
+        (Some(neoforge_version), Some(forge_version)) => bail!(
+            "Server pack has both NeoForge ({neoforge_version}) and Forge ({forge_version}) \
+             installed under libraries/ — ambiguous modloader, refusing to guess"
+        ),
+        (Some(version), None) => return Ok((Some("neoforge".to_string()), Some(version))),
+        (None, Some(version)) => return Ok((Some("forge".to_string()), Some(version))),
+        (None, None) => {}
     }
 
     // Fabric and Quilt ship a self-contained launcher jar with no version in the
     // name. The loader is already installed, so a missing version is fine here.
     if data_path.join("fabric-server-launch.jar").exists() {
-        return (Some("fabric".to_string()), None);
+        return Ok((Some("fabric".to_string()), None));
     }
 
     if data_path.join("quilt-server-launch.jar").exists() {
-        return (Some("quilt".to_string()), None);
+        return Ok((Some("quilt".to_string()), None));
     }
 
     // Bare pack: the loader still has to be installed from a root-level jar.
@@ -726,23 +762,55 @@ async fn detect_modloader_from_files(data_path: &Path) -> (Option<String>, Optio
         while let Ok(Some(entry)) = entries.next_entry().await {
             let name = entry.file_name().to_string_lossy().to_string();
             if let Some(version) = loader_version_from_jar_name(&name, "neoforge-") {
-                return (Some("neoforge".to_string()), Some(version));
+                return Ok((Some("neoforge".to_string()), Some(version)));
             }
             if forge_version.is_none() {
                 forge_version = loader_version_from_jar_name(&name, "forge-");
             }
         }
         if let Some(version) = forge_version {
-            return (Some("forge".to_string()), Some(version));
+            return Ok((Some("forge".to_string()), Some(version)));
         }
     }
 
-    (None, None)
+    Ok((None, None))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn server_pack_eula_is_never_extracted_verbatim() {
+        // A pack's own eula.txt must never auto-accept the EULA on the
+        // operator's behalf, even on a brand new install where the
+        // "already exists" guard that protects the other preserved config
+        // files doesn't apply yet (this is a fresh, empty target dir).
+        use std::io::Write;
+
+        let src_dir = tempfile::tempdir().unwrap();
+        let zip_path = src_dir.path().join("pack.zip");
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            zip.start_file("eula.txt", zip::write::FileOptions::<()>::default())
+                .unwrap();
+            zip.write_all(b"eula=true\n").unwrap();
+            zip.start_file("server.jar", zip::write::FileOptions::<()>::default())
+                .unwrap();
+            zip.write_all(b"jar").unwrap();
+            zip.finish().unwrap();
+        }
+
+        let target_dir = tempfile::tempdir().unwrap();
+        extract_zip_to_dir(&zip_path, target_dir.path()).unwrap();
+
+        assert!(
+            !target_dir.path().join("eula.txt").exists(),
+            "a pack's eula.txt must never be written, even on a fresh install"
+        );
+        assert!(target_dir.path().join("server.jar").exists());
+    }
 
     #[test]
     fn save_path_protection_covers_world_dirs() {
@@ -815,7 +883,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_preinstalled_neoforge(dir.path(), "21.1.77");
 
-        let (loader, version) = detect_modloader_from_files(dir.path()).await;
+        let (loader, version) = detect_modloader_from_files(dir.path()).await.unwrap();
 
         assert_eq!(loader.as_deref(), Some("neoforge"));
         assert_eq!(version.as_deref(), Some("21.1.77"));
@@ -829,8 +897,9 @@ mod tests {
             .join("libraries/net/minecraftforge/forge/1.20.1-47.4.10");
         std::fs::create_dir_all(&loader_dir).unwrap();
         std::fs::write(loader_dir.join("unix_args.txt"), "-p libraries/foo.jar").unwrap();
+        std::fs::write(loader_dir.join("win_args.txt"), "-p libraries/foo.jar").unwrap();
 
-        let (loader, version) = detect_modloader_from_files(dir.path()).await;
+        let (loader, version) = detect_modloader_from_files(dir.path()).await.unwrap();
 
         assert_eq!(loader.as_deref(), Some("forge"));
         assert_eq!(version.as_deref(), Some("1.20.1-47.4.10"));
@@ -842,7 +911,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("neoforge-21.1.77-installer.jar"), b"jar").unwrap();
 
-        let (loader, version) = detect_modloader_from_files(dir.path()).await;
+        let (loader, version) = detect_modloader_from_files(dir.path()).await.unwrap();
 
         assert_eq!(loader.as_deref(), Some("neoforge"));
         // The `-installer` suffix must not leak into the version, or the maven
@@ -857,6 +926,7 @@ mod tests {
         assert_eq!(
             detect_modloader_from_files(fabric.path())
                 .await
+                .unwrap()
                 .0
                 .as_deref(),
             Some("fabric")
@@ -865,7 +935,11 @@ mod tests {
         let quilt = tempfile::tempdir().unwrap();
         std::fs::write(quilt.path().join("quilt-server-launch.jar"), b"jar").unwrap();
         assert_eq!(
-            detect_modloader_from_files(quilt.path()).await.0.as_deref(),
+            detect_modloader_from_files(quilt.path())
+                .await
+                .unwrap()
+                .0
+                .as_deref(),
             Some("quilt")
         );
     }
@@ -876,10 +950,49 @@ mod tests {
         std::fs::write(dir.path().join("server.jar"), b"jar").unwrap();
         std::fs::create_dir_all(dir.path().join("world")).unwrap();
 
-        let (loader, version) = detect_modloader_from_files(dir.path()).await;
+        let (loader, version) = detect_modloader_from_files(dir.path()).await.unwrap();
 
         assert_eq!(loader, None);
         assert_eq!(version, None);
+    }
+
+    #[tokio::test]
+    async fn loader_version_dir_without_argfile_is_not_detected() {
+        // Regression: a version directory can exist without the installer
+        // having finished (e.g. an interrupted extraction) — the old scan
+        // accepted any directory under libraries/, so this used to falsely
+        // report the loader as installed.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("libraries/net/neoforged/neoforge/21.1.77"))
+            .unwrap();
+        // No unix_args.txt / win_args.txt written into the version dir.
+
+        let (loader, version) = detect_modloader_from_files(dir.path()).await.unwrap();
+
+        assert_eq!(loader, None);
+        assert_eq!(version, None);
+    }
+
+    #[tokio::test]
+    async fn ambiguous_forge_and_neoforge_trees_are_rejected() {
+        // A data dir with both loader trees fully installed is not a state
+        // any real install produces — treat it as corrupt rather than
+        // silently preferring NeoForge.
+        let dir = tempfile::tempdir().unwrap();
+        write_preinstalled_neoforge(dir.path(), "21.1.77");
+        let forge_dir = dir
+            .path()
+            .join("libraries/net/minecraftforge/forge/1.20.1-47.4.10");
+        std::fs::create_dir_all(&forge_dir).unwrap();
+        std::fs::write(forge_dir.join("unix_args.txt"), "-p libraries/foo.jar").unwrap();
+        std::fs::write(forge_dir.join("win_args.txt"), "-p libraries/foo.jar").unwrap();
+
+        let result = detect_modloader_from_files(dir.path()).await;
+
+        assert!(
+            result.is_err(),
+            "expected an ambiguity error, got {result:?}"
+        );
     }
 
     #[test]

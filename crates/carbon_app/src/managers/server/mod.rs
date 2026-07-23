@@ -31,6 +31,27 @@ pub mod provider;
 const MAX_PATH: usize = if cfg!(windows) { 260 } else { 4096 };
 const ILLEGAL_CHARS: &[char] = &['/', ':', '\\', '<', '>', '*', '|', '"', '?', '^'];
 
+/// Auto-restart tuning for a server that keeps crashing right after boot (bad
+/// heap args, a corrupted world, etc). Both the per-attempt delay and the
+/// total attempt count are bounded, so a server that crashes instantly can
+/// never spin the JVM in a tight loop: the delay doubles per consecutive fast
+/// crash up to a ceiling, and auto-restart gives up entirely past a cap.
+const CRASH_RESTART_BASE_DELAY_SECS: u64 = 3;
+const CRASH_RESTART_MAX_DELAY_SECS: u64 = 5 * 60;
+const CRASH_RESTART_MAX_ATTEMPTS: u32 = 6;
+/// A run lasting at least this long is treated as healthy: a later crash
+/// starts a fresh attempt count instead of continuing the backoff.
+const CRASH_RESTART_HEALTHY_UPTIME_SECS: i64 = 60;
+
+/// Backoff delay before auto-restarting a crashed server, doubling per
+/// consecutive fast crash and capped so it can never grow unbounded (the
+/// exponent is clamped before the shift, so this never overflows).
+fn crash_restart_delay(attempts: u32) -> std::time::Duration {
+    let exponent = attempts.saturating_sub(1).min(10);
+    let backoff_secs = CRASH_RESTART_BASE_DELAY_SECS.saturating_mul(1u64 << exponent);
+    std::time::Duration::from_secs(backoff_secs.min(CRASH_RESTART_MAX_DELAY_SECS))
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("Minecraft server EULA has not been accepted for server {server_id}")]
 pub struct EulaNotAcceptedError {
@@ -85,6 +106,9 @@ pub struct ServerManager {
     server_logs: RwLock<HashMap<ServerLogId, watch::Sender<Vec<String>>>>,
     log_counter: Mutex<i32>,
     index_lock: Mutex<()>,
+    /// Consecutive fast-crash count per server, used to back off and cap
+    /// automatic restarts. See `crash_restart_delay`.
+    crash_restart_state: DashMap<ServerId, u32>,
 }
 
 impl std::fmt::Debug for ServerManager {
@@ -107,6 +131,7 @@ impl ServerManager {
             server_logs: RwLock::new(HashMap::new()),
             log_counter: Mutex::new(0),
             index_lock: Mutex::new(()),
+            crash_restart_state: DashMap::new(),
         }
     }
 
@@ -990,13 +1015,45 @@ impl ManagerRef<'_, ServerManager> {
         let lock = self.get_op_lock(id);
         let _guard = lock.lock().await;
 
+        // Block on states where deleting now would race a background writer.
+        // `Running` is handled below (stop it, then proceed) rather than
+        // rejected here. `Deleting` is deliberately NOT rejected: it only
+        // shows up on a server whose own earlier `delete_server` call already
+        // deleted the DB row before failing (e.g. mid-`remove_dir_all`), and
+        // rejecting it here would turn that failure into a permanently stuck
+        // state instead of one the caller can retry by calling delete again.
+        {
+            let servers = self.servers.read().await;
+            let server = servers
+                .get(&id)
+                .ok_or_else(|| anyhow!("Server not found"))?;
+            match &server.state {
+                ServerState::Stopped { .. }
+                | ServerState::Running { .. }
+                | ServerState::Deleting => {}
+                ServerState::Installing(_) => {
+                    bail!("Cannot delete a server while it is installing");
+                }
+                ServerState::Starting(_) => {
+                    bail!("Cannot delete a server while it is starting");
+                }
+                ServerState::Stopping => {
+                    bail!("Server is stopping — wait for it to fully stop before deleting");
+                }
+            }
+        }
+
         // Stop if running
         {
             let servers = self.servers.read().await;
             if let Some(server) = servers.get(&id) {
                 if matches!(server.state, ServerState::Running { .. }) {
                     drop(servers);
-                    self.stop_server(id).await?;
+                    // Already holding this server's op-lock, so the unlocked
+                    // body must be called directly — going through
+                    // `stop_server` would re-lock the same non-reentrant
+                    // per-id `Mutex` and deadlock.
+                    self.stop_server_locked(id).await?;
                     // Wait a moment for graceful shutdown
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 }
@@ -1038,6 +1095,7 @@ impl ManagerRef<'_, ServerManager> {
         // Remove from memory
         self.servers.write().await.remove(&id);
         self.server_op_locks.remove(&id);
+        self.crash_restart_state.remove(&id);
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_GROUPS, None);
@@ -1173,6 +1231,7 @@ impl ManagerRef<'_, ServerManager> {
                 db_server.xms,
                 &db_server.extra_java_args,
                 &launch_config,
+                db_server.modloader_type.as_deref(),
                 log_tx,
             )
             .await?;
@@ -1214,7 +1273,8 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_SERVER_DETAILS, None);
 
         // Spawn a watcher for unexpected exits (crash/normal exit not triggered by stop/kill).
-        // If auto_restart is enabled, restart the server automatically.
+        // If auto_restart is enabled, restart the server automatically with a capped,
+        // backing-off retry so a server that crashes instantly cannot tight-loop.
         let app = self.app.clone();
         tokio::spawn(async move {
             exit_notify.notified().await;
@@ -1222,52 +1282,86 @@ impl ManagerRef<'_, ServerManager> {
             // Check if the exit was unexpected (state is still Running).
             // If stop_server/kill_server initiated the shutdown, they will have
             // already transitioned the state away from Running.
-            let should_restart = {
+            let (should_restart, uptime) = {
                 let mut servers = app.server_manager.servers.write().await;
                 let Some(server) = servers.get_mut(&id) else {
                     return;
                 };
-                if !matches!(server.state, ServerState::Running { .. }) {
+                let start_time = match &server.state {
+                    ServerState::Running { start_time, .. } => *start_time,
                     // stop_server or kill_server already handling cleanup
-                    return;
-                }
+                    _ => return,
+                };
                 // Unexpected exit — clean up the handle
                 server.handle = None;
                 server.state = ServerState::Stopped { failed_task: None };
 
                 // Check auto_restart setting from DB
-                server_repo::get_server(&app.db, id.0)
+                let auto_restart = server_repo::get_server(&app.db, id.0)
                     .await
                     .ok()
                     .flatten()
                     .map(|s| s.auto_restart)
-                    .unwrap_or(false)
+                    .unwrap_or(false);
+
+                (auto_restart, Utc::now() - start_time)
             };
 
             app.invalidate(GET_ALL_SERVERS, None);
             app.invalidate(GET_SERVER_DETAILS, None);
 
-            if should_restart {
-                info!("Server {} exited unexpectedly, auto-restarting", id.0);
-                // Brief delay to avoid tight crash loops
-                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                // ManagerRef's future is not Send, so we use a oneshot to
-                // bridge into a context where we can call start_server.
-                let (tx, rx) = tokio::sync::oneshot::channel::<anyhow::Result<()>>();
-                let app2 = app.clone();
-                // This inner task owns the Arc and can create a ManagerRef locally
-                std::thread::spawn(move || {
-                    let rt = tokio::runtime::Handle::current();
-                    let result = rt.block_on(app2.server_manager().start_server(id));
-                    let _ = tx.send(result);
-                });
-                match rx.await {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => error!("Failed to auto-restart server {}: {}", id.0, e),
-                    Err(_) => error!("Auto-restart channel dropped for server {}", id.0),
-                }
-            } else {
+            if !should_restart {
                 warn!("Server {} exited unexpectedly", id.0);
+                return;
+            }
+
+            // A run lasting at least CRASH_RESTART_HEALTHY_UPTIME_SECS resets the
+            // attempt count — this crash starts a fresh sequence rather than
+            // continuing a tight loop.
+            let healthy = uptime >= chrono::Duration::seconds(CRASH_RESTART_HEALTHY_UPTIME_SECS);
+            let attempts = {
+                let mut entry = app
+                    .server_manager
+                    .crash_restart_state
+                    .entry(id)
+                    .or_insert(0);
+                if healthy {
+                    *entry = 0;
+                }
+                *entry += 1;
+                *entry
+            };
+
+            if attempts > CRASH_RESTART_MAX_ATTEMPTS {
+                error!(
+                    "Server {} crashed {} times in a row without staying up {}s; giving up on auto-restart until it is started manually",
+                    id.0,
+                    attempts - 1,
+                    CRASH_RESTART_HEALTHY_UPTIME_SECS
+                );
+                return;
+            }
+
+            let delay = crash_restart_delay(attempts);
+            info!(
+                "Server {} exited unexpectedly, auto-restarting in {:?} (attempt {}/{})",
+                id.0, delay, attempts, CRASH_RESTART_MAX_ATTEMPTS
+            );
+            tokio::time::sleep(delay).await;
+            // ManagerRef's future is not Send, so we use a oneshot to
+            // bridge into a context where we can call start_server.
+            let (tx, rx) = tokio::sync::oneshot::channel::<anyhow::Result<()>>();
+            let app2 = app.clone();
+            // This inner task owns the Arc and can create a ManagerRef locally
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Handle::current();
+                let result = rt.block_on(app2.server_manager().start_server(id));
+                let _ = tx.send(result);
+            });
+            match rx.await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => error!("Failed to auto-restart server {}: {}", id.0, e),
+                Err(_) => error!("Auto-restart channel dropped for server {}", id.0),
             }
         });
 
@@ -1279,6 +1373,15 @@ impl ManagerRef<'_, ServerManager> {
         let lock = self.get_op_lock(id);
         let _guard = lock.lock().await;
 
+        self.stop_server_locked(id).await
+    }
+
+    /// Body of `stop_server`, assuming the caller already holds `id`'s
+    /// op-lock. `delete_server` holds that same lock across its own "stop if
+    /// running" step and calls this directly — going through `stop_server`
+    /// there would re-lock the non-reentrant per-id `Mutex` the caller is
+    /// still holding and deadlock every time the server is `Running`.
+    async fn stop_server_locked(self, id: ServerId) -> anyhow::Result<()> {
         let provider = self.get_provider();
 
         let exit_notify = {
@@ -2961,4 +3064,39 @@ fn generate_shortpath(name: &str) -> String {
         .as_millis();
 
     format!("{}_{}", base, timestamp)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn crash_restart_delay_grows_and_caps() {
+        assert_eq!(crash_restart_delay(1), std::time::Duration::from_secs(3));
+        assert_eq!(crash_restart_delay(2), std::time::Duration::from_secs(6));
+        assert_eq!(crash_restart_delay(3), std::time::Duration::from_secs(12));
+        assert_eq!(crash_restart_delay(4), std::time::Duration::from_secs(24));
+
+        // Eventually reaches the configured ceiling (well past MAX_ATTEMPTS,
+        // which is what actually stops the retries in practice — see
+        // `crash_restart_delay_never_zero` for the overflow-safety guarantee).
+        assert_eq!(
+            crash_restart_delay(20),
+            std::time::Duration::from_secs(CRASH_RESTART_MAX_DELAY_SECS)
+        );
+
+        // A pathologically large attempt count must not overflow the shift or
+        // wrap the delay back down — it just stays at the ceiling.
+        assert_eq!(
+            crash_restart_delay(u32::MAX),
+            std::time::Duration::from_secs(CRASH_RESTART_MAX_DELAY_SECS)
+        );
+    }
+
+    #[test]
+    fn crash_restart_delay_never_zero() {
+        // attempts is always >= 1 in practice (incremented before use), but
+        // guard the boundary explicitly: no delay would defeat the backoff.
+        assert!(crash_restart_delay(1) > std::time::Duration::ZERO);
+    }
 }

@@ -25,6 +25,7 @@ pub trait ServerProvider: Send + Sync {
         xms: i32,
         extra_args: &str,
         launch_config: &LaunchConfig,
+        modloader_type: Option<&str>,
         log_tx: mpsc::UnboundedSender<String>,
     ) -> Result<ServerHandle>;
 
