@@ -8,6 +8,7 @@ use crate::domain::server::{
     ServerState, ServerType,
 };
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::minecraft::modrinth::secure_path_join;
 use crate::managers::orphan_pid;
 use anyhow::{Context, anyhow, bail};
 use carbon_repos::dbtypes::DbDateTime;
@@ -52,6 +53,13 @@ fn crash_restart_delay(attempts: u32) -> std::time::Duration {
     let exponent = attempts.saturating_sub(1).min(10);
     let backoff_secs = CRASH_RESTART_BASE_DELAY_SECS.saturating_mul(1u64 << exponent);
     std::time::Duration::from_secs(backoff_secs.min(CRASH_RESTART_MAX_DELAY_SECS))
+}
+
+/// Strips control characters (notably newlines) from a single-line console
+/// command, so an operator-supplied field embedded in one — a ban reason, an
+/// IP — can't smuggle in extra newline-separated console commands.
+fn sanitize_console_command(command: &str) -> String {
+    command.chars().filter(|c| !c.is_control()).collect()
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -1955,6 +1963,10 @@ impl ManagerRef<'_, ServerManager> {
     /// Send a console command if the server is running (best-effort)
     pub async fn send_console_if_running(self, id: ServerId, command: String) {
         if self.is_server_running(id).await {
+            // Structured console commands are single-line; an operator-supplied
+            // field (ban reason, IP) with an embedded newline would otherwise
+            // inject additional console commands.
+            let command = sanitize_console_command(&command);
             let _ = self.send_console_command(id, command).await;
         }
     }
@@ -2180,7 +2192,9 @@ impl ManagerRef<'_, ServerManager> {
 
         let mods_path = server_path.get_mods_path();
         tokio::fs::create_dir_all(&mods_path).await?;
-        let install_path = mods_path.join(&file.file_name);
+        // The filename comes from the platform response; confine it under mods/
+        // so a `..`/absolute name can't write elsewhere.
+        let install_path = secure_path_join(&mods_path, &file.file_name)?;
 
         let checksums = file
             .hashes
@@ -2314,7 +2328,9 @@ impl ManagerRef<'_, ServerManager> {
 
         let mods_path = server_path.get_mods_path();
         tokio::fs::create_dir_all(&mods_path).await?;
-        let install_path = mods_path.join(&file.filename);
+        // The filename comes from the platform response; confine it under mods/
+        // so a `..`/absolute name can't write elsewhere.
+        let install_path = secure_path_join(&mods_path, &file.filename)?;
 
         let checksum = Checksum::Sha1(file.hashes.sha1.clone());
 
@@ -3241,6 +3257,23 @@ fn generate_shortpath(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sanitize_console_command_strips_control_chars() {
+        assert_eq!(
+            sanitize_console_command("ban Steve griefing"),
+            "ban Steve griefing"
+        );
+        // A newline in the ban reason must not become a second console command.
+        assert_eq!(
+            sanitize_console_command("ban Steve reason\nop attacker"),
+            "ban Steve reasonop attacker"
+        );
+        assert_eq!(
+            sanitize_console_command("ban-ip 1.2.3.4 reason\r\nop attacker"),
+            "ban-ip 1.2.3.4 reasonop attacker"
+        );
+    }
 
     #[test]
     fn crash_restart_delay_grows_and_caps() {
