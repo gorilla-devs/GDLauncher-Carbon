@@ -896,61 +896,6 @@ async function createWindow(): Promise<BrowserWindow> {
       }, 500)
     }
 
-    function upsertKeyValue(obj: any, keyToChange: string, value: any) {
-      const keyToChangeLower = keyToChange.toLowerCase()
-      for (const key of Object.keys(obj)) {
-        if (key.toLowerCase() === keyToChangeLower) {
-          return
-        }
-      }
-      // Insert at end instead
-      obj[keyToChange] = value
-    }
-
-    win?.webContents.session.webRequest.onBeforeSendHeaders(
-      (details, callback) => {
-        const { requestHeaders } = details
-        upsertKeyValue(requestHeaders, "Access-Control-Allow-Origin", ["*"])
-
-        // YouTube's embedded player requires an HTTP Referer identifying the
-        // embedding site; packaged builds load from file://, which sends none,
-        // so the player refuses to play with error 153. Insert-only: when a
-        // real Referer exists (dev server pages, the player's own
-        // sub-requests) it is kept.
-        let hostname = ""
-        try {
-          hostname = new URL(details.url).hostname
-        } catch {
-          // ignore unparseable URLs
-        }
-        if (
-          hostname === "youtube.com" ||
-          hostname.endsWith(".youtube.com") ||
-          hostname === "youtube-nocookie.com" ||
-          hostname.endsWith(".youtube-nocookie.com")
-        ) {
-          upsertKeyValue(
-            requestHeaders,
-            "Referer",
-            "https://app.gdlauncher.com/"
-          )
-        }
-
-        callback({ requestHeaders })
-      }
-    )
-
-    win?.webContents.session.webRequest.onHeadersReceived(
-      (details, callback) => {
-        const { responseHeaders } = details
-        upsertKeyValue(responseHeaders, "Access-Control-Allow-Origin", ["*"])
-        upsertKeyValue(responseHeaders, "Access-Control-Allow-Headers", ["*"])
-        callback({
-          responseHeaders
-        })
-      }
-    )
-
     if (import.meta.env.DEV && !__SHOWCASE_MODE__) {
       win?.webContents.openDevTools()
     }
@@ -1385,6 +1330,17 @@ ipcMain.handle("getCurrentProgress", () => {
   return lastCoreModuleProgress
 })
 
+// Case-insensitive insert-only header write: existing values always win.
+function upsertKeyValue(obj: any, keyToChange: string, value: any) {
+  const keyToChangeLower = keyToChange.toLowerCase()
+  for (const key of Object.keys(obj)) {
+    if (key.toLowerCase() === keyToChangeLower) {
+      return
+    }
+  }
+  obj[keyToChange] = value
+}
+
 app.whenReady().then(async () => {
   console.log("App is ready")
   const accessibility = validateArgument("--enable-accessibility")
@@ -1402,65 +1358,44 @@ app.whenReady().then(async () => {
     applyPendingEmail()
   }
 
-  session.defaultSession.webRequest.onBeforeSendHeaders(
-    {
-      urls: ["http://*/*", "https://*/*"]
-    },
-    (details, callback) => {
-      details.requestHeaders.Origin = "https://app.gdlauncher.com"
-      callback({ requestHeaders: details.requestHeaders })
+  // Electron allows exactly one listener per webRequest event per session —
+  // a later registration silently replaces an earlier one — so all header
+  // rewriting for the renderer session lives in this single pair.
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const { requestHeaders } = details
+
+    // YouTube's embedded player requires an HTTP Referer identifying the
+    // embedding site; packaged builds load from file://, which sends none,
+    // so the player refuses to play with error 153. Insert-only: when a
+    // real Referer exists (dev server pages, the player's own sub-requests)
+    // it is kept.
+    let hostname = ""
+    try {
+      hostname = new URL(details.url).hostname
+    } catch {
+      // ignore unparseable URLs
     }
-  )
-
-  session.defaultSession.webRequest.onHeadersReceived(
-    {
-      urls: ["http://*/*", "https://*/*"]
-    },
-    (details, callback) => {
-      delete details.responseHeaders!["Access-Control-Allow-Origin"]
-
-      delete details.responseHeaders!["access-control-allow-origin"]
-      details.responseHeaders!["Access-Control-Allow-Origin"] = ["*"]
-
-      // Remove X-Frame-Options and CSP frame-ancestors for iframe-embeddable content
-      // This allows YouTube and other embeds to work when loaded from file:// origin
-      const url = details.url.toLowerCase()
-      const isEmbeddableContent =
-        url.includes("youtube.com") ||
-        url.includes("youtube-nocookie.com") ||
-        url.includes("googlevideo.com") || // YouTube video CDN
-        url.includes("i.imgur.com") ||
-        url.includes("cdn.ko-fi.com")
-
-      if (isEmbeddableContent) {
-        // Remove X-Frame-Options header (case-insensitive)
-        delete details.responseHeaders!["X-Frame-Options"]
-        delete details.responseHeaders!["x-frame-options"]
-
-        // Remove or modify Content-Security-Policy frame-ancestors
-        // Note: CSP can have multiple header names
-        const cspKeys = Object.keys(details.responseHeaders!).filter(
-          (key) =>
-            key.toLowerCase() === "content-security-policy" ||
-            key.toLowerCase() === "content-security-policy-report-only"
-        )
-        for (const key of cspKeys) {
-          const values = details.responseHeaders![key]
-          if (values) {
-            // Remove frame-ancestors directive from CSP
-            details.responseHeaders![key] = values.map((value) =>
-              value.replace(/frame-ancestors\s+[^;]+;?/gi, "")
-            )
-          }
-        }
-      }
-
-      callback({
-        cancel: false,
-        responseHeaders: details.responseHeaders
-      })
+    if (
+      hostname === "youtube.com" ||
+      hostname.endsWith(".youtube.com") ||
+      hostname === "youtube-nocookie.com" ||
+      hostname.endsWith(".youtube-nocookie.com")
+    ) {
+      upsertKeyValue(requestHeaders, "Referer", "https://app.gdlauncher.com/")
     }
-  )
+
+    callback({ requestHeaders })
+  })
+
+  // The renderer runs from file:// in packaged builds, so cross-origin
+  // responses need permissive CORS headers for fetches to succeed. Insert-only:
+  // servers that set their own values keep them.
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const { responseHeaders } = details
+    upsertKeyValue(responseHeaders, "Access-Control-Allow-Origin", ["*"])
+    upsertKeyValue(responseHeaders, "Access-Control-Allow-Headers", ["*"])
+    callback({ responseHeaders })
+  })
 
   app.on("second-instance", (_e, argv) => {
     // Handle protocol URLs on Windows (passed as command line arguments)
