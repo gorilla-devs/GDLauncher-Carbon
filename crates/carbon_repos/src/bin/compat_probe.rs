@@ -21,7 +21,10 @@
 //! Both subcommands print a machine-greppable `PROBE:<RESULT>` line so the
 //! harness can assert on the outcome without depending on exact prose.
 
-use carbon_repos::checker::{check_manifests, check_module, check_nullability, check_query_plans};
+use carbon_repos::checker::{
+    check_classification, check_insert_datetime_columns, check_manifests, check_module,
+    check_nullability, check_pool_routing, check_query_plans,
+};
 use carbon_repos::compat::{OpenVerdict, RefusalKind};
 use carbon_repos::registry::QueryCheck;
 use rusqlite::Connection;
@@ -99,10 +102,24 @@ fn probe_check(db_path: &Path) -> ExitCode {
     };
     let queries = all_registered_queries();
     let mut violations = Vec::new();
+    // Every rule shaped `(conn, queries) -> Vec<String>` runs here — the full
+    // set `checker.rs` exports for validating registered queries against a
+    // live schema (`tests/module_registration.rs` mechanically asserts this
+    // list stays complete against checker.rs's exports). `check_handwritten_sql`
+    // is deliberately excluded: it lints source files for un-registered SQL,
+    // not registered queries against a schema, so it does not fit this probe's
+    // "does this query still work against this database" purpose.
     violations.extend(check_module(&conn, &queries));
     violations.extend(check_manifests(&conn, &queries));
     violations.extend(check_nullability(&conn, &queries));
     violations.extend(check_query_plans(&conn, &queries));
+    violations.extend(check_classification(&conn, &queries));
+    violations.extend(check_insert_datetime_columns(&conn, &queries));
+    // Schema-independent (no `Connection` needed), so it isn't part of the
+    // mechanically-tracked set above, but it's cheap and worth running here
+    // too: a shape/verb pool-routing mismatch is exactly the kind of static
+    // fact an old binary's checker should still catch against a newer schema.
+    violations.extend(check_pool_routing(&queries));
 
     if violations.is_empty() {
         println!("PROBE:CHECK_OK|{}", queries.len());
@@ -116,23 +133,11 @@ fn probe_check(db_path: &Path) -> ExitCode {
     }
 }
 
-/// Every registered `QueryCheck` across every repo module — the same aggregation
-/// the in-process checker tests use, so the probe covers the identical query set.
+/// Every registered `QueryCheck` across every repo module — delegates to
+/// `carbon_repos::repos::all_queries()`, the single shared source of truth
+/// also used by the in-process checker tests, so the probe covers the
+/// identical query set without hand-maintaining a second copy of the module
+/// list (spec L9).
 fn all_registered_queries() -> Vec<QueryCheck> {
-    use carbon_repos::repos;
-    let mut all: Vec<QueryCheck> = Vec::new();
-    all.extend(repos::java::all_queries());
-    all.extend(repos::app_configuration::all_queries());
-    all.extend(repos::frontend_preference::all_queries());
-    all.extend(repos::http_cache::all_queries());
-    all.extend(repos::account::all_queries());
-    all.extend(repos::skin::all_queries());
-    all.extend(repos::active_downloads::all_queries());
-    all.extend(repos::instance::all_queries());
-    all.extend(repos::server::all_queries());
-    all.extend(repos::version_meta::all_queries());
-    all.extend(repos::mod_file_cache::all_queries());
-    all.extend(repos::mod_metadata::all_queries());
-    all.extend(repos::modpack_cache::all_queries());
-    all
+    carbon_repos::repos::all_queries()
 }

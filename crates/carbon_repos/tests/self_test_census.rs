@@ -58,15 +58,18 @@ const EXPECTED_RULES: &[&str] = &[
     "checker.undeclared-param",
     "checker.positional-param",
     "checker.result-column-present",
+    "checker.duplicate-result-column",
     // Query checker authorizer-driven lints.
     "checker.freshness",
     "checker.nullability-nullable-source",
     "checker.nullability-expression-origin",
+    "checker.nullability-outer-join-widening",
     "checker.query-plan-full-scan",
     "checker.handwritten-sql-registered",
     "checker.insert-datetime-explicit",
     "checker.sql-ascii-leading",
     "checker.read-class-no-writes",
+    "checker.routing-matches-class",
     // Bidirectional runner verifier + refusals (compat.rs).
     "compat.diverged-checksum",
     "compat.backwards-missing-metadata",

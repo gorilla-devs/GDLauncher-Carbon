@@ -164,9 +164,7 @@ impl MigrationSet {
     /// sha256 (hex) of a migration's `up` SQL. Detects a divergent history at
     /// the same version number.
     pub fn checksum(&self, version: i32) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(self.migrations[(version - 1) as usize].up_sql.as_bytes());
-        hex::encode(hasher.finalize())
+        sha256_hex(self.migrations[(version - 1) as usize].up_sql.as_bytes())
     }
 
     /// Forward-only application, used by tests and tooling that always start at
@@ -257,13 +255,26 @@ impl MigrationSet {
     /// Applies migrations `from+1..=to`, each in its own transaction: `up`, the
     /// `_migrations` row, and the `user_version` bump commit together so no
     /// reachable state carries a schema change without its metadata.
+    ///
+    /// The metadata row is `INSERT OR REPLACE`d rather than plain-inserted: a
+    /// file-level restore (e.g. a Time Machine / VSS snapshot of just the main
+    /// database file, taken out of sync with its `-wal`) can leave a stale
+    /// `_migrations` row for a version above the restored `user_version` — a
+    /// row from history this restore rolled back past. A plain `INSERT` would
+    /// then hit that row's `version` primary key and fail with a constraint
+    /// violation the moment this loop reaches it, rolling back an otherwise
+    /// perfectly applicable migration and turning a self-healable state into a
+    /// fatal `DB_MIGRATION_FAILED`. `REPLACE` instead overwrites the stale row
+    /// with the metadata for the `up` this transaction is applying right now —
+    /// exactly what belongs at that version — which is a no-op in the
+    /// overwhelmingly common case where no such row exists yet.
     fn apply_pending(&self, conn: &mut Connection, from: i32, to: i32) -> DbResult<()> {
         for version in (from + 1)..=to {
             let def = &self.migrations[(version - 1) as usize];
             let tx = conn.transaction()?;
             tx.execute_batch(def.up_sql)?;
             tx.execute(
-                &format!("INSERT INTO {MIGRATION_ROW_COLUMNS}"),
+                &format!("INSERT OR REPLACE INTO {MIGRATION_ROW_COLUMNS}"),
                 params![
                     version,
                     def.name,
@@ -458,6 +469,17 @@ impl MigrationSet {
         }
         dump_schema(&conn)
     }
+}
+
+/// sha256 (hex) of `bytes` — the exact hash [`MigrationSet::checksum`] applies
+/// to a migration's `up_sql`. Exposed so tooling that must compute a
+/// migration's checksum before `get_migrations()` carries it — `new_migration`
+/// freezing it into `tests/migration_checksums_frozen.rs` — uses the identical
+/// algorithm rather than a hand-copied one.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
 }
 
 /// Creates the `_migrations` bookkeeping table if it does not already exist.

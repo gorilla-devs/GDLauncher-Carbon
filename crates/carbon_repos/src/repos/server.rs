@@ -498,6 +498,7 @@ const INSERT_SERVER_CHECK: QueryCheck = QueryCheck {
     ],
     columns: None,
     class: crate::registry::class_of(INSERT_SERVER_SQL),
+    routes_write: true,
 };
 const INSERT_SERVER_GROUP_CHECK: QueryCheck = QueryCheck {
     name: "insert_server_group",
@@ -505,6 +506,7 @@ const INSERT_SERVER_GROUP_CHECK: QueryCheck = QueryCheck {
     params: &[":name", ":group_index", ":library_position"],
     columns: None,
     class: crate::registry::class_of(INSERT_SERVER_GROUP_SQL),
+    routes_write: true,
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the

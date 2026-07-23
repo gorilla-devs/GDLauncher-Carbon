@@ -1,6 +1,6 @@
 use carbon_repos::checker::{
     check_classification, check_insert_datetime_columns, check_manifests, check_module,
-    check_nullability, check_query_plans,
+    check_nullability, check_pool_routing, check_query_plans,
 };
 use carbon_repos::registry::QueryCheck;
 use rusqlite::Connection;
@@ -15,22 +15,11 @@ fn migrated_db() -> (tempfile::TempDir, Connection) {
 
 /// Every registered `QueryCheck` across every repo module. Every checker rule
 /// runs over this same aggregated set, so every repo is covered automatically.
+/// Delegates to `carbon_repos::repos::all_queries()` — the single shared
+/// source of truth also used by `src/bin/compat_probe.rs` — rather than
+/// hand-maintaining a second copy of the module list here (spec L9).
 fn all_registered_queries() -> Vec<QueryCheck> {
-    let mut all: Vec<QueryCheck> = Vec::new();
-    all.extend(carbon_repos::repos::java::all_queries());
-    all.extend(carbon_repos::repos::app_configuration::all_queries());
-    all.extend(carbon_repos::repos::frontend_preference::all_queries());
-    all.extend(carbon_repos::repos::http_cache::all_queries());
-    all.extend(carbon_repos::repos::account::all_queries());
-    all.extend(carbon_repos::repos::skin::all_queries());
-    all.extend(carbon_repos::repos::active_downloads::all_queries());
-    all.extend(carbon_repos::repos::instance::all_queries());
-    all.extend(carbon_repos::repos::server::all_queries());
-    all.extend(carbon_repos::repos::version_meta::all_queries());
-    all.extend(carbon_repos::repos::mod_file_cache::all_queries());
-    all.extend(carbon_repos::repos::mod_metadata::all_queries());
-    all.extend(carbon_repos::repos::modpack_cache::all_queries());
-    all
+    carbon_repos::repos::all_queries()
 }
 
 #[test]
@@ -95,6 +84,12 @@ fn classification_lint_passes_for_all_registered_queries() {
     );
 }
 
+#[test]
+fn pool_routing_lint_passes_for_all_registered_queries() {
+    let v = check_pool_routing(&all_registered_queries());
+    assert!(v.is_empty(), "pool routing violations:\n{}", v.join("\n"));
+}
+
 // ---------------------------------------------------------------------------
 // Planted-failure self-tests: every rule is fence-tested with a query that must
 // be flagged, so a broken checker can't silently pass everything.
@@ -114,6 +109,7 @@ fn checker_catches_planted_structural_failures() {
             params: &[],
             columns: None,
             class: carbon_repos::registry::class_of("SELECT id FROM NotATable"),
+            routes_write: false,
         },
         // Declared param the SQL does not bind.
         QueryCheck {
@@ -122,6 +118,7 @@ fn checker_catches_planted_structural_failures() {
             params: &[":wrong"],
             columns: None,
             class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
+            routes_write: false,
         },
         // SQL param the registry does not declare (exact set equality flags a
         // bound parameter with no matching declaration).
@@ -131,6 +128,7 @@ fn checker_catches_planted_structural_failures() {
             params: &[],
             columns: None,
             class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
+            routes_write: false,
         },
     ];
     let v = check_module(&conn, &planted);
@@ -161,6 +159,7 @@ fn checker_does_not_flag_question_mark_in_string_literal() {
         class: carbon_repos::registry::class_of(
             "SELECT id FROM Java WHERE major = :major OR os = 'what?'",
         ),
+        routes_write: false,
     }];
     // The '?'-in-literal rule must not fire; only the param-set mismatch for the
     // deliberately-unused declared name should show up.
@@ -196,6 +195,7 @@ fn checker_flags_a_positional_param_in_a_single_param_query() {
             params,
             columns: None,
             class: carbon_repos::registry::class_of(sql),
+            routes_write: false,
         }];
         let v = check_module(&conn, &planted);
         assert!(
@@ -217,6 +217,7 @@ fn checker_flags_real_positional_param_in_multiparam_query() {
         class: carbon_repos::registry::class_of(
             "SELECT id FROM Java WHERE major = :major AND arch = ?",
         ),
+        routes_write: false,
     }];
     let v = check_module(&conn, &planted);
     assert!(
@@ -244,12 +245,83 @@ fn checker_flags_declared_column_missing_from_result_set() {
         params: &[":id"],
         columns: Some(COLS),
         class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
+        routes_write: false,
     }];
     let v = check_module(&conn, &planted);
     assert!(
         v.iter()
             .any(|m| m.contains("missing_result_column") && m.contains("major")),
         "must flag a declared column absent from the result set, got: {v:?}"
+    );
+}
+
+#[test]
+fn duplicate_result_column_rule_catches_an_unaliased_join_collision() {
+    // CENSUS-SELFTEST: checker.duplicate-result-column
+    // An unaliased join exposing two same-named result columns (both sides
+    // happen to have an `id`) silently binds the left one under rusqlite's
+    // by-name row decoding — the right one is never reachable by name despite
+    // appearing in the result set.
+    use carbon_repos::from_row::{ColumnSpec, TypeClass};
+    const COLS: &[ColumnSpec] = &[ColumnSpec {
+        name: "id",
+        ty: TypeClass::Text,
+        nullable: false,
+        explicit_nullable: false,
+    }];
+    let (_d, conn) = migrated_db();
+
+    let dup_sql = "SELECT Java.id, Instance.id FROM Java, Instance";
+    let planted = [QueryCheck {
+        name: "unaliased_join_duplicate_id",
+        sql: dup_sql,
+        params: &[],
+        columns: Some(COLS),
+        class: carbon_repos::registry::class_of(dup_sql),
+        routes_write: false,
+    }];
+    let v = check_module(&conn, &planted);
+    assert!(
+        v.iter()
+            .any(|m| m.contains("unaliased_join_duplicate_id")
+                && m.contains("duplicate column name")),
+        "must flag a join exposing two same-named result columns, got: {v:?}"
+    );
+
+    // A distinctly-aliased join must not be flagged as a duplicate.
+    let ok_sql = "SELECT Java.id AS java_id, Instance.id AS instance_id FROM Java, Instance";
+    let ok = [QueryCheck {
+        name: "aliased_join",
+        sql: ok_sql,
+        params: &[],
+        columns: Some(COLS),
+        class: carbon_repos::registry::class_of(ok_sql),
+        routes_write: false,
+    }];
+    let ok_violations = check_module(&conn, &ok);
+    assert!(
+        !ok_violations
+            .iter()
+            .any(|m| m.contains("duplicate column name")),
+        "distinctly-aliased columns must not be flagged as duplicates, got: {ok_violations:?}"
+    );
+
+    // Case-insensitive: `Id` and `id` must also collide, matching rusqlite's
+    // own case-insensitive by-name column resolution.
+    let case_sql = "SELECT Java.id AS Id, Instance.id AS id FROM Java, Instance";
+    let case_variant = [QueryCheck {
+        name: "case_insensitive_collision",
+        sql: case_sql,
+        params: &[],
+        columns: Some(COLS),
+        class: carbon_repos::registry::class_of(case_sql),
+        routes_write: false,
+    }];
+    assert!(
+        check_module(&conn, &case_variant)
+            .iter()
+            .any(|m| m.contains("duplicate column name")),
+        "a case-insensitive duplicate ('Id' vs 'id') must also be flagged"
     );
 }
 
@@ -267,6 +339,7 @@ fn manifest_freshness_lint_catches_planted_failure() {
         class: carbon_repos::registry::class_of(
             "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
         ),
+        routes_write: true,
     }];
     let v = check_manifests(&conn, &planted);
     assert_eq!(
@@ -288,6 +361,7 @@ fn manifest_freshness_lint_catches_upsert_missing_freshness() {
         params: &[":id", ":v", ":t"],
         columns: None,
         class: carbon_repos::registry::QueryClass::Write,
+        routes_write: true,
     }];
     let v = check_manifests(&conn, &planted);
     assert_eq!(
@@ -346,6 +420,124 @@ fn nullability_lint_catches_unmarked_expression_column() {
 }
 
 #[test]
+fn nullability_lint_catches_a_not_null_column_widened_by_an_unambiguous_left_join() {
+    // CENSUS-SELFTEST: checker.nullability-outer-join-widening
+    let (_d, conn) = migrated_db();
+    conn.execute_batch(
+        "CREATE TABLE OjParent (id INTEGER PRIMARY KEY);
+         CREATE TABLE OjChild (id INTEGER PRIMARY KEY, parent_id INTEGER, label TEXT NOT NULL);
+         INSERT INTO OjParent (id) VALUES (1), (2);
+         INSERT INTO OjChild (id, parent_id, label) VALUES (1, 1, 'x');",
+    )
+    .unwrap();
+
+    use carbon_repos::from_row::{ColumnSpec, TypeClass};
+    const NON_OPTION: &[ColumnSpec] = &[ColumnSpec {
+        name: "label",
+        ty: TypeClass::Text,
+        nullable: false,
+        explicit_nullable: false,
+    }];
+    let sql =
+        "SELECT OjChild.label FROM OjParent LEFT JOIN OjChild ON OjParent.id = OjChild.parent_id";
+    let planted = [QueryCheck {
+        name: "outer_join_widened",
+        sql,
+        params: &[],
+        columns: Some(NON_OPTION),
+        class: carbon_repos::registry::class_of(sql),
+        routes_write: false,
+    }];
+    let v = check_nullability(&conn, &planted);
+    assert!(
+        v.iter()
+            .any(|m| m.contains("outer_join_widened") && m.contains("LEFT JOIN")),
+        "must flag a NOT NULL column widened to nullable by an unambiguous LEFT JOIN, got: {v:?}"
+    );
+
+    // The same column declared Option (or nullable) is accepted.
+    const OPTION: &[ColumnSpec] = &[ColumnSpec {
+        name: "label",
+        ty: TypeClass::Text,
+        nullable: true,
+        explicit_nullable: false,
+    }];
+    let ok = [QueryCheck {
+        name: "outer_join_widened_declared_option",
+        sql,
+        params: &[],
+        columns: Some(OPTION),
+        class: carbon_repos::registry::class_of(sql),
+        routes_write: false,
+    }];
+    assert!(
+        check_nullability(&conn, &ok).is_empty(),
+        "a column correctly declared Option for the LEFT JOIN's optional side must not be flagged"
+    );
+}
+
+#[test]
+fn nullability_lint_does_not_flag_inner_joins_or_self_joins() {
+    let (_d, conn) = migrated_db();
+    conn.execute_batch(
+        "CREATE TABLE OjParent2 (id INTEGER PRIMARY KEY);
+         CREATE TABLE OjChild2 (id INTEGER PRIMARY KEY, parent_id INTEGER, label TEXT NOT NULL);
+         CREATE TABLE OjTree (id INTEGER PRIMARY KEY, parent_id INTEGER, label TEXT NOT NULL);
+         INSERT INTO OjParent2 (id) VALUES (1);
+         INSERT INTO OjChild2 (id, parent_id, label) VALUES (1, 1, 'x');
+         INSERT INTO OjTree (id, parent_id, label) VALUES (1, NULL, 'root');",
+    )
+    .unwrap();
+
+    use carbon_repos::from_row::{ColumnSpec, TypeClass};
+    const NON_OPTION: &[ColumnSpec] = &[ColumnSpec {
+        name: "label",
+        ty: TypeClass::Text,
+        nullable: false,
+        explicit_nullable: false,
+    }];
+
+    // A plain INNER JOIN never widens nullability.
+    let inner_sql =
+        "SELECT OjChild2.label FROM OjParent2 JOIN OjChild2 ON OjParent2.id = OjChild2.parent_id";
+    let inner = [QueryCheck {
+        name: "inner_join_not_widened",
+        sql: inner_sql,
+        params: &[],
+        columns: Some(NON_OPTION),
+        class: carbon_repos::registry::class_of(inner_sql),
+        routes_write: false,
+    }];
+    assert!(
+        check_nullability(&conn, &inner).is_empty(),
+        "an INNER JOIN must never be treated as widening"
+    );
+
+    // A self-join is ambiguous — the same schema table is introduced twice
+    // (once on the preserved side, once on the optional side), and
+    // column_metadata reports only the bare schema name, with no way to tell
+    // which occurrence a given result column came from. Selecting the
+    // PRESERVED side's column proves the ambiguity guard actually suppresses
+    // the rule here: without it, this LEFT JOIN's mere presence would flag
+    // every column resolving to "OjTree", including this one, which is wrong.
+    let self_join_sql = "SELECT parent.label FROM OjTree AS parent \
+                          LEFT JOIN OjTree AS child ON child.parent_id = parent.id";
+    let self_join = [QueryCheck {
+        name: "self_join_preserved_side_not_flagged",
+        sql: self_join_sql,
+        params: &[],
+        columns: Some(NON_OPTION),
+        class: carbon_repos::registry::class_of(self_join_sql),
+        routes_write: false,
+    }];
+    assert!(
+        check_nullability(&conn, &self_join).is_empty(),
+        "a self-join must be skipped: column_metadata can't disambiguate which side a column is from, got: {:?}",
+        check_nullability(&conn, &self_join)
+    );
+}
+
+#[test]
 fn query_plan_lint_catches_planted_full_scan() {
     // CENSUS-SELFTEST: checker.query-plan-full-scan
     // ModMetadata is a guarded table with no index on `name`, so a WHERE on it
@@ -357,6 +549,7 @@ fn query_plan_lint_catches_planted_full_scan() {
         params: &[":name"],
         columns: None,
         class: carbon_repos::registry::class_of("SELECT id FROM ModMetadata WHERE name = :name"),
+        routes_write: false,
     }];
     let v = check_query_plans(&conn, &planted);
     assert!(
@@ -383,6 +576,7 @@ fn query_plan_lint_catches_a_full_scan_behind_a_table_alias() {
             params: &[":name"],
             columns: None,
             class: carbon_repos::registry::class_of(sql),
+            routes_write: false,
         }];
         let v = check_query_plans(&conn, &planted);
         assert!(
@@ -406,6 +600,7 @@ fn insert_datetime_lint_catches_planted_failures() {
             class: carbon_repos::registry::class_of(
                 "INSERT INTO VersionInfoCache (id, versionInfo) VALUES (:id, :v)",
             ),
+            routes_write: true,
         },
         // No column list at all — flagged outright regardless of the table.
         QueryCheck {
@@ -416,6 +611,7 @@ fn insert_datetime_lint_catches_planted_failures() {
             class: carbon_repos::registry::class_of(
                 "INSERT INTO VersionInfoCache VALUES (:id, :v, :t)",
             ),
+            routes_write: true,
         },
     ];
     let v = check_insert_datetime_columns(&conn, &planted);
@@ -438,6 +634,7 @@ fn insert_datetime_lint_catches_planted_failures() {
         class: carbon_repos::registry::class_of(
             "INSERT INTO VersionInfoCache (id, versionInfo, lastUpdatedAt) VALUES (:id, :v, :t)",
         ),
+        routes_write: true,
     }];
     assert!(
         check_insert_datetime_columns(&conn, &ok).is_empty(),
@@ -454,6 +651,7 @@ fn insert_datetime_lint_catches_planted_failures() {
         class: carbon_repos::registry::class_of(
             "UPDATE VersionInfoCache SET versionInfo = :v WHERE id = :id",
         ),
+        routes_write: true,
     }];
     assert!(
         check_insert_datetime_columns(&conn, &non_insert).is_empty(),
@@ -477,6 +675,11 @@ fn classification_lint_catches_planted_read_that_actually_writes() {
         params: &[":id"],
         columns: None,
         class: carbon_repos::registry::QueryClass::Read,
+        // Not itself a test of L5's routing rule: this literal simulates a
+        // WITH-CTE-fooled `class`, so `routes_write` agrees with it (as if it
+        // had gone through a read-routing arm) rather than planting a second,
+        // unrelated failure here.
+        routes_write: false,
     }];
     let v = check_classification(&conn, &planted);
     assert_eq!(
@@ -493,6 +696,7 @@ fn classification_lint_catches_planted_read_that_actually_writes() {
         params: &[":id"],
         columns: None,
         class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
+        routes_write: false,
     }];
     assert!(
         check_classification(&conn, &real_read).is_empty(),
@@ -509,10 +713,86 @@ fn classification_lint_catches_planted_read_that_actually_writes() {
         params: &[],
         columns: None,
         class: carbon_repos::registry::QueryClass::Write,
+        routes_write: true,
     }];
     assert!(
         check_classification(&conn, &write_class_no_writes).is_empty(),
         "write-class queries must never be checked by the read-class-no-writes rule"
+    );
+}
+
+#[test]
+fn pool_routing_lint_catches_a_write_declared_through_a_read_routing_arm() {
+    // CENSUS-SELFTEST: checker.routing-matches-class
+    // A future `UPDATE … RETURNING x -> i64`-shaped query: SQLite genuinely
+    // returns rows for it (RETURNING makes any DML row-returning), so it fits
+    // the `i64` arm's `query_row` shape — but that arm hard-codes
+    // `routes_write: false`, routing it to the read-only pool where it would
+    // fail on every call (SQLITE_READONLY). `class` correctly derives `Write`
+    // from the leading verb; this is the one place both facts are compared.
+    let planted = [QueryCheck {
+        name: "bump_major_returning",
+        sql: "UPDATE Java SET major = major + 1 WHERE id = :id RETURNING major",
+        params: &[":id"],
+        columns: None,
+        class: carbon_repos::registry::class_of(
+            "UPDATE Java SET major = major + 1 WHERE id = :id RETURNING major",
+        ),
+        routes_write: false,
+    }];
+    assert_eq!(
+        planted[0].class,
+        carbon_repos::registry::QueryClass::Write,
+        "sanity: the leading verb is UPDATE, so class_of must derive Write"
+    );
+    let v = check_pool_routing(&planted);
+    assert_eq!(
+        v.len(),
+        1,
+        "must flag a Write-classified query whose routes_write is false, got: {v:?}"
+    );
+    assert!(v[0].contains("bump_major_returning"));
+
+    // The inverse mismatch — a genuine read declared through the write arm —
+    // must also be caught: nothing about the rule is one-directional.
+    let over_routed = [QueryCheck {
+        name: "over_routed_read",
+        sql: "SELECT id FROM Java WHERE id = :id",
+        params: &[":id"],
+        columns: None,
+        class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
+        routes_write: true,
+    }];
+    let v = check_pool_routing(&over_routed);
+    assert_eq!(
+        v.len(),
+        1,
+        "must flag a Read-classified query whose routes_write is true, got: {v:?}"
+    );
+
+    // A query whose class and routes_write agree — true for every real
+    // registered query today — must not be flagged either way.
+    let agreeing = [
+        QueryCheck {
+            name: "agreeing_read",
+            sql: "SELECT id FROM Java WHERE id = :id",
+            params: &[":id"],
+            columns: None,
+            class: carbon_repos::registry::class_of("SELECT id FROM Java WHERE id = :id"),
+            routes_write: false,
+        },
+        QueryCheck {
+            name: "agreeing_write",
+            sql: "DELETE FROM Java WHERE id = :id",
+            params: &[":id"],
+            columns: None,
+            class: carbon_repos::registry::class_of("DELETE FROM Java WHERE id = :id"),
+            routes_write: true,
+        },
+    ];
+    assert!(
+        check_pool_routing(&agreeing).is_empty(),
+        "agreeing class/routes_write must never be flagged"
     );
 }
 
@@ -594,6 +874,7 @@ fn ascii_leading_rule_catches_unicode_whitespace_prefix() {
         params: &[],
         columns: None,
         class: carbon_repos::registry::QueryClass::Read,
+        routes_write: false,
     }];
     let v = check_module(&conn, &planted);
     assert!(
@@ -606,6 +887,7 @@ fn ascii_leading_rule_catches_unicode_whitespace_prefix() {
         params: &[],
         columns: None,
         class: carbon_repos::registry::QueryClass::Read,
+        routes_write: false,
     }];
     assert!(
         !check_module(&conn, &clean)

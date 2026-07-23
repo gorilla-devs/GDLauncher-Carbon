@@ -21,7 +21,7 @@
 //! The runtime never runs this tool; it executes the reviewed, committed,
 //! CI-verified scripts.
 
-use carbon_repos::compat::MigrationKind;
+use carbon_repos::compat::{MigrationKind, sha256_hex};
 use carbon_repos::downgen::{
     GenError, analyze_up, full_schema_dump, generate_down, insert_migration_entry,
     verify_round_trip,
@@ -33,6 +33,14 @@ use std::process::ExitCode;
 const MIGRATIONS_SUBDIR: &str = "prisma/migrations";
 const BASELINE_PATH: &str = "baseline/baseline.sql";
 const LIB_RS_PATH: &str = "src/lib.rs";
+const CHECKSUMS_TEST_PATH: &str = "tests/migration_checksums_frozen.rs";
+
+/// The exact anchor comment `tests/migration_checksums_frozen.rs` carries
+/// inside its `FROZEN` array. `new_migration` inserts each new migration's
+/// `(name, checksum)` tuple directly above this line, mirroring how
+/// [`MIGRATION_LIST_ANCHOR`](carbon_repos::downgen::MIGRATION_LIST_ANCHOR)
+/// works for `lib.rs`.
+const CHECKSUM_LIST_ANCHOR: &str = "// new-migration:anchor — new_migration appends the new (name, checksum) tuple directly above this line";
 
 const TEMPLATE: &str = "-- Write the forward (up) SQL for this migration here, then rerun\n\
 -- `cargo run -p carbon_repos --bin new_migration -- <name>` to generate down.sql.\n";
@@ -162,7 +170,10 @@ fn generate_or_verify(
             Ok(()) => {
                 println!("Hand-written down.sql verified: it round-trips the prior schema.");
                 regenerate_baseline(prev, up)?;
-                apply_list_entry(&default_lib_path(), dir_name, prev, up, &down)
+                let list_code = apply_list_entry(&default_lib_path(), dir_name, prev, up, &down)?;
+                let checksum_code =
+                    append_checksum_entry(&default_checksums_test_path(), dir_name, up)?;
+                Ok(combine(list_code, checksum_code))
             }
             Err(e) => {
                 eprintln!("Hand-written down.sql does NOT round-trip:\n{e}");
@@ -190,7 +201,10 @@ fn generate_or_verify(
                 std::fs::write(&down_path, &down)?;
                 println!("Generated {} (verified round-trip).", down_path.display());
                 regenerate_baseline(prev, up)?;
-                apply_list_entry(&default_lib_path(), dir_name, prev, up, &down)
+                let list_code = apply_list_entry(&default_lib_path(), dir_name, prev, up, &down)?;
+                let checksum_code =
+                    append_checksum_entry(&default_checksums_test_path(), dir_name, up)?;
+                Ok(combine(list_code, checksum_code))
             }
             Err(GenError::RoundTripFailed { expected, actual }) => {
                 eprintln!(
@@ -323,6 +337,108 @@ fn apply_list_entry(
             print!("{entry}");
             Ok(ExitCode::FAILURE)
         }
+    }
+}
+
+/// This checkout's real `tests/migration_checksums_frozen.rs` — the path
+/// [`append_checksum_entry`] edits during normal tool runs. Kept as its own
+/// function, mirroring [`default_lib_path`], so tests can point the appender
+/// at a scratch path instead.
+fn default_checksums_test_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(CHECKSUMS_TEST_PATH)
+}
+
+/// Appends this migration's `(name, sha256-of-up)` tuple to the `FROZEN` list
+/// in `checksums_path` (spec L1: the shipped-migration checksum fence),
+/// mirroring how [`apply_list_entry`] inserts into `lib.rs`. Best-effort: a
+/// missing or duplicated anchor is a warning with the tuple printed for a
+/// manual paste, not a hard stop, but never silent — a migration missing from
+/// `FROZEN` already fails `migration_checksums_frozen.rs`'s own count check
+/// loudly, in CI, before it ships, so skipping this step is caught elsewhere
+/// even when it isn't caught here.
+fn append_checksum_entry(
+    checksums_path: &Path,
+    dir_name: &str,
+    up: &str,
+) -> std::io::Result<ExitCode> {
+    let checksum = sha256_hex(up.as_bytes());
+    let entry = format!("    (\n        \"{dir_name}\",\n        \"{checksum}\",\n    ),");
+    let src = std::fs::read_to_string(checksums_path)?;
+    match insert_before_anchor(&src, CHECKSUM_LIST_ANCHOR, &entry, dir_name) {
+        Ok(updated) => {
+            if updated == src {
+                println!(
+                    "{} already has a frozen checksum entry for {dir_name}; nothing to insert.",
+                    checksums_path.display()
+                );
+            } else {
+                std::fs::write(checksums_path, &updated)?;
+                println!(
+                    "Appended the frozen checksum entry for {dir_name} to {}.",
+                    checksums_path.display()
+                );
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            eprintln!(
+                "warning: could not auto-append the frozen checksum entry to {}: {e}\n\
+                 Add this tuple to FROZEN by hand:\n{entry}",
+                checksums_path.display()
+            );
+            Ok(ExitCode::FAILURE)
+        }
+    }
+}
+
+/// Inserts `entry` directly above the line containing `anchor` in `src`,
+/// returning the updated source. Idempotent: identifies the tuple by its
+/// quoted `dir_name`, so if a tuple naming it is already present, `src` is
+/// returned unchanged — rerunning the tool for the same migration never
+/// duplicates the entry. Fails if `anchor` is missing or appears more than
+/// once, since there would then be no single unambiguous insertion point.
+/// A smaller, file-agnostic sibling of [`insert_migration_entry`], which is
+/// hard-wired to `lib.rs`'s own anchor constant.
+fn insert_before_anchor(
+    src: &str,
+    anchor: &str,
+    entry: &str,
+    dir_name: &str,
+) -> Result<String, String> {
+    let anchor_count = src.matches(anchor).count();
+    if anchor_count == 0 {
+        return Err(format!("no `{anchor}` marker found"));
+    }
+    if anchor_count > 1 {
+        return Err(format!(
+            "more than one `{anchor}` marker found; the insertion point is ambiguous"
+        ));
+    }
+
+    let needle = format!("\"{dir_name}\"");
+    if src.contains(&needle) {
+        return Ok(src.to_string());
+    }
+
+    let anchor_pos = src.find(anchor).expect("anchor_count == 1 checked above");
+    let line_start = src[..anchor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+
+    let mut out = String::with_capacity(src.len() + entry.len() + 1);
+    out.push_str(&src[..line_start]);
+    out.push_str(entry);
+    out.push('\n');
+    out.push_str(&src[line_start..]);
+    Ok(out)
+}
+
+/// `SUCCESS` only when both steps succeeded — the combined exit code for the
+/// two independent "append an entry" steps ([`apply_list_entry`] and
+/// [`append_checksum_entry`]) that run after a migration's down is verified.
+fn combine(a: ExitCode, b: ExitCode) -> ExitCode {
+    if a == ExitCode::SUCCESS && b == ExitCode::SUCCESS {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
     }
 }
 
@@ -487,5 +603,102 @@ mod tests {
         );
         // The file is left untouched — no partial/corrupt write.
         assert_eq!(std::fs::read_to_string(&lib_path).unwrap(), no_anchor);
+    }
+
+    const SCRATCH_CHECKSUMS_SRC: &str = "const FROZEN: &[(&str, &str)] = &[\n\
+        (\n\
+            \"20240120134904_init\",\n\
+            \"deadbeef\",\n\
+        ),\n\
+        // new-migration:anchor — new_migration appends the new (name, checksum) tuple directly above this line\n\
+    ];\n";
+
+    fn scratch_checksums_test() -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("migration_checksums_frozen.rs");
+        std::fs::write(&path, SCRATCH_CHECKSUMS_SRC).unwrap();
+        (dir, path)
+    }
+
+    #[test]
+    fn append_checksum_entry_writes_the_tuple_into_a_scratch_test_file() {
+        let (_dir, path) = scratch_checksums_test();
+        let code = append_checksum_entry(&path, "20260501000000_add_widget", UP).unwrap();
+        assert_eq!(code, ExitCode::SUCCESS);
+
+        let updated = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            updated.contains("\"20260501000000_add_widget\""),
+            "the checksums test must contain the new migration's name:\n{updated}"
+        );
+        assert!(
+            updated.contains(&sha256_hex(UP.as_bytes())),
+            "the checksums test must contain the computed sha256 of the up SQL:\n{updated}"
+        );
+        assert!(
+            updated.contains("\"20240120134904_init\""),
+            "the pre-existing entries must be preserved:\n{updated}"
+        );
+        assert_eq!(
+            updated.matches("new-migration:anchor").count(),
+            1,
+            "the anchor must survive the edit exactly once:\n{updated}"
+        );
+    }
+
+    #[test]
+    fn append_checksum_entry_is_idempotent_across_reruns() {
+        let (_dir, path) = scratch_checksums_test();
+        append_checksum_entry(&path, "20260501000000_add_widget", UP).unwrap();
+        let once = std::fs::read_to_string(&path).unwrap();
+
+        let code = append_checksum_entry(&path, "20260501000000_add_widget", UP).unwrap();
+        assert_eq!(code, ExitCode::SUCCESS);
+        let twice = std::fs::read_to_string(&path).unwrap();
+
+        assert_eq!(
+            once, twice,
+            "rerunning for the same migration must not duplicate its checksum entry"
+        );
+    }
+
+    #[test]
+    fn append_checksum_entry_warns_loudly_when_the_anchor_is_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("migration_checksums_frozen.rs");
+        let no_anchor = SCRATCH_CHECKSUMS_SRC.replace(
+            "// new-migration:anchor — new_migration appends the new (name, checksum) tuple directly above this line\n",
+            "",
+        );
+        std::fs::write(&path, &no_anchor).unwrap();
+
+        let code = append_checksum_entry(&path, "20260501000000_add_widget", UP).unwrap();
+        assert_eq!(
+            code,
+            ExitCode::FAILURE,
+            "a missing anchor must be reported as a failure, not silently skipped"
+        );
+        // The file is left untouched — no partial/corrupt write.
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), no_anchor);
+    }
+
+    #[test]
+    fn combine_is_success_only_when_both_steps_succeed() {
+        assert_eq!(
+            combine(ExitCode::SUCCESS, ExitCode::SUCCESS),
+            ExitCode::SUCCESS
+        );
+        assert_eq!(
+            combine(ExitCode::FAILURE, ExitCode::SUCCESS),
+            ExitCode::FAILURE
+        );
+        assert_eq!(
+            combine(ExitCode::SUCCESS, ExitCode::FAILURE),
+            ExitCode::FAILURE
+        );
+        assert_eq!(
+            combine(ExitCode::FAILURE, ExitCode::FAILURE),
+            ExitCode::FAILURE
+        );
     }
 }

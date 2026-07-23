@@ -454,6 +454,41 @@ fn every_post_floor_migration_matches_its_declared_metadata() {
 }
 
 #[test]
+fn a_down_that_lowercases_text_is_reported_lossy() {
+    // The boundary seeder's TEXT choices must include a mixed-case ASCII
+    // string. Every other seeded string is either empty, already lowercase,
+    // or outside the ASCII range `lower()` folds by default, so `lower(v)` is
+    // a true no-op on all of them — only the mixed-case row can expose a down
+    // that silently lowercases (or uppercases) a TEXT column.
+    let prev = "CREATE TABLE \"N\" (id INTEGER PRIMARY KEY, v TEXT NOT NULL);";
+    let lost = seeded_lost_fields(&[prev], "", "UPDATE \"N\" SET v = lower(v);").unwrap();
+    assert!(
+        lost.contains("N.v"),
+        "a down that lowercases a mixed-case seeded value must be reported lossy: {lost:?}"
+    );
+}
+
+#[test]
+fn a_down_that_only_preserves_integer_datetimes_is_reported_lossy_for_text_ones() {
+    // The boundary seeder must seed a TEXT-shaped value into a DATETIME-
+    // declared column's boundary rows, not just integers: `DbDateTime` stores
+    // these as epoch-millis integers, but a legacy TEXT-shaped datetime is a
+    // representation the column's declared type equally admits (spec: the
+    // TEXT-legacy path is disjoint from the INTEGER path). The down below is a
+    // true no-op for every integer boundary value (and for NULL) and touches
+    // only a `typeof = 'text'` value, so it can only be caught if a TEXT row
+    // exists at all.
+    let prev = "CREATE TABLE \"D\" (id INTEGER PRIMARY KEY, v DATETIME NOT NULL);";
+    let down = "UPDATE \"D\" SET v = CASE WHEN typeof(v) = 'text' THEN 0 ELSE v END;";
+    let lost = seeded_lost_fields(&[prev], "", down).unwrap();
+    assert!(
+        lost.contains("D.v"),
+        "a transform that only preserves integer-shaped datetimes must be reported lossy \
+         once a TEXT-shaped datetime is also seeded: {lost:?}"
+    );
+}
+
+#[test]
 fn a_down_that_loses_rows_is_reported_lossy() {
     // Row loss, not just column loss: the up rebuilds "B" and the down rebuilds
     // it back with the right shape but restores only some of the rows. The

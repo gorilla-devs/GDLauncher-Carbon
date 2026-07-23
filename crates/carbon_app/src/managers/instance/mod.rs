@@ -1420,9 +1420,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     /// Remove an instance from the database without checking if it exists.
     /// Does not invalidate.
+    ///
+    /// Deletes the instance and its `ModFileCache` rows in the same write
+    /// transaction (`delete_instance_tx`) rather than relying on the
+    /// `ON DELETE CASCADE` edge alone: the FK sweep falls back to leaving
+    /// foreign keys off for the whole session when it meets a violation it
+    /// cannot repair, and `GDL_DISABLE_FK_ENFORCEMENT=1` selects the same
+    /// state, so on those sessions the cascade never fires. Mirrors the
+    /// equivalent server-delete fix.
     async fn remove_instance(self, instance: InstanceId) -> anyhow::Result<()> {
         let instance_id = *instance;
-        instance_repo::delete_instance(&self.app.db, instance_id).await?;
+        instance_repo::delete_instance_tx(&self.app.db, instance_id).await?;
 
         self.app.meta_cache_manager().gc_mod_metadata().await;
 

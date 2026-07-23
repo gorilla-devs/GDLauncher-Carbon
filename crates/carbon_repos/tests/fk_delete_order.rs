@@ -180,6 +180,51 @@ async fn gc_orphan_metadata_keeps_referenced_rows_under_fk_on() {
 }
 
 #[tokio::test]
+async fn deleting_an_instance_clears_its_file_cache_without_fk_enforcement() {
+    // `remove_instance` (carbon_app) calls `delete_instance_tx` rather than
+    // relying on the cascade alone: under FK enforcement the cascade already
+    // clears these rows (see `delete_instance_with_mods_cascades_and_manual_cleanup_is_idempotent`
+    // above), but `sweep_and_decide` falls back to leaving foreign keys off
+    // for the whole session when it meets a violation it cannot repair, and
+    // `GDL_DISABLE_FK_ENFORCEMENT=1` selects the same state — on those
+    // sessions nothing else would clear `ModFileCache`, which in turn keeps
+    // its referenced `ModMetadata` row alive forever (gc_orphan_metadata only
+    // reclaims metadata nothing still references).
+    let (_d, db) = migrated_fk_off().await;
+    let g = inst::insert_group(&db, "g".into(), 0, None).await.unwrap() as i32;
+    let iid = inst::add_instance_tx(&db, "i".into(), "sp".into(), 0, g, None)
+        .await
+        .unwrap() as i32;
+    seed_metadata(&db, "meta1").await;
+    mfc::upsert_mod_file_cache(
+        &db,
+        iid,
+        "a.jar".into(),
+        1,
+        true,
+        "mods".into(),
+        "meta1".into(),
+        now(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(count(&db, "SELECT COUNT(*) FROM ModFileCache").await, 1);
+
+    inst::delete_instance_tx(&db, iid).await.unwrap();
+
+    assert_eq!(
+        count(&db, "SELECT COUNT(*) FROM ModFileCache").await,
+        0,
+        "the instance's cache rows must be cleared without relying on the cascade"
+    );
+
+    // Orphaned metadata is then reclaimable, exactly as it is on the FK-ON path.
+    let gced = meta::gc_orphan_metadata(&db).await.unwrap();
+    assert_eq!(gced, 1);
+    assert_eq!(count(&db, "SELECT COUNT(*) FROM ModMetadata").await, 0);
+}
+
+#[tokio::test]
 async fn deleting_a_server_clears_its_file_cache_without_fk_enforcement() {
     // The instance path issues its own cleanup alongside the cascade; the server
     // path relied on the cascade alone, so on an FK-OFF session the rows were

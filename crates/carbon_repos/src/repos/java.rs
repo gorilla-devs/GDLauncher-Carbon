@@ -103,6 +103,7 @@ const INSERT_JAVA_CHECK: crate::registry::QueryCheck = crate::registry::QueryChe
     ],
     columns: None,
     class: crate::registry::class_of(INSERT_JAVA_SQL),
+    routes_write: true,
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus

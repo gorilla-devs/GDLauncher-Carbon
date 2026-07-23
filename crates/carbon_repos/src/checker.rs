@@ -16,7 +16,12 @@
 //! - [`check_nullability`]: each result column's origin is resolved via
 //!   `column_metadata`; a column whose source is nullable must be `Option`, and
 //!   an expression column with no resolvable origin must be `Option` or carry an
-//!   explicit `#[nullable(...)]` override.
+//!   explicit `#[nullable(...)]` override. It also catches the one case where a
+//!   `NOT NULL`-by-schema column must still be `Option`: sourced from a table
+//!   this query joins via an *unambiguous* `LEFT [OUTER] JOIN` (see
+//!   [`unambiguous_left_join_tables`] for exactly what that covers and does
+//!   not — a deliberately conservative, self-join-safe subset of general
+//!   outer-join nullability, not a full join-position analysis).
 //! - [`check_query_plans`]: `EXPLAIN QUERY PLAN` must not full-scan a guarded
 //!   hot cache table unless the query is explicitly allowlisted.
 //! - [`check_insert_datetime_columns`]: every registered `INSERT`'s explicit
@@ -106,6 +111,28 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
                         "{}: column '{}' missing from result set {actual_cols:?}",
                         q.name, spec.name
                     ));
+                }
+            }
+            // 5. duplicate result-column names (case-insensitive, matching
+            // rusqlite's own case-insensitive by-name column resolution): the
+            // generated `FromRow::from_row` reads every field by name, and
+            // that lookup resolves to the first matching column index — an
+            // unaliased join exposing two same-named columns (e.g. both sides
+            // having an `id`) silently binds the left one, with the right one
+            // never reachable by name despite appearing in the result set.
+            let mut seen: Vec<String> = Vec::new();
+            for name in &actual_cols {
+                let lower = name.to_ascii_lowercase();
+                // CENSUS-RULE: checker.duplicate-result-column
+                if seen.contains(&lower) {
+                    violations.push(format!(
+                        "{}: result set has a duplicate column name '{name}' (columns: \
+                         {actual_cols:?}) — FromRow's by-name lookup would silently bind \
+                         the first (left) one; alias one side of the join distinctly",
+                        q.name
+                    ));
+                } else {
+                    seen.push(lower);
                 }
             }
         }
@@ -318,6 +345,42 @@ pub fn check_classification(conn: &Connection, queries: &[QueryCheck]) -> Vec<St
     violations
 }
 
+/// Pool-routing rule: every registered query's [`QueryCheck::routes_write`]
+/// must agree with its [`QueryCheck::class`] (`routes_write == (class ==
+/// Write)`).
+///
+/// `class` is derived from the SQL's leading verb; `routes_write` is a
+/// *second*, independently hard-coded fact — which `queries!` arm actually
+/// fired, since only the `usize`/`execute` arm routes to the writer and every
+/// row-returning arm (`Option<Row>`, `Vec<Row>`, `i64`, bare `Row`) routes to
+/// the read-only pool regardless of what the SQL does. The two facts agree for
+/// every query in this codebase today, but nothing stopped a future write
+/// declared through a row-returning arm (`UPDATE … RETURNING id -> i64`) from
+/// silently keying its runtime pool off the return-type shape rather than the
+/// SQL verb: `check_classification` above only catches a *misclassified*
+/// `class` (a `WITH`-wrapped write that lies about its own leading verb) — it
+/// is structurally blind to a *correctly*-classified `Write` query that was
+/// declared via a read-routing arm anyway, because that arm's `class_of($sql)`
+/// call computes `Write` right alongside the very `routes_write: false` that
+/// disagrees with it. This rule is the one place both facts are compared.
+pub fn check_pool_routing(queries: &[QueryCheck]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for q in queries {
+        let expected = q.class == QueryClass::Write;
+        // CENSUS-RULE: checker.routing-matches-class
+        if q.routes_write != expected {
+            violations.push(format!(
+                "{}: classified {:?} but routes_write is {} — a write declared through a \
+                 row-returning arm routes to the read-only pool and fails every call \
+                 (SQLITE_READONLY), while a read declared through the usize/execute arm \
+                 routes to the writer needlessly",
+                q.name, q.class, q.routes_write
+            ));
+        }
+    }
+    violations
+}
+
 /// Origin-based nullability lint. For every row-returning query, each expected
 /// column is matched to its result column and its origin resolved via
 /// `column_metadata`:
@@ -326,11 +389,19 @@ pub fn check_classification(conn: &Connection, queries: &[QueryCheck]) -> Vec<St
 ///   (`Option`), otherwise a NULL read panics at runtime;
 /// - a column with no resolvable origin (a SQL expression / aggregate) must be
 ///   declared nullable or carry an explicit `#[nullable(...)]` override, since
-///   its nullability can't be inferred.
+///   its nullability can't be inferred;
+/// - a column sourced from a table this query joins via an unambiguous `LEFT
+///   [OUTER] JOIN` must also be declared nullable, even when that table's own
+///   schema marks the column `NOT NULL` — see [`unambiguous_left_join_tables`]
+///   for exactly what "unambiguous" means and what is deliberately left
+///   uncovered.
 ///
-/// The source-NOT-NULL direction is intentionally not enforced: a LEFT JOIN can
-/// make a NOT-NULL source column NULL in the result, so declaring such a column
-/// `Option` is correct, not a violation.
+/// The source-NOT-NULL direction is intentionally not enforced *in general*: a
+/// LEFT JOIN can make a NOT-NULL source column NULL in the result, so
+/// declaring such a column `Option` is correct, not a violation. The
+/// unambiguous-LEFT-JOIN case above is the one exception where this rule does
+/// still enforce that direction, precisely because it can tell (from the SQL
+/// text) that the column's table sits on the optional side.
 pub fn check_nullability(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
     let mut violations = Vec::new();
     for q in queries {
@@ -342,6 +413,7 @@ pub fn check_nullability(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
             Ok(st) => st,
             Err(_) => continue,
         };
+        let left_join_tables = unambiguous_left_join_tables(q.sql);
         for spec in cols {
             // An explicit override takes the developer at their word.
             if spec.explicit_nullable {
@@ -353,12 +425,27 @@ pub fn check_nullability(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
                 Err(_) => continue,
             };
             match st.column_metadata(idx) {
-                Ok(Some((_, _, _, _, _, not_null, _, _))) => {
+                Ok(Some((_, table_name, _, _, _, not_null, _, _))) => {
                     // CENSUS-RULE: checker.nullability-nullable-source
                     if !not_null && !spec.nullable {
                         violations.push(format!(
                             "{}: column '{}' maps a nullable source column but is declared non-null (use Option or #[nullable(true)])",
                             q.name, spec.name
+                        ));
+                    }
+                    // CENSUS-RULE: checker.nullability-outer-join-widening
+                    if !spec.nullable
+                        && left_join_tables
+                            .contains(&table_name.to_string_lossy().to_ascii_uppercase())
+                    {
+                        violations.push(format!(
+                            "{}: column '{}' is sourced from '{}', which this query LEFT JOINs — \
+                             an unmatched row makes it NULL regardless of that table's own \
+                             NOT NULL constraint; declare it Option or add an explicit \
+                             #[nullable(...)] override",
+                            q.name,
+                            spec.name,
+                            table_name.to_string_lossy()
                         ));
                     }
                 }
@@ -376,6 +463,97 @@ pub fn check_nullability(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
         }
     }
     violations
+}
+
+/// The schema table names (upper-cased) this query joins via an *unambiguous*
+/// `LEFT [OUTER] JOIN`: introduced exactly once in the whole query, and that
+/// one introduction is a `LEFT`/`LEFT OUTER` join. Used by [`check_nullability`]
+/// to catch a `NOT NULL`-by-schema column widened to nullable purely by
+/// sitting on a LEFT JOIN's optional side — something `column_metadata` alone
+/// can never see, since SQLite reports a column's schema constraint, not its
+/// join position.
+///
+/// "Unambiguous" is deliberately conservative, trading recall for zero false
+/// positives:
+///
+/// - **Self-joins are skipped.** A table introduced more than once (`FROM Foo
+///   a LEFT JOIN Foo b ON …`) is dropped entirely: `column_metadata` reports
+///   the bare schema name ("Foo") with no way to tell which occurrence a given
+///   result column came from, so treating *any* occurrence as authoritative
+///   for *every* occurrence would flag the preserved side (`a`) as if it were
+///   the optional one (`b`).
+/// - **Only `LEFT`/`LEFT OUTER JOIN` is recognised.** A `RIGHT JOIN` (which
+///   widens the *preceding* tables instead) and a `FULL [OUTER] JOIN` (which
+///   widens both sides) are not detected — neither appears anywhere in this
+///   codebase's registered queries today, so the added complexity of tracking
+///   them is deferred rather than risking an incorrect implementation.
+/// - **No multi-hop propagation.** Only the table named directly after the
+///   `LEFT JOIN` keyword is considered widened. A further `INNER JOIN` chained
+///   onto that table's alias does not have its own widening modelled.
+/// - **Derived tables and CTEs resolve safely, not necessarily precisely.** A
+///   `LEFT JOIN (SELECT …) AS sub` has no bare identifier after `JOIN` (a `(`
+///   token instead), so it never matches a real schema table name — the
+///   heuristic silently does not apply rather than misfiring.
+///
+/// None of these gaps can produce a false positive; they can only make the
+/// rule miss a case, which is exactly the existing status quo this rule
+/// improves on rather than regresses.
+fn unambiguous_left_join_tables(sql: &str) -> std::collections::HashSet<String> {
+    let tokens = sql_tokens(sql);
+    let mut occurrences: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut seen_via_left_join: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+
+    for (i, tok) in tokens.iter().enumerate() {
+        let is_from = tok.eq_ignore_ascii_case("FROM");
+        let is_join = tok.eq_ignore_ascii_case("JOIN");
+        if !is_from && !is_join {
+            continue;
+        }
+        // A bare identifier must follow; a `(` (derived table) or anything
+        // else never matches a real schema table name later, so recording it
+        // is harmless, but only an identifier can ever actually match.
+        let Some(name) = tokens.get(i + 1) else {
+            continue;
+        };
+        if !name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphabetic() || c == '_')
+        {
+            continue;
+        }
+        let key = name.to_ascii_uppercase();
+        *occurrences.entry(key.clone()).or_insert(0) += 1;
+
+        if is_join {
+            // Walk back over join-modifier keywords immediately preceding
+            // this `JOIN` to see whether `LEFT` (with an optional `OUTER`
+            // between it and `JOIN`) introduced it.
+            let mut j = i;
+            let mut is_left = false;
+            while j > 0 {
+                let prev = &tokens[j - 1];
+                if prev.eq_ignore_ascii_case("OUTER") {
+                    j -= 1;
+                    continue;
+                }
+                if prev.eq_ignore_ascii_case("LEFT") {
+                    is_left = true;
+                }
+                break;
+            }
+            if is_left {
+                seen_via_left_join.insert(key);
+            }
+        }
+    }
+
+    seen_via_left_join
+        .into_iter()
+        .filter(|name| occurrences.get(name) == Some(&1))
+        .collect()
 }
 
 /// Hot cache tables that must never be full-scanned by a registered query: a

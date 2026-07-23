@@ -808,11 +808,13 @@ fn seed_table(
     // Columns that must be unique (primary key or any unique index member).
     let unique_cols = unique_column_set(conn, table, tbl)?;
 
-    // Four rows so a NOT NULL column sees every integer boundary (0, -1,
-    // i64::MAX, i64::MIN) and both string/blob boundaries; every table gets the
-    // same count, so a child in FK-topological order always finds enough
-    // distinct parent rows to key against.
-    let rows_per_table = 4;
+    // Five rows so a NOT NULL column sees every integer boundary (0, -1,
+    // i64::MAX, i64::MIN) and every string/blob boundary, plus a fifth row
+    // exercising a mixed-case ASCII string and, for DATETIME-declared columns,
+    // a TEXT-shaped datetime value; every table gets the same count, so a
+    // child in FK-topological order always finds enough distinct parent rows
+    // to key against.
+    let rows_per_table = 5;
     let mut rows = Vec::new();
     for row_i in 0..rows_per_table {
         let mut row: BTreeMap<String, Value> = BTreeMap::new();
@@ -950,6 +952,17 @@ fn boundary_value(col: &Col, row_i: usize, must_be_unique: bool, counter: &mut i
 
     match affinity {
         Affinity::Integer | Affinity::Numeric => {
+            // A DATETIME-declared column's 5th row is a TEXT datetime string
+            // rather than another integer boundary: `DbDateTime` stores these
+            // as epoch-millis integers, but a TEXT-shaped datetime value is a
+            // real representation this column's declared type admits, and
+            // nothing else here ever seeds one. A future down that only
+            // handles the integer shape (e.g. an arithmetic rewrite) would
+            // otherwise pass this round-trip proof by never encountering the
+            // shape it mishandles.
+            if row_i == 4 && is_datetime_declared(&col.ctype) {
+                return Value::Text("2024-04-10 20:56:05".to_string());
+            }
             let choices = [0i64, -1, i64::MAX, i64::MIN];
             Value::Integer(choices[row_i % choices.len()])
         }
@@ -958,9 +971,19 @@ fn boundary_value(col: &Col, row_i: usize, must_be_unique: bool, counter: &mut i
             Value::Real(choices[row_i % choices.len()])
         }
         Affinity::Text => {
-            // Empty string and unicode-nasty strings (no embedded NUL — SQLite
-            // truncates TEXT at NUL; NUL bytes are exercised in BLOB columns).
-            let choices = ["", "café🔥\u{1F9FF}'\"\\—", "  spaced  ", "𝕏𝕐𝕫"];
+            // Empty string, unicode-nasty strings (no embedded NUL — SQLite
+            // truncates TEXT at NUL; NUL bytes are exercised in BLOB columns),
+            // and a mixed-case ASCII string: without it, every prior choice is
+            // either already lowercase or has no case at all, so a future down
+            // that silently lowercases (or uppercases) a TEXT column would
+            // falsely verify as lossless.
+            let choices = [
+                "",
+                "café🔥\u{1F9FF}'\"\\—",
+                "  spaced  ",
+                "𝕏𝕐𝕫",
+                "AbC xYz 0Z",
+            ];
             Value::Text(choices[row_i % choices.len()].to_string())
         }
         Affinity::Blob => {
@@ -1000,6 +1023,17 @@ fn type_affinity(ctype: &str) -> Affinity {
         // BOOLEAN, DATETIME, NUMERIC, DECIMAL, … → NUMERIC affinity.
         Affinity::Numeric
     }
+}
+
+/// True when `ctype`'s declared type names a DATE/TIME column, case-
+/// insensitively — the `DATETIME` columns [`crate::dbtypes::DbDateTime`]
+/// stores as epoch-millis integers, which [`type_affinity`] buckets under
+/// `Numeric` (no `INT`/`CHAR`/`CLOB`/`TEXT`/`BLOB`/`REAL`/`FLOA`/`DOUB`
+/// substring matches). Used only to pick the boundary seeder's 5th-row value
+/// for such a column; it is not a distinct [`Affinity`] variant.
+fn is_datetime_declared(ctype: &str) -> bool {
+    let t = ctype.to_ascii_uppercase();
+    t.contains("DATE") || t.contains("TIME")
 }
 
 /// Inserts one fully-specified row.

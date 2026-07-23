@@ -55,6 +55,7 @@ const DELETE_SKIN_CHECK: QueryCheck = QueryCheck {
     params: &[":id"],
     columns: None,
     class: crate::registry::class_of(DELETE_SKIN_SQL),
+    routes_write: true,
 };
 const INSERT_SKIN_CHECK: QueryCheck = QueryCheck {
     name: "replace_skin_and_link_account::insert_skin",
@@ -62,6 +63,7 @@ const INSERT_SKIN_CHECK: QueryCheck = QueryCheck {
     params: &[":id", ":skin"],
     columns: None,
     class: crate::registry::class_of(INSERT_SKIN_SQL),
+    routes_write: true,
 };
 const UPDATE_ACCOUNT_SKIN_CHECK: QueryCheck = QueryCheck {
     name: "replace_skin_and_link_account::update_account_skin",
@@ -69,6 +71,7 @@ const UPDATE_ACCOUNT_SKIN_CHECK: QueryCheck = QueryCheck {
     params: &[":id", ":uuid"],
     columns: None,
     class: crate::registry::class_of(UPDATE_ACCOUNT_SKIN_SQL),
+    routes_write: true,
 };
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus

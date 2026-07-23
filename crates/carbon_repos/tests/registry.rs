@@ -78,3 +78,68 @@ async fn async_wrappers_route_reads_to_read_pool_and_writes_to_write_pool() {
     assert_eq!(q::set_major(&db, "a", 22).await.unwrap(), 1);
     assert_eq!(q::get_by_id(&db, "a").await.unwrap().unwrap().major, 22);
 }
+
+/// L5 (spec: pool routing keyed off return-shape, not SQL verb): a real
+/// `queries!`-declared write whose return shape is `i64` rather than `usize`.
+/// `RETURNING` makes any DML row-returning, so this fits the `i64` arm's
+/// `query_row` shape and is legal Rust — but that arm hard-codes
+/// `routes_write: false` (routes to the read pool) regardless of what the SQL
+/// actually does, while `class_of` still correctly derives `Write` from the
+/// leading verb. `check_pool_routing` (`src/checker.rs`) is the static fence
+/// for this; the test below empirically reproduces the runtime failure it
+/// exists to catch before it ships.
+mod shape_verb_mismatch {
+    use carbon_repos::queries;
+
+    queries! {
+        fn bump_major_returning(id: &str, major: i32) -> i64 =
+            "UPDATE Java SET major = :major WHERE id = :id RETURNING major";
+    }
+}
+
+#[tokio::test]
+async fn a_write_declared_through_a_read_routing_arm_fails_against_the_read_only_pool() {
+    use carbon_repos::db_exec::Db;
+    use carbon_repos::registry::QueryClass;
+
+    let check = shape_verb_mismatch::QUERIES[0];
+    assert_eq!(
+        check.class,
+        QueryClass::Write,
+        "the leading verb is UPDATE, so class_of must derive Write"
+    );
+    assert!(
+        !check.routes_write,
+        "the i64 arm always hard-codes routes_write: false"
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("t.db");
+    {
+        let mut conn = Connection::open(&path).unwrap();
+        let (m, _n) = carbon_repos::get_migrations();
+        m.to_latest(&mut conn).unwrap();
+        conn.execute_batch(
+            "INSERT INTO Java (id, path, major, fullVersion, type, os, arch, vendor, isValid)
+             VALUES ('a', '/j', 17, '17', 'local', 'linux', 'x64', 'az', 1)",
+        )
+        .unwrap();
+    }
+
+    // Sanity: the exact same statement succeeds when run directly against a
+    // regular (non-read-only) connection — the SQL and the RETURNING shape
+    // are both valid; only the pool it gets routed to is wrong.
+    let mut direct_conn = Connection::open(&path).unwrap();
+    let direct = shape_verb_mismatch::bump_major_returning_conn(&wg(&mut direct_conn), "a", 22);
+    assert_eq!(direct.unwrap(), 22);
+
+    // The async wrapper, routed by return-shape rather than verb, hits the
+    // read-only pool and fails loudly (SQLITE_READONLY) rather than silently
+    // no-op-ing or corrupting data.
+    let db = Db::open(&path, 2, false).unwrap();
+    let err = shape_verb_mismatch::bump_major_returning(&db, "a", 99).await;
+    assert!(
+        err.is_err(),
+        "a write routed to the read-only pool must fail loudly, not silently succeed: {err:?}"
+    );
+}
