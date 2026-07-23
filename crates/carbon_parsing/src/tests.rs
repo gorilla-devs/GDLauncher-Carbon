@@ -288,6 +288,66 @@ fn test_missing_message() {
 }
 
 #[test]
+fn test_complete_but_unparseable_event_does_not_wedge_the_parser() {
+    // Regression test: a complete-but-unparseable event (tags balance, but the
+    // detailed parse fails -- here on a non-numeric timestamp) must not leave
+    // its bytes stuck at the front of the buffer. Otherwise every later call
+    // to `parse_next` re-reads and re-errors on the exact same bytes forever,
+    // freezing the live log for the rest of the session even though good
+    // events keep arriving right behind it.
+    let good_event_1 = r#"<log4j:Event logger="Logger1" timestamp="1111111111" level="INFO" thread="main">
+            <log4j:Message><![CDATA[first good message]]></log4j:Message>
+        </log4j:Event>"#;
+    let bad_event = r#"<log4j:Event logger="Logger1" timestamp="not-a-number" level="INFO" thread="main">
+            <log4j:Message><![CDATA[bad timestamp]]></log4j:Message>
+        </log4j:Event>"#;
+    let good_event_2 = r#"<log4j:Event logger="Logger1" timestamp="2222222222" level="WARN" thread="main">
+            <log4j:Message><![CDATA[second good message]]></log4j:Message>
+        </log4j:Event>"#;
+    let good_event_3 = r#"<log4j:Event logger="Logger1" timestamp="3333333333" level="ERROR" thread="main">
+            <log4j:Message><![CDATA[third good message]]></log4j:Message>
+        </log4j:Event>"#;
+
+    let mut parser = LogParser::new();
+    parser.feed(good_event_1.as_bytes());
+    parser.feed(bad_event.as_bytes());
+    parser.feed(good_event_2.as_bytes());
+    parser.feed(good_event_3.as_bytes());
+
+    match parser.parse_next() {
+        Ok(Some(ParsedItem::LogEntry(entry))) => {
+            assert_eq!(entry.message.trim(), "first good message");
+        }
+        v => panic!("Expected the first good LogEntry, got {:?}", v),
+    }
+
+    // The malformed event surfaces its error on this call...
+    match parser.parse_next() {
+        Err(ParserError::TimestampError(_)) => {}
+        v => panic!("Expected a TimestampError for the bad event, got {:?}", v),
+    }
+
+    // ...but must not still be sitting at the front of the buffer: every event
+    // fed afterwards keeps parsing normally, proving the parser advanced past it.
+    match parser.parse_next() {
+        Ok(Some(ParsedItem::LogEntry(entry))) => {
+            assert_eq!(entry.message.trim(), "second good message");
+        }
+        v => panic!("Expected the second good LogEntry, got {:?}", v),
+    }
+
+    match parser.parse_next() {
+        Ok(Some(ParsedItem::LogEntry(entry))) => {
+            assert_eq!(entry.message.trim(), "third good message");
+        }
+        v => panic!("Expected the third good LogEntry, got {:?}", v),
+    }
+
+    // Nothing left un-drained.
+    assert_eq!(parser.parse_next().unwrap(), None);
+}
+
+#[test]
 fn test_whitespace_handling() {
     let input = r#"
             <log4j:Event    logger="Logger1"     timestamp="1234567890"    level="INFO"   thread="main"   >

@@ -207,9 +207,27 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     // Re-exchange GDL tokens on every startup to ensure they're valid
     // (handles backend target changes where JWT signing keys differ)
+    //
+    // Bounded so a stalled connection can't block `axum::serve` forever: generous
+    // enough for the HTTP client's own timeout/retries to get through a handful of
+    // accounts, but finite. Any account left un-refreshed when this times out is
+    // simply refreshed later, on demand, by `ensure_gdl_auth_token`, so a timeout
+    // here is handled exactly like the existing error path: log and move on.
+    const REFRESH_GDL_TOKENS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
     let t = std::time::Instant::now();
-    if let Err(e) = app.account_manager().refresh_all_gdl_tokens().await {
-        tracing::warn!("Failed to refresh GDL tokens on startup: {}", e);
+    match tokio::time::timeout(
+        REFRESH_GDL_TOKENS_TIMEOUT,
+        app.account_manager().refresh_all_gdl_tokens(),
+    )
+    .await
+    {
+        Ok(Err(e)) => tracing::warn!("Failed to refresh GDL tokens on startup: {}", e),
+        Err(_) => tracing::warn!(
+            "Timed out after {:?} refreshing GDL tokens on startup",
+            REFRESH_GDL_TOKENS_TIMEOUT
+        ),
+        Ok(Ok(())) => {}
     }
     debug!(
         "[startup-timing] refresh_all_gdl_tokens completed in {:.2}s",

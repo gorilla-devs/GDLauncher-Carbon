@@ -90,6 +90,47 @@ pub fn secure_path_join<P1: AsRef<Path>, P2: AsRef<Path>>(
     }
 }
 
+/// Ceiling on how many decompressed bytes a single hand-rolled zip extraction pass
+/// (one call site's whole override loop) will write to disk or read into memory.
+/// Reuses the export side's own instance-size cap: nothing a legitimate import
+/// needs ever produces more override content than a legitimate export of the same
+/// size class would, so this rejects a decompression bomb (a tiny compressed entry
+/// inflating to gigabytes) without ever wrongly limiting real content.
+pub const MAX_EXTRACTED_OVERRIDE_BYTES: u64 =
+    crate::managers::instance::export::MAX_SHARE_SIZE_BYTES;
+
+/// True if a zip entry's Unix mode indicates it's a symlink (`S_IFLNK`). Pass
+/// `entry.unix_mode()` directly. A hand-rolled extractor that materializes a
+/// symlink entry as a regular file ends up writing the link's *target path text*
+/// as the file's contents -- silent data corruption, distinct from path
+/// traversal (handled separately via `secure_path_join`). `None` (no Unix
+/// external attributes, e.g. an archive built on Windows) is never a symlink.
+pub fn is_symlink_mode(unix_mode: Option<u32>) -> bool {
+    unix_mode.is_some_and(|mode| mode & 0o170000 == 0o120000)
+}
+
+/// Copies `reader` into `writer`, erroring out instead of copying more than
+/// `limit` bytes. Guards a hand-rolled zip extractor against a decompression
+/// bomb: a tiny compressed entry that expands to an enormous amount of data
+/// would otherwise be written to disk (or read into memory, e.g. to hash it)
+/// with no bound at all. Returns the number of bytes actually copied so callers
+/// can thread a shrinking budget across multiple entries.
+pub fn copy_bounded<R: std::io::Read, W: std::io::Write>(
+    reader: &mut R,
+    writer: &mut W,
+    limit: u64,
+) -> anyhow::Result<u64> {
+    // UFCS avoids the ambiguity between `R`'s own `Read` impl (which would move
+    // `*reader`) and the blanket `Read for &mut R` impl by unifying `Self` with
+    // `reader`'s actual type (`&mut R`) directly.
+    let mut limited = std::io::Read::take(reader, limit + 1);
+    let copied = std::io::copy(&mut limited, writer)?;
+    if copied > limit {
+        anyhow::bail!("Archive entry exceeds the {limit} byte decompressed size limit");
+    }
+    Ok(copied)
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum ProgressState {
     Idle,
@@ -272,6 +313,10 @@ pub async fn prepare_modpack_from_mrpack(
         let overrides_folder_name = "overrides";
         spawn_blocking(move || {
             let total_archive_files = archive.len() as u64;
+            // Cumulative across the whole pass, not per entry: without this, many
+            // entries each just under a per-entry cap could still add up to an
+            // unbounded amount written to disk.
+            let mut extracted_bytes: u64 = 0;
             for i in 0..archive.len() {
                 let mut file = archive.by_index(i)?;
                 if !(file.name().starts_with(&overrides_folder_name)) {
@@ -291,6 +336,14 @@ pub async fn prepare_modpack_from_mrpack(
 
                 if file.name().ends_with('/') {
                     continue;
+                } else if is_symlink_mode(file.unix_mode()) {
+                    // A symlink entry materialized as a regular file would end up
+                    // containing the link's target path text instead of real data.
+                    tracing::warn!(
+                        "Skipping modrinth override entry `{}`: symlinks are not extracted",
+                        file.name()
+                    );
+                    continue;
                 } else {
                     if let Some(parent) = out_path.parent() {
                         if !parent.exists() {
@@ -299,7 +352,9 @@ pub async fn prepare_modpack_from_mrpack(
                     }
                     let mut out_file = std::fs::File::create(&out_path)?;
 
-                    std::io::copy(&mut file, &mut out_file)?;
+                    let remaining_budget =
+                        MAX_EXTRACTED_OVERRIDE_BYTES.saturating_sub(extracted_bytes);
+                    extracted_bytes += copy_bounded(&mut file, &mut out_file, remaining_budget)?;
                 }
 
                 progress_percentage_sender.send(ProgressState::ExtractingPackOverrides(
@@ -317,4 +372,47 @@ pub async fn prepare_modpack_from_mrpack(
         index,
         downloadables,
     })
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn is_symlink_mode_recognises_the_symlink_file_type_bits() {
+        // S_IFLNK | 0o777, the mode `zip` reports for a typical symlink entry.
+        assert!(is_symlink_mode(Some(0o120777)));
+        // A regular file (S_IFREG) and a directory (S_IFDIR) are not symlinks.
+        assert!(!is_symlink_mode(Some(0o100644)));
+        assert!(!is_symlink_mode(Some(0o040755)));
+        // No Unix external attributes at all (e.g. an archive built on Windows).
+        assert!(!is_symlink_mode(None));
+    }
+
+    #[test]
+    fn copy_bounded_allows_data_within_the_limit() {
+        let data = b"hello world";
+        let mut out = Vec::new();
+        let copied = copy_bounded(&mut &data[..], &mut out, data.len() as u64).unwrap();
+        assert_eq!(copied, data.len() as u64);
+        assert_eq!(out, data);
+    }
+
+    /// Regression test: a decompression bomb (a small compressed entry that
+    /// expands to far more data than expected) must error out instead of being
+    /// copied through without limit.
+    #[test]
+    fn copy_bounded_rejects_data_over_the_limit() {
+        let data = vec![0u8; 1024];
+        let mut out = Vec::new();
+        assert!(copy_bounded(&mut &data[..], &mut out, 100).is_err());
+    }
+
+    #[test]
+    fn copy_bounded_accepts_data_exactly_at_the_limit() {
+        let data = vec![0u8; 100];
+        let mut out = Vec::new();
+        let copied = copy_bounded(&mut &data[..], &mut out, 100).unwrap();
+        assert_eq!(copied, 100);
+    }
 }

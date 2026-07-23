@@ -28,13 +28,28 @@ pub enum ImportShareCodeProgress {
     Progress(i32), // 0-100
 }
 
-use super::{InstanceManager, export::InstanceExportManager};
+use super::{
+    InstanceManager,
+    export::{InstanceExportManager, MAX_SHARE_SIZE_BYTES},
+};
 
 mod curseforge;
 mod curseforge_archive;
 mod gdlpack;
 mod legacy_gdlauncher;
 mod modrinth_archive;
+
+/// A share code is a server-issued opaque token, but it becomes a filename
+/// component (`{share_code}.gdlpack`) before it's ever checked against anything
+/// server-side, so it's validated as such rather than trusted to already be
+/// safe: a plain, bounded, separator-free token.
+fn is_valid_share_code(share_code: &str) -> bool {
+    !share_code.is_empty()
+        && share_code.len() <= 64
+        && share_code
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
 
 #[derive(Debug)]
 pub struct InstanceImportManager {
@@ -60,6 +75,14 @@ impl ManagerRef<'_, InstanceImportManager> {
         mpsc::Receiver<ImportShareCodeProgress>,
         tokio::task::JoinHandle<Result<(), anyhow::Error>>,
     )> {
+        // The share code becomes a filename component (`{share_code}.gdlpack`) below,
+        // before it's ever checked against anything server-side. Reject anything but a
+        // plain, bounded token up front so it can never be used to escape the temp
+        // directory (e.g. a code containing `..` or a path separator).
+        if !is_valid_share_code(&share_code) {
+            return Err(anyhow!("Invalid share code"));
+        }
+
         let (tx, rx) = mpsc::channel(10);
         let app = self.app.clone();
 
@@ -109,8 +132,21 @@ impl ManagerRef<'_, InstanceImportManager> {
                 }
 
                 let chunk = chunk_result?;
-                file.write_all(&chunk).await?;
                 downloaded += chunk.len() as u64;
+
+                // Bound the download independent of what the server claims via
+                // Content-Length (total_size, used only for the progress percentage
+                // below): a malicious or misbehaving presigned URL response could
+                // otherwise stream an unbounded amount of data onto disk. Genuine
+                // shares are already capped at this same size on export, so nothing
+                // legitimate is ever rejected here.
+                if downloaded > MAX_SHARE_SIZE_BYTES {
+                    return Err(anyhow!(
+                        "Share code archive exceeds the {MAX_SHARE_SIZE_BYTES} byte limit"
+                    ));
+                }
+
+                file.write_all(&chunk).await?;
 
                 if let Some(total) = total_size {
                     let progress = (downloaded as f64 / total as f64 * 85.0 + 5.0) as i32;
@@ -452,5 +488,35 @@ impl<T: Clone + Into<ImportableInstance>> From<InternalImportEntry<T>> for Impor
             InternalImportEntry::Valid(t) => ImportEntry::Valid(t.into()),
             InternalImportEntry::Invalid(e) => ImportEntry::Invalid(e),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn valid_share_codes_are_accepted() {
+        assert!(is_valid_share_code("abcDEF123"));
+        assert!(is_valid_share_code("a-code_with-mixed_separators-123"));
+        assert!(is_valid_share_code(&"a".repeat(64)));
+    }
+
+    /// Regression test: the share code becomes a filename component
+    /// (`{share_code}.gdlpack`) with no other validation, so anything that could
+    /// escape the intended temp directory must be rejected up front.
+    #[test]
+    fn share_codes_that_could_escape_the_temp_directory_are_rejected() {
+        assert!(!is_valid_share_code("../../etc/passwd"));
+        assert!(!is_valid_share_code(".."));
+        assert!(!is_valid_share_code("foo/bar"));
+        assert!(!is_valid_share_code("foo\\bar"));
+        assert!(!is_valid_share_code("/etc/passwd"));
+    }
+
+    #[test]
+    fn empty_or_overlong_share_codes_are_rejected() {
+        assert!(!is_valid_share_code(""));
+        assert!(!is_valid_share_code(&"a".repeat(65)));
     }
 }

@@ -165,6 +165,13 @@ pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
             env!("USER_AGENT_PREFIX"),
             env!("APP_VERSION")
         ))
+        // This client serves small JSON API calls (GDL/CurseForge/Modrinth), several
+        // of which run on the startup critical path before any recovery UI exists, so
+        // a stalled connection must fail instead of hanging. Large file downloads run
+        // through a separate client in carbon_net that intentionally has no overall
+        // timeout; this bound never touches those.
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(60))
         .build()
         .expect("Failed to build HTTP client");
 

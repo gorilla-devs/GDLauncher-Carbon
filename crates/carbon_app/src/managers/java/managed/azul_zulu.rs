@@ -4,7 +4,7 @@ use crate::{
     managers::java::{java_checker::JavaChecker, scan_and_sync::upsert_java_component_to_db},
 };
 use anyhow::Context;
-use carbon_net::{DownloadOptions, Downloadable, Progress};
+use carbon_net::{Checksum, DownloadOptions, Downloadable, Progress};
 use carbon_repos::db_exec::Db;
 use carbon_rt_path::{ManagedJavasPath, TempPath};
 use serde::Deserialize;
@@ -47,11 +47,20 @@ impl Managed for AzulZulu {
 
         let content_length = reqwest::get(download_url).await?.content_length();
 
-        let downloadable = if let Some(content_length) = content_length {
-            Downloadable::new(download_url, download_temp_path).with_size(content_length)
-        } else {
-            Downloadable::new(download_url, download_temp_path)
-        };
+        // Best-effort: the list endpoint behind `fetch_all_versions` doesn't carry a
+        // checksum at all, but Azul's per-package detail endpoint does. A failure here
+        // (network blip, timeout, unexpected response shape) must never block the
+        // install -- it just means the download proceeds unchecked, exactly as before
+        // this existed.
+        let sha256 = fetch_package_sha256(&version.id).await;
+
+        let mut downloadable = Downloadable::new(download_url, download_temp_path);
+        if let Some(content_length) = content_length {
+            downloadable = downloadable.with_size(content_length);
+        }
+        if let Some(sha256) = sha256 {
+            downloadable = downloadable.with_checksum(Some(Checksum::Sha256(sha256)));
+        }
 
         trace!("Downloadable: {:?}", downloadable);
 
@@ -110,11 +119,7 @@ impl Managed for AzulZulu {
                         })?
                         .to_owned();
 
-                    root.components()
-                        .next()
-                        .ok_or_else(|| anyhow::anyhow!("No root component"))?
-                        .as_os_str()
-                        .to_owned()
+                    single_root_component(&root)?
                 };
 
                 let is_single_root_dir = archive.file_names().all(|file_name| {
@@ -293,6 +298,78 @@ impl Managed for AzulZulu {
     }
 }
 
+/// Extracts and validates the first path component of a zip's root entry name,
+/// which decides both whether the archive has a single common root directory
+/// (`is_single_root_dir` in `setup`) and, if so, what that directory's cleanup
+/// path (`install_root`) will be.
+///
+/// `enclosed_name()` already guards against absolute paths and `..` components,
+/// but not against a leading `./`: an archive whose entries are all
+/// `./`-prefixed (corrupt or crafted) resolves its first component to a bare
+/// `.` (`Component::CurDir`), not a real directory name. Joining the
+/// managed-javas root with "." is a no-op, so trusting that as `install_root`
+/// would make it alias the managed-javas root itself -- and the failure branch
+/// in `setup` `remove_dir_all`s `install_root`, wiping every other installed
+/// JRE along with the bad one. Only a genuine, single named directory
+/// component (`Component::Normal`) is accepted.
+fn single_root_component(root_entry_name: &Path) -> anyhow::Result<std::ffi::OsString> {
+    let first_component = root_entry_name
+        .components()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("No root component"))?;
+
+    let std::path::Component::Normal(name) = first_component else {
+        return Err(anyhow::anyhow!(
+            "Invalid zip. Root entry is not a plain directory name: {:?}",
+            first_component
+        ));
+    };
+
+    Ok(name.to_owned())
+}
+
+/// Best-effort fetch of a package's sha256 from Azul's per-package detail endpoint
+/// (`{AZUL_BASE_URL}{package_uuid}`). The list endpoint behind `get_all_by_os_arch`
+/// doesn't carry a checksum at all, so this is a second call keyed on the package
+/// UUID already known from that list.
+///
+/// Returns `None` on any failure -- request error, timeout, non-success status,
+/// unexpected response shape, or a missing/null field -- so the install always
+/// proceeds regardless: a missing checksum just means the download isn't
+/// verified against one, and only a genuinely served hash gets checked.
+async fn fetch_package_sha256(package_uuid: &str) -> Option<String> {
+    #[derive(Deserialize)]
+    struct PackageDetail {
+        sha256_hash: Option<String>,
+    }
+
+    let url = format!("{AZUL_BASE_URL}{package_uuid}");
+
+    let fetch = async {
+        reqwest::get(&url)
+            .await
+            .ok()?
+            .error_for_status()
+            .ok()?
+            .json::<PackageDetail>()
+            .await
+            .ok()?
+            .sha256_hash
+    };
+
+    // A stall here must not hold up the whole install: this is an integrity-check
+    // enhancement, not something the download can't proceed without.
+    match tokio::time::timeout(std::time::Duration::from_secs(10), fetch).await {
+        Ok(sha256) => sha256.map(|hash| hash.trim().to_lowercase()),
+        Err(_) => {
+            trace!(
+                "Timed out fetching sha256 for Azul package {package_uuid}; installing without a checksum"
+            );
+            None
+        }
+    }
+}
+
 const AZUL_BASE_URL: &str = "https://api.azul.com/metadata/v1/zulu/packages/";
 struct AzulAPI;
 
@@ -433,5 +510,30 @@ mod test {
         let versions = AzulAPI::get_all_versions().await.unwrap();
 
         assert!(!versions.is_empty());
+    }
+
+    #[test]
+    fn single_root_component_accepts_a_plain_directory_name() {
+        let root = single_root_component(Path::new("zulu-21.0.1-jre/bin/java")).unwrap();
+        assert_eq!(root, "zulu-21.0.1-jre");
+    }
+
+    /// Regression test: an archive whose entries are all `./`-prefixed must be
+    /// rejected, not accepted with `root_dir == "."` -- which would otherwise
+    /// make `install_root` alias the managed-javas root and let the cleanup
+    /// path in `setup` wipe every installed JRE.
+    #[test]
+    fn single_root_component_rejects_a_leading_dot_slash() {
+        assert!(single_root_component(Path::new("./bin/java")).is_err());
+    }
+
+    #[test]
+    fn single_root_component_rejects_a_bare_current_dir() {
+        assert!(single_root_component(Path::new(".")).is_err());
+    }
+
+    #[test]
+    fn single_root_component_rejects_a_bare_parent_dir() {
+        assert!(single_root_component(Path::new("..")).is_err());
     }
 }

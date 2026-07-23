@@ -330,11 +330,23 @@ impl ModplatformCacher for ModrinthModCacher {
         let futures = batch.into_iter().filter_map(|(metadata_id, sha512)| {
             let sha512_match = matches.remove(&sha512);
             sha512_match.map(|(project, team, version)| async move {
-                let file = version
+                // The version matched on the queried hash, but Modrinth's response
+                // is external data: an odd or hash-mismatched result can still list
+                // no file whose own hash matches. Skip just this mod rather than
+                // panicking the shared query/save/icon task group, which would
+                // silently stop all Modrinth caching for the rest of the session.
+                let Some(file) = version
                     .files
                     .iter()
                     .find(|file| file.hashes.sha512 == sha512)
-                    .expect("file to be present in it's response");
+                else {
+                    let project_id = &project.id;
+                    let version_id = &version.id;
+                    warn!(
+                        "Modrinth version {version_id} of project {project_id} has no file matching queried hash {sha512}; skipping this mod"
+                    );
+                    return;
+                };
 
                 let authors = team
                     .iter()
@@ -641,5 +653,177 @@ mod test {
         newer.loaders = vec!["not-a-loader".to_string()];
 
         assert_eq!(build_update_paths(&installed, "project", &[newer]), "");
+    }
+
+    /// Regression test: a version can match on the queried hash while an odd or
+    /// hash-mismatched Modrinth response still lists no file whose own hash
+    /// matches it. `save_batch` must skip just that entry rather than panic --
+    /// a panic here would take down the whole shared query/save/icon task group
+    /// (`cache_modplatform`'s unsupervised `join!`), silently stopping ALL
+    /// Modrinth caching for the rest of the session. The rest of the batch --
+    /// including a perfectly normal entry right alongside the bad one -- must
+    /// still cache.
+    #[tokio::test]
+    async fn odd_response_for_one_mod_does_not_abort_the_rest_of_the_batch() {
+        use carbon_platforms::modrinth::project::{
+            License, Project, ProjectStatus, ProjectSupportRange, ProjectType,
+        };
+        use carbon_platforms::modrinth::responses::{
+            ProjectsResponse, TeamResponse, VersionHashesResponse,
+        };
+        use carbon_platforms::modrinth::user::{TeamMember, User};
+        use carbon_platforms::modrinth::version::{Hashes, VersionFile};
+
+        fn project(id: &str) -> Project {
+            Project {
+                slug: id.to_string(),
+                title: id.to_string(),
+                description: String::new(),
+                categories: Vec::new(),
+                client_side: ProjectSupportRange::Required,
+                server_side: ProjectSupportRange::Required,
+                body: String::new(),
+                additional_categories: Vec::new(),
+                issues_url: None,
+                source_url: None,
+                wiki_url: None,
+                discord_url: None,
+                donation_urls: Vec::new(),
+                project_type: ProjectType::Mod,
+                downloads: 0,
+                icon_url: None,
+                color: None,
+                id: id.to_string(),
+                team: format!("{id}-team"),
+                moderator_message: None,
+                published: "2026-01-01T00:00:00Z".parse::<UtcDateTime>().unwrap(),
+                updated: "2026-01-01T00:00:00Z".parse::<UtcDateTime>().unwrap(),
+                approved: None,
+                followers: 0,
+                status: ProjectStatus::Approved,
+                license: License {
+                    id: "MIT".to_string(),
+                    name: "MIT".to_string(),
+                    url: None,
+                },
+                versions: Vec::new(),
+                game_versions: vec!["1.20.1".to_string()],
+                loaders: vec!["forge".to_string()],
+                gallery: Vec::new(),
+            }
+        }
+
+        fn team(project_id: &str) -> TeamResponse {
+            TeamResponse(vec![TeamMember {
+                team_id: format!("{project_id}-team"),
+                user: User {
+                    username: "author".to_string(),
+                    name: None,
+                    id: "author-id".to_string(),
+                    avatar_url: None,
+                },
+                role: "Owner".to_string(),
+                accepted: true,
+                ordering: None,
+            }])
+        }
+
+        fn file(sha512: &str) -> VersionFile {
+            VersionFile {
+                hashes: Hashes {
+                    sha512: sha512.to_string(),
+                    sha1: "irrelevant".to_string(),
+                    others: HashMap::new(),
+                },
+                url: format!("https://example.invalid/{sha512}.jar"),
+                filename: format!("{sha512}.jar"),
+                primary: true,
+                size: 1,
+                file_type: None,
+            }
+        }
+
+        let app = crate::setup_managers_for_test().await;
+
+        // The version matched on this hash, but (an odd/hash-mismatched
+        // response) none of its files actually carry that hash.
+        let bad_sha512 = "b".repeat(128);
+        let mut bad_version = version("bad-version", "bad-project", 1, VersionType::Release);
+        bad_version.files = vec![file("some-other-hash")];
+
+        // A normal response where the file really does carry the queried hash.
+        let good_sha512 = "g".repeat(128);
+        let mut good_version = version("good-version", "good-project", 2, VersionType::Release);
+        good_version.files = vec![file(&good_sha512)];
+
+        let mut versions = HashMap::new();
+        versions.insert(bad_sha512.clone(), bad_version);
+        versions.insert(good_sha512.clone(), good_version);
+
+        metarepo::insert_metadata(
+            &app.db,
+            "bad-metadata",
+            1,
+            b"bad-sha512-raw",
+            b"bad-sha1-raw",
+            "forge",
+            None,
+            None,
+            None,
+            None,
+            None,
+            DbDateTime(chrono::Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        metarepo::insert_metadata(
+            &app.db,
+            "good-metadata",
+            2,
+            b"good-sha512-raw",
+            b"good-sha1-raw",
+            "forge",
+            None,
+            None,
+            None,
+            None,
+            None,
+            DbDateTime(chrono::Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+
+        let bundle = (
+            vec![bad_sha512.clone(), good_sha512.clone()],
+            vec![
+                ("bad-metadata".to_string(), bad_sha512.clone()),
+                ("good-metadata".to_string(), good_sha512.clone()),
+            ],
+            VersionHashesResponse(versions),
+            ProjectsResponse(vec![project("bad-project"), project("good-project")]),
+            vec![team("bad-project"), team("good-project")],
+            Vec::new(),
+        );
+
+        // Must not panic: a panic here would take down the shared
+        // query/save/icon task group and stop Modrinth caching for the rest
+        // of the session.
+        ModrinthModCacher::save_batch(&app, CacheEntityId::Server(1), bundle).await;
+
+        let good_cached = metarepo::get_mr_cache_by_metadata(&app.db, "good-metadata")
+            .await
+            .unwrap();
+        assert!(
+            good_cached.is_some(),
+            "the good entry alongside the bad one should still be cached"
+        );
+
+        let bad_cached = metarepo::get_mr_cache_by_metadata(&app.db, "bad-metadata")
+            .await
+            .unwrap();
+        assert!(
+            bad_cached.is_none(),
+            "the bad entry has no matching file and must be skipped, not cached"
+        );
     }
 }
