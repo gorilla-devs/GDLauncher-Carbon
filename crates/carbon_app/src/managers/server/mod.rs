@@ -8,6 +8,7 @@ use crate::domain::server::{
     ServerState, ServerType,
 };
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::orphan_pid;
 use anyhow::{Context, anyhow, bail};
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::mod_file_cache as mfcdb;
@@ -286,15 +287,15 @@ impl ManagerRef<'_, ServerManager> {
         // is still alive AND still java is killed first.
         for (server_id, root, pid) in recorded {
             let is_live_java = pid
-                .map(|p| is_live_java_process(&system, p))
+                .map(|p| orphan_pid::is_live_java_process(&system, p))
                 .unwrap_or(false);
 
-            match reconcile_pid(pid, is_live_java) {
-                PidReconcileAction::NoPidFile => {}
-                PidReconcileAction::RemoveStale => {
+            match orphan_pid::reconcile_pid(pid, is_live_java) {
+                orphan_pid::PidReconcileAction::NoPidFile => {}
+                orphan_pid::PidReconcileAction::RemoveStale => {
                     provider::remove_pid_file(&root).await;
                 }
-                PidReconcileAction::KillOrphan => {
+                orphan_pid::PidReconcileAction::KillOrphan => {
                     // Safe: KillOrphan is only ever produced from `Some(pid)`.
                     let pid = pid.expect("KillOrphan implies a recorded pid");
                     warn!(
@@ -3173,53 +3174,6 @@ impl ManagerRef<'_, ServerManager> {
     }
 }
 
-/// Outcome of reconciling one server's recorded pid against the live
-/// process table (see `ServerManager::clean_up_orphaned_servers`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PidReconcileAction {
-    /// No pidfile was present for this server — nothing to do.
-    NoPidFile,
-    /// The recorded pid is dead, or alive but not a java process (the pid
-    /// was reused by something unrelated) — the stale file is removed, but
-    /// nothing is killed.
-    RemoveStale,
-    /// The recorded pid is alive and still a java process: an orphaned JVM
-    /// left over from a session the core did not shut down cleanly.
-    KillOrphan,
-}
-
-/// Decide what to do with a server's recorded pid. Deliberately split out
-/// from the sysinfo lookup so this branch is unit-testable without a real
-/// process table: `is_live_java` is the caller's answer to "is this pid
-/// currently alive and running as java", however it determined that.
-///
-/// Killing only ever requires BOTH a pid this server actually recorded AND
-/// sysinfo confirming it currently looks like a JVM — a name mismatch (pid
-/// reused by an unrelated process) always falls back to `RemoveStale`.
-fn reconcile_pid(recorded_pid: Option<u32>, is_live_java: bool) -> PidReconcileAction {
-    match recorded_pid {
-        None => PidReconcileAction::NoPidFile,
-        Some(_) if is_live_java => PidReconcileAction::KillOrphan,
-        Some(_) => PidReconcileAction::RemoveStale,
-    }
-}
-
-/// Whether `pid` is currently alive and its process name contains "java"
-/// (case-insensitive). `system` must already have been refreshed for this
-/// pid (see `ProcessesToUpdate::Some` in `clean_up_orphaned_servers`) —
-/// this only reads back what's already there.
-fn is_live_java_process(system: &System, pid: u32) -> bool {
-    system
-        .process(Pid::from_u32(pid))
-        .map(|p| {
-            p.name()
-                .to_string_lossy()
-                .to_ascii_lowercase()
-                .contains("java")
-        })
-        .unwrap_or(false)
-}
-
 fn generate_shortpath(name: &str) -> String {
     let sanitized: String = name
         .graphemes(true)
@@ -3281,112 +3235,10 @@ mod tests {
         assert!(crash_restart_delay(1) > std::time::Duration::ZERO);
     }
 
-    // --- orphan pid reconciliation ---------------------------------------
-
-    #[test]
-    fn reconcile_pid_decisions() {
-        // No pidfile at all: nothing to do, regardless of what a liveness
-        // check would have said.
-        assert_eq!(reconcile_pid(None, false), PidReconcileAction::NoPidFile);
-        assert_eq!(reconcile_pid(None, true), PidReconcileAction::NoPidFile);
-
-        // A recorded pid that's dead, or alive but not java (reused by
-        // something unrelated) — never kill, just drop the stale file.
-        assert_eq!(
-            reconcile_pid(Some(1234), false),
-            PidReconcileAction::RemoveStale
-        );
-
-        // A recorded pid that's alive AND still java: an orphaned JVM.
-        assert_eq!(
-            reconcile_pid(Some(1234), true),
-            PidReconcileAction::KillOrphan
-        );
-    }
-
-    #[test]
-    fn is_live_java_process_false_for_a_dead_pid() {
-        // A pid this large will not be alive on any real system — this
-        // exercises the "pid not found" branch of `System::process`.
-        let dead_pid = u32::MAX - 100;
-        let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(dead_pid)]));
-
-        assert!(!is_live_java_process(&system, dead_pid));
-    }
-
-    #[test]
-    fn is_live_java_process_false_for_a_live_non_java_pid() {
-        // The test binary itself is alive but is not a java process — this
-        // exercises the name-mismatch branch without spawning anything.
-        let own_pid = std::process::id();
-        let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(own_pid)]));
-
-        // Confirm sysinfo actually found the process (proving the `false`
-        // below comes from the name not matching, not from a lookup that
-        // silently failed and would have returned `false` either way).
-        assert!(
-            system.process(Pid::from_u32(own_pid)).is_some(),
-            "sysinfo did not find this test's own live process"
-        );
-        assert!(!is_live_java_process(&system, own_pid));
-    }
-
-    #[tokio::test]
-    async fn orphan_reconciliation_removes_pidfile_for_a_dead_recorded_pid() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
-
-        let dead_pid = u32::MAX - 100;
-        provider::write_pid_file(root, dead_pid).await;
-
-        let recorded = provider::read_pid_file(root).await.unwrap();
-        assert_eq!(recorded, Some(dead_pid));
-
-        let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(dead_pid)]));
-        let is_live_java = is_live_java_process(&system, dead_pid);
-
-        match reconcile_pid(recorded, is_live_java) {
-            PidReconcileAction::RemoveStale => provider::remove_pid_file(root).await,
-            other => panic!("expected RemoveStale for a dead pid, got {:?}", other),
-        }
-
-        assert_eq!(provider::read_pid_file(root).await.unwrap(), None);
-    }
-
-    #[tokio::test]
-    async fn orphan_reconciliation_removes_pidfile_for_a_live_non_java_pid() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
-
-        // Our own pid: alive for the duration of the test, but not java.
-        let own_pid = std::process::id();
-        provider::write_pid_file(root, own_pid).await;
-        let recorded = provider::read_pid_file(root).await.unwrap();
-
-        let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(own_pid)]));
-        let is_live_java = is_live_java_process(&system, own_pid);
-        assert!(
-            !is_live_java,
-            "test process must not be misidentified as java"
-        );
-
-        match reconcile_pid(recorded, is_live_java) {
-            PidReconcileAction::RemoveStale => provider::remove_pid_file(root).await,
-            other => panic!(
-                "expected RemoveStale for a live non-java pid, got {:?}",
-                other
-            ),
-        }
-
-        assert_eq!(provider::read_pid_file(root).await.unwrap(), None);
-        // Confirms reconciliation never tried to kill anything here: this
-        // test's own process is still alive to make this assertion at all.
-        assert!(System::new_all().process(Pid::from_u32(own_pid)).is_some());
-    }
+    // Pure decision logic (`reconcile_pid`, `is_live_java_process`,
+    // `PidReconcileAction`) and pidfile read/write/remove lifecycle tests
+    // now live in `managers::orphan_pid`, which both this manager and
+    // `InstanceManager` share.
 
     // --- shutdown_running ---------------------------------------------
 

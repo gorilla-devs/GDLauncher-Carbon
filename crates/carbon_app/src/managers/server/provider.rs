@@ -1,11 +1,11 @@
 use crate::domain::server::LaunchConfig;
-use anyhow::{Context, Result};
+use crate::managers::orphan_pid;
+use anyhow::Result;
 use async_trait::async_trait;
 use carbon_rt_path::ServerPath;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::{Notify, mpsc};
-use tracing::warn;
 
 #[derive(Debug)]
 pub struct ServerHandle {
@@ -48,7 +48,7 @@ pub const PID_FILE_NAME: &str = ".gdl_server.pid";
 /// (`ServerManager::load_servers`, on every core startup) compute this from
 /// the same `ServerPath::get_root()`, so they always agree on the location.
 pub fn pid_file_path(server_root: &Path) -> PathBuf {
-    server_root.join(PID_FILE_NAME)
+    orphan_pid::pid_file_path(server_root, PID_FILE_NAME)
 }
 
 /// Record `pid` as this server's current JVM. Best-effort: a write failure
@@ -56,29 +56,13 @@ pub fn pid_file_path(server_root: &Path) -> PathBuf {
 /// run won't be auto-cleaned up on the next launch — it must never block or
 /// fail the launch itself.
 pub async fn write_pid_file(server_root: &Path, pid: u32) {
-    let path = pid_file_path(server_root);
-    if let Err(e) = tokio::fs::write(&path, pid.to_string()).await {
-        warn!(
-            "Failed to write server pidfile at {}: {}",
-            path.display(),
-            e
-        );
-    }
+    orphan_pid::write_pid_file(server_root, PID_FILE_NAME, pid).await;
 }
 
 /// Remove a server's pidfile. Best-effort: a missing file is not an error,
 /// and any other failure is only logged.
 pub async fn remove_pid_file(server_root: &Path) {
-    let path = pid_file_path(server_root);
-    match tokio::fs::remove_file(&path).await {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => warn!(
-            "Failed to remove server pidfile at {}: {}",
-            path.display(),
-            e
-        ),
-    }
+    orphan_pid::remove_pid_file(server_root, PID_FILE_NAME).await;
 }
 
 /// Read and parse a server's pidfile. `Ok(None)` means no pidfile exists —
@@ -86,18 +70,7 @@ pub async fn remove_pid_file(server_root: &Path) {
 /// failure comes back as `Err` so the caller can log it and fall back to
 /// treating it exactly like "no pidfile"; this must never fail startup.
 pub async fn read_pid_file(server_root: &Path) -> Result<Option<u32>> {
-    let path = pid_file_path(server_root);
-    match tokio::fs::read_to_string(&path).await {
-        Ok(content) => {
-            let pid = content
-                .trim()
-                .parse::<u32>()
-                .with_context(|| format!("invalid pid recorded in {}", path.display()))?;
-            Ok(Some(pid))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e).with_context(|| format!("failed to read pidfile at {}", path.display())),
-    }
+    orphan_pid::read_pid_file(server_root, PID_FILE_NAME).await
 }
 
 #[cfg(test)]

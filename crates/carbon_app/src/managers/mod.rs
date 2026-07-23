@@ -31,6 +31,7 @@ pub(crate) mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;
+mod orphan_pid;
 pub mod rich_presence;
 pub mod server;
 mod settings;
