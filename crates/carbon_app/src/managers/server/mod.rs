@@ -62,6 +62,17 @@ fn sanitize_console_command(command: &str) -> String {
     command.chars().filter(|c| !c.is_control()).collect()
 }
 
+/// Resolves the server port, defaulting when unset, and rejects a value outside
+/// the valid TCP range so an out-of-range port fails here with a clear message
+/// rather than as an opaque JVM bind error at launch.
+fn resolve_server_port(port: Option<i32>) -> anyhow::Result<i32> {
+    let port = port.unwrap_or(25565);
+    if !(1..=65535).contains(&port) {
+        bail!("Server port must be between 1 and 65535, got {port}");
+    }
+    Ok(port)
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("Minecraft server EULA has not been accepted for server {server_id}")]
 pub struct EulaNotAcceptedError {
@@ -459,7 +470,7 @@ impl ManagerRef<'_, ServerManager> {
             bail!("Server name cannot be empty");
         }
 
-        let port = port.unwrap_or(25565);
+        let port = resolve_server_port(port)?;
 
         // Generate shortpath from name
         let shortpath = generate_shortpath(&name);
@@ -697,7 +708,7 @@ impl ManagerRef<'_, ServerManager> {
             bail!("Server name cannot be empty");
         }
 
-        let port = port.unwrap_or(25565);
+        let port = resolve_server_port(port)?;
         let shortpath = generate_shortpath(&name);
         let runtime_path = &self.app.settings_manager().runtime_path;
         let servers_path = runtime_path.get_servers();
@@ -3255,6 +3266,17 @@ fn generate_shortpath(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolve_server_port_defaults_and_bounds() {
+        assert_eq!(resolve_server_port(None).unwrap(), 25565);
+        assert_eq!(resolve_server_port(Some(25577)).unwrap(), 25577);
+        assert_eq!(resolve_server_port(Some(1)).unwrap(), 1);
+        assert_eq!(resolve_server_port(Some(65535)).unwrap(), 65535);
+        assert!(resolve_server_port(Some(0)).is_err());
+        assert!(resolve_server_port(Some(-1)).is_err());
+        assert!(resolve_server_port(Some(65536)).is_err());
+    }
 
     #[test]
     fn sanitize_console_command_strips_control_chars() {
