@@ -1135,6 +1135,92 @@ ipcMain.handle("getRuntimePath", async () => {
   return CURRENT_RUNTIME_PATH
 })
 
+/** Whether `child` is `parent` itself or nested under it. */
+function isPathInside(child: string, parent: string): boolean {
+  const rel = path.relative(parent, child)
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel))
+}
+
+/**
+ * Authoritative guard for a runtime-path relocation target. `changeRuntimePath`
+ * is reachable from the renderer and writes GDL's tree into the target before
+ * deleting the old runtime, so a bad target is destructive. The renderer-side
+ * `validateRuntimePath` is only advisory; this is the real check. Relocation is
+ * intentionally "anywhere the user wants" (e.g. another drive), so this is a
+ * denylist of dangerous locations plus structural guards, not an allowlist.
+ */
+function assertSafeRuntimeTarget(target: string) {
+  if (!path.isAbsolute(target)) {
+    throw new Error(`Runtime path must be absolute: ${target}`)
+  }
+
+  const resolved = path.resolve(target)
+
+  // A filesystem/drive root (its own parent).
+  if (path.dirname(resolved) === resolved) {
+    throw new Error(
+      `Refusing to use a filesystem root as the runtime path: ${target}`
+    )
+  }
+
+  // Nesting with the current runtime in either direction would copy a directory
+  // into itself, or delete a parent of the source.
+  if (CURRENT_RUNTIME_PATH) {
+    const current = path.resolve(CURRENT_RUNTIME_PATH)
+    if (isPathInside(resolved, current) || isPathInside(current, resolved)) {
+      throw new Error(
+        `Runtime path may not nest with the current runtime: ${target}`
+      )
+    }
+  }
+
+  // Anything under the user's home is allowed; otherwise reject known system
+  // directories (and their descendants).
+  const home = path.resolve(os.homedir())
+  if (isPathInside(resolved, home)) {
+    return
+  }
+
+  const systemDirs =
+    process.platform === "win32"
+      ? [
+          process.env.SystemRoot,
+          process.env.windir,
+          process.env.ProgramFiles,
+          process.env["ProgramFiles(x86)"],
+          process.env.ProgramData,
+          "C:\\Windows",
+          "C:\\Program Files",
+          "C:\\Program Files (x86)",
+          "C:\\ProgramData"
+        ]
+      : process.platform === "darwin"
+        ? ["/System", "/Library", "/usr", "/bin", "/sbin", "/etc", "/Applications"]
+        : [
+            "/usr",
+            "/bin",
+            "/sbin",
+            "/etc",
+            "/lib",
+            "/lib64",
+            "/boot",
+            "/dev",
+            "/proc",
+            "/sys",
+            "/run"
+          ]
+
+  for (const dir of systemDirs) {
+    if (!dir) continue
+    const resolvedDir = path.resolve(dir)
+    if (resolved === resolvedDir || isPathInside(resolved, resolvedDir)) {
+      throw new Error(
+        `Refusing to use a system directory as the runtime path: ${target}`
+      )
+    }
+  }
+}
+
 ipcMain.handle(
   "changeRuntimePath",
   async (_, newPath: string, switchOnly = false) => {
@@ -1153,6 +1239,9 @@ ipcMain.handle(
       console.log(`[RTP] No-op: same path`)
       return
     }
+
+    // Reject dangerous targets before creating/copying/deleting anything.
+    assertSafeRuntimeTarget(newPath)
 
     const runtimeOverridePath = path.join(
       app.getPath("userData"),
