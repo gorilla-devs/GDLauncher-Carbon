@@ -35,10 +35,15 @@ impl TryFrom<i32> for ModChannel {
     type Error = anyhow::Error;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        Self::all()
-            .get(value as usize)
-            .map(|v| *v)
-            .ok_or_else(|| anyhow!("invalid mod channel id {value}"))
+        // Must invert `ModChannel::from(..) as i32` (the cache's stored form), so
+        // this maps the enum discriminants directly rather than indexing `all()`,
+        // whose display order (stable-first) is the reverse of the discriminants.
+        match value {
+            x if x == Self::Alpha as i32 => Ok(Self::Alpha),
+            x if x == Self::Beta as i32 => Ok(Self::Beta),
+            x if x == Self::Stable as i32 => Ok(Self::Stable),
+            _ => Err(anyhow!("invalid mod channel id {value}")),
+        }
     }
 }
 
@@ -264,5 +269,23 @@ mod test {
         let query = search_params.into_query_parameters().unwrap();
 
         assert_eq!(query, "gameId=432&sortOrder=asc&classId=6");
+    }
+
+    #[test]
+    fn mod_channel_i32_round_trips_by_discriminant() {
+        use super::ModChannel;
+
+        // The metadata cache persists a channel as `ModChannel::from(..) as i32`
+        // and reads it back with `ModChannel::try_from`. Decoding must invert the
+        // stored discriminant, otherwise a stable release reads back as alpha (and
+        // vice-versa) and the update gate mis-classifies it.
+        for channel in [ModChannel::Alpha, ModChannel::Beta, ModChannel::Stable] {
+            let stored = channel as i32;
+            assert_eq!(
+                ModChannel::try_from(stored).unwrap(),
+                channel,
+                "channel {channel:?} stored as {stored} did not round-trip"
+            );
+        }
     }
 }
