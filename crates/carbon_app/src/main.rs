@@ -311,16 +311,27 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     );
 
     // Graceful shutdown on external termination: without this, a running
-    // server's JVM is orphaned whenever this core process is killed instead
-    // of exiting through its own request handling (an external `kill`,
-    // Ctrl+C while running `pnpm watch:core`, or Electron's normal-quit
-    // path). `shutdown_running` bounds itself to ~3s, so this task always
-    // resolves and exits well inside the ~5s Electron waits before force
-    // killing the core.
+    // server's JVM or game process is orphaned whenever this core process is
+    // killed instead of exiting through its own request handling (an
+    // external `kill`, Ctrl+C while running `pnpm watch:core`, or Electron's
+    // normal-quit path). By product decision the game is tied to the
+    // launcher's lifecycle just like a server (whose own JVM already gets
+    // `kill_on_drop(true)` in `LocalServerProvider::start`), so it gets the
+    // same shutdown treatment here. Each `shutdown_running` bounds itself to
+    // ~3s; running them concurrently rather than sequentially keeps the
+    // total wait bounded by the slower of the two rather than their sum, so
+    // this task always resolves and exits well inside the ~5s Electron
+    // waits before force killing the core.
     tokio::spawn(async move {
         wait_for_termination_signal().await;
-        info!("Termination signal received, shutting down running servers before exit");
-        app2.server_manager().shutdown_running().await;
+        info!(
+            "Termination signal received, shutting down running servers and instances before exit"
+        );
+        futures::future::join(
+            app2.server_manager().shutdown_running(),
+            app2.instance_manager().shutdown_running(),
+        )
+        .await;
         std::process::exit(0);
     });
 
