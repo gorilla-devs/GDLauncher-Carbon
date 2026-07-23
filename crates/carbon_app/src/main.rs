@@ -134,6 +134,34 @@ pub fn main() {
         });
 }
 
+/// Waits for a request to terminate this process: SIGTERM or SIGINT on
+/// unix (an external `kill`, Ctrl+C, or a service manager's stop signal),
+/// or Ctrl+C everywhere else.
+///
+/// This does NOT observe Windows' `TerminateProcess` — that is how
+/// Electron actually kills the core on Windows, and it is not a catchable
+/// signal on that platform. Orphaned server JVMs from that path are instead
+/// cleaned up on the next launch by the pidfile check in
+/// `ServerManager::load_servers`.
+#[cfg(unix)]
+async fn wait_for_termination_signal() {
+    use tokio::signal::unix::{SignalKind, signal};
+
+    let mut sigterm = signal(SignalKind::terminate()).expect("failed to install a SIGTERM handler");
+    let mut sigint = signal(SignalKind::interrupt()).expect("failed to install a SIGINT handler");
+
+    tokio::select! {
+        _ = sigterm.recv() => {}
+        _ = sigint.recv() => {}
+        _ = tokio::signal::ctrl_c() => {}
+    }
+}
+
+#[cfg(not(unix))]
+async fn wait_for_termination_signal() {
+    let _ = tokio::signal::ctrl_c().await;
+}
+
 async fn get_available_port() -> TcpListener {
     info!("Scanning for available port");
     for port in 1025..65535 {
@@ -281,6 +309,20 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         "[startup-timing] reached axum::serve in {:.2}s total",
         startup_total.elapsed().as_secs_f64()
     );
+
+    // Graceful shutdown on external termination: without this, a running
+    // server's JVM is orphaned whenever this core process is killed instead
+    // of exiting through its own request handling (an external `kill`,
+    // Ctrl+C while running `pnpm watch:core`, or Electron's normal-quit
+    // path). `shutdown_running` bounds itself to ~3s, so this task always
+    // resolves and exits well inside the ~5s Electron waits before force
+    // killing the core.
+    tokio::spawn(async move {
+        wait_for_termination_signal().await;
+        info!("Termination signal received, shutting down running servers before exit");
+        app2.server_manager().shutdown_running().await;
+        std::process::exit(0);
+    });
 
     // As soon as the server is ready, notify via stdout
     tokio::spawn(async move {
