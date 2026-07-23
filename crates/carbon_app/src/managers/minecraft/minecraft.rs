@@ -802,6 +802,10 @@ pub async fn launch_minecraft(
 
     command_exec.stdout(std::process::Stdio::piped());
     command_exec.stderr(std::process::Stdio::piped());
+    // Tie the game to the launcher session: if the owning run task is torn
+    // down while the game is still alive, the process is killed rather than
+    // orphaned (the same guarantee the server JVM already has).
+    command_exec.kill_on_drop(true);
 
     let child = command_exec.args(command_args);
 

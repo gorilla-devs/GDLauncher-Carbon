@@ -23,6 +23,7 @@ use crate::{
     managers::minecraft::{UpdateValue, curseforge},
     managers::modplatforms::curseforge::convert_cf_version_to_standard_version,
     managers::modplatforms::modrinth::convert_mr_version_to_standard_version,
+    managers::orphan_pid,
     managers::vtask::Subtask,
     managers::{
         self, ManagerRef,
@@ -52,7 +53,7 @@ use tokio::sync::{Mutex, Semaphore, watch};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 
 mod java;
 mod minecraft;
@@ -667,6 +668,18 @@ impl ManagerRef<'_, InstanceManager> {
                         return;
                     };
 
+                    // Record the pid so a future `InstanceManager::scan_instances`
+                    // pass can detect and kill this game JVM if the core exits
+                    // without going through the kill_rx/child.wait() path below
+                    // (crash, force-quit, Windows TerminateProcess). Best-effort:
+                    // never blocks or fails the launch on write failure.
+                    orphan_pid::write_pid_file(
+                        &instance_path.get_root(),
+                        super::PID_FILE_NAME,
+                        process_id,
+                    )
+                    .await;
+
                     let Some(running_log_id) = log_id else {
                         tracing::error!("log_id missing when launching instance {}", *instance_id);
                         let _ = app
@@ -782,6 +795,15 @@ impl ManagerRef<'_, InstanceManager> {
                                 .await;
                         }
                     }
+
+                    // The game process has exited by this point regardless of
+                    // whether the select above resolved via a natural exit or a
+                    // kill signal — `child.wait()` above blocks until it has.
+                    // The pidfile no longer refers to anything a future startup
+                    // reap needs to clean up. Best-effort, removed exactly once
+                    // here on both paths.
+                    orphan_pid::remove_pid_file(&instance_path.get_root(), super::PID_FILE_NAME)
+                        .await;
 
                     let _ = app.rich_presence_manager().stop_activity().await;
 
@@ -1012,6 +1034,57 @@ impl ManagerRef<'_, InstanceManager> {
     }
 }
 
+impl InstanceManager {
+    /// Best-effort kill of every currently running game process, meant for
+    /// the core process itself being terminated (SIGTERM/SIGINT/Ctrl+C) so
+    /// games get a kill signal instead of being silently orphaned. Bounded
+    /// to `SHUTDOWN_TIMEOUT` for the whole operation — including a stalled
+    /// kill — so a caller awaiting this can never hang past that; a timeout
+    /// here is only logged. It does not change what the caller does next
+    /// (main.rs exits the process either way, relying on the pidfile-based
+    /// reap in `scan_instances` on next launch as the fallback for whatever
+    /// didn't get killed in time). Mirrors `ServerManager::shutdown_running`.
+    ///
+    /// Fire-and-forget: this only sends the kill signal on `kill_tx` and does
+    /// not wait for the game process to actually exit before returning — the
+    /// pidfile reap on the next launch is the safety net for anything left
+    /// alive past this call (or past `SHUTDOWN_TIMEOUT`).
+    pub async fn shutdown_running(&self) {
+        const SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+        let outcome = tokio::time::timeout(SHUTDOWN_TIMEOUT, async {
+            let instances = self.instances.read().await;
+
+            let kills = instances.values().filter_map(|instance| {
+                let InstanceType::Valid(data) = &instance.type_ else {
+                    return None;
+                };
+                match &data.state {
+                    LaunchState::Running(running) => {
+                        Some((instance.shortpath.as_str(), &running.kill_tx))
+                    }
+                    _ => None,
+                }
+            });
+
+            futures::future::join_all(kills.map(|(shortpath, kill_tx)| async move {
+                if let Err(e) = kill_tx.send(()).await {
+                    warn!("Failed to signal shutdown to instance {}: {}", shortpath, e);
+                }
+            }))
+            .await;
+        })
+        .await;
+
+        if outcome.is_err() {
+            warn!(
+                "shutdown_running did not finish within {:?}; proceeding with core exit anyway",
+                SHUTDOWN_TIMEOUT
+            );
+        }
+    }
+}
+
 pub enum LaunchState {
     Inactive { failed_task: Option<VisualTaskId> },
     Queued(VisualTaskId),
@@ -1139,5 +1212,117 @@ async fn process_logs(
             }
             else => break,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::managers::instance::{Instance, InstanceData};
+
+    fn dummy_config() -> info::Instance {
+        info::Instance {
+            name: "test".to_string(),
+            icon: info::InstanceIcon::Default,
+            date_created: Utc::now(),
+            date_updated: Utc::now(),
+            last_played: None,
+            seconds_played: 0,
+            modpack: None,
+            game_configuration: info::GameConfig {
+                version: None,
+                global_java_args: true,
+                extra_java_args: None,
+                memory: None,
+                java_override: None,
+                game_resolution: None,
+            },
+            pre_launch_hook: None,
+            post_exit_hook: None,
+            wrapper_command: None,
+            mod_sources: None,
+            notes: String::new(),
+        }
+    }
+
+    fn instance_data_with_state(state: LaunchState) -> InstanceData {
+        InstanceData {
+            favorite: false,
+            config: dummy_config(),
+            state,
+            modpack_update_curseforge: None,
+            modpack_update_modrinth: None,
+            icon_revision: None,
+        }
+    }
+
+    // --- shutdown_running ---------------------------------------------
+
+    #[tokio::test]
+    async fn shutdown_running_kills_a_running_instances_handle() {
+        let manager = InstanceManager::new();
+
+        let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
+
+        manager.instances.write().await.insert(
+            InstanceId(1),
+            Instance {
+                shortpath: "test-instance".to_string(),
+                type_: InstanceType::Valid(instance_data_with_state(LaunchState::Running(
+                    RunningInstance {
+                        process_id: 4242,
+                        kill_tx,
+                        start_time: Utc::now(),
+                        log: GameLogId(1),
+                    },
+                ))),
+            },
+        );
+
+        manager.shutdown_running().await;
+
+        // `shutdown_running` sends on the instance's `kill_tx` — receiving on
+        // it confirms it found the running instance and drove it through the
+        // same kill path `kill_instance` uses.
+        assert!(
+            kill_rx.try_recv().is_ok(),
+            "expected shutdown_running to send a kill signal to the running instance"
+        );
+    }
+
+    #[tokio::test]
+    async fn shutdown_running_ignores_inactive_instances_and_returns_promptly() {
+        let manager = InstanceManager::new();
+
+        manager.instances.write().await.insert(
+            InstanceId(1),
+            Instance {
+                shortpath: "test-instance".to_string(),
+                type_: InstanceType::Valid(instance_data_with_state(LaunchState::Inactive {
+                    failed_task: None,
+                })),
+            },
+        );
+
+        // Must return promptly (well within the 3s bound) when nothing is
+        // running, and must not panic on a non-`Running` state.
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            manager.shutdown_running(),
+        )
+        .await
+        .expect("shutdown_running must not hang when no instance is running");
+    }
+
+    #[tokio::test]
+    async fn shutdown_running_with_no_instances_at_all_returns_promptly() {
+        let manager = InstanceManager::new();
+
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            manager.shutdown_running(),
+        )
+        .await
+        .expect("shutdown_running must not hang with an empty instance map");
     }
 }
