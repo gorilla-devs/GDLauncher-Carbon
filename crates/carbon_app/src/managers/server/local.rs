@@ -1,4 +1,4 @@
-use super::provider::{ServerHandle, ServerProvider};
+use super::provider::{ServerHandle, ServerProvider, remove_pid_file, write_pid_file};
 use crate::domain::server::LaunchConfig;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -38,6 +38,7 @@ impl ServerProvider for LocalServerProvider {
         log_tx: mpsc::UnboundedSender<String>,
     ) -> Result<ServerHandle> {
         let data_path = server_path.get_data_path();
+        let server_root = server_path.get_root();
 
         let (xms, xmx) = clamp_heap_mb(xms, xmx);
 
@@ -145,6 +146,13 @@ impl ServerProvider for LocalServerProvider {
 
         info!("Server process started with PID {}", pid);
 
+        // Best-effort: record the pid so a future `load_servers` pass can
+        // detect and kill this JVM if the core exits without going through
+        // `stop`/`kill` first (crash, force-quit, Windows TerminateProcess —
+        // none of which run the kill/wait task below). Never blocks or fails
+        // the launch on write failure.
+        write_pid_file(&server_root, pid).await;
+
         // Set up stdin channel
         let (stdin_tx, mut stdin_rx) = mpsc::channel::<String>(64);
         let mut stdin = child.stdin.take().expect("Failed to take stdin");
@@ -195,6 +203,7 @@ impl ServerProvider for LocalServerProvider {
         let exit_notify = Arc::new(Notify::new());
         let exit_notify_clone = exit_notify.clone();
         let log_tx_exit = log_tx;
+        let exit_server_root = server_root.clone();
         tokio::spawn(async move {
             tokio::select! {
                 _ = kill_rx.recv() => {
@@ -220,6 +229,10 @@ impl ServerProvider for LocalServerProvider {
                     }
                 }
             }
+            // Best-effort: the process is gone either way (killed or exited
+            // on its own), so the pidfile no longer refers to anything a
+            // future `load_servers` pass needs to clean up.
+            remove_pid_file(&exit_server_root).await;
             exit_notify_clone.notify_waiters();
         });
 

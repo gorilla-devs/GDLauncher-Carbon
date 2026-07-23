@@ -16,6 +16,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::sync::{Mutex, RwLock, mpsc, watch};
 use tracing::{error, info, warn};
 use unicode_segmentation::UnicodeSegmentation;
@@ -138,6 +139,56 @@ impl ServerManager {
     fn get_provider(&self) -> Box<dyn ServerProvider> {
         Box::new(LocalServerProvider)
     }
+
+    /// Best-effort graceful shutdown of every currently running (or
+    /// starting) server, meant for the core process itself being terminated
+    /// (SIGTERM/SIGINT/Ctrl+C) so servers get a `kill` signal instead of
+    /// being silently orphaned. Bounded to `SHUTDOWN_TIMEOUT` for the whole
+    /// operation — including a stalled kill — so a caller awaiting this can
+    /// never hang past that; a timeout here is only logged; it does not
+    /// change what the caller does next (main.rs exits the process either
+    /// way, relying on `.kill_on_drop(true)` and the pidfile-based cleanup
+    /// on next launch as the fallback for whatever didn't get killed).
+    pub async fn shutdown_running(&self) {
+        const SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+        let outcome = tokio::time::timeout(SHUTDOWN_TIMEOUT, async {
+            let provider = self.get_provider();
+            let servers = self.servers.read().await;
+
+            let kills = servers.iter().filter_map(|(id, data)| {
+                let is_live = matches!(
+                    data.state,
+                    ServerState::Running { .. } | ServerState::Starting(_)
+                );
+                match (is_live, &data.handle) {
+                    (true, Some(handle)) => Some((*id, handle)),
+                    _ => None,
+                }
+            });
+
+            futures::future::join_all(kills.map(|(id, handle)| {
+                let provider = &provider;
+                async move {
+                    if let Err(e) = provider.kill(handle).await {
+                        warn!(
+                            "Failed to signal shutdown to server {} (pid {}): {}",
+                            id.0, handle.process_id, e
+                        );
+                    }
+                }
+            }))
+            .await;
+        })
+        .await;
+
+        if outcome.is_err() {
+            warn!(
+                "shutdown_running did not finish within {:?}; proceeding with core exit anyway",
+                SHUTDOWN_TIMEOUT
+            );
+        }
+    }
 }
 
 impl ManagerRef<'_, ServerManager> {
@@ -162,6 +213,13 @@ impl ManagerRef<'_, ServerManager> {
     async fn load_servers(self) -> anyhow::Result<()> {
         let db_servers = server_repo::get_all_servers(&self.app.db).await?;
 
+        // Before any server is registered in memory as Stopped, reconcile
+        // its pidfile against the live process table: a JVM from a session
+        // the core didn't shut down cleanly (crash, force-quit, Windows
+        // TerminateProcess) is otherwise invisible here and keeps holding
+        // its port forever.
+        self.clean_up_orphaned_servers(&db_servers).await;
+
         let mut servers = self.servers.write().await;
         for db_server in db_servers {
             servers.insert(
@@ -176,6 +234,82 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         Ok(())
+    }
+
+    /// Reconcile every server's on-disk pidfile against the live process
+    /// table, killing any pid that is still alive AND still looks like a
+    /// java process (an orphaned JVM this core recorded but never cleaned
+    /// up), and otherwise just discarding a stale/reused pid. Entirely
+    /// best-effort: every failure is logged and swallowed so this can never
+    /// fail or delay startup.
+    async fn clean_up_orphaned_servers(self, db_servers: &[server_repo::ServerRow]) {
+        let runtime_path = &self.app.settings_manager().runtime_path;
+        let servers_path = runtime_path.get_servers();
+
+        // Pass 1: read every server's pidfile (best-effort, one small file
+        // read each) and collect the recorded pids up front, so the process
+        // table only needs a single targeted refresh for this whole pass
+        // instead of a full system scan per server.
+        let mut recorded: Vec<(i32, std::path::PathBuf, Option<u32>)> =
+            Vec::with_capacity(db_servers.len());
+        for db_server in db_servers {
+            let root = servers_path
+                .get_server_path(&db_server.shortpath)
+                .get_root();
+            let pid = match provider::read_pid_file(&root).await {
+                Ok(pid) => pid,
+                Err(e) => {
+                    warn!(
+                        "Failed to read pidfile for server {} at {}: {}",
+                        db_server.id,
+                        root.display(),
+                        e
+                    );
+                    None
+                }
+            };
+            recorded.push((db_server.id, root, pid));
+        }
+
+        let pids: Vec<Pid> = recorded
+            .iter()
+            .filter_map(|(_, _, pid)| pid.map(Pid::from_u32))
+            .collect();
+
+        let mut system = System::new();
+        if !pids.is_empty() {
+            system.refresh_processes(ProcessesToUpdate::Some(&pids));
+        }
+
+        // Pass 2: reconcile. Every server with a recorded pid gets its
+        // pidfile removed one way or another; only a pid sysinfo confirms
+        // is still alive AND still java is killed first.
+        for (server_id, root, pid) in recorded {
+            let is_live_java = pid
+                .map(|p| is_live_java_process(&system, p))
+                .unwrap_or(false);
+
+            match reconcile_pid(pid, is_live_java) {
+                PidReconcileAction::NoPidFile => {}
+                PidReconcileAction::RemoveStale => {
+                    provider::remove_pid_file(&root).await;
+                }
+                PidReconcileAction::KillOrphan => {
+                    // Safe: KillOrphan is only ever produced from `Some(pid)`.
+                    let pid = pid.expect("KillOrphan implies a recorded pid");
+                    warn!(
+                        "Server {} has an orphaned java process (pid {}) still running from a previous session — killing it",
+                        server_id, pid
+                    );
+                    if let Some(process) = system.process(Pid::from_u32(pid)) {
+                        if !process.kill() {
+                            warn!("Failed to signal orphaned server process (pid {})", pid);
+                        }
+                    }
+                    provider::remove_pid_file(&root).await;
+                }
+            }
+        }
     }
 
     fn get_op_lock(self, id: ServerId) -> Arc<Mutex<()>> {
@@ -3039,6 +3173,53 @@ impl ManagerRef<'_, ServerManager> {
     }
 }
 
+/// Outcome of reconciling one server's recorded pid against the live
+/// process table (see `ServerManager::clean_up_orphaned_servers`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PidReconcileAction {
+    /// No pidfile was present for this server — nothing to do.
+    NoPidFile,
+    /// The recorded pid is dead, or alive but not a java process (the pid
+    /// was reused by something unrelated) — the stale file is removed, but
+    /// nothing is killed.
+    RemoveStale,
+    /// The recorded pid is alive and still a java process: an orphaned JVM
+    /// left over from a session the core did not shut down cleanly.
+    KillOrphan,
+}
+
+/// Decide what to do with a server's recorded pid. Deliberately split out
+/// from the sysinfo lookup so this branch is unit-testable without a real
+/// process table: `is_live_java` is the caller's answer to "is this pid
+/// currently alive and running as java", however it determined that.
+///
+/// Killing only ever requires BOTH a pid this server actually recorded AND
+/// sysinfo confirming it currently looks like a JVM — a name mismatch (pid
+/// reused by an unrelated process) always falls back to `RemoveStale`.
+fn reconcile_pid(recorded_pid: Option<u32>, is_live_java: bool) -> PidReconcileAction {
+    match recorded_pid {
+        None => PidReconcileAction::NoPidFile,
+        Some(_) if is_live_java => PidReconcileAction::KillOrphan,
+        Some(_) => PidReconcileAction::RemoveStale,
+    }
+}
+
+/// Whether `pid` is currently alive and its process name contains "java"
+/// (case-insensitive). `system` must already have been refreshed for this
+/// pid (see `ProcessesToUpdate::Some` in `clean_up_orphaned_servers`) —
+/// this only reads back what's already there.
+fn is_live_java_process(system: &System, pid: u32) -> bool {
+    system
+        .process(Pid::from_u32(pid))
+        .map(|p| {
+            p.name()
+                .to_string_lossy()
+                .to_ascii_lowercase()
+                .contains("java")
+        })
+        .unwrap_or(false)
+}
+
 fn generate_shortpath(name: &str) -> String {
     let sanitized: String = name
         .graphemes(true)
@@ -3098,5 +3279,189 @@ mod tests {
         // attempts is always >= 1 in practice (incremented before use), but
         // guard the boundary explicitly: no delay would defeat the backoff.
         assert!(crash_restart_delay(1) > std::time::Duration::ZERO);
+    }
+
+    // --- orphan pid reconciliation ---------------------------------------
+
+    #[test]
+    fn reconcile_pid_decisions() {
+        // No pidfile at all: nothing to do, regardless of what a liveness
+        // check would have said.
+        assert_eq!(reconcile_pid(None, false), PidReconcileAction::NoPidFile);
+        assert_eq!(reconcile_pid(None, true), PidReconcileAction::NoPidFile);
+
+        // A recorded pid that's dead, or alive but not java (reused by
+        // something unrelated) — never kill, just drop the stale file.
+        assert_eq!(
+            reconcile_pid(Some(1234), false),
+            PidReconcileAction::RemoveStale
+        );
+
+        // A recorded pid that's alive AND still java: an orphaned JVM.
+        assert_eq!(
+            reconcile_pid(Some(1234), true),
+            PidReconcileAction::KillOrphan
+        );
+    }
+
+    #[test]
+    fn is_live_java_process_false_for_a_dead_pid() {
+        // A pid this large will not be alive on any real system — this
+        // exercises the "pid not found" branch of `System::process`.
+        let dead_pid = u32::MAX - 100;
+        let mut system = System::new();
+        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(dead_pid)]));
+
+        assert!(!is_live_java_process(&system, dead_pid));
+    }
+
+    #[test]
+    fn is_live_java_process_false_for_a_live_non_java_pid() {
+        // The test binary itself is alive but is not a java process — this
+        // exercises the name-mismatch branch without spawning anything.
+        let own_pid = std::process::id();
+        let mut system = System::new();
+        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(own_pid)]));
+
+        // Confirm sysinfo actually found the process (proving the `false`
+        // below comes from the name not matching, not from a lookup that
+        // silently failed and would have returned `false` either way).
+        assert!(
+            system.process(Pid::from_u32(own_pid)).is_some(),
+            "sysinfo did not find this test's own live process"
+        );
+        assert!(!is_live_java_process(&system, own_pid));
+    }
+
+    #[tokio::test]
+    async fn orphan_reconciliation_removes_pidfile_for_a_dead_recorded_pid() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+
+        let dead_pid = u32::MAX - 100;
+        provider::write_pid_file(root, dead_pid).await;
+
+        let recorded = provider::read_pid_file(root).await.unwrap();
+        assert_eq!(recorded, Some(dead_pid));
+
+        let mut system = System::new();
+        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(dead_pid)]));
+        let is_live_java = is_live_java_process(&system, dead_pid);
+
+        match reconcile_pid(recorded, is_live_java) {
+            PidReconcileAction::RemoveStale => provider::remove_pid_file(root).await,
+            other => panic!("expected RemoveStale for a dead pid, got {:?}", other),
+        }
+
+        assert_eq!(provider::read_pid_file(root).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn orphan_reconciliation_removes_pidfile_for_a_live_non_java_pid() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+
+        // Our own pid: alive for the duration of the test, but not java.
+        let own_pid = std::process::id();
+        provider::write_pid_file(root, own_pid).await;
+        let recorded = provider::read_pid_file(root).await.unwrap();
+
+        let mut system = System::new();
+        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(own_pid)]));
+        let is_live_java = is_live_java_process(&system, own_pid);
+        assert!(
+            !is_live_java,
+            "test process must not be misidentified as java"
+        );
+
+        match reconcile_pid(recorded, is_live_java) {
+            PidReconcileAction::RemoveStale => provider::remove_pid_file(root).await,
+            other => panic!(
+                "expected RemoveStale for a live non-java pid, got {:?}",
+                other
+            ),
+        }
+
+        assert_eq!(provider::read_pid_file(root).await.unwrap(), None);
+        // Confirms reconciliation never tried to kill anything here: this
+        // test's own process is still alive to make this assertion at all.
+        assert!(System::new_all().process(Pid::from_u32(own_pid)).is_some());
+    }
+
+    // --- shutdown_running ---------------------------------------------
+
+    #[tokio::test]
+    async fn shutdown_running_kills_a_running_servers_handle() {
+        let manager = ServerManager::new();
+
+        let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
+        let (stdin_tx, _stdin_rx) = mpsc::channel::<String>(1);
+        let handle = ServerHandle {
+            process_id: 4242,
+            kill_tx,
+            stdin_tx,
+            exit_notify: Arc::new(tokio::sync::Notify::new()),
+        };
+
+        manager.servers.write().await.insert(
+            ServerId(1),
+            ServerData {
+                shortpath: "test-server".to_string(),
+                state: ServerState::Running {
+                    start_time: Utc::now(),
+                    log_id: ServerLogId(1),
+                    process_id: 4242,
+                },
+                handle: Some(handle),
+                last_log_id: None,
+            },
+        );
+
+        manager.shutdown_running().await;
+
+        // `LocalServerProvider::kill` just forwards onto `kill_tx` —
+        // receiving on it confirms `shutdown_running` found the running
+        // server's handle and drove it through the same kill path
+        // `kill_server` uses.
+        assert!(
+            kill_rx.try_recv().is_ok(),
+            "expected shutdown_running to send a kill signal to the running server"
+        );
+    }
+
+    #[tokio::test]
+    async fn shutdown_running_ignores_stopped_servers_and_returns_promptly() {
+        let manager = ServerManager::new();
+
+        manager.servers.write().await.insert(
+            ServerId(1),
+            ServerData {
+                shortpath: "test-server".to_string(),
+                state: ServerState::Stopped { failed_task: None },
+                handle: None,
+                last_log_id: None,
+            },
+        );
+
+        // Must return promptly (well within the 3s bound) when nothing is
+        // running, and must not panic on a `None` handle.
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            manager.shutdown_running(),
+        )
+        .await
+        .expect("shutdown_running must not hang when no server is running");
+    }
+
+    #[tokio::test]
+    async fn shutdown_running_with_no_servers_at_all_returns_promptly() {
+        let manager = ServerManager::new();
+
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            manager.shutdown_running(),
+        )
+        .await
+        .expect("shutdown_running must not hang with an empty server map");
     }
 }
