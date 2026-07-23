@@ -308,6 +308,41 @@ export type CoreModule = () => Promise<
 // rotate randomly per launch.
 const DEV_API_TOKEN = "dev-mode-only-do-not-use-in-production"
 
+// The spawned core process, tracked at module scope so recovery handlers can
+// terminate it even when it never reached READY: a hung startup resolves the
+// core promise via the timeout below while the process itself stays alive.
+let coreProcessHandle: ChildProcessWithoutNullStreams | null = null
+
+// Terminate the core (if still running) and wait, briefly, for it to exit.
+// Recovery must release the database file before deleting or overwriting it;
+// on Windows the holding process has to have exited first.
+async function killCoreProcess(timeoutMs = 5000): Promise<void> {
+  const proc = coreProcessHandle
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) {
+    return
+  }
+  await new Promise<void>((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) {
+        return
+      }
+      settled = true
+      resolve()
+    }
+    proc.once("exit", finish)
+    const timer = setTimeout(finish, timeoutMs)
+    if (typeof timer.unref === "function") {
+      timer.unref()
+    }
+    try {
+      proc.kill()
+    } catch {
+      finish()
+    }
+  })
+}
+
 const loadCoreModule: CoreModule = () =>
   new Promise((resolve, _) => {
     console.log("Loading core module...")
@@ -352,6 +387,7 @@ const loadCoreModule: CoreModule = () =>
           RUST_BACKTRACE: "full"
         }
       })
+      coreProcessHandle = coreModule
       console.log("Core module spawned successfully")
     } catch (err: unknown) {
       console.error(`[CORE] Spawn error: ${String(err)}`)
@@ -602,6 +638,7 @@ const loadCoreModule: CoreModule = () =>
 
     coreModule.on("exit", (code) => {
       console.log(`[CORE] Exit with code: ${code}`)
+      coreProcessHandle = null
 
       // If we get here without `started` being true, the core module exited
       // before emitting `_STATUS_:READY`. That's always an error condition,
@@ -914,14 +951,7 @@ async function createWindow(): Promise<BrowserWindow> {
 ipcMain.handle("relaunch", async () => {
   console.log("relaunching app...")
 
-  try {
-    const _coreModule = await coreModule
-    if (_coreModule.type === "success") {
-      _coreModule.result.kill()
-    }
-  } catch {
-    // No op
-  }
+  await killCoreProcess()
 
   app.relaunch()
   app.exit()
@@ -931,15 +961,10 @@ ipcMain.handle("deleteDbAndRestart", async () => {
   console.log("deleting database and restarting app...")
 
   // Kill the core FIRST: on Windows, unlinking a file the core still holds
-  // open fails, so the process must exit before we delete the database.
-  try {
-    const _coreModule = await coreModule
-    if (_coreModule.type === "success") {
-      _coreModule.result.kill()
-    }
-  } catch {
-    // No op
-  }
+  // open fails, so the process must exit before we delete the database. This
+  // also covers a startup that hung before READY, where the process is still
+  // alive.
+  await killCoreProcess()
 
   const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
 
@@ -971,17 +996,25 @@ ipcMain.handle(
     console.log(`restoring database from snapshot ${snapshotPath}...`)
 
     // Kill the core FIRST so the database file is not held open while we
-    // overwrite it (same Windows open-file constraint as the reset path).
-    try {
-      const _coreModule = await coreModule
-      if (_coreModule.type === "success") {
-        _coreModule.result.kill()
-      }
-    } catch {
-      // No op
-    }
+    // overwrite it (same Windows open-file constraint as the reset path). This
+    // also covers a startup that hung before READY.
+    await killCoreProcess()
 
     const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
+
+    // Only the core-emitted pre-downgrade snapshot beside the database may be
+    // restored. Reject any other path so a compromised renderer cannot copy an
+    // arbitrary file over the database.
+    const expectedSnapshot = path.join(
+      CURRENT_RUNTIME_PATH!,
+      "gdl_conf.pre-downgrade.db"
+    )
+    if (path.resolve(snapshotPath) !== path.resolve(expectedSnapshot)) {
+      console.error(
+        `refusing to restore from unexpected snapshot path: ${snapshotPath}`
+      )
+      return
+    }
 
     try {
       await fs.copyFile(snapshotPath, dbPath)
