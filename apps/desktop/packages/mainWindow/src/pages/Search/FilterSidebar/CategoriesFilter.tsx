@@ -7,6 +7,7 @@ import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { SearchableCheckboxList } from "./SearchableCheckboxList"
 import { formatModrinthCategory } from "@/utils/modrinthCategories"
+import { sanitizeSvgIcon } from "@/utils/modplatformDescriptionConverter"
 
 export function CategoriesFilter() {
   const searchResults = useSearchContext()
@@ -32,7 +33,7 @@ export function CategoriesFilter() {
         value: category.id,
         icon: (
           // eslint-disable-next-line solid/no-innerhtml
-          <div class="h-4 w-4" innerHTML={category.icon?.value ?? ""} />
+          <div class="h-4 w-4" innerHTML={sanitizeSvgIcon(category.icon?.value)} />
         )
       }))
   )

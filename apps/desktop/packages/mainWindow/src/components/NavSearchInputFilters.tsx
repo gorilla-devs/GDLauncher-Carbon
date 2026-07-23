@@ -28,6 +28,7 @@ import { rspc } from "@/utils/rspcClient"
 import { capitalize } from "@/utils/helpers"
 import { formatModrinthCategory } from "@/utils/modrinthCategories"
 import { ModloaderIcon } from "@/utils/sidebar"
+import { sanitizeSvgIcon } from "@/utils/modplatformDescriptionConverter"
 import { useGlobalStore } from "./GlobalStoreContext"
 import useSearchContext from "./SearchInputContext"
 import { useTransContext } from "@gd/i18n"
@@ -134,7 +135,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
         value: category.id,
         icon: (
           // eslint-disable-next-line solid/no-innerhtml
-          <div class="h-4 w-4" innerHTML={category.icon?.value ?? ""} />
+          <div class="h-4 w-4" innerHTML={sanitizeSvgIcon(category.icon?.value)} />
         )
       }))
   }

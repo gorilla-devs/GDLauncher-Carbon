@@ -10,6 +10,7 @@ import {
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { Switch, Match, createSignal } from "solid-js"
+import { sanitizeSvgIcon } from "@/utils/modplatformDescriptionConverter"
 import { apiUrl } from "./rspcClient"
 
 export const isListInstanceInvalid = (status: ListInstanceStatus) => {
@@ -164,7 +165,7 @@ export const CategoryIcon = (props: {
   return (
     <Switch>
       <Match when={props.type === "embedded"}>
-        <div class="h-4 w-4" innerHTML={props.value} />
+        <div class="h-4 w-4" innerHTML={sanitizeSvgIcon(props.value)} />
       </Match>
       <Match when={props.type === "url"}>
         <img class="h-4 w-4" src={props.value} />
