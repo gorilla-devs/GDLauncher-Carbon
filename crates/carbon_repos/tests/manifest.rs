@@ -452,3 +452,21 @@ fn every_post_floor_migration_matches_its_declared_metadata() {
             .unwrap_or_else(|e| panic!("migration {} data_down: {e}", def.name));
     }
 }
+
+#[test]
+fn a_down_that_loses_rows_is_reported_lossy() {
+    // Row loss, not just column loss: the up rebuilds "B" and the down rebuilds
+    // it back with the right shape but restores only some of the rows. The
+    // schema round-trip cannot see this — it compares DDL over an empty
+    // database — so the seeded comparison is the only thing standing between a
+    // row-dropping down and a `data_down: "full"` declaration.
+    let up = "ALTER TABLE \"B\" ADD COLUMN extra TEXT;";
+    let down = "ALTER TABLE \"B\" DROP COLUMN extra; DELETE FROM \"B\" WHERE id > 0;";
+
+    let lost = seeded_lost_fields(&[BASE], up, down).unwrap();
+
+    assert!(
+        lost.contains("B.label"),
+        "a row that never came back must report its fields lost, got {lost:?}"
+    );
+}
