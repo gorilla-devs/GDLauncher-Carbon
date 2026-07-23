@@ -813,25 +813,19 @@ impl ManagerRef<'_, ServerManager> {
             },
         );
 
-        // Download and save the modpack icon before spawning (small thumbnail, won't block)
+        // Download and save the modpack icon before spawning (small thumbnail, won't block).
+        // Reuse the instance downloader so the caller-supplied URL is scheme-checked
+        // and the body is size-capped.
         if let Some(ref url) = icon_url {
-            match self.app.reqwest_client.get(url).send().await {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        if let Ok(bytes) = response.bytes().await {
-                            let icon_path = server_path.get_root().join("icon.png");
-                            if let Err(e) = tokio::fs::write(&icon_path, &bytes).await {
-                                warn!("Failed to write server icon: {}", e);
-                            } else {
-                                let sid = server_id.0;
-                                let _ = server_repo::set_server_icon_revision(
-                                    &self.app.db,
-                                    sid,
-                                    Some(1),
-                                )
-                                .await;
-                            }
-                        }
+            match self.app.instance_manager().download_icon(url.clone()).await {
+                Ok((_, bytes)) => {
+                    let icon_path = server_path.get_root().join("icon.png");
+                    if let Err(e) = tokio::fs::write(&icon_path, &bytes).await {
+                        warn!("Failed to write server icon: {}", e);
+                    } else {
+                        let sid = server_id.0;
+                        let _ =
+                            server_repo::set_server_icon_revision(&self.app.db, sid, Some(1)).await;
                     }
                 }
                 Err(e) => {

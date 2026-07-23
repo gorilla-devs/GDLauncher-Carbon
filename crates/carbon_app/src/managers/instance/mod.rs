@@ -19,6 +19,7 @@ use crate::livenesstracker::LivenessTracker;
 use crate::managers::instance::modpack::PackVersionFile;
 use anyhow::bail;
 use anyhow::{Context, anyhow};
+use futures::StreamExt;
 use carbon_platforms::ModPlatform;
 use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
 use carbon_platforms::modrinth::search::{ProjectID, VersionID};
@@ -1585,6 +1586,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn download_icon(self, url: String) -> anyhow::Result<(String, Vec<u8>)> {
+        // The URL is caller-supplied. Only follow it over http(s) so a `file://`
+        // (or other) scheme can't be used to read arbitrary local resources.
+        let parsed = reqwest::Url::parse(&url).context("invalid icon url")?;
+        if !matches!(parsed.scheme(), "http" | "https") {
+            anyhow::bail!("icon url must be http or https");
+        }
+
         let extension = url
             .rsplit_once('/')
             .map(|(_, name)| name.rsplit_once('.'))
@@ -1592,16 +1600,29 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .map(|(_, ext)| ext)
             .unwrap_or("png");
 
-        let data = self
+        const MAX_ICON_BYTES: usize = 10 * 1024 * 1024;
+
+        let response = self
             .app
             .reqwest_client
             .get(&url)
             .send()
             .await?
-            .bytes()
-            .await?;
+            .error_for_status()?;
 
-        Ok((format!("icon.{extension}"), data.to_vec()))
+        // Read with a hard cap instead of `.bytes()` so a large (or endless)
+        // body can't exhaust memory.
+        let mut stream = response.bytes_stream();
+        let mut data = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            if data.len() + chunk.len() > MAX_ICON_BYTES {
+                anyhow::bail!("icon exceeds the {MAX_ICON_BYTES} byte limit");
+            }
+            data.extend_from_slice(&chunk);
+        }
+
+        Ok((format!("icon.{extension}"), data))
     }
 
     pub async fn set_loaded_icon(self, icon: (String, Vec<u8>)) {
