@@ -111,11 +111,19 @@ const EditGDLProfile = () => {
   }
 
   // Initialize form with current values
+  let textFieldsInitialized = false
   createEffect(() => {
     const user = validGDLUser()
     if (user) {
-      setDisplayName(user.displayName || "")
-      setRecoveryEmail(user.email || "")
+      // Seed the editable text fields only once. A background refetch of the
+      // GDL account (e.g. after requesting a verification email or changing the
+      // avatar in this same dialog) must not overwrite an unsaved display-name
+      // or recovery-email edit the user is still typing.
+      if (!textFieldsInitialized) {
+        textFieldsInitialized = true
+        setDisplayName(user.displayName || "")
+        setRecoveryEmail(user.email || "")
+      }
       // Don't clobber a pending local selection (e.g. after an upload failure
       // where we keep the dialog open and want to preserve the user's choice).
       const hasPendingLocalAvatar = untrack(
