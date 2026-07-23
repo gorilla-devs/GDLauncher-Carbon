@@ -82,6 +82,21 @@ const ogImage = toAbsoluteImage(image);
 const ogImageType = imageMimeType(ogImage);
 const ogImageAlt = imageAlt || `${title} - GDLauncher`;
 
+// JSON-LD values (addon name/summary, etc.) come from CurseForge/Modrinth and
+// are attacker-controlled. `JSON.stringify` doesn't escape `</script>`, `&`,
+// or the JS line/paragraph separators, so a crafted project name could break
+// out of the script tag or inject markup. The unicode-escaped sequences below
+// round-trip to the exact same JSON.parse'd value, so this is a pure
+// script-context escape, not a data change.
+function jsonLdSafe(data: Record<string, unknown>): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 const currentLocale = getLocaleFromUrl(Astro.url.pathname);
 const pathBase = pathWithoutLocale(Astro.url.pathname);
 const currentUrl =
@@ -177,7 +192,7 @@ const xDefault = pathHasLocalizedVersions
 
 <!-- Structured data -->
 {jsonLd?.map((data) => (
-  <script type="application/ld+json" set:html={JSON.stringify(data)} />
+  <script type="application/ld+json" set:html={jsonLdSafe(data)} />
 ))}
 
 <ViewTransitions />
