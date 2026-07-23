@@ -41,6 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "Instance Java Arguments",
   "_trn_instance_settings.prepend_global_java_args": "Prepend global Java arguments before instance extra Java arguments ({GLOBAL_JAVA_ARGS} below)",
   "_trn_instance_settings.java_path_profile": "Instance Java Path / Profile",
+  "_trn_instance_settings.java_override_mismatch": "The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
   "_trn_system_profiles": "System Profiles",
   "_trn_custom_profiles": "Custom Profiles",
   "_trn_profile_used_in_mc_versions": "This profile is used in the following Minecraft versions",
