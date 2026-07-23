@@ -210,14 +210,15 @@ const Loading = (props: {
 function Button(props: Props) {
   const c = children(() => props.children)
 
-  const [_, others] = splitProps(props, [
+  const [local, others] = splitProps(props, [
     "as",
     "icon",
     "iconRight",
     "uppercase",
     "loading",
     "size",
-    "children"
+    "children",
+    "disabled"
   ])
 
   const mergedProps = mergeProps(
@@ -237,6 +238,11 @@ function Button(props: Props) {
     <Dynamic
       component={component}
       {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
+      // `loading` must imply `disabled` on the native element, not just the
+      // pointer-events-none styling below — otherwise a focused button still
+      // re-fires its click handler on Enter/Space while a mutation is in
+      // flight, letting keyboard users double-submit.
+      disabled={local.loading || local.disabled}
       classList={{
         ...getVariant(
           props.type || "primary",

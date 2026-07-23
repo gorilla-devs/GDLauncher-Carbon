@@ -26,7 +26,7 @@ import {
   onCleanup,
   useContext
 } from "solid-js"
-import { format } from "date-fns"
+import { safeFormat } from "@/utils/date"
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar"
 
 import ModDownloadButton from "@/components/ModDownloadButton"
@@ -415,10 +415,7 @@ const AddonExplore = (props: { children?: any }) => {
                       <Switch>
                         <Match when={!isFetching()}>
                           <Show when={project.data?.releaseDate}>
-                            {format(
-                              new Date(project.data?.releaseDate!).getTime(),
-                              "P"
-                            )}
+                            {safeFormat(project.data?.releaseDate!, "P")}
                           </Show>
                         </Match>
                         <Match when={isFetching()}>

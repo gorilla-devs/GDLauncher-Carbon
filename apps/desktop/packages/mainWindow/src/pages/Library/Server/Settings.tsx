@@ -1,7 +1,7 @@
 import { rspc } from "@/utils/rspcClient"
 import { Button, Input, Slider, Switch } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
-import { createEffect, createSignal, Show } from "solid-js"
+import { createEffect, createSignal, on, Show } from "solid-js"
 import { FEServerDetails } from "@gd/core_module/bindings"
 import { generateSequence } from "@/utils/helpers"
 import Title from "@/pages/Settings/components/Title"
@@ -28,15 +28,24 @@ const Settings = (props: SettingsProps) => {
     mutationKey: ["server.updateServer"]
   }))
 
-  createEffect(() => {
-    const d = props.serverDetails
-    if (!d) return
-    setName(d.name)
-    setXmx(d.xmx)
-    setXms(d.xms)
-    setExtraJavaArgs(d.extraJavaArgs)
-    setAutoRestart(d.autoRestart)
-  })
+  // Reset the local form signals only when the viewed server changes, not on
+  // every `serverDetails` refetch (e.g. the instant-save invalidation from
+  // `save()` below) — otherwise a refetch mid-edit clobbers whatever the
+  // user is still typing in a sibling field.
+  createEffect(
+    on(
+      () => props.serverDetails?.id,
+      () => {
+        const d = props.serverDetails
+        if (!d) return
+        setName(d.name)
+        setXmx(d.xmx)
+        setXms(d.xms)
+        setExtraJavaArgs(d.extraJavaArgs)
+        setAutoRestart(d.autoRestart)
+      }
+    )
+  )
 
   const save = (
     update: Partial<{
@@ -52,7 +61,15 @@ const Settings = (props: SettingsProps) => {
       name: update.name ?? null,
       xmx: update.xmx ?? null,
       xms: update.xms ?? null,
-      extraJavaArgs: update.extraJavaArgs ?? null,
+      // extraJavaArgs is a double-Option on the backend (`null` means
+      // "clear", distinct from "leave untouched"), unlike the single-Option
+      // fields above where `null` already means "leave untouched". Re-send
+      // the current value when this call isn't the one changing it, so
+      // saving e.g. xmx alone can't silently blank the java args.
+      extraJavaArgs:
+        update.extraJavaArgs !== undefined
+          ? update.extraJavaArgs
+          : props.serverDetails.extraJavaArgs,
       autoRestart: update.autoRestart ?? null
     })
   }

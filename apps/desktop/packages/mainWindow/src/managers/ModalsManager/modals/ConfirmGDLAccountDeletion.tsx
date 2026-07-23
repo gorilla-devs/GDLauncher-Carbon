@@ -16,6 +16,46 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
     mutationKey: ["account.requestGdlAccountDeletion"]
   }))
 
+  const confirmDeletion = async () => {
+    const uuid = globalStore.accounts.data?.find(
+      (account: AccountEntry) =>
+        account.uuid === globalStore.settings.data?.gdlAccountId
+    )?.uuid
+
+    if (!uuid) {
+      toast.error("Request Failed", {
+        description: "No active GDLauncher account found."
+      })
+      return
+    }
+
+    try {
+      const result = await requestAccountDeletionMutation.mutateAsync(uuid)
+      if (result === "success") {
+        toast.success("Deletion Request Sent", {
+          description: "Check your email"
+        })
+      } else if (result.failed.cooldown !== null) {
+        toast.error("Too Many Requests", {
+          description: `Please try again in ${result.failed.cooldown} seconds`
+        })
+      } else {
+        toast.error("Request Failed", {
+          description:
+            result.failed.message ??
+            "Unable to process deletion request. Please try again later."
+        })
+      }
+      modalsContext?.closeModal()
+    } catch {
+      // Leave the modal open so the user can retry instead of silently
+      // losing the request to an unhandled rejection.
+      toast.error("Request Failed", {
+        description: "Unable to process deletion request. Please try again later."
+      })
+    }
+  }
+
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -29,6 +69,7 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
         </div>
         <div class="flex w-full justify-between">
           <Button
+            disabled={requestAccountDeletionMutation.isPending}
             onClick={() => {
               modalsContext?.closeModal()
             }}
@@ -37,36 +78,8 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
           </Button>
           <Button
             type="secondary"
-            onClick={async () => {
-              const uuid = globalStore.accounts.data?.find(
-                (account: AccountEntry) =>
-                  account.uuid === globalStore.settings.data?.gdlAccountId
-              )?.uuid
-
-              if (!uuid) {
-                throw new Error("No active gdl account")
-              }
-
-              const result =
-                await requestAccountDeletionMutation.mutateAsync(uuid)
-              if (result === "success") {
-                toast.success("Deletion Request Sent", {
-                  description: "Check your email"
-                })
-              } else if (result.failed.cooldown !== null) {
-                toast.error("Too Many Requests", {
-                  description: `Please try again in ${result.failed.cooldown} seconds`
-                })
-              } else {
-                toast.error("Request Failed", {
-                  description:
-                    result.failed.message ??
-                    "Unable to process deletion request. Please try again later."
-                })
-              }
-
-              modalsContext?.closeModal()
-            }}
+            loading={requestAccountDeletionMutation.isPending}
+            onClick={confirmDeletion}
           >
             {t("instances:_trn_instance_confirm_deletion.delete")}
           </Button>

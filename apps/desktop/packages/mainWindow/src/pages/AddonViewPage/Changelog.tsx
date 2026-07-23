@@ -24,7 +24,7 @@ import { rspc } from "@/utils/rspcClient"
 import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
 import useChangelogData from "./changelog.data"
 import { CFFEFile } from "@gd/core_module/bindings"
-import { format, formatDistanceToNowStrict } from "date-fns"
+import { safeFormat, safeFormatDistanceToNowStrict } from "@/utils/date"
 
 const ChangelogCard = (props: {
   content: string
@@ -51,10 +51,10 @@ const ChangelogCard = (props: {
             >
               <div class="text-lightSlate-600 flex items-center gap-2 text-xs">
                 <div class="i-hugeicons:calendar-01 shrink-0 h-4 w-4" />
-                <span>{format(new Date(props.releaseDate!), "PPP")}</span>
+                <span>{safeFormat(props.releaseDate!, "PPP")}</span>
                 <span class="text-lightSlate-700">•</span>
                 <span class="text-lightSlate-500">
-                  {formatDistanceToNowStrict(new Date(props.releaseDate!), {
+                  {safeFormatDistanceToNowStrict(props.releaseDate!, {
                     addSuffix: true
                   })}
                 </span>

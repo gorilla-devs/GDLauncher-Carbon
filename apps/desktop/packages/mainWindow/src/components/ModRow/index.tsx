@@ -10,7 +10,7 @@ import {
   PopoverContent,
   Spinner
 } from "@gd/ui"
-import { formatDistanceToNowStrict } from "date-fns"
+import { safeFormatDistanceToNowStrict } from "@/utils/date"
 import {
   createSignal,
   getOwner,
@@ -149,9 +149,7 @@ const ModRow = (props: ModRowProps) => {
           <div class="text-lightSlate-700 flex items-center gap-2">
             <i class="text-lightSlate-700 i-hugeicons:clock-01" />
             <div class="whitespace-nowrap text-sm">
-              {formatDistanceToNowStrict(
-                new Date(props.data.releaseDate).getTime()
-              )}
+              {safeFormatDistanceToNowStrict(props.data.releaseDate)}
             </div>
           </div>
           <div class="text-lightSlate-700 flex items-center gap-2">

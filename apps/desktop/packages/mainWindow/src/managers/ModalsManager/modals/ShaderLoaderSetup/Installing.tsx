@@ -1,4 +1,4 @@
-import { Progress, Spinner } from "@gd/ui"
+import { Button, Progress, Spinner } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
 import { createSignal, onMount, onCleanup, Match, Switch, Show } from "solid-js"
@@ -155,6 +155,11 @@ const Installing = (props: StepProps) => {
       } catch (e) {
         if (destroyed()) return
         setError((e as Error)?.message ?? "Install failed")
+        // The pipeline is no longer running once it's errored, so backdrop
+        // close (gated on this signal via the modal registry) is available
+        // again even though the visible controls below are the primary way
+        // out of this state.
+        setShaderInstallRunning(false)
         return
       }
     }
@@ -162,6 +167,18 @@ const Installing = (props: StepProps) => {
     if (destroyed()) return
     props.data.onComplete?.(lastTaskId)
     modalsContext?.closeModal()
+  }
+
+  const cancel = () => {
+    setShaderInstallRunning(false)
+    props.data.onComplete?.(null)
+    modalsContext?.closeModal()
+  }
+
+  const retry = () => {
+    setError(null)
+    setShaderInstallRunning(true)
+    void run()
   }
 
   onMount(() => {
@@ -198,52 +215,70 @@ const Installing = (props: StepProps) => {
   }
 
   return (
-    <div class="w-130 flex h-72 flex-col items-center justify-around">
-      <Spinner class="h-12 w-12" />
-      <div class="flex flex-col items-center gap-1 text-center">
-        <h3 class="m-0 text-lg">
-          <Switch>
-            <Match when={stepName() === "modloader"}>
-              <Trans key="content:_trn_shader_loader_installing_modloader" />
-            </Match>
-            <Match when={stepName() === "loader"}>
-              <Trans key="content:_trn_shader_loader_installing_loader" />
-            </Match>
-            <Match when={stepName() === "shader"}>
-              <Trans key="content:_trn_shader_loader_installing_shader" />
-            </Match>
-          </Switch>
-        </h3>
-        <Show when={activeSubtask()} keyed>
-          {(sub) => (
-            <p class="text-darkSlate-100 m-0 text-sm">
-              {t(
-                getTaskTranslationKey(sub.name.translation),
-                getTranslationArgs(sub.name)
-              )}
-            </p>
-          )}
-        </Show>
-        <Show when={subtaskDetail()} keyed>
-          {(detail) => (
-            <p class="text-darkSlate-200 m-0 font-mono text-xs">{detail}</p>
-          )}
-        </Show>
+    <Show
+      when={!error()}
+      fallback={
+        <div class="w-130 flex h-72 flex-col items-center justify-center gap-4 text-center">
+          <div class="i-hugeicons:alert-02 text-3xl text-red-400" />
+          <p class="text-red-400 m-0 text-sm">{error()}</p>
+          <div class="mt-2 flex gap-2">
+            <Button type="secondary" onClick={cancel}>
+              <Trans key="content:_trn_shader_loader_cancel" />
+            </Button>
+            <Button type="primary" onClick={retry}>
+              <div class="i-hugeicons:refresh h-4 w-4" />
+              <Trans key="general:_trn_retry" />
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div class="w-130 flex h-72 flex-col items-center justify-around">
+        <Spinner class="h-12 w-12" />
+        <div class="flex flex-col items-center gap-1 text-center">
+          <h3 class="m-0 text-lg">
+            <Switch>
+              <Match when={stepName() === "modloader"}>
+                <Trans key="content:_trn_shader_loader_installing_modloader" />
+              </Match>
+              <Match when={stepName() === "loader"}>
+                <Trans key="content:_trn_shader_loader_installing_loader" />
+              </Match>
+              <Match when={stepName() === "shader"}>
+                <Trans key="content:_trn_shader_loader_installing_shader" />
+              </Match>
+            </Switch>
+          </h3>
+          <Show when={activeSubtask()} keyed>
+            {(sub) => (
+              <p class="text-darkSlate-100 m-0 text-sm">
+                {t(
+                  getTaskTranslationKey(sub.name.translation),
+                  getTranslationArgs(sub.name)
+                )}
+              </p>
+            )}
+          </Show>
+          <Show when={subtaskDetail()} keyed>
+            {(detail) => (
+              <p class="text-darkSlate-200 m-0 font-mono text-xs">{detail}</p>
+            )}
+          </Show>
+        </div>
+        <div class="flex w-full flex-col items-center gap-1">
+          <Progress value={overallPercent()} />
+          <p class="text-darkSlate-100 m-0 text-xs">
+            <Trans
+              key="content:_trn_shader_loader_step_progress"
+              options={{
+                current: stepIndex() + 1,
+                total: stepCount()
+              }}
+            />
+          </p>
+        </div>
       </div>
-      <div class="flex w-full flex-col items-center gap-1">
-        <Progress value={overallPercent()} />
-        <p class="text-darkSlate-100 m-0 text-xs">
-          <Trans
-            key="content:_trn_shader_loader_step_progress"
-            options={{
-              current: stepIndex() + 1,
-              total: stepCount()
-            }}
-          />
-        </p>
-      </div>
-      {error() && <p class="text-red-400 m-0 text-xs">{error()}</p>}
-    </div>
+    </Show>
   )
 }
 

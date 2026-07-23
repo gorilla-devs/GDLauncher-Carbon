@@ -2,7 +2,7 @@ import { Trans } from "@gd/i18n"
 import { Checkbox } from "@gd/ui"
 import { For, Show, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
-import { format } from "date-fns"
+import { safeFormat } from "@/utils/date"
 import { getTitleByDays } from "@/utils/helpers"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
@@ -166,7 +166,7 @@ const Screenshots = () => {
                         <img class="h-32 w-60" src={screenshot.img} />
                         <div class="mt-2 flex items-center justify-between">
                           <p class="text-lightSlate-700 text-md m-0">
-                            {format(new Date(screenshot.date), "dd-MM-yyyy")}
+                            {safeFormat(screenshot.date, "dd-MM-yyyy")}
                           </p>
                           <div class="i-hugeicons:more-horizontal text-lightSlate-700" />
                         </div>
