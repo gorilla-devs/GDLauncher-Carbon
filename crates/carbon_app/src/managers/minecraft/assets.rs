@@ -59,6 +59,16 @@ pub async fn get_meta(
             )
         })?;
 
+        // A structurally-valid but empty index (no objects) is almost certainly a
+        // bad response (captive portal, truncated body). Treat it as a failure so
+        // the fallback keeps the previously-good cache instead of overwriting it.
+        if parsed.objects.is_empty() {
+            anyhow::bail!(
+                "asset index from `{}` contains no objects",
+                version_asset_index.url
+            );
+        }
+
         version_meta::upsert_assets_meta(
             db,
             &version_asset_index.id,
