@@ -817,23 +817,6 @@ fn cache_modplatform<C: ModplatformCacher>(
 }
 
 impl ManagerRef<'_, MetaCacheManager> {
-    pub async fn instance_removed(self, instance_id: InstanceId) {
-        let entity_id = CacheEntityId::Instance(instance_id);
-        join!(
-            self.local_targets
-                .send_modify(|targets| targets.revoke_target(entity_id)),
-            self.curseforge_targets
-                .send_modify(|targets| targets.revoke_target(entity_id)),
-            self.modrinth_targets
-                .send_modify(|targets| targets.revoke_target(entity_id)),
-        );
-
-        let instance_id_val = *instance_id;
-        let _ = mfcdb::delete_mod_file_cache_by_instance(&self.app.db, instance_id_val).await;
-
-        self.gc_mod_metadata().await;
-    }
-
     pub async fn gc_mod_metadata(self) {
         let _ = metarepo::gc_orphan_metadata(&self.app.db).await;
     }
