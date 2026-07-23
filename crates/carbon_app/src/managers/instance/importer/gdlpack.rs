@@ -80,8 +80,17 @@ impl GdlpackImporter {
                     .read_to_end(&mut data)
                     .map_err(|_| Translation::InstanceImportGdlpackMalformedManifest)?;
 
-                serde_json::from_slice::<Manifest>(&data)
-                    .map_err(|_| Translation::InstanceImportGdlpackMalformedManifest)?
+                let manifest = serde_json::from_slice::<Manifest>(&data)
+                    .map_err(|_| Translation::InstanceImportGdlpackMalformedManifest)?;
+
+                // Only format version 1 is understood. A newer pack could share a
+                // v1-compatible shape and silently misimport, so refuse anything
+                // else rather than guess.
+                if manifest.format_version != 1 {
+                    return Err(Translation::InstanceImportGdlpackMalformedManifest);
+                }
+
+                manifest
             };
 
             // Extract icon if present
