@@ -1016,11 +1016,25 @@ ipcMain.handle(
       return
     }
 
+    const tmpPath = `${dbPath}.restore-tmp`
     try {
-      await fs.copyFile(snapshotPath, dbPath)
+      // Copy to a sibling temp file, then atomically rename it over the
+      // database. A crash or error mid-copy then leaves the original database
+      // intact rather than a half-written one whose sidecars we're about to
+      // drop below.
+      await fs.copyFile(snapshotPath, tmpPath)
+      await fs.rename(tmpPath, dbPath)
       console.log("snapshot restored over gdl_conf.db")
     } catch (e) {
       console.error("failed to restore snapshot:", e)
+      try {
+        await fs.unlink(tmpPath)
+      } catch {
+        // best effort — the temp file may not have been created
+      }
+      // Leave the existing database and its sidecars untouched rather than
+      // relaunching onto a half-restored file.
+      return
     }
 
     // Drop the WAL/SHM sidecars so the restored file is opened as-is rather
