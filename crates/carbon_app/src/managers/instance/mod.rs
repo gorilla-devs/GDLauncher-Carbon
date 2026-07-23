@@ -2511,6 +2511,54 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
+    /// Best-effort check of whether a user-set Java override resolves to a major
+    /// version incompatible with `required_profile`, using only already-scanned
+    /// Javas (no probing at details-fetch time). Returns false when there is no
+    /// override, no requirement, or the override's Java can't be identified
+    /// cheaply — a Path override to an unscanned binary is left for the
+    /// launch-time warning rather than probed here.
+    async fn java_override_mismatch(
+        &self,
+        java_override: &Option<info::JavaOverride>,
+        required_profile: Option<SystemJavaProfileName>,
+    ) -> bool {
+        let (Some(required), Some(java_override)) = (required_profile, java_override) else {
+            return false;
+        };
+
+        let resolved_version = match java_override {
+            info::JavaOverride::Path(Some(path)) => {
+                let Ok(all) = self.app.java_manager().get_available_javas().await else {
+                    return false;
+                };
+                all.values()
+                    .flatten()
+                    .find(|java| java.component.path == *path)
+                    .map(|java| java.component.version.clone())
+            }
+            info::JavaOverride::Profile(Some(name)) => {
+                let java_manager = self.app.java_manager();
+                let (Ok(profiles), Ok(all)) = (
+                    java_manager.get_java_profiles().await,
+                    java_manager.get_available_javas().await,
+                ) else {
+                    return false;
+                };
+                profiles
+                    .iter()
+                    .find(|profile| profile.name == *name)
+                    .and_then(|profile| profile.java_id.as_ref())
+                    .and_then(|java_id| all.values().flatten().find(|java| java.id == *java_id))
+                    .map(|java| java.component.version.clone())
+            }
+            _ => None,
+        };
+
+        resolved_version
+            .map(|version| !required.is_java_version_compatible(&version))
+            .unwrap_or(false)
+    }
+
     pub async fn instance_details(
         self,
         instance_id: InstanceId,
@@ -2543,24 +2591,22 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             mc_manifest = manifest.ok();
         }
 
-        let required_java_profile = mc_version.clone().and_then(|version| {
-            let Some(manifest) = mc_manifest else {
-                return None;
-            };
-            let java = manifest
+        let required_java_profile_name = mc_version.clone().and_then(|version| {
+            let manifest = mc_manifest.as_ref()?;
+            let required_java = manifest
                 .versions
                 .iter()
                 .find(|profile| profile.id == version)
-                .and_then(|version| version.java_profile.clone());
+                .and_then(|version| version.java_profile.clone())?;
 
-            let Some(required_java) = java else {
-                return None;
-            };
-
-            SystemJavaProfileName::try_from(required_java)
-                .map(|v| v.to_string())
-                .ok()
+            SystemJavaProfileName::try_from(required_java).ok()
         });
+        let required_java_profile = required_java_profile_name.as_ref().map(|v| v.to_string());
+
+        let java_override = instance.config.game_configuration.java_override.clone();
+        let java_override_mismatch = self
+            .java_override_mismatch(&java_override, required_java_profile_name)
+            .await;
 
         Ok(domain::InstanceDetails {
             id: instance_id,
@@ -2586,8 +2632,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 Some(info::GameVersion::Custom(_)) => Vec::new(), // todo
                 None => Vec::new(),
             },
-            java_override: instance.config.game_configuration.java_override.clone(),
+            java_override,
             required_java_profile,
+            java_override_mismatch,
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
             icon_revision,

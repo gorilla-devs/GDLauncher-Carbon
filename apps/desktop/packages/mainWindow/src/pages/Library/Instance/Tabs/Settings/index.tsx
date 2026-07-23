@@ -434,6 +434,20 @@ const Settings = () => {
             </div>
           </Match>
         </SolidSwitch>
+        <Show when={routeData?.instanceDetails?.data?.javaOverrideMismatch}>
+          <div class="mt-2 flex items-start gap-2 text-yellow-500">
+            <div class="i-hugeicons:alert-02 mt-0.5 h-4 w-4 shrink-0" />
+            <p class="m-0 text-sm">
+              <Trans
+                key="java:_trn_instance_settings.java_override_mismatch"
+                options={{
+                  defaultValue:
+                    "The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management."
+                }}
+              />
+            </p>
+          </div>
+        </Show>
       </Show>
       <Row>
         <Title>
