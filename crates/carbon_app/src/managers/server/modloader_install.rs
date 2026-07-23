@@ -631,8 +631,10 @@ pub async fn existing_install_launch_config(
     }
 }
 
-/// Name of the Forge/NeoForge argument file for the current platform.
-fn platform_args_file_name() -> &'static str {
+/// Name of the Forge/NeoForge argument file for the current platform. Shared
+/// with `modpack`'s pack-detection scan so it requires the same evidence
+/// (the argfile actually present) that the launch-time lookup does.
+pub(crate) fn platform_args_file_name() -> &'static str {
     if cfg!(windows) {
         "win_args.txt"
     } else {
