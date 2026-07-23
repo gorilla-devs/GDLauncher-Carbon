@@ -165,13 +165,13 @@ const Installing = (props: StepProps) => {
     }
 
     if (destroyed()) return
-    props.data.onComplete?.(lastTaskId)
+    props.complete(lastTaskId)
     modalsContext?.closeModal()
   }
 
   const cancel = () => {
     setShaderInstallRunning(false)
-    props.data.onComplete?.(null)
+    props.complete(null)
     modalsContext?.closeModal()
   }
 

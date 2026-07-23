@@ -1,4 +1,4 @@
-import { createSignal, Match, Switch } from "solid-js"
+import { createSignal, Match, Switch, onCleanup } from "solid-js"
 import type {
   ShaderRecommendation,
   ModSource,
@@ -31,6 +31,10 @@ export interface StepProps {
   setStep: (step: WizardStep) => void
   setInstallPlan: (plan: InstallPlan) => void
   installPlan: () => InstallPlan
+  // Signals completion exactly once. Steps call this instead of
+  // `data.onComplete` directly so the owner's loading state is always cleared,
+  // including when the modal is dismissed via Escape or a backdrop click.
+  complete: (taskId: number | null) => void
 }
 
 const Intro = (props: StepProps) => {
@@ -48,7 +52,7 @@ const Intro = (props: StepProps) => {
   }
 
   const cancel = () => {
-    props.data.onComplete?.(null)
+    props.complete(null)
     modalsContext?.closeModal()
   }
 
@@ -111,6 +115,17 @@ const ShaderLoaderSetup = (props: ModalProps) => {
 
   const data = (): ShaderLoaderSetupData => props?.data
 
+  // Notify the owner exactly once, whatever closes the modal. A backdrop click
+  // or Escape unmounts this component without running the Cancel/Install
+  // handlers, so onCleanup is what guarantees the owner's loading state clears.
+  let completed = false
+  const complete = (taskId: number | null) => {
+    if (completed) return
+    completed = true
+    data().onComplete?.(taskId)
+  }
+  onCleanup(() => complete(null))
+
   return (
     <ModalLayout
       noHeader={currentStep() === "installing"}
@@ -121,6 +136,7 @@ const ShaderLoaderSetup = (props: ModalProps) => {
         <Match when={currentStep() === "intro"}>
           <Intro
             data={data()}
+            complete={complete}
             setStep={setCurrentStep}
             setInstallPlan={setInstallPlan}
             installPlan={installPlan}
@@ -129,6 +145,7 @@ const ShaderLoaderSetup = (props: ModalProps) => {
         <Match when={currentStep() === "installing"}>
           <Installing
             data={data()}
+            complete={complete}
             setStep={setCurrentStep}
             setInstallPlan={setInstallPlan}
             installPlan={installPlan}
