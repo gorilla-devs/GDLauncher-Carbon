@@ -136,6 +136,16 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                   <div class="mt-4 text-base opacity-80">
                     {migrationError()}
                   </div>
+                  <Button
+                    type="secondary"
+                    class="mt-6"
+                    onClick={() => {
+                      setMigrationError(undefined)
+                      modalsContext?.closeModal()
+                    }}
+                  >
+                    <Trans key="general:_trn_dismiss" />
+                  </Button>
                 </div>
               </Match>
               <Match when={!migrationError()}>

@@ -2,7 +2,7 @@ import { ModRowProps } from "@/utils/mods"
 import { formatDownloadCount } from "@/utils/helpers"
 import { Trans } from "@gd/i18n"
 import { Badge } from "@gd/ui"
-import { formatDistanceToNowStrict } from "date-fns"
+import { safeFormatDistanceToNowStrict } from "@/utils/date"
 import { For, Match, Show, Switch, createMemo } from "solid-js"
 import { useGlobalStore } from "../GlobalStoreContext"
 
@@ -121,8 +121,8 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
                 <Trans
                   key="content:_trn_modpack.last_updated_time"
                   options={{
-                    time: formatDistanceToNowStrict(
-                      new Date(props.data.data.lastUpdated).getTime()
+                    time: safeFormatDistanceToNowStrict(
+                      props.data.data.lastUpdated
                     )
                   }}
                 />
@@ -138,8 +138,8 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
                 <Trans
                   key="content:_trn_modpack.release_date_time"
                   options={{
-                    time: formatDistanceToNowStrict(
-                      new Date(props.data.data.releaseDate).getTime()
+                    time: safeFormatDistanceToNowStrict(
+                      props.data.data.releaseDate
                     )
                   }}
                 />

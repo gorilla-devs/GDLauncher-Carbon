@@ -3,7 +3,8 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { For, Show } from "solid-js"
 import useInstanceData from "./instance.data"
 import { useParams } from "@solidjs/router"
-import { format, formatDuration, intervalToDuration } from "date-fns"
+import { formatDuration, intervalToDuration } from "date-fns"
+import { safeFormat } from "@/utils/date"
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner"
 import { apiUrl } from "@/utils/rspcClient"
 import { Button } from "@gd/ui"
@@ -92,10 +93,7 @@ const Overview = () => {
         <Show when={routeData.instanceDetails.data?.lastPlayed}>
           <Card
             title={t("instances:_trn_overview_card_last_played_title")}
-            text={format(
-              new Date(routeData.instanceDetails.data?.lastPlayed!),
-              "PPP"
-            )}
+            text={safeFormat(routeData.instanceDetails.data?.lastPlayed!, "PPP")}
             icon="sign"
             class="flex-1"
           />

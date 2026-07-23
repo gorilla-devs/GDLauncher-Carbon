@@ -1,6 +1,6 @@
 import { Trans } from "@gd/i18n"
 import { Show } from "solid-js"
-import { format } from "date-fns"
+import { safeFormat } from "@/utils/date"
 import { CFFEFile } from "@gd/core_module/bindings"
 
 interface Props {
@@ -49,7 +49,7 @@ const Version = (props: Props) => {
                   {props.version.gameVersions[0]}
                   <div class="bg-darkSlate-300 h-2 w-px" />
                   <p class="text-darkSlate-300 text-md m-0">
-                    {format(new Date(props.version.fileDate), "dd-MM-yyyy")}
+                    {safeFormat(props.version.fileDate, "dd-MM-yyyy")}
                   </p>
                   <div class="bg-darkSlate-300 h-2 w-px" />
                   <span class={getColor(props.version.releaseType)}>

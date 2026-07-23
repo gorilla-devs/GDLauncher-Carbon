@@ -1,7 +1,7 @@
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button } from "@gd/ui"
+import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -24,6 +24,23 @@ const ConfirmMsWithGDLAccountRemoval = (props: ModalProps) => {
     mutationKey: ["account.deleteAccount"]
   }))
 
+  const confirmRemoval = async () => {
+    try {
+      await deleteAccountMutation.mutateAsync(data().uuid)
+      modalsContext?.closeModal()
+
+      if (accountsLength() === 1) {
+        navigator.navigate("/")
+      }
+    } catch {
+      // Leave the modal open so the user can retry instead of silently
+      // losing the request to an unhandled rejection.
+      toast.error("Request Failed", {
+        description: "Unable to remove the account. Please try again later."
+      })
+    }
+  }
+
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -37,6 +54,7 @@ const ConfirmMsWithGDLAccountRemoval = (props: ModalProps) => {
         </div>
         <div class="flex w-full justify-between">
           <Button
+            disabled={deleteAccountMutation.isPending}
             onClick={() => {
               modalsContext?.closeModal()
             }}
@@ -45,14 +63,8 @@ const ConfirmMsWithGDLAccountRemoval = (props: ModalProps) => {
           </Button>
           <Button
             type="secondary"
-            onClick={async () => {
-              await deleteAccountMutation.mutateAsync(data().uuid)
-              modalsContext?.closeModal()
-
-              if (accountsLength() === 1) {
-                navigator.navigate("/")
-              }
-            }}
+            loading={deleteAccountMutation.isPending}
+            onClick={confirmRemoval}
           >
             {t("accounts:_trn_confirm_removal")}
           </Button>

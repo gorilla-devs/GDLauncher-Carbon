@@ -112,8 +112,11 @@ export const useServerAddonMutations = (
   }
 
   const gotoSearchPage = () => {
+    // Servers only ever allow ["mod", "datapack"] (modded) or ["datapack"]
+    // (vanilla) — see allowedAddonTypes() in utils/platformSearch.ts. "shader"
+    // is never a valid tab for a server.
     const hasModloader = !!serverDetails.data?.modloaderType
-    const target = hasModloader ? "mod" : "shader"
+    const target = hasModloader ? "mod" : "datapack"
     navigator.navigate(`/search/${target}?serverId=${params.id}`)
   }
 
