@@ -1,0 +1,469 @@
+---
+import type { GetStaticPaths } from "astro"
+import GuideLayout from "../../../components/GuideLayout.astro"
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  type Locale,
+  localizeInternalLinks,
+} from "../../../lib/i18n"
+
+export const getStaticPaths: GetStaticPaths = () =>
+  LOCALES
+    .filter((loc) => loc !== DEFAULT_LOCALE)
+    .map((loc) => ({ params: { locale: loc } }))
+
+const { locale } = Astro.params as { locale: Exclude<Locale, "en"> }
+
+interface Step { name: string; text: string }
+interface Meta { title: string; description: string; steps: Step[]; body: string }
+
+const meta: Record<Exclude<Locale, "en">, Meta> = {
+  ja: {
+    title: "PC を初期化する前に GDLauncher をバックアップする方法",
+    description: "フォーマットや新しい PC への移行の前に GDLauncher のデータ (インスタンス、ワールド、アカウント、Java、設定) をバックアップし、進行状況を失わずに復元する手順。",
+    steps: [
+      { name: "Runtime Path を確認", text: "GDLauncher を開き Settings → Runtime Path。入力欄のパスをコピー。そのフォルダーにインスタンス、ワールド、Java、ランチャーデータベース、アカウントが入っています。バックアップが必要なのはこれ 1 つだけ。" },
+      { name: "GDLauncher を終了", text: "コピーの前に GDLauncher を完全に終了。SQLite データベースはランチャーが書き込んでいる最中にコピーすると壊れたコピーになることがあります。" },
+      { name: "Runtime Path フォルダーをコピー", text: "Runtime Path フォルダー全体をバックアップ先にコピー。外付けドライブ、USB メモリ、NAS、オフラインのクラウドアーカイブ、何でも構いません。フォルダー構造はそのまま保つこと。" },
+      { name: "コピーを検証", text: "コピー先のサイズが元と数 MB 以内で一致するか確認。インスタンスのサブフォルダーを 1 つ開き、プレースホルダーやショートカットではなく実ファイルとして読めることを確認。" }
+    ],
+    body: `<h2>実際にバックアップが必要なもの</h2>
+<p>フォルダー 1 つ、Runtime Path だけです。この中に全インスタンス (Mod、ワールド、config、スクリーンショット、ワールドデータ)、共有の Minecraft アセット、共有ライブラリ、GDLauncher がダウンロードした Java ランタイム、アカウントと設定が入ったランチャーの SQLite データベース (<code>gdl_conf.db</code>)、そして <code>__gdl_logs__/</code> のアプリ全体ログが揃っています。このフォルダーさえバックアップすれば、大事なものは全部残ります。</p>
+<p>Electron 自身のデータフォルダーは不要です。ウィンドウ位置や内部キャッシュなど、初回起動時にランチャーが作り直すものしか入っていません。省いても失うものはありません。</p>
+
+<h2>Runtime Path を見つける</h2>
+<p>一番簡単なのは GDLauncher を開いて <strong>Settings → Runtime Path</strong> のパスをコピーする方法です。移動したことがあってもなくても、これが唯一の正解です。</p>
+<p>GDLauncher が開けない場合 (ドライブが壊れている、OS が起動しないなど) のデフォルトの場所:</p>
+<ul>
+<li><strong>Windows</strong>: <code>%APPDATA%\\gdlauncher_carbon\\data</code> (Win+R かエクスプローラーのアドレスバーに貼り付け)。</li>
+<li><strong>macOS</strong>: <code>~/Library/Application Support/gdlauncher_carbon/data</code> (Finder で Cmd+Shift+G、貼り付けて Enter)。</li>
+<li><strong>Linux</strong>: <code>~/.local/share/gdlauncher_carbon/data</code> (<code>XDG_DATA_HOME</code> を設定しているなら <code>$XDG_DATA_HOME/gdlauncher_carbon/data</code>)。</li>
+</ul>
+<p>Settings から Runtime Path を移動したことがある場合、上のデフォルトフォルダーは存在しないか空で、その隣の <code>runtime_path_override</code> というファイルが実際の場所を指しています。テキストエディターで開けば、1 行だけ書かれた絶対パスが本当のデータの場所です。</p>
+
+<h2>バックアップの手順</h2>
+<p>まず GDLauncher を終了します。Runtime Path の SQLite データベースはランチャーが閉じていれば安全にコピーできますが、書き込み中につかむと壊れたコピーができることがあります。</p>
+<p>あとは Runtime Path フォルダーを構造ごとバックアップ先にコピーするだけ。別のドライブ、USB メモリ、NAS、オフラインのクラウドアーカイブ、どこでも構いません。これから消すドライブの上でなければ大丈夫です。</p>
+
+<h2>初期化後に復元する</h2>
+<p>新しい OS の上で:</p>
+<ol>
+<li>GDLauncher をインストール。一度起動して閉じます。これでデフォルトのフォルダーが作られます。</li>
+<li>バックアップした Runtime Path フォルダーを新環境の最終的な場所にコピー。前と同じドライブ / パスでも、別の場所 (大きいドライブなど) でも構いません。</li>
+<li>GDLauncher を再度開き <strong>Settings → Runtime Path</strong> で今コピーしたフォルダーを指定。有効な GDLauncher データが既に入っているフォルダーを指定すると、ランチャーがそれを検出してコピーも重複もせずに切り替えます。</li>
+<li>ランチャーを再起動。インスタンス、アカウント、設定、Java インストールがすべて戻っています。</li>
+</ol>
+
+<h2>バックアップに含まれるもの・含まれないもの</h2>
+<p><strong>Runtime Path のバックアップで残るもの:</strong></p>
+<ul>
+<li>全インスタンス: Mod、config、セーブしたワールド、スクリーンショット、リソースパック、シェーダーパック、データパック。</li>
+<li>サインイン済みの Microsoft アカウント (トークンごとランチャーのデータベースに保存)。初回起動でリフレッシュが走ることはありますが、サインインし直す必要はありません。</li>
+<li>設定: テーマ、言語、デフォルトの Java 引数、デフォルトメモリ、Runtime Path 自体。</li>
+<li>GDLauncher がダウンロードした Java インストール。これは省いて初回起動時に再ダウンロードさせても構いません。バックアップは速くなり、代わりに一度だけダウンロードが発生します。</li>
+<li>アプリ全体ログとインスタンスごとのログ。</li>
+</ul>
+<p><strong>残らないもの (そして必要ないもの):</strong></p>
+<ul>
+<li>Electron のウィンドウ状態 (サイズ、位置)。ランチャーが新しいデフォルトを選ぶだけです。</li>
+<li>OS のキーチェーンのエントリ。GDLauncher はアカウントを自前の DB で管理しています。</li>
+</ul>
+
+<h2>空き容量が足りないときの最小構成</h2>
+<p>Runtime Path 全体が入らない場合は <code>&lt;runtime_path&gt;/instances/</code> と <code>&lt;runtime_path&gt;/gdl_conf.db</code> だけをコピーしてください。instances にワールドと config が、データベースにアカウントと設定が入っています。キャッシュされた Minecraft アセット、ライブラリ、Java インストールは失われますが、これらは初回起動で再ダウンロードされます。</p>
+<p>本当に最低限で済ませるなら、各インスタンスの <code>instance/saves/</code> サブフォルダーだけをコピー。これはワールドファイルだけです。インスタンスの構成 (Mod リスト、バージョン、Mod ローダー) は失われますが、ワールドデータは残り、あとから新規作成したインスタンスに読み込めます。</p>
+
+<h2>初期化だけでなくドライブや PC も変える場合</h2>
+<p>バックアップは同じで、復元先が新しいマシンになるだけです。GDLauncher の Runtime Path データは同じ OS 系統の間ならそのまま移せます。Windows → Windows、Linux → Linux は直接動きます。Windows ↔ macOS ↔ Linux をまたぐ場合もワールド、config、リソースパック、ほとんどの Mod は動きますが、Java は OS ごとにバイナリが違うため再検出され、ネイティブライブラリが初回起動で再ダウンロードされることがあります。</p>
+<p>関連: 手動コピーではなくアプリ内でデータを移す方法は <a href="/guides/move-runtime-path">GDLauncher のデータを別のドライブに移す</a> を参照してください。</p>
+
+<h2>プレイ中に Runtime Path を同期しないこと</h2>
+<p>OneDrive、iCloud、Dropbox、Google Drive デスクトップなどは GDLauncher とファイルハンドルを奪い合います。復元後、これらが常時同期しているフォルダーの中に Runtime Path を置かないでください。「ファイルが使用中」エラーや、ときどきセーブの破損が起きます。Runtime Path は普通のローカルドライブに置き、バックアップは別途取ってください。</p>`
+  },
+  ko: {
+    title: "PC를 포맷하기 전에 GDLauncher를 백업하는 방법",
+    description: "포맷하거나 새 PC로 옮기기 전에 GDLauncher 데이터(인스턴스, 월드, 계정, Java, 설정)를 백업하고 진행 상황을 잃지 않고 복원하는 방법.",
+    steps: [
+      { name: "런타임 경로 확인", text: "GDLauncher를 열고 Settings → Runtime Path로 이동해 입력란의 경로를 복사하세요. 그 폴더에 인스턴스, 월드, Java, 런처 데이터베이스, 계정이 전부 들어 있습니다. 백업할 건 이거 하나뿐입니다." },
+      { name: "GDLauncher 종료", text: "복사 전에 GDLauncher를 완전히 종료하세요. SQLite 데이터베이스 같은 파일은 런처가 쓰고 있는 도중에 복사하면 손상된 사본이 될 수 있습니다." },
+      { name: "런타임 경로 폴더 복사", text: "런타임 경로 폴더 전체를 백업할 곳으로 복사하세요. 외장 드라이브, USB, NAS, 오프라인 클라우드 보관소 등 아무거나 괜찮습니다. 폴더 구조만 그대로 유지하세요." },
+      { name: "복사본 확인", text: "대상 폴더 용량이 원본과 몇 MB 이내로 일치하는지 확인하세요. 인스턴스 하위 폴더를 하나 열어 자리표시자나 바로가기가 아니라 실제로 읽을 수 있는 파일인지 확인합니다." }
+    ],
+    body: `<h2>실제로 백업해야 하는 것</h2>
+<p>폴더 하나, 런타임 경로면 됩니다. 그 안에 모든 인스턴스(모드, 세이브, 설정, 스크린샷, 월드 데이터), 공유 Minecraft 에셋, 공유 라이브러리, GDLauncher가 받아둔 Java 런타임, 계정과 설정이 담긴 런처 SQLite 데이터베이스(<code>gdl_conf.db</code>), 그리고 <code>__gdl_logs__/</code>의 앱 전역 로그가 들어 있습니다. 이 폴더만 백업하면 중요한 건 전부 챙긴 겁니다.</p>
+<p>Electron 자체 데이터 폴더는 백업할 필요 없습니다. 창 위치나 내부 캐시처럼 런처가 첫 실행 때 다시 만드는 것들만 들어 있어서, 빼도 잃는 게 없습니다.</p>
+
+<h2>런타임 경로 찾기</h2>
+<p>가장 쉬운 방법은 GDLauncher를 열고 <strong>Settings → Runtime Path</strong>에 표시된 경로를 복사하는 겁니다. 경로를 옮긴 적이 있든 없든 이게 기준입니다.</p>
+<p>GDLauncher가 아예 안 열린다면(드라이브 고장, OS 손상 등) 기본 위치는 다음과 같습니다:</p>
+<ul>
+<li><strong>Windows</strong>: <code>%APPDATA%\\gdlauncher_carbon\\data</code> (Win+R이나 탐색기 주소창에 붙여넣기).</li>
+<li><strong>macOS</strong>: <code>~/Library/Application Support/gdlauncher_carbon/data</code> (Finder에서 Cmd+Shift+G, 붙여넣고 Enter).</li>
+<li><strong>Linux</strong>: <code>~/.local/share/gdlauncher_carbon/data</code> (<code>XDG_DATA_HOME</code>을 설정했다면 <code>$XDG_DATA_HOME/gdlauncher_carbon/data</code>).</li>
+</ul>
+<p>Settings에서 런타임 경로를 옮긴 적이 있다면 위 기본 폴더는 없거나 비어 있고, 그 옆의 <code>runtime_path_override</code> 파일이 실제 위치를 가리킵니다. 아무 텍스트 편집기로 열면 한 줄짜리 절대 경로가 진짜 데이터 위치입니다.</p>
+
+<h2>백업하기</h2>
+<p>먼저 GDLauncher를 종료하세요. 런타임 경로의 SQLite 데이터베이스는 런처가 닫혀 있으면 안전하게 복사되지만, 쓰는 중에 가져가면 손상된 사본이 나올 수 있습니다.</p>
+<p>그다음 런타임 경로 폴더를 구조 그대로 원하는 백업 위치로 복사하세요. 다른 드라이브, USB, NAS, 오프라인 클라우드 보관소 어디든 상관없습니다. 곧 지울 그 드라이브만 아니면 됩니다.</p>
+
+<h2>포맷 후 복원하기</h2>
+<p>새로 설치한 OS에서:</p>
+<ol>
+<li>GDLauncher를 설치하고 한 번 실행했다가 닫습니다. 기본 폴더가 만들어집니다.</li>
+<li>백업해둔 런타임 경로 폴더를 새 시스템의 최종 위치로 복사합니다. 예전과 같은 드라이브/경로여도 되고, 더 큰 드라이브 같은 새 위치여도 됩니다.</li>
+<li>GDLauncher를 다시 열고 <strong>Settings → Runtime Path</strong>에서 방금 복원한 폴더를 지정합니다. 이미 유효한 GDLauncher 데이터가 있는 폴더를 지정하면 런처가 이를 감지해 복사나 중복 없이 그대로 전환합니다.</li>
+<li>런처를 재시작합니다. 인스턴스, 계정, 설정, Java 설치가 모두 돌아와 있습니다.</li>
+</ol>
+
+<h2>백업에 포함되는 것과 아닌 것</h2>
+<p><strong>런타임 경로를 백업하면 보존되는 것:</strong></p>
+<ul>
+<li>모든 인스턴스: 모드, 설정, 저장된 월드, 스크린샷, 리소스팩, 셰이더팩, 데이터팩.</li>
+<li>로그인된 Microsoft 계정(토큰과 함께 런처 데이터베이스에 저장). 첫 실행에서 갱신이 필요할 수 있지만 다시 로그인할 필요는 없습니다.</li>
+<li>설정: 테마, 언어, 기본 Java 인자, 기본 메모리, 런타임 경로 자체.</li>
+<li>GDLauncher가 받아둔 Java 설치본. 이건 빼고 첫 실행 때 다시 받게 해도 됩니다. 백업은 빨라지고 대신 한 번 다운로드가 발생합니다.</li>
+<li>앱 전역 로그와 인스턴스별 로그.</li>
+</ul>
+<p><strong>보존되지 않는 것(그리고 필요 없는 것):</strong></p>
+<ul>
+<li>Electron 창 상태(크기, 위치). 런처가 새 기본값을 고를 뿐입니다.</li>
+<li>OS 키체인 항목. GDLauncher는 계정을 자체 DB로 관리합니다.</li>
+</ul>
+
+<h2>공간이 부족할 때의 최소 백업</h2>
+<p>런타임 경로 전체가 안 들어가면 <code>&lt;runtime_path&gt;/instances/</code>와 <code>&lt;runtime_path&gt;/gdl_conf.db</code>만 복사하세요. instances에는 월드와 설정이, 데이터베이스에는 계정과 설정이 들어 있습니다. 캐시된 Minecraft 에셋, 라이브러리, Java 설치본은 잃지만 이건 첫 실행에서 다시 받습니다.</p>
+<p>정말 최소한만 챙기려면 각 인스턴스의 <code>instance/saves/</code> 하위 폴더만 복사하세요. 월드 파일만 남습니다. 인스턴스 구성(모드 목록, 버전, 모드로더)은 잃지만 월드 데이터는 살아남아 나중에 새로 만든 인스턴스에 넣을 수 있습니다.</p>
+
+<h2>포맷만이 아니라 드라이브나 PC까지 바꾸는 경우</h2>
+<p>백업은 똑같고 복원만 새 기기에서 하면 됩니다. GDLauncher의 런타임 데이터는 같은 OS 계열끼리는 그대로 옮겨집니다. Windows → Windows, Linux → Linux는 바로 됩니다. Windows ↔ macOS ↔ Linux를 넘나드는 경우에도 월드, 설정, 리소스팩, 대부분의 모드는 그대로 쓰이지만, Java는 OS마다 바이너리가 달라 다시 감지되고 네이티브 라이브러리는 첫 실행에서 다시 받을 수 있습니다.</p>
+<p>참고: 수동 복사 대신 앱 안에서 데이터를 옮기는 방법은 <a href="/guides/move-runtime-path">GDLauncher의 데이터를 다른 드라이브로 옮기기</a> 문서를 보세요.</p>
+
+<h2>플레이 중에 런타임 경로를 동기화하지 마세요</h2>
+<p>OneDrive, iCloud, Dropbox, Google Drive 데스크톱 등은 GDLauncher와 파일 핸들을 두고 경쟁합니다. 복원한 뒤 이런 도구가 활발히 동기화하는 폴더 안에 런타임 경로를 두지 마세요. "파일이 사용 중" 오류와 간헐적인 세이브 손상이 생깁니다. 런타임 경로는 평범한 로컬 드라이브에 두고 백업은 따로 하세요.</p>`
+  },
+  de: {
+    title: "Alle GDLauncher-Daten vor dem Formatieren des PCs sichern",
+    description: "Sichere alle GDLauncher-Daten (Instanzen, Welten, Accounts, Java, Einstellungen) vor einer Formatierung oder einem PC-Wechsel und stelle sie ohne Fortschrittsverlust wieder her.",
+    steps: [
+      { name: "Runtime Path finden", text: "Öffne GDLauncher und geh zu Settings → Runtime Path. Kopier den Pfad aus dem Eingabefeld. In diesem Ordner liegen deine Instanzen, Welten, Java, die Launcher-Datenbank und deine Accounts. Mehr musst du nicht sichern." },
+      { name: "GDLauncher schließen", text: "Beende GDLauncher komplett, bevor du kopierst. Dateien wie die SQLite-Datenbank können beim Kopieren beschädigt werden, wenn der Launcher gleichzeitig hineinschreibt." },
+      { name: "Runtime-Path-Ordner kopieren", text: "Kopier den kompletten Runtime-Path-Ordner dorthin, wo das Backup liegen soll: externe Festplatte, USB-Stick, NAS, Offline-Cloud-Archiv, was auch immer du hast. Lass die Ordnerstruktur unverändert." },
+      { name: "Kopie prüfen", text: "Vergleich die Größe am Ziel mit der Quelle, ein paar MB Abweichung sind normal. Öffne einen der Instanz-Unterordner und stell sicher, dass die Dateien lesbar sind und keine Platzhalter oder Verknüpfungen." }
+    ],
+    body: `<h2>Was du wirklich sichern musst</h2>
+<p>Ein einziger Ordner: der Runtime Path. Darin steckt jede Instanz (mit Mods, Welten, Configs, Screenshots, Weltdaten), die gemeinsamen Minecraft-Assets, die gemeinsamen Libraries, die von GDLauncher heruntergeladenen Java-Runtimes, die SQLite-Datenbank des Launchers (<code>gdl_conf.db</code>) mit deinen Accounts und Einstellungen sowie die app-weiten Logs unter <code>__gdl_logs__/</code>. Sicher diesen Ordner und du hast alles, worauf es ankommt.</p>
+<p>Electrons eigenen Datenordner brauchst du nicht. Da liegt nur, was der Launcher beim ersten Start ohnehin neu anlegt: Fensterposition, interne Caches, solche Sachen. Ihn wegzulassen kostet dich nichts.</p>
+
+<h2>Den Runtime Path finden</h2>
+<p>Am einfachsten: GDLauncher öffnen, zu <strong>Settings → Runtime Path</strong> gehen und den angezeigten Pfad kopieren. Das ist die verlässliche Quelle, egal ob du ihn je verschoben hast oder nicht.</p>
+<p>Falls GDLauncher nicht mehr startet (sterbende Festplatte, kaputtes System), sind das die Standardorte:</p>
+<ul>
+<li><strong>Windows</strong>: <code>%APPDATA%\\gdlauncher_carbon\\data</code> (in Win+R oder die Adresszeile des Explorers einfügen).</li>
+<li><strong>macOS</strong>: <code>~/Library/Application Support/gdlauncher_carbon/data</code> (Finder → Cmd+Shift+G, einfügen, Enter).</li>
+<li><strong>Linux</strong>: <code>~/.local/share/gdlauncher_carbon/data</code> (oder <code>$XDG_DATA_HOME/gdlauncher_carbon/data</code>, falls du <code>XDG_DATA_HOME</code> gesetzt hast).</li>
+</ul>
+<p>Hast du den Runtime Path irgendwann über die Settings verschoben, ist der Standardordner oben leer oder gar nicht da, und eine Datei namens <code>runtime_path_override</code> daneben zeigt auf den echten Ort. Öffne sie mit einem beliebigen Texteditor: die einzelne Zeile darin ist der absolute Pfad zu deinen Runtime-Daten.</p>
+
+<h2>Das Backup anlegen</h2>
+<p>Schließ zuerst GDLauncher. Die SQLite-Datenbank im Runtime Path lässt sich gefahrlos kopieren, solange der Launcher zu ist, kann aber eine beschädigte Kopie ergeben, wenn du sie mitten im Schreiben greifst.</p>
+<p>Dann kopier den Runtime-Path-Ordner mit unveränderter Struktur dorthin, wo das Backup liegen soll. Andere Festplatte, USB-Stick, NAS, Offline-Cloud-Archiv, das Ziel ist egal, solange es nicht das Laufwerk ist, das du gleich löschst.</p>
+
+<h2>Nach dem Formatieren wiederherstellen</h2>
+<p>Auf dem frischen System:</p>
+<ol>
+<li>Installier GDLauncher. Einmal starten und wieder schließen, damit die Standardordner angelegt werden.</li>
+<li>Kopier deinen gesicherten Runtime-Path-Ordner an seinen endgültigen Platz auf dem neuen System. Gern derselbe Pfad wie vorher, gern auch ein neuer (zum Beispiel eine größere Platte).</li>
+<li>Öffne GDLauncher wieder. Geh zu <strong>Settings → Runtime Path</strong> und zeig auf den gerade wiederhergestellten Ordner. Enthält der Zielordner bereits gültige GDLauncher-Daten, erkennt der Launcher das und schaltet um, ohne irgendetwas zu kopieren oder zu duplizieren.</li>
+<li>Launcher neu starten. Instanzen, Accounts, Einstellungen und Java-Installationen sind alle wieder da.</li>
+</ol>
+
+<h2>Was im Backup steckt und was nicht</h2>
+<p><strong>Bleibt erhalten, wenn du den Runtime Path sicherst:</strong></p>
+<ul>
+<li>Jede Instanz: Mods, Configs, gespeicherte Welten, Screenshots, Resource Packs, Shader Packs, Datapacks.</li>
+<li>Angemeldete Microsoft-Accounts (samt Tokens in der Launcher-Datenbank). Beim ersten Start werden sie eventuell neu aktualisiert, anmelden musst du dich aber nicht noch mal.</li>
+<li>Einstellungen: Theme, Sprache, Standard-Java-Argumente, Standardspeicher, der Runtime Path selbst.</li>
+<li>Von GDLauncher heruntergeladene Java-Installationen. Die kannst du auch weglassen und beim ersten Start neu laden lassen: schnelleres Backup gegen einen einmaligen Download.</li>
+<li>App-weite und instanzbezogene Logs.</li>
+</ul>
+<p><strong>Bleibt nicht erhalten (und brauchst du auch nicht):</strong></p>
+<ul>
+<li>Electron-Fensterzustand (Größe, Position). Der Launcher nimmt einfach neue Standardwerte.</li>
+<li>Einträge im System-Schlüsselbund, GDLauncher verwaltet Accounts in seiner eigenen Datenbank.</li>
+</ul>
+
+<h2>Minimal-Backup, wenn der Platz knapp ist</h2>
+<p>Passt der komplette Runtime Path nicht, kopier nur <code>&lt;runtime_path&gt;/instances/</code> und <code>&lt;runtime_path&gt;/gdl_conf.db</code>. In instances liegen deine Welten und Configs, in der Datenbank deine Accounts und Einstellungen. Die zwischengespeicherten Minecraft-Assets, Libraries und Java-Installationen sind dann weg, die lädt der Launcher beim ersten Start aber neu.</p>
+<p>Als absolute Untergrenze kopier von jeder Instanz nur den Unterordner <code>instance/saves/</code>. Das sind bloß deine Weltdateien. Die Instanzkonfiguration (Modliste, Version, Modloader) ist damit weg, die Weltdaten überleben aber und lassen sich später in eine frisch erstellte Instanz legen.</p>
+
+<h2>Wenn du nicht nur formatierst, sondern auch Laufwerk oder PC wechselst</h2>
+<p>Gleiches Backup, Wiederherstellung eben auf der neuen Maschine. Die Runtime-Daten von GDLauncher wandern innerhalb derselben Betriebssystemfamilie problemlos. Windows → Windows oder Linux → Linux geht direkt. Über Windows ↔ macOS ↔ Linux hinweg funktionieren Welten, Configs, Resource Packs und die meisten Mods weiterhin, der Launcher erkennt Java aber neu (andere Binaries pro System) und lädt beim ersten Start eventuell native Libraries nach.</p>
+<p>Siehe auch: <a href="/guides/move-runtime-path">GDLauncher-Daten auf ein anderes Laufwerk verschieben</a> für den Weg über die App statt manuellem Kopieren.</p>
+
+<h2>Synchronisier den Runtime Path nicht beim Spielen</h2>
+<p>OneDrive, iCloud, Dropbox, Google Drive Desktop und Co. streiten sich mit GDLauncher um Datei-Handles. Leg den Runtime Path nach der Wiederherstellung nicht in einen Ordner, den diese Tools aktiv synchronisieren, sonst bekommst du "Datei in Benutzung"-Fehler und gelegentlich beschädigte Spielstände. Halte den Runtime Path auf einer normalen lokalen Platte und sichere ihn separat.</p>`
+  },
+  fr: {
+    title: "Comment sauvegarder GDLauncher avant de formater son PC",
+    description: "Sauvegarde toutes les données GDLauncher (instances, mondes, comptes, Java, paramètres) avant un formatage ou un changement de machine, puis restaure-les sans perdre de progression.",
+    steps: [
+      { name: "Trouver le runtime path", text: "Ouvre GDLauncher et va dans Settings → Runtime Path. Copie le chemin affiché dans le champ. Ce dossier contient tes instances, tes mondes, Java, la base de données du launcher et tes comptes. C'est la seule chose à sauvegarder." },
+      { name: "Fermer GDLauncher", text: "Quitte complètement GDLauncher avant de copier. Des fichiers comme la base SQLite peuvent se corrompre en cours de copie si le launcher est en train d'écrire dedans." },
+      { name: "Copier le dossier runtime path", text: "Copie l'intégralité du dossier runtime path là où tu gardes ta sauvegarde : disque externe, clé USB, NAS, archive cloud hors ligne, ce que tu as sous la main. Garde juste la structure des dossiers intacte." },
+      { name: "Vérifier la copie", text: "Vérifie que la taille à destination correspond à la source à quelques Mo près. Ouvre un des sous-dossiers d'instance pour confirmer que les fichiers sont bien lisibles, et pas des espaces réservés ou des raccourcis." }
+    ],
+    body: `<h2>Ce qu'il faut vraiment sauvegarder</h2>
+<p>Un seul dossier : le runtime path. Dedans se trouvent toutes les instances (avec leurs mods, mondes, configs, captures, données de monde), les assets Minecraft partagés, les libraries partagées, les runtimes Java téléchargés par GDLauncher, la base SQLite du launcher (<code>gdl_conf.db</code>) avec tes comptes et paramètres, et les logs globaux dans <code>__gdl_logs__/</code>. Sauvegarde ce dossier et tu as tout ce qui compte.</p>
+<p>Pas besoin de sauvegarder le dossier de données d'Electron. Il ne contient que ce que le launcher recrée au premier lancement : position de la fenêtre, caches internes, ce genre de choses. Le laisser de côté ne te coûte rien.</p>
+
+<h2>Trouver ton runtime path</h2>
+<p>Le plus simple : ouvre GDLauncher, va dans <strong>Settings → Runtime Path</strong> et copie le chemin affiché. C'est la source de vérité, que tu l'aies déjà déplacé ou non.</p>
+<p>Si GDLauncher refuse de s'ouvrir (disque mourant, système cassé), voici les emplacements par défaut :</p>
+<ul>
+<li><strong>Windows</strong> : <code>%APPDATA%\\gdlauncher_carbon\\data</code> (à coller dans Win+R ou dans la barre d'adresse de l'Explorateur).</li>
+<li><strong>macOS</strong> : <code>~/Library/Application Support/gdlauncher_carbon/data</code> (Finder → Cmd+Maj+G, colle, Entrée).</li>
+<li><strong>Linux</strong> : <code>~/.local/share/gdlauncher_carbon/data</code> (ou <code>$XDG_DATA_HOME/gdlauncher_carbon/data</code> si tu as défini <code>XDG_DATA_HOME</code>).</li>
+</ul>
+<p>Si tu as déjà déplacé le runtime path via les Settings, le dossier par défaut ci-dessus sera absent ou vide, et un fichier nommé <code>runtime_path_override</code> juste à côté pointe vers le vrai emplacement. Ouvre-le avec n'importe quel éditeur de texte : sa ligne unique est le chemin absolu de tes données.</p>
+
+<h2>Faire la sauvegarde</h2>
+<p>Ferme GDLauncher d'abord. La base SQLite du runtime path se copie sans risque launcher fermé, mais peut produire une copie corrompue si tu l'attrapes pendant une écriture.</p>
+<p>Ensuite copie le dossier runtime path, structure intacte, là où tu veux la sauvegarde. Autre disque, clé USB, NAS, archive cloud hors ligne, la destination importe peu tant que ce n'est pas le disque que tu t'apprêtes à effacer.</p>
+
+<h2>Restaurer après le formatage</h2>
+<p>Sur le système fraîchement installé :</p>
+<ol>
+<li>Installe GDLauncher. Lance-le une fois puis ferme-le, ça crée les dossiers par défaut.</li>
+<li>Copie ton dossier runtime path sauvegardé à son emplacement final sur le nouveau système. Le même disque et le même chemin qu'avant, ou ailleurs (un disque plus grand par exemple).</li>
+<li>Rouvre GDLauncher. Va dans <strong>Settings → Runtime Path</strong> et pointe-le sur le dossier que tu viens de restaurer. Quand tu vises un dossier qui contient déjà des données GDLauncher valides, le launcher le détecte et bascule dessus sans rien copier ni dupliquer.</li>
+<li>Redémarre le launcher. Tes instances, comptes, paramètres et installations Java sont tous de retour.</li>
+</ol>
+
+<h2>Ce qui est dans la sauvegarde et ce qui n'y est pas</h2>
+<p><strong>Préservé en sauvegardant le runtime path :</strong></p>
+<ul>
+<li>Toutes les instances : mods, configs, mondes sauvegardés, captures, resource packs, shader packs, datapacks.</li>
+<li>Les comptes Microsoft connectés (stockés dans la base du launcher, avec les tokens). Ils peuvent devoir se rafraîchir au premier lancement, mais tu n'auras pas à te reconnecter.</li>
+<li>Les paramètres : thème, langue, arguments Java par défaut, mémoire par défaut, le runtime path lui-même.</li>
+<li>Les installations Java téléchargées par GDLauncher. Tu peux les sauter et laisser GDLauncher les retélécharger au premier lancement : sauvegarde plus rapide contre un téléchargement unique.</li>
+<li>Les logs globaux et ceux de chaque instance.</li>
+</ul>
+<p><strong>Non préservé (et dont tu n'as pas besoin) :</strong></p>
+<ul>
+<li>L'état de la fenêtre Electron (taille, position). Le launcher repart simplement sur ses valeurs par défaut.</li>
+<li>Les entrées du trousseau système, GDLauncher gère les comptes dans sa propre base.</li>
+</ul>
+
+<h2>Sauvegarde minimale si tu manques de place</h2>
+<p>Si le runtime path complet ne rentre pas, copie seulement <code>&lt;runtime_path&gt;/instances/</code> et <code>&lt;runtime_path&gt;/gdl_conf.db</code>. instances contient tes mondes et tes configs, la base contient tes comptes et tes paramètres. Tu perdras les assets Minecraft, les libraries et les installations Java en cache, mais tout ça se retélécharge au premier lancement.</p>
+<p>Pour le strict minimum, copie le sous-dossier <code>instance/saves/</code> de chaque instance. Ce sont juste tes fichiers de monde. Tu perdras la configuration de l'instance (liste de mods, version, modloader) mais les mondes survivent et pourront être chargés plus tard dans une instance recréée.</p>
+
+<h2>Si tu changes aussi de disque ou de PC, pas seulement de système</h2>
+<p>Même sauvegarde, restauration sur la nouvelle machine. Les données runtime de GDLauncher se déplacent sans souci au sein d'une même famille d'OS. Windows → Windows ou Linux → Linux fonctionne directement. En passant de Windows ↔ macOS ↔ Linux, les mondes, configs, resource packs et la plupart des mods fonctionnent, mais le launcher redétectera Java (binaires différents selon l'OS) et pourra retélécharger des libraries natives au premier lancement.</p>
+<p>À voir aussi : <a href="/guides/move-runtime-path">Déplacer les données de GDLauncher sur un autre disque</a> pour la méthode intégrée, sans copier-coller manuel.</p>
+
+<h2>Ne synchronise pas le runtime path pendant que tu joues</h2>
+<p>OneDrive, iCloud, Dropbox, Google Drive desktop, etc. se disputent les handles de fichiers avec GDLauncher. Après la restauration, ne place pas le runtime path dans un dossier que ces outils synchronisent activement : tu auras des erreurs "fichier en cours d'utilisation" et des corruptions de sauvegarde occasionnelles. Garde le runtime path sur un disque local classique et sauvegarde-le séparément.</p>`
+  },
+  es: {
+    title: "Cómo hacer copia de seguridad de GDLauncher antes de formatear el PC",
+    description: "Guarda todos los datos de GDLauncher (instancias, mundos, cuentas, Java, ajustes) antes de formatear o cambiar de equipo, y restáuralos sin perder progreso.",
+    steps: [
+      { name: "Localiza tu runtime path", text: "Abre GDLauncher y ve a Settings → Runtime Path. Copia la ruta que aparece en el campo. Esa carpeta contiene tus instancias, mundos, Java, la base de datos del launcher y tus cuentas. Es lo único que necesitas respaldar." },
+      { name: "Cierra GDLauncher", text: "Cierra GDLauncher del todo antes de copiar. Archivos como la base de datos SQLite pueden corromperse a mitad de copia si el launcher está escribiendo en ellos al mismo tiempo." },
+      { name: "Copia la carpeta del runtime path", text: "Copia la carpeta del runtime path entera a donde vayas a guardar la copia: disco externo, USB, NAS, un archivo en la nube sin sincronización, lo que tengas. Solo mantén la estructura de carpetas intacta." },
+      { name: "Verifica la copia", text: "Comprueba que el tamaño del destino coincide con el del origen con unos pocos MB de margen. Abre una de las subcarpetas de instancia para confirmar que los archivos se leen de verdad, y no son marcadores o accesos directos." }
+    ],
+    body: `<h2>Qué necesitas respaldar de verdad</h2>
+<p>Una sola carpeta: el runtime path. Dentro está cada instancia (con sus mods, mundos, configs, capturas, datos de mundo), los assets compartidos de Minecraft, las libraries compartidas, los runtimes de Java que descargó GDLauncher, la base de datos SQLite del launcher (<code>gdl_conf.db</code>) con tus cuentas y ajustes, y los logs generales en <code>__gdl_logs__/</code>. Respalda esa carpeta y tienes todo lo que importa.</p>
+<p>No hace falta respaldar la carpeta de datos de Electron. Solo guarda cosas que el launcher reconstruye en el primer arranque: posición de la ventana, cachés internas y poco más. Saltártela no te cuesta nada.</p>
+
+<h2>Encontrar tu runtime path</h2>
+<p>Lo más fácil: abre GDLauncher, ve a <strong>Settings → Runtime Path</strong> y copia la ruta que muestra. Esa es la fuente de la verdad, lo hayas movido alguna vez o no.</p>
+<p>Si GDLauncher no abre (disco muriéndose, sistema roto), la ubicación por defecto es:</p>
+<ul>
+<li><strong>Windows</strong>: <code>%APPDATA%\\gdlauncher_carbon\\data</code> (pégalo en Win+R o en la barra de direcciones del Explorador).</li>
+<li><strong>macOS</strong>: <code>~/Library/Application Support/gdlauncher_carbon/data</code> (Finder → Cmd+Mayús+G, pega, Enter).</li>
+<li><strong>Linux</strong>: <code>~/.local/share/gdlauncher_carbon/data</code> (o <code>$XDG_DATA_HOME/gdlauncher_carbon/data</code> si tienes <code>XDG_DATA_HOME</code> configurado).</li>
+</ul>
+<p>Si alguna vez moviste el runtime path desde los ajustes, la carpeta por defecto de arriba estará vacía o no existirá, y un archivo llamado <code>runtime_path_override</code> junto a ella apunta a la ubicación real. Ábrelo con cualquier editor de texto: su única línea es la ruta absoluta de tus datos.</p>
+
+<h2>Hacer la copia</h2>
+<p>Cierra GDLauncher primero. La base SQLite del runtime path se copia sin riesgo con el launcher cerrado, pero puede darte una copia corrupta si la pillas mientras escribe.</p>
+<p>Luego copia la carpeta del runtime path, con su estructura intacta, a donde quieras la copia. Otro disco, un USB, un NAS, un archivo en la nube sin sincronizar: el destino da igual mientras no sea el disco que estás a punto de borrar.</p>
+
+<h2>Restaurar después del formateo</h2>
+<p>En el sistema recién instalado:</p>
+<ol>
+<li>Instala GDLauncher. Ábrelo una vez y ciérralo, así se crean las carpetas por defecto.</li>
+<li>Copia la carpeta del runtime path respaldada a su ubicación final en el sistema nuevo. Puede ser el mismo disco y ruta que antes, o un sitio distinto (un disco más grande, por ejemplo).</li>
+<li>Vuelve a abrir GDLauncher. Ve a <strong>Settings → Runtime Path</strong> y apúntalo a la carpeta que acabas de restaurar. Cuando apuntas a una carpeta que ya contiene datos válidos de GDLauncher, el launcher lo detecta y cambia a ella sin copiar ni duplicar nada.</li>
+<li>Reinicia el launcher. Tus instancias, cuentas, ajustes e instalaciones de Java están todas de vuelta.</li>
+</ol>
+
+<h2>Qué entra en la copia y qué no</h2>
+<p><strong>Se conserva al respaldar el runtime path:</strong></p>
+<ul>
+<li>Todas las instancias: mods, configs, mundos guardados, capturas, resource packs, shader packs, datapacks.</li>
+<li>Las cuentas de Microsoft con sesión iniciada (guardadas en la base del launcher, con sus tokens). Puede que se refresquen en el primer arranque, pero no tendrás que iniciar sesión otra vez.</li>
+<li>Los ajustes: tema, idioma, argumentos de Java por defecto, memoria por defecto, el propio runtime path.</li>
+<li>Las instalaciones de Java descargadas por GDLauncher. Puedes saltártelas y dejar que se descarguen en el primer arranque: copia más rápida a cambio de una descarga puntual.</li>
+<li>Los logs generales y los de cada instancia.</li>
+</ul>
+<p><strong>No se conserva (y no lo necesitas):</strong></p>
+<ul>
+<li>El estado de la ventana de Electron (tamaño, posición). El launcher simplemente elige valores nuevos por defecto.</li>
+<li>Las entradas del llavero del sistema: GDLauncher gestiona las cuentas en su propia base de datos.</li>
+</ul>
+
+<h2>Copia mínima si vas justo de espacio</h2>
+<p>Si no te cabe el runtime path entero, copia solo <code>&lt;runtime_path&gt;/instances/</code> y <code>&lt;runtime_path&gt;/gdl_conf.db</code>. En instances están tus mundos y configs, y en la base de datos tus cuentas y ajustes. Perderás los assets de Minecraft, las libraries y las instalaciones de Java en caché, pero todo eso se vuelve a descargar en el primer arranque.</p>
+<p>Como mínimo absoluto, copia la subcarpeta <code>instance/saves/</code> de cada instancia. Eso son solo tus archivos de mundo. Perderás la configuración de la instancia (lista de mods, versión, modloader) pero los mundos sobreviven y podrás cargarlos más adelante en una instancia creada de cero.</p>
+
+<h2>Si además cambias de disco o de PC, no solo formateas</h2>
+<p>La misma copia, restaurada en la máquina nueva. Los datos del runtime de GDLauncher se mueven sin problema dentro de la misma familia de sistemas. Windows → Windows o Linux → Linux funciona directamente. Al cruzar entre Windows ↔ macOS ↔ Linux siguen funcionando mundos, configs, resource packs y la mayoría de mods, pero el launcher volverá a detectar Java (binarios distintos por sistema) y puede que redescargue libraries nativas en el primer arranque.</p>
+<p>Ver también: <a href="/guides/move-runtime-path">Mover los datos de GDLauncher a otro disco</a> para hacerlo desde la propia app en vez de copiando y pegando a mano.</p>
+
+<h2>No sincronices el runtime path mientras juegas</h2>
+<p>OneDrive, iCloud, Dropbox, Google Drive de escritorio y compañía compiten con GDLauncher por los handles de archivo. Después de restaurar, no pongas el runtime path dentro de una carpeta que estas herramientas sincronicen activamente: verás errores de "archivo en uso" y corrupción ocasional de partidas. Mantén el runtime path en un disco local normal y respáldalo aparte.</p>`
+  },
+  "pt-BR": {
+    title: "Como fazer backup do GDLauncher antes de formatar o PC",
+    description: "Faça backup de todos os dados do GDLauncher (instâncias, mundos, contas, Java, configurações) antes de formatar ou trocar de máquina, e restaure sem perder progresso.",
+    steps: [
+      { name: "Encontre seu runtime path", text: "Abra o GDLauncher e vá em Settings → Runtime Path. Copie o caminho mostrado no campo. Essa pasta guarda suas instâncias, mundos, Java, o banco do launcher e suas contas. É a única coisa que você precisa fazer backup." },
+      { name: "Feche o GDLauncher", text: "Encerre o GDLauncher por completo antes de copiar. Arquivos como o banco SQLite podem corromper no meio da cópia se o launcher estiver escrevendo neles ao mesmo tempo." },
+      { name: "Copie a pasta do runtime path", text: "Copie a pasta do runtime path inteira pra onde você vai guardar o backup: HD externo, pendrive, NAS, um arquivo na nuvem sem sincronização, o que você tiver. Só mantenha a estrutura de pastas intacta." },
+      { name: "Confira a cópia", text: "Veja se o tamanho no destino bate com o da origem, com alguns MB de diferença. Abra uma das subpastas de instância pra confirmar que os arquivos são legíveis de verdade, e não placeholders ou atalhos." }
+    ],
+    body: `<h2>O que você realmente precisa salvar</h2>
+<p>Uma pasta só: o runtime path. Dentro dela está cada instância (com mods, mundos, configs, screenshots, dados de mundo), os assets compartilhados do Minecraft, as libraries compartilhadas, os runtimes Java que o GDLauncher baixou, o banco SQLite do launcher (<code>gdl_conf.db</code>) com suas contas e configurações, e os logs gerais em <code>__gdl_logs__/</code>. Faça backup dessa pasta e você tem tudo que importa.</p>
+<p>Não precisa salvar a pasta de dados do próprio Electron. Ela só guarda coisas que o launcher refaz na primeira execução: posição da janela, caches internos, esse tipo de coisa. Pular ela não custa nada.</p>
+
+<h2>Achando seu runtime path</h2>
+<p>Jeito mais fácil: abra o GDLauncher, vá em <strong>Settings → Runtime Path</strong> e copie o caminho mostrado. Essa é a fonte da verdade, tendo você movido ele um dia ou não.</p>
+<p>Se o GDLauncher não abrir (disco morrendo, sistema quebrado), o local padrão é:</p>
+<ul>
+<li><strong>Windows</strong>: <code>%APPDATA%\\gdlauncher_carbon\\data</code> (cole no Win+R ou na barra de endereço do Explorer).</li>
+<li><strong>macOS</strong>: <code>~/Library/Application Support/gdlauncher_carbon/data</code> (Finder → Cmd+Shift+G, cole, Enter).</li>
+<li><strong>Linux</strong>: <code>~/.local/share/gdlauncher_carbon/data</code> (ou <code>$XDG_DATA_HOME/gdlauncher_carbon/data</code> se você definiu <code>XDG_DATA_HOME</code>).</li>
+</ul>
+<p>Se você já moveu o runtime path pelas configurações, a pasta padrão acima vai estar vazia ou nem existir, e um arquivo chamado <code>runtime_path_override</code> ao lado dela aponta pro local real. Abra com qualquer editor de texto: a única linha dentro dele é o caminho absoluto dos seus dados.</p>
+
+<h2>Fazendo o backup</h2>
+<p>Feche o GDLauncher primeiro. O banco SQLite do runtime path é seguro de copiar com o launcher fechado, mas pode gerar uma cópia corrompida se você pegar ele no meio de uma escrita.</p>
+<p>Depois copie a pasta do runtime path, com a estrutura intacta, pra onde você quer o backup. Outro drive, um pendrive, um NAS, um arquivo na nuvem offline: o destino não importa, desde que não seja o disco que você está prestes a apagar.</p>
+
+<h2>Restaurando depois de formatar</h2>
+<p>No sistema recém-instalado:</p>
+<ol>
+<li>Instale o GDLauncher. Abra uma vez e feche, isso cria as pastas padrão.</li>
+<li>Copie a pasta do runtime path do backup pro lugar definitivo no sistema novo. Pode ser o mesmo drive e caminho de antes, ou outro lugar (um disco maior, por exemplo).</li>
+<li>Reabra o GDLauncher. Vá em <strong>Settings → Runtime Path</strong> e aponte pra pasta que você acabou de restaurar. Quando você mira numa pasta que já contém dados GDLauncher válidos, o launcher detecta e troca pra ela sem copiar nem duplicar nada.</li>
+<li>Reinicie o launcher. Suas instâncias, contas, configurações e instalações de Java estão todas de volta.</li>
+</ol>
+
+<h2>O que vai no backup e o que não vai</h2>
+<p><strong>Preservado ao salvar o runtime path:</strong></p>
+<ul>
+<li>Todas as instâncias: mods, configs, mundos salvos, screenshots, resource packs, shader packs, datapacks.</li>
+<li>Contas Microsoft logadas (guardadas no banco do launcher, com os tokens). Elas podem precisar de refresh na primeira execução, mas você não vai ter que logar de novo.</li>
+<li>Configurações: tema, idioma, argumentos Java padrão, memória padrão, o próprio runtime path.</li>
+<li>Instalações de Java baixadas pelo GDLauncher. Dá pra pular essas e deixar o GDLauncher baixar de novo na primeira execução: backup mais rápido em troca de um download único.</li>
+<li>Logs gerais e logs por instância.</li>
+</ul>
+<p><strong>Não preservado (e você não precisa):</strong></p>
+<ul>
+<li>Estado da janela do Electron (tamanho, posição). O launcher só escolhe novos padrões.</li>
+<li>Entradas no chaveiro do sistema: o GDLauncher usa o banco dele pras contas.</li>
+</ul>
+
+<h2>Backup mínimo se estiver sem espaço</h2>
+<p>Se o runtime path inteiro não couber, copie só <code>&lt;runtime_path&gt;/instances/</code> e <code>&lt;runtime_path&gt;/gdl_conf.db</code>. Em instances estão seus mundos e configs, no banco estão suas contas e configurações. Você perde os assets do Minecraft, as libraries e as instalações de Java em cache, mas tudo isso baixa de novo na primeira execução.</p>
+<p>Pro mínimo absoluto, copie a subpasta <code>instance/saves/</code> de cada instância. Isso é só os arquivos de mundo. Você perde a configuração da instância (lista de mods, versão, modloader) mas os mundos sobrevivem e podem ser carregados depois numa instância criada do zero.</p>
+
+<h2>Se você também vai trocar de disco ou de PC, não só formatar</h2>
+<p>Mesmo backup, restaurando na máquina nova. Os dados de runtime do GDLauncher viajam bem dentro da mesma família de sistema. Windows → Windows ou Linux → Linux funciona direto. Cruzando Windows ↔ macOS ↔ Linux, mundos, configs, resource packs e a maioria dos mods continuam funcionando, mas o launcher vai redetectar o Java (binários diferentes por sistema) e pode rebaixar libraries nativas na primeira execução.</p>
+<p>Veja também: <a href="/guides/move-runtime-path">Mover os dados do GDLauncher pra outro drive</a> pro jeito de dentro do app, sem copiar e colar na mão.</p>
+
+<h2>Não sincronize o runtime path enquanto joga</h2>
+<p>OneDrive, iCloud, Dropbox, Google Drive desktop e afins disputam file handles com o GDLauncher. Depois de restaurar, não coloque o runtime path dentro de uma pasta que essas ferramentas sincronizam ativamente: vai dar erro de "arquivo em uso" e corrupção ocasional de save. Mantenha o runtime path num drive local comum e faça o backup dele à parte.</p>`
+  },
+  it: {
+    title: "Come fare il backup di GDLauncher prima di formattare il PC",
+    description: "Salva tutti i dati di GDLauncher (istanze, mondi, account, Java, impostazioni) prima di formattare o cambiare macchina, poi ripristinali senza perdere progressi.",
+    steps: [
+      { name: "Trova il tuo runtime path", text: "Apri GDLauncher e vai in Settings → Runtime Path. Copia il percorso mostrato nel campo. Quella cartella contiene istanze, mondi, Java, il database del launcher e i tuoi account. È l'unica cosa di cui devi fare il backup." },
+      { name: "Chiudi GDLauncher", text: "Esci completamente da GDLauncher prima di copiare. File come il database SQLite possono corrompersi a metà copia se il launcher ci sta scrivendo nello stesso momento." },
+      { name: "Copia la cartella del runtime path", text: "Copia l'intera cartella del runtime path dove tieni il backup: disco esterno, chiavetta USB, NAS, un archivio cloud offline, quello che hai. Basta lasciare intatta la struttura delle cartelle." },
+      { name: "Verifica la copia", text: "Controlla che la dimensione a destinazione corrisponda a quella di origine a meno di qualche MB. Apri una delle sottocartelle di istanza per confermare che i file siano davvero leggibili, non segnaposto o collegamenti." }
+    ],
+    body: `<h2>Cosa devi salvare davvero</h2>
+<p>Una cartella sola: il runtime path. Dentro ci sono tutte le istanze (con mod, mondi, config, screenshot, dati dei mondi), gli asset condivisi di Minecraft, le libraries condivise, i runtime Java scaricati da GDLauncher, il database SQLite del launcher (<code>gdl_conf.db</code>) con account e impostazioni, e i log a livello app sotto <code>__gdl_logs__/</code>. Fai il backup di quella cartella e hai tutto quello che conta.</p>
+<p>Non serve salvare la cartella dati di Electron. Contiene solo roba che il launcher ricostruisce al primo avvio: posizione della finestra, cache interne, cose così. Saltarla non ti costa niente.</p>
+
+<h2>Trovare il tuo runtime path</h2>
+<p>Il modo più semplice: apri GDLauncher, vai in <strong>Settings → Runtime Path</strong> e copia il percorso mostrato. Quella è la fonte affidabile, che tu l'abbia mai spostato o no.</p>
+<p>Se GDLauncher non si apre più (disco che sta morendo, sistema rotto), la posizione di default è:</p>
+<ul>
+<li><strong>Windows</strong>: <code>%APPDATA%\\gdlauncher_carbon\\data</code> (incollalo in Win+R o nella barra degli indirizzi di Esplora file).</li>
+<li><strong>macOS</strong>: <code>~/Library/Application Support/gdlauncher_carbon/data</code> (Finder → Cmd+Shift+G, incolla, Invio).</li>
+<li><strong>Linux</strong>: <code>~/.local/share/gdlauncher_carbon/data</code> (oppure <code>$XDG_DATA_HOME/gdlauncher_carbon/data</code> se hai impostato <code>XDG_DATA_HOME</code>).</li>
+</ul>
+<p>Se hai spostato il runtime path dalle impostazioni, la cartella di default qui sopra sarà vuota o non ci sarà proprio, e un file chiamato <code>runtime_path_override</code> lì accanto punta alla posizione reale. Aprilo con un editor di testo qualsiasi: la sua unica riga è il percorso assoluto dei tuoi dati.</p>
+
+<h2>Fare il backup</h2>
+<p>Prima chiudi GDLauncher. Il database SQLite nel runtime path si copia senza rischi a launcher chiuso, ma può darti una copia corrotta se lo prendi mentre ci sta scrivendo.</p>
+<p>Poi copia la cartella del runtime path, con la struttura intatta, dove vuoi tenere il backup. Un altro disco, una chiavetta, un NAS, un archivio cloud offline: la destinazione non conta, basta che non sia il disco che stai per cancellare.</p>
+
+<h2>Ripristinare dopo la formattazione</h2>
+<p>Sul sistema appena installato:</p>
+<ol>
+<li>Installa GDLauncher. Avvialo una volta e chiudilo, così crea le cartelle di default.</li>
+<li>Copia la cartella del runtime path che hai salvato nella sua posizione definitiva sul sistema nuovo. Può essere lo stesso disco e percorso di prima, o un posto diverso (un disco più capiente, per dire).</li>
+<li>Riapri GDLauncher. Vai in <strong>Settings → Runtime Path</strong> e puntalo alla cartella appena ripristinata. Quando punti a una cartella che contiene già dati GDLauncher validi, il launcher se ne accorge e ci passa senza copiare né duplicare nulla.</li>
+<li>Riavvia il launcher. Istanze, account, impostazioni e installazioni Java sono tutte tornate.</li>
+</ol>
+
+<h2>Cosa c'è nel backup e cosa no</h2>
+<p><strong>Si conserva salvando il runtime path:</strong></p>
+<ul>
+<li>Tutte le istanze: mod, config, mondi salvati, screenshot, resource pack, shader pack, datapack.</li>
+<li>Gli account Microsoft con cui hai fatto l'accesso (salvati nel database del launcher, token compresi). Al primo avvio potrebbero doversi rinfrescare, ma non dovrai rifare il login.</li>
+<li>Le impostazioni: tema, lingua, argomenti Java di default, memoria di default, il runtime path stesso.</li>
+<li>Le installazioni Java scaricate da GDLauncher. Puoi anche saltarle e lasciare che GDLauncher le riscarichi al primo avvio: backup più veloce in cambio di un download una tantum.</li>
+<li>I log a livello app e quelli per istanza.</li>
+</ul>
+<p><strong>Non si conserva (e non ti serve):</strong></p>
+<ul>
+<li>Lo stato della finestra di Electron (dimensione, posizione). Il launcher riparte semplicemente dai suoi default.</li>
+<li>Le voci nel portachiavi di sistema: GDLauncher gestisce gli account nel proprio database.</li>
+</ul>
+
+<h2>Backup minimo se sei a corto di spazio</h2>
+<p>Se il runtime path intero non ci sta, copia solo <code>&lt;runtime_path&gt;/instances/</code> e <code>&lt;runtime_path&gt;/gdl_conf.db</code>. In instances ci sono mondi e config, nel database account e impostazioni. Perdi gli asset di Minecraft, le libraries e le installazioni Java in cache, ma quelli si riscaricano al primo avvio.</p>
+<p>Per il minimo assoluto, copia la sottocartella <code>instance/saves/</code> di ogni istanza. Sono solo i file dei mondi. Perdi la configurazione dell'istanza (lista mod, versione, modloader) ma i dati dei mondi sopravvivono e potrai caricarli in seguito in un'istanza creata da zero.</p>
+
+<h2>Se oltre a formattare cambi anche disco o PC</h2>
+<p>Stesso backup, ripristino sulla macchina nuova. I dati runtime di GDLauncher si spostano bene all'interno della stessa famiglia di sistemi. Windows → Windows o Linux → Linux funziona direttamente. Passando tra Windows ↔ macOS ↔ Linux continuano a funzionare mondi, config, resource pack e la maggior parte delle mod, ma il launcher rileverà di nuovo Java (binari diversi per sistema) e potrebbe riscaricare librerie native al primo avvio.</p>
+<p>Vedi anche: <a href="/guides/move-runtime-path">Spostare i dati di GDLauncher su un altro disco</a> per il modo integrato nell'app, senza copia-incolla a mano.</p>
+
+<h2>Non sincronizzare il runtime path mentre giochi</h2>
+<p>OneDrive, iCloud, Dropbox, Google Drive desktop e simili si contendono i file handle con GDLauncher. Dopo il ripristino non mettere il runtime path dentro una cartella che questi tool sincronizzano attivamente: ti ritrovi errori "file in uso" e ogni tanto salvataggi corrotti. Tieni il runtime path su un normale disco locale e fanne il backup separatamente.</p>`
+  }
+}
+
+const m = meta[locale]
+---
+
+<GuideLayout
+  title={m.title}
+  description={m.description}
+  keywords="backup gdlauncher, backup minecraft instances, save minecraft data before format, move gdlauncher new pc, restore gdlauncher, gdlauncher migration"
+  lastUpdated="May 2026"
+  howTo={{ totalTimeIso: "PT15M", steps: m.steps }}
+>
+  <Fragment set:html={localizeInternalLinks(m.body, locale)} />
+</GuideLayout>
