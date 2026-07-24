@@ -90,14 +90,24 @@ pub fn secure_path_join<P1: AsRef<Path>, P2: AsRef<Path>>(
     }
 }
 
-/// Ceiling on how many decompressed bytes a single hand-rolled zip extraction pass
-/// (one call site's whole override loop) will write to disk or read into memory.
-/// Reuses the export side's own instance-size cap: nothing a legitimate import
-/// needs ever produces more override content than a legitimate export of the same
-/// size class would, so this rejects a decompression bomb (a tiny compressed entry
-/// inflating to gigabytes) without ever wrongly limiting real content.
-pub const MAX_EXTRACTED_OVERRIDE_BYTES: u64 =
-    crate::managers::instance::export::MAX_SHARE_SIZE_BYTES;
+/// Ceiling on how many decompressed bytes a single hand-rolled zip extraction
+/// pass (one call site's whole override loop) writes to disk. Rejects a
+/// decompression bomb: a tiny compressed entry inflating without bound.
+///
+/// Deliberately not tied to the share size cap, which limits the *compressed*
+/// archive GDL uploads for its own share feature. Third-party modpacks are
+/// bound by nothing GDL controls, and one bundling worlds, resource packs or
+/// shader packs legitimately reaches gigabytes of uncompressed overrides, so
+/// borrowing that number aborted real imports partway through with an error no
+/// retry could get past.
+pub const MAX_EXTRACTED_OVERRIDE_BYTES: u64 = 16 * 1024 * 1024 * 1024;
+
+/// Ceiling on a single archive entry read fully into memory (rather than
+/// streamed to disk) so it can be hashed. Far below
+/// [`MAX_EXTRACTED_OVERRIDE_BYTES`] because this path only matches small
+/// unresolved files: anything larger is not a candidate anyway, and the bound is
+/// what keeps a bomb from being allocated in full just to hash it.
+pub const MAX_HASHED_ENTRY_BYTES: u64 = 64 * 1024 * 1024;
 
 /// True if a zip entry's Unix mode indicates it's a symlink (`S_IFLNK`). Pass
 /// `entry.unix_mode()` directly. A hand-rolled extractor that materializes a
@@ -414,5 +424,24 @@ mod test {
         let mut out = Vec::new();
         let copied = copy_bounded(&mut &data[..], &mut out, 100).unwrap();
         assert_eq!(copied, 100);
+    }
+
+    #[test]
+    fn extraction_limits_are_independent_of_the_share_size_cap() {
+        use crate::managers::instance::export::MAX_SHARE_SIZE_BYTES;
+
+        // The share cap limits the compressed archive GDL uploads; these bound
+        // uncompressed extraction of third-party packs. Tying them together
+        // aborted real modpack imports, so they must stay separate — and the
+        // extraction budget has to leave room for packs that ship worlds or
+        // resource packs.
+        assert!(
+            MAX_EXTRACTED_OVERRIDE_BYTES > MAX_SHARE_SIZE_BYTES,
+            "override extraction must not be capped at the share upload limit"
+        );
+        assert!(
+            MAX_HASHED_ENTRY_BYTES < MAX_EXTRACTED_OVERRIDE_BYTES,
+            "an entry buffered in memory must be bounded far below a whole extraction pass"
+        );
     }
 }
