@@ -85,6 +85,47 @@ fn server_addon_dir(
     }
 }
 
+/// Narrows a CurseForge file search by the server's modloader, but only when
+/// the project is a mod.
+///
+/// A datapack is published without loader tags, so filtering its files by a
+/// loader matches none of them and the search reports the addon as having no
+/// version compatible with the server.
+fn curseforge_modloader_filter(
+    class_id: Option<&carbon_platforms::curseforge::ClassId>,
+    server_modloader: Option<&str>,
+) -> Option<carbon_platforms::curseforge::ModLoaderType> {
+    use carbon_platforms::curseforge::{ClassId, ModLoaderType};
+
+    if !matches!(class_id, Some(ClassId::Mods) | None) {
+        return None;
+    }
+
+    match server_modloader? {
+        "forge" => Some(ModLoaderType::Forge),
+        "fabric" => Some(ModLoaderType::Fabric),
+        "quilt" => Some(ModLoaderType::Quilt),
+        "neoforge" => Some(ModLoaderType::NeoForge),
+        _ => None,
+    }
+}
+
+/// The Modrinth half of [`curseforge_modloader_filter`]. A datapack's versions
+/// are tagged `datapack` rather than with a loader, so a loader-filtered
+/// version query returns an empty list.
+fn modrinth_loader_filter(
+    project_type: &carbon_platforms::modrinth::project::ProjectType,
+    server_modloader: Option<&str>,
+) -> Option<Vec<String>> {
+    use carbon_platforms::modrinth::project::ProjectType;
+
+    if *project_type != ProjectType::Mod {
+        return None;
+    }
+
+    server_modloader.map(|loader| vec![loader.to_string()])
+}
+
 /// Resolves the server port, defaulting when unset, and rejects a value outside
 /// the valid TCP range so an out-of-range port fails here with a clear message
 /// rather than as an opaque JVM bind error at launch.
@@ -2298,20 +2339,28 @@ impl ManagerRef<'_, ServerManager> {
         id: ServerId,
         project_id: u32,
     ) -> anyhow::Result<VisualTaskId> {
-        use carbon_platforms::curseforge::filters::{ModFilesParameters, ModFilesParametersQuery};
+        use carbon_platforms::curseforge::filters::{
+            ModFilesParameters, ModFilesParametersQuery, ModParameters,
+        };
 
         let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
+        let project = self
+            .app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod(ModParameters {
+                mod_id: project_id as i32,
+            })
+            .await?;
+
         let game_version = db_server.game_version.clone();
-        let modloader_type = db_server.modloader_type.as_deref().and_then(|ml| match ml {
-            "forge" => Some(carbon_platforms::curseforge::ModLoaderType::Forge),
-            "fabric" => Some(carbon_platforms::curseforge::ModLoaderType::Fabric),
-            "quilt" => Some(carbon_platforms::curseforge::ModLoaderType::Quilt),
-            "neoforge" => Some(carbon_platforms::curseforge::ModLoaderType::NeoForge),
-            _ => None,
-        });
+        let modloader_type = curseforge_modloader_filter(
+            project.data.class_id.as_ref(),
+            db_server.modloader_type.as_deref(),
+        );
 
         let files = self
             .app
@@ -2445,8 +2494,16 @@ impl ManagerRef<'_, ServerManager> {
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
+        let project = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_project(ProjectID(project_id.clone()))
+            .await?;
+
         let game_version = db_server.game_version.clone();
-        let loaders = db_server.modloader_type.as_ref().map(|ml| vec![ml.clone()]);
+        let loaders =
+            modrinth_loader_filter(&project.project_type, db_server.modloader_type.as_deref());
 
         let versions = self
             .app
@@ -3396,6 +3453,39 @@ mod tests {
             server_addon_dir(&server_path, true, "cool-datapack-fabric.jar"),
             server_path.get_mods_path()
         );
+    }
+
+    #[test]
+    fn modloader_filter_narrows_mod_searches_only() {
+        use carbon_platforms::curseforge::{ClassId, ModLoaderType};
+        use carbon_platforms::modrinth::project::ProjectType;
+
+        // A modded server narrows a mod search to its own loader.
+        assert!(matches!(
+            curseforge_modloader_filter(Some(&ClassId::Mods), Some("fabric")),
+            Some(ModLoaderType::Fabric)
+        ));
+        assert_eq!(
+            modrinth_loader_filter(&ProjectType::Mod, Some("fabric")),
+            Some(vec!["fabric".to_string()])
+        );
+
+        // A datapack carries no loader tag on either platform, so keeping the
+        // filter would match nothing and report the pack as having no version
+        // compatible with the server.
+        assert!(
+            curseforge_modloader_filter(Some(&ClassId::Datapacks), Some("fabric")).is_none(),
+            "the server's modloader must not narrow a datapack search"
+        );
+        assert_eq!(
+            modrinth_loader_filter(&ProjectType::DataPack, Some("fabric")),
+            None,
+            "the server's modloader must not narrow a datapack search"
+        );
+
+        // A vanilla server has no loader to narrow by in the first place.
+        assert!(curseforge_modloader_filter(Some(&ClassId::Mods), None).is_none());
+        assert_eq!(modrinth_loader_filter(&ProjectType::Mod, None), None);
     }
 
     #[test]
