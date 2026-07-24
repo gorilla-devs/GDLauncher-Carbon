@@ -243,11 +243,20 @@ impl InstanceImporter for ModrinthArchiveImporter {
             Some(MrMetadata {
                 image_url: Some(image_url),
                 ..
-            }) => Some(
-                app.instance_manager()
-                    .download_icon(image_url.clone())
-                    .await?,
-            ),
+            }) => match app
+                .instance_manager()
+                .download_icon(image_url.clone())
+                .await
+            {
+                Ok(icon) => Some(icon),
+                // The icon is decorative and its URL is whatever the pack was
+                // published with, so a rotted link costs the instance its
+                // artwork rather than the whole import.
+                Err(e) => {
+                    tracing::warn!("Failed to download modpack icon, importing without one: {e}");
+                    None
+                }
+            },
             _ => None,
         };
 

@@ -303,11 +303,20 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             Some(CfMetadata {
                 image_url: Some(image_url),
                 ..
-            }) => Some(
-                app.instance_manager()
-                    .download_icon(image_url.clone())
-                    .await?,
-            ),
+            }) => match app
+                .instance_manager()
+                .download_icon(image_url.clone())
+                .await
+            {
+                Ok(icon) => Some(icon),
+                // The icon is decorative and its URL is whatever the pack was
+                // published with, so a rotted link falls back to the packaged
+                // icon rather than costing the user the whole import.
+                Err(e) => {
+                    tracing::warn!("Failed to download modpack icon, using the packaged one: {e}");
+                    instance.gdl_icon.clone()
+                }
+            },
             _ => instance.gdl_icon.clone(),
         };
 
