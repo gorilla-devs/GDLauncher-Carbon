@@ -12,7 +12,6 @@ import { rspc } from "@/utils/rspcClient"
 import { useModal } from "./managers/ModalsManager"
 import { useGDNavigate } from "./managers/NavigationManager"
 import { parseSearchQuery } from "./utils/searchQueryParser"
-import { useKeyDownEvent } from "@solid-primitives/keyboard"
 import { checkForUpdates } from "./utils/updater"
 import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning"
 import { ACCOUNT_BANNED_EVENT } from "./utils/bannedEventBridge"
@@ -111,20 +110,6 @@ const App = (props: Props) => {
       untrack(() => {
         modalsContext?.openModal({ name: "betaPrompt" })
       })
-    }
-  })
-
-  const event = useKeyDownEvent()
-
-  createEffect(() => {
-    // close modal clicking Escape
-    const e = event()
-    if (e) {
-      if (e.key === "Escape") {
-        untrack(() => {
-          modalsContext?.closeModal()
-        })
-      }
     }
   })
 
