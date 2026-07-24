@@ -61,15 +61,19 @@ const Settings = (props: SettingsProps) => {
       name: update.name ?? null,
       xmx: update.xmx ?? null,
       xms: update.xms ?? null,
-      // extraJavaArgs is a double-Option on the backend (`null` means
-      // "clear", distinct from "leave untouched"), unlike the single-Option
-      // fields above where `null` already means "leave untouched". Re-send
-      // the current value when this call isn't the one changing it, so
-      // saving e.g. xmx alone can't silently blank the java args.
-      extraJavaArgs:
-        update.extraJavaArgs !== undefined
-          ? update.extraJavaArgs
-          : props.serverDetails.extraJavaArgs,
+      // extraJavaArgs is a double-Option on the backend: omitting it leaves
+      // the stored value untouched and `null` clears it, unlike the
+      // single-Option fields above where `null` already means untouched. So
+      // saving e.g. xmx alone simply leaves the field out and cannot blank
+      // the java args.
+      //
+      // Omitted rather than re-sent from props, which is only as fresh as the
+      // last completed refetch: a save fired before this mutation's
+      // invalidation round-trips would carry the pre-edit value and overwrite
+      // the edit that was just saved.
+      ...(update.extraJavaArgs !== undefined
+        ? { extraJavaArgs: update.extraJavaArgs }
+        : {}),
       autoRestart: update.autoRestart ?? null
     })
   }
