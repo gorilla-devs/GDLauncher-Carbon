@@ -832,7 +832,12 @@ async fn _download_file(
                 .finalize_reset(),
         );
 
-        if actual_hash != *expected_hash {
+        // Hex case carries no meaning, and `expected_hash` is whatever the source
+        // handed us verbatim: Mojang, Modrinth, CurseForge, Forge install profiles
+        // and Azul all populate `Checksum` straight from their API payload without
+        // normalizing it. A source switching to uppercase would otherwise fail every
+        // download it serves.
+        if !actual_hash.eq_ignore_ascii_case(expected_hash) {
             return Err(DownloadError::ChecksumMismatch {
                 expected: expected_hash.clone(),
                 actual: actual_hash,
@@ -1130,7 +1135,8 @@ async fn validate_file(
                 | Checksum::Md5(hash) => hash,
             };
 
-            if actual_hash != *expected_hash {
+            // Case-insensitive for the same reason as the post-download check above.
+            if !actual_hash.eq_ignore_ascii_case(expected_hash) {
                 error!(
                     "Checksum mismatch: expected {}, got {}",
                     expected_hash, actual_hash
@@ -1436,6 +1442,60 @@ mod tests {
             result,
             Err(DownloadError::ChecksumMismatch { .. })
         ));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_validate_file_accepts_uppercase_checksum() {
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let content = b"Hello, World!";
+        let mut file = File::create(&file_path).await.unwrap();
+        file.write_all(content).await.unwrap();
+        file.flush().await.unwrap();
+
+        let checksum = Checksum::Sha256(
+            "DFFD6021BB2BD5B0AF676290809EC3A53191DD81C7F70A4B28688A362182986F".to_string(),
+        );
+
+        validate_file(&file_path, Some(13), &Some(checksum), true)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_download_accepts_uppercase_checksum() {
+        let mut server = mockito::Server::new_async().await;
+        let mock_url = server.url();
+
+        let mock = server
+            .mock("GET", "/test.txt")
+            .with_status(200)
+            .with_header("content-type", "text/plain")
+            .with_body("Hello, World!")
+            .expect(1)
+            .create_async()
+            .await;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+
+        let downloadable = Downloadable {
+            url: format!("{}/test.txt", mock_url),
+            path: file_path.clone(),
+            checksum: Some(Checksum::Sha256(
+                "DFFD6021BB2BD5B0AF676290809EC3A53191DD81C7F70A4B28688A362182986F".to_string(),
+            )),
+            size: Some(13),
+        };
+
+        let options = DownloadOptions::builder().concurrency(1).build();
+
+        download_multiple(&[downloadable], options).await.unwrap();
+        assert_eq!(std::fs::read_to_string(file_path).unwrap(), "Hello, World!");
+
+        mock.assert();
     }
 
     #[tokio::test]
