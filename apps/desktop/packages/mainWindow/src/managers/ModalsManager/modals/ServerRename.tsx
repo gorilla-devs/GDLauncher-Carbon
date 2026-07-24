@@ -23,9 +23,11 @@ const ServerRename = (props: ModalProps) => {
     updateServerMutation.mutate({
       id: props.data?.id,
       name: trimmed,
+      // `null` leaves these untouched. extraJavaArgs is the exception — it is
+      // a double-Option where `null` clears the stored value — so a rename
+      // omits it entirely rather than blanking the server's java args.
       xmx: null,
       xms: null,
-      extraJavaArgs: null,
       autoRestart: null
     })
   }
