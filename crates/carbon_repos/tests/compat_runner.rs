@@ -539,3 +539,84 @@ fn stale_migrations_row_above_user_version_self_heals_on_reapply() {
         .unwrap();
     assert_eq!(rows, 1, "the stale row must be replaced, not duplicated");
 }
+
+/// Breaking migration 26, self-contained so a down-run covers exactly one
+/// version. Marked breaking because the kind is what forces the down-run path
+/// rather than an overlay.
+const BREAKING_AT_26: MigrationDef = MigrationDef {
+    name: "26_add_gadget",
+    up_sql: "CREATE TABLE Gadget (id INTEGER PRIMARY KEY);",
+    down_sql: Some("DROP TABLE Gadget;"),
+    kind: MigrationKind::Breaking,
+    data_down: "full",
+};
+
+/// A torn file-level restore (a VSS or Time Machine copy of the main file out
+/// of sync with its `-wal`) can leave `_migrations` rows for versions the
+/// restored schema never received. Such a row must not be down-run: that
+/// migration's forward half never touched this database.
+///
+/// The planted down here is the dangerous shape — hand-written DML (the
+/// `--dml-reviewed` class the tooling supports) that rewrites data without
+/// altering the schema. A pure-DDL down would usually fail against a schema it
+/// never modified and roll the whole attempt back, but this one succeeds, the
+/// schema still matches the reference, and the transaction commits: the
+/// corruption reaches the user reported as a successful downgrade.
+#[test]
+fn stale_migration_rows_above_user_version_are_not_down_run() {
+    let (_d, path) = temp_db();
+    let l25 = base();
+    let l26 = extend(&base(), &[BREAKING_AT_26]);
+
+    let reference = {
+        let mut c = open_db(&path.with_extension("ref.db"));
+        l25.to_latest(&mut c).unwrap();
+        dump_schema(&c).unwrap()
+    };
+
+    {
+        let mut conn = open_db(&path);
+        l26.to_latest(&mut conn).unwrap();
+        assert_eq!(user_version(&conn), 26);
+
+        conn.execute_batch(
+            "INSERT INTO AppConfiguration (releaseChannel, xmx) VALUES ('stable', 4096);",
+        )
+        .unwrap();
+
+        // The stale row: recorded, but its up never ran here. Its down halves
+        // the configured heap — the inverse of a doubling this database never
+        // received.
+        conn.execute(
+            "INSERT INTO _migrations \
+             (version, name, checksum, kind, down_sql, data_down, applied_at) \
+             VALUES (27, '27_scale_xmx', 'deadbeef', 'breaking', ?1, 'full', 0)",
+            ["UPDATE AppConfiguration SET xmx = xmx / 2;"],
+        )
+        .unwrap();
+    }
+
+    {
+        let mut conn = open_db(&path);
+        let verdict = l25.open(&mut conn, &path).unwrap();
+        assert_eq!(
+            verdict,
+            OpenVerdict::Downgraded,
+            "the genuinely applied migration 26 still steps back"
+        );
+        assert_eq!(user_version(&conn), 25);
+        assert_eq!(
+            dump_schema(&conn).unwrap(),
+            reference,
+            "schema is byte-identical to own 25"
+        );
+
+        let xmx: i64 = conn
+            .query_row("SELECT xmx FROM AppConfiguration", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            xmx, 4096,
+            "the stale row's down must not have run; it would have halved this"
+        );
+    }
+}
