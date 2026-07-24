@@ -1,13 +1,12 @@
-use super::provider::{ServerHandle, ServerProvider, remove_pid_file, write_pid_file};
+use super::provider::{ServerHandle, ServerProvider, exit_signal, remove_pid_file, write_pid_file};
 use crate::domain::server::LaunchConfig;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use carbon_rt_path::ServerPath;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::{Notify, mpsc};
+use tokio::sync::mpsc;
 use tracing::{error, info};
 
 pub struct LocalServerProvider;
@@ -200,8 +199,7 @@ impl ServerProvider for LocalServerProvider {
 
         // Set up kill channel and exit notification
         let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
-        let exit_notify = Arc::new(Notify::new());
-        let exit_notify_clone = exit_notify.clone();
+        let (exited_tx, exited) = exit_signal();
         let log_tx_exit = log_tx;
         let exit_server_root = server_root.clone();
         tokio::spawn(async move {
@@ -233,14 +231,14 @@ impl ServerProvider for LocalServerProvider {
             // on its own), so the pidfile no longer refers to anything a
             // future `load_servers` pass needs to clean up.
             remove_pid_file(&exit_server_root).await;
-            exit_notify_clone.notify_waiters();
+            let _ = exited_tx.send(true);
         });
 
         Ok(ServerHandle {
             process_id: pid,
             kill_tx,
             stdin_tx,
-            exit_notify,
+            exited,
         })
     }
 

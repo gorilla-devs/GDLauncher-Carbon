@@ -1491,7 +1491,7 @@ impl ManagerRef<'_, ServerManager> {
 
         let process_id = handle.process_id;
 
-        let exit_notify = handle.exit_notify.clone();
+        let mut exited = handle.exited.clone();
 
         // Update state
         {
@@ -1530,7 +1530,7 @@ impl ManagerRef<'_, ServerManager> {
         // backing-off retry so a server that crashes instantly cannot tight-loop.
         let app = self.app.clone();
         tokio::spawn(async move {
-            exit_notify.notified().await;
+            exited.wait().await;
 
             // Check if the exit was unexpected (state is still Running).
             // If stop_server/kill_server initiated the shutdown, they will have
@@ -1640,7 +1640,7 @@ impl ManagerRef<'_, ServerManager> {
     async fn stop_server_locked(self, id: ServerId) -> anyhow::Result<()> {
         let provider = self.get_provider();
 
-        let exit_notify = {
+        let mut exited = {
             let servers = self.servers.read().await;
             let server = servers
                 .get(&id)
@@ -1649,7 +1649,7 @@ impl ManagerRef<'_, ServerManager> {
                 .handle
                 .as_ref()
                 .ok_or_else(|| anyhow!("Server is not running"))?;
-            handle.exit_notify.clone()
+            handle.exited.clone()
         };
 
         // Send stop command
@@ -1678,7 +1678,7 @@ impl ManagerRef<'_, ServerManager> {
         tokio::spawn(async move {
             const GRACEFUL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-            match tokio::time::timeout(GRACEFUL_TIMEOUT, exit_notify.notified()).await {
+            match tokio::time::timeout(GRACEFUL_TIMEOUT, exited.wait()).await {
                 Ok(()) => {
                     info!("Server {} process exited gracefully", id.0);
                 }
@@ -1696,11 +1696,8 @@ impl ManagerRef<'_, ServerManager> {
                     }
                     drop(servers);
                     // Brief wait for the kill to complete
-                    let _ = tokio::time::timeout(
-                        std::time::Duration::from_secs(5),
-                        exit_notify.notified(),
-                    )
-                    .await;
+                    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), exited.wait())
+                        .await;
                 }
             }
 
@@ -3531,11 +3528,14 @@ mod tests {
 
         let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
         let (stdin_tx, _stdin_rx) = mpsc::channel::<String>(1);
+        let (exited_tx, exited) = provider::exit_signal();
+        // Keep the process alive from the signal's point of view.
+        std::mem::forget(exited_tx);
         let handle = ServerHandle {
             process_id: 4242,
             kill_tx,
             stdin_tx,
-            exit_notify: Arc::new(tokio::sync::Notify::new()),
+            exited,
         };
 
         manager.servers.write().await.insert(
@@ -3605,9 +3605,12 @@ mod tests {
     fn running_server_with_handle() -> ServerData {
         let (kill_tx, _kill_rx) = mpsc::channel::<()>(1);
         let (stdin_tx, _stdin_rx) = mpsc::channel::<String>(1);
-        // Leak the receivers so the channels stay open for the test's lifetime.
+        let (exited_tx, exited) = provider::exit_signal();
+        // Leak the far ends so the channels stay open — and the process stays
+        // un-exited — for the test's lifetime.
         std::mem::forget(_kill_rx);
         std::mem::forget(_stdin_rx);
+        std::mem::forget(exited_tx);
         ServerData {
             shortpath: "test-server".to_string(),
             state: ServerState::Running {
@@ -3619,7 +3622,7 @@ mod tests {
                 process_id: 4242,
                 kill_tx,
                 stdin_tx,
-                exit_notify: Arc::new(tokio::sync::Notify::new()),
+                exited,
             }),
             last_log_id: None,
         }
