@@ -16,7 +16,8 @@ use tokio::sync::watch;
 use tracing::{debug, trace, warn};
 
 use super::modrinth::{
-    MAX_EXTRACTED_OVERRIDE_BYTES, copy_bounded, is_symlink_mode, secure_path_join,
+    MAX_EXTRACTED_OVERRIDE_BYTES, MAX_HASHED_ENTRY_BYTES, copy_bounded, is_symlink_mode,
+    secure_path_join,
 };
 
 use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
@@ -343,8 +344,7 @@ pub async fn prepare_modpack_from_gdlpack(
                         // entry over the limit can never legitimately be the small
                         // unresolved file we are matching against anyway.
                         let mut contents = Vec::new();
-                        if copy_bounded(&mut entry, &mut contents, MAX_EXTRACTED_OVERRIDE_BYTES)
-                            .is_err()
+                        if copy_bounded(&mut entry, &mut contents, MAX_HASHED_ENTRY_BYTES).is_err()
                         {
                             continue;
                         }
