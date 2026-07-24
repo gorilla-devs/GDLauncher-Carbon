@@ -321,11 +321,37 @@ impl MigrationSet {
         user_version: i32,
     ) -> DbResult<OpenVerdict> {
         // Rows for every version ahead of our own, newest first (down-run order).
+        //
+        // Bounded above by `user_version`, which counts what was actually
+        // applied. A torn file-level restore (a VSS or Time Machine copy of the
+        // main file out of sync with its -wal) can leave `_migrations` rows for
+        // versions the restored schema never received; `apply_pending` was
+        // hardened for that same state. Down-running such a row would apply a
+        // migration's inverse to a schema that never got its forward half, and
+        // for the hand-written DML class of down that transforms data while
+        // leaving the schema untouched — so the verification below still
+        // matches and the corruption commits as a successful downgrade.
+        let stale_ahead = {
+            let mut stmt = conn.prepare(
+                "SELECT version FROM _migrations WHERE version > ?1 ORDER BY version DESC",
+            )?;
+            let rows = stmt.query_map([user_version], |row| row.get::<_, i32>(0))?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+        if !stale_ahead.is_empty() {
+            tracing::warn!(
+                "ignoring _migrations row(s) {stale_ahead:?} above user_version {user_version}: \
+                 recorded but never applied to this schema, so their downs are not run"
+            );
+        }
+
         let ahead = {
             let mut stmt = conn.prepare(
-                "SELECT version, kind, down_sql FROM _migrations WHERE version > ?1 ORDER BY version DESC",
+                "SELECT version, kind, down_sql FROM _migrations
+                 WHERE version > ?1 AND version <= ?2
+                 ORDER BY version DESC",
             )?;
-            let rows = stmt.query_map([count], |row| {
+            let rows = stmt.query_map([count, user_version], |row| {
                 Ok((
                     row.get::<_, i32>(0)?,
                     row.get::<_, String>(1)?,
