@@ -2,10 +2,13 @@
 import { Image } from "astro:assets"
 import HeroDownload from "./HeroDownload"
 import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
-import { LAUNCHER_VERSION } from "../../lib/launcherManifests"
+import { getLauncherVersion } from "../../lib/launcherManifests"
 
 const locale = getLocaleFromUrl(Astro.url.pathname)
 const t = useTranslations(locale)
+// The pages rendering this hero are prerendered, so this resolves during the
+// build and ships as a constant.
+const launcherVersion = await getLauncherVersion()
 ---
 
 <section class="relative min-h-[640px] lg:h-[calc(100vh-4rem)] flex flex-col items-center overflow-hidden">
@@ -52,7 +55,7 @@ const t = useTranslations(locale)
         <div class="mb-8" data-scroll="fade-up" data-scroll-delay="200">
           <HeroDownload
             client:only="solid-js"
-            version={LAUNCHER_VERSION}
+            version={launcherVersion}
             labels={{
               windows: t("download.button.windows"),
               macos: t("download.button.macos"),

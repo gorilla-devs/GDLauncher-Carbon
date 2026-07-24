@@ -1,17 +1,24 @@
 import type { APIRoute } from "astro"
-import { DOWNLOAD_URLS } from "../../lib/launcherManifests"
+import { getDownloadUrl, type DownloadOs } from "../../lib/launcherManifests"
 
 export const prerender = false
 
+const SUPPORTED_OS = ["windows", "mac", "linux"] as const
+
+function isSupported(os: string): os is DownloadOs {
+  return (SUPPORTED_OS as readonly string[]).includes(os)
+}
+
 // Thin worker route: keeps the stable /download/<os> URL and reliable worker
-// routing, but the redirect target is resolved at build time (see
-// launcherManifests.ts), so there's no runtime fetch and nothing to cache.
-export const GET: APIRoute = ({ params }) => {
+// routing. The redirect target comes from the release manifest, read on this
+// isolate's first download and reused after that (see launcherManifests.ts).
+export const GET: APIRoute = async ({ params }) => {
   const os = params.os
-  if (!os || !(os in DOWNLOAD_URLS)) {
+  if (!os || !isSupported(os)) {
     return new Response("Not Found", { status: 404 })
   }
-  const url = DOWNLOAD_URLS[os as keyof typeof DOWNLOAD_URLS]
+
+  const url = await getDownloadUrl(os)
   if (!url) {
     return new Response("Download URL unavailable", { status: 502 })
   }
