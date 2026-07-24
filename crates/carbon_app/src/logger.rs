@@ -6,8 +6,8 @@ use tracing_subscriber::{
 };
 
 /// Hard cap for a single log file (launcher session logs and per-instance game logs).
-/// A log-spamming game previously grew one session file past 100 GB; once the cap is
-/// reached, further output is dropped after a single truncation notice.
+/// Without it a log-spamming game can grow one session file past 100 GB; once the cap
+/// is reached, further output is dropped after a single truncation notice.
 pub const MAX_LOG_FILE_SIZE: u64 = 256 * 1024 * 1024;
 
 pub const LOG_TRUNCATION_NOTICE: &[u8] = b"\n[log truncated: file size cap reached]\n";

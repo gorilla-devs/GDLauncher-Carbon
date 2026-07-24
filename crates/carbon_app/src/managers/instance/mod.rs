@@ -678,8 +678,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .await?;
         }
 
-        // Also keep groupIndex in sync for backwards compatibility
-        // (This maintains the old ordering system while we transition)
+        // Also keep groupIndex in sync for backwards compatibility: it's the
+        // legacy ordering field, restamped here from the library-position order.
         let all_groups =
             instance_repo::get_groups_with_library_position_ordered(&self.app.db).await?;
 
@@ -2084,8 +2084,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let app = self.app.clone();
 
         // Run the actual deletion in a spawned task so the rspc call returns
-        // promptly, but log failures (previously they were dropped silently
-        // and the instance would re-appear next list).
+        // promptly, but log failures: a dropped one leaves the instance to
+        // re-appear on the next list.
         tokio::spawn(async move {
             if let Err(e) = app.instance_manager()._delete_instance(instance_id).await {
                 tracing::error!("Failed to delete instance {}: {:#}", instance_id.0, e);
@@ -2260,9 +2260,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         instance_id: InstanceId,
         name: String,
     ) -> anyhow::Result<InstanceId> {
-        // Step 1: snapshot what we need from `instances` under a read lock and
+        // First snapshot what we need from `instances` under a read lock and
         // release it before the long fs copy. Holding `instances` across the
-        // copy serialized every other op (prepare_game, list_mods, etc.) for
+        // copy serializes every other op (prepare_game, list_mods, etc.) for
         // the entire duration of duplication.
         let (mut new_info, src_shortpath) = {
             let instances = self.instances.read().await;
@@ -2334,7 +2334,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             )
             .await?;
 
-        // Step 2: only now reacquire the write lock to insert the new entry.
+        // Only now reacquire the write lock to insert the new entry.
         let mut instances = self.instances.write().await;
         instances.insert(
             id,

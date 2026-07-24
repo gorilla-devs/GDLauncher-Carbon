@@ -192,7 +192,7 @@ pub async fn prepare_modpack_from_gdlpack(
             *state = ProgressState::ResolvingFiles(0, total_files);
         });
 
-        // Step 1: Batch resolve from Modrinth (primary source)
+        // Resolve from Modrinth first — the primary source.
         debug!("Resolving {} files from Modrinth", platform_files.len());
         let modrinth_results = match batch_resolve_modrinth(app, &platform_files).await {
             Ok(results) => {
@@ -211,14 +211,14 @@ pub async fn prepare_modpack_from_gdlpack(
             *state = ProgressState::ResolvingFiles(total_files / 2, total_files);
         });
 
-        // Step 2: Collect files not found in Modrinth for CurseForge lookup
+        // Collect the files Modrinth didn't resolve, to look up on CurseForge.
         let not_in_modrinth: Vec<FileHashes> = platform_files
             .iter()
             .filter(|h| !modrinth_results.contains_key(&h.sha512))
             .cloned()
             .collect();
 
-        // Step 3: Batch resolve remaining from CurseForge
+        // Resolve the remainder from CurseForge.
         let curseforge_results = if !not_in_modrinth.is_empty() {
             debug!(
                 "Resolving {} remaining files from CurseForge",
@@ -246,7 +246,7 @@ pub async fn prepare_modpack_from_gdlpack(
             *state = ProgressState::ResolvingFiles(total_files, total_files);
         });
 
-        // Step 4: Build downloadables from resolved files
+        // Build downloadables from the resolved files.
         for hashes in &platform_files {
             // Try Modrinth first, then CurseForge
             let resolved = modrinth_results

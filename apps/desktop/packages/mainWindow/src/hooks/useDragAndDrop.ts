@@ -36,7 +36,6 @@ export function useDragSource(
     // Only handle left click
     if (e.button !== 0) return
 
-    // Check if disabled
     if (options.disabled?.()) return
 
     // Prevent text selection

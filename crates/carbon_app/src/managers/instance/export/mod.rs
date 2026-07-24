@@ -692,7 +692,7 @@ impl ManagerRef<'_, InstanceExportManager> {
             instance_id
         );
 
-        // Use the existing instance_icon method which handles path resolution correctly
+        // Reuse the instance's own icon as the share background.
         let Some((_icon_name, image_data)) = self
             .app
             .instance_manager()

@@ -74,7 +74,6 @@ const GroupHeader = (props: GroupHeaderProps) => {
     }
   })
 
-  // Handle save
   const handleSave = () => {
     const newName = editValue().trim()
     if (newName && newName !== props.name) {

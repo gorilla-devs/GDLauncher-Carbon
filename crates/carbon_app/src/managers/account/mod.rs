@@ -2165,8 +2165,6 @@ fn is_jwt_expired(token: &str) -> bool {
     (exp as i64) <= deadline
 }
 
-// get_gdl_auth_token removed — replaced by ensure_gdl_auth_token on ManagerRef
-
 /*impl From<FullAccount> for db::account::Data {
     fn from(value: FullAccount) -> Self {
         let (access_token, refresh_token, token_expires) = match value.type_ {
