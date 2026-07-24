@@ -4,16 +4,47 @@ use anyhow::Result;
 use async_trait::async_trait;
 use carbon_rt_path::ServerPath;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::sync::{Notify, mpsc};
+use tokio::sync::{mpsc, watch};
 
 #[derive(Debug)]
 pub struct ServerHandle {
     pub process_id: u32,
     pub kill_tx: mpsc::Sender<()>,
     pub stdin_tx: mpsc::Sender<String>,
-    /// Notified when the server process exits (gracefully or after kill).
-    pub exit_notify: Arc<Notify>,
+    /// Resolves once the server process has exited, gracefully or after a kill.
+    pub exited: ExitSignal,
+}
+
+/// "The server process has exited", readable by any number of waiters.
+///
+/// Level-triggered, which is the whole point: waiters attach at unpredictable
+/// times — the crash watcher spawns behind a servers-map write, a database
+/// write and a full process-table scan, and a stop can be requested at any
+/// moment — and a JVM that dies on a bad `-X` flag can be gone before any of
+/// them. An edge-triggered wake delivered into that gap reaches nobody and is
+/// never redelivered, leaving the server displayed as Running forever and
+/// every later stop waiting out its full timeout.
+#[derive(Debug, Clone)]
+pub struct ExitSignal(watch::Receiver<bool>);
+
+impl ExitSignal {
+    /// Resolves once the process has exited, immediately if it already had.
+    pub async fn wait(&mut self) {
+        // `wait_for` inspects the current value before it waits, so an exit
+        // that landed first still resolves this. Its only error is every
+        // sender having been dropped, which happens when the supervising task
+        // finishes — after it published the exit — so that means the same
+        // thing.
+        let _ = self.0.wait_for(|exited| *exited).await;
+    }
+}
+
+/// Creates an [`ExitSignal`] and the sender that resolves it. The sender
+/// belongs to whatever supervises the process; dropping it resolves every
+/// waiter, so it must outlive the process it reports on.
+pub fn exit_signal() -> (watch::Sender<bool>, ExitSignal) {
+    let (tx, rx) = watch::channel(false);
+    (tx, ExitSignal(rx))
 }
 
 #[async_trait]
@@ -76,6 +107,50 @@ pub async fn read_pid_file(server_root: &Path) -> Result<Option<u32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn exit_signalled_before_a_waiter_attaches_is_still_observed() {
+        let (exited_tx, mut exited) = exit_signal();
+
+        // The JVM dies before anything waits on it. That window is real: the
+        // crash watcher only attaches after a servers-map write, a database
+        // write and a process-table scan, and a bad `-X` flag kills the JVM in
+        // about the time the scan alone takes.
+        exited_tx.send(true).unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), exited.wait())
+            .await
+            .expect("a waiter attaching after the exit must still observe it");
+    }
+
+    #[tokio::test]
+    async fn every_waiter_is_released_by_one_exit() {
+        // The crash watcher and an in-flight stop both wait on the same signal.
+        let (exited_tx, exited) = exit_signal();
+        let mut watcher = exited.clone();
+        let mut stopper = exited;
+
+        exited_tx.send(true).unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            watcher.wait().await;
+            stopper.wait().await;
+        })
+        .await
+        .expect("one exit must release every waiter, not just the first");
+    }
+
+    #[tokio::test]
+    async fn a_running_process_does_not_resolve_the_signal() {
+        let (_exited_tx, mut exited) = exit_signal();
+
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(300), exited.wait())
+                .await
+                .is_err(),
+            "the signal must stay pending while the process is alive"
+        );
+    }
 
     #[tokio::test]
     async fn pid_file_write_read_remove_lifecycle() {
