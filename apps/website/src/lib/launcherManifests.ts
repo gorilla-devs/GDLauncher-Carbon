@@ -1,16 +1,17 @@
 import yaml from "js-yaml"
 
 /**
- * Launcher version and per-OS download URLs, resolved once at build time.
+ * Launcher version and per-OS download URLs, read from the release manifests.
  *
- * The website is redeployed on every launcher release, so both the version
- * and the download filenames are build-time constants. Resolving them here
- * means the homepage and the /download/[os] redirect serve correct values
- * with no runtime fetch and no cache-invalidation problem: a redeploy is, by
- * definition, a fresh value.
+ * Prerendered pages resolve these while `astro build` runs, so the homepage
+ * ships the version as a constant. `/download/[os]` does not: it is a worker
+ * route, so this module is evaluated inside the isolate serving the request
+ * and the manifests are read on first use, then memoized for that isolate.
  *
- * A failed fetch (e.g. an offline local build) degrades to "latest" for the
- * version and null download URLs (the redirect endpoint then returns 502).
+ * Only successes are memoized, and each OS is resolved on its own. An isolate
+ * lives far longer than one request, so caching a failed read — or letting one
+ * unreadable manifest discard the other two — would take download buttons
+ * across the whole site out until that isolate happened to be recycled.
  */
 interface Manifest {
   version?: string
@@ -25,45 +26,44 @@ const MANIFEST_URL = {
 
 export type DownloadOs = keyof typeof MANIFEST_URL
 
-async function fetchManifest(url: string): Promise<Manifest> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return yaml.load(await res.text()) as Manifest
+const FALLBACK_VERSION = "latest"
+
+const manifests = new Map<DownloadOs, Manifest>()
+
+async function getManifest(os: DownloadOs): Promise<Manifest | null> {
+  const memoized = manifests.get(os)
+  if (memoized) return memoized
+
+  try {
+    const res = await fetch(MANIFEST_URL[os])
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const manifest = yaml.load(await res.text()) as Manifest
+    manifests.set(os, manifest)
+    return manifest
+  } catch (e) {
+    console.error(`Failed to read the ${os} launcher manifest`, e)
+    return null
+  }
 }
 
-let version = "latest"
-const downloadUrls: Record<DownloadOs, string | null> = {
-  windows: null,
-  mac: null,
-  linux: null
+/** Installer URL for `os`, or null when its manifest can't be read. */
+export async function getDownloadUrl(os: DownloadOs): Promise<string | null> {
+  const manifest = await getManifest(os)
+  if (!manifest?.path) return null
+
+  // The mac manifest reports a .zip path because that's what electron-updater
+  // tracks for delta updates, but the installer users want is the .dmg sitting
+  // next to it at the same base name.
+  const path =
+    os === "mac" && manifest.path.endsWith(".zip")
+      ? manifest.path.replace(/\.zip$/, ".dmg")
+      : manifest.path
+
+  return `https://cdn-raw.gdl.gg/launcher/${path}`
 }
 
-try {
-  const [win, mac, linux] = await Promise.all([
-    fetchManifest(MANIFEST_URL.windows),
-    fetchManifest(MANIFEST_URL.mac),
-    fetchManifest(MANIFEST_URL.linux)
-  ])
-
-  if (win.version) version = win.version
-  if (win.path) {
-    downloadUrls.windows = `https://cdn-raw.gdl.gg/launcher/${win.path}`
-  }
-  if (mac.path) {
-    // The mac manifest reports a .zip path because that's what
-    // electron-updater tracks for delta updates, but the installer users
-    // want is the .dmg sitting next to it at the same base name.
-    const path = mac.path.endsWith(".zip")
-      ? mac.path.replace(/\.zip$/, ".dmg")
-      : mac.path
-    downloadUrls.mac = `https://cdn-raw.gdl.gg/launcher/${path}`
-  }
-  if (linux.path) {
-    downloadUrls.linux = `https://cdn-raw.gdl.gg/launcher/${linux.path}`
-  }
-} catch {
-  // Keep the "latest" / null fallbacks.
+/** Released launcher version, or "latest" when the manifest can't be read. */
+export async function getLauncherVersion(): Promise<string> {
+  const manifest = await getManifest("windows")
+  return manifest?.version ?? FALLBACK_VERSION
 }
-
-export const LAUNCHER_VERSION = version
-export const DOWNLOAD_URLS = downloadUrls
