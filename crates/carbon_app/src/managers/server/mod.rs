@@ -1541,9 +1541,12 @@ impl ManagerRef<'_, ServerManager> {
             // bridge into a context where we can call start_server.
             let (tx, rx) = tokio::sync::oneshot::channel::<anyhow::Result<()>>();
             let app2 = app.clone();
+            // Captured here, on a runtime thread: the handle lives in a
+            // thread-local that a freshly spawned OS thread does not inherit,
+            // so resolving it inside the closure below would panic instead.
+            let rt = tokio::runtime::Handle::current();
             // This inner task owns the Arc and can create a ManagerRef locally
             std::thread::spawn(move || {
-                let rt = tokio::runtime::Handle::current();
                 let result = rt.block_on(app2.server_manager().start_server(id));
                 let _ = tx.send(result);
             });
@@ -3266,6 +3269,34 @@ fn generate_shortpath(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The auto-restart watcher bridges into `start_server` by moving a runtime
+    /// handle onto a dedicated OS thread, because the `ManagerRef` future is not
+    /// `Send`. Resolving the handle on that thread instead would panic — tokio
+    /// keeps it in a thread-local that `std::thread::spawn` does not inherit —
+    /// and the panic surfaces only as a dropped oneshot, so the restart silently
+    /// never happens.
+    #[tokio::test]
+    async fn runtime_handle_bridges_onto_a_plain_os_thread() {
+        let (tx, rx) = tokio::sync::oneshot::channel::<u32>();
+        let rt = tokio::runtime::Handle::current();
+
+        std::thread::spawn(move || {
+            // Drives a future that needs the runtime's timer driver, the way
+            // `start_server` needs its IO driver.
+            let result = rt.block_on(async {
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                7
+            });
+            let _ = tx.send(result);
+        });
+
+        assert_eq!(
+            rx.await.expect("bridge thread dropped the channel"),
+            7,
+            "the bridge must run the future rather than panicking"
+        );
+    }
 
     #[test]
     fn resolve_server_port_defaults_and_bounds() {
