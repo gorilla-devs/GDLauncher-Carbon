@@ -14,6 +14,7 @@ use anyhow::{Context, anyhow, bail};
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_repos::repos::server::{self as server_repo, IndexShift, ServerPatch};
+use carbon_rt_path::ServerPath;
 use chrono::Utc;
 use dashmap::DashMap;
 use std::collections::HashMap;
@@ -60,6 +61,28 @@ fn crash_restart_delay(attempts: u32) -> std::time::Duration {
 /// IP — can't smuggle in extra newline-separated console commands.
 fn sanitize_console_command(command: &str) -> String {
     command.chars().filter(|c| !c.is_control()).collect()
+}
+
+/// Picks the directory an installed addon belongs in.
+///
+/// A server reads `.jar` mods from `mods/` and `.zip` datapacks from
+/// `world/datapacks/`, and `cache_server_local` scans exactly those two
+/// pairings — a file in the other directory is both dead to the server and
+/// invisible in the addon list, so it can't even be removed from the UI.
+///
+/// The extension is part of the decision, not just the project's type: a
+/// datapack project also publishes loader-packaged `.jar` versions, and those
+/// are mods regardless of how the project is classified.
+fn server_addon_dir(
+    server_path: &ServerPath,
+    is_datapack_project: bool,
+    filename: &str,
+) -> std::path::PathBuf {
+    if is_datapack_project && filename.ends_with(".zip") {
+        server_path.get_datapacks_path()
+    } else {
+        server_path.get_mods_path()
+    }
 }
 
 /// Resolves the server port, defaulting when unset, and rejects a value outside
@@ -2174,7 +2197,7 @@ impl ManagerRef<'_, ServerManager> {
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
         use carbon_net::{Checksum, DownloadOptions, Downloadable};
-        use carbon_platforms::curseforge::filters::ModFileParameters;
+        use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
 
         let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
@@ -2197,16 +2220,29 @@ impl ManagerRef<'_, ServerManager> {
             .await?
             .data;
 
+        let project = self
+            .app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod(ModParameters {
+                mod_id: project_id as i32,
+            })
+            .await?;
+
         let download_url = file
             .download_url
             .clone()
             .ok_or_else(|| anyhow!("Mod cannot be downloaded without privileged API key"))?;
 
-        let mods_path = server_path.get_mods_path();
-        tokio::fs::create_dir_all(&mods_path).await?;
-        // The filename comes from the platform response; confine it under mods/
-        // so a `..`/absolute name can't write elsewhere.
-        let install_path = secure_path_join(&mods_path, &file.file_name)?;
+        let install_dir = server_addon_dir(
+            &server_path,
+            project.data.class_id == Some(carbon_platforms::curseforge::ClassId::Datapacks),
+            &file.file_name,
+        );
+        tokio::fs::create_dir_all(&install_dir).await?;
+        // The filename comes from the platform response; confine it under the
+        // addon directory so a `..`/absolute name can't write elsewhere.
+        let install_path = secure_path_join(&install_dir, &file.file_name)?;
 
         let checksums = file
             .hashes
@@ -2313,7 +2349,7 @@ impl ManagerRef<'_, ServerManager> {
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
         use carbon_net::{Checksum, DownloadOptions, Downloadable};
-        use carbon_platforms::modrinth::search::VersionID;
+        use carbon_platforms::modrinth::search::{ProjectID, VersionID};
 
         let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
@@ -2332,17 +2368,28 @@ impl ManagerRef<'_, ServerManager> {
             .get_version(VersionID(version_id.clone()))
             .await?;
 
+        let project = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_project(ProjectID(project_id.clone()))
+            .await?;
+
         let file = version
             .files
             .iter()
             .reduce(|a, b| if b.primary { b } else { a })
             .ok_or_else(|| anyhow!("Modrinth version has no files"))?;
 
-        let mods_path = server_path.get_mods_path();
-        tokio::fs::create_dir_all(&mods_path).await?;
-        // The filename comes from the platform response; confine it under mods/
-        // so a `..`/absolute name can't write elsewhere.
-        let install_path = secure_path_join(&mods_path, &file.filename)?;
+        let install_dir = server_addon_dir(
+            &server_path,
+            project.project_type == carbon_platforms::modrinth::project::ProjectType::DataPack,
+            &file.filename,
+        );
+        tokio::fs::create_dir_all(&install_dir).await?;
+        // The filename comes from the platform response; confine it under the
+        // addon directory so a `..`/absolute name can't write elsewhere.
+        let install_path = secure_path_join(&install_dir, &file.filename)?;
 
         let checksum = Checksum::Sha1(file.hashes.sha1.clone());
 
@@ -3323,6 +3370,31 @@ mod tests {
         assert_eq!(
             sanitize_console_command("ban-ip 1.2.3.4 reason\r\nop attacker"),
             "ban-ip 1.2.3.4 reasonop attacker"
+        );
+    }
+
+    #[test]
+    fn server_addon_dir_keeps_datapacks_out_of_mods() {
+        let server_path = ServerPath::new(std::path::PathBuf::from("servers/test"));
+
+        // A datapack under `mods/` is dead twice over: the server never loads
+        // it, and `cache_server_local` only scans `*.jar` there, so it can't be
+        // listed or deleted from the UI either.
+        assert_eq!(
+            server_addon_dir(&server_path, true, "cool-datapack.zip"),
+            server_path.get_datapacks_path()
+        );
+
+        assert_eq!(
+            server_addon_dir(&server_path, false, "cool-mod.jar"),
+            server_path.get_mods_path()
+        );
+
+        // A datapack project's loader-packaged version is a mod, and belongs in
+        // `mods/` despite how the project is classified.
+        assert_eq!(
+            server_addon_dir(&server_path, true, "cool-datapack-fabric.jar"),
+            server_path.get_mods_path()
         );
     }
 

@@ -673,10 +673,10 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
   // Which addon types make sense for whatever the search is adding to.
   //
-  // Servers only ever consume mods and datapacks — `listServerAddons` scans
-  // exactly those two directories, and every install path writes into `mods/`,
-  // so offering shaders or resource packs here would drop them into the
-  // server's mods folder. Modpacks are excluded for instances and servers
+  // Servers only ever consume mods and datapacks — those are the only two
+  // directories `listServerAddons` scans, and the only two an install can
+  // target, so offering shaders or resource packs here would drop them into
+  // the server's mods folder. Modpacks are excluded for instances and servers
   // alike: picking one from an "add addons" browse creates a whole new
   // instance/server rather than adding anything to the current one.
   const allowedAddonTypes = createMemo<FEUnifiedSearchType[]>(() => {
