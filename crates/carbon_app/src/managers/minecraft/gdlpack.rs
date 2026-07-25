@@ -47,6 +47,28 @@ struct ResolvedFile {
 /// Batch size for API calls (both platforms support up to 1000)
 const BATCH_SIZE: usize = 1000;
 
+/// Picks the hash a resolved file's download is verified against.
+///
+/// `platform_sha1` describes exactly what the platform's CDN will serve, so it
+/// wins when present. It often isn't: CurseForge's fingerprint results carry a
+/// SHA-1 only sometimes, and a gdlpack written by another launcher's exporter
+/// need not populate `sha1` at all, since Modrinth resolution only needs
+/// `sha512` and CurseForge only needs `murmur2`. Each remaining digest is
+/// therefore taken from the manifest in strength order, and an absent hash
+/// yields `None` — attaching an empty one would fail every download it was
+/// meant to protect, with a mismatch no retry could clear.
+fn download_checksum(platform_sha1: &str, manifest: &FileHashes) -> Option<carbon_net::Checksum> {
+    if !platform_sha1.is_empty() {
+        Some(carbon_net::Checksum::Sha1(platform_sha1.to_string()))
+    } else if !manifest.sha512.is_empty() {
+        Some(carbon_net::Checksum::Sha512(manifest.sha512.clone()))
+    } else if !manifest.sha1.is_empty() {
+        Some(carbon_net::Checksum::Sha1(manifest.sha1.clone()))
+    } else {
+        None
+    }
+}
+
 /// Batch resolve files from Modrinth using SHA512 hashes
 /// Returns a map of SHA512 -> (download_url, relative_path)
 async fn batch_resolve_modrinth(
@@ -270,15 +292,8 @@ pub async fn prepare_modpack_from_gdlpack(
                             .map(|(p, _)| p.clone())
                     });
 
-                    // Prefer SHA1 from platform, fall back to manifest
-                    let sha1 = if !file.sha1.is_empty() {
-                        file.sha1.clone()
-                    } else {
-                        hashes.sha1.clone()
-                    };
-
                     let downloadable = Downloadable::new(&file.download_url, target_path)
-                        .with_checksum(Some(carbon_net::Checksum::Sha1(sha1)))
+                        .with_checksum(download_checksum(&file.sha1, hashes))
                         .with_size(file.size);
 
                     downloadables.push((downloadable, skip_path));
@@ -536,4 +551,50 @@ pub async fn prepare_modpack_from_gdlpack(
         version,
         downloadables,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn manifest_hashes(sha512: &str, sha1: &str) -> FileHashes {
+        FileHashes {
+            sha512: sha512.to_string(),
+            sha1: sha1.to_string(),
+            murmur2: 1,
+        }
+    }
+
+    #[test]
+    fn the_platform_sha1_wins_when_the_platform_supplied_one() {
+        match download_checksum("platform-sha1", &manifest_hashes("mr-sha512", "mr-sha1")) {
+            Some(carbon_net::Checksum::Sha1(hash)) => assert_eq!(hash, "platform-sha1"),
+            other => panic!("expected the platform SHA-1, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_manifest_sha512_covers_a_platform_that_reported_no_sha1() {
+        // CurseForge fingerprint matches carry a SHA-1 only sometimes.
+        match download_checksum("", &manifest_hashes("mr-sha512", "mr-sha1")) {
+            Some(carbon_net::Checksum::Sha512(hash)) => assert_eq!(hash, "mr-sha512"),
+            other => panic!("expected the manifest SHA-512, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_manifest_sha1_is_the_last_resort() {
+        match download_checksum("", &manifest_hashes("", "mr-sha1")) {
+            Some(carbon_net::Checksum::Sha1(hash)) => assert_eq!(hash, "mr-sha1"),
+            other => panic!("expected the manifest SHA-1, got {other:?}"),
+        }
+    }
+
+    /// A foreign exporter may populate only `murmur2`, which resolves on
+    /// CurseForge without any digest. Verification is then skipped rather than
+    /// run against an empty hash, which would fail every such download.
+    #[test]
+    fn a_file_with_no_digest_anywhere_is_left_unverified() {
+        assert!(download_checksum("", &manifest_hashes("", "")).is_none());
+    }
 }
