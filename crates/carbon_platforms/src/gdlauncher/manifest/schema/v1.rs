@@ -126,12 +126,34 @@ pub struct OptionalFeature {
     pub override_paths: Vec<String>,
 }
 
+/// Folds a hex digest to lowercase as it is read.
+///
+/// A gdlpack is an interchange format, so its hashes are written by whatever
+/// exporter produced the pack, and hex case carries no meaning: `AB12` and
+/// `ab12` are the same digest. Consumers both compare these strings and key maps
+/// by them (the Modrinth resolution map is keyed by the hash sent in the query,
+/// then looked up again by this field), so a digest that arrives in a different
+/// case than the platform reports it would match one use and miss the other.
+/// Folding once here leaves every downstream use working on one casing.
+///
+/// ASCII-only on purpose: a hex digest is ASCII, and full Unicode folding would
+/// let a locale-specific rule alter a character it should leave alone.
+fn deserialize_lowercase_hex<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let hex = String::deserialize(deserializer)?;
+    Ok(hex.to_ascii_lowercase())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileHashes {
     /// SHA-512 hash (Modrinth resolution + primary verification)
+    #[serde(deserialize_with = "deserialize_lowercase_hex")]
     pub sha512: String,
     /// SHA-1 hash (Modrinth resolution + Java verification)
+    #[serde(deserialize_with = "deserialize_lowercase_hex")]
     pub sha1: String,
     /// Murmur2 fingerprint (CurseForge resolution)
     pub murmur2: u32,
@@ -293,5 +315,66 @@ mod tests {
             }
             _ => panic!("Expected Optional feature"),
         }
+    }
+
+    /// A pack written by another launcher may spell its digests in upper case.
+    /// Both carriers of `FileHashes` -- the required platform entry and an
+    /// optional feature's `platforms` list -- must land lowercased, so the
+    /// resolution map is keyed and looked up on one casing.
+    #[test]
+    fn uppercase_manifest_hashes_are_read_as_lowercase() {
+        let json = r#"{
+            "formatVersion": 1,
+            "name": "Foreign Pack",
+            "createdAt": "2024-01-15T10:30:00Z",
+            "dependencies": {
+                "minecraft": "1.20.1",
+                "modloaders": [
+                    { "type": "forge", "version": "47.2.0", "primary": true }
+                ]
+            },
+            "entries": [
+                {
+                    "type": "platform",
+                    "hashes": { "sha512": "AB12CD", "sha1": "EF34AB", "murmur2": 123456 }
+                },
+                {
+                    "type": "optional",
+                    "description": "Shader support",
+                    "platforms": [{ "sha512": "DEADBEEF", "sha1": "CAFEBABE", "murmur2": 789012 }],
+                    "overridePaths": []
+                }
+            ]
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).unwrap();
+
+        match &manifest.entries[0] {
+            PackFile::Platform(pf) => {
+                assert_eq!(pf.hashes.sha512, "ab12cd");
+                assert_eq!(pf.hashes.sha1, "ef34ab");
+                assert_eq!(pf.hashes.murmur2, 123456);
+            }
+            _ => panic!("Expected Platform file"),
+        }
+
+        match &manifest.entries[1] {
+            PackFile::Optional(of) => {
+                assert_eq!(of.platforms[0].sha512, "deadbeef");
+                assert_eq!(of.platforms[0].sha1, "cafebabe");
+            }
+            _ => panic!("Expected Optional feature"),
+        }
+    }
+
+    /// Mixed case must fold too -- a digest is not required to arrive uniformly
+    /// cased, and a lowercase one must pass through untouched.
+    #[test]
+    fn mixed_and_lower_case_hashes_both_normalize() {
+        let hashes: FileHashes =
+            serde_json::from_str(r#"{ "sha512": "aB1c", "sha1": "abcd", "murmur2": 1 }"#).unwrap();
+
+        assert_eq!(hashes.sha512, "ab1c");
+        assert_eq!(hashes.sha1, "abcd");
     }
 }
