@@ -117,7 +117,18 @@ export async function stopHarness(
       }
     },
     async () => {
-      fs.rmSync(harness.runtimePath, { recursive: true, force: true })
+      // `force: true` only suppresses ENOENT. On Windows the core module is
+      // killed via `TerminateProcess` (see `main.rs`'s
+      // `wait_for_termination_signal`), which can leave the SQLite files
+      // under `<scratch>/data` briefly handle-locked after `app.close()`
+      // returns — retrying rides out that window instead of throwing
+      // EBUSY/EPERM straight out of teardown.
+      fs.rmSync(harness.runtimePath, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100
+      })
     }
   ]
 
