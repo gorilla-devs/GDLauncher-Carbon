@@ -487,6 +487,7 @@ const HomeGridInner = () => {
 
   return (
     <div
+      data-testid="library-root"
       class="box-border flex flex-1 flex-col p-6"
       onMouseDown={(e) => {
         if (!shouldIgnoreClick(e)) {

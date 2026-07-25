@@ -375,7 +375,10 @@ export function EnrollingStep(props: EnrollingStepProps) {
           </Show>
 
           {/* Step 2: Enter the code */}
-          <div class="bg-darkSlate-800 flex flex-col items-center gap-2 rounded-xl px-6 py-4">
+          <div
+            data-testid="login-device-code"
+            class="bg-darkSlate-800 flex flex-col items-center gap-2 rounded-xl px-6 py-4"
+          >
             <Show when={!expired()}>
               <p class="text-lightSlate-200 m-0 text-base font-semibold">
                 <Trans key="auth:_trn_login.step_2_enter_code" />

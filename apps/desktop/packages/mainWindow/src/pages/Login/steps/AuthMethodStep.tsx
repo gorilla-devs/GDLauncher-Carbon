@@ -86,6 +86,7 @@ export function AuthMethodStep() {
               <Trans key="auth:_trn_login.trouble_browser_signin" />
             </p>
             <button
+              data-testid="login-use-device-code"
               type="button"
               class="text-primary-400 hover:text-primary-300 cursor-pointer text-sm font-medium underline disabled:cursor-not-allowed disabled:opacity-50"
               onClick={(e) => {
