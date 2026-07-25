@@ -102,6 +102,10 @@ pub fn main() {
 
             let _guard = logger::setup_logger(&runtime_path).await;
 
+            // After the logger so its `E2E MODE` warnings land somewhere: with
+            // no subscriber installed yet, `tracing::warn!` is a silent no-op.
+            managers::account::endpoints::init_from_args();
+
             // Clean up leftover temp files/folders from previous sessions
             let temp_path = carbon_rt_path::TempPath::new(runtime_path.join("temp"));
             temp_path.cleanup_all().await;

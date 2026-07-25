@@ -16,6 +16,8 @@ use crate::error::request::{
     MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails, censor_error,
 };
 
+use super::endpoints;
+
 #[derive(Debug, Clone)]
 pub struct DeviceCode {
     pub user_code: String,
@@ -38,7 +40,7 @@ impl DeviceCode {
         }
 
         let response = client
-            .get("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
+            .get(endpoints::device_code_url())
             .query(&[
                 ("client_id", env!("MS_AUTH_CLIENT_ID")),
                 (
@@ -77,7 +79,7 @@ impl DeviceCode {
             trace!("Polling for auth token at {:?}", Utc::now());
 
             let response = bare_client
-                .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+                .post(endpoints::ms_token_url())
                 .form(&[
                     ("client_id", env!("MS_AUTH_CLIENT_ID")),
                     (
@@ -187,8 +189,7 @@ impl MsAuth {
         }
 
         let response = client
-            .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
-            //.post("https://login.live.com/oauth20_token.srf")
+            .post(endpoints::ms_token_url())
             .form(&[
                 ("client_id", env!("MS_AUTH_CLIENT_ID")),
                 ("refresh_token", refresh_token),
@@ -249,7 +250,7 @@ impl XboxAuth {
             });
 
             let response = client
-                .post("https://user.auth.xboxlive.com/user/authenticate")
+                .post(endpoints::xbl_authenticate_url())
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .body(reqwest::Body::from(serde_json::to_string(&json)?))
@@ -280,7 +281,7 @@ impl XboxAuth {
         });
 
         let response = client
-            .post("https://xsts.auth.xboxlive.com/xsts/authorize")
+            .post(endpoints::xsts_authorize_url())
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .body(reqwest::Body::from(serde_json::to_string(&json)?))
@@ -512,7 +513,7 @@ impl McAuth {
         trace!("Authenticating Minecraft account");
 
         let response = client
-            .post("https://api.minecraftservices.com/authentication/login_with_xbox")
+            .post(endpoints::mc_login_with_xbox_url())
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .body(reqwest::Body::from(serde_json::to_string(&json)?))
@@ -545,7 +546,7 @@ impl McAuth {
         }
 
         let response = client
-            .get("https://api.minecraftservices.com/entitlements/mcstore")
+            .get(endpoints::mc_entitlements_url())
             .bearer_auth(&self.access_token)
             .send()
             .await
@@ -614,7 +615,7 @@ pub async fn get_profile(
     access_token: &str,
 ) -> anyhow::Result<Result<McProfile, GetProfileError>> {
     let response = client
-        .get("https://api.minecraftservices.com/minecraft/profile")
+        .get(endpoints::mc_profile_url())
         .bearer_auth(access_token)
         .send()
         .await
@@ -683,10 +684,7 @@ pub async fn check_username_available(
     }
 
     let response = client
-        .get(format!(
-            "https://api.minecraftservices.com/minecraft/profile/name/{}/available",
-            username
-        ))
+        .get(endpoints::mc_name_availability_url(username))
         .bearer_auth(access_token)
         .send()
         .await
@@ -725,7 +723,7 @@ pub async fn create_profile(
     let body_str = serde_json::to_string(&body)?;
 
     let response = client
-        .post("https://api.minecraftservices.com/minecraft/profile")
+        .post(endpoints::mc_profile_url())
         .bearer_auth(access_token)
         .header("Content-Type", "application/json")
         .body(reqwest::Body::from(body_str))
@@ -834,6 +832,12 @@ pub enum McEntitlement {
 
 impl McEntitlement {
     fn mojang_jwt_key() -> DecodingKey {
+        #[cfg(feature = "e2e")]
+        if let Some(pem) = endpoints::e2e_entitlement_key() {
+            return DecodingKey::from_rsa_pem(pem)
+                .expect("the e2e entitlement key is not a valid RSA public key PEM");
+        }
+
         // The test at the bottom of this file makes sure this unwrap is fine.
         DecodingKey::from_rsa_pem(include_bytes!("mojang_jwt_signature.pem")).unwrap()
     }
@@ -992,7 +996,7 @@ pub enum AccessTokenStatus {
 
 #[cfg(test)]
 mod test {
-    use super::McEntitlement;
+    use super::{Algorithm, ErrorKind, McEntitlement, Utc, Validation};
 
     /// Make sure it's possible to get a JWT decoding key from
     /// the saved public key.
@@ -1000,5 +1004,43 @@ mod test {
     fn valid_mojang_account_sig() {
         // unwrap performed inside
         let _ = McEntitlement::mojang_jwt_key();
+    }
+
+    #[test]
+    fn mojang_key_verifies_a_token_signed_by_mojang_only() {
+        // A JWT signed with any other key must be rejected. Without this, an
+        // entitlement-key override that leaked into a shipped build would let
+        // an attacker-signed entitlement pass as genuine.
+        //
+        // The claims carry a live `exp`: `Validation::new` requires it by
+        // default, and without it `decode` would fail on the missing claim
+        // before it ever checked the signature, making this pass for the
+        // wrong reason even against a matching key. Pinning the error to
+        // `InvalidSignature` closes that gap.
+        use jsonwebtoken::{EncodingKey, Header, encode};
+
+        let rsa = rsa::RsaPrivateKey::new(&mut rand::thread_rng(), 2048)
+            .expect("generating a test RSA key");
+        let pem = rsa::pkcs8::EncodePrivateKey::to_pkcs8_pem(&rsa, Default::default())
+            .expect("encoding the test key as PKCS#8 PEM");
+
+        let exp = (Utc::now() + chrono::Duration::hours(1)).timestamp();
+        let forged = encode(
+            &Header::new(Algorithm::RS256),
+            &serde_json::json!({ "entitlements": [{ "name": "product_minecraft" }], "exp": exp }),
+            &EncodingKey::from_rsa_pem(pem.as_bytes()).expect("loading the test key"),
+        )
+        .expect("signing the forged entitlement");
+
+        let decoded = jsonwebtoken::decode::<serde_json::Value>(
+            &forged,
+            &McEntitlement::mojang_jwt_key(),
+            &Validation::new(Algorithm::RS256),
+        );
+
+        assert!(
+            matches!(decoded.unwrap_err().kind(), ErrorKind::InvalidSignature),
+            "the default key must reject a non-Mojang signature on its signature, not on its claims"
+        );
     }
 }

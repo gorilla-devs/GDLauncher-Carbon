@@ -75,7 +75,12 @@ const BetaPrompt = (props: ModalProps) => {
           <Button type="secondary" size="large" onClick={handleMaybeLater}>
             <Trans key="modals:_trn_beta_prompt_later" />
           </Button>
-          <Button type="secondary" size="large" onClick={handleNeverAsk}>
+          <Button
+            data-testid="beta-prompt-never"
+            type="secondary"
+            size="large"
+            onClick={handleNeverAsk}
+          >
             <Trans key="modals:_trn_beta_prompt_never" />
           </Button>
         </div>

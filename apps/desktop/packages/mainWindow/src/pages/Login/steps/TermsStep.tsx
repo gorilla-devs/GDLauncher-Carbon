@@ -48,7 +48,10 @@ export function TermsStep(props: TermsStepProps) {
             checked={props.termsAccepted}
             onChange={() => props.onTermsAcceptedChange(!props.termsAccepted)}
           >
-            <span class="text-lightSlate-100 select-none text-base font-medium leading-relaxed ml-2">
+            <span
+              data-testid="login-terms-checkbox"
+              class="text-lightSlate-100 select-none text-base font-medium leading-relaxed ml-2"
+            >
               <Trans key="auth:_trn_login.terms_checkbox_label" />
             </span>
           </Checkbox>

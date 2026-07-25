@@ -36,7 +36,7 @@ jobs:
       - name: Iridium patchfix
         run: node iridium_patchfix.js
       - name: Build
-        run: pnpm build:mac-universal
+        run: pnpm build:mac-universal-e2e
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
@@ -57,6 +57,7 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           TEST_BASE_API: ${{ vars.TEST_BASE_API }}
+          E2E_INTERNAL_AUTH_TOKEN: ${{ secrets.E2E_INTERNAL_AUTH_TOKEN }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
@@ -76,14 +77,12 @@ jobs:
         with:
           name: test-results-macos
           path: ./GDL/apps/desktop/test-results/
-      - name: Upload main.log for debugging
+      - name: Upload e2e debug logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-macos
-          path: |
-            ./GDL/apps/desktop/release/mac-universal/gdl_data/main.log
-            ./GDL/apps/desktop/release/mac-universal/gdl_data/data/__gdl_logs__/*.log
+          path: ./GDL/apps/desktop/test-results/e2e-logs/**/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
@@ -115,7 +114,7 @@ jobs:
       - name: Iridium patchfix
         run: node iridium_patchfix.js
       - name: Build
-        run: pnpm build:linux-x64
+        run: pnpm build:linux-x64-e2e
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
@@ -137,6 +136,7 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           TEST_BASE_API: ${{ vars.TEST_BASE_API }}
+          E2E_INTERNAL_AUTH_TOKEN: ${{ secrets.E2E_INTERNAL_AUTH_TOKEN }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
@@ -164,14 +164,12 @@ jobs:
         with:
           name: test-results-linux
           path: ./GDL/apps/desktop/test-results/
-      - name: Upload main.log for debugging
+      - name: Upload e2e debug logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-linux
-          path: |
-            ./GDL/apps/desktop/release/linux-unpacked/gdl_data/main.log
-            ./GDL/apps/desktop/release/linux-unpacked/gdl_data/data/__gdl_logs__/*.log
+          path: ./GDL/apps/desktop/test-results/e2e-logs/**/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
@@ -210,7 +208,7 @@ jobs:
         run: node iridium_patchfix.js
       - name: Build
         shell: bash
-        run: pnpm build:win-x64
+        run: pnpm build:win-x64-e2e
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
@@ -235,6 +233,7 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           TEST_BASE_API: ${{ vars.TEST_BASE_API }}
+          E2E_INTERNAL_AUTH_TOKEN: ${{ secrets.E2E_INTERNAL_AUTH_TOKEN }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
@@ -255,14 +254,12 @@ jobs:
         with:
           name: test-results-windows
           path: ./GDL/apps/desktop/test-results/
-      - name: Upload main.log for debugging
+      - name: Upload e2e debug logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-windows
-          path: |
-            ./GDL/apps/desktop/release/win-unpacked/gdl_data/main.log
-            ./GDL/apps/desktop/release/win-unpacked/gdl_data/data/__gdl_logs__/*.log
+          path: ./GDL/apps/desktop/test-results/e2e-logs/**/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1

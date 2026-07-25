@@ -975,6 +975,7 @@ function AuthFlowContent() {
             <Show when={getCurrentStep()?.type === "welcome"}>
               <Button
                 size="large"
+                data-testid="login-welcome-continue"
                 type="primary"
                 fullWidth
                 onClick={handleWelcomeContinue}
@@ -990,6 +991,7 @@ function AuthFlowContent() {
             <Show when={getCurrentStep()?.type === "terms"}>
               <Button
                 size="large"
+                data-testid="login-terms-continue"
                 type="primary"
                 fullWidth
                 onClick={handleTermsContinue}
@@ -1058,6 +1060,7 @@ function AuthFlowContent() {
             >
               <Button
                 size="large"
+                data-testid="login-gdl-sync-account"
                 type="primary"
                 fullWidth
                 onClick={handleSyncExistingAccount}
