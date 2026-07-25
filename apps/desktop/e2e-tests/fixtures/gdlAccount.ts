@@ -41,6 +41,50 @@ export function readProvisionConfig(): ProvisionConfig | null {
   return { apiBase: apiBase.replace(/\/+$/, ""), internalToken }
 }
 
+interface ProvisionResponseBody {
+  token: string
+  oid: string
+  email: string
+  display_name: string
+  expires_at: number
+}
+
+const REQUIRED_PROVISION_FIELDS = [
+  "token",
+  "oid",
+  "email",
+  "display_name",
+  "expires_at"
+] as const
+
+/**
+ * Guards a 2xx provisioning response before its fields are read.
+ *
+ * Without this, a renamed or dropped field on the backend surfaces as
+ * `token: undefined` here, `JSON.stringify` silently drops it from whatever
+ * gets logged, and the actual failure resurfaces much later as an opaque
+ * mid-enrollment deserialize error instead of a named provisioning failure.
+ */
+function assertProvisionResponseBody(
+  body: unknown
+): asserts body is ProvisionResponseBody {
+  if (typeof body !== "object" || body === null) {
+    throw new Error(
+      "provisioning succeeded but the response body was not a JSON object"
+    )
+  }
+
+  const missing = REQUIRED_PROVISION_FIELDS.filter(
+    (field) => (body as Record<string, unknown>)[field] === undefined
+  )
+
+  if (missing.length > 0) {
+    throw new Error(
+      `provisioning succeeded but the response is missing: ${missing.join(", ")}`
+    )
+  }
+}
+
 function describeFailure(status: number, body: string): string {
   if (status === 401) {
     return "provisioning rejected the internal token — check E2E_INTERNAL_AUTH_TOKEN"
@@ -87,7 +131,8 @@ export async function provisionTestUser(
     throw new Error(describeFailure(response.status, await response.text()))
   }
 
-  const body = await response.json()
+  const body: unknown = await response.json()
+  assertProvisionResponseBody(body)
 
   return {
     token: body.token,

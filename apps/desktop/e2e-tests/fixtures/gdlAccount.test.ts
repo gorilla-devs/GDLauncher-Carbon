@@ -119,6 +119,30 @@ describe("provisionTestUser", () => {
       provisionTestUser(CFG, fetchImpl as unknown as typeof fetch)
     ).rejects.toThrow(/E2E_INTERNAL_AUTH_TOKEN/)
   })
+
+  it("names the missing field when a renamed or dropped field would otherwise surface as undefined", async () => {
+    const fetchImpl = vi.fn(async () =>
+      ok({
+        // `token` is absent, the way a renamed backend field would arrive.
+        oid: "o",
+        email: "e",
+        display_name: "d",
+        expires_at: 1
+      })
+    )
+
+    await expect(
+      provisionTestUser(CFG, fetchImpl as unknown as typeof fetch)
+    ).rejects.toThrow(/missing: token/)
+  })
+
+  it("rejects a response body that isn't a JSON object", async () => {
+    const fetchImpl = vi.fn(async () => ok("not an object"))
+
+    await expect(
+      provisionTestUser(CFG, fetchImpl as unknown as typeof fetch)
+    ).rejects.toThrow(/not a JSON object/)
+  })
 })
 
 describe("deleteTestUser", () => {
