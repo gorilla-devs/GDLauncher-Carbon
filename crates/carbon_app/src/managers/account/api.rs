@@ -832,6 +832,12 @@ pub enum McEntitlement {
 
 impl McEntitlement {
     fn mojang_jwt_key() -> DecodingKey {
+        #[cfg(feature = "e2e")]
+        if let Some(pem) = endpoints::e2e_entitlement_key() {
+            return DecodingKey::from_rsa_pem(pem)
+                .expect("the e2e entitlement key is not a valid RSA public key PEM");
+        }
+
         // The test at the bottom of this file makes sure this unwrap is fine.
         DecodingKey::from_rsa_pem(include_bytes!("mojang_jwt_signature.pem")).unwrap()
     }
@@ -990,7 +996,7 @@ pub enum AccessTokenStatus {
 
 #[cfg(test)]
 mod test {
-    use super::McEntitlement;
+    use super::{Algorithm, ErrorKind, McEntitlement, Utc, Validation};
 
     /// Make sure it's possible to get a JWT decoding key from
     /// the saved public key.
@@ -998,5 +1004,43 @@ mod test {
     fn valid_mojang_account_sig() {
         // unwrap performed inside
         let _ = McEntitlement::mojang_jwt_key();
+    }
+
+    #[test]
+    fn mojang_key_verifies_a_token_signed_by_mojang_only() {
+        // A JWT signed with any other key must be rejected. Without this, an
+        // entitlement-key override that leaked into a shipped build would let
+        // an attacker-signed entitlement pass as genuine.
+        //
+        // The claims carry a live `exp`: `Validation::new` requires it by
+        // default, and without it `decode` would fail on the missing claim
+        // before it ever checked the signature, making this pass for the
+        // wrong reason even against a matching key. Pinning the error to
+        // `InvalidSignature` closes that gap.
+        use jsonwebtoken::{EncodingKey, Header, encode};
+
+        let rsa = rsa::RsaPrivateKey::new(&mut rand::thread_rng(), 2048)
+            .expect("generating a test RSA key");
+        let pem = rsa::pkcs8::EncodePrivateKey::to_pkcs8_pem(&rsa, Default::default())
+            .expect("encoding the test key as PKCS#8 PEM");
+
+        let exp = (Utc::now() + chrono::Duration::hours(1)).timestamp();
+        let forged = encode(
+            &Header::new(Algorithm::RS256),
+            &serde_json::json!({ "entitlements": [{ "name": "product_minecraft" }], "exp": exp }),
+            &EncodingKey::from_rsa_pem(pem.as_bytes()).expect("loading the test key"),
+        )
+        .expect("signing the forged entitlement");
+
+        let decoded = jsonwebtoken::decode::<serde_json::Value>(
+            &forged,
+            &McEntitlement::mojang_jwt_key(),
+            &Validation::new(Algorithm::RS256),
+        );
+
+        assert!(
+            matches!(decoded.unwrap_err().kind(), ErrorKind::InvalidSignature),
+            "the default key must reject a non-Mojang signature on its signature, not on its claims"
+        );
     }
 }

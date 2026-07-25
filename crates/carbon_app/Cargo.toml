@@ -106,6 +106,8 @@ tempfile = { workspace = true }
 flowtest = { workspace = true }
 tracing-test = { workspace = true }
 mockito = { workspace = true }
+rsa = { version = "0.9", features = ["pem"] }
+rand = "0.8"
 
 [features]
 production = ["iridium"]

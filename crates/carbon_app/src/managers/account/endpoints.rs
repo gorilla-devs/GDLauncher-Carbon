@@ -14,6 +14,12 @@
 //! Gating on `not(feature = "production")` would not be enough: snapshot
 //! builds reach real users and are compiled without that feature.
 
+// Belt-and-braces alongside the "never built into a shipped artifact"
+// contract above: this makes the dangerous combination fail to compile
+// rather than rely solely on build scripts never requesting it.
+#[cfg(all(feature = "e2e", feature = "production"))]
+compile_error!("the e2e overrides must never be compiled into a production build");
+
 use std::sync::OnceLock;
 
 pub const MS_LOGIN_DEFAULT: &str = "https://login.microsoftonline.com";
@@ -63,6 +69,18 @@ fn endpoints() -> &'static Endpoints {
     ENDPOINTS.get_or_init(Endpoints::default)
 }
 
+/// PEM of the public key that verifies the entitlement JWT, when overridden.
+///
+/// `None` means Mojang's bundled key is used. Only ever `Some` under the `e2e`
+/// feature with `--e2e_entitlement_key` supplied.
+#[cfg(feature = "e2e")]
+static ENTITLEMENT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
+
+#[cfg(feature = "e2e")]
+pub fn e2e_entitlement_key() -> Option<&'static [u8]> {
+    ENTITLEMENT_KEY.get().map(Vec::as_slice)
+}
+
 /// The value following `name` in `args`, or `None` when the flag is absent or
 /// is the final token.
 pub(crate) fn arg_value<I: Iterator<Item = String>>(mut args: I, name: &str) -> Option<String> {
@@ -97,6 +115,24 @@ pub fn init_from_args() {
             ENDPOINTS
                 .set(endpoints)
                 .expect("auth endpoints were read before init_from_args ran");
+        }
+
+        if let Some(path) = arg_value(std::env::args(), "--e2e_entitlement_key") {
+            tracing::warn!("E2E MODE: entitlement key read from {path}");
+
+            // A missing or unreadable key would otherwise surface much later
+            // as an opaque signature failure mid-enrollment.
+            let pem = std::fs::read(&path)
+                .unwrap_or_else(|e| panic!("cannot read the e2e entitlement key at {path}: {e}"));
+
+            // Parsed once here and the result discarded: a key that reads
+            // fine but isn't a valid RSA public key PEM must fail at startup,
+            // not resurface as an opaque signature failure mid-enrollment.
+            jsonwebtoken::DecodingKey::from_rsa_pem(&pem).unwrap_or_else(|e| {
+                panic!("the e2e entitlement key at {path} is not a valid RSA public key PEM: {e}")
+            });
+
+            ENTITLEMENT_KEY.set(pem).expect("init_from_args ran twice");
         }
     }
 }
@@ -301,5 +337,13 @@ mod test {
             mc_name_availability_url("Notch"),
             "https://api.minecraftservices.com/minecraft/profile/name/Notch/available"
         );
+    }
+
+    #[cfg(feature = "e2e")]
+    #[test]
+    fn entitlement_key_is_unset_without_the_flag() {
+        // `cargo test` argv never carries --e2e_entitlement_key, so the
+        // override must stay dormant and Mojang's bundled key must win.
+        assert!(e2e_entitlement_key().is_none());
     }
 }
