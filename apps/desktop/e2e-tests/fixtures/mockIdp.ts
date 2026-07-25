@@ -78,6 +78,16 @@ export async function startHarness(): Promise<Harness> {
   }
 }
 
+export interface StopHarnessDeps {
+  deleteUser: typeof deleteTestUser
+  readConfig: typeof readProvisionConfig
+}
+
+const defaultStopHarnessDeps: StopHarnessDeps = {
+  deleteUser: deleteTestUser,
+  readConfig: readProvisionConfig
+}
+
 /**
  * Releases everything the harness holds.
  *
@@ -88,14 +98,22 @@ export async function startHarness(): Promise<Harness> {
  * throws, so a closed mock never costs the backend row its deletion. The
  * first error is what callers see; later ones are logged rather than
  * dropped.
+ *
+ * `deps` defaults to the real backend call and env read; tests inject fakes
+ * for both, the same way `provisionTestUser` takes an injectable `fetchImpl`.
  */
-export async function stopHarness(harness: Harness): Promise<void> {
+export async function stopHarness(
+  harness: Harness,
+  deps: StopHarnessDeps = defaultStopHarnessDeps
+): Promise<void> {
+  const { deleteUser, readConfig } = deps
+
   const steps: (() => Promise<void>)[] = [
     () => harness.mock.close(),
     async () => {
-      const cfg = readProvisionConfig()
+      const cfg = readConfig()
       if (cfg && harness.mode === "proxy") {
-        await deleteTestUser(cfg, harness.user.oid)
+        await deleteUser(cfg, harness.user.oid)
       }
     },
     async () => {
@@ -103,12 +121,17 @@ export async function stopHarness(harness: Harness): Promise<void> {
     }
   ]
 
+  // A boolean sentinel rather than checking `firstError !== undefined`: a
+  // step throwing a literal `undefined` would otherwise let a later real
+  // error overwrite it as the reported "first" error.
+  let hasFirstError = false
   let firstError: unknown
   for (const step of steps) {
     try {
       await step()
     } catch (error) {
-      if (firstError === undefined) {
+      if (!hasFirstError) {
+        hasFirstError = true
         firstError = error
       } else {
         console.error("e2e harness: teardown step failed", error)
@@ -116,7 +139,7 @@ export async function stopHarness(harness: Harness): Promise<void> {
     }
   }
 
-  if (firstError !== undefined) {
+  if (hasFirstError) {
     throw firstError instanceof Error
       ? firstError
       : new Error("e2e harness: teardown step failed", { cause: firstError })
