@@ -29,6 +29,7 @@ import { spawn } from "child_process"
 import crypto from "crypto"
 import log from "electron-log/main"
 import { hashEmailForOverwolf } from "./utils/emailHash"
+import { buildCoreModuleArgs } from "./utils/coreArgs.js"
 import * as Sentry from "@sentry/electron/main"
 import "./preloadListeners"
 import getAdSize from "./adSize"
@@ -243,6 +244,8 @@ const allowMultipleInstances = validateArgument(
 )
 
 const overrideBaseApi = validateArgument("--gdl_override_base_api")
+const e2eAuthBase = validateArgument("--gdl_e2e_auth_base")
+const e2eEntitlementKey = validateArgument("--gdl_e2e_entitlement_key")
 
 if (!allowMultipleInstances) {
   if (!app.requestSingleInstanceLock()) {
@@ -371,11 +374,12 @@ const loadCoreModule: CoreModule = () =>
     let coreModule: ChildProcessWithoutNullStreams | null = null
     const logs: Log[] = []
 
-    const args = ["--runtime_path", CURRENT_RUNTIME_PATH!]
-
-    if (overrideBaseApi?.value) {
-      args.push("--base_api", overrideBaseApi.value)
-    }
+    const args = buildCoreModuleArgs({
+      runtimePath: CURRENT_RUNTIME_PATH!,
+      baseApi: overrideBaseApi?.value,
+      e2eAuthBase: e2eAuthBase?.value,
+      e2eEntitlementKey: e2eEntitlementKey?.value
+    })
 
     try {
       coreModule = spawn(coreModulePath, args, {
