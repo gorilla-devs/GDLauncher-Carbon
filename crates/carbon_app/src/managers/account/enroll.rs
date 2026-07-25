@@ -4,6 +4,7 @@ use super::api::{
     DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount, McAuth,
     McEntitlementMissingError, MsAuth, XboxAuth, XboxError, get_profile,
 };
+use super::endpoints;
 use super::gdl_account::GDLAccountTask;
 use super::oauth_server::{OAuthCallbackHandle, OAuthCallbackServer};
 use anyhow::anyhow;
@@ -189,9 +190,8 @@ impl EnrollmentTask {
 
                 // Build Microsoft OAuth authorization URL
                 // Using Authorization Code Flow (RFC 6749 Section 4.1) + PKCE (RFC 7636).
-                let mut auth_url =
-                    Url::parse("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
-                        .map_err(|e| anyhow!("Failed to parse OAuth URL: {}", e))?;
+                let mut auth_url = Url::parse(&endpoints::ms_authorize_url())
+                    .map_err(|e| anyhow!("Failed to parse OAuth URL: {}", e))?;
                 auth_url
                     .query_pairs_mut()
                     .append_pair("client_id", env!("MS_AUTH_CLIENT_ID"))
@@ -248,7 +248,7 @@ impl EnrollmentTask {
 
                 info!("Exchanging authorization code for access token");
                 let token_response = client
-                    .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+                    .post(endpoints::ms_token_url())
                     .form(&[
                         ("client_id", env!("MS_AUTH_CLIENT_ID")),
                         (

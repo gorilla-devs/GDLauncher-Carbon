@@ -16,6 +16,8 @@ use crate::error::request::{
     MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails, censor_error,
 };
 
+use super::endpoints;
+
 #[derive(Debug, Clone)]
 pub struct DeviceCode {
     pub user_code: String,
@@ -38,7 +40,7 @@ impl DeviceCode {
         }
 
         let response = client
-            .get("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
+            .get(endpoints::device_code_url())
             .query(&[
                 ("client_id", env!("MS_AUTH_CLIENT_ID")),
                 (
@@ -77,7 +79,7 @@ impl DeviceCode {
             trace!("Polling for auth token at {:?}", Utc::now());
 
             let response = bare_client
-                .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+                .post(endpoints::ms_token_url())
                 .form(&[
                     ("client_id", env!("MS_AUTH_CLIENT_ID")),
                     (
@@ -187,8 +189,7 @@ impl MsAuth {
         }
 
         let response = client
-            .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
-            //.post("https://login.live.com/oauth20_token.srf")
+            .post(endpoints::ms_token_url())
             .form(&[
                 ("client_id", env!("MS_AUTH_CLIENT_ID")),
                 ("refresh_token", refresh_token),
@@ -249,7 +250,7 @@ impl XboxAuth {
             });
 
             let response = client
-                .post("https://user.auth.xboxlive.com/user/authenticate")
+                .post(endpoints::xbl_authenticate_url())
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .body(reqwest::Body::from(serde_json::to_string(&json)?))
@@ -280,7 +281,7 @@ impl XboxAuth {
         });
 
         let response = client
-            .post("https://xsts.auth.xboxlive.com/xsts/authorize")
+            .post(endpoints::xsts_authorize_url())
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .body(reqwest::Body::from(serde_json::to_string(&json)?))
@@ -512,7 +513,7 @@ impl McAuth {
         trace!("Authenticating Minecraft account");
 
         let response = client
-            .post("https://api.minecraftservices.com/authentication/login_with_xbox")
+            .post(endpoints::mc_login_with_xbox_url())
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .body(reqwest::Body::from(serde_json::to_string(&json)?))
@@ -545,7 +546,7 @@ impl McAuth {
         }
 
         let response = client
-            .get("https://api.minecraftservices.com/entitlements/mcstore")
+            .get(endpoints::mc_entitlements_url())
             .bearer_auth(&self.access_token)
             .send()
             .await
@@ -614,7 +615,7 @@ pub async fn get_profile(
     access_token: &str,
 ) -> anyhow::Result<Result<McProfile, GetProfileError>> {
     let response = client
-        .get("https://api.minecraftservices.com/minecraft/profile")
+        .get(endpoints::mc_profile_url())
         .bearer_auth(access_token)
         .send()
         .await
@@ -683,10 +684,7 @@ pub async fn check_username_available(
     }
 
     let response = client
-        .get(format!(
-            "https://api.minecraftservices.com/minecraft/profile/name/{}/available",
-            username
-        ))
+        .get(endpoints::mc_name_availability_url(username))
         .bearer_auth(access_token)
         .send()
         .await
@@ -725,7 +723,7 @@ pub async fn create_profile(
     let body_str = serde_json::to_string(&body)?;
 
     let response = client
-        .post("https://api.minecraftservices.com/minecraft/profile")
+        .post(endpoints::mc_profile_url())
         .bearer_auth(access_token)
         .header("Content-Type", "application/json")
         .body(reqwest::Body::from(body_str))
