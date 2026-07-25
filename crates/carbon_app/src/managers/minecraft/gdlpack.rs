@@ -68,9 +68,12 @@ async fn batch_resolve_modrinth(
             .await?;
 
         for (sha512, version) in versions {
-            // Find the file that matches our hash
+            // Find the file that matches our hash. `sha512` is the key Modrinth
+            // echoes back from the query, so it carries the gdlpack manifest's
+            // casing, while `file.hashes.sha512` carries Modrinth's own — compare
+            // the two without regard to hex case.
             for file in &version.files {
-                if file.hashes.sha512 == sha512 {
+                if file.hashes.sha512.eq_ignore_ascii_case(&sha512) {
                     let relative_path = format!("mods/{}", file.filename);
                     results.insert(
                         sha512.clone(),
@@ -353,7 +356,9 @@ pub async fn prepare_modpack_from_gdlpack(
                         let hash = Sha512::digest(&contents);
                         let hash_hex = hex::encode(hash);
 
-                        if hash_hex == hashes.sha512 {
+                        // `hash_hex` is lowercase by construction; `hashes.sha512`
+                        // is whatever the gdlpack manifest declared.
+                        if hash_hex.eq_ignore_ascii_case(&hashes.sha512) {
                             found = true;
                             trace!(
                                 "Found unresolved platform file in overrides: {} (SHA512: {})",
