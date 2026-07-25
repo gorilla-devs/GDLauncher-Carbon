@@ -74,10 +74,18 @@ export interface LaunchOptions {
  * Multiple instances are allowed so a suite can run while a developer's own
  * launcher is open, and Sentry is off so test crashes never reach the real
  * project.
+ *
+ * The returned `pageErrors` array collects every uncaught renderer exception
+ * for the page's whole life: an error thrown outside Solid's error boundary
+ * — in an event handler, or an unhandled rejection — never mounts
+ * `#appFatalCrashState`, so nothing else would ever observe it. Collecting
+ * into an array and letting the caller assert on it in a test body is the
+ * pattern Playwright recommends over throwing from inside the listener,
+ * which does not reliably propagate to the runner as a failed assertion.
  */
 export async function launchApp(
   opts: LaunchOptions
-): Promise<{ app: ElectronApplication; page: Page }> {
+): Promise<{ app: ElectronApplication; page: Page; pageErrors: Error[] }> {
   const binaryPath = getBinaryPath()
   const args = ["--gdl_allow_multiple_instances", "--gdl_disable_sentry"]
 
@@ -138,5 +146,11 @@ export async function launchApp(
   const page = await app.firstWindow()
   page.on("console", (msg) => console.log(msg.text()))
 
-  return { app, page }
+  const pageErrors: Error[] = []
+  page.on("pageerror", (error) => {
+    console.error(error)
+    pageErrors.push(error)
+  })
+
+  return { app, page, pageErrors }
 }

@@ -6,12 +6,22 @@ import { startHarness, stopHarness, type Harness } from "./mockIdp.js"
 
 interface Fixtures {
   /** A launched app on a virgin runtime path with nobody logged in. */
-  freshApp: { app: ElectronApplication; page: Page; harness: Harness }
+  freshApp: {
+    app: ElectronApplication
+    page: Page
+    harness: Harness
+    pageErrors: Error[]
+  }
 }
 
 interface WorkerFixtures {
   /** A logged-in app, shared by every test this worker runs. */
-  authenticatedApp: { app: ElectronApplication; page: Page; harness: Harness }
+  authenticatedApp: {
+    app: ElectronApplication
+    page: Page
+    harness: Harness
+    pageErrors: Error[]
+  }
 }
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
@@ -24,7 +34,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
 
       const harness = await startHarness()
       try {
-        const { app, page } = await launchApp({
+        const { app, page, pageErrors } = await launchApp({
           runtimePath: harness.runtimePath,
           baseApi: `${harness.mock.url}/gdl`,
           e2eAuthBase: harness.mock.url,
@@ -32,7 +42,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         })
 
         try {
-          await use({ app, page, harness })
+          await use({ app, page, harness, pageErrors })
         } finally {
           await app.close()
         }
@@ -53,7 +63,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
 
       const harness = await startHarness()
       try {
-        const { app, page } = await launchApp({
+        const { app, page, pageErrors } = await launchApp({
           runtimePath: harness.runtimePath,
           baseApi: `${harness.mock.url}/gdl`,
           e2eAuthBase: harness.mock.url,
@@ -62,7 +72,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
 
         try {
           await completeLogin(page, harness)
-          await use({ app, page, harness })
+          await use({ app, page, harness, pageErrors })
         } finally {
           await app.close()
         }
