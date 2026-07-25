@@ -77,14 +77,12 @@ jobs:
         with:
           name: test-results-macos
           path: ./GDL/apps/desktop/test-results/
-      - name: Upload main.log for debugging
+      - name: Upload e2e debug logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-macos
-          path: |
-            ./GDL/apps/desktop/release/mac-universal/gdl_data/main.log
-            ./GDL/apps/desktop/release/mac-universal/gdl_data/data/__gdl_logs__/*.log
+          path: ./GDL/apps/desktop/test-results/e2e-logs/**/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
@@ -166,14 +164,12 @@ jobs:
         with:
           name: test-results-linux
           path: ./GDL/apps/desktop/test-results/
-      - name: Upload main.log for debugging
+      - name: Upload e2e debug logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-linux
-          path: |
-            ./GDL/apps/desktop/release/linux-unpacked/gdl_data/main.log
-            ./GDL/apps/desktop/release/linux-unpacked/gdl_data/data/__gdl_logs__/*.log
+          path: ./GDL/apps/desktop/test-results/e2e-logs/**/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
@@ -258,14 +254,12 @@ jobs:
         with:
           name: test-results-windows
           path: ./GDL/apps/desktop/test-results/
-      - name: Upload main.log for debugging
+      - name: Upload e2e debug logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-windows
-          path: |
-            ./GDL/apps/desktop/release/win-unpacked/gdl_data/main.log
-            ./GDL/apps/desktop/release/win-unpacked/gdl_data/data/__gdl_logs__/*.log
+          path: ./GDL/apps/desktop/test-results/e2e-logs/**/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1

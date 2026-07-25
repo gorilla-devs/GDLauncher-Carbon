@@ -1,10 +1,13 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { describe, expect, it, vi } from "vitest"
 import type { MockServer } from "../mock-idp/server.js"
 import type { ProvisionConfig } from "./gdlAccount.js"
 import { stopHarness, type Harness } from "./mockIdp.js"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const CFG: ProvisionConfig = {
   apiBase: "https://api-test.invalid",
@@ -39,6 +42,7 @@ function makeHarness(
     mode: "proxy",
     runtimePath,
     entitlementKeyPath: path.join(runtimePath, "entitlement-key.pem"),
+    startedAt: Date.now(),
     ...overrides
   }
 }
@@ -129,5 +133,45 @@ describe("stopHarness", () => {
     await stopHarness(harness, { deleteUser, readConfig })
 
     expect(deleteUser).not.toHaveBeenCalled()
+  })
+
+  it("copies __gdl_logs__ into test-results/e2e-logs before deleting the scratch directory", async () => {
+    const runtimePath = makeTempDir()
+    const coreLogsDir = path.join(runtimePath, "__gdl_logs__")
+    fs.mkdirSync(coreLogsDir)
+    fs.writeFileSync(path.join(coreLogsDir, "2026-01-01_00-00-00.log"), "hello")
+
+    const deleteUser = vi.fn(
+      async () => {}
+    ) as unknown as typeof import("./gdlAccount.js").deleteTestUser
+    const readConfig = vi.fn(() => CFG)
+    const harness = makeHarness(runtimePath, { mode: "standalone" })
+
+    // Mirrors DEBUG_LOGS_ROOT's own resolution in mockIdp.ts, which isn't
+    // exported: CI's "Upload e2e debug logs" step reads this same tree.
+    const destDir = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "test-results",
+      "e2e-logs",
+      path.basename(runtimePath)
+    )
+
+    try {
+      await stopHarness(harness, { deleteUser, readConfig })
+
+      expect(
+        fs.readFileSync(
+          path.join(destDir, "__gdl_logs__", "2026-01-01_00-00-00.log"),
+          "utf8"
+        )
+      ).toBe("hello")
+      // The scratch directory itself is still gone — this doesn't replace
+      // cleanup, it runs before it.
+      expect(fs.existsSync(runtimePath)).toBe(false)
+    } finally {
+      fs.rmSync(destDir, { recursive: true, force: true })
+    }
   })
 })
