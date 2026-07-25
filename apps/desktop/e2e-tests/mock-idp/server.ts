@@ -6,6 +6,7 @@ import {
   type ServerResponse
 } from "node:http"
 import { AddressInfo } from "node:net"
+import { forwardToApiTest, standaloneStub } from "./proxy.js"
 import {
   SECONDS_IN_A_DAY,
   generateEntitlementKeypair,
@@ -215,6 +216,47 @@ export async function startMockServer(
           }
         ]
       })
+      return
+    }
+
+    // --- gdl api ---------------------------------------------------------
+    if (route.startsWith("/gdl/")) {
+      const gdlRoute = route.slice("/gdl".length)
+
+      // The one hop a mock must own: enderium verifies the Microsoft id_token
+      // against Microsoft's live JWKS, so a locally minted one is always
+      // rejected there.
+      if (gdlRoute === "/v1/auth/token") {
+        json(res, 200, {
+          access_token: opts.gdlToken,
+          token_type: "Bearer",
+          expires_at: Math.floor(Date.now() / 1000) + SECONDS_IN_A_DAY
+        })
+        return
+      }
+
+      if (opts.apiTestBase) {
+        await forwardToApiTest(
+          req,
+          res,
+          await readBody(req),
+          opts.apiTestBase,
+          gdlRoute
+        )
+        return
+      }
+
+      const stub = standaloneStub(gdlRoute)
+      if (stub) {
+        res.writeHead(stub.status, { "content-type": stub.contentType })
+        res.end(stub.body)
+        return
+      }
+
+      res.writeHead(501, { "content-type": "text/plain" })
+      res.end(
+        `mock-idp standalone mode has no stub for ${req.method} ${gdlRoute}`
+      )
       return
     }
 

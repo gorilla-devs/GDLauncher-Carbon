@@ -1,4 +1,11 @@
 import { createPublicKey, createVerify } from "node:crypto"
+import {
+  createServer,
+  request,
+  type IncomingHttpHeaders,
+  type Server
+} from "node:http"
+import { AddressInfo } from "node:net"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { identityFromOid, startMockServer, type MockServer } from "./server.js"
 
@@ -238,5 +245,210 @@ describe("identityFromOid", () => {
     )
 
     expect(a.mcUuid).not.toBe(b.mcUuid)
+  })
+})
+
+describe("gdl token exchange", () => {
+  it("answers the exchange with the provisioned token", async () => {
+    // enderium validates a real Microsoft id_token against Microsoft's live
+    // JWKS, so this hop can never reach api-test with a mock-minted token.
+    const res = await fetch(`${mock.url}/gdl/v1/auth/token`, {
+      method: "POST",
+      headers: { authorization: "Bearer mock-id-token" }
+    })
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.access_token).toBe("gdl-token-under-test")
+    expect(body.token_type).toBe("Bearer")
+    expect(body.expires_at).toBeGreaterThan(Math.floor(Date.now() / 1000))
+  })
+
+  it("serves the standalone stubs when no api-test base is configured", async () => {
+    const res = await fetch(`${mock.url}/gdl/v1/users/user`)
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toHaveProperty("microsoft_oid")
+  })
+
+  it("names the route when a gdl call has no stub and no proxy", async () => {
+    const res = await fetch(`${mock.url}/gdl/v1/instance-share/quota`)
+
+    expect(res.status).toBe(501)
+    expect(await res.text()).toContain("/v1/instance-share/quota")
+  })
+})
+
+interface UpstreamRequest {
+  method?: string
+  url?: string
+  body: string
+  headers: IncomingHttpHeaders
+}
+
+describe("gdl proxy to api-test", () => {
+  let upstream: Server
+  let upstreamPort: number
+  // Written by the upstream's own request handler below, from inside the
+  // "strips hop-by-hop headers" test's raw http.request callbacks — a
+  // closure TypeScript's flow analysis doesn't see into. Resetting this
+  // with a same-type cast (rather than a bare `= undefined`) keeps it typed
+  // as `UpstreamRequest | undefined` at the read site instead of narrowing
+  // it to `undefined` (and then `never` on property access) for the rest of
+  // the test, which would silently defeat the assertions that read it.
+  let upstreamRequest: UpstreamRequest | undefined
+  let proxied: MockServer
+
+  beforeEach(async () => {
+    upstream = createServer((req, res) => {
+      const chunks: Buffer[] = []
+      req.on("data", (chunk) => chunks.push(chunk))
+      req.on("end", () => {
+        upstreamRequest = {
+          method: req.method,
+          url: req.url,
+          body: Buffer.concat(chunks).toString("utf8"),
+          headers: req.headers
+        }
+        res.writeHead(201, { "content-type": "application/json" })
+        res.end(JSON.stringify({ echoed: true }))
+      })
+    })
+    await new Promise<void>((resolve) =>
+      upstream.listen(0, "127.0.0.1", resolve)
+    )
+
+    upstreamPort = (upstream.address() as AddressInfo).port
+    proxied = await startMockServer({
+      identity: identityFromOid(OID, `e2e-${OID}@e2e.invalid`, "e2e_6789ab"),
+      gdlToken: "gdl-token-under-test",
+      apiTestBase: `http://127.0.0.1:${upstreamPort}`
+    })
+  })
+
+  afterEach(async () => {
+    await proxied.close()
+    await new Promise<void>((resolve) => upstream.close(() => resolve()))
+  })
+
+  it("forwards method, path, and body to the upstream and relays its response unchanged", async () => {
+    const res = await fetch(`${proxied.url}/gdl/v1/instance-share/quota`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ hello: "world" })
+    })
+
+    expect(res.status).toBe(201)
+    expect(await res.json()).toEqual({ echoed: true })
+
+    expect(upstreamRequest?.method).toBe("POST")
+    // The mock strips the "/gdl" prefix before forwarding, since api-test
+    // itself doesn't know about it.
+    expect(upstreamRequest?.url).toBe("/v1/instance-share/quota")
+    expect(upstreamRequest?.body).toBe(JSON.stringify({ hello: "world" }))
+  })
+
+  it("forwards a bodyless GET without hanging on a body that will never arrive", async () => {
+    const res = await fetch(`${proxied.url}/gdl/v1/instance-share/quota`)
+
+    expect(res.status).toBe(201)
+    expect(upstreamRequest?.method).toBe("GET")
+    expect(upstreamRequest?.body).toBe("")
+  })
+
+  it("strips hop-by-hop headers instead of relaying them to the upstream", async () => {
+    // A plain `fetch()` can't set most of these — building the request by
+    // hand is what actually exercises the strip logic in forwardToApiTest,
+    // since undici's own fetch either silently drops or outright refuses to
+    // send several of them itself.
+    const body = JSON.stringify({ hello: "world" })
+    const { port: proxiedPort } = proxied
+
+    // If forwardToApiTest fails to strip a header `fetch` itself rejects on
+    // (transfer-encoding, upgrade), the promise below still resolves — it's
+    // the mock's own `handle().catch()` answering 500, not a hang — so a
+    // status assertion is what actually catches that case; leftover state in
+    // `upstreamRequest` from an earlier call would make a bare header check
+    // pass by accident.
+    function rawPost(
+      headers: Record<string, string | number>
+    ): Promise<number> {
+      return new Promise((resolve, reject) => {
+        const req = request(
+          {
+            hostname: "127.0.0.1",
+            port: proxiedPort,
+            method: "POST",
+            path: "/gdl/v1/instance-share/quota",
+            headers
+          },
+          (res) => {
+            res.on("data", () => {})
+            res.on("end", () => resolve(res.statusCode ?? 0))
+          }
+        )
+        req.on("error", reject)
+        req.end(body)
+      })
+    }
+
+    upstreamRequest = undefined as UpstreamRequest | undefined
+    const statusA = await rawPost({
+      "content-type": "application/json",
+      "content-length": Buffer.byteLength(body),
+      // A value `fetch` would never independently produce (its own default
+      // for an outgoing HTTP/1.1 call is "keep-alive"), so seeing it survive
+      // on the upstream side would mean this request's original header
+      // leaked through unstripped.
+      connection: "close",
+      "keep-alive": "timeout=5",
+      te: "trailers",
+      "proxy-authorization": "Basic mock-proxy-creds",
+      "proxy-authenticate": "Basic realm=mock"
+    })
+
+    expect(statusA).toBe(201)
+    // `host` must name the upstream the mock dialed, not the mock itself.
+    expect(upstreamRequest?.headers.host).toBe(`127.0.0.1:${upstreamPort}`)
+    // `fetch` always sets its own "connection" and "content-length" for an
+    // outgoing request with a known-length body, so their absence isn't the
+    // right signal — what matters is that neither carries this request's
+    // original values through: a leaked "close" would mean the upstream
+    // connection gets torn down after one call, and a leaked, unrecomputed
+    // content-length is exactly what causes the truncated/hung requests this
+    // function exists to avoid.
+    expect(upstreamRequest?.headers.connection).not.toBe("close")
+    expect(upstreamRequest?.headers["content-length"]).toBe(
+      String(Buffer.byteLength(body))
+    )
+    for (const stripped of [
+      "keep-alive",
+      "te",
+      "proxy-authorization",
+      "proxy-authenticate"
+    ]) {
+      expect(upstreamRequest?.headers[stripped]).toBeUndefined()
+    }
+
+    // transfer-encoding, upgrade, and trailer get their own request: any of
+    // them alongside a fixed content-length produces an ambiguous or
+    // trailer-without-chunking request that Node itself refuses to send, so
+    // this has to be a second, chunked call.
+    upstreamRequest = undefined as UpstreamRequest | undefined
+    const statusB = await rawPost({
+      "content-type": "application/json",
+      "transfer-encoding": "chunked",
+      upgrade: "h2c",
+      trailer: "X-Foo"
+    })
+
+    // A leaked transfer-encoding or upgrade header makes the forwarded
+    // `fetch` call reject synchronously; the mock's catch-all then answers
+    // 500 instead of relaying the upstream's 201, which is exactly the
+    // regression this assertion exists to catch.
+    expect(statusB).toBe(201)
+    expect(upstreamRequest?.headers["transfer-encoding"]).toBeUndefined()
+    expect(upstreamRequest?.headers.upgrade).toBeUndefined()
+    expect(upstreamRequest?.headers.trailer).toBeUndefined()
   })
 })
