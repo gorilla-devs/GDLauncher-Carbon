@@ -95,8 +95,8 @@ pub(crate) fn arg_value<I: Iterator<Item = String>>(mut args: I, name: &str) -> 
 
 /// The endpoints the e2e arguments ask for, or `None` when no override is present.
 ///
-/// Split from `init_from_args` so the argument contract can be asserted without
-/// touching the process-wide `ENDPOINTS`.
+/// Pure, so the argument contract can be asserted without touching the
+/// process-wide `ENDPOINTS`.
 #[cfg(feature = "e2e")]
 pub(crate) fn endpoints_from_args<I: Iterator<Item = String>>(args: I) -> Option<Endpoints> {
     arg_value(args, "--e2e_auth_base").map(|base| Endpoints::rooted_at(&base))
