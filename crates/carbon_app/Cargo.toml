@@ -109,3 +109,6 @@ mockito = { workspace = true }
 
 [features]
 production = ["iridium"]
+# Test-only auth endpoint and entitlement-key overrides. Never enabled by a
+# build that produces a published artifact — see managers/account/endpoints.rs.
+e2e = []

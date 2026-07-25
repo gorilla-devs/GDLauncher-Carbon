@@ -99,6 +99,7 @@ pub fn main() {
             info!("Initializing runtime path");
             let runtime_path = runtime_path_override::get_runtime_path_override().await;
             let base_api_override = base_api_override::get_base_api_override();
+            managers::account::endpoints::init_from_args();
 
             let _guard = logger::setup_logger(&runtime_path).await;
 

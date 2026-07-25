@@ -45,6 +45,7 @@ use self::{enroll::EnrollmentTask, skin::SkinManager};
 use super::{AppInner, AppRef, ManagerRef};
 
 pub mod api;
+pub mod endpoints;
 mod enroll;
 pub mod gdl_account;
 mod oauth_server;
