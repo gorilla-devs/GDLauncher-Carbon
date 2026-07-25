@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures/index.js"
-import { getActualUrl } from "./tests_helpers.js"
+import { getActualPath } from "./tests_helpers.js"
 
 test.describe("Init", () => {
   test("starts without a fatal crash and titles the window", async ({
@@ -23,7 +23,7 @@ test.describe("Init", () => {
   }) => {
     const { page } = freshApp
 
-    expect(getActualUrl(page.url())).toBe("/")
+    expect(getActualPath(page.url())).toBe("/")
     await expect(page.locator("#auth-flow")).toBeVisible()
   })
 })

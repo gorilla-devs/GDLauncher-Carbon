@@ -1,6 +1,6 @@
 import { byTestId, TEST_IDS } from "./helpers/selectors.js"
 import { expect, test } from "./fixtures/index.js"
-import { getActualUrl } from "./tests_helpers.js"
+import { getActualPath } from "./tests_helpers.js"
 
 // No per-test timeout override is needed: the `authenticatedApp` fixture
 // carries its own 180s setup budget, and these bodies only read state the
@@ -11,7 +11,7 @@ test.describe("Authenticated app", () => {
   }) => {
     const { page } = authenticatedApp
 
-    expect(getActualUrl(page.url())).toBe("/library")
+    expect(getActualPath(page.url())).toBe("/library")
     await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
   })
 

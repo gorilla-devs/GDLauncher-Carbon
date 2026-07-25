@@ -11,6 +11,12 @@ import type { PlaywrightTestConfig } from "@playwright/test"
  */
 const config: PlaywrightTestConfig = {
   testDir: "./e2e-tests",
+  /* `e2e-tests/` also holds vitest unit specs (`*.test.ts`), which import
+     vitest's `expect`. Playwright's default testMatch would collect those
+     files too, and the two `expect` implementations collide defining the
+     same `$$jest-matchers-object` global, aborting collection before any
+     test runs — so this narrows collection to Playwright specs only. */
+  testMatch: "**/*.spec.ts",
   /* Maximum time one test *body* can run for. Fixture setup is budgeted
      separately — see e2e-tests/fixtures/index.ts. */
   timeout: 30 * 1000,
