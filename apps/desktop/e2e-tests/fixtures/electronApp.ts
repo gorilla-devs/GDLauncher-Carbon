@@ -95,6 +95,11 @@ export async function launchApp(
 
   console.log("Launching Electron from:", binaryPath)
   console.log("Binary exists:", fs.existsSync(binaryPath))
+  if (fs.existsSync(binaryPath)) {
+    const stats = fs.statSync(binaryPath)
+    console.log("Binary is executable:", !!(stats.mode & fs.constants.S_IXUSR))
+    console.log("Binary size:", stats.size)
+  }
   console.log("Args:", args.join(" "))
   console.log("Runtime path:", opts.runtimePath)
   console.log("DISPLAY:", process.env.DISPLAY)

@@ -11,7 +11,8 @@ import type { PlaywrightTestConfig } from "@playwright/test"
  */
 const config: PlaywrightTestConfig = {
   testDir: "./e2e-tests",
-  /* Maximum time one test can run for. */
+  /* Maximum time one test *body* can run for. Fixture setup is budgeted
+     separately — see e2e-tests/fixtures/index.ts. */
   timeout: 30 * 1000,
   expect: {
     /**
