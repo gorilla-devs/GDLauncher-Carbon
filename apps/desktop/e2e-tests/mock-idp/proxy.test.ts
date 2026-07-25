@@ -3,9 +3,12 @@ import { STANDALONE_STUBS, standaloneStub } from "./proxy.js"
 
 describe("standaloneStub", () => {
   it("covers every route the launcher hits before the library renders", () => {
-    // Confirmed against the call sites in gdl_account.rs, terms_and_privacy.rs
-    // and api/mod.rs. A missing entry surfaces as a 501 naming the route.
+    // Confirmed against the call sites in gdl_account.rs, terms_and_privacy.rs,
+    // api/mod.rs, and managers/mod.rs (the singular `/v1/announcement`, a
+    // separate call from the plural `/v1/announcements`). A missing entry
+    // surfaces as a 501 naming the route.
     expect(Object.keys(STANDALONE_STUBS).sort()).toEqual([
+      "/v1/announcement",
       "/v1/announcements",
       "/v1/latest_consent_checksum",
       "/v1/privacy_statement_md",

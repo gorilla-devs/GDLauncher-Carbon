@@ -10,9 +10,10 @@ export interface StubResponse {
  * The GDL routes the launcher calls between startup and the library
  * rendering, answered locally when there is no api-test to proxy to.
  *
- * Derived from the call sites in `gdl_account.rs`, `terms_and_privacy.rs`, and
- * `api/mod.rs`. `/v1/auth/token` is handled by the server itself, since its
- * response body depends on the run's provisioned token.
+ * Derived from the call sites in `gdl_account.rs`, `terms_and_privacy.rs`,
+ * `api/mod.rs`, and `managers/mod.rs`. `/v1/auth/token` is handled by the
+ * server itself, since its response body depends on the run's provisioned
+ * token.
  */
 export const STANDALONE_STUBS: Record<string, StubResponse> = {
   // Shape matches `GDLUser` (gdl_account.rs) field-for-field: every field
@@ -77,6 +78,15 @@ export const STANDALONE_STUBS: Record<string, StubResponse> = {
   // `api/mod.rs` decodes this with `.json::<Vec<Announcement>>()`; an empty
   // array satisfies that regardless of `Announcement`'s own field shape.
   "/v1/announcements": {
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify([])
+  },
+  // Singular, and a different call site from the one above: `managers/mod.rs`
+  // fires this at app init and discards the result with `let _ = ...`, so any
+  // response satisfies it — stubbed anyway so a standalone run never logs a
+  // 501 for a route the launcher legitimately calls.
+  "/v1/announcement": {
     status: 200,
     contentType: "application/json",
     body: JSON.stringify([])
