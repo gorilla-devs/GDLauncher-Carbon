@@ -9,10 +9,16 @@ test.describe("Authenticated app", () => {
   test("lands on the library after a full device-code enrollment", async ({
     authenticatedApp
   }) => {
-    const { page } = authenticatedApp
+    const { page, pageErrors } = authenticatedApp
 
     expect(getActualPath(page.url())).toBe("/library")
     await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
+    // Asserted here only: `authenticatedApp` is worker-scoped, so
+    // `pageErrors` accumulates across every test in this file, and asserting
+    // it in more than one place would make failures depend on run order.
+    // The login flow — device code, Xbox, XSTS, GDL sync — is where an
+    // uncaught renderer exception is most likely.
+    expect(pageErrors).toEqual([])
   })
 
   test("walked the whole Microsoft chain rather than skipping it", async ({
