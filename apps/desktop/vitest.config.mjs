@@ -5,10 +5,7 @@ export default defineConfig({
     globals: true,
     // Playwright specs are `*.spec.ts` and stay out of vitest; the mock
     // server's own unit tests are `*.test.ts` and run here.
-    include: [
-      "packages/**/*.{test,spec}.{ts,tsx}",
-      "e2e-tests/**/*.test.ts"
-    ],
+    include: ["packages/**/*.{test,spec}.{ts,tsx}", "e2e-tests/**/*.test.ts"],
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
