@@ -81,17 +81,44 @@ export async function startHarness(): Promise<Harness> {
 /**
  * Releases everything the harness holds.
  *
- * Teardown of the provisioned user matters: api-test's deletion sweep only
- * claims rows deleted more than seven days ago, so a skipped teardown leaves a
- * row behind indefinitely.
+ * Teardown of the provisioned user matters most of the three: api-test's
+ * deletion sweep only claims rows deleted more than seven days ago, while the
+ * mock dies with the worker process regardless and the OS eventually sweeps
+ * temp directories on its own. All three steps run even if an earlier one
+ * throws, so a closed mock never costs the backend row its deletion. The
+ * first error is what callers see; later ones are logged rather than
+ * dropped.
  */
 export async function stopHarness(harness: Harness): Promise<void> {
-  await harness.mock.close()
+  const steps: (() => Promise<void>)[] = [
+    () => harness.mock.close(),
+    async () => {
+      const cfg = readProvisionConfig()
+      if (cfg && harness.mode === "proxy") {
+        await deleteTestUser(cfg, harness.user.oid)
+      }
+    },
+    async () => {
+      fs.rmSync(harness.runtimePath, { recursive: true, force: true })
+    }
+  ]
 
-  const cfg = readProvisionConfig()
-  if (cfg && harness.mode === "proxy") {
-    await deleteTestUser(cfg, harness.user.oid)
+  let firstError: unknown
+  for (const step of steps) {
+    try {
+      await step()
+    } catch (error) {
+      if (firstError === undefined) {
+        firstError = error
+      } else {
+        console.error("e2e harness: teardown step failed", error)
+      }
+    }
   }
 
-  fs.rmSync(harness.runtimePath, { recursive: true, force: true })
+  if (firstError !== undefined) {
+    throw firstError instanceof Error
+      ? firstError
+      : new Error("e2e harness: teardown step failed", { cause: firstError })
+  }
 }
