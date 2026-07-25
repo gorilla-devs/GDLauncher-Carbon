@@ -241,7 +241,7 @@ export async function startMockServer(
           res,
           await readBody(req),
           opts.apiTestBase,
-          gdlRoute
+          `${gdlRoute}${url.search}`
         )
         return
       }

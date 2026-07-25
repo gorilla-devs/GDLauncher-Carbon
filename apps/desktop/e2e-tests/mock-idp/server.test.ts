@@ -452,3 +452,53 @@ describe("gdl proxy to api-test", () => {
     expect(upstreamRequest?.headers.trailer).toBeUndefined()
   })
 })
+
+describe("gdl proxy to api-test mounted under a base path", () => {
+  let upstream: Server
+  let upstreamRequest: UpstreamRequest | undefined
+  let proxied: MockServer
+
+  beforeEach(async () => {
+    upstream = createServer((req, res) => {
+      upstreamRequest = {
+        method: req.method,
+        url: req.url,
+        body: "",
+        headers: req.headers
+      }
+      res.writeHead(200, { "content-type": "application/json" })
+      res.end(JSON.stringify({ echoed: true }))
+    })
+    await new Promise<void>((resolve) =>
+      upstream.listen(0, "127.0.0.1", resolve)
+    )
+    const upstreamPort = (upstream.address() as AddressInfo).port
+
+    proxied = await startMockServer({
+      identity: identityFromOid(OID, `e2e-${OID}@e2e.invalid`, "e2e_6789ab"),
+      gdlToken: "gdl-token-under-test",
+      // A mount path of its own, the way a real api-test deployment reached
+      // through a reverse proxy might be configured — `new URL(route, base)`
+      // would silently drop this and dial the upstream's root instead.
+      apiTestBase: `http://127.0.0.1:${upstreamPort}/api-base`
+    })
+  })
+
+  afterEach(async () => {
+    await proxied.close()
+    await new Promise<void>((resolve) => upstream.close(() => resolve()))
+  })
+
+  it("preserves both the base path and the query string when forwarding", async () => {
+    const res = await fetch(
+      `${proxied.url}/gdl/v1/instance-share/my-shares?limit=10&offset=20`
+    )
+
+    expect(res.status).toBe(200)
+    // Both halves of the bug this guards against: dropping `apiTestBase`'s
+    // own path (`/api-base`) and dropping the query string entirely.
+    expect(upstreamRequest?.url).toBe(
+      "/api-base/v1/instance-share/my-shares?limit=10&offset=20"
+    )
+  })
+})

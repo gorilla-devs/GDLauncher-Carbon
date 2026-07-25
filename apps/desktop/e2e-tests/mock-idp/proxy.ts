@@ -118,6 +118,9 @@ const STRIPPED_HEADERS = new Set([
  * Replays a request against the real api-test host and streams the answer back
  * unchanged, so every GDL call except the token exchange exercises the real
  * backend with a real token.
+ *
+ * `route` must already carry the query string (e.g. `/v1/x?limit=10`) — this
+ * function only concatenates it onto `apiTestBase`, it does not add one.
  */
 export async function forwardToApiTest(
   req: IncomingMessage,
@@ -126,7 +129,15 @@ export async function forwardToApiTest(
   apiTestBase: string,
   route: string
 ): Promise<void> {
-  const target = new URL(route, apiTestBase)
+  // Concatenated, not resolved: `new URL(route, apiTestBase)` treats
+  // `apiTestBase` as a page URL and replaces its whole path with `route`,
+  // silently discarding any path component `apiTestBase` carries (e.g. a
+  // `/api` mount) — `new URL("/v1/x", "https://host/api")` resolves to
+  // `https://host/v1/x`. Trimmed here rather than trusting the caller:
+  // `readProvisionConfig` happens to strip a trailing slash from `apiBase`,
+  // but nothing enforces that on every caller, and a doubled slash would
+  // change the request path just as silently.
+  const target = `${apiTestBase.replace(/\/+$/, "")}${route}`
   const headers = new Headers()
 
   for (const [key, value] of Object.entries(req.headers)) {
