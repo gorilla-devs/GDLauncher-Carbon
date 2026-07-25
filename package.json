@@ -41,7 +41,7 @@
     "test": "turbo run test --env-mode=loose",
     "test:unit": "turbo run test:unit --env-mode=loose",
     "test:e2e": "turbo run test --env-mode=loose --filter @gd/desktop",
-    "test:rust": "cargo test",
+    "test:rust": "cargo test && cargo test -p carbon_app --features e2e",
     "test:all": "pnpm test:rust && pnpm test:unit && pnpm test:e2e",
     "test-prod": "turbo run test --env-mode=loose --filter @gd/desktop",
     "------divider-codegen------": "------divider------",
