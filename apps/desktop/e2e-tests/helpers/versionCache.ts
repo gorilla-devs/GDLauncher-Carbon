@@ -34,8 +34,14 @@ import type { Processor, SidedDataEntry } from "./processorOutputs.js"
  * separate copies of the version-cache DB read existed before being
  * collapsed into this file (see `f3c8af8`'s commit message), and a shortpath
  * lookup is not reason enough to start a fourth.
+ *
+ * Exported so `dbSeed.test.ts` can read back a seeded database's structure
+ * through the same connection lifecycle rather than hand-rolling a fifth.
  */
-function withConfigDb<T>(runtimePath: string, fn: (db: DatabaseSync) => T): T {
+export function withConfigDb<T>(
+  runtimePath: string,
+  fn: (db: DatabaseSync) => T
+): T {
   const dbPath = path.join(runtimePath, "gdl_conf.db")
   const db = new DatabaseSync(dbPath, { readOnly: true })
   try {
