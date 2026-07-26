@@ -41,7 +41,17 @@ const LOADER = "fabric"
 
 /** Distinguishes this fixture's instance from anything `instanceInstall.spec.ts`
  *  / `loaderInstall.spec.ts` create in the same worker run, in case a future
- *  suite ever shares a worker with them. */
+ *  suite ever shares a worker with them.
+ *
+ *  Names are disjoint, but the shared runtime path is not: at CI's
+ *  `workers: 1` every spec installs into one `assets/`, `libraries/` and
+ *  `managed_javas/`. This fixture's Fabric 1.20.1 install would therefore
+ *  satisfy a `loaderInstall.spec.ts` assertion about Fabric 1.20.1 artifacts
+ *  if it ran first — today it cannot, because Playwright orders spec files
+ *  by path and `loaderInstall` sorts ahead of the mod specs. That ordering
+ *  is the only thing keeping those assertions honest, so a spec file renamed
+ *  or added ahead of it needs this checked again. Assertions about
+ *  loader-specific artifacts belong in the spec that installs them. */
 export const INSTALLED_INSTANCE_NAME = "gdl-e2e-mods-fabric"
 
 /**

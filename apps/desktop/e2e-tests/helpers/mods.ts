@@ -444,16 +444,18 @@ export async function deleteModViaUi(
  * expected to leave at most one such entry, but a test that failed before
  * installing anything must not throw again here.
  *
- * Shared by `modInstall.spec.ts` and `modLifecycle.spec.ts`, which
- * previously each carried their own copy of this same logic — two copies is
- * exactly the seam that let one of them go stale: `toRemove.filename` is the
- * app's cached *base* name (the backend never writes the `.disabled` suffix
- * into that column, `managers/instance/mods.rs:333-337`), while
- * `listModFiles` returns real on-disk names, including a suffixed one after
- * a disable. Checking only the base name — the bug this helper fixes — can
- * never go red for the one path that actually leaves the file disabled,
- * since `delete_mod` (`managers/instance/mods.rs:408-412`) removes whichever
- * variant is present regardless.
+ * Shared by `modInstall.spec.ts` and `modLifecycle.spec.ts` so the two
+ * cannot drift apart on the subtlety below.
+ *
+ * The leftover check must look for both the base name and the `.disabled`
+ * variant. `toRemove.filename` is the app's cached *base* name — the backend
+ * never writes the `.disabled` suffix into that column
+ * (`managers/instance/mods.rs:333-337`) — while `listModFiles` returns real
+ * on-disk names, including a suffixed one after a disable. A check against
+ * the base name alone can never go red for the one path that actually leaves
+ * the file disabled, because `delete_mod`
+ * (`managers/instance/mods.rs:408-412`) removes whichever variant is present
+ * regardless.
  *
  * Deliberately does not chase down dependency jars a platform declares
  * alongside the target mod: every install this suite performs sends
