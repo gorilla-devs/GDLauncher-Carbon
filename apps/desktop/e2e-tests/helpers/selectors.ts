@@ -4,6 +4,22 @@
  * Kept in one place so renaming an anchor is a single edit rather than a
  * search through specs. Deliberately few: only the elements a test must click
  * or wait on carry one.
+ *
+ * Two hazards to check before adding an anchor here, both already hit on this
+ * suite:
+ *
+ * 1. A `data-testid` on a `@gd/ui` component may not reach the DOM at all, or
+ *    may reach an element that cannot be clicked. `Checkbox` does not forward
+ *    unknown props; `Radio` and `Switch` do forward, but onto a `display:none`
+ *    or zero-size native input. TypeScript accepts a hyphenated attribute on a
+ *    component either way, so it type-checks regardless. Verify by reading the
+ *    attribute back out of the running app's DOM, never by grepping source.
+ *
+ * 2. Anything under `pages/Search/FilterSidebar`'s `ExpandedPanel` renders
+ *    twice — the docked panel and the hover flyout are both permanently
+ *    mounted and only CSS-toggled — so an anchor placed there double-matches.
+ *    `PlatformFilter` takes a `testAnchors` prop so only the docked copy
+ *    carries ids; a new anchor in any sibling filter needs the same treatment.
  */
 export const TEST_IDS = Object.freeze({
   termsCheckbox: "login-terms-checkbox",
