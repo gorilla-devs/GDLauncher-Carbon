@@ -748,6 +748,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   classList={{
                     "!outline-primary-500": loader() === modloader.key
                   }}
+                  data-testid={`instance-creation-loader-${modloader.key ?? "vanilla"}`}
                   onClick={() => {
                     if (modloader.key === "forge") {
                       forgeVersionsQuery.refetch()
@@ -806,12 +807,15 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     }
                     disallowEmptySelection={true}
                     itemComponent={(itemProps) => (
-                      <SelectItem item={itemProps.item}>
+                      <SelectItem
+                        item={itemProps.item}
+                        data-testid={`instance-creation-loader-version-option-${itemProps.item.rawValue}`}
+                      >
                         {itemProps.item.rawValue}
                       </SelectItem>
                     )}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger data-testid="instance-creation-loader-version-trigger">
                       <SelectValue<string>>
                         {(state) => state.selectedOption()}
                       </SelectValue>

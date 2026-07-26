@@ -18,6 +18,14 @@ export const TEST_IDS = Object.freeze({
   instanceCreationCustomTab: "instance-creation-custom-tab",
   instanceCreationName: "instance-creation-name",
   instanceCreationVersionTrigger: "instance-creation-version-trigger",
+  // Prefix only — the five loader buttons (vanilla, forge, neoforge, fabric,
+  // quilt) each append their key. The vanilla entry has no modloader key, so
+  // its anchor is the stable literal "instance-creation-loader-vanilla"
+  // rather than "-undefined". Use `byLoader` rather than concatenating by
+  // hand.
+  loaderOption: "instance-creation-loader",
+  instanceCreationLoaderVersionTrigger:
+    "instance-creation-loader-version-trigger",
   instanceCreationSubmit: "instance-creation-submit",
   instanceTile: "instance-tile",
   instancePlay: "instance-play",
@@ -42,4 +50,9 @@ export function byTestId(id: string): string {
 /** An instance tile located by the name the test gave it. */
 export function byInstanceName(name: string): string {
   return `[data-testid="instance-tile"][data-instance-name="${name}"]`
+}
+
+/** A modloader picker button located by its key ("vanilla", "forge", ...). */
+export function byLoader(key: string): string {
+  return byTestId(`${TEST_IDS.loaderOption}-${key}`)
 }
