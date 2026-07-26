@@ -258,6 +258,40 @@ describe("verifyAssetIndex — modern layout", () => {
     expect(missingKeyResult.problems[0]).not.toBe(emptyMapResult.problems[0])
   })
 
+  it("reports a null or hash-less object entry as a problem, not a thrown exception", async () => {
+    // A per-entry counterpart to the "invalid JSON"/"no objects key" tests
+    // above: the file parses and `objects` is a real map, but one entry
+    // inside it is corrupt. `entry.hash.slice(0, 2)` on either shape below
+    // would throw a TypeError out of `mapConcurrent` without the guard this
+    // pins, aborting the whole call instead of reporting a clean per-object
+    // problem list — the same never-throw contract, one level deeper.
+    const content = Buffer.from("valid asset bytes")
+    const hash = sha1(content)
+    await writeAssetObject(runtimePath, hash, content)
+
+    await writeAssetIndex(runtimePath, "malformed-entries-index", {
+      objects: {
+        "valid.ogg": { hash, size: content.length },
+        "null-entry.ogg": null,
+        "no-hash.ogg": { size: 4 }
+      }
+    })
+
+    await expect(
+      verifyAssetIndex(runtimePath, "malformed-entries-index")
+    ).resolves.toMatchObject({ ok: false })
+
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "malformed-entries-index"
+    )
+    expect(result.problems.some((p) => p.includes("null-entry.ogg"))).toBe(true)
+    expect(result.problems.some((p) => p.includes("no-hash.ogg"))).toBe(true)
+    // The one well-formed entry alongside the malformed ones is still
+    // checked normally and does not itself become a problem.
+    expect(result.problems.some((p) => p.includes("valid.ogg"))).toBe(false)
+  })
+
   it("reports an index object absent from disk, naming the object", async () => {
     const entries = await buildModernTree("missing-object-index", 3)
     const missingName = Object.keys(entries)[0]
@@ -322,6 +356,15 @@ describe("verifyAssetIndex — modern layout", () => {
     const first = await verifyAssetIndex(runtimePath, "determinism-index")
     const second = await verifyAssetIndex(runtimePath, "determinism-index")
 
+    // `toEqual` alone cannot tell "deterministically samples the right
+    // objects" from "deterministically samples nothing": a `sampleKeys`
+    // striding branch that degenerated to returning `[]` would make both
+    // runs come back clean and equal, and this test would stay green. The
+    // corruption must actually be found, on top of being found the same way
+    // twice, for this to exercise the striding branch at all rather than
+    // just its stability.
+    expect(first.ok).toBe(false)
+    expect(first.problems.some((p) => p.includes(corruptedName))).toBe(true)
     expect(first).toEqual(second)
   })
 })

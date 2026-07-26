@@ -249,12 +249,37 @@ export async function verifyAssetIndex(
   const problems: string[] = []
   const missingNames = new Set<string>()
 
-  const existence = await mapConcurrent(names, CONCURRENCY, async (name) => {
-    const obj = objects[name]
-    const objectPath = resolveObjectPath(name, obj.hash)
-    const exists = await pathExists(objectPath)
-    return { name, obj, objectPath, exists }
-  })
+  // An index entry that is `null` or has no string `hash` can't be resolved
+  // to a path at all (the modern layout needs `hash.slice(0, 2)`, the legacy
+  // layout needs a real hash to compare a sampled object against) — reported
+  // as a problem for that one name rather than thrown out of `mapConcurrent`,
+  // which would abort the whole call and, in a spec, replace a per-version
+  // problem list with an unhelpful exception. Same never-throw contract this
+  // module already keeps one level up, at the whole-file JSON parse (see the
+  // "invalid JSON" test above).
+  const validNames: string[] = []
+  for (const name of names) {
+    const obj = objects[name] as { hash?: unknown } | null | undefined
+    if (!obj || typeof obj.hash !== "string" || obj.hash.length === 0) {
+      problems.push(
+        `asset index at ${indexPath} has an invalid entry for "${name}" ` +
+          `(missing or non-string "hash") — cannot verify this object`
+      )
+      continue
+    }
+    validNames.push(name)
+  }
+
+  const existence = await mapConcurrent(
+    validNames,
+    CONCURRENCY,
+    async (name) => {
+      const obj = objects[name]
+      const objectPath = resolveObjectPath(name, obj.hash)
+      const exists = await pathExists(objectPath)
+      return { name, obj, objectPath, exists }
+    }
+  )
 
   for (const entry of existence) {
     if (!entry.exists) {
@@ -268,7 +293,7 @@ export async function verifyAssetIndex(
   // Hash a deterministic sample of the objects that do exist. Existence is
   // still checked for every object above; hashing all of them would dominate
   // the cost of a test whose point is the install, not this check.
-  const presentNames = names.filter((name) => !missingNames.has(name))
+  const presentNames = validNames.filter((name) => !missingNames.has(name))
   const sample = sampleKeys(presentNames)
 
   const hashResults = await mapConcurrent(sample, CONCURRENCY, async (name) => {

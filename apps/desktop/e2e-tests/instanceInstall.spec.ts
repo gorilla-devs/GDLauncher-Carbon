@@ -1,5 +1,3 @@
-import { DatabaseSync } from "node:sqlite"
-import path from "node:path"
 import { decodeMatrix } from "./versionMatrix.js"
 import { expect, test } from "./fixtures/index.js"
 import { attachCoreLogOnFailure } from "./fixtures/electronApp.js"
@@ -11,6 +9,7 @@ import {
   waitForInstallComplete
 } from "./helpers/instances.js"
 import { verifyAssetIndex, verifyClientJar } from "./helpers/installVerify.js"
+import { readVersionInfo } from "./helpers/versionCache.js"
 
 const raw = process.env.E2E_VERSION_MATRIX
 if (!raw) {
@@ -21,78 +20,6 @@ if (!raw) {
 }
 const MATRIX = decodeMatrix(raw)
 const SEED = process.env.E2E_VERSION_SEED ?? "<unset>"
-
-/** The subset of Mojang's version JSON this spec needs off of it. */
-interface CachedVersionInfo {
-  assetIndex?: { id?: string }
-  downloads?: { client?: { sha1?: string } }
-}
-
-/**
- * Reads the version JSON the app already downloaded for `versionId`, straight
- * off disk — never re-fetched from the network, so verification never depends
- * on a second source (Mojang again, this time from the test) that could
- * disagree with what actually got installed for reasons unrelated to the
- * install itself.
- *
- * The core does not write this JSON as a loose file under the runtime path;
- * it caches the exact response bytes it fetched in the `VersionInfoCache`
- * table of the runtime's own `gdl_conf.db` (see `get_version`'s
- * `version_meta::upsert_version_info` call in
- * `crates/carbon_app/src/managers/minecraft/minecraft.rs`, and the table
- * shape in `crates/carbon_repos/src/repos/version_meta.rs`). That db is
- * opened WAL-mode by the core (`crates/carbon_repos/src/db_exec.rs`), so a
- * separate read-only connection from here is safe to open concurrently.
- *
- * `assetIndex.id` (not the sibling `assets` string field — same value on a
- * well-formed manifest, but `assetIndex.id` is what the core actually names
- * the cached index file after, in `assets.rs`'s `get_assets_dir`) is the
- * asset index id for `verifyAssetIndex`: it is never the version id (e.g.
- * live Mojang data has 1.20.1 sharing bare numeric id `"5"` with a run of
- * other releases, and 1.12.2/1.16.5 sharing the minor-only `"1.12"`/`"1.16"`),
- * so this always reads the real value off the cached JSON rather than
- * assuming one. (The id literally spelled `legacy` — the one real
- * `"virtual": true` index left in live Mojang data, verified directly
- * against it — belongs to the 1.6.x release line, not 1.7.10; that is why
- * `versionMatrix.ts`'s `PINNED_VERSIONS` pins `1.6.4` specifically to
- * exercise `verifyAssetIndex`'s virtual branch. That branch itself reads the
- * index JSON's own `"virtual"` field, never the id string or the version id,
- * so nothing here depends on which id Mojang currently routes through it.)
- */
-function readCachedVersionInfo(
-  runtimePath: string,
-  versionId: string
-): CachedVersionInfo {
-  const dbPath = path.join(runtimePath, "gdl_conf.db")
-  const db = new DatabaseSync(dbPath, { readOnly: true })
-  try {
-    const row = db
-      .prepare("SELECT versionInfo FROM VersionInfoCache WHERE id = ?")
-      .get(versionId)
-
-    if (!row) {
-      throw new Error(
-        `no cached version JSON for "${versionId}" in ${dbPath} ` +
-          "(table VersionInfoCache) — the app never downloaded it, or the " +
-          "cache key does not match the version id"
-      )
-    }
-
-    const versionInfo = row.versionInfo
-    if (!(versionInfo instanceof Uint8Array)) {
-      throw new Error(
-        `VersionInfoCache.versionInfo for "${versionId}" in ${dbPath} is not ` +
-          `a blob (got ${typeof versionInfo}) — cache row is malformed`
-      )
-    }
-
-    return JSON.parse(
-      Buffer.from(versionInfo).toString("utf8")
-    ) as CachedVersionInfo
-  } finally {
-    db.close()
-  }
-}
 
 test.describe("instance install", () => {
   // `authenticatedApp` is worker-scoped, so it never receives a per-test
@@ -158,7 +85,7 @@ test.describe("instance install", () => {
         // The app believes it installed. Now prove the files it says it put
         // on disk are actually there and correct, independent of anything it
         // reported through the UI.
-        const cachedVersion = readCachedVersionInfo(
+        const cachedVersion = readVersionInfo(
           authenticatedApp.harness.runtimePath,
           entry.id
         )

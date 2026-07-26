@@ -155,6 +155,35 @@
     }
   },
   {
+    "name": "synthetic_edge_cases",
+    "processors": [
+      {
+        "jar": "com.example:noop-tool:1.0",
+        "classpath": [],
+        "args": [
+          "[com.example:direct-ref:2.5.0]",
+          "[com.example:multi-segment:1.0.0:cls1:cls2:cls3]",
+          "[com.example:bad-extension:1.0@]"
+        ]
+      },
+      {
+        "jar": "com.example:sha-tool:1.0",
+        "classpath": [],
+        "args": ["--input", "{QUOTED_SHA_REF}"]
+      }
+    ],
+    "data": {
+      "QUOTED_SHA_REF": {
+        "client": "[com.example:quoted-sha-target:3.1.4]",
+        "server": "[com.example:quoted-sha-target:3.1.4]"
+      },
+      "QUOTED_SHA_REF_SHA": {
+        "client": "''deadbeefdeadbeefdeadbeefdeadbeefdeadbeef''",
+        "server": "'ignored'"
+      }
+    }
+  },
+  {
     "name": "forge_1_12_2_pre_flattening_empty",
     "processors": [],
     "data": {}

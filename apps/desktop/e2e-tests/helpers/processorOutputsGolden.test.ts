@@ -70,10 +70,23 @@ interface GoldenOutputCase {
  * normalized away here rather than either side changing its own convention
  * (`RequiredLibrary.expectedSha1` stays `undefined`-for-absent, matching
  * every other optional field in this module).
+ *
+ * And normalizes path separators to `/` on both sides: `requiredLibraryPaths`
+ * builds `relativePath` with `path.join` (`processorOutputs.ts`), which is
+ * `\`-joined on Windows, while the committed golden always stores `/` (the
+ * Rust side's own `to_golden` normalizes `\`→`/` before writing it) — without
+ * this, every non-empty case mismatches on `windows-2022` CI even though the
+ * two implementations agree. Applied to both `computed` and `expected` so the
+ * comparison is correct regardless of which side happens to carry which
+ * separator.
  */
 function sortedByPath(required: RequiredLibrary[]): RequiredLibrary[] {
   return [...required]
-    .map((f) => ({ ...f, expectedSha1: f.expectedSha1 ?? undefined }))
+    .map((f) => ({
+      ...f,
+      relativePath: f.relativePath.split(path.sep).join("/"),
+      expectedSha1: f.expectedSha1 ?? undefined
+    }))
     .sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 }
 

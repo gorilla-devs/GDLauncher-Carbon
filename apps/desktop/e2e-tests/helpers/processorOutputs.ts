@@ -155,7 +155,27 @@ function gradleSpecifierToPath(spec: GradleSpecifier): string {
 function resolveRef(mavenRef: string): string | undefined {
   if (!isMavenRef(mavenRef)) return undefined
   const inner = mavenRef.slice(1, -1)
-  const spec = parseGradleSpecifier(inner)
+  return mavenCoordinateToPath(inner)
+}
+
+/**
+ * Resolves a bare (non-bracketed) maven coordinate — `daedalus::minecraft::
+ * Library`'s own `name` field, e.g. `"net.fabricmc:fabric-loader:0.15.6"` —
+ * to a path relative to `libraries/`. This is the same maven-path derivation
+ * `resolveRef` uses for `[...]`-bracketed processor data refs, exposed
+ * separately because a `Library.name` is never bracketed (only the
+ * `data`/output refs `requiredLibraryPaths` resolves are).
+ *
+ * `libraries_into_vec_downloadable`'s `library.url` fallback branch
+ * (`crates/carbon_app/src/domain/minecraft/minecraft.rs`) derives the exact
+ * same path for any library that declares a bare maven `url` instead of an
+ * explicit `downloads.artifact.path` — which, confirmed against a live
+ * meta.gdl.gg fetch, is every library a Fabric or Quilt loader-version JSON
+ * declares, the loader's own jar included. `loaderInstall.spec.ts` uses this
+ * to verify that jar landed on disk without hardcoding its path.
+ */
+export function mavenCoordinateToPath(coordinate: string): string | undefined {
+  const spec = parseGradleSpecifier(coordinate)
   return spec ? gradleSpecifierToPath(spec) : undefined
 }
 

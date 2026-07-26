@@ -274,13 +274,19 @@ function fnv1a(str: string): number {
  * substituting a different seed if it is ever missing or malformed —
  * silently diverging from the printed replay seed would be a worse failure
  * than a loud one.
+ *
+ * Exported: `loaderInstall.spec.ts` reuses this exact function (as its own
+ * `baseSeed`) rather than carrying a second, identically-worded copy — both
+ * modules need the same seed under the same "must already be set by
+ * globalSetup.ts" contract, so one implementation is the single place that
+ * contract is expressed.
  */
-function resolveLoaderVersionSeed(): number {
+export function resolveLoaderVersionSeed(): number {
   const raw = process.env.E2E_VERSION_SEED
   const parsed = raw === undefined ? NaN : Number.parseInt(raw, 10)
   if (!Number.isFinite(parsed)) {
     throw new Error(
-      "createInstanceViaUi: picking a loader version deterministically " +
+      "resolveLoaderVersionSeed: picking a loader version deterministically " +
         "requires E2E_VERSION_SEED to already be set to an integer " +
         `(globalSetup.ts sets this before any test runs) — got ${JSON.stringify(raw)}`
     )

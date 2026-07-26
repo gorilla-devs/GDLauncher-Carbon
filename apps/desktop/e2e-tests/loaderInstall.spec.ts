@@ -1,5 +1,3 @@
-import { DatabaseSync } from "node:sqlite"
-import path from "node:path"
 import type { Page } from "playwright"
 import { expect, test } from "./fixtures/index.js"
 import { attachCoreLogOnFailure } from "./fixtures/electronApp.js"
@@ -15,6 +13,7 @@ import {
   deriveLoaderVersionSeed,
   ensureLibraryInteractive,
   pickSeededOption,
+  resolveLoaderVersionSeed,
   waitForInstallComplete,
   type Loader
 } from "./helpers/instances.js"
@@ -24,29 +23,20 @@ import {
   verifyLibrariesPresent
 } from "./helpers/installVerify.js"
 import {
-  requiredLibraryPaths,
-  type Processor,
-  type SidedDataEntry
+  mavenCoordinateToPath,
+  requiredLibraryPaths
 } from "./helpers/processorOutputs.js"
+import {
+  readPartialVersionInfo,
+  readVersionInfo,
+  type CachedLoaderLibrary
+} from "./helpers/versionCache.js"
 
 // `globalSetup.ts` always resolves and prints a seed before any spec module
 // is imported (see playwright.config.ts's `globalSetup`), the same way
 // `instanceInstall.spec.ts` relies on it — reused here rather than minted
 // separately so one run's console banner covers both specs.
 const SEED = process.env.E2E_VERSION_SEED ?? "<unset>"
-
-function numericSeed(): number {
-  const raw = process.env.E2E_VERSION_SEED
-  const parsed = raw === undefined ? NaN : Number.parseInt(raw, 10)
-  if (!Number.isFinite(parsed)) {
-    throw new Error(
-      "loaderInstall.spec.ts needs E2E_VERSION_SEED already set to an " +
-        "integer by globalSetup.ts before it can derive its own " +
-        `loader-version picks — got ${JSON.stringify(raw)}`
-    )
-  }
-  return parsed
-}
 
 /**
  * Pinned loader/Minecraft combinations, each chosen to cover something the
@@ -57,11 +47,14 @@ function numericSeed(): number {
  * required set for it, asserted explicitly via `expectsProcessorArtifacts:
  * false` rather than being silently skipped), the actively-developed
  * NeoForge fork on whatever it currently supports newest, and Fabric/Quilt
- * (no processors at all — `PartialVersionInfoCache` is never populated for
- * them, so `expectsProcessorArtifacts` is omitted rather than `false`: the
- * processor block below doesn't run for them at all, the same way it never
- * ran before this fix round, and `false` would misleadingly imply "checked
- * and confirmed zero" the way it correctly does for 1.12.2).
+ * (no processors at all — `PartialVersionInfoCache` is never populated with
+ * a `processors` field for them, so `expectsProcessorArtifacts` is omitted
+ * rather than `false`: the processor block below doesn't run for them at
+ * all, and `false` would misleadingly imply "checked and confirmed zero"
+ * the way it correctly does for 1.12.2. They still get their own
+ * unique-to-the-install disk check — see `findLoaderLibraryPath` — it is
+ * just keyed on the loader jar's own library entry rather than on
+ * processor-generated ones).
  *
  * `expectsProcessorArtifacts` exists because a bare `if (required.length >
  * 0)` guard around the verification call makes "derived zero" and "derived
@@ -252,128 +245,58 @@ function offeredLoaderVersions(
   )
 }
 
-/** The subset of `daedalus::modded::PartialVersionInfo` this spec needs off
- *  a Forge/NeoForge cache entry — see `readCachedPartialVersionInfo`. */
-interface CachedPartialVersionInfo {
-  processors?: Processor[]
-  data?: Record<string, SidedDataEntry>
+/**
+ * The maven `group:artifact` (no version) each loader's own jar publishes
+ * under — confirmed against a live meta.gdl.gg fetch while closing this
+ * gap: both loaders' cached `PartialVersionInfo.libraries` always include
+ * exactly one entry at this coordinate, at the exact `loaderVersion` just
+ * installed, alongside version-independent dependencies (ASM, sponge-mixin)
+ * and the templated intermediary/hashed mappings entries that never
+ * coincide with it.
+ */
+const LOADER_LIBRARY_ARTIFACT: Record<"fabric" | "quilt", string> = {
+  fabric: "net.fabricmc:fabric-loader",
+  quilt: "org.quiltmc:quilt-loader"
 }
 
 /**
- * Reads the Forge/NeoForge loader-version JSON the app already fetched and
- * cached for `cacheId`, straight off disk — same technique
- * `instanceInstall.spec.ts`'s `readCachedVersionInfo` uses for the vanilla
- * `VersionInfoCache` table, applied to `PartialVersionInfoCache` instead
- * (`crates/carbon_app/src/managers/minecraft/forge.rs` /
- * `neoforge.rs`'s `get_version`, `crates/carbon_repos/src/repos/version_meta.rs`
- * for the table shape). `cacheId` is `"forge-<version>"` /
- * `"neoforge-<version>"` — the exact `db_entry_name` those modules build
- * from the chosen loader version string.
+ * The `libraries/`-relative path of `loader`'s own jar for `loaderVersion`,
+ * derived from the cached loader-version JSON's own `libraries` array rather
+ * than assumed: finds the entry whose maven coordinate is
+ * `LOADER_LIBRARY_ARTIFACT[loader]:loaderVersion` and resolves its path the
+ * same way the app itself does (`mavenCoordinateToPath`, mirroring
+ * `libraries_into_vec_downloadable`'s `library.url` fallback branch).
  *
- * This is what makes the processor-artifact assertion below possible without
- * hardcoding any maven paths: `processors`/`data` are whatever the
- * *actually-installed, seeded-random* build declared, read back rather than
- * assumed.
+ * This is the Fabric/Quilt equivalent of the processor-artifact assertion
+ * below: `loaderVersion` is the exact build seeded-picked and just installed
+ * for this matrix entry, so the derived path is unique to this combination —
+ * nothing else in the suite ever writes under `net/fabricmc/fabric-loader/`
+ * or `org/quiltmc/quilt-loader/`, unlike the client jar and asset index
+ * (shared with whatever installed this Minecraft version first).
  */
-function readCachedPartialVersionInfo(
-  runtimePath: string,
-  cacheId: string
-): CachedPartialVersionInfo {
-  const dbPath = path.join(runtimePath, "gdl_conf.db")
-  const db = new DatabaseSync(dbPath, { readOnly: true })
-  try {
-    const row = db
-      .prepare(
-        "SELECT partialVersionInfo FROM PartialVersionInfoCache WHERE id = ?"
-      )
-      .get(cacheId)
-
-    if (!row) {
-      throw new Error(
-        `no cached loader version JSON for "${cacheId}" in ${dbPath} ` +
-          "(table PartialVersionInfoCache) — the app never fetched it, or " +
-          "the cache key does not match the loader version string"
-      )
-    }
-
-    const partialVersionInfo = row.partialVersionInfo
-    if (!(partialVersionInfo instanceof Uint8Array)) {
-      throw new Error(
-        `PartialVersionInfoCache.partialVersionInfo for "${cacheId}" in ` +
-          `${dbPath} is not a blob (got ${typeof partialVersionInfo}) — cache row is malformed`
-      )
-    }
-
-    return JSON.parse(
-      Buffer.from(partialVersionInfo).toString("utf8")
-    ) as CachedPartialVersionInfo
-  } finally {
-    db.close()
+function findLoaderLibraryPath(
+  libraries: CachedLoaderLibrary[] | undefined,
+  loader: "fabric" | "quilt",
+  loaderVersion: string
+): string {
+  const expectedCoordinate = `${LOADER_LIBRARY_ARTIFACT[loader]}:${loaderVersion}`
+  const match = (libraries ?? []).find((lib) => lib.name === expectedCoordinate)
+  if (!match) {
+    throw new Error(
+      `cached ${loader} loader-version JSON for "${loaderVersion}" has no ` +
+        `"${expectedCoordinate}" library — cannot verify the loader jar ` +
+        "itself was installed"
+    )
   }
-}
 
-/** The subset of Mojang's version JSON this spec needs off of it — mirrors
- *  `instanceInstall.spec.ts`'s identical interface of the same name. */
-interface CachedVersionInfo {
-  assetIndex?: { id?: string }
-  downloads?: { client?: { sha1?: string } }
-}
-
-/**
- * Reads the app's cached *vanilla* version JSON for `mcVersion` off
- * `VersionInfoCache` — a deliberate duplicate of
- * `instanceInstall.spec.ts`'s `readCachedVersionInfo` (same table, same
- * technique, same reasoning for why `assetIndex.id` and not the sibling
- * `assets` field), not a shared import: that function is module-private
- * there and this fix round is scoped to `loaderInstall.spec.ts` alone (see
- * task-5-report.md's "Fix round 1" section for why extracting a shared
- * helper was considered and deliberately deferred rather than folded in
- * here unprompted).
- *
- * Every loader combination in this matrix installs onto a real vanilla
- * Minecraft version underneath, and `daedalus::modded::merge_partial_version`
- * always takes `asset_index` and (via `inherits_from`) the client jar's
- * location from the *vanilla* `VersionInfo` passed in, never from the
- * loader's own partial one (confirmed in
- * `crates/carbon_app/src/managers/instance/run/minecraft.rs`, which resolves
- * `client_path` off `version_info.inherits_from` after merging, and in
- * daedalus's `merge_partial_version` itself, which sets `asset_index:
- * merge.asset_index` unconditionally) — so this is keyed by `mcVersion`
- * (the Minecraft version an entry installs on), never by the loader version.
- */
-function readCachedVersionInfo(
-  runtimePath: string,
-  mcVersion: string
-): CachedVersionInfo {
-  const dbPath = path.join(runtimePath, "gdl_conf.db")
-  const db = new DatabaseSync(dbPath, { readOnly: true })
-  try {
-    const row = db
-      .prepare("SELECT versionInfo FROM VersionInfoCache WHERE id = ?")
-      .get(mcVersion)
-
-    if (!row) {
-      throw new Error(
-        `no cached version JSON for "${mcVersion}" in ${dbPath} ` +
-          "(table VersionInfoCache) — the app never downloaded it, or the " +
-          "cache key does not match the version id"
-      )
-    }
-
-    const versionInfo = row.versionInfo
-    if (!(versionInfo instanceof Uint8Array)) {
-      throw new Error(
-        `VersionInfoCache.versionInfo for "${mcVersion}" in ${dbPath} is ` +
-          `not a blob (got ${typeof versionInfo}) — cache row is malformed`
-      )
-    }
-
-    return JSON.parse(
-      Buffer.from(versionInfo).toString("utf8")
-    ) as CachedVersionInfo
-  } finally {
-    db.close()
+  const relativePath = mavenCoordinateToPath(match.name)
+  if (!relativePath) {
+    throw new Error(
+      `"${match.name}" (the ${loader} loader library) did not parse as a ` +
+        "maven coordinate — cannot derive its expected library path"
+    )
   }
+  return relativePath
 }
 
 test.describe("loader install matrix", () => {
@@ -395,7 +318,7 @@ test.describe("loader install matrix", () => {
       entry.mcVersion ?? "(newest supported)"
     } (seed ${SEED})`, async ({ authenticatedApp }) => {
       const { page } = authenticatedApp
-      const baseSeed = numericSeed()
+      const baseSeed = resolveLoaderVersionSeed()
 
       // See instanceInstall.spec.ts's own `bodyFailed` doc comment: a
       // `throw` inside `finally` discards whatever the try-block was
@@ -446,20 +369,21 @@ test.describe("loader install matrix", () => {
           tile.locator(byTestId(TEST_IDS.instancePlay))
         ).toBeVisible()
 
-        // The app believes it installed. Verify the files it says it put on
-        // disk are actually there and correct, independent of anything it
-        // reported through the UI — the same check
-        // `instanceInstall.spec.ts`'s vanilla matrix makes, applied
-        // uniformly to every loader here rather than only the
-        // processor-running ones: the client jar and assets are installed
-        // regardless of loader (see `readCachedVersionInfo`'s doc comment
-        // for why this is keyed by `mcVersion`, not by loader or loader
-        // version), so resting this on the tile's self-reported state alone
-        // for Fabric/Quilt would be exactly the kind of trust this whole
-        // plan exists to stop extending. Found in code review of this
-        // suite's first version — see task-5-report.md's "Fix round 1"
-        // section.
-        const cachedVersion = readCachedVersionInfo(
+        // The app believes it installed. Verify the vanilla substrate every
+        // loader install sits on top of — client jar and assets — is
+        // genuinely present and correct, independent of anything reported
+        // through the UI (see `readVersionInfo`'s doc comment for why this
+        // is keyed by `mcVersion`, not by loader or loader version). This
+        // check alone does not prove *this* install produced those files:
+        // in CI's `workers: 1`, `instanceInstall.spec.ts`'s vanilla matrix
+        // runs first and already pins 1.20.1/1.12.2, so for every entry
+        // above except NeoForge (whose Minecraft version is live-resolved,
+        // not pinned) the files it finds here could equally be leftovers
+        // from that earlier run. The loader-specific check further below —
+        // the processor-generated libraries for Forge/NeoForge, the loader
+        // jar itself for Fabric/Quilt — is what is actually unique to this
+        // combination's own install, regardless of run order.
+        const cachedVersion = readVersionInfo(
           authenticatedApp.harness.runtimePath,
           mcVersion
         )
@@ -501,10 +425,11 @@ test.describe("loader install matrix", () => {
         // so this block doesn't run for them at all (no `expectedSha1`-style
         // "assert exactly zero" here either — there is no cache row to read
         // in the first place, a structurally different case from 1.12.2
-        // genuinely declaring zero).
+        // genuinely declaring zero); the `else` branch below is their
+        // equivalent, unique-to-this-install check.
         if (entry.loader === "forge" || entry.loader === "neoforge") {
           const cacheId = `${entry.loader}-${loaderVersion}`
-          const cached = readCachedPartialVersionInfo(
+          const cached = readPartialVersionInfo(
             authenticatedApp.harness.runtimePath,
             cacheId
           )
@@ -559,6 +484,39 @@ test.describe("loader install matrix", () => {
           if (!result.ok) {
             throw new Error(
               `processor-generated libraries missing after installing ` +
+                `${cacheId}:\n` +
+                result.problems.map((problem) => `  - ${problem}`).join("\n")
+            )
+          }
+        } else {
+          // Fabric/Quilt's equivalent of the processor-artifact assertion
+          // above: neither loader runs install processors, but both declare
+          // their own loader jar as a library in their cached loader-version
+          // JSON, at a maven path keyed on the exact `loaderVersion` just
+          // seeded-picked and installed (see `findLoaderLibraryPath`'s doc
+          // comment). Nothing else this suite installs ever writes under
+          // `net/fabricmc/fabric-loader/` or `org/quiltmc/quilt-loader/`, so
+          // — unlike the client jar/asset index check above — finding this
+          // file present and correct is evidence of *this* install, not a
+          // leftover from whatever ran earlier in the same worker.
+          const cacheId = `${entry.loader}-${loaderVersion}`
+          const cached = readPartialVersionInfo(
+            authenticatedApp.harness.runtimePath,
+            cacheId
+          )
+          const loaderLibraryPath = findLoaderLibraryPath(
+            cached.libraries,
+            entry.loader,
+            loaderVersion
+          )
+
+          const result = await verifyLibrariesPresent(
+            authenticatedApp.harness.runtimePath,
+            [loaderLibraryPath]
+          )
+          if (!result.ok) {
+            throw new Error(
+              `${entry.loader} loader library missing after installing ` +
                 `${cacheId}:\n` +
                 result.problems.map((problem) => `  - ${problem}`).join("\n")
             )

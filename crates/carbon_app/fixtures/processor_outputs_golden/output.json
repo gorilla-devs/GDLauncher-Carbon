@@ -42,6 +42,23 @@
     ]
   },
   {
+    "name": "synthetic_edge_cases",
+    "required": [
+      {
+        "relativePath": "com/example/direct-ref/2.5.0/direct-ref-2.5.0.jar",
+        "expectedSha1": null
+      },
+      {
+        "relativePath": "com/example/multi-segment/1.0.0/multi-segment-1.0.0-cls1-cls2-cls3.jar",
+        "expectedSha1": null
+      },
+      {
+        "relativePath": "com/example/quoted-sha-target/3.1.4/quoted-sha-target-3.1.4.jar",
+        "expectedSha1": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+      }
+    ]
+  },
+  {
     "name": "forge_1_12_2_pre_flattening_empty",
     "required": []
   }
