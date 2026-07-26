@@ -51,6 +51,8 @@ export function ListItem(props: SearchResultItemProps) {
   return (
     <div class="my-1 overflow-hidden rounded-md">
       <div
+        data-testid="search-result-row"
+        data-project-id={props.result.id}
         class="group relative flex h-full cursor-pointer gap-2 overflow-x-hidden overflow-y-visible rounded-md border border-transparent px-8 py-4 transition-all duration-100 hover:scale-[1.02] hover:border-white/10 hover:bg-white/5 hover:shadow-lg hover:shadow-black/10"
         style={{
           isolation: "isolate"

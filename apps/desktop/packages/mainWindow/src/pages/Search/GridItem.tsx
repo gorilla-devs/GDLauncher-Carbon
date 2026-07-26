@@ -30,6 +30,8 @@ export function GridItem(props: GridItemProps) {
 
   return (
     <div
+      data-testid="search-result-row"
+      data-project-id={props.result.id}
       class="ease-spring bg-darkSlate-800 hover:border-primary-500/40 hover:shadow-primary-500/10 group relative aspect-square cursor-pointer overflow-hidden rounded-2xl border border-white/5 transition-all duration-150 hover:shadow-2xl"
       classList={{
         "border-primary-500/40 shadow-2xl shadow-primary-500/10":

@@ -24,6 +24,14 @@ interface ModDownloadButtonProps {
   selectedServerId?: number
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
+  /** Opt-in anchor for the rendered install/download button, forwarded to
+   *  `InstallButton`. Left unset everywhere this component can render more
+   *  than one instance for different addons at once (search result lists,
+   *  version rows) — an anchor there would match every one of them. Set
+   *  only by the addon page's primary header button; the page's own sticky
+   *  icon-only duplicate of the same addon's button deliberately leaves it
+   *  unset too, for the same reason. */
+  testId?: string
 }
 
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
@@ -277,6 +285,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           onDownload={handleDownload}
           size={props.size}
           iconOnly={props.iconOnly}
+          testId={props.testId}
         />
       </Match>
       <Match when={!props.selectedInstanceId}>
@@ -307,6 +316,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           onDownload={handleDownload}
           size={props.size}
           iconOnly={props.iconOnly}
+          testId={props.testId}
         />
       </Match>
     </Switch>

@@ -25,13 +25,33 @@ import path from "node:path"
 import type { Processor, SidedDataEntry } from "./processorOutputs.js"
 
 /**
- * Opens `runtimePath`'s `gdl_conf.db` read-only, reads `column` from the row
- * keyed by `id` in `table`, and JSON-parses it as UTF-8. Every cache table
- * this suite reads follows the same shape (one blob column, keyed by a
- * string id), so this is the one place that shape assumption — and its
- * failure modes (no such row; the column isn't a blob) — is expressed,
- * rather than each caller re-deriving its own error wording for the same two
- * ways a cache read can be wrong.
+ * Opens `runtimePath`'s `gdl_conf.db` read-only for the duration of `fn`,
+ * closing it afterward regardless of outcome. The one place this suite opens
+ * that database, so every reader against it — the blob-cache reader below,
+ * and `readInstanceByName`'s plain-column read further down — shares one
+ * connection-lifecycle implementation instead of each hand-rolling its own
+ * open/close pair. This module's own history is why that matters: three
+ * separate copies of the version-cache DB read existed before being
+ * collapsed into this file (see `f3c8af8`'s commit message), and a shortpath
+ * lookup is not reason enough to start a fourth.
+ */
+function withConfigDb<T>(runtimePath: string, fn: (db: DatabaseSync) => T): T {
+  const dbPath = path.join(runtimePath, "gdl_conf.db")
+  const db = new DatabaseSync(dbPath, { readOnly: true })
+  try {
+    return fn(db)
+  } finally {
+    db.close()
+  }
+}
+
+/**
+ * Reads `column` from the row keyed by `id` in `table`, and JSON-parses it as
+ * UTF-8. Every cache table this suite reads follows the same shape (one blob
+ * column, keyed by a string id), so this is the one place that shape
+ * assumption — and its failure modes (no such row; the column isn't a blob)
+ * — is expressed, rather than each caller re-deriving its own error wording
+ * for the same two ways a cache read can be wrong.
  */
 function readBlobRow(
   runtimePath: string,
@@ -40,31 +60,28 @@ function readBlobRow(
   id: string,
   notFoundHint: string
 ): unknown {
-  const dbPath = path.join(runtimePath, "gdl_conf.db")
-  const db = new DatabaseSync(dbPath, { readOnly: true })
-  try {
+  return withConfigDb(runtimePath, (db) => {
     const row = db
       .prepare(`SELECT ${column} FROM ${table} WHERE id = ?`)
       .get(id) as Record<string, unknown> | undefined
 
     if (!row) {
       throw new Error(
-        `no cached row for "${id}" in ${dbPath} (table ${table}) — ${notFoundHint}`
+        `no cached row for "${id}" in ${path.join(runtimePath, "gdl_conf.db")} ` +
+          `(table ${table}) — ${notFoundHint}`
       )
     }
 
     const blob = row[column]
     if (!(blob instanceof Uint8Array)) {
       throw new Error(
-        `${table}.${column} for "${id}" in ${dbPath} is not a blob ` +
-          `(got ${typeof blob}) — cache row is malformed`
+        `${table}.${column} for "${id}" in ${path.join(runtimePath, "gdl_conf.db")} ` +
+          `is not a blob (got ${typeof blob}) — cache row is malformed`
       )
     }
 
     return JSON.parse(Buffer.from(blob).toString("utf8"))
-  } finally {
-    db.close()
-  }
+  })
 }
 
 /** The subset of Mojang's version JSON this suite needs off of it. */
@@ -154,4 +171,69 @@ export function readPartialVersionInfo(
     cacheId,
     "the app never fetched it, or the cache key does not match the loader version string"
   ) as CachedPartialVersionInfo
+}
+
+/** The subset of `carbon_repos::repos::instance::InstanceRow` the e2e suite
+ *  needs off it: `id` is the numeric `FEInstanceId` the rspc API takes for
+ *  every per-instance call (e.g. `InstallMod.instance_id`,
+ *  `packages/core_module/bindings.d.ts`); `shortpath` is the instance's
+ *  actual on-disk directory name under `<runtimePath>/instances/`. */
+export interface InstanceRow {
+  id: number
+  shortpath: string
+}
+
+/**
+ * Reads an instance's database row by its display `name`, straight off the
+ * `Instance` table in `gdl_conf.db` — never assumed off the name itself.
+ *
+ * Neither field this suite needs is recoverable from the DOM: the library
+ * tile only ever renders `data-instance-name`/`data-instance-state`/
+ * `data-instance-failed` (`components/Instance/Tile.tsx`), never the row id
+ * or the shortpath. The shortpath in particular is not the display name —
+ * `next_folder` (`crates/carbon_app/src/managers/instance/mod.rs`) derives it
+ * from the name via `sanitize_name` plus a numeric-suffix dedup loop against
+ * whatever already exists on disk, so a name containing characters
+ * `sanitize_name` replaces, or colliding with an existing instance's folder,
+ * gets a shortpath that genuinely differs from the name typed in the
+ * creation modal. `InstancesPath::get_instance_path(shortpath)`
+ * (`crates/carbon_rt_path/src/lib.rs`) is what actually resolves an
+ * instance's on-disk root from it.
+ *
+ * `name` is assumed unique here — nothing in `Instance`'s schema enforces
+ * that, but every caller in this suite creates its own uniquely-named
+ * instance, so a duplicate is itself a test bug worth surfacing. Enforced
+ * directly: this reads every matching row and throws if more than one comes
+ * back, rather than silently picking the first the way a plain `.get()`
+ * would.
+ */
+export function readInstanceByName(
+  runtimePath: string,
+  name: string
+): InstanceRow {
+  return withConfigDb(runtimePath, (db) => {
+    const rows = db
+      .prepare(`SELECT id, shortpath FROM Instance WHERE name = ?`)
+      .all(name) as { id: number; shortpath: string }[]
+
+    if (rows.length === 0) {
+      throw new Error(
+        `no Instance row named "${name}" in ` +
+          `${path.join(runtimePath, "gdl_conf.db")} — was it actually ` +
+          "created, and does the name match exactly?"
+      )
+    }
+    if (rows.length > 1) {
+      throw new Error(
+        `${rows.length} Instance rows named "${name}" in ` +
+          `${path.join(runtimePath, "gdl_conf.db")} — every caller in this ` +
+          "suite creates its own uniquely-named instance, so a duplicate " +
+          "is a test bug worth surfacing, not something to silently pick " +
+          "one of"
+      )
+    }
+
+    const [row] = rows
+    return { id: row.id, shortpath: row.shortpath }
+  })
 }

@@ -342,6 +342,154 @@ comes from gets looked up in the first place) — both live outside
 `required_files`'s own signature, so a regression there would not turn this
 cross-check red.
 
+## Mod tests
+
+Two spec files exercise mod management end to end:
+`modInstall.spec.ts` (install from each platform) and
+`modLifecycle.spec.ts` (disable, enable, delete, update on an already-installed
+mod). Both share the `installedInstance` fixture below and both verify on
+disk, never by trusting the app's own UI rendering of the same fact.
+
+### The warm `installedInstance` fixture
+
+`fixtures/installedInstance.ts` is worker-scoped (`{ scope: "worker" }`, same
+mechanism as `authenticatedApp`): it installs one Fabric 1.20.1 instance
+(`gdl-e2e-mods-fabric`) once per worker, on top of the worker's own
+`authenticatedApp`, and every mod test in that worker reuses it rather than
+paying for its own create-and-install. Fabric is the loader chosen for this
+because it installs faster than every other loader (~8s once the
+assets/libraries/JRE substrate is warm) and every mod this suite targets
+supports it; 1.20.1 reuses the same pinned combination
+`loaderInstall.spec.ts`'s own matrix already exercises.
+
+The fixture hands out `instanceName` and `modsDir` — the instance's `mods/`
+directory path, resolved from its real on-disk shortpath
+(`fixtures/installedInstance.ts`'s `resolveModsDir`) rather than assumed
+equal to the instance's display name. The non-obvious part, worth stating
+plainly because it is easy to get wrong: **`instance/mods` does not exist
+when the fixture hands this path out.** Nothing in the instance-install path
+creates it — unlike the server-side counterpart
+(`server/modloader_install.rs`, which eagerly `create_dir_all`s its own mods
+path), the instance side only creates `mods/` lazily, the first time a
+CurseForge/Modrinth install actually writes a file there
+(`managers/instance/installer/mod.rs`'s `get_install_path`). The fixture
+deliberately does **not** `mkdir` it: doing so would mutate the state the app
+under test operates on, and would turn a real regression — mod installation
+breaking such that `mods/` never gets created — into an invisible one, every
+downstream test finding a directory that happens to exist and reporting only
+"mod file missing" rather than "mods directory does not exist". Callers that
+need the directory to exist (to list its contents, say) install a mod first
+or handle the absence themselves; `helpers/modVerify.ts`'s functions already
+treat a missing `mods/` as a reported problem rather than a thrown `ENOENT`
+or a vacuous pass.
+
+### What mod verification checks
+
+`helpers/modVerify.ts` is pure Node — no Playwright, no DOM — so it can be
+unit-tested directly and reused from any spec. It checks, independent of
+anything the app itself reports:
+
+- **Presence** (`verifyModInstalled`) — the named file exists somewhere
+  under `modsDir`, enabled or disabled.
+- **Size and sha1**, both optional and both checked exactly (no sampling,
+  unlike the asset-index hash sampling above — a mod jar is a few MB, not
+  worth trading precision for speed) against whichever variant is found.
+- **Enabled state** (`verifyModEnabled`) — whether the enabled or disabled
+  variant is the one present.
+
+A disabled mod is not a flag or a sidecar file: it is the same file renamed
+in place with a literal `.disabled` suffix appended to the full filename,
+living in the same folder an enabled mod would
+(`ManagerRef<InstanceManager>::enable_mod`,
+`crates/carbon_app/src/managers/instance/mods.rs:300`, the suffix built at
+:335-337 and the two `tokio::fs::rename` calls at :348 and :358). Both
+`verifyModInstalled` and `verifyModEnabled` check both paths and treat
+**both present at once as a failure**, not a state where one variant wins —
+`enable_mod` refuses to rename onto an existing destination, so this should
+never happen, and reporting it as its own distinct problem is what makes
+"both variants present" a detectable bug state instead of a silently
+tolerated one.
+
+### Install suite: which mods, and why
+
+`modInstall.spec.ts` installs one real mod from each platform:
+
+- **Modrinth: Fabric API** (`P7dR8mSH`) — the load-bearing dependency of the
+  Fabric mod ecosystem, maintained by FabricMC itself. Virtually no Fabric
+  mod ships without it, which is what makes it a durable choice: it is
+  vanishingly unlikely to disappear or stop publishing 1.20.1 builds.
+- **CurseForge: Sodium** (`394468`) — CaffeineMC's rendering-optimization
+  mod, one of the most widely installed Fabric mods that exists, mirrored to
+  CurseForge from its Modrinth/GitHub origin. Deliberately a **different**
+  mod than the Modrinth case installs: if both tests installed the same
+  project, a bug that only ever satisfies one platform's install path could
+  still leave a leftover file from the other test's run and make the
+  assertion pass for the wrong reason. Two distinct mods mean neither test's
+  disk assertion can be satisfied by the other's leftovers.
+
+Filenames, sizes, and sha1s are never hardcoded. Both tests read the
+just-installed mod's `filename`/`file_size`/sha1 back off the app's own
+`instance.getInstanceMods` response (`helpers/mods.ts`'s
+`openInstanceAddons`, called fresh after the install completes) and match by
+exact platform project id — never "the first" or "the only" row. This is the
+point of the test, not an implementation detail: a CDN regression that
+changes what gets served changes what this list reports too, not just a
+hand-built download URL that the test would otherwise still pass against.
+
+**These two tests are the regression guard for the 2026-07-19 CurseForge CDN
+key incident** (`edge.forgecdn.net` starting to require an `x-api-key`,
+breaking every shipped client). Nothing else in this suite downloads a mod
+file — `instanceInstall.spec.ts` and `loaderInstall.spec.ts` install Minecraft
+itself and loader builds, never a mod — so before `modInstall.spec.ts`
+existed, that entire code path had no coverage at all.
+
+### Lifecycle suite: disable, enable, delete, update
+
+`modLifecycle.spec.ts` drives Fabric API on Modrinth for all four tests.
+Disable/enable/delete are deliberately not platform-specific:
+`enable_mod`/`delete_mod` operate purely on the cached DB row and its
+on-disk filename, with no branch on CurseForge vs. Modrinth, so one
+well-understood project is enough to exercise the mechanism without paying
+for a second platform's search-and-install round trip in every test.
+
+The update test is the awkward one. A real update needs a file genuinely
+older than whatever the platform currently offers, so it installs one
+specific, deliberately-not-newest build through the addon page's **Versions
+tab** rather than asserting anything weaker. Each row there gives
+`ModDownloadButton` a `fileId`, which routes the click through
+`instance.installMod` (`INSTALL_MOD`, a specific version id) rather than
+`instance.installLatestMod` (`INSTALL_LATEST_MOD`) — the mechanism that
+makes installing something other than latest possible at all
+(`helpers/mods.ts`'s `installAddonVersion` and `openAddonVersions`).
+`pickOlderVersion` sorts the returned list by its own `datePublished` field
+(never trusting API order) and picks the second-newest, so exactly one
+already-confirmed-newer build exists for the later update to move to.
+
+**Limitation, stated honestly rather than papered over**: the Versions tab's
+list is virtualized (`@tanstack/solid-virtual`), so only rows near the
+viewport are mounted in the DOM. `installAddonVersion` asserts the target
+row is actually visible before doing anything else, with a message that
+names this exact risk, but there is no scrolling fallback — a version that
+sorts outside the initial mount-plus-overscan window will fail there. This
+works today because every version list this suite reaches is small (~16–27
+rows once scoped to the instance's own Minecraft version and loader) and
+mounts without scrolling; reaching further back into a project's history
+would need a scrolling helper that does not exist yet.
+
+**The CurseForge equivalent of this test is deliberately not implemented.**
+`openAddonVersions`'s CurseForge branch (`modplatforms.curseforge.getModFiles`)
+was written symmetrically alongside the Modrinth path from source, but never
+once driven live by anything in this suite. On review it was judged
+plausibly wrong rather than merely untested: CurseForge's `getModFiles` is
+actually paginated (`ModFilesParametersQuery`'s `index`/`pageSize`), unlike
+Modrinth's single-response `getProjectVersions`, so the dual-request
+settle-window race `openAddonVersions` uses — tuned specifically against
+Modrinth's own two-fetch timing — is not a safe assumption to carry over. The
+branch was deleted rather than kept as unexercised, symmetric-looking
+coverage; `openAddonVersions` is Modrinth-only today, with no platform
+parameter. A future CurseForge update test needs that branch written fresh
+against CurseForge's real paginated behavior, confirmed live.
+
 ## Suite wall-clock
 
 Measured on this branch at `workers: 1` — what CI actually runs:
@@ -350,30 +498,51 @@ GitHub Actions sets `CI=true` on every job, so every CI run is single-worker
 regardless of local defaults.
 
 - Full e2e suite (`init`, `login`, `instanceInstall`'s 8-entry vanilla
-  matrix, `loaderInstall`'s 5-entry loader matrix — 19 tests total):
-  **145–149s (2m25s–2m29s)** across two repeated runs (`pnpm exec playwright
-  test` directly, and `pnpm test:e2e`, both `CI=true`).
+  matrix, `loaderInstall`'s 5-entry loader matrix, `modInstall`'s 2 tests,
+  `modLifecycle`'s 4 tests — **25 tests total**): **187–200s (3.1–3.3
+  minutes)** across repeated full runs at `CI=true`.
 - Unit suite (`pnpm test:unit`, 145 tests across 16 files): **~2–3s**.
-- Combined: **~150s (~2.5 minutes)** of test time per OS.
+- Combined: **roughly 3.1–3.3 minutes** of test time per OS.
 
 `.github/workflows/all_os.yml` runs this on three OS jobs (`ubuntu-22.04`,
 `windows-2022`, `macos-14`) **in parallel**, each with its own 80-minute job
 timeout, each forcing `workers: 1` the same way. Only Linux was directly
 measured for this document; Windows and macOS are expected to land in the
 same order of magnitude — the suite is network- and install-bound against
-the same seeded matrix, not CPU-bound — but that is an expectation, not a
-second measurement.
+the same seeded matrix and the same live mod platforms, not CPU-bound — but
+that is an expectation, not a second measurement.
 
 The arithmetic that matters for a PR: because the three OS jobs run in
 parallel rather than in series, the wall-clock this suite adds to a PR's
-critical path is **one** OS's ~2.5 minutes, not three times it. The 3×
-only shows up as total CI compute — three runners each spending ~2.5 minutes
-on the test step, on top of their own build and lint steps.
+critical path is **one** OS's ~3.1–3.3 minutes, not three times it. The 3×
+only shows up as total CI compute — three runners each spending ~3.1–3.3
+minutes on the test step, on top of their own build and lint steps — roughly
+9.4–10 minutes of test-step compute across the three jobs combined.
 
-**At ~2.5 minutes against an 80-minute per-job timeout, the suite comfortably
-fits a per-PR run today.** That is a statement about the current measured
-duration, not a recommendation — whether to split PR vs. nightly runs as the
-matrix grows is a call for a human, not this document.
+**At ~3.1–3.3 minutes against an 80-minute per-job timeout, the suite
+comfortably fits a per-PR run today**, the mod suites' added ~40–50s
+included. That is a statement about the current measured duration, not a
+recommendation — whether to split PR vs. nightly runs as the matrix grows is
+a call for a human, not this document.
+
+### Third-party flakiness is observed, not theoretical
+
+One full-suite run on this branch hit a real failure: `modInstall.spec.ts`'s
+"installs Sodium from CurseForge" failed on `addon-install-button` never
+becoming visible, in code that round's changes never touched and that had
+been green in every prior run that day. A re-run of the full suite
+immediately after came back clean (25/25), which points at a live-network
+flake in CurseForge's search rather than a regression.
+
+With `retries: 0` (`playwright.config.ts`), a flake like that is a genuine
+red build, not a retried-away yellow one. That is a deliberate trade-off,
+not an oversight: this suite installs real mods from real, live third-party
+platforms specifically so a break like the CDN key incident shows up, and
+that same design accepts that a third-party outage or transient failure
+occasionally shows up too, indistinguishable from a real regression until
+someone re-runs it. State this plainly rather than discover it by surprise:
+an occasional red CI run on this suite that a re-run clears is expected
+behavior, not evidence the suite itself is broken.
 
 ## Troubleshooting
 

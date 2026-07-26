@@ -19,6 +19,7 @@ interface InstallButtonProps {
   onDownload: () => void
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
+  testId?: string
 }
 
 export const InstallButton = (props: InstallButtonProps) => {
@@ -26,6 +27,7 @@ export const InstallButton = (props: InstallButtonProps) => {
     <Tooltip>
       <TooltipTrigger>
         <Button
+          data-testid={props.testId}
           uppercase={!props.iconOnly}
           variant={props.isInstalled() ? "green" : "primary"}
           disabled={props.instanceLocked() && !props.isInstalled()}

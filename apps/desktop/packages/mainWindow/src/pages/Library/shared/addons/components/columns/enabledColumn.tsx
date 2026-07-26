@@ -38,7 +38,17 @@ export const createEnabledColumn = (config: EnabledColumnConfig) => {
               </Show>
             }
           >
-            <div class="group" onMouseDown={(e) => e.stopPropagation()}>
+            <div
+              class="group"
+              data-testid="mod-row-toggle"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {/* The anchor lives on this wrapping div rather than as a prop
+                  on Switch: Switch spreads all its props onto the native
+                  `<input type="checkbox">` it renders, but that input is
+                  zero-size (`w-0 h-0`) — the visible, clickable surface is
+                  the enclosing `<label>`. This div hugs that label's size
+                  (it's an unstretched flex item), so it's clickable. */}
               <Switch
                 checked={row.enabled}
                 onChange={() => config.onToggle(row)}

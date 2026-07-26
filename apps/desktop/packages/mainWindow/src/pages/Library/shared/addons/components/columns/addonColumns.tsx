@@ -264,6 +264,7 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
                   fallback={<Spinner class="h-5 w-5 text-blue-400" />}
                 >
                   <div
+                    data-testid="mod-row-update"
                     class="i-hugeicons:download-02 cursor-pointer text-lg transition-colors"
                     classList={{
                       "text-green-500 hover:text-green-400": !isDisabled(),

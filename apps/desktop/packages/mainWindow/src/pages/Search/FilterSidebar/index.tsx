@@ -22,6 +22,10 @@ function ExpandedPanel(props: {
   onResetFilters: () => void
   onCollapse: () => void
   hasActiveFilters: boolean
+  /** True only for the docked panel instance — see the two call sites
+   *  below and `PlatformFilter`'s own `testAnchors` doc comment for why
+   *  this exists: `ExpandedPanel` is mounted twice at once. */
+  testAnchors?: boolean
 }) {
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
@@ -156,7 +160,7 @@ function ExpandedPanel(props: {
       <div class="relative flex-1 overflow-hidden">
         <div class="h-full overflow-y-auto px-2 pb-4">
           <div data-filter-section="platform">
-            <PlatformFilter />
+            <PlatformFilter testAnchors={props.testAnchors} />
           </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
           <div data-filter-section="categories">
@@ -316,6 +320,7 @@ export function FilterSidebar() {
           onResetFilters={resetAllFilters}
           onCollapse={() => searchResults?.setSidebarExpanded(false)}
           hasActiveFilters={hasActiveFilters()}
+          testAnchors
         />
       </div>
 
