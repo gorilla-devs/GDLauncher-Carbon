@@ -1,6 +1,10 @@
 import { test as base, expect } from "@playwright/test"
 import type { ElectronApplication, Page } from "playwright"
 import { isCoreModulePresent, launchApp } from "./electronApp.js"
+import {
+  installFixtureInstance,
+  type InstalledInstance
+} from "./installedInstance.js"
 import { completeLogin, dismissStartupModals } from "./login.js"
 import { startHarness, stopHarness, type Harness } from "./mockIdp.js"
 
@@ -22,6 +26,10 @@ interface WorkerFixtures {
     harness: Harness
     pageErrors: Error[]
   }
+  /** A logged-in app with one warm, already-installed Fabric instance,
+   *  shared by every mod test this worker runs. See
+   *  `fixtures/installedInstance.ts`. */
+  installedInstance: InstalledInstance
 }
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
@@ -82,6 +90,23 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       }
     },
     // Launch plus a full device-code enrollment, paid once per worker.
+    { scope: "worker", timeout: 180_000 }
+  ],
+
+  installedInstance: [
+    async ({ authenticatedApp }, use) => {
+      const installed = await installFixtureInstance(authenticatedApp)
+      await use(installed)
+      // No teardown here, deliberately: the instance is torn down along with
+      // the rest of `authenticatedApp.harness.runtimePath` when that
+      // worker-scoped fixture's own `finally` removes it — staying warm
+      // across every test in the worker is this fixture's entire point.
+    },
+    // Depends on `authenticatedApp` (login plus enrollment, up to 180s) and
+    // adds a real Fabric install on top of it — generous next to the ~8s a
+    // Fabric install measures at once the substrate (assets/libraries/JRE)
+    // is warm, but a cold worker also pays for that substrate the first
+    // time, same as `instanceInstall.spec.ts`'s own first-install cost.
     { scope: "worker", timeout: 180_000 }
   ]
 })
