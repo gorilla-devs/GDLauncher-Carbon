@@ -37,9 +37,11 @@ export interface MatrixEntry {
 /**
  * Deterministic PRNG (mulberry32). Given the same seed it produces the same
  * sequence of floats in [0, 1) on every platform, which is what makes
- * `pickMatrix` reproducible.
+ * `pickMatrix` reproducible. Exported so any other seeded draw in the e2e
+ * suite (e.g. `helpers/instances.ts`'s `pickSeededOption`) reuses this
+ * implementation instead of a second, divergent PRNG.
  */
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0
   return () => {
     a = (a + 0x6d2b79f5) >>> 0
