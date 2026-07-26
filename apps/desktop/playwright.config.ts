@@ -40,7 +40,15 @@ const config: PlaywrightTestConfig = {
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
+  /* Never retry, deliberately — including on CI.
+     This suite drives real services: meta.gdl.gg, Mojang's CDNs, CurseForge
+     and Modrinth. An outage or a throttle there breaking the build is the
+     signal we are paying for, not noise to be absorbed: the CurseForge CDN
+     once began requiring an API key and broke every shipped client, which is
+     exactly the class of failure these tests exist to catch. Retrying would
+     convert that into a slower green run.
+     A red build from a third-party flake is the accepted cost. Investigate
+     it, or re-run it by hand — do not raise this number. */
   retries: 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
