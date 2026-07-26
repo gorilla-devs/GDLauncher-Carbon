@@ -392,6 +392,16 @@ const loadCoreModule: CoreModule = () =>
         }
       })
       coreProcessHandle = coreModule
+      // Exposed for the e2e harness (`e2e-tests/fixtures/electronApp.ts`'s
+      // `relaunchApp`), which runs in a separate OS process from this one and
+      // has no other way to read this process's own module-scope state. It
+      // reads this via Playwright's `ElectronApplication.evaluate`, which
+      // executes directly in this main process, to confirm the core process
+      // it just closed has genuinely exited before relaunching onto the same
+      // database — see that file for why a fixed sleep isn't good enough
+      // here. Harmless outside a test: just an OS pid number on `globalThis`.
+      ;(globalThis as Record<string, unknown>).__gdlCoreProcessId =
+        coreModule.pid ?? null
       console.log("Core module spawned successfully")
     } catch (err: unknown) {
       console.error(`[CORE] Spawn error: ${String(err)}`)
