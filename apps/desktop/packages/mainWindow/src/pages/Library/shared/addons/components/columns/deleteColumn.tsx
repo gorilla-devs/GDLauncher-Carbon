@@ -44,6 +44,7 @@ export const createDeleteColumn = (config: DeleteColumnConfig) => {
             <Tooltip>
               <TooltipTrigger>
                 <div
+                  data-testid="mod-row-delete"
                   class="i-hugeicons:delete-02 text-lightSlate-500 h-5 w-5 cursor-pointer transition-colors hover:text-red-400"
                   onClick={() => config.onDelete(row)}
                 />

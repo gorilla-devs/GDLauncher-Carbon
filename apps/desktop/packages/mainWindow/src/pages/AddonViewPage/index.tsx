@@ -482,6 +482,7 @@ const AddonExplore = (props: { children?: any }) => {
                           selectedInstanceMods={instanceMods.data ?? undefined}
                           selectedServerAddons={serverAddons.data ?? undefined}
                           selectedServerId={selectedServerId()}
+                          testId="addon-install-button"
                         />
                       </Match>
                     </Switch>
@@ -580,6 +581,11 @@ const AddonExplore = (props: { children?: any }) => {
                         project.data?.type && project.data?.type !== "modpack"
                       }
                     >
+                      {/* Sticky-header duplicate of the button above, for
+                          the same addon — deliberately not given a
+                          `testId`, since both are mounted at once (only
+                          toggled via width/opacity as the header sticks) and
+                          a shared anchor would give tests two matches. */}
                       <ModDownloadButton
                         addon={project.data}
                         selectedInstanceId={selectedInstanceId()}

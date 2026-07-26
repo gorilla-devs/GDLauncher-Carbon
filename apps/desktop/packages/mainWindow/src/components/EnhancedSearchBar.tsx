@@ -127,6 +127,7 @@ export function EnhancedSearchBar() {
         <Show when={!isExpanded()}>
           <input
             ref={simpleInputRef}
+            data-testid="search-input"
             placeholder={t("search:_trn_search_discover_anything")}
             class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 cursor-pointer bg-transparent text-sm outline-none"
             value=""
@@ -135,9 +136,13 @@ export function EnhancedSearchBar() {
           />
         </Show>
 
+        {/* Only one of the simple/expanded inputs is ever mounted at a time
+            (mutually exclusive Show blocks), so both may safely carry the
+            same anchor — see selectors.ts's TEST_IDS.searchInput. */}
         <Show when={isExpanded()}>
           <input
             ref={expandedInputRef}
+            data-testid="search-input"
             placeholder={t("search:_trn_search_discover_anything")}
             class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
             value={searchResults?.searchQuery().searchQuery ?? ""}

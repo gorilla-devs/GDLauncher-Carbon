@@ -716,6 +716,17 @@ export function AddonTable<T extends AddonTableItem>(
                     "will-change": "transform"
                   }}
                   data-row-id={row.id}
+                  // Keyed by filename rather than `row.id`: the id is a
+                  // database row id, but tests need a key that survives
+                  // enable/disable. It's already stable across that
+                  // toggle — the backend only renames the on-disk file (a
+                  // `.disabled` suffix), it never rewrites the cached
+                  // `filename` column the API serves this from (see
+                  // `managers/instance/mods.rs`'s `enable_mod` and the
+                  // `.disabled`-stripping scan in
+                  // `managers/metadata/cache/mod.rs`).
+                  data-testid="mod-row"
+                  data-mod-filename={row.original.filename}
                   onMouseDown={(e) => handleMouseDown(row.id, e)}
                   onMouseEnter={() => handleMouseEnter(row.id)}
                   onContextMenu={(e) => handleContextMenu(row.id, e)}
