@@ -1,0 +1,162 @@
+[
+  {
+    "name": "forge_1_20_1",
+    "processors": [
+      {
+        "jar": "net.minecraftforge:installertools:1.3.0",
+        "classpath": [],
+        "args": [
+          "--task",
+          "BUNDLER_EXTRACT",
+          "--input",
+          "{MINECRAFT_JAR}",
+          "--output",
+          "{MC_UNPACKED}",
+          "--jar-only"
+        ],
+        "sides": ["server"]
+      },
+      {
+        "jar": "net.minecraftforge:jarsplitter:1.1.4",
+        "classpath": [],
+        "args": [
+          "--input",
+          "{MINECRAFT_JAR}",
+          "--slim",
+          "{MC_SLIM}",
+          "--extra",
+          "{MC_EXTRA}",
+          "--srg",
+          "{MERGED_MAPPINGS}"
+        ],
+        "outputs": {
+          "{MC_SLIM}": "{MC_SLIM_SHA}",
+          "{MC_EXTRA}": "{MC_EXTRA_SHA}"
+        },
+        "sides": ["client"]
+      },
+      {
+        "jar": "net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all",
+        "classpath": [],
+        "args": [
+          "--input",
+          "{MC_SLIM}",
+          "--output",
+          "{MC_SRG}",
+          "--names",
+          "{MERGED_MAPPINGS}",
+          "--ann-fix",
+          "--ids-fix",
+          "--src-fix",
+          "--record-fix"
+        ]
+      },
+      {
+        "jar": "net.minecraftforge:binarypatcher:1.1.1",
+        "classpath": [],
+        "args": [
+          "--clean",
+          "{MC_SRG}",
+          "--output",
+          "{PATCHED}",
+          "--apply",
+          "{BINPATCH}"
+        ]
+      }
+    ],
+    "data": {
+      "MC_SLIM": {
+        "client": "[net.minecraft:client:1.20.1-20230612.114412:slim]",
+        "server": "[net.minecraft:server:1.20.1-20230612.114412:slim]"
+      },
+      "MC_SLIM_SHA": {
+        "client": "'de86b035d2da0f78940796bb95c39a932ed84834'",
+        "server": "'9e06bdd77ca6d95b2cced0bf372245f753eeb16a'"
+      },
+      "MC_EXTRA": {
+        "client": "[net.minecraft:client:1.20.1-20230612.114412:extra]",
+        "server": "[net.minecraft:server:1.20.1-20230612.114412:extra]"
+      },
+      "MC_EXTRA_SHA": {
+        "client": "'8c5a95cbce940cfdb304376ae9fea47968d02587'",
+        "server": "'13522e3278befd103064d91a199451df4cd2633f'"
+      },
+      "MC_SRG": {
+        "client": "[net.minecraft:client:1.20.1-20230612.114412:srg]",
+        "server": "[net.minecraft:server:1.20.1-20230612.114412:srg]"
+      },
+      "PATCHED": {
+        "client": "[net.minecraftforge:forge:1.20.1-47.2.0:client]",
+        "server": "[net.minecraftforge:forge:1.20.1-47.2.0:server]"
+      },
+      "PATCHED_SHA": {
+        "client": "'3e175b011146785588f1649a20d1834d10282a7c'",
+        "server": "'597ed4e82a3e309572f7ceafa2408571ba7e6c43'"
+      },
+      "BINPATCH": {
+        "client": "[net.minecraftforge:forge:1.20.1-forge-47.2.0:client@lzma]",
+        "server": "[net.minecraftforge:forge:1.20.1-forge-47.2.0:server@lzma]"
+      },
+      "MC_UNPACKED": {
+        "client": "[net.minecraft:client:1.20.1-20230612.114412:unpacked]",
+        "server": "[net.minecraft:server:1.20.1-20230612.114412:unpacked]"
+      },
+      "MERGED_MAPPINGS": {
+        "client": "[de.oceanlabs.mcp:mcp_config:1.20.1-20230612.114412:mappings-merged@txt]",
+        "server": "[de.oceanlabs.mcp:mcp_config:1.20.1-20230612.114412:mappings-merged@txt]"
+      }
+    }
+  },
+  {
+    "name": "neoforge_26",
+    "processors": [
+      {
+        "jar": "net.neoforged.installertools:installertools:4.0.12:fatjar",
+        "classpath": [],
+        "args": [
+          "--task",
+          "EXTRACT_FILES",
+          "--archive",
+          "{INSTALLER}",
+          "--from",
+          "data/run.sh",
+          "--to",
+          "{ROOT}/run.sh"
+        ],
+        "sides": ["server"]
+      },
+      {
+        "jar": "net.neoforged.installertools:installertools:4.0.12:fatjar",
+        "classpath": [],
+        "args": [
+          "--task",
+          "PROCESS_MINECRAFT_JAR",
+          "--no-mod-manifest",
+          "--input",
+          "{MINECRAFT_JAR}",
+          "--output",
+          "{PATCHED}",
+          "--extract-libraries-to",
+          "{ROOT}/libraries/",
+          "--apply-patches",
+          "{BINPATCH}"
+        ]
+      }
+    ],
+    "data": {
+      "PATCHED": {
+        "client": "[net.neoforged:minecraft-client-patched:26.2.0.23-beta]",
+        "server": "[net.neoforged:minecraft-server-patched:26.2.0.23-beta]"
+      },
+      "BINPATCH": {
+        "client": "[net.minecraftforge:forge:neoforge-26.2.0.23-beta:client@lzma]",
+        "server": "[net.minecraftforge:forge:neoforge-26.2.0.23-beta:client@lzma]"
+      }
+    }
+  },
+  {
+    "name": "forge_1_12_2_pre_flattening_empty",
+    "processors": [],
+    "data": {}
+  }
+]
