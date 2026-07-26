@@ -138,10 +138,10 @@ export async function deleteInstanceViaUi(
 
 /**
  * Restores the app to an interactive library, regardless of how the
- * previous test ended. A click that hangs past `actionTimeout` is abandoned
- * by Playwright without running the test's own `finally` (see
- * playwright.config.ts's `actionTimeout` comment), which can leave the
- * creation modal open over the shared worker-scoped app — every remaining
+ * previous test ended. A test that exhausts the 15-minute budget across
+ * several bounded waits is abandoned by Playwright without running its own
+ * `finally`, which can leave the creation modal open over the shared
+ * worker-scoped app — every remaining
  * matrix entry would then hang clicking `library-add-instance` behind the
  * modal's own `#overlay`. Closing the modal is best-effort (never throws):
  * a test that already failed must not have that failure buried by a
