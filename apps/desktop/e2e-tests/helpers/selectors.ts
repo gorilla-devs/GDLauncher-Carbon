@@ -13,9 +13,21 @@ export const TEST_IDS = Object.freeze({
   deviceCode: "login-device-code",
   gdlSyncAccount: "login-gdl-sync-account",
   libraryRoot: "library-root",
-  betaPromptNever: "beta-prompt-never"
+  betaPromptNever: "beta-prompt-never",
+  addInstance: "library-add-instance",
+  instanceCreationCustomTab: "instance-creation-custom-tab",
+  instanceCreationName: "instance-creation-name",
+  instanceCreationVersionTrigger: "instance-creation-version-trigger",
+  instanceCreationSubmit: "instance-creation-submit",
+  instanceTile: "instance-tile",
+  instancePlay: "instance-play"
 })
 
 export function byTestId(id: string): string {
   return `[data-testid="${id}"]`
+}
+
+/** An instance tile located by the name the test gave it. */
+export function byInstanceName(name: string): string {
+  return `[data-testid="instance-tile"][data-instance-name="${name}"]`
 }

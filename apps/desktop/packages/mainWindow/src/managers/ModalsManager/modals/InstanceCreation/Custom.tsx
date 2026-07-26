@@ -560,6 +560,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               <Input
                 class="w-full"
                 required
+                data-testid="instance-creation-name"
                 placeholder={t("instances:_trn_new_instance")}
                 inputColor="bg-darkSlate-800"
                 onInput={(e) => {
@@ -648,7 +649,10 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   (v) => v.id === itemProps.item.rawValue
                 )
                 return (
-                  <SelectItem item={itemProps.item}>
+                  <SelectItem
+                    item={itemProps.item}
+                    data-testid={`instance-creation-version-option-${itemProps.item.rawValue}`}
+                  >
                     <div class="flex w-full items-center justify-between gap-2">
                       <span
                         classList={{
@@ -671,7 +675,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 )
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger data-testid="instance-creation-version-trigger">
                 <SelectValue<string>>
                   {(state) => state.selectedOption()}
                 </SelectValue>
@@ -849,6 +853,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             !isUpdatingWithDiffs()
           )}
           type="primary"
+          data-testid="instance-creation-submit"
           style={{ width: "100%", "max-width": "200px" }}
           onClick={() => {
             if (instanceData()) handleUpdate()

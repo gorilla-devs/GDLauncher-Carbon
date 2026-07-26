@@ -65,6 +65,16 @@ const InstanceTile = (props: {
   const isPreparingState = () => getPreparingState(validInstance()?.state)
   const isDeleting = () => isInstanceDeleting(validInstance()?.state)
 
+  // Raw LaunchState tag (e.g. "inactive" | "queued" | "preparing" |
+  // "running" | "deleting"), passed through verbatim for e2e anchors -
+  // the flattened booleans below cannot express "deleting" on their own.
+  const instanceState = () => validInstance()?.state?.state
+  // "Failed" means: currently inactive AND that inactive state carries a
+  // failed task id. `inactiveState()` already returns undefined for every
+  // non-inactive state, so this single check covers both conditions.
+  const instanceFailed = () =>
+    inactiveState() !== undefined && inactiveState() !== null
+
   const modloader = () => validInstance()?.modloader
 
   // Task ID can be from either queued or preparing state
@@ -167,6 +177,9 @@ const InstanceTile = (props: {
       version={validInstance()?.mc_version}
       isInvalid={props.instance.status.status === "invalid"}
       failError={failError()}
+      instanceState={instanceState()}
+      instanceFailed={instanceFailed()}
+      instanceFailReason={failError()}
       isRunning={!!isRunning()}
       isQueued={isQueuedState() !== undefined}
       isPreparing={isPreparingState() !== undefined}

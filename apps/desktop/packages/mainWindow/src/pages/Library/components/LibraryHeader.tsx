@@ -461,6 +461,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
         type="primary"
         size="small"
         class="shrink-0"
+        data-testid="library-add-instance"
         onClick={() => {
           if (isServerMode()) {
             modals?.openModal({ name: "serverCreation" })

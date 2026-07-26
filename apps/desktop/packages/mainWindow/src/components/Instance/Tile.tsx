@@ -51,6 +51,11 @@ interface Props {
   isDeleting?: boolean
   subTasks?: FESubtask[] | undefined
   failError?: string
+  /** Raw `LaunchState` tag ("inactive" | "queued" | "preparing" | "running" | "deleting"). */
+  instanceState?: string
+  /** True only when inactive with a non-null failed task; omit rather than "false" when not failed. */
+  instanceFailed?: boolean
+  instanceFailReason?: string
   identifier: string
   onClick?: (_e: MouseEvent) => void
   size: 1 | 2 | 3 | 4 | 5
@@ -372,7 +377,13 @@ const Tile = (props: Props) => {
           </ContextMenuGroup>
         </Show>
       </ContextMenuContent>
-      <ContextMenuTrigger>
+      <ContextMenuTrigger
+        data-testid="instance-tile"
+        data-instance-name={props.instance.name}
+        data-instance-state={props.instanceState}
+        data-instance-failed={props.instanceFailed ? "true" : undefined}
+        data-instance-fail-reason={props.instanceFailReason || undefined}
+      >
         <BaseTile
           name={props.instance.name}
           size={props.size}
@@ -408,6 +419,7 @@ const Tile = (props: Props) => {
           playButtonContent={
             <>
               <div
+                data-testid="instance-play"
                 class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} text-lightSlate-50 h-5 w-5 shrink-0`}
               />
               <Show when={props.size >= 2}>
