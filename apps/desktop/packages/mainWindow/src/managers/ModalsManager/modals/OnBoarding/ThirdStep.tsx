@@ -143,6 +143,7 @@ const ThirdStep = (props: Props) => {
                 <Trans key="onboarding:_trn_prev" />
               </Button>
               <Button
+                data-testid="onboarding-skip"
                 onClick={() => {
                   modalsContext?.closeModal()
                 }}

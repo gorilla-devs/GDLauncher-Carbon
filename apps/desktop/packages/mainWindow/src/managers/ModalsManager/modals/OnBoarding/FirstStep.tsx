@@ -34,6 +34,7 @@ const FirstStep = (props: Props) => {
 
       <div class="flex w-full justify-end">
         <Button
+          data-testid="onboarding-next"
           type="primary"
           size="large"
           onClick={() => {

@@ -350,6 +350,7 @@ const Tile = (props: Props) => {
               </ContextMenuSub>
               <ContextMenuSeparator />
               <ContextMenuItem
+                data-testid="instance-context-delete"
                 class="flex items-center gap-2"
                 onClick={handleDelete}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
