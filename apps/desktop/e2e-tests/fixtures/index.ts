@@ -1,7 +1,7 @@
 import { test as base, expect } from "@playwright/test"
 import type { ElectronApplication, Page } from "playwright"
 import { isCoreModulePresent, launchApp } from "./electronApp.js"
-import { completeLogin } from "./login.js"
+import { completeLogin, dismissStartupModals } from "./login.js"
 import { startHarness, stopHarness, type Harness } from "./mockIdp.js"
 
 interface Fixtures {
@@ -72,6 +72,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
 
         try {
           await completeLogin(page, harness)
+          await dismissStartupModals(page)
           await use({ app, page, harness, pageErrors })
         } finally {
           await app.close()

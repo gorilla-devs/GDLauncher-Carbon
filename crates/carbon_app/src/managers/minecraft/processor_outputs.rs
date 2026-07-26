@@ -253,6 +253,7 @@ fn hash_file_sha1(path: &Path) -> std::io::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     // Trimmed from the live meta.gdl.gg payload for forge 1.20.1-47.2.0
     // (classpath arrays emptied; irrelevant to resolution). Covers: a
@@ -584,6 +585,154 @@ mod tests {
         assert!(
             unhashed.is_file(),
             "files without a known SHA are existence-checked only"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // Golden cross-check against the TS port
+    // -----------------------------------------------------------------
+    //
+    // `required_files` is load-bearing production code (called from
+    // `managers/instance/run/minecraft.rs` to decide whether Forge/NeoForge
+    // processors need to re-run at launch), and the e2e suite
+    // (`apps/desktop/e2e-tests/loaderInstall.spec.ts`) carries an
+    // independent TypeScript port of it
+    // (`apps/desktop/e2e-tests/helpers/processorOutputs.ts`) so the
+    // processor-artifact assertion can run without a Rust binding into the
+    // Playwright process. Two independent implementations of the same
+    // logic drift silently unless something forces them to agree: this
+    // test computes `required_files`'s real output for a fixed, committed
+    // input fixture and compares it byte-for-byte against a committed
+    // golden output file; `processorOutputs.test.ts` reads the exact same
+    // two files (`../../../../crates/carbon_app/fixtures/processor_outputs_golden/`
+    // from its own location) and asserts its port produces the same
+    // (order-normalized) result. A behavior change here either breaks this
+    // test (if the golden wasn't regenerated) or, once the golden is
+    // deliberately regenerated to reflect an intended change, breaks the TS
+    // test until that port is updated to match — either way a human is
+    // told, rather than the two implementations quietly disagreeing while
+    // each individually keeps passing its own tests.
+    //
+    // `outputs` on `Processor` is a `HashMap`, so multiple entries in one
+    // processor's `outputs` map can be visited in different orders across
+    // runs — this normalizes that away by sorting on `relative_path` before
+    // serializing, on both sides, so the comparison is over the *set* of
+    // required files, not incidental Rust HashMap iteration order.
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    struct GoldenCase {
+        name: String,
+        processors: Vec<Processor>,
+        data: HashMap<String, SidedDataEntry>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    #[serde(rename_all = "camelCase")]
+    struct GoldenRequiredFile {
+        relative_path: String,
+        expected_sha1: Option<String>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct GoldenOutputCase {
+        name: String,
+        required: Vec<GoldenRequiredFile>,
+    }
+
+    fn golden_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/processor_outputs_golden")
+    }
+
+    /// Converts `required_files`'s output to the portable golden shape:
+    /// forward-slash paths (Rust's own `PathBuf` join uses `\` on Windows,
+    /// which would make the committed golden file platform-dependent
+    /// otherwise — the TS port always produces `/`-joined paths when run on
+    /// Linux/macOS CI, and this keeps the comparison meaningful regardless
+    /// of which OS generated or reads the golden), sorted by path for the
+    /// HashMap-ordering reason above.
+    fn to_golden(required: &[RequiredFile]) -> Vec<GoldenRequiredFile> {
+        let mut out: Vec<GoldenRequiredFile> = required
+            .iter()
+            .map(|f| GoldenRequiredFile {
+                relative_path: f.path.to_string_lossy().replace('\\', "/"),
+                expected_sha1: f.expected_sha1.clone(),
+            })
+            .collect();
+        out.sort_by(|a, b| a.relative_path.cmp(&b.relative_path));
+        out
+    }
+
+    /// Computes `required_files` for every case in the committed input
+    /// fixture, in the same golden shape the committed output file stores.
+    fn compute_golden_output(cases: &[GoldenCase]) -> Vec<GoldenOutputCase> {
+        cases
+            .iter()
+            .map(|case| {
+                // `Path::new("")` mirrors `requiredLibraryPaths`'s TS side
+                // (which never joins a libraries root at all): joining onto
+                // an empty base leaves `RequiredFile::path` exactly the
+                // relative path, so nothing here needs to strip a prefix
+                // back off before comparing.
+                let required =
+                    required_files(&case.processors, Some(&case.data), Path::new(""));
+                GoldenOutputCase {
+                    name: case.name.clone(),
+                    required: to_golden(&required),
+                }
+            })
+            .collect()
+    }
+
+    /// Compares `required_files`'s real output against a committed golden
+    /// file (see the module-level comment above this test for why this
+    /// exists). Run with `UPDATE_GOLDEN_PROCESSOR_OUTPUTS=1` to regenerate
+    /// the golden after a deliberate behavior change — review the diff like
+    /// any other source change, and update `processorOutputs.test.ts`'s
+    /// port to match before committing it, since that test will otherwise
+    /// go red against the new golden.
+    #[test]
+    fn required_files_matches_committed_golden() {
+        let dir = golden_dir();
+        let input_path = dir.join("input.json");
+        let output_path = dir.join("output.json");
+
+        let input_json = std::fs::read_to_string(&input_path).unwrap_or_else(|e| {
+            panic!("failed to read golden input {input_path:?}: {e}")
+        });
+        let cases: Vec<GoldenCase> = serde_json::from_str(&input_json).unwrap_or_else(|e| {
+            panic!("failed to parse golden input {input_path:?}: {e}")
+        });
+        assert!(
+            !cases.is_empty(),
+            "golden input fixture {input_path:?} has no cases"
+        );
+
+        let computed = compute_golden_output(&cases);
+        let computed_json = serde_json::to_string_pretty(&computed).unwrap() + "\n";
+
+        if std::env::var_os("UPDATE_GOLDEN_PROCESSOR_OUTPUTS").is_some() {
+            std::fs::write(&output_path, &computed_json).unwrap_or_else(|e| {
+                panic!("failed to write golden output {output_path:?}: {e}")
+            });
+            eprintln!("Regenerated golden output at {output_path:?}");
+            return;
+        }
+
+        let golden_json = std::fs::read_to_string(&output_path).unwrap_or_else(|e| {
+            panic!(
+                "failed to read committed golden output {output_path:?}: {e} \
+                 (run with UPDATE_GOLDEN_PROCESSOR_OUTPUTS=1 to generate it)"
+            )
+        });
+
+        assert_eq!(
+            computed_json, golden_json,
+            "required_files' output no longer matches the committed golden at \
+             {output_path:?}. If this is an intended behavior change: re-run with \
+             UPDATE_GOLDEN_PROCESSOR_OUTPUTS=1 cargo test -p carbon_app \
+             required_files_matches_committed_golden, review the diff, update \
+             apps/desktop/e2e-tests/helpers/processorOutputs.test.ts's port to \
+             match, and commit both together."
         );
     }
 }

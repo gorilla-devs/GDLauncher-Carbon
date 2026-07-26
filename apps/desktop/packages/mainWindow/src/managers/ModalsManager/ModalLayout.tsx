@@ -48,6 +48,7 @@ const ModalLayout = (props: Props) => {
           <div class="box-border flex items-center justify-between px-5 pt-3 pb-4">
             <h2 class="text-lg font-bold text-lightSlate-50">{props.title}</h2>
             <div
+              data-testid="modal-close"
               class="text-darkSlate-300 i-hugeicons:cancel-01 hover:text-lightSlate-100 h-5 w-5 press-effect active:scale-90 cursor-pointer"
               onClick={() => {
                 if (!props.preventClose) {

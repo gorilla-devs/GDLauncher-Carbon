@@ -1,0 +1,65 @@
+[
+  {
+    "name": "forge_1_20_1",
+    "required": [
+      {
+        "relativePath": "de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412-mappings-merged.txt",
+        "expectedSha1": null
+      },
+      {
+        "relativePath": "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-extra.jar",
+        "expectedSha1": "8c5a95cbce940cfdb304376ae9fea47968d02587"
+      },
+      {
+        "relativePath": "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-slim.jar",
+        "expectedSha1": "de86b035d2da0f78940796bb95c39a932ed84834"
+      },
+      {
+        "relativePath": "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar",
+        "expectedSha1": null
+      },
+      {
+        "relativePath": "net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-client.jar",
+        "expectedSha1": "3e175b011146785588f1649a20d1834d10282a7c"
+      },
+      {
+        "relativePath": "net/minecraftforge/forge/1.20.1-forge-47.2.0/forge-1.20.1-forge-47.2.0-client.lzma",
+        "expectedSha1": null
+      }
+    ]
+  },
+  {
+    "name": "neoforge_26",
+    "required": [
+      {
+        "relativePath": "net/minecraftforge/forge/neoforge-26.2.0.23-beta/forge-neoforge-26.2.0.23-beta-client.lzma",
+        "expectedSha1": null
+      },
+      {
+        "relativePath": "net/neoforged/minecraft-client-patched/26.2.0.23-beta/minecraft-client-patched-26.2.0.23-beta.jar",
+        "expectedSha1": null
+      }
+    ]
+  },
+  {
+    "name": "synthetic_edge_cases",
+    "required": [
+      {
+        "relativePath": "com/example/direct-ref/2.5.0/direct-ref-2.5.0.jar",
+        "expectedSha1": null
+      },
+      {
+        "relativePath": "com/example/multi-segment/1.0.0/multi-segment-1.0.0-cls1-cls2-cls3.jar",
+        "expectedSha1": null
+      },
+      {
+        "relativePath": "com/example/quoted-sha-target/3.1.4/quoted-sha-target-3.1.4.jar",
+        "expectedSha1": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+      }
+    ]
+  },
+  {
+    "name": "forge_1_12_2_pre_flattening_empty",
+    "required": []
+  }
+]

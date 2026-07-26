@@ -10,15 +10,19 @@ test.describe("Authenticated app", () => {
     authenticatedApp
   }) => {
     const { page, pageErrors } = authenticatedApp
+    // `authenticatedApp` is worker-scoped and its `pageErrors` array lives
+    // for the worker's whole life, so by the time this test runs it already
+    // carries whatever every earlier spec file produced — CI's `workers: 1`
+    // runs spec files in one worker in path order, and `instanceInstall.spec.ts`
+    // (seven real installs) sorts before this file. Snapshotting the count
+    // this test inherits and asserting only what it adds itself keeps a
+    // renderer exception from an earlier install from being blamed on this
+    // test.
+    const inheritedErrorCount = pageErrors.length
 
     expect(getActualPath(page.url())).toBe("/library")
     await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
-    // Asserted here only: `authenticatedApp` is worker-scoped, so
-    // `pageErrors` accumulates across every test in this file, and asserting
-    // it in more than one place would make failures depend on run order.
-    // The login flow — device code, Xbox, XSTS, GDL sync — is where an
-    // uncaught renderer exception is most likely.
-    expect(pageErrors).toEqual([])
+    expect(pageErrors.slice(inheritedErrorCount)).toEqual([])
   })
 
   test("walked the whole Microsoft chain rather than skipping it", async ({

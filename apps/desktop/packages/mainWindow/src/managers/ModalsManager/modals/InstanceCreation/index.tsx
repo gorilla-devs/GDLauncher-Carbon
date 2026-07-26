@@ -32,7 +32,11 @@ const InstanceCreation = (props: ModalProps) => {
             <Tabs defaultValue={data()?.import ? "import" : "custom"}>
               <TabsList class="mx-4 mt-4 w-auto">
                 <TabsIndicator />
-                <TabsTrigger value="custom" class="flex-1">
+                <TabsTrigger
+                  value="custom"
+                  class="flex-1"
+                  data-testid="instance-creation-custom-tab"
+                >
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:add-01" />
                     <Trans key="instances:_trn_instance_creation_custom_tab" />

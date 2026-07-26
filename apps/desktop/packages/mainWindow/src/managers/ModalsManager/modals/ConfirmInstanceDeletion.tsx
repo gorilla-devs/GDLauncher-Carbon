@@ -78,6 +78,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
             {t("instances:_trn_instance_confirm_deletion.cancel")}
           </Button>
           <Button
+            data-testid="confirm-instance-deletion"
             type="secondary"
             onClick={() => {
               modalsContext?.closeModal()

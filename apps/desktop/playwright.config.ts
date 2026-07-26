@@ -17,9 +17,18 @@ const config: PlaywrightTestConfig = {
      same `$$jest-matchers-object` global, aborting collection before any
      test runs — so this narrows collection to Playwright specs only. */
   testMatch: "**/*.spec.ts",
-  /* Maximum time one test *body* can run for. Fixture setup is budgeted
-     separately — see e2e-tests/fixtures/index.ts. */
-  timeout: 30 * 1000,
+  /* Resolves the seeded version matrix once per run and hands it to workers
+     via process.env — see e2e-tests/globalSetup.ts. */
+  globalSetup: "./e2e-tests/globalSetup.ts",
+  /* Maximum time one test *body* can run for. A full install-and-launch
+     against a real version can legitimately take most of this; 15 minutes
+     is the project's hard ceiling for a single test. Fixture setup is
+     budgeted separately — see e2e-tests/fixtures/index.ts. */
+  timeout: 15 * 60 * 1000,
+  /* Backstop for the whole run: worst case is one 15-minute test per matrix
+     entry plus the login fixtures. This is what stops a wedged run holding
+     a CI runner indefinitely. */
+  globalTimeout: 3 * 60 * 60 * 1000,
   expect: {
     /**
      * Maximum time expect() should wait for the condition to be met.
@@ -39,8 +48,16 @@ const config: PlaywrightTestConfig = {
   reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
-    actionTimeout: 0,
+    /* Maximum time each action such as `click()` can take. Bounded rather
+       than the 0 (no limit) default: with a 15-minute test timeout, an
+       unbounded action on a missing anchor hangs for the full 15 minutes and
+       is then abandoned by Playwright without running its `finally` —
+       leaving the creation modal open over the shared worker-scoped app, so
+       every remaining matrix entry hangs too. 60s is comfortably above the
+       explicit waits already used for slow anchors (e.g. `dismissStartupModals`'s
+       60s waits in fixtures/login.ts) while still failing fast on a genuinely
+       missing one. */
+    actionTimeout: 60_000,
     /* Base URL to use in actions like `await page.goto('/')`. */
     // baseURL: 'http://localhost:3000',
 
