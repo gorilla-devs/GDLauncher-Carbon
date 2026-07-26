@@ -83,10 +83,23 @@ export interface LaunchOptions {
  * into an array and letting the caller assert on it in a test body is the
  * pattern Playwright recommends over throwing from inside the listener,
  * which does not reliably propagate to the runner as a failed assertion.
+ *
+ * The returned `stdout` array collects every chunk the Electron *main*
+ * process itself writes to its own stdout — this already includes the Rust
+ * core's own output, since `main/index.ts`'s `coreModule.stdout.on("data",
+ * ...)` handler `console.log`s every line the core prints (sanitized: the
+ * `_STATUS_:READY` api token and any account email are redacted, nothing
+ * else). This is the one place the core's stdout is captured in this
+ * harness — the same pipe `attachCoreLogOnFailure` below sits next to — so a
+ * test asserting on a `_STATUS_:` event should push a listener onto this
+ * same array rather than opening a second capture of the core's output.
  */
-export async function launchApp(
-  opts: LaunchOptions
-): Promise<{ app: ElectronApplication; page: Page; pageErrors: Error[] }> {
+export async function launchApp(opts: LaunchOptions): Promise<{
+  app: ElectronApplication
+  page: Page
+  pageErrors: Error[]
+  stdout: string[]
+}> {
   const binaryPath = getBinaryPath()
   const args = ["--gdl_allow_multiple_instances", "--gdl_disable_sentry"]
 
@@ -141,7 +154,12 @@ export async function launchApp(
     })
 
   app.on("console", (msg) => console.log(msg.text()))
-  app.process().stdout?.on("data", (data) => console.log(data.toString()))
+  const stdout: string[] = []
+  app.process().stdout?.on("data", (data) => {
+    const chunk = data.toString()
+    stdout.push(chunk)
+    console.log(chunk)
+  })
   app.process().stderr?.on("data", (data) => console.log(data.toString()))
 
   const page = await app.firstWindow()
@@ -153,7 +171,7 @@ export async function launchApp(
     pageErrors.push(error)
   })
 
-  return { app, page, pageErrors }
+  return { app, page, pageErrors, stdout }
 }
 
 /**
@@ -255,7 +273,12 @@ async function waitForPidExit(
 export async function relaunchApp(
   current: { app: ElectronApplication; page: Page },
   opts: LaunchOptions
-): Promise<{ app: ElectronApplication; page: Page; pageErrors: Error[] }> {
+): Promise<{
+  app: ElectronApplication
+  page: Page
+  pageErrors: Error[]
+  stdout: string[]
+}> {
   const corePidBefore = await getCoreProcessId(current.app)
   if (corePidBefore == null) {
     throw new Error(

@@ -51,7 +51,7 @@ function useLoading() {
                 <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 2px;">Restore Previous Database</div>
                 <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400));">Roll back to the database from just before the update. Only changes made after the update are lost; accounts and settings are kept.</div>
               </div>
-              <button id="restore-snapshot-btn" style="padding: 8px 16px; background: rgb(var(--green-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+              <button id="restore-snapshot-btn" data-testid="recovery-restore-snapshot-button" style="padding: 8px 16px; background: rgb(var(--green-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
                 Restore
               </button>
             </div>
@@ -59,7 +59,7 @@ function useLoading() {
         : ""
 
       oDiv.innerHTML = `
-      <div style="height: 100vh; overflow-y: auto; padding: 16px 20px; text-align: left;">
+      <div data-testid="recovery-fatal-screen" style="height: 100vh; overflow-y: auto; padding: 16px 20px; text-align: left;">
         <div style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
 
           <!-- Header -->
@@ -80,7 +80,7 @@ function useLoading() {
                 Copy
               </button>
             </div>
-            <div id="error-detail-content" style="font-size: 0.75rem; font-weight: 300; background: rgb(var(--darkSlate-900)); max-height: 120px; overflow-y: auto; padding: 10px; text-align: left; border-radius: 6px; overflow-wrap: break-word; white-space: pre-wrap; font-family: 'Ubuntu Mono', monospace; border: 1px solid rgb(var(--darkSlate-600)); line-height: 1.4;"></div>
+            <div id="error-detail-content" data-testid="recovery-error-detail" style="font-size: 0.75rem; font-weight: 300; background: rgb(var(--darkSlate-900)); max-height: 120px; overflow-y: auto; padding: 10px; text-align: left; border-radius: 6px; overflow-wrap: break-word; white-space: pre-wrap; font-family: 'Ubuntu Mono', monospace; border: 1px solid rgb(var(--darkSlate-600)); line-height: 1.4;"></div>
           </div>
 
           <!-- Step 1: Restart -->
@@ -91,7 +91,7 @@ function useLoading() {
                 <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 2px;">Restart GDLauncher</div>
                 <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400));">A simple restart often fixes temporary issues.</div>
               </div>
-              <button id="restart-btn" style="padding: 8px 16px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+              <button id="restart-btn" data-testid="recovery-retry-button" style="padding: 8px 16px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
                 Restart
               </button>
             </div>
@@ -138,7 +138,7 @@ function useLoading() {
               <button id="open-db-folder-btn" style="padding: 8px 12px; background: transparent; color: rgb(var(--lightSlate-300)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
                 Open Folder
               </button>
-              <button id="reset-db-btn" style="padding: 8px 14px; background: rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-50)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
+              <button id="reset-db-btn" data-testid="recovery-reset-db-button" style="padding: 8px 14px; background: rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-50)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
                 Reset & Restart
               </button>
             </div>
@@ -475,7 +475,7 @@ function useLoading() {
       oDiv.classList.add("appFatalCrash")
 
       oDiv.innerHTML = `
-      <div style="height: 100vh; overflow-y: auto; padding: 32px 20px; display: flex; flex-direction: column; align-items: center;">
+      <div data-testid="recovery-backwards-migration-screen" style="height: 100vh; overflow-y: auto; padding: 32px 20px; display: flex; flex-direction: column; align-items: center;">
         <!-- Logo -->
         <div style="flex: 1; display: flex; align-items: center; max-height: 35%;">
           <div>
@@ -509,7 +509,7 @@ function useLoading() {
           </div>
 
           <!-- Button -->
-          <button id="reset-db-btn" style="padding: 14px 32px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s;">
+          <button id="reset-db-btn" data-testid="recovery-reset-db-button" style="padding: 14px 32px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s;">
             Reset Database & Restart
           </button>
 

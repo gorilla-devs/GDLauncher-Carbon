@@ -65,6 +65,7 @@ declare global {
           type: "success"
           port: string
           apiToken: string
+          logs: Log[]
         }
       | {
           type: "error"
@@ -73,6 +74,7 @@ declare global {
         }
       | {
           type: "backwardsMigration"
+          logs: Log[]
         }
     >
     getCurrentOS: () => Promise<{

@@ -293,6 +293,14 @@ export type CoreModule = () => Promise<
         apiToken: string
         kill: () => void
       }
+      // The core's own stdout up to and including `_STATUS_:READY`.
+      // `main.tsx` ignores this on the success path, but it is the only
+      // record of a *non-fatal* status line — `DB_DOWNGRADED` chief among
+      // them — that startup otherwise never surfaces anywhere observable
+      // once the app is up. Exposed so `getCoreModule` can answer "what did
+      // the core actually report" regardless of outcome, not only on
+      // failure.
+      logs: Log[]
     }
   | {
       type: "error"
@@ -303,6 +311,7 @@ export type CoreModule = () => Promise<
     }
   | {
       type: "backwardsMigration"
+      logs: Log[]
     }
 >
 
@@ -356,7 +365,8 @@ const loadCoreModule: CoreModule = () =>
           port: 4650,
           apiToken: DEV_API_TOKEN,
           kill: () => {}
-        }
+        },
+        logs: []
       })
       console.log("Core module loaded in development mode")
       return
@@ -495,12 +505,14 @@ const loadCoreModule: CoreModule = () =>
                 port,
                 apiToken,
                 kill: () => coreModule?.kill()
-              }
+              },
+              logs
             })
           } else if (event === "BACKWARDS_MIGRATION") {
             console.log("[CORE] Backwards migration detected")
             resolve({
-              type: "backwardsMigration"
+              type: "backwardsMigration",
+              logs
             })
           } else if (event === "DB_DOWNGRADED") {
             // A newer database was stepped back to this build's version and
@@ -1469,7 +1481,10 @@ ipcMain.handle("getCoreModule", async () => {
 
   return {
     type: cm.type,
-    logs: cm.type === "error" ? cm.logs : undefined,
+    // Present for every outcome, not only `"error"`: the only record of a
+    // non-fatal status line (`DB_DOWNGRADED` chief among them) once startup
+    // has moved on, since nothing else threads it anywhere observable.
+    logs: cm.logs,
     snapshotPath: cm.type === "error" ? cm.snapshotPath : undefined,
     port: cm.type === "success" ? cm.result.port : undefined,
     apiToken: cm.type === "success" ? cm.result.apiToken : undefined

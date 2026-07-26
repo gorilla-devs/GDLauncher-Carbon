@@ -130,7 +130,35 @@ export const TEST_IDS = Object.freeze({
   // it. Chosen over `discordIntegration`/`showAppCloseWarning` because it has
   // no side effect beyond a CSS class (no RPC connection attempt, no close
   // dialog to accidentally gate other flows on).
-  settingsReducedMotionToggle: "settings-reduced-motion-toggle"
+  settingsReducedMotionToggle: "settings-reduced-motion-toggle",
+
+  // The DB recovery ladder (`packages/preload/loading.ts`'s `fatalError`/
+  // `backwardsMigrationError`, rendered into `#appFatalCrash` by
+  // `packages/main/index.ts`'s failure path). Neither hazard above applies
+  // here: this screen is raw `innerHTML` built from template strings in the
+  // Electron preload, not a `@gd/ui` component (hazard 1) and not anywhere
+  // near `FilterSidebar` (hazard 2) — confirmed by reading how it mounts,
+  // not assumed. `fatalError` and `backwardsMigrationError` fully replace
+  // `#appFatalCrash`'s contents and are mutually exclusive (only one status
+  // event ever fires per launch), so the two screen-container ids below
+  // never coexist, and `recoveryResetDbButton` is deliberately the same
+  // testid on both screens for the same reason `searchInput`/`onboardingNext`
+  // reuse one id across mutually-exclusive mounts.
+  recoveryFatalScreen: "recovery-fatal-screen",
+  recoveryBackwardsMigrationScreen: "recovery-backwards-migration-screen",
+  recoveryRetryButton: "recovery-retry-button",
+  // Present only when the core's `_STATUS_:DB_DOWNGRADE_FAILED` line carried
+  // a snapshot path (`loading.ts`'s `restoreStepHtml`); absent, not merely
+  // hidden, otherwise. A DOM query for this id is a real presence check, not
+  // a visibility one.
+  recoveryRestoreSnapshotButton: "recovery-restore-snapshot-button",
+  recoveryResetDbButton: "recovery-reset-db-button",
+  // The fatal screen's log text box — the core's own log lines plus the
+  // `Database error: <EVENT>` line `main/index.ts` appends, rendered via
+  // `textContent` (never interpolated as HTML; see `loading.ts`'s own
+  // comment on why). Used to assert which status event actually drove the
+  // screen, independent of which buttons happen to be present.
+  recoveryErrorDetail: "recovery-error-detail"
 })
 
 export function byTestId(id: string): string {
