@@ -4,6 +4,7 @@ import { attachCoreLogOnFailure } from "./fixtures/electronApp.js"
 import { byModRow, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import { ensureLibraryInteractive } from "./helpers/instances.js"
 import {
+  cleanupInstalledMod,
   deleteModViaUi,
   installAddonVersion,
   installModIntoInstance,
@@ -96,39 +97,24 @@ test.describe("mod lifecycle", () => {
   }
 
   /**
-   * Re-fetches the mod list fresh (never a value captured earlier in the
-   * test body — same reasoning as `modInstall.spec.ts`'s identical cleanup)
-   * and deletes whatever Fabric API entry is still there, confirming it is
-   * genuinely gone from disk afterward. A no-op if nothing matches: every
-   * test's own body is expected to leave at most one such entry, but a test
-   * that failed before installing anything must not throw again here.
+   * Thin, test-named wrapper over `helpers/mods.ts`'s shared
+   * `cleanupInstalledMod` (also used by `modInstall.spec.ts`) — kept as a
+   * local function rather than inlined at each call site purely so the four
+   * call sites below stay one line each and every cleanup failure here is
+   * labeled "cleanupFabricApi" the same way it always has been.
    */
   async function cleanupFabricApi(
     page: Page,
     instanceName: string,
     modsDir: string
   ): Promise<void> {
-    const mods = await openInstanceAddons(page, instanceName)
-    const toRemove = mods.find(matchesFabricApi)
-    if (!toRemove) return
-
-    await deleteModViaUi(page, toRemove.filename)
-
-    const remaining = await listModFiles(modsDir)
-    if (remaining.includes(toRemove.filename)) {
-      // Not a direct `throw` inside a `finally` block (this function is
-      // only ever called from one, at each test's own call site below) —
-      // `no-unsafe-finally` only flags a throw lexically inside `finally`,
-      // so factoring this into its own function, unlike `modInstall.spec.ts`'s
-      // identical check inlined directly in `finally`, needs no
-      // `eslint-disable` here. The caller's own `catch` still gates whether
-      // this re-throws over a passing body, same behavior either way.
-      throw new Error(
-        `cleanupFabricApi: deleted "${toRemove.filename}" via the UI but ` +
-          `it is still present in ${modsDir} — the shared instance was not ` +
-          "returned to a clean state"
-      )
-    }
+    await cleanupInstalledMod(
+      page,
+      instanceName,
+      modsDir,
+      matchesFabricApi,
+      "cleanupFabricApi"
+    )
   }
 
   test("disables an installed mod", async ({ installedInstance }) => {

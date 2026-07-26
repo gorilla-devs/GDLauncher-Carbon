@@ -362,7 +362,7 @@ assets/libraries/JRE substrate is warm) and every mod this suite targets
 supports it; 1.20.1 reuses the same pinned combination
 `loaderInstall.spec.ts`'s own matrix already exercises.
 
-The fixture hands out `instanceId` and `modsDir` — the instance's `mods/`
+The fixture hands out `instanceName` and `modsDir` — the instance's `mods/`
 directory path, resolved from its real on-disk shortpath
 (`fixtures/installedInstance.ts`'s `resolveModsDir`) rather than assumed
 equal to the instance's display name. The non-obvious part, worth stating
@@ -498,18 +498,40 @@ is not rediscovered from scratch.
 `enable_mod` (`crates/carbon_app/src/managers/instance/mods.rs:300`) commits
 the on-disk rename (`tokio::fs::rename` at :348 for enabling, :358 for
 disabling) **before** the `ModFileCache.enabled` database write
-(`mfcdb::update_mod_file_enabled`, :361-367). Nothing reconciles the two if
-the process dies in between. A crash in that window leaves disk and DB
-permanently disagreeing: the mod is genuinely excluded from the game (its
+(`mfcdb::update_mod_file_enabled`, :361-367). A crash in that window leaves
+disk and DB disagreeing: the mod is genuinely excluded from the game (its
 file is renamed to `<filename>.disabled` on disk), while `list_mods` — which
 reads `ModFileCache.enabled` — still reports it enabled in the UI. Clicking
-disable again does not fix it: `enable_mod`'s own preconditions check disk
-(`disabled_path.exists()` at :350-352), so it hits `bail!("mod is already
-disabled")` and refuses. The user is left looking at a mod the UI shows as
-enabled that does not load and cannot be toggled back through the UI at all.
+disable again does not fix it in the moment: `enable_mod`'s own preconditions
+check disk (`disabled_path.exists()` at :350-352), so it hits `bail!("mod is
+already disabled")` and refuses.
+
+**This is not permanent.** `cache_local`'s per-instance disk scan
+(`managers/metadata/cache/mod.rs`) compares every cached row against disk,
+including the enabled flag: the skip condition at :1723-1731 is `*real_size
+== entry.filesize && *enabled == entry.enabled && *addon_type ==
+entry.addon_type`, where `enabled` comes from the disk scan itself (derived
+from the `.disabled` suffix, not the DB — the same source `modVerify.ts`
+reads). A mismatch fails that condition, so the entry is left in `modpaths`
+rather than skipped, and gets re-upserted at :1790-1798
+(`cache_mod_file_unchecked` → `upsert_mod_file_cache`, :1362-1372) with the
+disk-derived value, overwriting the stale DB row. This scan is queued for
+every instance at startup (`managers/instance/mod.rs:272-278`) and
+prioritised whenever the frontend opens an instance
+(`PRIORITIZE_INSTANCE_CACHE`, `api/instance/mod.rs:276-283`). So the
+disagreement is real but **transient**, and self-heals on the next local scan
+of that instance — in practice, the next time the user opens it. The
+user-visible symptom is a briefly-wrong toggle and one failed disable click,
+not a permanently wedged mod.
+
 `modLifecycle.spec.ts`'s disable/enable/delete tests read disk only (never
 the DB-backed `enabled` field the UI's switch reflects) specifically because
-of this — see the spec file's own module doc comment.
+of the non-atomic window above — see the spec file's own module doc comment.
+No test in this suite can be made flaky by it, either: `enable_mod` performs
+the rename and the DB write sequentially inside one handler before
+responding, and `toggleModEnabled` (`helpers/mods.ts`) awaits that response
+before returning, so there is no window in which a test's own assertion could
+observe the stale midpoint.
 
 ## Suite wall-clock
 

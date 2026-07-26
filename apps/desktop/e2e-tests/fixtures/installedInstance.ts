@@ -19,9 +19,6 @@ export interface InstalledInstance {
    *  `byInstanceName` and the library UI key on. Not the on-disk directory
    *  name; see `modsDir`'s doc comment. */
   instanceName: string
-  /** The numeric `Instance.id` / `FEInstanceId` — what every per-instance
-   *  rspc call (e.g. `InstallMod.instance_id`) actually takes. */
-  instanceId: number
   /** Absolute path to the instance's `mods/` directory, resolved from its
    *  real on-disk shortpath rather than assumed equal to `instanceName` —
    *  see `resolveModsDir`'s doc comment. This directory is created lazily by
@@ -169,10 +166,6 @@ export async function installFixtureInstance(auth: {
   })
   await waitForInstallComplete(page, INSTALLED_INSTANCE_NAME)
 
-  const { id: instanceId } = readInstanceByName(
-    harness.runtimePath,
-    INSTALLED_INSTANCE_NAME
-  )
   const modsDir = resolveModsDir(harness.runtimePath, INSTALLED_INSTANCE_NAME)
 
   return {
@@ -181,7 +174,6 @@ export async function installFixtureInstance(auth: {
     harness,
     pageErrors,
     instanceName: INSTALLED_INSTANCE_NAME,
-    instanceId,
     modsDir
   }
 }

@@ -34,6 +34,7 @@ import {
   byTestId,
   TEST_IDS
 } from "./selectors.js"
+import { listModFiles } from "./modVerify.js"
 
 export type ModPlatform = "curseforge" | "modrinth"
 
@@ -224,7 +225,30 @@ export async function searchForMod(
     opts.platform === "curseforge"
       ? TEST_IDS.searchPlatformCurseforge
       : TEST_IDS.searchPlatformModrinth
-  await page.click(byTestId(platformTestId))
+  const platformWrapper = page.locator(byTestId(platformTestId))
+  // The native `<input type="radio">` `Radio` forwards unknown props onto
+  // (visually hidden — `class="hidden"` — but a real DOM node with a real
+  // `checked` property, see `Radio/index.tsx` and `selectors.ts`'s hazard-1
+  // comment). Reading it first is what makes the click below a *set* rather
+  // than the *toggle* `PlatformFilter.handleSelect` (`PlatformFilter.tsx:22-38`)
+  // actually implements: it deselects (`searchApi: null`) when the clicked
+  // value already equals the current selection, and the filter's provider
+  // lives at the app level (`pages/withAds.tsx:53`), so a selection made on
+  // an earlier search survives every `/library` -> `/search` round trip this
+  // suite makes. Clicking unconditionally would silently flip an
+  // already-`opts.platform` filter to "search both" instead of leaving it
+  // set.
+  const platformRadio = platformWrapper.locator('input[type="radio"]')
+  if (!(await platformRadio.isChecked())) {
+    await platformWrapper.click()
+  }
+  await expect(platformRadio, {
+    message:
+      `searchForMod: platform filter is not selecting "${opts.platform}" ` +
+      "after searchForMod's set-not-toggle click — a regression here would " +
+      "otherwise search unfiltered (or the wrong platform) with nothing " +
+      "failing loudly"
+  }).toBeChecked()
 
   await page.fill(byTestId(TEST_IDS.searchInput), opts.query)
 
@@ -274,6 +298,15 @@ export async function openAddonPage(
  * Does not itself read back the installed mod's `filename`/`file_size` —
  * call `openInstanceAddons` again afterward for that (see its doc comment
  * for why that is the race-free way to get them from the app's own list).
+ *
+ * Asserts the button does not already read "Downloaded" before clicking, so
+ * the post-click assertion proves a transition happened here rather than
+ * being satisfied by state this call never caused. `InstallButton.tsx:56-57`
+ * renders "Downloaded" whenever `isInstalled()`, independent of who
+ * installed it — reachable via a leftover from a swallowed cleanup failure
+ * in a previous test (every spec here deliberately swallows cleanup errors
+ * when the body already failed), which would otherwise make this a silent
+ * no-op against an already-installed mod.
  */
 export async function installModIntoInstance(
   page: Page,
@@ -281,6 +314,14 @@ export async function installModIntoInstance(
 ): Promise<void> {
   const installButton = page.locator(byTestId(TEST_IDS.addonInstallButton))
   await expect(installButton).toBeVisible()
+  await expect(installButton, {
+    message:
+      `installModIntoInstance: install button for "${opts.instanceName}" ` +
+      'already read "Downloaded" before this function clicked it — the mod ' +
+      "is already installed (likely a leftover from a previous test's " +
+      "failed cleanup), so a real install here cannot be proven"
+  }).not.toHaveText(/downloaded/i)
+
   await installButton.click()
 
   await expect(installButton, {
@@ -393,6 +434,62 @@ export async function deleteModViaUi(
 
   await responsePromise
   await expect(row).toHaveCount(0)
+}
+
+/**
+ * Re-fetches the mod list fresh (never a value captured earlier in a test
+ * body — a body can fail partway through an install) and, if `matches` finds
+ * an entry, deletes it via the UI and confirms it is genuinely gone from
+ * disk afterward. A no-op if nothing matches: every test in this suite is
+ * expected to leave at most one such entry, but a test that failed before
+ * installing anything must not throw again here.
+ *
+ * Shared by `modInstall.spec.ts` and `modLifecycle.spec.ts`, which
+ * previously each carried their own copy of this same logic — two copies is
+ * exactly the seam that let one of them go stale: `toRemove.filename` is the
+ * app's cached *base* name (the backend never writes the `.disabled` suffix
+ * into that column, `managers/instance/mods.rs:333-337`), while
+ * `listModFiles` returns real on-disk names, including a suffixed one after
+ * a disable. Checking only the base name — the bug this helper fixes — can
+ * never go red for the one path that actually leaves the file disabled,
+ * since `delete_mod` (`managers/instance/mods.rs:408-412`) removes whichever
+ * variant is present regardless.
+ *
+ * Deliberately does not chase down dependency jars a platform declares
+ * alongside the target mod: every install this suite performs sends
+ * `install_deps: true` (`useModInstallation.ts:144`), so a dependency
+ * CurseForge/Modrinth start declaring for Fabric API or Sodium would land in
+ * the shared warm instance and outlive this cleanup, silently accumulating
+ * across a worker's run. Accepted as a known gap rather than an oversight —
+ * harmless today (neither current target mod declares one), not something
+ * this helper can distinguish from a mod the test itself is responsible for
+ * without knowing the full dependency graph a live platform returned.
+ */
+export async function cleanupInstalledMod(
+  page: Page,
+  instanceName: string,
+  modsDir: string,
+  matches: (mod: InstalledMod) => boolean,
+  label: string
+): Promise<void> {
+  const mods = await openInstanceAddons(page, instanceName)
+  const toRemove = mods.find(matches)
+  if (!toRemove) return
+
+  await deleteModViaUi(page, toRemove.filename)
+
+  const remaining = await listModFiles(modsDir)
+  const leftoverName = remaining.find(
+    (name) =>
+      name === toRemove.filename || name === `${toRemove.filename}.disabled`
+  )
+  if (leftoverName) {
+    throw new Error(
+      `${label}: deleted "${toRemove.filename}" via the UI but "${leftoverName}" ` +
+        `is still present in ${modsDir} — the shared instance was not ` +
+        "returned to a clean state"
+    )
+  }
 }
 
 /** A version listed on an addon's Versions tab — the subset `pickOlderVersion`

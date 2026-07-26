@@ -202,26 +202,38 @@ export interface InstanceRow {
  *
  * `name` is assumed unique here — nothing in `Instance`'s schema enforces
  * that, but every caller in this suite creates its own uniquely-named
- * instance, so a duplicate would itself be a test bug worth surfacing rather
- * than something this reader should silently pick one of.
+ * instance, so a duplicate is itself a test bug worth surfacing. Enforced
+ * directly: this reads every matching row and throws if more than one comes
+ * back, rather than silently picking the first the way a plain `.get()`
+ * would.
  */
 export function readInstanceByName(
   runtimePath: string,
   name: string
 ): InstanceRow {
   return withConfigDb(runtimePath, (db) => {
-    const row = db
+    const rows = db
       .prepare(`SELECT id, shortpath FROM Instance WHERE name = ?`)
-      .get(name) as { id: number; shortpath: string } | undefined
+      .all(name) as { id: number; shortpath: string }[]
 
-    if (!row) {
+    if (rows.length === 0) {
       throw new Error(
         `no Instance row named "${name}" in ` +
           `${path.join(runtimePath, "gdl_conf.db")} — was it actually ` +
           "created, and does the name match exactly?"
       )
     }
+    if (rows.length > 1) {
+      throw new Error(
+        `${rows.length} Instance rows named "${name}" in ` +
+          `${path.join(runtimePath, "gdl_conf.db")} — every caller in this ` +
+          "suite creates its own uniquely-named instance, so a duplicate " +
+          "is a test bug worth surfacing, not something to silently pick " +
+          "one of"
+      )
+    }
 
+    const [row] = rows
     return { id: row.id, shortpath: row.shortpath }
   })
 }

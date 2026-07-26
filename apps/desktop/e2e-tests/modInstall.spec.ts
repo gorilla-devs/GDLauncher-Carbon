@@ -1,8 +1,9 @@
-import { expect, test } from "./fixtures/index.js"
+import { test } from "./fixtures/index.js"
 import { attachCoreLogOnFailure } from "./fixtures/electronApp.js"
-import { byModRow, byTestId, TEST_IDS } from "./helpers/selectors.js"
+import { byTestId, TEST_IDS } from "./helpers/selectors.js"
 import { ensureLibraryInteractive } from "./helpers/instances.js"
 import {
+  cleanupInstalledMod,
   installModIntoInstance,
   openAddonPage,
   openInstanceAddons,
@@ -10,11 +11,7 @@ import {
   type InstalledMod,
   type ModPlatform
 } from "./helpers/mods.js"
-import {
-  listModFiles,
-  verifyModEnabled,
-  verifyModInstalled
-} from "./helpers/modVerify.js"
+import { verifyModEnabled, verifyModInstalled } from "./helpers/modVerify.js"
 
 /**
  * This is the CurseForge CDN regression guard (see task-4-brief.md): the
@@ -154,38 +151,21 @@ test.describe("mod install", () => {
         bodyFailed = true
         throw error
       } finally {
+        // `cleanupInstalledMod` (`helpers/mods.ts`, shared with
+        // `modLifecycle.spec.ts`) re-derives what's actually installed
+        // rather than trusting `installed` from the try-block: a failure
+        // partway through (e.g. the disk check throwing after a genuine
+        // install) must still be cleaned up, and re-reading is what makes
+        // this correct regardless of where the body failed, order-independent
+        // of the other test case in this file.
         try {
-          // Re-derive what's actually installed rather than trusting
-          // `installed` from the try-block: a failure partway through (e.g.
-          // the disk check throwing after a genuine install) must still be
-          // cleaned up, and re-reading is what makes this correct regardless
-          // of where the body failed, order-independent of the other test
-          // case in this file.
-          const mods = await openInstanceAddons(page, instanceName)
-          const toRemove = mods.find(testCase.matches)
-          if (toRemove) {
-            const row = page.locator(byModRow(toRemove.filename))
-            await row.locator(byTestId(TEST_IDS.modRowDelete)).click()
-            await expect(row).toHaveCount(0)
-
-            const remaining = await listModFiles(modsDir)
-            if (remaining.includes(toRemove.filename)) {
-              // Caught by this same `try`'s own `catch` right below (which
-              // gates on `bodyFailed` before deciding whether to re-throw or
-              // log) — not a direct escape from `finally` — but the rule
-              // flags any throw lexically inside a `finally` block
-              // regardless of nesting, same as the identical pattern this
-              // file's other `eslint-disable-next-line no-unsafe-finally`
-              // guards below.
-              // eslint-disable-next-line no-unsafe-finally
-              throw new Error(
-                `"${testCase.title}": cleanup deleted "${toRemove.filename}" ` +
-                  "via the UI but it is still present in " +
-                  `${modsDir} — the shared instance was not returned to a ` +
-                  "clean state"
-              )
-            }
-          }
+          await cleanupInstalledMod(
+            page,
+            instanceName,
+            modsDir,
+            testCase.matches,
+            `"${testCase.title}"`
+          )
         } catch (cleanupError) {
           // See instanceInstall.spec.ts's identical branch: only re-throw
           // over a body that itself succeeded, so cleanup failure never

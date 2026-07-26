@@ -224,17 +224,25 @@ export async function verifyModEnabled(
  * Lists mod files present directly under `modsDir` — enabled (`*.jar`) and
  * disabled (`*.jar.disabled`) alike, sorted for deterministic assertions.
  * Subdirectories and non-mod files (readmes, OS metadata, etc.) are
- * excluded. A `modsDir` that does not exist yet (see module doc comment)
- * is treated the same as an empty one: zero mod files found, never a
- * thrown `ENOENT`.
+ * excluded. A `modsDir` that does not exist yet (see module doc comment) is
+ * treated the same as an empty one: zero mod files found, never a thrown
+ * `ENOENT`. Any other `readdir` failure (permissions, `modsDir` resolving to
+ * a file instead of a directory, ...) is a genuine problem and is not
+ * swallowed — the opposite treatment would make every caller's leftover/delete
+ * assertion pass vacuously against a directory it never actually read, the
+ * same failure mode `verifyModInstalled`/`verifyModEnabled` one screen above
+ * are careful to avoid.
  */
 export async function listModFiles(modsDir: string): Promise<string[]> {
   let entries: Dirent[]
 
   try {
     entries = await fs.readdir(modsDir, { withFileTypes: true })
-  } catch {
-    return []
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return []
+    }
+    throw error
   }
 
   return entries

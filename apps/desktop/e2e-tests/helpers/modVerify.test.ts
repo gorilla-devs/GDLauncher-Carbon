@@ -319,4 +319,16 @@ describe("listModFiles", () => {
 
     await expect(listModFiles(absentModsDir)).resolves.toEqual([])
   })
+
+  it("propagates a non-ENOENT readdir error instead of swallowing it", async () => {
+    // A `modsDir` that resolves to a file rather than a directory throws
+    // ENOTDIR, not ENOENT — only the latter (the directory legitimately not
+    // existing yet) is a state this function treats as "zero mod files
+    // found"; anything else must surface rather than pass silently as an
+    // empty result.
+    const filePath = path.join(tmpRoot, "not-a-directory")
+    await fs.writeFile(filePath, "not a directory")
+
+    await expect(listModFiles(filePath)).rejects.toThrow()
+  })
 })
