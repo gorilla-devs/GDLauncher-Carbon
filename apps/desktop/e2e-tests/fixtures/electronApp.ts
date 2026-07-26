@@ -3,6 +3,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { _electron as electron } from "playwright"
 import type { ElectronApplication, Page } from "playwright"
+import type { TestInfo } from "@playwright/test"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -153,4 +154,49 @@ export async function launchApp(
   })
 
   return { app, page, pageErrors }
+}
+
+/**
+ * Attaches the Rust core's session log to the Playwright report when a test
+ * finished in a status other than the one it expected.
+ *
+ * A failure screenshot only shows the last UI frame; for a long install the
+ * actual cause almost always lives in the core's own log, not the DOM. The
+ * core writes one file per launch to `<runtimePath>/__gdl_logs__` (see
+ * `crates/carbon_app/src/logger.rs::setup_logger`) — but only in release
+ * builds, which is what the `-e2e` build variants are. A debug build creates
+ * the directory but never the file, so an empty or missing log here is
+ * expected outside a packaged run, not a bug in this function.
+ *
+ * No-ops (rather than throwing) on every "nothing to attach" case — a
+ * missing log must never fail a test on top of whatever already failed it.
+ */
+export async function attachCoreLogOnFailure(
+  testInfo: TestInfo,
+  runtimePath: string
+): Promise<void> {
+  if (testInfo.status === testInfo.expectedStatus) return
+
+  const logsDir = path.join(runtimePath, "__gdl_logs__")
+  if (!fs.existsSync(logsDir)) return
+
+  const logFiles = fs.readdirSync(logsDir).filter((f) => f.endsWith(".log"))
+  if (logFiles.length === 0) return
+
+  // One log file per core launch, and the worker launches the core once —
+  // but picking the newest by mtime rather than assuming array order keeps
+  // this correct if that ever changes.
+  const newest = logFiles
+    .map((name) => {
+      const filePath = path.join(logsDir, name)
+      return { filePath, mtimeMs: fs.statSync(filePath).mtimeMs }
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)[0]
+
+  if (fs.statSync(newest.filePath).size === 0) return
+
+  await testInfo.attach("core-log", {
+    path: newest.filePath,
+    contentType: "text/plain"
+  })
 }

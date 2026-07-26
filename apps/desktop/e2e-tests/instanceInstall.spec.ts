@@ -1,5 +1,6 @@
 import { decodeMatrix } from "./versionMatrix.js"
 import { expect, test } from "./fixtures/index.js"
+import { attachCoreLogOnFailure } from "./fixtures/electronApp.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
   createInstanceViaUi,
@@ -18,6 +19,14 @@ const MATRIX = decodeMatrix(raw)
 const SEED = process.env.E2E_VERSION_SEED ?? "<unset>"
 
 test.describe("instance install", () => {
+  // `authenticatedApp` is worker-scoped, so it never receives a per-test
+  // `TestInfo` to gate an attachment on (see `attachCoreLogOnFailure`'s
+  // doc comment) — `afterEach` is the one hook Playwright runs per test
+  // that still gets both the worker fixture's value and a real `TestInfo`.
+  test.afterEach(async ({ authenticatedApp }, testInfo) => {
+    await attachCoreLogOnFailure(testInfo, authenticatedApp.harness.runtimePath)
+  })
+
   for (const entry of MATRIX) {
     test(`installs Minecraft ${entry.id} (${entry.source}, seed ${SEED})`, async ({
       authenticatedApp
@@ -25,6 +34,15 @@ test.describe("instance install", () => {
       const { page } = authenticatedApp
       const name = `gdl-e2e-${entry.id}`
 
+      // `bodyFailed` records whether the try-block itself failed. A `throw`
+      // inside `finally` discards whatever the try-block was throwing — JS
+      // semantics, not a Playwright reporting choice — so a cleanup failure
+      // must never re-throw over an already-failing body, only over a
+      // passing one. An explicit boolean rather than an "error is undefined"
+      // sentinel: a literal `throw undefined` from the body would otherwise
+      // be misread as "the body succeeded" (same reasoning as
+      // `hasFirstError` in `fixtures/mockIdp.ts`'s `stopHarness`).
+      let bodyFailed = false
       try {
         await createInstanceViaUi(page, { name, version: entry.id })
         await waitForInstallComplete(page, name)
@@ -45,12 +63,25 @@ test.describe("instance install", () => {
         await expect(
           tile.locator(byTestId(TEST_IDS.instancePlay))
         ).toBeEnabled()
+      } catch (error) {
+        bodyFailed = true
+        throw error
       } finally {
-        // Deliberately NOT swallowed. Cleanup runs against shared, worker-
-        // scoped state, so a silent failure here does not stay local — it
-        // corrupts the starting conditions of every later test in the worker
-        // and resurfaces as an unrelated first-click timeout somewhere else.
-        await deleteInstanceViaUi(page, name)
+        try {
+          await deleteInstanceViaUi(page, name)
+        } catch (cleanupError) {
+          // Cleanup corrupts shared worker state, so it must not pass
+          // silently — but it must not bury the failure that caused it
+          // either. Re-throw only when the body itself succeeded.
+          if (!bodyFailed) {
+            // Deliberate: this branch only runs when the try-block
+            // succeeded, so there is no try-block error here for the throw
+            // to discard.
+            // eslint-disable-next-line no-unsafe-finally
+            throw cleanupError
+          }
+          console.error(`cleanup for "${name}" also failed:`, cleanupError)
+        }
       }
     })
   }

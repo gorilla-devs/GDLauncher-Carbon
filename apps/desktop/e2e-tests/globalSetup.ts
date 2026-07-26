@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url"
 import {
   encodeMatrix,
   pickMatrix,
@@ -68,3 +69,24 @@ async function globalSetup(): Promise<void> {
 }
 
 export default globalSetup
+
+// Playwright imports this module for its `default` export and calls it
+// itself — it never runs this file as the process entry point, so this
+// branch is dead weight for that path and only fires when the file is
+// invoked directly (`pnpm exec tsx e2e-tests/globalSetup.ts`), which is the
+// supported way to inspect a matrix without paying for a full run. This is
+// also the reason `playwright test --list` can't be used for that instead:
+// list mode skips global setup entirely (see the README), so there is no
+// other supported way to see the matrix short of running it.
+//
+// `pathToFileURL` rather than a manual `file://${...}` template: on Windows
+// `process.argv[1]` is a backslash path (`C:\repo\...`) while
+// `import.meta.url` is `file:///C:/repo/...` — a string-built comparison
+// never matches there, which would silently restore the exact no-op this
+// self-invocation exists to eliminate.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  void globalSetup()
+}
