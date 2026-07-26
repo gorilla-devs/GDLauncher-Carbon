@@ -439,16 +439,24 @@ const General = () => {
             <Trans key="settings:_trn_potato_mode_title" />
           </Title>
           <RightHandSide>
-            <Switch
-              checked={settings.reducedMotion}
-              onChange={(e) => {
-                settingsMutation.mutate({
-                  reducedMotion: {
-                    Set: e.currentTarget.checked
-                  }
-                })
-              }}
-            />
+            {/* The anchor lives on this wrapping div rather than as a prop on
+                Switch: Switch spreads all its props onto the native
+                `<input type="checkbox">` it renders, but that input is
+                zero-size (`w-0 h-0`) — the visible, clickable surface is the
+                enclosing `<label>`. Same pattern as the mod-row toggle
+                (pages/Library/shared/addons/components/columns/enabledColumn.tsx). */}
+            <div data-testid="settings-reduced-motion-toggle">
+              <Switch
+                checked={settings.reducedMotion}
+                onChange={(e) => {
+                  settingsMutation.mutate({
+                    reducedMotion: {
+                      Set: e.currentTarget.checked
+                    }
+                  })
+                }}
+              />
+            </div>
           </RightHandSide>
         </Row>
         <Row>

@@ -105,8 +105,19 @@ export const INSTALLED_INSTANCE_NAME = "gdl-e2e-mods-fabric"
  * The containment check (`modsDir` resolves inside the instance's own root,
  * not the runtime root) guards against a `path.join` argument order mistake
  * silently producing some other real directory that happens to exist.
+ *
+ * Exported: `persistence.spec.ts` reuses this exact function against its own,
+ * differently-named instance (it cannot use `installFixtureInstance`/
+ * `INSTALLED_INSTANCE_NAME` below directly — those are wired to the
+ * worker-scoped `authenticatedApp`, and this suite's persistence test
+ * deliberately runs on its own, non-worker-scoped runtime path — see that
+ * spec's module doc comment for why) rather than carrying a second copy of
+ * this path derivation and its safety checks.
  */
-function resolveModsDir(runtimePath: string, instanceName: string): string {
+export function resolveModsDir(
+  runtimePath: string,
+  instanceName: string
+): string {
   const { shortpath } = readInstanceByName(runtimePath, instanceName)
 
   const instanceRoot = path.join(runtimePath, "instances", shortpath)

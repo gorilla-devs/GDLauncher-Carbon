@@ -237,3 +237,41 @@ export function readInstanceByName(
     return { id: row.id, shortpath: row.shortpath }
   })
 }
+
+/** The subset of the single-row `AppConfiguration` table (the app-wide
+ *  settings row) `persistence.spec.ts` needs off it. */
+export interface AppConfigurationRow {
+  reducedMotion: boolean
+}
+
+/**
+ * Reads the single-row `AppConfiguration` table straight off `gdl_conf.db` —
+ * the disk-side half of `persistence.spec.ts`'s "an app setting survives a
+ * restart" case, mirroring `readInstanceByName`'s plain-column read directly
+ * above. Unlike `readVersionInfo`/`readPartialVersionInfo`, this is not a
+ * JSON-blob cache: `settings.setSettings` writes straight into typed columns
+ * on this table (`crates/carbon_repos/src/repos/app_configuration.rs`), so
+ * this is a direct column read rather than a `readBlobRow` call.
+ *
+ * `AppConfiguration` always has exactly one row, at `id = 0` (seeded by the
+ * baseline/migration chain) — this throws rather than returning a default if
+ * that row is somehow missing, the same "never silently substitute" stance
+ * `resolveLoaderVersionSeed` takes above.
+ */
+export function readAppConfiguration(runtimePath: string): AppConfigurationRow {
+  return withConfigDb(runtimePath, (db) => {
+    const row = db
+      .prepare(`SELECT reducedMotion FROM AppConfiguration WHERE id = 0`)
+      .get() as { reducedMotion: number | bigint } | undefined
+
+    if (!row) {
+      throw new Error(
+        `no AppConfiguration row (id=0) in ` +
+          `${path.join(runtimePath, "gdl_conf.db")} — this table should ` +
+          "always have exactly one row"
+      )
+    }
+
+    return { reducedMotion: Boolean(row.reducedMotion) }
+  })
+}

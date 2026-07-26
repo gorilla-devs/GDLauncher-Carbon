@@ -37,6 +37,12 @@ export const TEST_IDS = Object.freeze({
   // have silently clicked a wrong match instead of failing had a second
   // `<img>` ever been added under `<nav>`.
   navbarLogo: "navbar-logo",
+  // The navbar's settings gear icon (`Navbar.tsx`), the app's only route to
+  // `/settings`. A `@gd/ui` `TabsTrigger`, which spreads unknown props onto
+  // Kobalte's own `<button>` (confirmed by reading `Tabs/index.tsx` — no
+  // hazard-1 wrinkle here, unlike Checkbox/Radio/Switch), so this anchor
+  // reaches a real clickable element directly.
+  navbarSettings: "navbar-settings",
   betaPromptNever: "beta-prompt-never",
   addInstance: "library-add-instance",
   instanceCreationCustomTab: "instance-creation-custom-tab",
@@ -115,7 +121,16 @@ export const TEST_IDS = Object.freeze({
   // helper exists here) — confirmed live that a ~16-entry, already-filtered
   // single-Minecraft-version list mounts in full without scrolling (see
   // task-5-report.md), which is the only shape this suite relies on.
-  addonVersionRow: "addon-version-row"
+  addonVersionRow: "addon-version-row",
+  // Settings > General's "Potato mode" (`reducedMotion`) toggle
+  // (`pages/Settings/General.tsx`), used by `persistence.spec.ts` as the
+  // "an app setting survives a restart" case. On a wrapping div, not the
+  // Switch itself — same zero-size-native-input reason as `modRowToggle`
+  // above; find the real `input[type="checkbox"]` underneath to read/click
+  // it. Chosen over `discordIntegration`/`showAppCloseWarning` because it has
+  // no side effect beyond a CSS class (no RPC connection attempt, no close
+  // dialog to accidentally gate other flows on).
+  settingsReducedMotionToggle: "settings-reduced-motion-toggle"
 })
 
 export function byTestId(id: string): string {
