@@ -80,21 +80,20 @@ export const INSTALLED_INSTANCE_NAME = "gdl-e2e-mods-fabric"
  * `create_dir_all`s `ServerPath::get_mods_path()`), the instance side only
  * ever creates `mods/` lazily, the first time a CurseForge/Modrinth install
  * call writes a file there (`managers/instance/installer/mod.rs`'s
- * `get_install_path`). An earlier version of this fixture pre-created the
- * directory so downstream "does modsDir exist" checks would trivially pass;
- * that was reverted (see task-1-report.md's "Fix round 1") for two reasons:
- * pre-creating mutates the state the app under test operates on, which risks
- * masking a code path that branches on the directory's existence; and, more
- * importantly, it would turn a real regression (mod installation breaking
- * such that `mods/` never gets created) into an invisible one — every
- * downstream test would still find a directory, report a missing mod file,
- * and send whoever's debugging toward download logic instead of directory
- * creation. Left absent, that same break instead produces "mods directory
- * does not exist", pointing straight at the cause. Task 2's
- * `verifyModInstalled` is specified to treat a missing/empty `mods/` as a
- * reported problem rather than a vacuous pass, so the absent-directory case
- * is handled in the assertion that can see the failure, not papered over in
- * setup.
+ * `get_install_path`).
+ *
+ * Creating it here would be wrong for two reasons. It mutates the state the
+ * app under test operates on, which risks masking a code path that branches
+ * on the directory's existence. And it would turn a real regression — mod
+ * installation breaking such that `mods/` never gets created — into an
+ * invisible one: every downstream test would still find a directory, report
+ * a missing mod file, and send whoever is debugging toward download logic
+ * instead of directory creation. Absent, that same break produces "mods
+ * directory does not exist", pointing straight at the cause.
+ *
+ * `verifyModInstalled` treats a missing or empty `mods/` as a reported
+ * problem rather than a vacuous pass, so the absent-directory case is
+ * handled in the assertion that can see the failure, not papered over here.
  *
  * The containment check (`modsDir` resolves inside the instance's own root,
  * not the runtime root) guards against a `path.join` argument order mistake
