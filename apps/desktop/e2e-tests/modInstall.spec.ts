@@ -56,8 +56,7 @@ test.describe("mod install", () => {
     // to the library via the same navbar-logo click `helpers/mods.ts` uses,
     // best-effort, before the interactive-library assertion.
     await installedInstance.page
-      .locator("nav img")
-      .first()
+      .locator(byTestId(TEST_IDS.navbarLogo))
       .click({ timeout: 5_000 })
       .catch(() => {})
     await ensureLibraryInteractive(installedInstance.page)

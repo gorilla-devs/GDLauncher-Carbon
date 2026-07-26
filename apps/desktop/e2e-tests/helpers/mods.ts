@@ -27,7 +27,13 @@
  */
 
 import { expect, type Page } from "@playwright/test"
-import { byInstanceName, byTestId, TEST_IDS } from "./selectors.js"
+import {
+  byAddonVersionRow,
+  byInstanceName,
+  byModRow,
+  byTestId,
+  TEST_IDS
+} from "./selectors.js"
 
 export type ModPlatform = "curseforge" | "modrinth"
 
@@ -52,6 +58,14 @@ export interface InstalledMod {
    *  has no metadata for this file (should not happen for a file it just
    *  installed itself, but this mirrors the struct's own `Option`). */
   sha1: string | null
+  /** `Mod.has_update` (`crates/carbon_app/src/managers/instance/mods.rs`'s
+   *  `list_mods`) — true once the metadata-cache pass has both run for this
+   *  file and found a newer, channel-eligible build for the instance's own
+   *  Minecraft version/loader. Populated asynchronously (see
+   *  `modLifecycle.spec.ts`'s update test doc comment for the timing this
+   *  drives), so a freshly installed mod reads `false` here until that pass
+   *  completes, independent of whether a newer build genuinely exists. */
+  hasUpdate: boolean
 }
 
 interface RawModResponse {
@@ -62,6 +76,7 @@ interface RawModResponse {
   curseforge?: { project_id: number } | null
   modrinth?: { project_id: string } | null
   metadata?: { sha_1?: string | null } | null
+  has_update: boolean
 }
 
 /** How long a real search against the live CurseForge/Modrinth APIs (via the
@@ -104,14 +119,15 @@ function byPrimaryButton(page: Page, text: string) {
 /**
  * Returns to `/library` from wherever `page` currently is, via the
  * navbar logo (`Navbar.tsx`'s `onClick={() => navigator.navigate("/library")}`).
- * There is no test anchor on this element (out of this task's file scope —
- * see task-4-brief.md's file list), so it's located structurally: it is the
- * only `<img>` under the top `<nav>` — the account avatar `<img>` (the other
- * match `getByRole` would find) lives in a different subtree keyed by
- * account uuid, confirmed live (see task-4-report.md).
+ * Anchored on `TEST_IDS.navbarLogo`, a `data-testid` on the logo `<img>`
+ * itself — this used to be found structurally ("the only `<img>` under the
+ * top `<nav>`"), which was brittle in the dangerous direction: a second
+ * `<img>` ever added under `<nav>` would have silently clicked the wrong
+ * element rather than failing. See `TEST_IDS.navbarLogo`'s doc comment in
+ * `selectors.ts` for why this anchor is safe from both documented hazards.
  */
 async function goToLibrary(page: Page): Promise<void> {
-  await page.locator("nav img").first().click()
+  await page.click(byTestId(TEST_IDS.navbarLogo))
   await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
 }
 
@@ -187,7 +203,8 @@ export async function openInstanceAddons(
     enabled: m.enabled,
     curseforgeProjectId: m.curseforge?.project_id ?? null,
     modrinthProjectId: m.modrinth?.project_id ?? null,
-    sha1: m.metadata?.sha_1 ?? null
+    sha1: m.metadata?.sha_1 ?? null,
+    hasUpdate: m.has_update
   }))
 }
 
@@ -271,4 +288,444 @@ export async function installModIntoInstance(
       `installModIntoInstance: install button for "${opts.instanceName}" ` +
       `never reported success (expected its text to read "Downloaded")`
   }).toHaveText(/downloaded/i, { timeout: INSTALL_TIMEOUT })
+}
+
+/** Envelope every rspc response in this app shares — see
+ *  `openInstanceAddons`'s identical inline shape. Named here because the
+ *  lifecycle drivers below parse it repeatedly. */
+interface RspcEnvelope {
+  result?: { type?: string; data?: unknown }
+}
+
+/** How long a rename-only mutation (`instance.enableMod`/`instance.disableMod`
+ *  /`instance.deleteMod`) is given to answer. All three do their filesystem
+ *  work synchronously inside the handler before returning (confirmed against
+ *  `crates/carbon_app/src/managers/instance/mods.rs`'s `enable_mod` and
+ *  `delete_mod` — no `tokio::spawn`/`VisualTaskId` involved, unlike install
+ *  or update), so this is a bound on a local rename/unlink plus one DB write,
+ *  not a network download — short next to `INSTALL_TIMEOUT`. */
+const LIFECYCLE_MUTATION_TIMEOUT = 15_000
+
+/**
+ * Awaits `mutationName`'s rspc response (already in flight or about to be —
+ * call before triggering the action) and throws if it came back an rspc
+ * error. Returns nothing on success: callers that need the mutation's own
+ * return value read it off `openInstanceAddons` afterward instead, the same
+ * "trust a fresh list read, not the mutation's own payload" precedent
+ * `installModIntoInstance`'s callers already follow.
+ */
+async function awaitMutationOk(
+  page: Page,
+  mutationName: string,
+  timeout: number
+): Promise<void> {
+  const response = await page
+    .waitForResponse((r) => r.url().includes(mutationName), { timeout })
+    .catch((cause) => {
+      throw new Error(
+        `awaitMutationOk: no ${mutationName} response observed within ${timeout}ms`,
+        { cause }
+      )
+    })
+
+  const body = (await response.json()) as RspcEnvelope
+  if (body.result?.type === "error") {
+    throw new Error(
+      `awaitMutationOk: ${mutationName} returned an rspc error: ` +
+        JSON.stringify(body.result.data)
+    )
+  }
+}
+
+/**
+ * Toggles `filename`'s enabled state from the instance's Addons tab (must
+ * already be there — same precondition as `searchForMod`), to `enabled`.
+ *
+ * Waits on the real `instance.enableMod`/`instance.disableMod` rspc
+ * response, not on the switch's own visual state: `handleToggleMod`
+ * (`Addons/hooks/useAddonMutations.tsx`) flips the row's `enabled` field in
+ * the reconciled store *before* awaiting the mutation (`optimisticToggleAddon`
+ * runs synchronously ahead of `mutateAsync`), so the switch's rendered state
+ * is not proof the on-disk rename this suite actually cares about has
+ * happened yet — only the resolved network response is.
+ */
+export async function toggleModEnabled(
+  page: Page,
+  filename: string,
+  enabled: boolean
+): Promise<void> {
+  const mutationName = enabled ? "instance.enableMod" : "instance.disableMod"
+  const responsePromise = awaitMutationOk(
+    page,
+    mutationName,
+    LIFECYCLE_MUTATION_TIMEOUT
+  )
+
+  const row = page.locator(byModRow(filename))
+  await row.locator(byTestId(TEST_IDS.modRowToggle)).click()
+
+  await responsePromise
+}
+
+/**
+ * Deletes `filename` from the instance's Addons tab via its row's delete
+ * control, and waits for the real `instance.deleteMod` rspc response before
+ * returning — not merely for the row to disappear from the DOM.
+ * `handleDeleteMod` (`Addons/hooks/useAddonMutations.tsx`) removes the row
+ * from the reconciled store optimistically, ahead of awaiting the mutation,
+ * same reasoning as `toggleModEnabled`'s doc comment: the row vanishing is
+ * not proof the file is actually gone from disk. Also asserts the row is
+ * gone afterward as a sanity check on the app's own bookkeeping, but that is
+ * secondary to the awaited response.
+ */
+export async function deleteModViaUi(
+  page: Page,
+  filename: string
+): Promise<void> {
+  const responsePromise = awaitMutationOk(
+    page,
+    "instance.deleteMod",
+    LIFECYCLE_MUTATION_TIMEOUT
+  )
+
+  const row = page.locator(byModRow(filename))
+  await row.locator(byTestId(TEST_IDS.modRowDelete)).click()
+
+  await responsePromise
+  await expect(row).toHaveCount(0)
+}
+
+/** A version listed on an addon's Versions tab — the subset `pickOlderVersion`
+ *  needs, read off the platform's own rspc response rather than the rendered
+ *  date text (see `openAddonVersions`'s doc comment for why). */
+export interface AddonVersionSummary {
+  /** Modrinth version id — the same value `ModDownloadButton`'s `fileId`
+   *  prop installs and `byAddonVersionRow` keys its DOM anchor on. */
+  fileId: string
+  /** ISO 8601 (Modrinth `date_published`, already that format on the wire —
+   *  never reformatted here). */
+  datePublished: string
+}
+
+/** How long the addon page's Versions tab is given to answer with the
+ *  project's version list — a real network round trip to the proxied
+ *  backend, same order of magnitude as `SEARCH_RESULTS_TIMEOUT`. */
+const VERSIONS_RESPONSE_TIMEOUT = 30_000
+
+/**
+ * From an addon page reached with `?instanceId=<id>` (i.e. via
+ * `openAddonPage`, called right after `searchForMod` — same precondition
+ * chain), opens the Versions tab and returns every Modrinth version reported
+ * for this project, read off the underlying
+ * `modplatforms.modrinth.getProjectVersions` rspc response rather than
+ * parsed from the rendered `safeFormat`'d date text — so `pickOlderVersion`'s
+ * ordering never depends on a display string round-tripping back into a
+ * real timestamp.
+ *
+ * Modrinth only, deliberately: an earlier version of this helper also had a
+ * CurseForge branch (`modplatforms.curseforge.getModFiles`), written
+ * symmetrically from source but never once executed by anything in this
+ * suite. It was removed rather than kept as unvalidated, symmetric-looking
+ * coverage — CurseForge's `getModFiles` is actually paginated
+ * (`ModFilesParametersQuery`'s `index`/`pageSize`), unlike Modrinth's
+ * single-response `getProjectVersions`, so the dual-request race logic below
+ * (tuned against Modrinth's specific timing — see the next paragraph) is not
+ * merely untested against CurseForge, it is plausibly wrong for it. A future
+ * CurseForge update test should write that branch fresh, against
+ * CurseForge's real paginated behavior confirmed live, not inherit this.
+ *
+ * This list ends up scoped to the instance's own Minecraft version and
+ * loader, but not on the *first* fetch: `InfiniteScrollVersionsQueryWrapper`
+ * mounts its query as soon as the addon page knows its `modId` — before it
+ * knows the instance's version at all — so the very first request goes out
+ * unfiltered (confirmed live: 1165 versions for Fabric API across every
+ * Minecraft release, see task-5-report.md), and only a second request,
+ * fired from a `createEffect` once `instance.getInstanceDetails` resolves,
+ * carries `game_versions`/`loaders` (confirmed live: 27 versions, all
+ * `"1.20.1"`/`"fabric"`, for the same project). Both requests share the same
+ * TanStack Query key, so nothing about the query name or timing tells them
+ * apart — only the request URL itself does (the scoped one is the only one
+ * carrying a `game_versions` param), which is what this waits for
+ * specifically rather than "whatever answers next" (a `waitForResponse`
+ * race against the unfiltered request was tried and observed to
+ * intermittently win — see task-5-report.md). Listening from before the
+ * click, not after, is what makes this deterministic instead of just
+ * narrowing the same race.
+ *
+ * Also waits for at least one row to mount in the DOM
+ * (`TEST_IDS.addonVersionRow`), since `installAddonVersion` needs it there,
+ * not merely present in the network response — this list is virtualized
+ * (`@tanstack/solid-virtual`) and only mounts rows near the viewport.
+ */
+export async function openAddonVersions(
+  page: Page
+): Promise<AddonVersionSummary[]> {
+  const queryName = "modplatforms.modrinth.getProjectVersions"
+  // Present on the URL of the scoped request only — confirmed live (see
+  // task-5-report.md).
+  const scopedMarker = "game_version"
+
+  const scopedResponses: import("@playwright/test").Response[] = []
+  const onResponse = (r: import("@playwright/test").Response) => {
+    if (r.url().includes(queryName) && r.url().includes(scopedMarker)) {
+      scopedResponses.push(r)
+    }
+  }
+  page.on("response", onResponse)
+
+  try {
+    await page.getByRole("tab", { name: "Versions" }).click()
+
+    await expect(page.locator(byTestId(TEST_IDS.addonVersionRow)).first(), {
+      message:
+        "openAddonVersions: no " +
+        `"${TEST_IDS.addonVersionRow}" row ever mounted`
+    }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
+
+    // The scoped request is fired from an effect chained behind its own
+    // `instance.getInstanceDetails` round trip, so it can still be in
+    // flight once the (unfiltered) first render's rows are already
+    // visible. Worse, the effect has been observed to fire it *twice* in a
+    // row (see the "last, not first" comment below) — each firing replaces
+    // the whole virtualized row set, which raced a caller's click on a
+    // specific row hard enough to fail it outright (element detached
+    // mid-click — see task-5-report.md's "Fix round 1" section). So this
+    // does not return the instant one scoped response lands; it waits for
+    // the count to stop changing for a full `SETTLE_WINDOW` first, so a
+    // caller that immediately clicks into the returned list isn't racing a
+    // second re-render still in flight.
+    const deadline = Date.now() + VERSIONS_RESPONSE_TIMEOUT
+    const SETTLE_WINDOW = 1_000
+    let lastCount = 0
+    let stableSince: number | null = null
+    while (Date.now() < deadline) {
+      if (scopedResponses.length !== lastCount) {
+        lastCount = scopedResponses.length
+        stableSince = Date.now()
+      } else if (
+        lastCount > 0 &&
+        stableSince !== null &&
+        Date.now() - stableSince >= SETTLE_WINDOW
+      ) {
+        break
+      }
+      await page.waitForTimeout(250)
+    }
+  } finally {
+    page.off("response", onResponse)
+  }
+
+  if (scopedResponses.length === 0) {
+    throw new Error(
+      `openAddonVersions: no ${queryName} request scoped to the instance's ` +
+        `own Minecraft version/loader (a "${scopedMarker}" URL param) was ` +
+        `observed within ${VERSIONS_RESPONSE_TIMEOUT}ms`
+    )
+  }
+
+  // Last, not first: `InfiniteScrollVersionsQueryWrapper`'s scoping effect
+  // has been observed to fire its scoped request twice in a row (see
+  // task-5-report.md) — harmless (same params, same result), but the last
+  // one is closest to whatever the DOM ends up rendering.
+  const response = scopedResponses[scopedResponses.length - 1]
+  const body = (await response.json()) as RspcEnvelope
+  if (body.result?.type === "error") {
+    throw new Error(
+      `openAddonVersions: ${queryName} returned an rspc error: ` +
+        JSON.stringify(body.result.data)
+    )
+  }
+
+  const versions: AddonVersionSummary[] = (
+    body.result?.data as { id: string; date_published: string }[]
+  ).map((v) => ({ fileId: v.id, datePublished: v.date_published }))
+
+  if (versions.length === 0) {
+    throw new Error(
+      `openAddonVersions: ${queryName} answered with zero versions scoped ` +
+        "to the instance's own Minecraft version/loader"
+    )
+  }
+
+  return versions
+}
+
+/**
+ * Picks a version from `versions` (as returned by `openAddonVersions`) that
+ * is deliberately not the newest — what the update lifecycle test installs
+ * so a later update is genuinely available to move to. Sorts by
+ * `datePublished` itself rather than trusting whatever order the platform's
+ * API returned them in, and returns the second-newest: exactly one
+ * already-confirmed-newer, real candidate exists (the newest), so the later
+ * update assertion has something concrete to have moved to, without reaching
+ * as far back as the oldest available build for no added guarantee.
+ */
+export function pickOlderVersion(
+  versions: AddonVersionSummary[]
+): AddonVersionSummary {
+  if (versions.length < 2) {
+    throw new Error(
+      `pickOlderVersion: need at least 2 versions to pick a deliberately ` +
+        `older one with a newer one available, got ${versions.length}`
+    )
+  }
+  const sorted = [...versions].sort(
+    (a, b) => Date.parse(b.datePublished) - Date.parse(a.datePublished)
+  )
+  return sorted[1]
+}
+
+/** How long installing one specific version off the Versions tab is given to
+ *  report success — mirrors `INSTALL_TIMEOUT`, the same real-CDN-download
+ *  bound `installModIntoInstance` uses for the addon page's main button. */
+const VERSION_INSTALL_TIMEOUT = 120_000
+
+/**
+ * Installs `version.fileId` off the addon page's Versions tab — the
+ * `INSTALL_MOD` path (a specific file/version id), never `INSTALL_LATEST_MOD`:
+ * `ModDownloadButton`'s `fileId` prop is always set for a version row
+ * (`RowContainer.tsx`), which is what routes the click through
+ * `instance.installMod` rather than `instance.installLatestMod`
+ * (`ModDownloadButton/hooks/useModInstallation.ts`'s `handleDownload`) — the
+ * mechanism this suite relies on to install something other than latest.
+ *
+ * `openAddonVersions` only confirms *some* row mounted, not this specific
+ * one: the list is virtualized (`@tanstack/solid-virtual`) and only mounts
+ * rows near the viewport, while `pickOlderVersion` picks by `datePublished`
+ * order — an order that happens to match the API's (and thus the DOM's
+ * mount) order today, but nothing guarantees it stays that way. So this
+ * asserts the target row is actually mounted before doing anything else,
+ * with a message that names the version and the reason it might not be —
+ * turning a generic timeout into a diagnosis rather than a confusing hang.
+ */
+export async function installAddonVersion(
+  page: Page,
+  version: AddonVersionSummary
+): Promise<void> {
+  const row = page.locator(byAddonVersionRow(version.fileId))
+  await expect(row, {
+    message:
+      `installAddonVersion: version "${version.fileId}" (published ` +
+      `${version.datePublished}) never mounted in the Versions tab's DOM. ` +
+      "This list is virtualized and only mounts rows near the viewport; " +
+      "pickOlderVersion picks by datePublished order, which is not " +
+      "guaranteed to match the DOM's mount order. This helper has no " +
+      "scrolling fallback, so a version outside the initial mount + " +
+      "overscan window will fail exactly like this."
+  }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
+  // Not just `row.locator("button")`: a version row resolves to three
+  // `<button>`s — the row's own name `Tooltip`'s trigger, the install
+  // button's `Tooltip` trigger (Kobalte renders both as real `<button>`
+  // elements that duplicate the install button's accessible name, "Download
+  // Version" — confirmed live, see task-5-report.md), and the actual
+  // `@gd/ui` `Button` underneath. `variant` is a real prop `Button` always
+  // spreads onto its own native element regardless of value (confirmed
+  // live) — neither Kobalte trigger ever carries it, in any of *their*
+  // states. Matching the attribute's mere presence (`[variant]`), not a
+  // specific value, matters: scoping on `[variant="primary"]` (tried first)
+  // stops matching the instant install succeeds and `InstallButton` flips
+  // the installed row's `variant` to `"green"` (`InstallButton.tsx`), and
+  // scoping on the Kobalte triggers' own `data-closed` (tried second, to
+  // exclude them instead) is not reliable either — that attribute itself
+  // toggles to `data-expanded` once a trigger's tooltip opens, which the
+  // click below can trigger incidentally.
+  const button = row.locator("button[variant]")
+  await button.click()
+
+  await expect(button, {
+    message:
+      `installAddonVersion: file "${version.fileId}" never reported ` +
+      'success (expected its text to read "Downloaded")'
+  }).toHaveText(/downloaded/i, { timeout: VERSION_INSTALL_TIMEOUT })
+}
+
+/** How long `waitForModFilenameChange` polls before giving up. The update
+ *  task itself downloads a real file off the proxied CDN and then blocks on
+ *  `override_caching_and_wait` before its `VisualTaskId` resolves
+ *  (`managers/instance/installer/mod.rs`) — generous next to the couple of
+ *  MB either fixture mod measures (see task-4-report.md), same order of
+ *  magnitude as `INSTALL_TIMEOUT`. */
+const UPDATE_TIMEOUT = 120_000
+
+/** How long `waitForModFilenameChange` sleeps between polls. */
+const UPDATE_POLL_INTERVAL = 2_000
+
+/**
+ * Polls the app's own mod list (fresh `instance.getInstanceMods` reads via
+ * `openInstanceAddons`, never a cached value — same reasoning as
+ * `modInstall.spec.ts`'s re-fetch in its own `finally`) until `matches` finds
+ * an entry whose `filename` no longer equals `oldFilename`, or throws after
+ * `UPDATE_TIMEOUT`.
+ *
+ * Exists because `instance.updateMod`'s rspc response only confirms the
+ * update *task* was accepted (`update_mod` returns a `VisualTaskId`
+ * immediately after spawning the background download —
+ * `managers/instance/mods.rs`), not that it finished; the frontend's own
+ * `handleUpdateMod` (`Addons/hooks/useAddonMutations.tsx`) polls for exactly
+ * this reason but caps itself at 10 real seconds before giving up on the
+ * spinner, which is not long enough to trust for a real network download and
+ * is a UI polish detail this suite must not inherit as its own bound.
+ */
+export async function waitForModFilenameChange(
+  page: Page,
+  instanceName: string,
+  opts: { oldFilename: string; matches: (mod: InstalledMod) => boolean }
+): Promise<InstalledMod> {
+  const start = Date.now()
+  while (Date.now() - start < UPDATE_TIMEOUT) {
+    const mods = await openInstanceAddons(page, instanceName)
+    const found = mods.find(opts.matches)
+    if (found && found.filename !== opts.oldFilename) {
+      return found
+    }
+    await page.waitForTimeout(UPDATE_POLL_INTERVAL)
+  }
+
+  throw new Error(
+    `waitForModFilenameChange: filename for "${instanceName}" never moved ` +
+      `off "${opts.oldFilename}" within ${UPDATE_TIMEOUT}ms`
+  )
+}
+
+/** How long `waitForModUpdateAvailable` polls before giving up. Generous
+ *  next to what this actually measured live (886ms — see task-5-report.md):
+ *  installing a mod always ends by blocking on the same
+ *  `override_caching_and_wait(instance_id, true, true)` an update install
+ *  does (`managers/instance/installer/mod.rs`), which is what computes this
+ *  file's `update_paths` — so `has_update` is already correct by the time
+ *  `installAddonVersion` returns, with no dependency on the slower periodic
+ *  background metadata-cache sweep (`MetaCacheManager::launch_background_tasks`)
+ *  a first read might suggest. Kept generous anyway rather than tightened to
+ *  the observed number: one proxied-backend measurement on one run is not a
+ *  guaranteed bound. */
+const HAS_UPDATE_TIMEOUT = 60_000
+
+/** How long `waitForModUpdateAvailable` sleeps between polls. */
+const HAS_UPDATE_POLL_INTERVAL = 2_000
+
+/**
+ * Polls the app's own mod list until `matches` finds an entry with
+ * `hasUpdate: true`, or throws after `HAS_UPDATE_TIMEOUT`. See
+ * `HAS_UPDATE_TIMEOUT`'s doc comment for why this is expected to resolve
+ * almost immediately rather than needing the periodic background scan.
+ */
+export async function waitForModUpdateAvailable(
+  page: Page,
+  instanceName: string,
+  matches: (mod: InstalledMod) => boolean
+): Promise<InstalledMod> {
+  const start = Date.now()
+  while (Date.now() - start < HAS_UPDATE_TIMEOUT) {
+    const mods = await openInstanceAddons(page, instanceName)
+    const found = mods.find(matches)
+    if (found?.hasUpdate) {
+      return found
+    }
+    await page.waitForTimeout(HAS_UPDATE_POLL_INTERVAL)
+  }
+
+  throw new Error(
+    `waitForModUpdateAvailable: no matching mod in "${instanceName}" ever ` +
+      `reported has_update within ${HAS_UPDATE_TIMEOUT}ms`
+  )
 }

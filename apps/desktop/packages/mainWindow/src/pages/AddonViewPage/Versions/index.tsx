@@ -179,6 +179,20 @@ const Versions = () => {
                         installedMod()?.remoteId.toString() ===
                         version?.fileId.toString()
                     }}
+                    // Keyed by the platform's own file/version id, the same
+                    // stable identifier `ModDownloadButton`'s `fileId` prop
+                    // uses to pick this exact build (see
+                    // `RowContainer.tsx`'s `fileId` memo) — not the row's
+                    // display name, which is not guaranteed unique. A plain
+                    // `<div>`, so this always reaches the DOM (unlike a
+                    // `data-testid` passed as a prop to a `@gd/ui`
+                    // component — see `selectors.ts`'s hazard 1). This
+                    // virtualized list only mounts rows near the viewport,
+                    // so a test targeting a specific `fileId` must pick one
+                    // already rendered rather than assuming every id is
+                    // reachable without scrolling.
+                    data-testid="addon-version-row"
+                    data-file-id={version.fileId}
                   >
                     <VersionRow
                       project={mod?.data}

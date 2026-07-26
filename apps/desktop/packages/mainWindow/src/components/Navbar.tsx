@@ -91,6 +91,7 @@ const AppNavbar = () => {
               }}
             />
             <img
+              data-testid="navbar-logo"
               src={wideLogoUrl}
               class="h-9 max-w-none transition-transform duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
               classList={{

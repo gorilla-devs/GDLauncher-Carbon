@@ -29,6 +29,14 @@ export const TEST_IDS = Object.freeze({
   deviceCode: "login-device-code",
   gdlSyncAccount: "login-gdl-sync-account",
   libraryRoot: "library-root",
+  // The navbar's wide logo (`Navbar.tsx`), the app's own "back to library"
+  // control from anywhere. A plain `<img>`, not a `@gd/ui` component, so
+  // hazard 1 above does not apply; it lives outside `FilterSidebar`, so
+  // hazard 2 doesn't either. Added to replace a structural `nav img >>
+  // first()` lookup that shared the account-avatar `<img>`'s tag and would
+  // have silently clicked a wrong match instead of failing had a second
+  // `<img>` ever been added under `<nav>`.
+  navbarLogo: "navbar-logo",
   betaPromptNever: "beta-prompt-never",
   addInstance: "library-add-instance",
   instanceCreationCustomTab: "instance-creation-custom-tab",
@@ -98,7 +106,16 @@ export const TEST_IDS = Object.freeze({
   // testid.
   modRowToggle: "mod-row-toggle",
   modRowDelete: "mod-row-delete",
-  modRowUpdate: "mod-row-update"
+  modRowUpdate: "mod-row-update",
+  // A row in the addon page's Versions tab (`AddonViewPage/Versions/index.tsx`),
+  // keyed by the platform's own file/version id via `byAddonVersionRow` —
+  // the same id `ModDownloadButton`'s `fileId` prop installs. This list is
+  // virtualized (`@tanstack/solid-virtual`): only rows near the viewport are
+  // ever mounted, so a target id must already be rendered (no scrolling
+  // helper exists here) — confirmed live that a ~16-entry, already-filtered
+  // single-Minecraft-version list mounts in full without scrolling (see
+  // task-5-report.md), which is the only shape this suite relies on.
+  addonVersionRow: "addon-version-row"
 })
 
 export function byTestId(id: string): string {
@@ -124,4 +141,16 @@ export function byLoader(key: string): string {
  */
 export function byModRow(filename: string): string {
   return `[data-testid="${TEST_IDS.modRow}"][data-mod-filename="${filename}"]`
+}
+
+/**
+ * A version row on an addon page's Versions tab, located by the platform's
+ * own file/version id (a CurseForge file id or Modrinth version id, both
+ * carried as `fileId` throughout the download-button plumbing — see
+ * `TEST_IDS.addonVersionRow`'s doc comment). Scope a query to this locator's
+ * one descendant `<button>` (rendered by `ModDownloadButton`/`InstallButton`)
+ * to click that specific build's install control.
+ */
+export function byAddonVersionRow(fileId: string): string {
+  return `[data-testid="${TEST_IDS.addonVersionRow}"][data-file-id="${fileId}"]`
 }
