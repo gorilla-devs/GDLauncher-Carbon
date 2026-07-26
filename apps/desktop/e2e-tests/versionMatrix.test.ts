@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { decodeMatrix, encodeMatrix, pickMatrix } from "./versionMatrix.js"
 
 // Newest-first, like Mojang's real manifest. Deliberately carries many more
-// releases than the plan pins: five of these become pinned entries, so the
+// releases than the plan pins: six of these become pinned entries, so the
 // random pool must stay large enough that a draw is a real choice rather
 // than a permutation of two candidates.
 const MANIFEST = [
@@ -26,6 +26,7 @@ const MANIFEST = [
   { id: "1.9.4", type: "release" },
   { id: "1.8.9", type: "release" },
   { id: "1.7.10", type: "release" },
+  { id: "1.6.4", type: "release" },
   { id: "b1.7.3", type: "old_beta" }
 ]
 
@@ -53,7 +54,7 @@ describe("pickMatrix", () => {
 
   it("always includes every pinned version present in the manifest", () => {
     const matrix = pickMatrix(MANIFEST, { seed: 7, randomCount: 2 })
-    for (const pinned of ["1.7.10", "1.12.2", "1.16.5", "1.20.1"]) {
+    for (const pinned of ["1.6.4", "1.7.10", "1.12.2", "1.16.5", "1.20.1"]) {
       expect(matrix).toContainEqual({ id: pinned, source: "pinned" })
     }
   })

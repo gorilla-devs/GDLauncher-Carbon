@@ -26,10 +26,16 @@
  * `crates/carbon_app/src/managers/minecraft/assets.rs:143-153` (`get_assets_dir`)
  * and `:189-199` (`reconstruct_assets`) both branch on
  * `assets_index.map_virtual` to decide between the virtual/legacy path and
- * the content-addressed objects path. 1.7.10's index sets `"virtual": true`,
- * which is what puts its assets under `assets/virtual/legacy/<name>` (its
- * index id is literally `legacy`) instead of `assets/objects/..`. This
- * module mirrors that same branch rather than special-casing any version id.
+ * the content-addressed objects path. 1.6.4's index sets `"virtual": true`
+ * (its index id is literally `legacy`, shared with the rest of the 1.6.x
+ * release line), which is what puts its assets under
+ * `assets/virtual/legacy/<name>` instead of `assets/objects/..`. Confirmed
+ * directly against live Mojang data, not assumed from the version number:
+ * 1.7.10 and every later version checked (1.12.2, 1.16.5, 1.20.1) resolve to
+ * their own non-virtual index instead — `legacy` is exactly this old. This
+ * module mirrors the JSON's own branch rather than special-casing any
+ * version id, which is what keeps it correct regardless of which id Mojang
+ * currently routes through that branch.
  *
  * `map_to_resources` (assets copied into the instance's own resources dir)
  * is a third layout the same JSON field set can select, but it addresses a

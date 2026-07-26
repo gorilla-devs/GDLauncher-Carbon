@@ -1,10 +1,14 @@
 /**
  * Picks which Minecraft versions the e2e install suite exercises on a given
  * run: a fixed set of pinned versions (each straddling a real format
- * boundary — legacy vs. modern asset index, pre/post-1.13 flattening,
- * LWJGL 2→3) plus a seeded random sample of additional releases, so runs
- * are reproducible from a single seed while still covering the wider
- * version surface over time.
+ * boundary, confirmed against live Mojang data rather than assumed from the
+ * version number — see `helpers/installVerify.ts`'s top comment — 1.6.4 is
+ * the newest release whose asset index still sets `"virtual": true` (id
+ * literally `legacy`), the actual legacy/virtual-vs-content-addressed asset
+ * boundary; 1.7.10 and 1.12.2 sit on the pre-1.13-flattening, LWJGL-2 side;
+ * 1.16.5 and 1.20.1 sit on the post-1.13, LWJGL-3 side) plus a seeded random
+ * sample of additional releases, so runs are reproducible from a single seed
+ * while still covering the wider version surface over time.
  */
 
 /**
@@ -13,6 +17,7 @@
  * id here, since it goes stale the moment Mojang ships a new version.
  */
 export const PINNED_VERSIONS: readonly string[] = [
+  "1.6.4",
   "1.7.10",
   "1.12.2",
   "1.16.5",

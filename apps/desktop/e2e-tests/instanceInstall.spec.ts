@@ -51,14 +51,13 @@ interface CachedVersionInfo {
  * live Mojang data has 1.20.1 sharing bare numeric id `"5"` with a run of
  * other releases, and 1.12.2/1.16.5 sharing the minor-only `"1.12"`/`"1.16"`),
  * so this always reads the real value off the cached JSON rather than
- * assuming one. (1.7.10 itself resolves to plain id `"1.7.10"` — the shared
- * id literally spelled `legacy` currently belongs to 1.6.x, one major
- * version older than this matrix's oldest pinned entry; verified directly
- * against Mojang's live meta while building this. Whichever version(s) it
- * belongs to, `verifyAssetIndex` still branches on the index JSON's own
- * `"virtual"` field, never on the id string, so this is not load-bearing —
- * noted here only because README.md's "legacy vs. modern" framing for why
- * 1.7.10 is pinned describes the id, not the mechanism.)
+ * assuming one. (The id literally spelled `legacy` — the one real
+ * `"virtual": true` index left in live Mojang data, verified directly
+ * against it — belongs to the 1.6.x release line, not 1.7.10; that is why
+ * `versionMatrix.ts`'s `PINNED_VERSIONS` pins `1.6.4` specifically to
+ * exercise `verifyAssetIndex`'s virtual branch. That branch itself reads the
+ * index JSON's own `"virtual"` field, never the id string or the version id,
+ * so nothing here depends on which id Mojang currently routes through it.)
  */
 function readCachedVersionInfo(
   runtimePath: string,
