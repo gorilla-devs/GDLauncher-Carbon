@@ -5,6 +5,7 @@ import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
   createInstanceViaUi,
   deleteInstanceViaUi,
+  ensureLibraryInteractive,
   waitForInstallComplete
 } from "./helpers/instances.js"
 
@@ -25,6 +26,12 @@ test.describe("instance install", () => {
   // that still gets both the worker fixture's value and a real `TestInfo`.
   test.afterEach(async ({ authenticatedApp }, testInfo) => {
     await attachCoreLogOnFailure(testInfo, authenticatedApp.harness.runtimePath)
+    // Restores a known-good, interactive library so one entry timing out on
+    // a missing anchor (abandoned by Playwright before its own `finally`
+    // runs — see playwright.config.ts's `actionTimeout` comment) cannot leave
+    // the creation modal stranded over the shared worker-scoped app and
+    // cascade into every remaining matrix entry hanging behind it.
+    await ensureLibraryInteractive(authenticatedApp.page)
   })
 
   for (const entry of MATRIX) {
@@ -60,9 +67,18 @@ test.describe("instance install", () => {
         // page: the fixture is worker-scoped, and leaving the app on that
         // route strands every later test in the same worker on a page where
         // the library header does not exist.
+        //
+        // `toBeVisible()`, not `toBeEnabled()`: the control is a plain `div`
+        // (BaseTile/index.tsx has no `aria-disabled`), and Playwright treats
+        // any non-form element without one as always enabled — that
+        // assertion could never fail. Presence *is* the assertion here: the
+        // `<Show>` this div lives under only mounts it when
+        // `!isLoadingOrWaiting() && !isDeleting && !isInvalid && !failError`
+        // (BaseTile/index.tsx), so its visibility is the real "ready to
+        // play" signal.
         await expect(
           tile.locator(byTestId(TEST_IDS.instancePlay))
-        ).toBeEnabled()
+        ).toBeVisible()
       } catch (error) {
         bodyFailed = true
         throw error

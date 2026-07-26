@@ -134,10 +134,15 @@ never runs twice.
 
 - **15 minutes** is the hard per-test ceiling (`playwright.config.ts`'s
   `timeout`).
-- **13 minutes** is `waitForInstallComplete`'s install bound
-  (`helpers/instances.ts`) — under the ceiling on purpose, so a genuinely
-  stuck install throws its own diagnosable message instead of being cut off
-  by Playwright with no explanation.
+- **11 minutes** is `waitForInstallComplete`'s install bound
+  (`helpers/instances.ts`), on top of its own 90s start bound — comfortably
+  under the 15-minute ceiling, with room left for the creation-modal
+  interactions, the post-install assertions, and cleanup, so a genuinely
+  stuck install throws its own diagnosable message instead of the whole
+  budget running out first and Playwright discarding it with no explanation.
+- **60 seconds** is the global action timeout (`playwright.config.ts`'s
+  `actionTimeout`), so a single missing anchor fails in a minute instead of
+  hanging for the rest of the test's 15-minute budget.
 
 ### Why later installs in the same run are fast
 
@@ -168,7 +173,7 @@ mode (see the plan's Out of Scope notes).
 
 ### Diagnosing a failed install
 
-A screenshot of the library grid rarely explains why a 12-minute install
+A screenshot of the library grid rarely explains why an 11-minute install
 failed — the answer is almost always in the Rust core's own log, not the
 DOM. `fixtures/electronApp.ts`'s `attachCoreLogOnFailure` reads the core's
 session log from `<runtimePath>/__gdl_logs__` and attaches it to the
@@ -192,8 +197,3 @@ bug.)
 - Skin fetches still reach `textures.minecraft.net` and will fail for the
   synthetic profile. Harmless — they only log.
 - The browser-OAuth enrollment path is not covered; the suite uses device code.
-- A first launch into the library queues the `onBoarding` and `changelogs`
-  modals on top of it, the same way the beta prompt does. They surface as
-  `m[N]` query params on the URL rather than as page state, so `completeLogin`
-  does not dismiss them — a test that needs to interact with the library will
-  have to.

@@ -48,8 +48,16 @@ const config: PlaywrightTestConfig = {
   reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
-    actionTimeout: 0,
+    /* Maximum time each action such as `click()` can take. Bounded rather
+       than the 0 (no limit) default: with a 15-minute test timeout, an
+       unbounded action on a missing anchor hangs for the full 15 minutes and
+       is then abandoned by Playwright without running its `finally` —
+       leaving the creation modal open over the shared worker-scoped app, so
+       every remaining matrix entry hangs too. 60s is comfortably above the
+       explicit waits already used for slow anchors (e.g. `dismissStartupModals`'s
+       60s waits in fixtures/login.ts) while still failing fast on a genuinely
+       missing one. */
+    actionTimeout: 60_000,
     /* Base URL to use in actions like `await page.goto('/')`. */
     // baseURL: 'http://localhost:3000',
 

@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url"
 import {
+  PINNED_VERSIONS,
   encodeMatrix,
   pickMatrix,
   type ManifestVersion
@@ -50,10 +51,24 @@ function resolveRandomCount(): number {
 async function globalSetup(): Promise<void> {
   const seed = resolveSeed()
   const randomCount = resolveRandomCount()
-  const matrix = pickMatrix(await fetchManifest(), { seed, randomCount })
+  const manifest = await fetchManifest()
+  const matrix = pickMatrix(manifest, { seed, randomCount })
 
   process.env.E2E_VERSION_SEED = String(seed)
   process.env.E2E_VERSION_MATRIX = encodeMatrix(matrix)
+
+  // `pickMatrix` silently filters `PINNED_VERSIONS` down to the ids actually
+  // present in the manifest (tolerance, not a bug — see versionMatrix.ts) —
+  // but a boundary version dropping out shrinks coverage with nothing else
+  // to say so. Diffed against the matrix's own pinned entries rather than
+  // the manifest directly, so this stays correct if `pickMatrix`'s filtering
+  // logic ever changes.
+  const presentPinnedIds = new Set(
+    matrix.filter((e) => e.source === "pinned").map((e) => e.id)
+  )
+  const missingPinnedIds = PINNED_VERSIONS.filter(
+    (id) => !presentPinnedIds.has(id)
+  )
 
   // Printed prominently: a failing run must be replayable from its output
   // alone via E2E_VERSION_SEED=<seed>.
@@ -63,6 +78,10 @@ async function globalSetup(): Promise<void> {
       "  e2e version matrix",
       `  seed: ${seed}   (replay with E2E_VERSION_SEED=${seed})`,
       ...matrix.map((e) => `    - ${e.id} (${e.source})`),
+      ...missingPinnedIds.map(
+        (id) =>
+          `    ⚠ pinned version ${id} missing from the manifest — matrix is short by 1`
+      ),
       ""
     ].join("\n")
   )
