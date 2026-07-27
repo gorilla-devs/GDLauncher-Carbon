@@ -55,10 +55,47 @@ export interface InstalledMod {
   enabled: boolean
   curseforgeProjectId: number | null
   modrinthProjectId: string | null
+  /** `modrinth.version_id` (`ModrinthModMetadata.version_id`,
+   *  `api/instance/mod.rs:1606`) — the specific Modrinth version the app
+   *  actually resolved and downloaded, as distinct from `modrinthProjectId`
+   *  (the mod itself, stable across every build). `null` when the file has
+   *  no Modrinth association. Confirmed live (task-3-report.md) to arrive
+   *  as a plain string, e.g. `"xhLT3C5f"`. */
+  modrinthVersionId: string | null
+  /** `curseforge.file_id` (`CurseForgeModMetadata.file_id`,
+   *  `api/instance/mod.rs:1594`) — the specific CurseForge file the app
+   *  actually resolved and downloaded, as distinct from
+   *  `curseforgeProjectId`. `null` when the file has no CurseForge
+   *  association. Confirmed live (task-3-report.md) to arrive as a plain
+   *  JSON number, e.g. `8443275` — not a string. */
+  curseforgeFileId: number | null
   /** `metadata.sha_1` off the cached mod-file-cache row. `null` when the app
    *  has no metadata for this file (should not happen for a file it just
    *  installed itself, but this mirrors the struct's own `Option`). */
   sha1: string | null
+  /** `metadata.modloaders` (`ModFileMetadata.modloaders`,
+   *  `api/instance/mod.rs:1579`), lowercased. Parsed from the **downloaded
+   *  jar's own manifest** — `fabric.mod.json`/`mods.toml`/`quilt.mod.json`
+   *  (`managers/metadata/mods.rs`'s `ModFileMetadata` conversions) — never
+   *  from a platform API, which is what makes this useful as an
+   *  independent check on which build actually got installed. Confirmed
+   *  live (task-3-report.md) to arrive as an array of single lowercase
+   *  words already (`FEInstanceModloaderType`'s `#[serde(rename_all =
+   *  "camelCase")]` on a fieldless variant name, e.g. `Fabric` ->
+   *  `"fabric"`), so the `.toLowerCase()` in the mapping below is
+   *  belt-and-braces, not load-bearing today — kept anyway so a call site
+   *  comparing against `"fabric"`/`"forge"` never silently breaks on a
+   *  future multi-word or differently-cased variant.
+   *
+   *  Empty (`[]`) whenever the app has no parsed metadata for this file
+   *  yet — same asynchronous-pass caveat `hasUpdate` below documents: the
+   *  jar-parsing metadata pass is not guaranteed to have completed by the
+   *  time a freshly installed mod is read back, so callers needing this
+   *  populated must wait for it rather than reading it immediately after
+   *  install (this helper adds no polling for that — see
+   *  `waitForModUpdateAvailable`/`waitForModFilenameChange` for the
+   *  existing poll-loop pattern a caller can reuse). */
+  modloaders: string[]
   /** `Mod.has_update` (`crates/carbon_app/src/managers/instance/mods.rs`'s
    *  `list_mods`) — true once the metadata-cache pass has both run for this
    *  file and found a newer, channel-eligible build for the instance's own
@@ -74,9 +111,9 @@ interface RawModResponse {
   filename: string
   file_size: number
   enabled: boolean
-  curseforge?: { project_id: number } | null
-  modrinth?: { project_id: string } | null
-  metadata?: { sha_1?: string | null } | null
+  curseforge?: { project_id: number; file_id: number } | null
+  modrinth?: { project_id: string; version_id: string } | null
+  metadata?: { sha_1?: string | null; modloaders?: string[] | null } | null
   has_update: boolean
 }
 
@@ -204,7 +241,10 @@ export async function openInstanceAddons(
     enabled: m.enabled,
     curseforgeProjectId: m.curseforge?.project_id ?? null,
     modrinthProjectId: m.modrinth?.project_id ?? null,
+    modrinthVersionId: m.modrinth?.version_id ?? null,
+    curseforgeFileId: m.curseforge?.file_id ?? null,
     sha1: m.metadata?.sha_1 ?? null,
+    modloaders: (m.metadata?.modloaders ?? []).map((l) => l.toLowerCase()),
     hasUpdate: m.has_update
   }))
 }
