@@ -51,7 +51,19 @@ const LOADER = "fabric"
  *  by path and `loaderInstall` sorts ahead of the mod specs. That ordering
  *  is the only thing keeping those assertions honest, so a spec file renamed
  *  or added ahead of it needs this checked again. Assertions about
- *  loader-specific artifacts belong in the spec that installs them. */
+ *  loader-specific artifacts belong in the spec that installs them.
+ *
+ *  `fixtures/forgeInstance.ts`'s `forgeInstance` fixture puts a second,
+ *  identically-shaped hazard on the same shared runtime path: it installs
+ *  Forge 1.20.1, and `loaderInstall.spec.ts`'s own Forge 1.20.1 matrix entry
+ *  asserts the processor-generated artifacts for exactly that combination.
+ *  `modResolution.spec.ts` (the only consumer of `forgeInstance`) sorts
+ *  after `loaderInstall` alphabetically, so today it cannot pre-satisfy them
+ *  either — but that makes this a *third* load-bearing ordering dependency,
+ *  joining this one and the `dbRecovery`-sorts-first dependency documented
+ *  in `HANDOFF-e2e.md` §3 (that third one guards process cleanup, not
+ *  installed artifacts, so it is not restated here — see that file for it).
+ *  Renaming or adding a spec file requires re-checking all three. */
 export const INSTALLED_INSTANCE_NAME = "gdl-e2e-mods-fabric"
 
 /**
