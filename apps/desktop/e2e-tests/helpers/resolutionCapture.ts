@@ -53,8 +53,13 @@
  * now), which is why that half stays sourced from the app's own response.
  */
 
-import type { Page, Response } from "@playwright/test"
-import { modrinthChannel, type ResolutionCandidate } from "./resolution.js"
+import { expect, type Page, type Response } from "@playwright/test"
+import {
+  curseforgeChannel,
+  modrinthChannel,
+  type ResolutionCandidate
+} from "./resolution.js"
+import { byTestId, TEST_IDS } from "./selectors.js"
 
 export interface VersionLists {
   /** Filtered to the instance's Minecraft version and loader, read off the
@@ -243,4 +248,434 @@ async function fetchUnfilteredDirect(
     )
   }
   return toCandidates(raw)
+}
+
+/**
+ * `captureModrinthVersions`'s CurseForge counterpart — written fresh, not
+ * adapted from it by analogy. `HANDOFF-e2e.md` records that an earlier,
+ * symmetric-looking CurseForge branch was written from source, never
+ * executed, and deleted rather than kept as unvalidated coverage, precisely
+ * because CurseForge's `getModFiles` is paginated (`index`/`pageSize`) while
+ * Modrinth's `getProjectVersions` is a single response — the two platforms'
+ * timing/caching behaviour is not symmetric merely by having a similar shape.
+ *
+ * **`unfiltered` here is NOT a full, all-versions-ever-published catalogue
+ * the way Modrinth's is.** `api.curseforge.com` requires an API key this
+ * test process deliberately does not have (unlike Modrinth's unauthenticated
+ * public API), so there is no direct-fetch escape hatch available here. The
+ * fallback this module uses instead (confirmed live this task, not assumed):
+ * a **loader-unfiltered, but still game-version-scoped**
+ * `modplatforms.curseforge.getModFiles` request, driven through the app's
+ * own addon page by checking its "Override Filters" checkbox and setting the
+ * modloader selector back to "All modloaders" while leaving the
+ * game-version selector at the instance's own Minecraft version. Task 1
+ * confirmed this exact shape returns every file for that Minecraft version
+ * regardless of loader — 8 files, `totalCount: 8`, for Cloth Config at
+ * 1.20.1 — which is precisely what makes the LOADER half of a compatibility
+ * check against this list capable of failing (it contains both the Forge
+ * and Fabric builds). The MC-VERSION half is a different story: because the
+ * request that produces this list is itself filtered to one Minecraft
+ * version, every entry it returns is *guaranteed* to declare that version —
+ * confirmed directly against Task 1's captured sample, where every one of
+ * the 8 `gameVersion=1.20.1`-filtered files literally lists `"1.20.1"` in
+ * its own `gameVersions` array. Asserting `gameVersions.includes(MC_VERSION)`
+ * against an entry drawn from this list would therefore be exactly the
+ * unfailable tautology this suite's central rule warns against, so
+ * `modResolution.spec.ts`'s CurseForge test does not make that assertion —
+ * only an *existence* check (is the installed file id present in this list
+ * at all) plus the loader check. The existence check is not vacuous the same
+ * way: if `install_latest_curseforge_mod`'s own game-version re-check
+ * (`.find(|value| value.game_versions.contains(&version))`,
+ * `managers/instance/mods.rs`) ever picked a file for the wrong Minecraft
+ * version, that file's id would not appear in this Minecraft-version-scoped
+ * oracle at all, so the existence check would genuinely fail.
+ *
+ * **Whether CurseForge shares Modrinth's caching problem — checked live,
+ * not assumed symmetric:** `InfiniteScrollVersionsQueryWrapper` is the exact
+ * same shared component for both platforms, keyed only on
+ * `["modplatforms.versions", modId, modplatform]` (no instance id, Minecraft
+ * version, or loader), and its module-level `versionsQuery` store
+ * (`pages/Mods/useVersionsQuery.tsx`) persists across addon-page visits the
+ * same way Modrinth's did. Confirmed live: on a second addon-page visit
+ * (this project, a different instance/loader) the very first, passively
+ * mounted request already carried the *previous* visit's leftover
+ * `modLoaderType`/`gameVersion` rather than a fresh unfiltered fetch — the
+ * same staleness class that broke Modrinth's original design. **This module
+ * does not rely on that passive mount-time fetch for either list.** Both the
+ * `scoped` request (fired automatically once `instance.getInstanceDetails`
+ * resolves) and the loader-unfiltered request this function drives via the
+ * "Override Filters" UI go through `setQueryWrapper`
+ * (`InfiniteScrollVersionsQueryWrapper`), which unconditionally
+ * `removeQueries`s the shared key before every `refetch()` — so both are
+ * forced, genuine network round trips regardless of cache state. Confirmed
+ * live across two consecutive addon-page visits in one run (fabric then
+ * forge): both the scoped and the loader-unfiltered request landed fresh,
+ * with the instance's own correct params, on both visits.
+ */
+
+/** Present on the scoped request's URL and on the loader-unfiltered
+ *  request's URL alike — both always carry a `gameVersion`. What
+ *  distinguishes them is whether `modLoaderType` is also non-null (see
+ *  `parseCurseforgeVersionsInput`'s callers). Unlike Modrinth's
+ *  `SCOPED_MARKER`, this is not consumed via a raw substring search:
+ *  CurseForge's own loader names collide as substrings of each other
+ *  (`"forge"` is a substring of `"neoforge"` — confirmed live, Task 1: one
+ *  file's `gameVersions` can list both), so this module always decodes the
+ *  rspc `?input=` query param and compares fields structurally instead. */
+const CF_QUERY_NAME = "modplatforms.curseforge.getModFiles"
+const CF_CAPTURE_TIMEOUT = 30_000
+const CF_SETTLE_WINDOW = 1_000
+
+/** The `query` object `InfiniteScrollVersionsQueryWrapper`'s CurseForge
+ *  branch sends as part of `modplatforms.curseforge.getModFiles`'s rspc
+ *  `input` — both `gameVersion` and `modLoaderType` are always present as
+ *  keys (never omitted the way Modrinth's `game_versions` is), but either
+ *  can hold a JSON `null`, which is what this module keys its
+ *  scoped-vs-loader-unfiltered classification on. */
+interface CurseforgeGetModFilesInput {
+  modId: number
+  query: {
+    index?: number | null
+    pageSize?: number | null
+    gameVersion?: string | null
+    modLoaderType?: string | null
+  }
+}
+
+/**
+ * Decodes a `modplatforms.curseforge.getModFiles` request URL's rspc
+ * `?input=` param back into the object the frontend serialised, rather than
+ * substring-matching the raw URL — see `CF_QUERY_NAME`'s doc comment for why
+ * that matters specifically for CurseForge's loader names. Exported so a
+ * caller (e.g. `modResolution.spec.ts`'s own request-scoping check) can
+ * inspect the exact same parsed shape this module classifies responses by,
+ * instead of re-implementing its own parsing. Returns `undefined` for a URL
+ * that isn't a well-formed `getModFiles` call (any other in-flight request,
+ * or a malformed one) rather than throwing — callers are expected to filter
+ * on the return value, the same way a failed `Array.isArray` check would be
+ * handled inline.
+ */
+export function parseCurseforgeVersionsInput(
+  url: string
+): CurseforgeGetModFilesInput | undefined {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return undefined
+  }
+  const raw = parsed.searchParams.get("input")
+  if (raw == null) return undefined
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return undefined
+  }
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("query" in value) ||
+    typeof (value as { query?: unknown }).query !== "object" ||
+    (value as { query?: unknown }).query === null
+  ) {
+    return undefined
+  }
+  return value as CurseforgeGetModFilesInput
+}
+
+/** Shape this module reads off a `getModFiles` response's `result.data` —
+ *  the pagination envelope's field names confirmed live, Task 1:
+ *  `{index, pageSize, resultCount, totalCount}`, siblings of the file array
+ *  under `result.data`/`result.data.pagination` respectively. */
+interface RawCurseforgeGetModFilesResponse {
+  data: RawCurseforgeFile[]
+  pagination: {
+    index: number
+    pageSize: number
+    resultCount: number
+    totalCount: number
+  }
+}
+
+interface RawCurseforgeFile {
+  id: number
+  /** ISO 8601, fractional-digit width observed to vary (`.94Z`, `.75Z`,
+   *  `.247Z`, `.05Z` — trailing zeros trimmed on the wire), so this is only
+   *  ever passed to `Date.parse`, never matched against a fixed-width
+   *  regex. */
+  fileDate: string
+  /** A **string** on the wire the frontend actually receives (`"stable"`),
+   *  despite the raw CurseForge API returning an integer — see
+   *  `curseforgeChannel`'s own doc comment in `resolution.ts` for the two
+   *  representations and why the string is the correct one to expect here. */
+  releaseType: string
+  /** Mixes Minecraft versions, Title-Case loader names, and
+   *  snapshot/side tags in one flat array — confirmed live, Task 1, e.g.
+   *  `["NeoForge","1.20.1","Forge","1.20"]` (note Forge *and* NeoForge on
+   *  the same file) and `["Fabric","1.20.1","1.20","1.20-Snapshot"]`. Split
+   *  by `toCandidates` below. */
+  gameVersions: string[]
+}
+
+/** The four loader names `ExploreVersionsNavbar.tsx`'s `SUPPORTED_MODLOADERS`
+ *  offers, lowercased — used to pick loader names back out of a file's
+ *  mixed `gameVersions` array. Everything in that array which isn't one of
+ *  these (case-insensitively) is treated as a Minecraft version/tag instead,
+ *  matching the design notes' instruction to split "loader names into
+ *  `loaders`, version strings into `gameVersions`". */
+const KNOWN_CURSEFORGE_LOADERS = new Set([
+  "forge",
+  "fabric",
+  "neoforge",
+  "quilt"
+])
+
+function splitCurseforgeGameVersions(raw: string[]): {
+  gameVersions: string[]
+  loaders: string[]
+} {
+  const gameVersions: string[] = []
+  const loaders: string[] = []
+  for (const entry of raw) {
+    const lower = entry.toLowerCase()
+    if (KNOWN_CURSEFORGE_LOADERS.has(lower)) {
+      loaders.push(lower)
+    } else {
+      gameVersions.push(entry)
+    }
+  }
+  return { gameVersions, loaders }
+}
+
+function toCurseforgeCandidates(
+  raw: RawCurseforgeFile[]
+): ResolutionCandidate[] {
+  return raw.map((f) => {
+    const { gameVersions, loaders } = splitCurseforgeGameVersions(
+      f.gameVersions
+    )
+    return {
+      id: String(f.id),
+      datePublished: f.fileDate,
+      channel: curseforgeChannel(f.releaseType),
+      gameVersions,
+      loaders
+    }
+  })
+}
+
+/**
+ * Parses one `getModFiles` response into `ResolutionCandidate`s, enforcing
+ * the mandatory pagination completeness guard first: if the envelope's
+ * `pagination.totalCount` exceeds the number of file entries the response
+ * actually carried, this throws naming both numbers rather than silently
+ * handing back a truncated list. "Newest of what we happened to see" is not
+ * "newest that exists" — a truncated list would quietly weaken every
+ * assertion built on it. Note for whoever reads a failure here:
+ * `install_latest_curseforge_mod` itself requests `page_size: 200`
+ * (`managers/instance/mods.rs`), so a project whose filtered file count
+ * exceeds 200 is a real limit of the shipped app, not merely of this test.
+ */
+async function toCandidatesFromCurseforgeResponse(
+  response: Response,
+  label: string
+): Promise<ResolutionCandidate[]> {
+  const body = (await response.json()) as {
+    result?: { type?: string; data?: unknown }
+  }
+  if (body.result?.type === "error") {
+    throw new Error(
+      `captureCurseforgeVersions (${label}): rspc error: ` +
+        JSON.stringify(body.result.data)
+    )
+  }
+  const payload = body.result?.data as
+    | RawCurseforgeGetModFilesResponse
+    | undefined
+  if (!payload || !Array.isArray(payload.data) || !payload.pagination) {
+    throw new Error(
+      `captureCurseforgeVersions (${label}): unexpected getModFiles ` +
+        `response shape (got ${JSON.stringify(body)})`
+    )
+  }
+
+  const { totalCount } = payload.pagination
+  if (payload.data.length < totalCount) {
+    throw new Error(
+      `captureCurseforgeVersions (${label}): pagination reports ` +
+        `totalCount=${totalCount} but this response only carried ` +
+        `${payload.data.length} file entries — the ${label} list would be ` +
+        "truncated, and asserting against a truncated list is worse than " +
+        "not asserting at all. install_latest_curseforge_mod itself " +
+        "requests page_size: 200, so a project exceeding that is a real " +
+        "limit of the app, not just of this test."
+    )
+  }
+
+  return toCurseforgeCandidates(payload.data)
+}
+
+/**
+ * Checks the "Override Filters" checkbox on the addon page's Versions tab
+ * and resets the modloader selector to "All modloaders", producing a fresh
+ * `getModFiles` request scoped to the instance's own Minecraft version but
+ * unfiltered by loader — see this file's CurseForge module doc comment for
+ * why that is the compatibility oracle this suite uses in place of a direct,
+ * unauthenticated fetch.
+ *
+ * Two live-confirmed hazards this works around (Task 1):
+ * - The checkbox and its "Override Filters" `<Trans>` label are **siblings**
+ *   in `ExploreVersionsNavbar.tsx`, not parent/child — clicking the label
+ *   does nothing. `Checkbox` (`packages/ui/src/Checkbox/index.tsx`) renders
+ *   a plain `<div>` root (pointer-capture handlers, not a native input or a
+ *   `<button>`), so this locates that div directly by scoping to its parent
+ *   row's class and taking the first child, rather than the row itself.
+ * - Both Select triggers in this navbar render as plain `<button>`s with no
+ *   accessible name (`getByRole('button', {name})` matches nothing, Task 1)
+ *   — the game-version trigger is first, the modloader trigger second
+ *   (confirmed live, this task); `.nth(1)` picks the modloader one.
+ */
+async function driveLoaderUnfilteredRequest(page: Page): Promise<void> {
+  const overrideCheckbox = page
+    .locator("div.text-lightSlate-700.flex.gap-2 > div")
+    .first()
+  await expect(overrideCheckbox, {
+    message:
+      "driveLoaderUnfilteredRequest: the addon page's Versions tab " +
+      '"Override Filters" checkbox never appeared'
+  }).toBeVisible()
+  await overrideCheckbox.click()
+
+  const modloaderTrigger = page
+    .locator("div.mb-4.flex.h-12.gap-4 button")
+    .nth(1)
+  await expect(modloaderTrigger, {
+    message:
+      "driveLoaderUnfilteredRequest: the modloader selector never became " +
+      "enabled after clicking the Override Filters checkbox"
+  }).toBeEnabled()
+  await modloaderTrigger.click()
+
+  // SelectItem (packages/ui/src/Select/index.tsx) renders as an <li> by
+  // default; Kobalte assigns it an "option" role. Matched on rendered text
+  // rather than a value, the same way Task 1 found the trigger buttons
+  // themselves must be (no useful accessible name to key on instead).
+  const allModloadersOption = page
+    .locator('[role="option"], li')
+    .filter({ hasText: "All modloaders" })
+    .first()
+  await expect(allModloadersOption, {
+    message:
+      'driveLoaderUnfilteredRequest: no "All modloaders" option appeared ' +
+      "after opening the modloader selector"
+  }).toBeVisible()
+  await allModloadersOption.click()
+}
+
+/**
+ * `run` drives the addon page's own natural navigation (opening the addon
+ * page and its Versions tab, from behind an `?instanceId=` that scopes the
+ * automatic `scoped` fetch to that instance's Minecraft version/loader) —
+ * the same minimal role `captureModrinthVersions`'s `run` plays. Everything
+ * needed to additionally obtain the loader-unfiltered oracle
+ * (`driveLoaderUnfilteredRequest`) is this function's own responsibility,
+ * not the caller's — keeping the "how do we get an unfiltered list on this
+ * platform" decision entirely inside this module, same as
+ * `captureModrinthVersions` keeps its direct-fetch decision to itself.
+ */
+export async function captureCurseforgeVersions(
+  page: Page,
+  run: () => Promise<void>
+): Promise<VersionLists> {
+  const scoped: Response[] = []
+  const unfiltered: Response[] = []
+
+  const onResponse = (r: Response) => {
+    if (!r.url().includes(CF_QUERY_NAME)) return
+    const input = parseCurseforgeVersionsInput(r.url())
+    if (!input) return
+    const { gameVersion, modLoaderType } = input.query
+    // The fully unrestricted catalogue (no gameVersion at all) — Task 1
+    // measured 216 entries for this project across every Minecraft version
+    // it has ever published for, truncated at the default pageSize of 20.
+    // Neither list this function produces wants that; ignore it.
+    if (gameVersion == null) return
+    if (modLoaderType != null) {
+      scoped.push(r)
+    } else {
+      unfiltered.push(r)
+    }
+  }
+  page.on("response", onResponse)
+
+  try {
+    await run()
+
+    await expect(page.locator(byTestId(TEST_IDS.addonVersionRow)).first(), {
+      message:
+        "captureCurseforgeVersions: no " +
+        `"${TEST_IDS.addonVersionRow}" row ever mounted after run()`
+    }).toBeVisible({ timeout: CF_CAPTURE_TIMEOUT })
+
+    await driveLoaderUnfilteredRequest(page)
+
+    // Settle on BOTH lists together, not just whichever fills first: the
+    // scoped effect has been observed to fire twice in a row (same
+    // reasoning as openAddonVersions/captureModrinthVersions), and the
+    // loader-unfiltered request is fired later than the scoped one (it
+    // depends on this function's own UI interaction, which only starts
+    // after run() returns) — a naive "first non-empty" read on either would
+    // risk reading the scoped bucket back before the unfiltered one has had
+    // a chance to receive anything.
+    const deadline = Date.now() + CF_CAPTURE_TIMEOUT
+    let lastTotal = 0
+    let stableSince: number | null = null
+    while (Date.now() < deadline) {
+      const total = scoped.length + unfiltered.length
+      if (total !== lastTotal) {
+        lastTotal = total
+        stableSince = Date.now()
+      } else if (
+        scoped.length > 0 &&
+        unfiltered.length > 0 &&
+        stableSince !== null &&
+        Date.now() - stableSince >= CF_SETTLE_WINDOW
+      ) {
+        break
+      }
+      await page.waitForTimeout(250)
+    }
+  } finally {
+    page.off("response", onResponse)
+  }
+
+  if (scoped.length === 0) {
+    throw new Error(
+      `captureCurseforgeVersions: no ${CF_QUERY_NAME} request scoped to ` +
+        "both a gameVersion and a modLoaderType was observed within " +
+        `${CF_CAPTURE_TIMEOUT}ms`
+    )
+  }
+  if (unfiltered.length === 0) {
+    throw new Error(
+      `captureCurseforgeVersions: no ${CF_QUERY_NAME} request scoped to a ` +
+        "gameVersion but unfiltered by modLoaderType was observed within " +
+        `${CF_CAPTURE_TIMEOUT}ms — driveLoaderUnfilteredRequest may not ` +
+        "have actually changed the modloader selector"
+    )
+  }
+
+  // Last, not first, for both — same "closest to the rendered DOM" reasoning
+  // as captureModrinthVersions/openAddonVersions.
+  const scopedCandidates = await toCandidatesFromCurseforgeResponse(
+    scoped[scoped.length - 1],
+    "scoped"
+  )
+  const unfilteredCandidates = await toCandidatesFromCurseforgeResponse(
+    unfiltered[unfiltered.length - 1],
+    "unfiltered"
+  )
+
+  return { scoped: scopedCandidates, unfiltered: unfilteredCandidates }
 }

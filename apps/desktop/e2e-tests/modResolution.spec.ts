@@ -14,9 +14,16 @@ import {
 import { verifyModInstalled } from "./helpers/modVerify.js"
 import { newestByDate } from "./helpers/resolution.js"
 import {
+  captureCurseforgeVersions,
   captureModrinthVersions,
+  parseCurseforgeVersionsInput,
   type VersionLists
 } from "./helpers/resolutionCapture.js"
+import {
+  RESOLUTION_PROJECT_CURSEFORGE_ID,
+  RESOLUTION_PROJECT_MODRINTH_ID,
+  RESOLUTION_PROJECT_QUERY
+} from "./helpers/resolutionFixtures.js"
 
 /**
  * Proves that installing an addon *without picking a version* resolves the
@@ -53,14 +60,13 @@ import {
  *   `release`/`stable` — no channel noise to fight (contrast Task 1's
  *   rejection of JEI, whose entire 1.20.1 line is `beta`-only).
  *
- * `RESOLUTION_PROJECT_CURSEFORGE_ID` is unused in this file today — it
- * belongs to Task 6's CurseForge test (same fixture project, same
- * task-1-report.md source), kept here only so the three constants Task 1
- * chose travel together rather than being rediscovered per platform.
+ * This file also carries the CurseForge counterpart test, against the same
+ * fixture project's CurseForge listing (`RESOLUTION_PROJECT_CURSEFORGE_ID`).
+ * The three fixture constants live in `helpers/resolutionFixtures.ts`, not
+ * exported from here — see that module's own doc comment for why importing
+ * a value across `.spec.ts` files is a Playwright footgun this suite used to
+ * carry (task-5-report.md's review, M8).
  */
-export const RESOLUTION_PROJECT_MODRINTH_ID = "9s6osm5g"
-export const RESOLUTION_PROJECT_CURSEFORGE_ID = "348521"
-export const RESOLUTION_PROJECT_QUERY = "cloth config"
 
 /** Minecraft version both `installedInstance` (Fabric) and `forgeInstance`
  *  (Forge) are pinned to (see their own fixture files) — this file carries
@@ -80,6 +86,18 @@ interface ResolutionInstance {
 
 const matchesClothConfig = (mod: InstalledMod) =>
   mod.modrinthProjectId === RESOLUTION_PROJECT_MODRINTH_ID
+
+/** `InstalledMod.curseforgeProjectId` is a number (Task 3), while the
+ *  fixture constant is kept as a string alongside its Modrinth sibling
+ *  (`helpers/resolutionFixtures.ts`) — converted once here rather than at
+ *  every call site. A mod installed via CurseForge never populates
+ *  `modrinthProjectId` (`RawModResponse.modrinth` is `null` for that install
+ *  path — `managers/instance/mods.rs`'s `list_mods` only fills the platform
+ *  fields that actually apply), so this is a genuinely different matcher
+ *  from `matchesClothConfig` above, not an alias for it. */
+const CURSEFORGE_PROJECT_ID = Number(RESOLUTION_PROJECT_CURSEFORGE_ID)
+const matchesClothConfigCurseforge = (mod: InstalledMod) =>
+  mod.curseforgeProjectId === CURSEFORGE_PROJECT_ID
 
 /** How long `waitForModloadersPopulated` polls before giving up. Mirrors
  *  `helpers/mods.ts`'s `HAS_UPDATE_TIMEOUT`/`HAS_UPDATE_POLL_INTERVAL` — the
@@ -309,6 +327,202 @@ async function resolveForInstance(
   return { modrinthVersionId }
 }
 
+/**
+ * `resolveForInstance`'s CurseForge counterpart. Structurally the same
+ * install-and-verify flow, but two things are genuinely different, not
+ * copy-paste artifacts:
+ *
+ * 1. **This is the path that never re-checks the modloader client-side.**
+ *    `install_latest_curseforge_mod` (`managers/instance/mods.rs`) sends
+ *    `mod_loader_type` straight through to CurseForge's own `getModFiles`
+ *    query and, after the response comes back, re-checks only
+ *    `.find(|value| value.game_versions.contains(&version))` — the
+ *    Minecraft version, never the loader. If CurseForge's own
+ *    `modLoaderType` filtering were ever silently dropped or broken
+ *    upstream, nothing on the Rust side would notice: the differ assertion
+ *    in this file's test body and the jar-parsed `modloaders` check below
+ *    are the only things standing between that and a green suite.
+ * 2. **The compatibility oracle's `unfiltered` list is not a full,
+ *    all-Minecraft-versions catalogue the way Modrinth's is** — see
+ *    `resolutionCapture.ts`'s CurseForge doc comment for why (no
+ *    unauthenticated direct-fetch route exists for CurseForge) and for why
+ *    that makes the Minecraft-version half of compatibility an *existence*
+ *    check here rather than a `gameVersions.includes(MC_VERSION)` check —
+ *    the latter would be tautological against a list that is itself
+ *    game-version-scoped by construction.
+ */
+async function resolveForInstanceCurseforge(
+  inst: ResolutionInstance,
+  loader: ResolutionLoader
+): Promise<{ curseforgeFileId: string }> {
+  const { page, instanceName, modsDir } = inst
+
+  await openInstanceAddons(page, instanceName)
+  await searchForMod(page, {
+    platform: "curseforge",
+    query: RESOLUTION_PROJECT_QUERY
+  })
+
+  // Same reasoning as resolveForInstance's own scopedRequestUrl check: this
+  // only proves the frontend's own modplatforms.curseforge.getModFiles call
+  // carried this instance's own Minecraft version AND loader — it does NOT
+  // prove install_latest_curseforge_mod's own outbound HTTP call to
+  // CurseForge was filtered (that happens entirely inside the core process
+  // and never passes through the renderer). Decoded via
+  // `parseCurseforgeVersionsInput` rather than a raw substring match:
+  // CurseForge's own loader names collide as substrings of each other
+  // (`"forge"` is a substring of `"neoforge"`), which a naive
+  // `url.includes(loader)` would miss — a real hole flagged against the
+  // Modrinth test's equivalent check (task-5-report.md's review, M1) that
+  // this file does not repeat.
+  let scopedRequestUrl: string | undefined
+  const onResponse = (r: Response) => {
+    const input = parseCurseforgeVersionsInput(r.url())
+    if (
+      input?.query.gameVersion === MC_VERSION &&
+      input?.query.modLoaderType === loader
+    ) {
+      scopedRequestUrl = r.url()
+    }
+  }
+  page.on("response", onResponse)
+
+  let versions: VersionLists
+  try {
+    versions = await captureCurseforgeVersions(page, async () => {
+      await openAddonPage(page, RESOLUTION_PROJECT_CURSEFORGE_ID)
+      await page.getByRole("tab", { name: "Versions" }).click()
+    })
+  } finally {
+    page.off("response", onResponse)
+  }
+
+  if (!scopedRequestUrl) {
+    throw new Error(
+      `resolveForInstanceCurseforge (${loader}): no ` +
+        "modplatforms.curseforge.getModFiles request was observed carrying " +
+        `both gameVersion="${MC_VERSION}" and modLoaderType="${loader}" — ` +
+        `the scoped request never reached the renderer with ` +
+        `"${instanceName}"'s own Minecraft version/loader.`
+    )
+  }
+
+  await installModIntoInstance(page, { instanceName })
+
+  const mods = await openInstanceAddons(page, instanceName)
+  const installed = mods.find(matchesClothConfigCurseforge)
+  if (!installed) {
+    throw new Error(
+      `resolveForInstanceCurseforge (${loader}): instance.getInstanceMods ` +
+        `for "${instanceName}" has no entry matching CurseForge project ` +
+        `${RESOLUTION_PROJECT_CURSEFORGE_ID} after install (got ` +
+        `${JSON.stringify(mods)})`
+    )
+  }
+
+  const curseforgeFileId = installed.curseforgeFileId
+  if (curseforgeFileId == null) {
+    throw new Error(
+      `resolveForInstanceCurseforge (${loader}): installed entry for ` +
+        `CurseForge project ${RESOLUTION_PROJECT_CURSEFORGE_ID} in ` +
+        `"${instanceName}" has a null curseforgeFileId — cannot compare it ` +
+        "against the scoped oracle."
+    )
+  }
+  const curseforgeFileIdStr = String(curseforgeFileId)
+
+  // Ordering comes from the SCOPED list — see resolveForInstance's identical
+  // reasoning above and the module doc comment. Never the tautology trap:
+  // this is the only place `versions.scoped` is read in this function.
+  const expectedNewest = newestByDate(versions.scoped)
+  if (curseforgeFileIdStr !== expectedNewest.id) {
+    throw new Error(
+      `resolveForInstanceCurseforge (${loader}): installed curseforgeFileId ` +
+        `"${curseforgeFileIdStr}" does not match the scoped list's newest ` +
+        `entry "${expectedNewest.id}" (published ` +
+        `${expectedNewest.datePublished}) — install_latest_curseforge_mod ` +
+        "did not pick the build this test's oracle expected."
+    )
+  }
+
+  // Compatibility comes from the UNFILTERED (loader-unfiltered,
+  // game-version-scoped) list — see resolutionCapture.ts's CurseForge doc
+  // comment and this function's own doc comment for why the Minecraft
+  // version half is an existence check here, not a
+  // `gameVersions.includes(MC_VERSION)` check: every entry in this list
+  // already satisfies that by construction (the request that produced it
+  // was itself filtered to `gameVersion=${MC_VERSION}`), so checking it
+  // again would be exactly the unfailable tautology this suite's central
+  // rule warns against. The loader check below is what can actually fail —
+  // this list is NOT loader-filtered, and Task 1 confirmed it contains both
+  // the Forge and Fabric builds.
+  const unfilteredRecord = versions.unfiltered.find(
+    (v) => v.id === curseforgeFileIdStr
+  )
+  if (!unfilteredRecord) {
+    throw new Error(
+      `resolveForInstanceCurseforge (${loader}): installed file id ` +
+        `"${curseforgeFileIdStr}" is not present at all in the ` +
+        `game-version-scoped, loader-unfiltered file list for Minecraft ` +
+        `${MC_VERSION} — either install_latest_curseforge_mod's own ` +
+        "game-version re-check picked a file for the wrong Minecraft " +
+        "version, or this test's oracle is out of sync with what the app " +
+        "actually installed."
+    )
+  }
+  if (!unfilteredRecord.loaders.includes(loader)) {
+    throw new Error(
+      `resolveForInstanceCurseforge (${loader}): installed file ` +
+        `"${curseforgeFileIdStr}" does not declare "${loader}" in its ` +
+        `loader-unfiltered gameVersions-derived loaders ` +
+        `(${JSON.stringify(unfilteredRecord.loaders)}) — the installed ` +
+        "build is not actually compatible with this instance's modloader."
+    )
+  }
+
+  // The jar-parsed loader — parsed from the downloaded file's own manifest,
+  // never from a platform API (see `InstalledMod.modloaders`'s doc comment
+  // in `helpers/mods.ts`). This is the check that would catch a dropped
+  // CurseForge-side `modLoaderType` filter even if the differ assertion in
+  // the test body somehow didn't (see this function's own doc comment,
+  // point 1).
+  const withLoaders = await waitForModloadersPopulated(
+    page,
+    instanceName,
+    matchesClothConfigCurseforge
+  )
+  if (!withLoaders.modloaders.includes(loader)) {
+    throw new Error(
+      `resolveForInstanceCurseforge (${loader}): jar-parsed modloaders for ` +
+        `the installed file are ${JSON.stringify(withLoaders.modloaders)}, ` +
+        `expected to include "${loader}" — parsed from the downloaded ` +
+        "jar's own manifest, independent of anything either platform's API " +
+        "reported."
+    )
+  }
+
+  await expect(page.locator(byModRow(installed.filename)), {
+    message:
+      `resolveForInstanceCurseforge (${loader}): mod row for ` +
+      `"${installed.filename}" never appeared in "${instanceName}"'s ` +
+      "Addons tab"
+  }).toBeVisible()
+
+  const diskResult = await verifyModInstalled(modsDir, {
+    filename: installed.filename,
+    expectedSize: installed.fileSize,
+    expectedSha1: installed.sha1 ?? undefined
+  })
+  if (!diskResult.ok) {
+    throw new Error(
+      `resolveForInstanceCurseforge (${loader}): disk verification failed:\n` +
+        diskResult.problems.map((p) => `  - ${p}`).join("\n")
+    )
+  }
+
+  return { curseforgeFileId: curseforgeFileIdStr }
+}
+
 test.describe("mod resolution", () => {
   // Both fixtures compose the same worker-scoped `authenticatedApp` (see
   // `fixtures/forgeInstance.ts`'s doc comment) — same app, same page, same
@@ -430,6 +644,112 @@ test.describe("mod resolution", () => {
         for (const cleanupError of cleanupErrors) {
           console.error(
             `cleanup for "${TEST_TITLE}" also failed:`,
+            cleanupError
+          )
+        }
+      }
+    }
+  })
+
+  const TEST_TITLE_CURSEFORGE =
+    "resolves the newest compatible CurseForge build for each instance's loader"
+
+  test(TEST_TITLE_CURSEFORGE, async ({ installedInstance, forgeInstance }) => {
+    // See modInstall.spec.ts's identical `bodyFailed` doc comment: a `throw`
+    // inside `finally` discards whatever the try-block was throwing, so
+    // cleanup failure must only re-throw over a passing body.
+    let bodyFailed = false
+    const resolvedIds: Partial<Record<ResolutionLoader, string>> = {}
+
+    try {
+      // Same sequential-by-construction reasoning as the Modrinth test above
+      // — both fixtures already resolved before this body runs, and both
+      // share one `page`, so driving them one after another is the only
+      // valid order regardless of what Task 2's fixture-concurrency finding
+      // says about fixture resolution itself.
+      const targets: { loader: ResolutionLoader; inst: ResolutionInstance }[] =
+        [
+          { loader: "fabric", inst: installedInstance },
+          { loader: "forge", inst: forgeInstance }
+        ]
+
+      for (const { loader, inst } of targets) {
+        const { curseforgeFileId } = await resolveForInstanceCurseforge(
+          inst,
+          loader
+        )
+        resolvedIds[loader] = curseforgeFileId
+      }
+
+      // This is the path that never re-checks the modloader client-side —
+      // install_latest_curseforge_mod (managers/instance/mods.rs) re-checks
+      // only game_versions, never the loader, trusting CurseForge's own
+      // `mod_loader_type` query parameter to have filtered correctly. If
+      // that upstream filter were ever silently dropped, both instances
+      // would resolve to whichever file sorts newest overall instead of
+      // their own loader's newest, and resolveForInstanceCurseforge's own
+      // request-scoping check cannot catch that either (it only observes
+      // the frontend's own rspc call, never the core's outbound HTTP to
+      // CurseForge). This assertion, plus the jar-parsed `modloaders` check
+      // already run for each instance, are the only things left standing
+      // between a dropped/broken CurseForge-side loader filter and a green
+      // suite.
+      if (resolvedIds.fabric === resolvedIds.forge) {
+        throw new Error(
+          `"${TEST_TITLE_CURSEFORGE}": both the Fabric and Forge instances ` +
+            `resolved to the same CurseForge file id ("${resolvedIds.fabric}"). ` +
+            "Task 1 confirmed Cloth Config API publishes 4 distinct Forge " +
+            "file ids and 4 distinct Fabric file ids at Minecraft 1.20.1, " +
+            "fully disjoint (task-1-report.md), so this is not expected " +
+            "from the fixture project itself. Likely causes, in order: (1) " +
+            "a real regression in install_latest_curseforge_mod's use of " +
+            "CurseForge's own modLoaderType filter, or (2) — only if this " +
+            "project is ever swapped out — the replacement shipping one " +
+            "universal file for both loaders instead of separate per-loader " +
+            "builds, which would make this a fixture-choice problem rather " +
+            "than a product one."
+        )
+      }
+    } catch (error) {
+      bodyFailed = true
+      throw error
+    } finally {
+      // Both instances get a cleanup attempt regardless of how far the body
+      // got — same reasoning as the Modrinth test's identical finally block.
+      const cleanupErrors: unknown[] = []
+      try {
+        await cleanupInstalledMod(
+          installedInstance.page,
+          installedInstance.instanceName,
+          installedInstance.modsDir,
+          matchesClothConfigCurseforge,
+          `"${TEST_TITLE_CURSEFORGE}" (Fabric instance)`
+        )
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError)
+      }
+      try {
+        await cleanupInstalledMod(
+          forgeInstance.page,
+          forgeInstance.instanceName,
+          forgeInstance.modsDir,
+          matchesClothConfigCurseforge,
+          `"${TEST_TITLE_CURSEFORGE}" (Forge instance)`
+        )
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError)
+      }
+
+      if (cleanupErrors.length > 0) {
+        // Only re-throw over a passing body, same reasoning as the Modrinth
+        // test's identical branch.
+        if (!bodyFailed) {
+          // eslint-disable-next-line no-unsafe-finally
+          throw cleanupErrors[0]
+        }
+        for (const cleanupError of cleanupErrors) {
+          console.error(
+            `cleanup for "${TEST_TITLE_CURSEFORGE}" also failed:`,
             cleanupError
           )
         }
