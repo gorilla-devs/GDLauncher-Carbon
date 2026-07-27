@@ -533,6 +533,241 @@ responding, and `toggleModEnabled` (`helpers/mods.ts`) awaits that response
 before returning, so there is no window in which a test's own assertion could
 observe the stale midpoint.
 
+## Persistence tests
+
+`persistence.spec.ts` proves that what the launcher writes survives a real
+process restart — not a page reload, not a re-mounted component tree, but the
+Rust core actually exiting and a fresh one reading the same runtime path back
+off disk. Every other spec in this suite either never closes the app or
+closes it only in teardown; this is the one file that would catch a bug that
+wrote nothing to disk, wrote it somewhere the next boot can't find, or wrote
+it in a form the startup reconciliation path corrupts.
+
+### `relaunchApp`, and why waiting for a real core exit matters
+
+`fixtures/electronApp.ts`'s `relaunchApp` closes the current
+`ElectronApplication` and launches a fresh one against the same runtime path
+— but only after confirming the Rust core process the old app owned has
+genuinely exited, not merely that `app.close()` resolved.
+
+Those are different events. `window-all-closed` in `main/index.ts` calls
+`coreModule.kill()` and `app.quit()` without awaiting the core's own `exit`
+event, so `app.close()` resolving only proves the *Electron* main process is
+gone — the core (holding the SQLite connections everything this spec reads
+back depends on) can still be alive. Relaunching before it has released those
+handles races the old process's open file/DB handles against the new one:
+depending on timing, the new core can find a lock it can't immediately
+acquire. Left unhandled, that surfaces as a failure that looks exactly like
+database corruption but has nothing to do with what this suite is actually
+testing.
+
+`relaunchApp` closes that gap by reading the outgoing core's pid off
+`globalThis.__gdlCoreProcessId` (published by `main/index.ts` right after
+`spawn()`) and polling for its real exit with `process.kill(pid, 0)` — Node's
+cross-platform existence probe, which sends no signal and just asks the OS
+whether the pid is still addressable. `ESRCH` is treated as "gone"; **every
+other errno, including `EPERM`**, is treated as "still alive" and falls
+through to the next poll, so a permissions quirk can never be misread as a
+clean exit. The poll is bounded at 15s, comfortably above the Rust
+termination handler's own ~3s-bounded graceful shutdown
+(`crates/carbon_app/src/main.rs`, ~line 317-340), and throws a diagnosable
+error naming the pid if the bound is ever hit rather than launching anyway.
+SQLite's own `busy_timeout = 5000` (`crates/carbon_repos/src/db_exec.rs`) is
+a second, independent layer underneath this, not a substitute for it: it
+absorbs a brief residual overlap (documented for Windows, where
+`TerminateProcess` is not a catchable signal so the graceful Rust shutdown
+never runs), but it cannot absorb the case this function actually prevents —
+relaunching while the old core is still fully alive and holding the database
+open.
+
+### What persistence coverage means here, and why both channels
+
+Four things are written through four different code paths during setup, then
+asserted **through two independent channels** after one real relaunch — the
+app's own UI/API response, and the on-disk state directly:
+
+1. **An instance** (name + Minecraft version) — UI: a fresh
+   `instance.getInstanceDetails` response. Disk: both the `Instance` DB row
+   *and* the instance's own on-disk `instance.json`
+   (`helpers/instanceConfig.ts`) — two disk-side checks, deliberately, since
+   this wave's whole point is SQLite survival specifically, not just "some
+   file exists somewhere".
+2. **An app setting** (`reducedMotion`, Settings > General's "Potato mode")
+   — UI: the switch's own `checked` state. Disk: the
+   `AppConfiguration.reducedMotion` column.
+3. **An installed mod**, left enabled — UI: `instance.getInstanceMods`.
+   Disk: `helpers/modVerify.ts`'s `verifyModInstalled`/`verifyModEnabled`
+   against the real jar. See "Mod state in the database is a cache, not a
+   persistence store" below for why this one is read honestly rather than
+   taken as proof of anything SQLite-specific.
+4. **A disabled mod** — same two channels, `enabled: false`. Genuinely
+   persistence-adjacent in a way (3) is not: the `.disabled` filename suffix
+   *is* the ground truth for this fact, not a proxy for something else, and
+   there is no network fallback that can reconstruct it.
+
+Checking only the UI would pass on stale in-memory state the running process
+never actually persisted — a query cache that survived the restart in memory
+would satisfy it for the wrong reason. Checking only disk would pass even if
+the app never loaded what it wrote back on boot — a write-only bug, where the
+next launch silently ignores its own data, would go undetected. Both
+channels have to agree on the *pre-restart* captured value for an assertion
+to mean what it claims.
+
+### Mod state in the database is a cache, not a persistence store
+
+**This finding took three separate sabotage rounds to establish and is
+recorded here so nobody has to re-derive it.** It changes what assertion (3)
+above is actually allowed to claim.
+
+The first attempt at the installed-mod assertion deleted the mod's
+`ModFileCache` row and expected the suite to go red on restart. It didn't:
+`cache_local`'s boot-time per-instance disk scan
+(`crates/carbon_app/src/managers/metadata/cache/mod.rs`, queued for every
+instance at startup — `managers/instance/mod.rs:272-278`) rebuilds
+`ModFileCache` from the jar file and its content hash alone, entirely
+locally, the instant the row is missing.
+
+The second attempt deleted only `ModrinthModCache` instead, reasoning that
+the platform association (which project a jar corresponds to on Modrinth)
+must be a real DB-only fact. Also green: a second, independent background
+task (`cache_modplatform::<ModrinthModCacher>`, driven by
+`instance_mods_needing_mr_refresh`) makes an **unconditional Modrinth
+hash-lookup API call on every boot** for any mod lacking a
+`ModrinthModCache` row, and re-derives the association before the assertion
+ever runs.
+
+The third attempt deleted `ModFileCache` **and** `ModMetadata` together
+(cascading to both `ModrinthModCache` and `CurseForgeModCache` — the entire
+per-mod DB footprint for that file). Still green.
+
+**Conclusion: nothing about an installed mod's observable state — presence,
+filename, size, enabled flag, or platform association — is uniquely tied to
+any SQLite row surviving a restart.** The launcher fully rebuilds it from the
+jar alone: a local disk scan for the file-level facts, plus an unconditional
+background network lookup for the platform association. Mod state in the
+database is a *cache* of what disk (and, for platform association, the
+network) already says, not the thing that makes it durable.
+
+Assertion (3) is kept, but documented — in the spec's own module and
+assertion-level doc comments, and here — as a **regression check on that
+reconciliation pipeline surviving a restart**, not as proof that any
+SQLite row persisted. A bug that silently broke the local scan, or that
+stopped the background re-association task from running at all, would still
+be caught by this assertion; a bug that broke *only* `ModFileCache`/
+`ModrinthModCache` persistence itself, with the reconciliation pipeline
+intact, would not be.
+
+**Open question this raises, not chased down here:** if the platform
+association is re-derived by a live Modrinth API call on every boot, what
+does an *offline* launch show for an installed mod? That lookup cannot run
+without a network, and nothing in this suite exercises a launch with the
+network unavailable.
+
+## Database recovery tests
+
+`dbRecovery.spec.ts` drives the database-open recovery ladder end to end:
+plant a damaged or future-versioned `gdl_conf.db` with `helpers/dbSeed.ts`,
+launch the real packaged app against it, and assert **both** halves of the
+contract every launch-time status relies on — that the core actually emitted
+the expected `_STATUS_:<EVENT>` line
+(`crates/carbon_app/src/managers/db_bootstrap.rs`'s `DbStatus` funnel), and
+that `apps/desktop/packages/main/index.ts` parsed that line and drove the
+*correct* rung of the recovery screen
+(`packages/preload/loading.ts`'s `fatalError`/`backwardsMigrationError`).
+Asserting only the log line would pass even if the UI rendered nothing;
+asserting only the UI would pass if the shell happened to guess right for the
+wrong reason.
+
+All six states `db_bootstrap.rs` can emit are covered, each in its own test:
+`DB_CORRUPT`, `BACKWARDS_MIGRATION`, `DB_DIVERGED`, `DB_DOWNGRADE_FAILED`,
+`DB_DOWNGRADED`, and `DB_MIGRATION_FAILED`. A seventh test seeds nothing —
+a genuinely healthy, unseeded first launch — and asserts every one of those
+same checks goes **red** against it (`getCoreModule().type` reports
+`"success"`, not `"error"`; `_STATUS_:DB_DOWNGRADED` is absent from a healthy
+boot's log). This negative control is what proves the six tests discriminate
+a real failure state rather than passing by construction — a version of this
+suite whose recovery assertions were unconditionally true would still fail
+this one.
+
+Two further tests click a real recovery-screen button rather than only
+asserting its presence: one drives "Restart" and confirms a brand-new OS
+process for the app/core binary actually appeared (not just that the
+handler's log line printed); the other drives "Reset Database & Restart" and
+confirms the seeded database file is genuinely gone from disk afterward.
+
+**The one deliberate omission.** `DB_DOWNGRADE_FAILED`'s "Restore Previous
+Database" rung is asserted **absent**, never exercised. `compat.rs`'s
+`down_run` runs every stored-down migration inside one transaction and rolls
+the *whole* thing back on any failure, including the "no stored down" branch
+the seed for this state drives — so the on-disk database after a failed
+down-run is, byte for byte, identical to the pre-down-run snapshot `down_run`
+just took. `snapshot_if_restorable` finds no difference and reports no
+snapshot path, so the restore rung never renders. No seed that honestly
+reaches `DB_DOWNGRADE_FAILED` can leave a differing, restorable snapshot
+behind — under the current fully-transactional `down_run`, it isn't obvious
+any real-world condition can either. The test asserts this rung's absence
+explicitly rather than skipping the check.
+
+### Correction: `DB_DOWNGRADED` needs a breaking tail, not an "additive" one
+
+Read `compat.rs`'s `handle_ahead` directly rather than assume: a
+migration-count tail that is entirely additive overlays **silently** —
+`Proceed`, a `tracing::info!` line, no `_STATUS_:` event at all. `Downgraded`
+only fires once a tail containing a *breaking* migration has its stored
+`down_sql` run successfully and the resulting schema matches this binary's
+own reference schema byte-for-byte. `dbSeed.ts`'s `DB_DOWNGRADED` seed
+reflects this: it replays the checked-in `baseline.sql` and adds one
+synthetic, independently-reversible breaking migration one version ahead,
+because that is the only construction that can honestly reach `Downgraded`
+rather than a silent additive overlay.
+
+## Fixed defect: fatal database exits could lose their own diagnostic
+
+Every fatal database-open path used to terminate with a direct
+`std::process::exit(2)` call (`crates/carbon_app/src/managers/mod.rs`).
+`std::process::exit` skips destructors, including the release build's
+`tracing_appender::non_blocking` `WorkerGuard` — the object whose `Drop`
+blocks until the background worker thread has actually flushed pending log
+lines to `__gdl_logs__/*.log`. On an idle machine that worker thread
+typically gets scheduled before the process dies anyway; under CPU
+contention it does not, so the one line naming *why* the process was exiting
+could be silently lost, producing an attached core log that is empty at
+exactly the moment it mattered most.
+
+Fatal DB exits now go through `logger::flush_and_exit(2)`
+(`crates/carbon_app/src/logger.rs`), which takes the process-lifetime
+`WorkerGuard` out of a static and drops it — forcing the flush — before
+calling `std::process::exit`.
+
+**Evidence standard used to confirm this was a genuine race, not a
+hypothetical one:** `DB_CORRUPT` was seeded and the release `carbon_app`
+binary run directly under `taskset -c 0` (pinning it to a single core, which
+forces the tracing-appender worker thread to compete for the same core as
+the exiting main thread and lose the scheduling race). Before the fix: 0 of
+40 pinned runs had the fatal-error diagnostic in the log file. After the
+fix: 40 of 40 did. Unpinned, on an otherwise-idle multi-core machine, the bug
+did not reproduce either way (30/30 hit both before and after) — confirming
+this was a real, timing-dependent race rather than a deterministic bug that
+a small sample happened to miss. A `taskset`-pinned, tens-of-runs comparison
+like this — not a handful of manual runs — is the bar for claiming a race
+condition is actually fixed.
+
+## No third-party surface
+
+Unlike the install and mod waves — which download real Minecraft versions
+from Mojang, real loader builds from meta.gdl.gg, and real mods from
+CurseForge and Modrinth, and have all previously hit genuine live-service
+flakiness (see "Third-party flakiness is observed, not theoretical" below)
+— `persistence.spec.ts` and `dbRecovery.spec.ts` touch no third-party
+service at all. The only network endpoint either file talks to is the local
+mock IdP (`mock-idp/`); `dbRecovery.spec.ts` never even calls `completeLogin`
+— every one of its tests launches against a seeded database and asserts on
+the resulting startup status or screen, well before login would ever be
+reached (and for the fatal states, before the app gets anywhere near the
+login page at all). There is no live external dependency
+either file's pass/fail can be blamed on, and neither has produced a flake
+in any run so far.
+
 ## Suite wall-clock
 
 Measured on this branch at `workers: 1` — what CI actually runs:
@@ -542,10 +777,23 @@ regardless of local defaults.
 
 - Full e2e suite (`init`, `login`, `instanceInstall`'s 8-entry vanilla
   matrix, `loaderInstall`'s 5-entry loader matrix, `modInstall`'s 2 tests,
-  `modLifecycle`'s 4 tests — **25 tests total**): **187–200s (3.1–3.3
-  minutes)** across repeated full runs at `CI=true`.
+  `modLifecycle`'s 4 tests, `persistence`'s 1 test, `dbRecovery`'s 8 tests
+  — **34 tests total**): **~5.0 minutes (300s)**, measured with a full
+  `CI=true pnpm exec playwright test` run over all eight spec files on this
+  branch (`34 passed (5.0m)`).
+- `persistence.spec.ts` alone: **~54s** for its 1 test (isolated run).
+- `dbRecovery.spec.ts` alone: **~24s** for its 8 tests (isolated run).
+- The pre-existing 25-test install/mod suite (`init`, `login`,
+  `instanceInstall`, `loaderInstall`, `modInstall`, `modLifecycle`) was
+  previously measured at 187–200s (3.1–3.3 minutes) on its own; this wave
+  adds roughly 78s of test time (~54s + ~24s) on top of that when run in
+  isolation, and the combined full-suite figure above (~300s) is consistent
+  with that arithmetic — this wave's specs run sequentially after the
+  install/mod specs under `fullyParallel: false`, `workers: 1`, so their
+  cost adds rather than overlaps.
 - Unit suite (`pnpm test:unit`, 145 tests across 16 files): **~2–3s**.
-- Combined: **roughly 3.1–3.3 minutes** of test time per OS.
+- Combined: **roughly 5.0 minutes** of e2e test time per OS, plus the unit
+  suite's few seconds.
 
 `.github/workflows/all_os.yml` runs this on three OS jobs (`ubuntu-22.04`,
 `windows-2022`, `macos-14`) **in parallel**, each with its own 80-minute job
@@ -557,16 +805,17 @@ that is an expectation, not a second measurement.
 
 The arithmetic that matters for a PR: because the three OS jobs run in
 parallel rather than in series, the wall-clock this suite adds to a PR's
-critical path is **one** OS's ~3.1–3.3 minutes, not three times it. The 3×
-only shows up as total CI compute — three runners each spending ~3.1–3.3
-minutes on the test step, on top of their own build and lint steps — roughly
-9.4–10 minutes of test-step compute across the three jobs combined.
+critical path is **one** OS's ~5.0 minutes, not three times it. The 3× only
+shows up as total CI compute — three runners each spending ~5.0 minutes on
+the test step, on top of their own build and lint steps — roughly 15 minutes
+of test-step compute across the three jobs combined.
 
-**At ~3.1–3.3 minutes against an 80-minute per-job timeout, the suite
-comfortably fits a per-PR run today**, the mod suites' added ~40–50s
-included. That is a statement about the current measured duration, not a
-recommendation — whether to split PR vs. nightly runs as the matrix grows is
-a call for a human, not this document.
+**At ~5.0 minutes against an 80-minute per-job timeout, the suite
+comfortably fits a per-PR run today**, this wave's added ~78s (persistence +
+recovery) and the mod suites' earlier ~40–50s both included. That is a
+statement about the current measured duration, not a recommendation —
+whether to split PR vs. nightly runs as the matrix grows is a call for a
+human, not this document.
 
 ### Third-party flakiness is observed, not theoretical
 
