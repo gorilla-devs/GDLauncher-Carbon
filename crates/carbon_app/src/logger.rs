@@ -303,11 +303,35 @@ mod test {
         assert_eq!(writer.inner, expected);
     }
 
-    const PANIC_HOOK_TEST_CHILD_ENV: &str = "CARBON_APP_PANIC_HOOK_TEST_CHILD";
-    const PANIC_HOOK_TEST_LOGDIR_ENV: &str = "CARBON_APP_PANIC_HOOK_TEST_LOGDIR";
-    const PANIC_HOOK_TEST_MARKER: &str = "PANIC_HOOK_FLUSH_MARKER_2f9c1b7a";
-    const PANIC_HOOK_TEST_NAME: &str =
-        "logger::test::panic_hook_flushes_pending_log_line_before_unwind";
+    const PANIC_HOOK_PROBE_MARKER: &str = "PANIC_HOOK_PROBE_MARKER_9d3fa1c4";
+
+    /// Resolves the compiled path of the `panic_hook_probe` binary
+    /// (`src/bin/panic_hook_probe.rs`) sibling to this test binary.
+    ///
+    /// `CARGO_BIN_EXE_<name>` is Cargo's own documented way to hand a test
+    /// the exact path of another target in the same package, but it is only
+    /// populated for integration-test/bench targets — not for a unit test
+    /// running inside a `bin` target's own harness, which is what this is.
+    /// Falling back to deriving the path from `current_exe()` (this test
+    /// binary lives at `target/<profile>/deps/carbon_app-<hash>`; the
+    /// unhashed sibling binaries Cargo also places at `target/<profile>/`)
+    /// covers exactly that gap.
+    fn panic_hook_probe_path() -> std::path::PathBuf {
+        if let Ok(path) = std::env::var("CARGO_BIN_EXE_panic_hook_probe") {
+            return std::path::PathBuf::from(path);
+        }
+        let exe = std::env::current_exe().expect("failed to resolve the test binary's own path");
+        let profile_dir = exe
+            .parent() // .../target/<profile>/deps
+            .and_then(|p| p.parent()) // .../target/<profile>
+            .expect("test binary path has no target/<profile> ancestor");
+        let name = if cfg!(windows) {
+            "panic_hook_probe.exe"
+        } else {
+            "panic_hook_probe"
+        };
+        profile_dir.join(name)
+    }
 
     /// Confirms `install_panic_hook` actually flushes a log line written
     /// immediately before a panic to disk, rather than losing it the way an
@@ -322,53 +346,37 @@ mod test {
     /// plain debug `cargo test` this file is simply never written and the
     /// test is compiled out.
     ///
-    /// Runs the actual check in a child process rather than inline
-    /// (`PANIC_HOOK_TEST_CHILD_ENV` selects which one this invocation is).
-    /// `install_panic_hook` replaces the *global* panic hook for the whole
-    /// process, and `cargo test` runs every test in this binary concurrently
-    /// in that one process — including `managers::download::test::
-    /// attempt_download_twice`, a `#[should_panic]` test elsewhere in this
-    /// crate. An unrelated panic on another thread hits this same hook and
-    /// can drain the process-lifetime `LOG_GUARD` before this test's own
-    /// marker line is even written — observed live: this test was reliable
-    /// filtered to itself and flaky as part of the full suite. A child
-    /// process gives it sole ownership of its own `LOG_GUARD`, exactly like
-    /// the one real panic a launched app ever needs this mechanism for.
+    /// Shells out to `panic_hook_probe` rather than panicking inline: a
+    /// panic inside this test function fires on a libtest-spawned worker
+    /// thread, never this process's own main thread, and the test harness's
+    /// own bookkeeping between that panic and the eventual `process::exit`
+    /// gives the async log writer ample time to flush on its own — hook or
+    /// no hook. A test built that way cannot tell `install_panic_hook` apart
+    /// from its absence (confirmed live: disabling the hook and panicking
+    /// in-process here still passed 35/35, `taskset`-pinned included). Only
+    /// a panic on a genuine main thread, with nothing else running,
+    /// reproduces the race this hook exists to close — see
+    /// `panic_hook_probe`'s own doc comment.
     #[cfg(not(debug_assertions))]
     #[test]
     fn panic_hook_flushes_pending_log_line_before_unwind() {
-        if std::env::var_os(PANIC_HOOK_TEST_CHILD_ENV).is_some() {
-            let logdir =
-                std::env::var(PANIC_HOOK_TEST_LOGDIR_ENV).expect("child: logdir env var missing");
-            tokio::runtime::Runtime::new()
-                .unwrap()
-                .block_on(super::setup_logger(std::path::Path::new(&logdir)));
-            super::install_panic_hook();
-            // The hook runs synchronously at this call site, before the
-            // stack unwinds any further — see `install_panic_hook`'s own
-            // doc comment. The test harness catches the unwind and reports
-            // this test as failed rather than aborting the child process,
-            // but that happens after the hook (and therefore the flush)
-            // has already run.
-            tracing::error!("{}", PANIC_HOOK_TEST_MARKER);
-            panic!("deliberate test panic for panic_hook_flushes_pending_log_line_before_unwind");
-        }
+        let probe = panic_hook_probe_path();
+        assert!(
+            probe.exists(),
+            "panic_hook_probe binary not found at {probe:?} — \
+             `cargo build`/`cargo test` should have produced it alongside carbon_app"
+        );
 
         let tmp = tempfile::tempdir().unwrap();
-        let exe = std::env::current_exe().expect("failed to resolve the test binary's own path");
-        let status = std::process::Command::new(&exe)
-            .arg("--exact")
-            .arg(PANIC_HOOK_TEST_NAME)
-            .arg("--test-threads=1")
-            .env(PANIC_HOOK_TEST_CHILD_ENV, "1")
-            .env(PANIC_HOOK_TEST_LOGDIR_ENV, tmp.path())
+        let status = std::process::Command::new(&probe)
+            .arg(tmp.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
-            .expect("failed to spawn the child test process");
+            .expect("failed to spawn panic_hook_probe");
         assert!(
             !status.success(),
-            "the child process should have failed: it panics deliberately"
+            "panic_hook_probe should have exited non-zero: it panics deliberately"
         );
 
         let logs_dir = tmp.path().join("__gdl_logs__");
@@ -379,9 +387,9 @@ mod test {
             .expect("setup_logger should have created a log file");
         let contents = std::fs::read_to_string(newest.path()).unwrap();
         assert!(
-            contents.contains(PANIC_HOOK_TEST_MARKER),
+            contents.contains(PANIC_HOOK_PROBE_MARKER),
             "expected the panic hook to have flushed the pending log line to \
-             disk before the child process exited; log contents:\n{contents}"
+             disk before panic_hook_probe exited; log contents:\n{contents}"
         );
     }
 }
