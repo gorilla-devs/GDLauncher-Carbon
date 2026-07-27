@@ -66,6 +66,15 @@
  * | `DB_DOWNGRADED`        | `DB_DOWNGRADED`          | *no* recovery screen — non-fatal, boots normally |
  * | `DB_MIGRATION_FAILED`  | `DB_MIGRATION_FAILED`    | fatal screen, no restore-snapshot step  |
  *
+ * A seventh test seeds nothing — a genuinely healthy, unseeded first launch
+ * — and asserts every one of those same checks goes negative against it
+ * (`getCoreModule().type` reports `"success"`, not `"error"`; none of the
+ * six `_STATUS_:` events above appear in a healthy boot's log). This is the
+ * negative control: it is what proves the six tests above discriminate a
+ * real failure state rather than passing by construction — a version of
+ * this suite whose recovery assertions were unconditionally true would
+ * still fail this one.
+ *
  * **Why "Restore Previous Database" is asserted absent, never exercised.**
  * `loading.ts` only renders that step when `_STATUS_:DB_DOWNGRADE_FAILED`
  * carries a snapshot path, which `compat.rs`'s `snapshot_if_restorable`
@@ -425,6 +434,79 @@ test("seeding DB_DOWNGRADED is non-fatal: the core emits it and the app boots no
 })
 
 /**
+ * Every `_STATUS_:` event `db_bootstrap.rs`'s `DbStatus` funnel can emit for
+ * a fatal or informational DB outcome — the full `SeedState` union
+ * (`helpers/dbSeed.ts`) plus `READY`, which every seeded state above is
+ * checked to NOT short-circuit into. Duplicated here as a literal list
+ * rather than derived from `SeedState` itself: this test's whole point is a
+ * negative control independent of the six seed functions, so it must not
+ * share a definition with the thing it is cross-checking against.
+ */
+const ALL_SEEDABLE_STATUS_EVENTS = [
+  "DB_CORRUPT",
+  "BACKWARDS_MIGRATION",
+  "DB_DIVERGED",
+  "DB_DOWNGRADE_FAILED",
+  "DB_DOWNGRADED",
+  "DB_MIGRATION_FAILED"
+] as const
+
+// eslint-disable-next-line no-empty-pattern
+test("a genuinely healthy, unseeded first launch reports success and none of the six recovery events — the negative control", async ({}, testInfo) => {
+  expect(isCoreModulePresent()).toBeTruthy()
+
+  const harness = await startHarness()
+  let launched: Launched | undefined
+  try {
+    // Deliberately no `seedDatabase` call: `startHarness` mints a fresh,
+    // empty `runtimePath` (`mockIdp.ts`), so this launch hits the real
+    // fresh-install baseline path (`compat.rs`'s `install_baseline`) rather
+    // than any of the six seeded terminal states above.
+    launched = await launchAgainstHarness(harness)
+    const { page } = launched
+
+    // What proves the six tests above actually discriminate a real failure
+    // state, rather than passing by construction: every one of those tests'
+    // own checks — `getCoreModule().type`, the six `_STATUS_:` events, both
+    // recovery screens — is run here too, against a database this test
+    // knows is healthy, and every one of them must come back negative. A
+    // version of this suite whose recovery assertions were unconditionally
+    // true (e.g. `expect(coreResult.type).not.toBe("success")` mistyped as
+    // always passing) would still fail this one.
+    const coreResult = await getCoreModuleResult(page)
+    expect(coreResult.type, "getCoreModule().type").toBe("success")
+    const logText = coreModuleLogText(coreResult)
+    for (const event of ALL_SEEDABLE_STATUS_EVENTS) {
+      expect(
+        logText,
+        `a healthy boot's log unexpectedly contains _STATUS_:${event}`
+      ).not.toContain(`_STATUS_:${event}`)
+    }
+
+    await expect(page.locator("#auth-flow")).toBeVisible({ timeout: 60_000 })
+    await expect(
+      page.locator(byTestId(TEST_IDS.recoveryFatalScreen))
+    ).toHaveCount(0)
+    await expect(
+      page.locator(byTestId(TEST_IDS.recoveryBackwardsMigrationScreen))
+    ).toHaveCount(0)
+
+    expect(launched.pageErrors, {
+      message:
+        "an uncaught renderer exception happened during a genuinely healthy boot"
+    }).toEqual([])
+  } finally {
+    if (launched) {
+      await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
+        () => {}
+      )
+      await launched.app.close().catch(() => {})
+    }
+    await stopHarness(harness)
+  }
+})
+
+/**
  * Finds every currently-running process whose command line matches
  * `binaryPath` — `pgrep -f` on Linux/macOS, matching the full path (both
  * used by this suite's CI matrix). Windows has no command-line-matching
@@ -467,6 +549,67 @@ function pidsForBinary(binaryPath: string): number[] {
 }
 
 /**
+ * The env var `launchApp` sets on every spawned app/core process to point it
+ * at its own isolated runtime path (`fixtures/electronApp.ts`'s
+ * `LaunchOptions`/`env` block; read back by `main/index.ts` and forwarded to
+ * the core's own `--gdl_runtime_path` argv). Duplicated here as a literal
+ * rather than imported: `electronApp.ts` does not export it as a named
+ * constant either, so this matches that file's own style rather than adding
+ * a constant neither side otherwise needs.
+ */
+const RUNTIME_PATH_ENV_VAR = "GDL_RUNTIME_PATH"
+
+/**
+ * Best-effort check that `pid` was actually launched with `GDL_RUNTIME_PATH`
+ * set to `runtimePath` — the only thing that ties a process matching the
+ * app/core binary path back to *this* harness's own launch rather than some
+ * other one, since the runtime path is passed via env
+ * (`electronApp.ts`'s `launchApp`), not argv, and `pidsForBinary`'s
+ * `pgrep -f`/`tasklist` can only match on the binary path itself.
+ *
+ * `ps e` (BSD-syntax, supported natively by both Linux's `procps` and
+ * macOS's own `ps` — not a GNU-only extension) appends the process's
+ * environment to its command-line output, the same general mechanism
+ * `pidsForBinary` already relies on to find the process at all. Substring
+ * search rather than parsing into discrete `KEY=VALUE` pairs: `ps`'s own
+ * output has no unambiguous delimiter between adjacent env vars once values
+ * can contain spaces, and an exact `KEY=value` substring is already
+ * specific enough that a false positive would require another env var whose
+ * value happens to contain this exact `GDL_RUNTIME_PATH=<path>` text, which
+ * is not a realistic risk for a throwaway temp directory name.
+ *
+ * Any failure (the pid raced away between `pidsForBinary` finding it and
+ * this running, `ps` behaving unexpectedly, an unsupported platform) is
+ * reported as "cannot confirm" rather than thrown — a caller sweeping up
+ * leaked processes should treat that as "leave it alone", not "assume it's
+ * mine and kill it anyway".
+ */
+function pidRuntimePathMatches(pid: number, runtimePath: string): boolean {
+  try {
+    const output = execSync(`ps e -ww -p ${pid}`, { encoding: "utf8" })
+    return output.includes(`${RUNTIME_PATH_ENV_VAR}=${runtimePath}`)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * `process.kill(pid, 0)` is Node's documented cross-platform existence
+ * probe (same technique `electronApp.ts`'s `waitForPidExit` uses): signal
+ * `0` sends nothing, it just asks the OS whether `pid` is still addressable.
+ * `ESRCH` is the only error that means "gone" — anything else (`EPERM`, a
+ * pid that exists but isn't ours to signal) means the pid is still alive.
+ */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH"
+  }
+}
+
+/**
  * Polls until a process matching the app or core binary appears that was not
  * already running before the relaunch was triggered (`before`), or throws
  * once `timeoutMs` elapses.
@@ -479,6 +622,17 @@ function pidsForBinary(binaryPath: string): number[] {
  * `waitForStdout` alone. Only a genuine `app.relaunch()` spawns a brand new
  * OS process, which is what this function requires to see before it will
  * pass.
+ *
+ * `before` must be the pid set captured immediately before the click that
+ * triggers the relaunch, not an earlier one: this test's own app (main
+ * process plus its zygote/gpu/renderer/utility helpers, all of which carry
+ * the app binary's path as argv[0] and therefore match `pidsForBinary`) is
+ * itself a "new" process relative to any snapshot taken before that app was
+ * launched, and would satisfy this function on its own the instant it
+ * starts — long before any relaunch — making the check pass regardless of
+ * whether `app.relaunch()` ever actually ran. Callers that also want a
+ * pre-launch baseline for cleanup (`cleanupRelaunchSiblings`) keep that as a
+ * separate set for exactly this reason.
  */
 async function waitForRelaunchSibling(
   before: Set<number>,
@@ -494,7 +648,21 @@ async function waitForRelaunchSibling(
         if (!before.has(pid)) found.add(pid)
       }
     }
-    if (found.size > 0) return [...found]
+    if (found.size > 0) {
+      // A pid matching the binary path is not, on its own, proof of a
+      // genuine relaunch: this environment's Chromium re-execs the same
+      // binary as argv[0] for its zygote/gpu-process helpers, and under
+      // software-GPU fallback (observed live here — no real GPU device) a
+      // *still-running, never-relaunched* app can spawn one of these that
+      // exits again within milliseconds, which `pgrep -f` can catch mid-
+      // flight. Confirming the candidate is still alive after a short delay
+      // is what tells the two apart: a genuine `app.relaunch()` produces a
+      // new, long-lived main process, not a process that is already gone by
+      // the next check.
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      const confirmed = [...found].filter(isPidAlive)
+      if (confirmed.length > 0) return confirmed
+    }
     if (Date.now() >= deadline) {
       throw new Error(
         `waitForRelaunchSibling: no new process matching ${JSON.stringify(targets)} ` +
@@ -513,16 +681,38 @@ async function waitForRelaunchSibling(
  * the binary directly. Clicking a real button for real (deliberately done
  * only twice in this file — see the module doc comment) unavoidably leaves
  * that sibling running. This sweeps up anything matching the app or core
- * binary path that was not part of `before`, so a real test run does not
- * leave an idle GUI process behind on a developer's own machine.
+ * binary path that was not part of `before` (the pre-*launch* snapshot, not
+ * the pre-*click* one `waitForRelaunchSibling` uses — this function's job is
+ * "nothing from this whole test is still running", a superset of "the
+ * relaunch sibling specifically"), so a real test run does not leave an idle
+ * GUI process behind on a developer's own machine.
  *
- * Best-effort and Linux/macOS-only (`pgrep`/`kill` are Unix tools with no
- * Windows equivalent wired up here): a miss here never fails the test, and
- * on Windows CI the only cost is one idle process for the remainder of that
- * job's already-ephemeral VM — stated plainly in task-4-report.md rather
- * than chased with a second, less-tested cleanup path.
+ * Polls until the found set stops growing for a full second, rather than
+ * returning on the first match: Electron's own process tree spawns its
+ * zygote/gpu/renderer/utility helpers staggered over time, so stopping at
+ * the first sighting can capture only an early straggler and leave later
+ * siblings — including the actual relaunched core, which is what this
+ * function exists to catch — still running. `found` accumulates across
+ * every poll rather than being recomputed from scratch each time, so a pid
+ * that briefly appears and is gone by the next scan is still swept.
+ *
+ * Narrowed by `runtimePath` via `pidRuntimePathMatches` before anything is
+ * killed: `before` alone only proves a pid is new *to this test*, not that
+ * it belongs to this test's own harness rather than some other worker's app
+ * — the runtime path is what actually distinguishes them. A pid whose
+ * environment cannot be read (see `pidRuntimePathMatches`) is left alone
+ * rather than killed on the assumption it's ours.
+ *
+ * Best-effort and Linux/macOS-only (`pgrep`/`ps`/`kill` are Unix tools with
+ * no Windows equivalent wired up here): a miss here never fails the test,
+ * and on Windows CI the only cost is one idle process for the remainder of
+ * that job's already-ephemeral VM — stated plainly in task-4-report.md
+ * rather than chased with a second, less-tested cleanup path.
  */
-async function cleanupRelaunchSiblings(before: Set<number>): Promise<void> {
+async function cleanupRelaunchSiblings(
+  before: Set<number>,
+  runtimePath: string
+): Promise<void> {
   if (process.platform === "win32") {
     console.warn(
       "cleanupRelaunchSiblings: no-op on win32 — a relaunched sibling process " +
@@ -532,20 +722,46 @@ async function cleanupRelaunchSiblings(before: Set<number>): Promise<void> {
   }
 
   const deadline = Date.now() + 10_000
+  // Once at least one match is found, keep polling until a full second has
+  // passed with no *new* pid appearing — long enough for a staggered helper
+  // process to show up, short enough not to burn the whole 10s budget once
+  // things have genuinely settled.
+  const settleWindowMs = 1_000
   const targets = [getBinaryPath(), getCoreModulePath()]
   const found = new Set<number>()
+  let lastGrowthAt = Date.now()
 
   while (Date.now() < deadline) {
     for (const binaryPath of targets) {
       for (const pid of pidsForBinary(binaryPath)) {
-        if (!before.has(pid)) found.add(pid)
+        if (!before.has(pid) && !found.has(pid)) {
+          found.add(pid)
+          lastGrowthAt = Date.now()
+        }
       }
     }
-    if (found.size > 0) break
+    if (found.size > 0 && Date.now() - lastGrowthAt >= settleWindowMs) break
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
 
   for (const pid of found) {
+    // Chromium's own zygote/gpu-process helpers churn on this environment
+    // (spawn, crash, retry) fast enough that `pidsForBinary` routinely
+    // catches one mid-flight that has already exited by the time this loop
+    // reaches it. Checking liveness first, rather than going straight to
+    // `pidRuntimePathMatches`, keeps this function's log free of "leaving
+    // pid running" noise for pids that were never actually a cleanup
+    // candidate in the first place.
+    if (!isPidAlive(pid)) continue
+
+    if (!pidRuntimePathMatches(pid, runtimePath)) {
+      console.log(
+        `cleanupRelaunchSiblings: leaving pid ${pid} running — its ` +
+          `environment doesn't confirm it belongs to this harness's own ` +
+          `runtime path (${runtimePath})`
+      )
+      continue
+    }
     try {
       process.kill(pid, "SIGKILL")
       console.log(
@@ -578,6 +794,22 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
     await expect(retryButton).toBeVisible({ timeout: 60_000 })
     await expect(retryButton).toBeEnabled()
 
+    // Snapshotted immediately before the click, not reused from
+    // `beforePids` above: this test's own app (main process plus its
+    // zygote/gpu/renderer/utility helpers) is itself a new process relative
+    // to `beforePids`, which was captured before this test ever launched
+    // anything. Using that earlier snapshot here would let
+    // `waitForRelaunchSibling` return the instant it saw this test's own
+    // already-running app — true regardless of whether the click below ever
+    // triggers a real relaunch. `beforePids` stays reserved for
+    // `cleanupRelaunchSiblings`, whose job (sweep up everything left running
+    // by this whole test) is a different one — see that function's own doc
+    // comment.
+    const preClickPids = new Set([
+      ...pidsForBinary(getBinaryPath()),
+      ...pidsForBinary(getCoreModulePath())
+    ])
+
     await retryButton.click()
 
     // `ipcMain.handle("relaunch", ...)` (`main/index.ts`) logs this exact
@@ -590,10 +822,11 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
     await waitForStdout(launched, "relaunching app...")
 
     // The actual proof: a new OS process for the app or core binary that
-    // was not part of `beforePids`. Only a genuine `app.relaunch()` produces
-    // this — see `waitForRelaunchSibling`'s own doc comment for why the log
-    // line above cannot substitute for it.
-    await waitForRelaunchSibling(beforePids)
+    // was not part of `preClickPids`. Only a genuine `app.relaunch()`
+    // produces this — see `waitForRelaunchSibling`'s own doc comment for why
+    // the log line above cannot substitute for it, and why this must be the
+    // pre-*click* snapshot rather than `beforePids`.
+    await waitForRelaunchSibling(preClickPids)
   } finally {
     if (launched) {
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
@@ -601,7 +834,7 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
       )
       await launched.app.close().catch(() => {})
     }
-    await cleanupRelaunchSiblings(beforePids)
+    await cleanupRelaunchSiblings(beforePids, harness.runtimePath)
     await stopHarness(harness)
   }
 })
@@ -658,7 +891,7 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
       )
       await launched.app.close().catch(() => {})
     }
-    await cleanupRelaunchSiblings(beforePids)
+    await cleanupRelaunchSiblings(beforePids, harness.runtimePath)
     await stopHarness(harness)
   }
 })

@@ -101,6 +101,11 @@ pub fn main() {
             let base_api_override = base_api_override::get_base_api_override();
 
             logger::setup_logger(&runtime_path).await;
+            // After the logger so a panic anywhere below this point flushes
+            // the release-build file log before unwinding past it — see
+            // `logger::install_panic_hook`'s own doc comment for why a
+            // static `WorkerGuard` needs this at all.
+            logger::install_panic_hook();
 
             // After the logger so its `E2E MODE` warnings land somewhere: with
             // no subscriber installed yet, `tracing::warn!` is a silent no-op.
@@ -336,7 +341,11 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
             app2.instance_manager().shutdown_running(),
         )
         .await;
-        std::process::exit(0);
+        // Through `flush_and_exit` rather than a bare `std::process::exit`
+        // so the `info!` line just above reaches disk before the process
+        // dies, the same reasoning as the fatal-DB-error exit in
+        // `managers/mod.rs`.
+        logger::flush_and_exit(0);
     });
 
     // As soon as the server is ready, notify via stdout

@@ -295,15 +295,21 @@ export type CoreModule = () => Promise<
       }
       // The core's own stdout/stderr up to and including `_STATUS_:READY`.
       // The listeners that populate this stop appending once `started`
-      // flips true (see `loadCoreModule`), so this array is bounded at that
-      // point and never grows for the rest of the process's life, even
-      // though the listeners themselves stay attached to keep handling
-      // later events (`_INSTANCE_STATE_`, account email, ...). `main.tsx`
-      // ignores this on the success path, but it is the only record of a
-      // *non-fatal* status line — `DB_DOWNGRADED` chief among them — that
-      // startup otherwise never surfaces anywhere observable once the app is
-      // up. Exposed so `getCoreModule` can answer "what did the core
-      // actually report" regardless of outcome, not only on failure.
+      // flips true (see `loadCoreModule`), bounding this array from that
+      // point on; every fatal path bounds it too, for a different reason —
+      // the core process itself has exited, so no further `data` events
+      // fire regardless of `started`. Bounded on every path except one: the
+      // hung-startup timeout (`setTimeout` below) resolves with `started`
+      // still false while the core stays alive by design
+      // (`coreProcessHandle`'s own comment), so this buffer keeps growing
+      // there for as long as the core does. The listeners themselves stay
+      // attached in every case to keep handling later events
+      // (`_INSTANCE_STATE_`, account email, ...). `main.tsx` ignores this on
+      // the success path, but it is the only record of a *non-fatal* status
+      // line — `DB_DOWNGRADED` chief among them — that startup otherwise
+      // never surfaces anywhere observable once the app is up. Exposed so
+      // `getCoreModule` can answer "what did the core actually report"
+      // regardless of outcome, not only on failure.
       logs: Log[]
     }
   | {
@@ -470,13 +476,17 @@ const loadCoreModule: CoreModule = () =>
 
       const rows = dataString.split(/\r?\n|\r|\n/g)
 
-      // Bounds `logs` to output observed no later than `_STATUS_:READY`: once
-      // startup has resolved, this diagnostic buffer has done its job and
-      // must not keep accumulating for the rest of the process's life (it is
-      // exposed over IPC via `getCoreModule`, unconditionally, on every
-      // call). The dispatch loop below still runs unconditionally after
-      // this, since `_INSTANCE_STATE_`/account-email/close-warning handling
-      // must keep working for as long as the core runs.
+      // Bounds `logs` to output observed no later than `_STATUS_:READY` on
+      // the success path, or no later than the core's own exit on every
+      // fatal path (see the `CoreModule` type's own comment on `logs` for
+      // why those are the only two cases this bounds — the hung-startup
+      // timeout does not). This buffer is exposed over IPC via
+      // `getCoreModule`, unconditionally, on every call, so once one of
+      // those two things has happened it must not keep accumulating for the
+      // rest of the process's life. The dispatch loop below still runs
+      // unconditionally after this, since `_INSTANCE_STATE_`/account-email/
+      // close-warning handling must keep working for as long as the core
+      // runs.
       if (!started) {
         logs.push({
           type: "info",
@@ -668,7 +678,20 @@ const loadCoreModule: CoreModule = () =>
     })
 
     coreModule.stderr.on("data", (data) => {
-      // Same READY boundary as the stdout listener above.
+      // Same READY boundary as the stdout listener above, but unlike it,
+      // nothing here is redacted before being pushed to `logs` (exposed over
+      // IPC on every outcome, including success — see the `CoreModule` type
+      // comment). This is deliberately not the same risk as the stdout
+      // listener's redaction: `tracing` writes to the release build's file
+      // appender, never to stderr (`logger.rs`'s `setup_logger`), so nothing
+      // this process prints to its own stdout ever reaches this listener by
+      // construction. What can land here pre-READY is Rust's own panic
+      // output (a `RUST_BACKTRACE=full` backtrace, since `loadCoreModule`
+      // sets that env var) and `logger.rs`'s `cleanup_old_logs`, which
+      // `eprintln!`s directly on a failed old-log deletion — neither carries
+      // anything more sensitive than a local file path or Rust source
+      // location, nothing user-identifying, so no redaction is needed here
+      // the way the READY token and account email are on the stdout side.
       if (!started) {
         logs.push({
           type: "error",

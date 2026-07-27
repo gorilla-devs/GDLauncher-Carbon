@@ -682,12 +682,12 @@ All six states `db_bootstrap.rs` can emit are covered, each in its own test:
 `DB_CORRUPT`, `BACKWARDS_MIGRATION`, `DB_DIVERGED`, `DB_DOWNGRADE_FAILED`,
 `DB_DOWNGRADED`, and `DB_MIGRATION_FAILED`. A seventh test seeds nothing —
 a genuinely healthy, unseeded first launch — and asserts every one of those
-same checks goes **red** against it (`getCoreModule().type` reports
-`"success"`, not `"error"`; `_STATUS_:DB_DOWNGRADED` is absent from a healthy
-boot's log). This negative control is what proves the six tests discriminate
-a real failure state rather than passing by construction — a version of this
-suite whose recovery assertions were unconditionally true would still fail
-this one.
+same checks goes **negative** against it (`getCoreModule().type` reports
+`"success"`, not `"error"`; none of the six `_STATUS_:` events above appear
+in a healthy boot's log). This negative control is what proves the six tests
+discriminate a real failure state rather than passing by construction — a
+version of this suite whose recovery assertions were unconditionally true
+would still fail this one.
 
 Two further tests click a real recovery-screen button rather than only
 asserting its presence: one drives "Restart" and confirms a brand-new OS
@@ -777,21 +777,28 @@ regardless of local defaults.
 
 - Full e2e suite (`init`, `login`, `instanceInstall`'s 8-entry vanilla
   matrix, `loaderInstall`'s 5-entry loader matrix, `modInstall`'s 2 tests,
-  `modLifecycle`'s 4 tests, `persistence`'s 1 test, `dbRecovery`'s 8 tests
-  — **34 tests total**): **~5.0 minutes (300s)**, measured with a full
-  `CI=true pnpm exec playwright test` run over all eight spec files on this
-  branch (`34 passed (5.0m)`).
-- `persistence.spec.ts` alone: **~54s** for its 1 test (isolated run).
-- `dbRecovery.spec.ts` alone: **~24s** for its 8 tests (isolated run).
+  `modLifecycle`'s 4 tests, `persistence`'s 1 test, `dbRecovery`'s 9 tests
+  — **35 tests total**): projected **~5.0 minutes (300s)** — the last
+  full-suite measurement predates this file's negative-control test
+  (`dbRecovery`'s ninth), which isolated re-measurement below places at a few
+  more seconds; not re-measured end to end this round, since re-running the
+  full install/mod matrix costs real time against Mojang/CurseForge/Modrinth
+  independent of anything this wave touched.
+- `persistence.spec.ts` alone: **~66s** for its 1 test (isolated run,
+  re-measured this round).
+- `dbRecovery.spec.ts` alone: **~46–48s** for its 9 tests (isolated run,
+  re-measured this round after adding the negative control and fixing the
+  retry test's sibling-detection races — up from ~24s for 8, consistent with
+  one more full app launch plus `cleanupRelaunchSiblings`'s wider settle
+  window on the two relaunch tests).
 - The pre-existing 25-test install/mod suite (`init`, `login`,
   `instanceInstall`, `loaderInstall`, `modInstall`, `modLifecycle`) was
   previously measured at 187–200s (3.1–3.3 minutes) on its own; this wave
-  adds roughly 78s of test time (~54s + ~24s) on top of that when run in
-  isolation, and the combined full-suite figure above (~300s) is consistent
-  with that arithmetic — this wave's specs run sequentially after the
+  now adds roughly 112–114s of test time (~66s + ~46–48s) on top of that when
+  run in isolation — this wave's specs run sequentially after the
   install/mod specs under `fullyParallel: false`, `workers: 1`, so their
   cost adds rather than overlaps.
-- Unit suite (`pnpm test:unit`, 145 tests across 16 files): **~2–3s**.
+- Unit suite (`pnpm test:unit`, 190 tests across 19 files): **~1s**.
 - Combined: **roughly 5.0 minutes** of e2e test time per OS, plus the unit
   suite's few seconds.
 

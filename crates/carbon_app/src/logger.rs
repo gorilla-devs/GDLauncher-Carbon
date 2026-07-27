@@ -144,17 +144,60 @@ pub fn flush_and_exit(code: i32) -> ! {
     if let Some(lock) = LOG_GUARD.get() {
         // Dropping the guard sends the worker thread a shutdown message and
         // blocks (bounded, see `tracing_appender::non_blocking::WorkerGuard`)
-        // until it confirms the channel is drained.
-        drop(lock.lock().unwrap().take());
+        // until it confirms the channel is drained. A poisoned mutex (the
+        // only locker is this function and `install_panic_hook`'s hook,
+        // neither of which panics while holding it, so this is not expected
+        // to actually be poisoned) still yields its inner guard rather than
+        // turning an already-fatal exit into a second panic.
+        drop(
+            lock.lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .take(),
+        );
     }
     std::process::exit(code);
+}
+
+/// Installs a panic hook that flushes the release-build file log (see
+/// [`LOG_GUARD`]) before delegating to whatever hook was previously
+/// installed (the default one prints the panic message and location to
+/// stderr).
+///
+/// Panics unwind rather than abort — no profile in the workspace root
+/// `Cargo.toml` sets `panic = "abort"` — and unwinding never runs `Drop` on
+/// a `'static`, so without this hook a `tracing::error!` line written
+/// immediately before a `panic!` (the migration-failure branch in
+/// `managers/mod.rs`, or `axum::serve(...).unwrap()`'s implicit one) is only
+/// as likely to reach disk as the non-blocking writer's worker thread is to
+/// win an unscheduled race against the unwind — exactly the CPU-contention
+/// loss [`flush_and_exit`] exists to prevent on the deliberate-exit paths.
+/// A panic hook runs synchronously at the `panic!` call site, before the
+/// stack starts unwinding, so the flush here is unconditional rather than a
+/// race: by the time this function returns, any pending log line is already
+/// on disk.
+///
+/// A no-op in debug builds and in any release build reached before
+/// `setup_logger` has run: `LOG_GUARD` is only ever populated by the
+/// `#[cfg(not(debug_assertions))]` branch of `setup_logger`, so `LOG_GUARD.
+/// get()` is `None` in both cases and this falls straight through to the
+/// previous hook.
+pub fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if let Some(lock) = LOG_GUARD.get() {
+            let mut guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            drop(guard.take());
+        }
+        previous(info);
+    }));
 }
 
 /// Installs the tracing subscriber. In release builds this also owns the
 /// file writer's `WorkerGuard` for the rest of the process's life (see
 /// [`LOG_GUARD`]) rather than returning it to the caller, so [`flush_and_exit`]
-/// can reach it from any call site without threading it through every
-/// function between `main()` and a fatal exit deep in `managers::app`.
+/// and [`install_panic_hook`] can reach it from any call site without
+/// threading it through every function between `main()` and a fatal exit
+/// deep in `managers::app`.
 pub async fn setup_logger(runtime_path: &Path) {
     let logs_path = runtime_path.join("__gdl_logs__");
 
@@ -258,5 +301,87 @@ mod test {
         // Subsequent writes are silently dropped
         writer.write_all(b"more").unwrap();
         assert_eq!(writer.inner, expected);
+    }
+
+    const PANIC_HOOK_TEST_CHILD_ENV: &str = "CARBON_APP_PANIC_HOOK_TEST_CHILD";
+    const PANIC_HOOK_TEST_LOGDIR_ENV: &str = "CARBON_APP_PANIC_HOOK_TEST_LOGDIR";
+    const PANIC_HOOK_TEST_MARKER: &str = "PANIC_HOOK_FLUSH_MARKER_2f9c1b7a";
+    const PANIC_HOOK_TEST_NAME: &str =
+        "logger::test::panic_hook_flushes_pending_log_line_before_unwind";
+
+    /// Confirms `install_panic_hook` actually flushes a log line written
+    /// immediately before a panic to disk, rather than losing it the way an
+    /// unwind into a `'static` guard (never dropped) would on its own.
+    ///
+    /// Only meaningful in a release-shaped build: `setup_logger` only
+    /// installs the file writer and populates `LOG_GUARD` under
+    /// `#[cfg(not(debug_assertions))]`; in a debug build tracing goes
+    /// straight to a stdout layer with no guard to lose, so there would be
+    /// nothing for this test to observe. Run with `cargo test --release` (or
+    /// any profile with `debug-assertions = false`) to exercise it; under a
+    /// plain debug `cargo test` this file is simply never written and the
+    /// test is compiled out.
+    ///
+    /// Runs the actual check in a child process rather than inline
+    /// (`PANIC_HOOK_TEST_CHILD_ENV` selects which one this invocation is).
+    /// `install_panic_hook` replaces the *global* panic hook for the whole
+    /// process, and `cargo test` runs every test in this binary concurrently
+    /// in that one process — including `managers::download::test::
+    /// attempt_download_twice`, a `#[should_panic]` test elsewhere in this
+    /// crate. An unrelated panic on another thread hits this same hook and
+    /// can drain the process-lifetime `LOG_GUARD` before this test's own
+    /// marker line is even written — observed live: this test was reliable
+    /// filtered to itself and flaky as part of the full suite. A child
+    /// process gives it sole ownership of its own `LOG_GUARD`, exactly like
+    /// the one real panic a launched app ever needs this mechanism for.
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn panic_hook_flushes_pending_log_line_before_unwind() {
+        if std::env::var_os(PANIC_HOOK_TEST_CHILD_ENV).is_some() {
+            let logdir =
+                std::env::var(PANIC_HOOK_TEST_LOGDIR_ENV).expect("child: logdir env var missing");
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(super::setup_logger(std::path::Path::new(&logdir)));
+            super::install_panic_hook();
+            // The hook runs synchronously at this call site, before the
+            // stack unwinds any further — see `install_panic_hook`'s own
+            // doc comment. The test harness catches the unwind and reports
+            // this test as failed rather than aborting the child process,
+            // but that happens after the hook (and therefore the flush)
+            // has already run.
+            tracing::error!("{}", PANIC_HOOK_TEST_MARKER);
+            panic!("deliberate test panic for panic_hook_flushes_pending_log_line_before_unwind");
+        }
+
+        let tmp = tempfile::tempdir().unwrap();
+        let exe = std::env::current_exe().expect("failed to resolve the test binary's own path");
+        let status = std::process::Command::new(&exe)
+            .arg("--exact")
+            .arg(PANIC_HOOK_TEST_NAME)
+            .arg("--test-threads=1")
+            .env(PANIC_HOOK_TEST_CHILD_ENV, "1")
+            .env(PANIC_HOOK_TEST_LOGDIR_ENV, tmp.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .expect("failed to spawn the child test process");
+        assert!(
+            !status.success(),
+            "the child process should have failed: it panics deliberately"
+        );
+
+        let logs_dir = tmp.path().join("__gdl_logs__");
+        let newest = std::fs::read_dir(&logs_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .max_by_key(|e| e.metadata().unwrap().modified().unwrap())
+            .expect("setup_logger should have created a log file");
+        let contents = std::fs::read_to_string(newest.path()).unwrap();
+        assert!(
+            contents.contains(PANIC_HOOK_TEST_MARKER),
+            "expected the panic hook to have flushed the pending log line to \
+             disk before the child process exited; log contents:\n{contents}"
+        );
     }
 }
