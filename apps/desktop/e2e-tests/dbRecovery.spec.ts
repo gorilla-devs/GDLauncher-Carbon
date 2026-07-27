@@ -95,12 +95,16 @@
  * relaunch Playwright never mediated, not something this suite can silently
  * absorb. The retry test below drives it exactly once (rather than once per
  * state, which would multiply the same relaunch six times for the same code
- * path) and cleans up the resulting sibling process itself (Linux/macOS
- * `pgrep`, best-effort — see `cleanupRelaunchSiblings`'s own comment).
+ * path), asserts a new OS process for the app/core binary actually appeared
+ * (`waitForRelaunchSibling` — the log line `ipcMain`'s handler prints before
+ * calling `app.relaunch()` is not, by itself, proof the relaunch ran), and
+ * cleans up the resulting sibling process itself (Linux/macOS `pgrep`,
+ * best-effort — see `cleanupRelaunchSiblings`'s own comment).
  */
 
 import fs from "node:fs"
 import { execSync } from "node:child_process"
+import path from "node:path"
 import { expect, test } from "@playwright/test"
 import type { ElectronApplication, Page } from "playwright"
 import {
@@ -422,10 +426,33 @@ test("seeding DB_DOWNGRADED is non-fatal: the core emits it and the app boots no
 
 /**
  * Finds every currently-running process whose command line matches
- * `binaryPath` (`pgrep -f`, portable across Linux and macOS — both used by
- * this suite's CI matrix; Windows is not, see below).
+ * `binaryPath` — `pgrep -f` on Linux/macOS, matching the full path (both
+ * used by this suite's CI matrix). Windows has no command-line-matching
+ * equivalent readily available, so `tasklist` filters by image name (the
+ * basename) instead — coarser than `pgrep -f`, but the recovery-screen
+ * binaries (`GDLauncher.exe`, `core_module.exe`) are distinctive enough that
+ * this is not a practical false-positive risk in a test's own throwaway VM.
  */
 function pidsForBinary(binaryPath: string): number[] {
+  if (process.platform === "win32") {
+    try {
+      const output = execSync(
+        `tasklist /FI "IMAGENAME eq ${path.basename(binaryPath)}" /FO CSV /NH`,
+        { encoding: "utf8" }
+      )
+      // CSV rows look like: "image.exe","1234","Console","1","12,345 K"
+      // `tasklist` prints a plain "INFO: No tasks..." line (no leading
+      // quote) instead of CSV when nothing matches — filtered out below.
+      return output
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith('"'))
+        .map((line) => Number(line.split('","')[1]?.replace(/"/g, "")))
+        .filter((n) => Number.isInteger(n) && n > 0)
+    } catch {
+      return []
+    }
+  }
+
   try {
     return execSync(`pgrep -f ${JSON.stringify(binaryPath)}`, {
       encoding: "utf8"
@@ -436,6 +463,46 @@ function pidsForBinary(binaryPath: string): number[] {
   } catch {
     // pgrep exits 1 with no output when nothing matches — not an error here.
     return []
+  }
+}
+
+/**
+ * Polls until a process matching the app or core binary appears that was not
+ * already running before the relaunch was triggered (`before`), or throws
+ * once `timeoutMs` elapses.
+ *
+ * This is the actual proof a retry click worked, not `waitForStdout`'s
+ * `"relaunching app..."` line: `ipcMain.handle("relaunch", ...)` logs that
+ * line *before* calling `killCoreProcess()`, `app.relaunch()`, and
+ * `app.exit()` (`main/index.ts`), so a handler that logged the line and then
+ * threw or returned early — never actually relaunching — would still satisfy
+ * `waitForStdout` alone. Only a genuine `app.relaunch()` spawns a brand new
+ * OS process, which is what this function requires to see before it will
+ * pass.
+ */
+async function waitForRelaunchSibling(
+  before: Set<number>,
+  timeoutMs = 15_000
+): Promise<number[]> {
+  const deadline = Date.now() + timeoutMs
+  const targets = [getBinaryPath(), getCoreModulePath()]
+
+  for (;;) {
+    const found = new Set<number>()
+    for (const binaryPath of targets) {
+      for (const pid of pidsForBinary(binaryPath)) {
+        if (!before.has(pid)) found.add(pid)
+      }
+    }
+    if (found.size > 0) return [...found]
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `waitForRelaunchSibling: no new process matching ${JSON.stringify(targets)} ` +
+          `appeared within ${timeoutMs}ms of clicking Restart — app.relaunch() ` +
+          "was never observed to actually run."
+      )
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
   }
 }
 
@@ -514,12 +581,19 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
     await retryButton.click()
 
     // `ipcMain.handle("relaunch", ...)` (`main/index.ts`) logs this exact
-    // line before calling `app.relaunch(); app.exit()`. Waiting for it
-    // proves the click's full round trip — renderer button, preload
-    // listener, ipcMain handler — executed the real handler, not that a
-    // listener merely exists and does nothing (exactly the "guessed right
-    // for the wrong reason" failure mode this task exists to rule out).
+    // line before calling `killCoreProcess()`, `app.relaunch()`, and
+    // `app.exit()`. Waiting for it proves the click's full round trip —
+    // renderer button, preload listener, ipcMain handler — reached the real
+    // handler. It does NOT by itself prove the relaunch happened: the log
+    // line is printed before any of those three calls, so a handler that
+    // logged it and then threw or returned early would satisfy this alone.
     await waitForStdout(launched, "relaunching app...")
+
+    // The actual proof: a new OS process for the app or core binary that
+    // was not part of `beforePids`. Only a genuine `app.relaunch()` produces
+    // this — see `waitForRelaunchSibling`'s own doc comment for why the log
+    // line above cannot substitute for it.
+    await waitForRelaunchSibling(beforePids)
   } finally {
     if (launched) {
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(

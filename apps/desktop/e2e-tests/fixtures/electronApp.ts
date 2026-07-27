@@ -90,9 +90,11 @@ export interface LaunchOptions {
  * ...)` handler `console.log`s every line the core prints (sanitized: the
  * `_STATUS_:READY` api token and any account email are redacted, nothing
  * else). This is the one place the core's stdout is captured in this
- * harness — the same pipe `attachCoreLogOnFailure` below sits next to — so a
- * test asserting on a `_STATUS_:` event should push a listener onto this
- * same array rather than opening a second capture of the core's output.
+ * harness, so a test asserting on a `_STATUS_:` event should push a listener
+ * onto this same array rather than opening a second capture of the core's
+ * output. It is a separate channel from `attachCoreLogOnFailure` below,
+ * which reads the core's own `tracing`-backed file log rather than this pipe
+ * — see that function's doc comment.
  */
 export async function launchApp(opts: LaunchOptions): Promise<{
   app: ElectronApplication

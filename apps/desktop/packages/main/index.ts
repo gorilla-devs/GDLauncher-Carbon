@@ -293,13 +293,17 @@ export type CoreModule = () => Promise<
         apiToken: string
         kill: () => void
       }
-      // The core's own stdout up to and including `_STATUS_:READY`.
-      // `main.tsx` ignores this on the success path, but it is the only
-      // record of a *non-fatal* status line — `DB_DOWNGRADED` chief among
-      // them — that startup otherwise never surfaces anywhere observable
-      // once the app is up. Exposed so `getCoreModule` can answer "what did
-      // the core actually report" regardless of outcome, not only on
-      // failure.
+      // The core's own stdout/stderr up to and including `_STATUS_:READY`.
+      // The listeners that populate this stop appending once `started`
+      // flips true (see `loadCoreModule`), so this array is bounded at that
+      // point and never grows for the rest of the process's life, even
+      // though the listeners themselves stay attached to keep handling
+      // later events (`_INSTANCE_STATE_`, account email, ...). `main.tsx`
+      // ignores this on the success path, but it is the only record of a
+      // *non-fatal* status line — `DB_DOWNGRADED` chief among them — that
+      // startup otherwise never surfaces anywhere observable once the app is
+      // up. Exposed so `getCoreModule` can answer "what did the core
+      // actually report" regardless of outcome, not only on failure.
       logs: Log[]
     }
   | {
@@ -466,10 +470,19 @@ const loadCoreModule: CoreModule = () =>
 
       const rows = dataString.split(/\r?\n|\r|\n/g)
 
-      logs.push({
-        type: "info",
-        message: sanitized
-      })
+      // Bounds `logs` to output observed no later than `_STATUS_:READY`: once
+      // startup has resolved, this diagnostic buffer has done its job and
+      // must not keep accumulating for the rest of the process's life (it is
+      // exposed over IPC via `getCoreModule`, unconditionally, on every
+      // call). The dispatch loop below still runs unconditionally after
+      // this, since `_INSTANCE_STATE_`/account-email/close-warning handling
+      // must keep working for as long as the core runs.
+      if (!started) {
+        logs.push({
+          type: "info",
+          message: sanitized
+        })
+      }
 
       for (const row of rows) {
         if (row.startsWith("_STATUS_:")) {
@@ -655,10 +668,13 @@ const loadCoreModule: CoreModule = () =>
     })
 
     coreModule.stderr.on("data", (data) => {
-      logs.push({
-        type: "error",
-        message: data.toString()
-      })
+      // Same READY boundary as the stdout listener above.
+      if (!started) {
+        logs.push({
+          type: "error",
+          message: data.toString()
+        })
+      }
       console.error(`[CORE] Error: ${data.toString()}`)
     })
 

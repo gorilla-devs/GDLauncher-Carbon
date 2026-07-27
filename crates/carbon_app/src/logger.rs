@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
@@ -117,7 +118,44 @@ pub fn cleanup_old_logs(logs_path: &Path, keep_count: usize) {
     }
 }
 
-pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
+/// Owns the release-build file log's `WorkerGuard` for the rest of the
+/// process's life. `WorkerGuard::drop` is what actually blocks until the
+/// non-blocking writer's worker thread has flushed pending lines to disk; a
+/// guard that only lived in a local at the `main()` call site would never run
+/// that `Drop` on a `std::process::exit` call elsewhere in the process, since
+/// `exit` terminates immediately without unwinding. Keeping the only owning
+/// reference in a process-lifetime static instead lets [`flush_and_exit`] take
+/// it and drop it on demand from anywhere in the crate. Stays `None` in debug
+/// builds, where `setup_logger` never installs a file writer.
+static LOG_GUARD: OnceLock<Mutex<Option<WorkerGuard>>> = OnceLock::new();
+
+/// Flushes the release-build file log (if any) and exits the process.
+///
+/// A bare `std::process::exit` skips every destructor, including the
+/// `WorkerGuard` that would otherwise block until `tracing-appender`'s
+/// background worker thread drains its channel and writes pending lines to
+/// disk. On an idle machine that worker thread usually gets scheduled in time
+/// anyway, but under CPU contention it does not: a `tracing::error!` call
+/// made immediately before a fatal exit can be silently lost, taking with it
+/// the one line that names why the process is exiting. Every call site that
+/// needs to terminate right after logging a fatal error should exit through
+/// here instead of calling `std::process::exit` directly.
+pub fn flush_and_exit(code: i32) -> ! {
+    if let Some(lock) = LOG_GUARD.get() {
+        // Dropping the guard sends the worker thread a shutdown message and
+        // blocks (bounded, see `tracing_appender::non_blocking::WorkerGuard`)
+        // until it confirms the channel is drained.
+        drop(lock.lock().unwrap().take());
+    }
+    std::process::exit(code);
+}
+
+/// Installs the tracing subscriber. In release builds this also owns the
+/// file writer's `WorkerGuard` for the rest of the process's life (see
+/// [`LOG_GUARD`]) rather than returning it to the caller, so [`flush_and_exit`]
+/// can reach it from any call site without threading it through every
+/// function between `main()` and a fatal exit deep in `managers::app`.
+pub async fn setup_logger(runtime_path: &Path) {
     let logs_path = runtime_path.join("__gdl_logs__");
 
     println!("Logs path: {}", logs_path.display());
@@ -170,8 +208,6 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
             .with(printer)
             .with(filter)
             .init();
-
-        None
     }
     #[cfg(not(debug_assertions))]
     {
@@ -194,7 +230,7 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
             .init();
 
         tracing::trace!("Logger initialized");
-        return Some(guard);
+        let _ = LOG_GUARD.set(Mutex::new(Some(guard)));
     }
 }
 

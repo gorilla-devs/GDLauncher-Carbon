@@ -20,10 +20,88 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // helpers -> e2e-tests -> desktop -> apps -> repo root, same resolution
 // dbSeed.ts itself uses.
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..")
+const MIGRATIONS_DIR = path.join(
+  REPO_ROOT,
+  "crates/carbon_repos/prisma/migrations"
+)
+const LIB_RS_PATH = path.join(REPO_ROOT, "crates/carbon_repos/src/lib.rs")
 const FIRST_MIGRATION_SQL_PATH = path.join(
   REPO_ROOT,
   "crates/carbon_repos/prisma/migrations/20240120134904_init/migration.sql"
 )
+
+/**
+ * Independently re-derives the migration name set straight from
+ * `get_migrations()` in `crates/carbon_repos/src/lib.rs` — the single source
+ * of truth (root `CLAUDE.md`) — rather than trusting `dbSeed.ts`'s own
+ * `migrationCount()`, which only counts `prisma/migrations/` directories.
+ *
+ * This exists because `migrationCount()` is what `dbSeed.ts`'s seed
+ * functions themselves use to compute a seeded `_migrations.version` (e.g.
+ * `seedDbDowngradeFailed`'s `migrationCount() + 1`). A test whose own
+ * "expected" version is ALSO computed via `migrationCount()` cannot catch
+ * `migrationCount()` disagreeing with the real Rust classifier — both sides
+ * of the assertion would drift together and stay green. Parsing the actual
+ * source `get_migrations()` binds against gives an expectation that is wrong
+ * in exactly the way the real classifier would be wrong, so a real
+ * directory/source mismatch fails this loudly instead of passing
+ * self-consistently (see task-3-review.md point 4).
+ *
+ * Handles both entry forms `get_migrations()` can contain: the
+ * `historical_migration!("<name>")` macro (every entry today, pre-floor) and
+ * a literal `MigrationDef { name: "<name>", ... }` struct (what
+ * `cargo run -p carbon_repos --bin new_migration` prints to paste in for
+ * migrations authored after the floor, per root `CLAUDE.md`).
+ */
+function migrationNamesFromRustSource(): string[] {
+  const source = fsSync.readFileSync(LIB_RS_PATH, "utf8")
+
+  const fnStart = source.indexOf("pub fn get_migrations()")
+  if (fnStart === -1) {
+    throw new Error(
+      "migrationNamesFromRustSource: could not find `pub fn get_migrations()` in lib.rs — has it moved or been renamed?"
+    )
+  }
+  const bodyStart = source.indexOf("{", fnStart)
+
+  // Brace-counting rather than a regex up to the next `}`: the function body
+  // contains nested `{}` (the `MigrationSet` struct literal, any
+  // `MigrationDef { ... }` entries), so the first `}` is not the real end.
+  let depth = 0
+  let bodyEnd = -1
+  for (let i = bodyStart; i < source.length; i++) {
+    if (source[i] === "{") depth++
+    else if (source[i] === "}") {
+      depth--
+      if (depth === 0) {
+        bodyEnd = i
+        break
+      }
+    }
+  }
+  if (bodyEnd === -1) {
+    throw new Error(
+      "migrationNamesFromRustSource: unbalanced braces while scanning get_migrations()'s body"
+    )
+  }
+
+  const body = source.slice(bodyStart, bodyEnd)
+  const names = new Set<string>()
+  for (const m of body.matchAll(/historical_migration!\(\s*"([^"]+)"\s*\)/g)) {
+    names.add(m[1])
+  }
+  for (const m of body.matchAll(/name:\s*"([^"]+)"/g)) {
+    names.add(m[1])
+  }
+
+  if (names.size === 0) {
+    throw new Error(
+      "migrationNamesFromRustSource: parsed zero migration names out of get_migrations() — the parser is broken, not the source"
+    )
+  }
+
+  return [...names]
+}
 
 let runtimePath: string
 
@@ -69,6 +147,27 @@ function userVersion(db: DatabaseSync): number {
   return (db.prepare(`PRAGMA user_version`).get() as { user_version: number })
     .user_version
 }
+
+describe("migrationCount() independent cross-check", () => {
+  it("the migration directory listing, get_migrations()'s Rust source, and migrationCount() all name the same migrations", () => {
+    const fromSource = migrationNamesFromRustSource()
+    const fromDirs = fsSync
+      .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+
+    // Set equality, not just count: catches a same-count-but-wrong-membership
+    // drift (e.g. a renamed directory) that a bare length comparison would
+    // miss.
+    expect(new Set(fromDirs)).toEqual(new Set(fromSource))
+
+    // `migrationCount()` itself must agree with the independently-derived
+    // count — this is the actual property the seed functions below depend
+    // on being true, and the one a same-function comparison could never
+    // catch drifting.
+    expect(migrationCount()).toBe(fromSource.length)
+  })
+})
 
 describe("seedDatabase", () => {
   it("clears a stale WAL sidecar from a previous run before seeding", async () => {
@@ -167,7 +266,11 @@ describe("seedDatabase", () => {
     it("records one breaking migration past this binary's count with no stored down", async () => {
       await seedDatabase(runtimePath, "DB_DOWNGRADE_FAILED")
 
-      const count = migrationCount()
+      // Independently-derived, not `migrationCount()`: this is what actually
+      // catches `seedDbDowngradeFailed`'s own internal `migrationCount()`
+      // call disagreeing with the real Rust classifier (see
+      // `migrationNamesFromRustSource`'s doc comment).
+      const count = migrationNamesFromRustSource().length
       withConfigDb(runtimePath, (db) => {
         expect(userVersion(db)).toBe(count + 1)
 
@@ -199,7 +302,9 @@ describe("seedDatabase", () => {
     it("carries this binary's real baseline schema plus one genuinely reversible breaking migration", async () => {
       await seedDatabase(runtimePath, "DB_DOWNGRADED")
 
-      const count = migrationCount()
+      // Independently-derived — see the `DB_DOWNGRADE_FAILED` test above and
+      // `migrationNamesFromRustSource`'s doc comment.
+      const count = migrationNamesFromRustSource().length
       const realTables = new Set(baselineTableNames())
 
       withConfigDb(runtimePath, (db) => {

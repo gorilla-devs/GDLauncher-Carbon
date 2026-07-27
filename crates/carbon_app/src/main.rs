@@ -100,7 +100,7 @@ pub fn main() {
             let runtime_path = runtime_path_override::get_runtime_path_override().await;
             let base_api_override = base_api_override::get_base_api_override();
 
-            let _guard = logger::setup_logger(&runtime_path).await;
+            logger::setup_logger(&runtime_path).await;
 
             // After the logger so its `E2E MODE` warnings land somewhere: with
             // no subscriber installed yet, `tracing::warn!` is a silent no-op.
