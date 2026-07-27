@@ -293,6 +293,24 @@ export type CoreModule = () => Promise<
         apiToken: string
         kill: () => void
       }
+      // The core's own stdout/stderr up to and including `_STATUS_:READY`.
+      // The listeners that populate this stop appending once `started`
+      // flips true (see `loadCoreModule`), bounding this array from that
+      // point on; every fatal path bounds it too, for a different reason —
+      // the core process itself has exited, so no further `data` events
+      // fire regardless of `started`. Bounded on every path except one: the
+      // hung-startup timeout (`setTimeout` below) resolves with `started`
+      // still false while the core stays alive by design
+      // (`coreProcessHandle`'s own comment), so this buffer keeps growing
+      // there for as long as the core does. The listeners themselves stay
+      // attached in every case to keep handling later events
+      // (`_INSTANCE_STATE_`, account email, ...). `main.tsx` ignores this on
+      // the success path, but it is the only record of a *non-fatal* status
+      // line — `DB_DOWNGRADED` chief among them — that startup otherwise
+      // never surfaces anywhere observable once the app is up. Exposed so
+      // `getCoreModule` can answer "what did the core actually report"
+      // regardless of outcome, not only on failure.
+      logs: Log[]
     }
   | {
       type: "error"
@@ -303,6 +321,7 @@ export type CoreModule = () => Promise<
     }
   | {
       type: "backwardsMigration"
+      logs: Log[]
     }
 >
 
@@ -356,7 +375,8 @@ const loadCoreModule: CoreModule = () =>
           port: 4650,
           apiToken: DEV_API_TOKEN,
           kill: () => {}
-        }
+        },
+        logs: []
       })
       console.log("Core module loaded in development mode")
       return
@@ -392,6 +412,16 @@ const loadCoreModule: CoreModule = () =>
         }
       })
       coreProcessHandle = coreModule
+      // Exposed for the e2e harness (`e2e-tests/fixtures/electronApp.ts`'s
+      // `relaunchApp`), which runs in a separate OS process from this one and
+      // has no other way to read this process's own module-scope state. It
+      // reads this via Playwright's `ElectronApplication.evaluate`, which
+      // executes directly in this main process, to confirm the core process
+      // it just closed has genuinely exited before relaunching onto the same
+      // database — see that file for why a fixed sleep isn't good enough
+      // here. Harmless outside a test: just an OS pid number on `globalThis`.
+      ;(globalThis as Record<string, unknown>).__gdlCoreProcessId =
+        coreModule.pid ?? null
       console.log("Core module spawned successfully")
     } catch (err: unknown) {
       console.error(`[CORE] Spawn error: ${String(err)}`)
@@ -446,10 +476,23 @@ const loadCoreModule: CoreModule = () =>
 
       const rows = dataString.split(/\r?\n|\r|\n/g)
 
-      logs.push({
-        type: "info",
-        message: sanitized
-      })
+      // Bounds `logs` to output observed no later than `_STATUS_:READY` on
+      // the success path, or no later than the core's own exit on every
+      // fatal path (see the `CoreModule` type's own comment on `logs` for
+      // why those are the only two cases this bounds — the hung-startup
+      // timeout does not). This buffer is exposed over IPC via
+      // `getCoreModule`, unconditionally, on every call, so once one of
+      // those two things has happened it must not keep accumulating for the
+      // rest of the process's life. The dispatch loop below still runs
+      // unconditionally after this, since `_INSTANCE_STATE_`/account-email/
+      // close-warning handling must keep working for as long as the core
+      // runs.
+      if (!started) {
+        logs.push({
+          type: "info",
+          message: sanitized
+        })
+      }
 
       for (const row of rows) {
         if (row.startsWith("_STATUS_:")) {
@@ -485,12 +528,14 @@ const loadCoreModule: CoreModule = () =>
                 port,
                 apiToken,
                 kill: () => coreModule?.kill()
-              }
+              },
+              logs
             })
           } else if (event === "BACKWARDS_MIGRATION") {
             console.log("[CORE] Backwards migration detected")
             resolve({
-              type: "backwardsMigration"
+              type: "backwardsMigration",
+              logs
             })
           } else if (event === "DB_DOWNGRADED") {
             // A newer database was stepped back to this build's version and
@@ -633,10 +678,26 @@ const loadCoreModule: CoreModule = () =>
     })
 
     coreModule.stderr.on("data", (data) => {
-      logs.push({
-        type: "error",
-        message: data.toString()
-      })
+      // Same READY boundary as the stdout listener above, but unlike it,
+      // nothing here is redacted before being pushed to `logs` (exposed over
+      // IPC on every outcome, including success — see the `CoreModule` type
+      // comment). This is deliberately not the same risk as the stdout
+      // listener's redaction: `tracing` writes to the release build's file
+      // appender, never to stderr (`logger.rs`'s `setup_logger`), so nothing
+      // this process prints to its own stdout ever reaches this listener by
+      // construction. What can land here pre-READY is Rust's own panic
+      // output (a `RUST_BACKTRACE=full` backtrace, since `loadCoreModule`
+      // sets that env var) and `logger.rs`'s `cleanup_old_logs`, which
+      // `eprintln!`s directly on a failed old-log deletion — neither carries
+      // anything more sensitive than a local file path or Rust source
+      // location, nothing user-identifying, so no redaction is needed here
+      // the way the READY token and account email are on the stdout side.
+      if (!started) {
+        logs.push({
+          type: "error",
+          message: data.toString()
+        })
+      }
       console.error(`[CORE] Error: ${data.toString()}`)
     })
 
@@ -1459,7 +1520,10 @@ ipcMain.handle("getCoreModule", async () => {
 
   return {
     type: cm.type,
-    logs: cm.type === "error" ? cm.logs : undefined,
+    // Present for every outcome, not only `"error"`: the only record of a
+    // non-fatal status line (`DB_DOWNGRADED` chief among them) once startup
+    // has moved on, since nothing else threads it anywhere observable.
+    logs: cm.logs,
     snapshotPath: cm.type === "error" ? cm.snapshotPath : undefined,
     port: cm.type === "success" ? cm.result.port : undefined,
     apiToken: cm.type === "success" ? cm.result.apiToken : undefined

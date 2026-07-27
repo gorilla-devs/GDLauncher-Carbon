@@ -1,6 +1,12 @@
 import { test as base, expect } from "@playwright/test"
 import type { ElectronApplication, Page } from "playwright"
 import { isCoreModulePresent, launchApp } from "./electronApp.js"
+
+// Re-exported so a spec that needs to restart the app across the fixture
+// boundary (e.g. a persistence test) can pull it from the same module it
+// already imports `test`/`expect` from, without a second import line into
+// `electronApp.js` for this one function.
+export { relaunchApp } from "./electronApp.js"
 import {
   installFixtureInstance,
   type InstalledInstance

@@ -83,10 +83,25 @@ export interface LaunchOptions {
  * into an array and letting the caller assert on it in a test body is the
  * pattern Playwright recommends over throwing from inside the listener,
  * which does not reliably propagate to the runner as a failed assertion.
+ *
+ * The returned `stdout` array collects every chunk the Electron *main*
+ * process itself writes to its own stdout — this already includes the Rust
+ * core's own output, since `main/index.ts`'s `coreModule.stdout.on("data",
+ * ...)` handler `console.log`s every line the core prints (sanitized: the
+ * `_STATUS_:READY` api token and any account email are redacted, nothing
+ * else). This is the one place the core's stdout is captured in this
+ * harness, so a test asserting on a `_STATUS_:` event should push a listener
+ * onto this same array rather than opening a second capture of the core's
+ * output. It is a separate channel from `attachCoreLogOnFailure` below,
+ * which reads the core's own `tracing`-backed file log rather than this pipe
+ * — see that function's doc comment.
  */
-export async function launchApp(
-  opts: LaunchOptions
-): Promise<{ app: ElectronApplication; page: Page; pageErrors: Error[] }> {
+export async function launchApp(opts: LaunchOptions): Promise<{
+  app: ElectronApplication
+  page: Page
+  pageErrors: Error[]
+  stdout: string[]
+}> {
   const binaryPath = getBinaryPath()
   const args = ["--gdl_allow_multiple_instances", "--gdl_disable_sentry"]
 
@@ -141,7 +156,12 @@ export async function launchApp(
     })
 
   app.on("console", (msg) => console.log(msg.text()))
-  app.process().stdout?.on("data", (data) => console.log(data.toString()))
+  const stdout: string[] = []
+  app.process().stdout?.on("data", (data) => {
+    const chunk = data.toString()
+    stdout.push(chunk)
+    console.log(chunk)
+  })
   app.process().stderr?.on("data", (data) => console.log(data.toString()))
 
   const page = await app.firstWindow()
@@ -153,7 +173,126 @@ export async function launchApp(
     pageErrors.push(error)
   })
 
-  return { app, page, pageErrors }
+  return { app, page, pageErrors, stdout }
+}
+
+/**
+ * Reads the OS pid of the currently-spawned core module process straight out
+ * of the Electron main process's own module state.
+ *
+ * The core is a grandchild of the Playwright test process (main spawns it,
+ * Playwright spawns main), so there is no direct handle to it here. `main
+ * /index.ts` puts the pid on `globalThis.__gdlCoreProcessId` right after
+ * `spawn()` specifically so this function can read it back via
+ * `ElectronApplication.evaluate`, which runs the callback inside the target
+ * app's own main-process context rather than this one.
+ *
+ * Returns `null` only for a dev-mode launch (no core process is spawned at
+ * all — `loadCoreModule` short-circuits) or a core that failed to spawn.
+ * Neither applies to the packaged, `-e2e` builds this suite drives.
+ */
+export async function getCoreProcessId(
+  app: ElectronApplication
+): Promise<number | null> {
+  return app.evaluate(
+    () =>
+      (globalThis as Record<string, unknown>).__gdlCoreProcessId as
+        | number
+        | null
+  )
+}
+
+/**
+ * Polls until `pid` no longer refers to a live process, or throws once
+ * `timeoutMs` elapses.
+ *
+ * `process.kill(pid, 0)` is Node's documented cross-platform existence probe:
+ * signal `0` sends nothing, it just asks the OS whether the pid is still
+ * addressable, and Node normalizes the "gone" case to an `ESRCH` error on
+ * every platform, Windows included (there `kill()` maps to `TerminateProcess`
+ * / a handle-based existence check rather than a real POSIX signal, but the
+ * pid-existence contract to callers is the same). Polling this instead of a
+ * fixed sleep is the point: `crates/carbon_app/src/main.rs`'s termination
+ * handler (~line 317-340) shuts down running servers/instances concurrently,
+ * bounded to ~3s, before calling `std::process::exit(0)` — genuinely
+ * variable, and a wait that isn't tied to the real exit would either race a
+ * slow shutdown or waste time on a fast one.
+ */
+async function waitForPidExit(
+  pid: number,
+  { timeoutMs = 15_000, pollIntervalMs = 50 } = {}
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+
+  for (;;) {
+    try {
+      process.kill(pid, 0)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") {
+        return
+      }
+      // Anything else (e.g. EPERM, meaning the pid exists but isn't ours to
+      // signal) is treated as "still alive" and falls through to the next
+      // poll — it is not the "gone" signal this function waits for.
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `relaunchApp: core process (pid ${pid}) did not exit within ${timeoutMs}ms of app.close(). ` +
+          "Relaunching against the same runtime path now would race the old process's SQLite handles " +
+          "and surface as a locked-database failure that looks like corruption but isn't."
+      )
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+  }
+}
+
+/**
+ * Closes `current.app` and relaunches on the same runtime path, only after
+ * confirming the core process it owned has genuinely exited.
+ *
+ * `app.close()` resolving only means the *Electron* main process is gone —
+ * `window-all-closed` in `main/index.ts` fires `coreModule.kill()` and calls
+ * `app.quit()` without awaiting the core's own `exit` event, so the core
+ * (holding the SQLite connections everything in the next task reads back)
+ * can genuinely still be alive after `close()` returns. Relaunching before it
+ * has released those handles is exactly the "looks like corruption" failure
+ * mode this exists to prevent.
+ *
+ * Reused SQLite's own `busy_timeout = 5000` (`crates/carbon_repos/src
+ * /db_exec.rs`) is the second layer, not this function's job to duplicate:
+ * even if the OS is still lazily tearing down file handles after the process
+ * itself is confirmed dead (documented for Windows in `mockIdp.ts`'s
+ * `stopHarness`), the newly-spawned core's own connection open absorbs a
+ * brief overlap by retrying internally rather than failing immediately.
+ *
+ * Throws rather than silently launching anyway if the pid can't be read at
+ * all (see `getCoreProcessId`) — proceeding without having verified the old
+ * process is gone would make every later persistence assertion meaningless
+ * while still looking green.
+ */
+export async function relaunchApp(
+  current: { app: ElectronApplication; page: Page },
+  opts: LaunchOptions
+): Promise<{
+  app: ElectronApplication
+  page: Page
+  pageErrors: Error[]
+  stdout: string[]
+}> {
+  const corePidBefore = await getCoreProcessId(current.app)
+  if (corePidBefore == null) {
+    throw new Error(
+      "relaunchApp: could not read the outgoing app's core process id — " +
+        "cannot verify it actually exited before relaunching onto the same runtime path"
+    )
+  }
+
+  await current.app.close()
+  await waitForPidExit(corePidBefore)
+
+  return launchApp(opts)
 }
 
 /**

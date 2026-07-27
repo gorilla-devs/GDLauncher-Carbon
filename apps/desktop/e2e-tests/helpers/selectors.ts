@@ -37,6 +37,12 @@ export const TEST_IDS = Object.freeze({
   // have silently clicked a wrong match instead of failing had a second
   // `<img>` ever been added under `<nav>`.
   navbarLogo: "navbar-logo",
+  // The navbar's settings gear icon (`Navbar.tsx`), the app's only route to
+  // `/settings`. A `@gd/ui` `TabsTrigger`, which spreads unknown props onto
+  // Kobalte's own `<button>` (confirmed by reading `Tabs/index.tsx` — no
+  // hazard-1 wrinkle here, unlike Checkbox/Radio/Switch), so this anchor
+  // reaches a real clickable element directly.
+  navbarSettings: "navbar-settings",
   betaPromptNever: "beta-prompt-never",
   addInstance: "library-add-instance",
   instanceCreationCustomTab: "instance-creation-custom-tab",
@@ -115,7 +121,44 @@ export const TEST_IDS = Object.freeze({
   // helper exists here) — confirmed live that a ~16-entry, already-filtered
   // single-Minecraft-version list mounts in full without scrolling,
   // which is the only shape this suite relies on.
-  addonVersionRow: "addon-version-row"
+  addonVersionRow: "addon-version-row",
+  // Settings > General's "Potato mode" (`reducedMotion`) toggle
+  // (`pages/Settings/General.tsx`), used by `persistence.spec.ts` as the
+  // "an app setting survives a restart" case. On a wrapping div, not the
+  // Switch itself — same zero-size-native-input reason as `modRowToggle`
+  // above; find the real `input[type="checkbox"]` underneath to read/click
+  // it. Chosen over `discordIntegration`/`showAppCloseWarning` because it has
+  // no side effect beyond a CSS class (no RPC connection attempt, no close
+  // dialog to accidentally gate other flows on).
+  settingsReducedMotionToggle: "settings-reduced-motion-toggle",
+
+  // The DB recovery ladder (`packages/preload/loading.ts`'s `fatalError`/
+  // `backwardsMigrationError`, rendered into `#appFatalCrash` by
+  // `packages/main/index.ts`'s failure path). Neither hazard above applies
+  // here: this screen is raw `innerHTML` built from template strings in the
+  // Electron preload, not a `@gd/ui` component (hazard 1) and not anywhere
+  // near `FilterSidebar` (hazard 2) — confirmed by reading how it mounts,
+  // not assumed. `fatalError` and `backwardsMigrationError` fully replace
+  // `#appFatalCrash`'s contents and are mutually exclusive (only one status
+  // event ever fires per launch), so the two screen-container ids below
+  // never coexist, and `recoveryResetDbButton` is deliberately the same
+  // testid on both screens for the same reason `searchInput`/`onboardingNext`
+  // reuse one id across mutually-exclusive mounts.
+  recoveryFatalScreen: "recovery-fatal-screen",
+  recoveryBackwardsMigrationScreen: "recovery-backwards-migration-screen",
+  recoveryRetryButton: "recovery-retry-button",
+  // Present only when the core's `_STATUS_:DB_DOWNGRADE_FAILED` line carried
+  // a snapshot path (`loading.ts`'s `restoreStepHtml`); absent, not merely
+  // hidden, otherwise. A DOM query for this id is a real presence check, not
+  // a visibility one.
+  recoveryRestoreSnapshotButton: "recovery-restore-snapshot-button",
+  recoveryResetDbButton: "recovery-reset-db-button",
+  // The fatal screen's log text box — the core's own log lines plus the
+  // `Database error: <EVENT>` line `main/index.ts` appends, rendered via
+  // `textContent` (never interpolated as HTML; see `loading.ts`'s own
+  // comment on why). Used to assert which status event actually drove the
+  // screen, independent of which buttons happen to be present.
+  recoveryErrorDetail: "recovery-error-detail"
 })
 
 export function byTestId(id: string): string {

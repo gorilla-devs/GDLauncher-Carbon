@@ -146,7 +146,13 @@ mod app {
                         .unwrap_or(false)
                     {
                         error!("Fatal database error; status already emitted, exiting gracefully");
-                        std::process::exit(2);
+                        // Exits through `logger::flush_and_exit` rather than a
+                        // bare `std::process::exit`: the latter skips the file
+                        // log's `WorkerGuard` drop entirely, which can lose
+                        // this line (and the one just emitted in
+                        // `load_and_migrate`) under CPU contention — the exact
+                        // diagnostic a failed launch needs most.
+                        crate::logger::flush_and_exit(2);
                     }
                     error!("Database migration failed: {}", e);
                     panic!("Database migration failed: {}", e);

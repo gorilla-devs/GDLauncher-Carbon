@@ -127,6 +127,7 @@ const AppNavbar = () => {
               <TabsTrigger
                 value="settings"
                 class="p-2"
+                data-testid="navbar-settings"
                 onClick={() => navigator.navigate("/settings")}
               >
                 <div class="i-hugeicons:settings-01 h-6 w-6" />

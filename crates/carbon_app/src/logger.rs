@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
@@ -117,7 +118,87 @@ pub fn cleanup_old_logs(logs_path: &Path, keep_count: usize) {
     }
 }
 
-pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
+/// Owns the release-build file log's `WorkerGuard` for the rest of the
+/// process's life. `WorkerGuard::drop` is what actually blocks until the
+/// non-blocking writer's worker thread has flushed pending lines to disk; a
+/// guard that only lived in a local at the `main()` call site would never run
+/// that `Drop` on a `std::process::exit` call elsewhere in the process, since
+/// `exit` terminates immediately without unwinding. Keeping the only owning
+/// reference in a process-lifetime static instead lets [`flush_and_exit`] take
+/// it and drop it on demand from anywhere in the crate. Stays `None` in debug
+/// builds, where `setup_logger` never installs a file writer.
+static LOG_GUARD: OnceLock<Mutex<Option<WorkerGuard>>> = OnceLock::new();
+
+/// Flushes the release-build file log (if any) and exits the process.
+///
+/// A bare `std::process::exit` skips every destructor, including the
+/// `WorkerGuard` that would otherwise block until `tracing-appender`'s
+/// background worker thread drains its channel and writes pending lines to
+/// disk. On an idle machine that worker thread usually gets scheduled in time
+/// anyway, but under CPU contention it does not: a `tracing::error!` call
+/// made immediately before a fatal exit can be silently lost, taking with it
+/// the one line that names why the process is exiting. Every call site that
+/// needs to terminate right after logging a fatal error should exit through
+/// here instead of calling `std::process::exit` directly.
+pub fn flush_and_exit(code: i32) -> ! {
+    if let Some(lock) = LOG_GUARD.get() {
+        // Dropping the guard sends the worker thread a shutdown message and
+        // blocks (bounded, see `tracing_appender::non_blocking::WorkerGuard`)
+        // until it confirms the channel is drained. A poisoned mutex (the
+        // only locker is this function and `install_panic_hook`'s hook,
+        // neither of which panics while holding it, so this is not expected
+        // to actually be poisoned) still yields its inner guard rather than
+        // turning an already-fatal exit into a second panic.
+        drop(
+            lock.lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .take(),
+        );
+    }
+    std::process::exit(code);
+}
+
+/// Installs a panic hook that flushes the release-build file log (see
+/// [`LOG_GUARD`]) before delegating to whatever hook was previously
+/// installed (the default one prints the panic message and location to
+/// stderr).
+///
+/// Panics unwind rather than abort — no profile in the workspace root
+/// `Cargo.toml` sets `panic = "abort"` — and unwinding never runs `Drop` on
+/// a `'static`, so without this hook a `tracing::error!` line written
+/// immediately before a `panic!` (the migration-failure branch in
+/// `managers/mod.rs`, or `axum::serve(...).unwrap()`'s implicit one) is only
+/// as likely to reach disk as the non-blocking writer's worker thread is to
+/// win an unscheduled race against the unwind — exactly the CPU-contention
+/// loss [`flush_and_exit`] exists to prevent on the deliberate-exit paths.
+/// A panic hook runs synchronously at the `panic!` call site, before the
+/// stack starts unwinding, so the flush here is unconditional rather than a
+/// race: by the time this function returns, any pending log line is already
+/// on disk.
+///
+/// A no-op in debug builds and in any release build reached before
+/// `setup_logger` has run: `LOG_GUARD` is only ever populated by the
+/// `#[cfg(not(debug_assertions))]` branch of `setup_logger`, so `LOG_GUARD.
+/// get()` is `None` in both cases and this falls straight through to the
+/// previous hook.
+pub fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if let Some(lock) = LOG_GUARD.get() {
+            let mut guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            drop(guard.take());
+        }
+        previous(info);
+    }));
+}
+
+/// Installs the tracing subscriber. In release builds this also owns the
+/// file writer's `WorkerGuard` for the rest of the process's life (see
+/// [`LOG_GUARD`]) rather than returning it to the caller, so [`flush_and_exit`]
+/// and [`install_panic_hook`] can reach it from any call site without
+/// threading it through every function between `main()` and a fatal exit
+/// deep in `managers::app`.
+pub async fn setup_logger(runtime_path: &Path) {
     let logs_path = runtime_path.join("__gdl_logs__");
 
     println!("Logs path: {}", logs_path.display());
@@ -170,8 +251,6 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
             .with(printer)
             .with(filter)
             .init();
-
-        None
     }
     #[cfg(not(debug_assertions))]
     {
@@ -194,7 +273,7 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
             .init();
 
         tracing::trace!("Logger initialized");
-        return Some(guard);
+        let _ = LOG_GUARD.set(Mutex::new(Some(guard)));
     }
 }
 
@@ -222,5 +301,95 @@ mod test {
         // Subsequent writes are silently dropped
         writer.write_all(b"more").unwrap();
         assert_eq!(writer.inner, expected);
+    }
+
+    const PANIC_HOOK_PROBE_MARKER: &str = "PANIC_HOOK_PROBE_MARKER_9d3fa1c4";
+
+    /// Resolves the compiled path of the `panic_hook_probe` binary
+    /// (`src/bin/panic_hook_probe.rs`) sibling to this test binary.
+    ///
+    /// `CARGO_BIN_EXE_<name>` is Cargo's own documented way to hand a test
+    /// the exact path of another target in the same package, but it is only
+    /// populated for integration-test/bench targets — not for a unit test
+    /// running inside a `bin` target's own harness, which is what this is.
+    /// Falling back to deriving the path from `current_exe()` (this test
+    /// binary lives at `target/<profile>/deps/carbon_app-<hash>`; the
+    /// unhashed sibling binaries Cargo also places at `target/<profile>/`)
+    /// covers exactly that gap.
+    fn panic_hook_probe_path() -> std::path::PathBuf {
+        if let Ok(path) = std::env::var("CARGO_BIN_EXE_panic_hook_probe") {
+            return std::path::PathBuf::from(path);
+        }
+        let exe = std::env::current_exe().expect("failed to resolve the test binary's own path");
+        let profile_dir = exe
+            .parent() // .../target/<profile>/deps
+            .and_then(|p| p.parent()) // .../target/<profile>
+            .expect("test binary path has no target/<profile> ancestor");
+        let name = if cfg!(windows) {
+            "panic_hook_probe.exe"
+        } else {
+            "panic_hook_probe"
+        };
+        profile_dir.join(name)
+    }
+
+    /// Confirms `install_panic_hook` actually flushes a log line written
+    /// immediately before a panic to disk, rather than losing it the way an
+    /// unwind into a `'static` guard (never dropped) would on its own.
+    ///
+    /// Only meaningful in a release-shaped build: `setup_logger` only
+    /// installs the file writer and populates `LOG_GUARD` under
+    /// `#[cfg(not(debug_assertions))]`; in a debug build tracing goes
+    /// straight to a stdout layer with no guard to lose, so there would be
+    /// nothing for this test to observe. Run with `cargo test --release` (or
+    /// any profile with `debug-assertions = false`) to exercise it; under a
+    /// plain debug `cargo test` this file is simply never written and the
+    /// test is compiled out.
+    ///
+    /// Shells out to `panic_hook_probe` rather than panicking inline: a
+    /// panic inside this test function fires on a libtest-spawned worker
+    /// thread, never this process's own main thread, and the test harness's
+    /// own bookkeeping between that panic and the eventual `process::exit`
+    /// gives the async log writer ample time to flush on its own — hook or
+    /// no hook. A test built that way cannot tell `install_panic_hook` apart
+    /// from its absence (confirmed live: disabling the hook and panicking
+    /// in-process here still passed 35/35, `taskset`-pinned included). Only
+    /// a panic on a genuine main thread, with nothing else running,
+    /// reproduces the race this hook exists to close — see
+    /// `panic_hook_probe`'s own doc comment.
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn panic_hook_flushes_pending_log_line_before_unwind() {
+        let probe = panic_hook_probe_path();
+        assert!(
+            probe.exists(),
+            "panic_hook_probe binary not found at {probe:?} — \
+             `cargo build`/`cargo test` should have produced it alongside carbon_app"
+        );
+
+        let tmp = tempfile::tempdir().unwrap();
+        let status = std::process::Command::new(&probe)
+            .arg(tmp.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .expect("failed to spawn panic_hook_probe");
+        assert!(
+            !status.success(),
+            "panic_hook_probe should have exited non-zero: it panics deliberately"
+        );
+
+        let logs_dir = tmp.path().join("__gdl_logs__");
+        let newest = std::fs::read_dir(&logs_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .max_by_key(|e| e.metadata().unwrap().modified().unwrap())
+            .expect("setup_logger should have created a log file");
+        let contents = std::fs::read_to_string(newest.path()).unwrap();
+        assert!(
+            contents.contains(PANIC_HOOK_PROBE_MARKER),
+            "expected the panic hook to have flushed the pending log line to \
+             disk before panic_hook_probe exited; log contents:\n{contents}"
+        );
     }
 }
