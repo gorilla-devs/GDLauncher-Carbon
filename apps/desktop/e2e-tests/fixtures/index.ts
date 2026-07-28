@@ -8,6 +8,10 @@ import { isCoreModulePresent, launchApp } from "./electronApp.js"
 // `electronApp.js` for this one function.
 export { relaunchApp } from "./electronApp.js"
 import {
+  installForgeFixtureInstance,
+  type ForgeInstance
+} from "./forgeInstance.js"
+import {
   installFixtureInstance,
   type InstalledInstance
 } from "./installedInstance.js"
@@ -36,6 +40,12 @@ interface WorkerFixtures {
    *  shared by every mod test this worker runs. See
    *  `fixtures/installedInstance.ts`. */
   installedInstance: InstalledInstance
+  /** A logged-in app with one warm, already-installed Forge instance,
+   *  shared by every mod-resolution test this worker runs. Composes the
+   *  same `authenticatedApp` (and therefore the same app/runtime path) that
+   *  `installedInstance` above does, so a single test can hold both
+   *  instances at once. See `fixtures/forgeInstance.ts`. */
+  forgeInstance: ForgeInstance
 }
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
@@ -114,6 +124,25 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     // is warm, but a cold worker also pays for that substrate the first
     // time, same as `instanceInstall.spec.ts`'s own first-install cost.
     { scope: "worker", timeout: 180_000 }
+  ],
+
+  forgeInstance: [
+    async ({ authenticatedApp }, use) => {
+      const installed = await installForgeFixtureInstance(authenticatedApp)
+      await use(installed)
+      // No teardown here, deliberately — same reasoning as
+      // `installedInstance` above: staying warm across the worker is the
+      // point, and it is removed along with the rest of
+      // `authenticatedApp.harness.runtimePath` when that worker-scoped
+      // fixture's own `finally` tears it down.
+    },
+    // 300s, above `installedInstance`'s 180s: Forge is materially slower to
+    // install than Fabric, and — unlike Fabric — also runs an install
+    // processor step that patches/SRGs the client jar into `libraries/`
+    // (see `loaderInstall.spec.ts`'s matrix comment on
+    // `expectsProcessorArtifacts`), adding real wall-clock time on top of
+    // the download itself.
+    { scope: "worker", timeout: 300_000 }
   ]
 })
 

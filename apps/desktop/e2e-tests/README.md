@@ -490,6 +490,177 @@ coverage; `openAddonVersions` is Modrinth-only today, with no platform
 parameter. A future CurseForge update test needs that branch written fresh
 against CurseForge's real paginated behavior, confirmed live.
 
+### The mod resolution suite (`modResolution.spec.ts`)
+
+Four tests prove the app resolves "which build to fetch" correctly along two
+different paths — installing an addon with no version picked, and updating
+an already-installed one — against **Cloth Config API**
+(the full, live-verified rationale: Modrinth `9s6osm5g` / CurseForge `348521`,
+`project_type: "mod"` so the loader filter actually applies, zero declared
+dependencies at 1.20.1 on either loader so `helpers/mods.ts`'s documented
+dependency-jar cleanup gap never bites, and — the property that matters most
+for the update-path tests below — its 1.20.1 line is **entirely stable**, on
+both loaders, with no beta/alpha noise to fight).
+
+**Install path** (two tests, both loaders): "resolves the newest compatible
+Modrinth build for each instance's loader" and its CurseForge counterpart.
+Each drives the *same* project through **two** instances pinned to the same
+Minecraft version but different loaders — `installedInstance` (Fabric) and
+the `forgeInstance` fixture below (Forge) — and asserts the two resolve to
+**different** version/file ids. That cross-instance differ is the assertion
+that actually catches a dropped loader filter: if `install_latest_modrinth_mod`
+(or its CurseForge counterpart) ever stopped filtering by loader, both
+instances would resolve to whichever build sorts newest overall instead of
+their own loader's newest, and this project is confirmed live to publish fully
+disjoint per-loader ids at 1.20.1 — so a collision here is never expected
+from the fixture itself.
+
+**Update path** (two tests, Modrinth/Fabric only): "updates to the newest
+compatible build and then reports no further update" and "install-latest and
+update converge on the same build". Modrinth-only because reaching a
+deliberately-older, still-installable build needs the addon page's Versions
+tab, and that path is only live-verified against Modrinth — the same
+constraint `modLifecycle.spec.ts`'s own update test already documents.
+
+#### The `forgeInstance` fixture
+
+`fixtures/forgeInstance.ts` mirrors `installedInstance.ts` almost exactly —
+worker-scoped (`{ scope: "worker", timeout: 300_000 }`), composing the same
+worker's `authenticatedApp` rather than a second login, and reusing
+`installedInstance.ts`'s `resolveModsDir`. The one thing that makes it worth
+a second fixture rather than a parameter on the first: it installs **Forge**
+at the same Minecraft version (**1.20.1**) `installedInstance` already pins
+Fabric to. That pairing is deliberate, not incidental — the whole install-path
+suite exists to compare what two different loaders resolve for one project at
+one Minecraft version, so the two fixtures have to agree on the version and
+differ only in loader for the comparison to mean anything. Both fixtures'
+`MC_VERSION`/pinned-version constants are intentionally duplicated rather than
+shared — the same small, accepted duplication
+`modResolution.spec.ts`'s own copy of the same constant follows.
+
+#### The three-oracle separation, and why the scoped list may never feed a compatibility assertion
+
+Every assertion in this suite answers one of three genuinely different
+questions, each from its own independent source — mixing them up is the
+single mistake this whole suite is built to make impossible:
+
+1. **Ordering** — "which build is newest" (install path) or "which build
+   should an update move to" (update path) — comes from `helpers/resolutionCapture.ts`'s
+   `scoped` list: the app's own `getProjectVersions`/`getModFiles` response,
+   already filtered server-side to the instance's Minecraft version and
+   loader. `helpers/resolution.ts`'s `newestByDate`/`newestUpdateCandidate`
+   read `scoped` exclusively.
+2. **Compatibility** — "is the build the app actually installed genuinely
+   compatible with this instance" — comes from `unfiltered`: for Modrinth, a
+   direct, unauthenticated fetch of every version the project has ever
+   published (`GET /v2/project/:id/version`), asserted against on both the
+   Minecraft-version and loader axes; for CurseForge, a
+   loader-unfiltered-but-still-game-version-scoped `getModFiles` request
+   driven through the addon page's "Override Filters" control (CurseForge has
+   no unauthenticated equivalent of Modrinth's direct-fetch escape hatch).
+   Because that CurseForge oracle is itself fetched scoped to the instance's
+   own Minecraft version, only the loader axis is actually asserted there —
+   the CurseForge test has **no assertion capable of catching a broken
+   CurseForge `gameVersion` filter** (a file it wrongly admitted would be
+   admitted into this oracle's own request too, since both share the same
+   parameter). That axis of coverage is Modrinth-only.
+3. **Loader** — parsed from the **downloaded jar's own manifest**
+   (`fabric.mod.json`/`mods.toml`/`quilt.mod.json`), never from either
+   platform's API — the one check that would still catch a broken filter even
+   if both API-side oracles above somehow agreed with it.
+
+**Why the rule matters**: a `scoped` entry is compatible with the instance
+*by construction* — the query that produced it was already filtered to this
+Minecraft version and loader — so asserting compatibility against it checks a
+tautology that can never fail. This is not a hypothetical risk: pointing the
+compatibility check at `scoped` instead of `unfiltered`, as a deliberate
+inverted proof, leaves the check **green** regardless — the direct demonstration
+that this exact mistake is silent, not
+loud, if it's ever made. Every compatibility assertion in this suite reads
+`unfiltered` exactly once and `scoped` never; every ordering assertion reads
+`scoped` exactly once and `unfiltered` never. Grep for `versions.scoped`/
+`versions.unfiltered` in `modResolution.spec.ts` to confirm this holds before
+trusting any change to this file.
+
+The update-path tests add a fourth wrinkle on top of the same rule: install
+and update resolve "latest" by genuinely different logic, so they need two
+different ordering predicates, never one shared between them.
+`install_latest_modrinth_mod`/`install_latest_curseforge_mod` take the first
+(newest-by-date) entry of the filtered response with **no channel filter at
+all** — modelled by `newestByDate`. `find_mod_update`
+(`managers/instance/mods.rs:616`) sorts newest-first and walks the instance's
+allowed channels (`AppConfiguration.mod_channels`) in list order, taking the
+first candidate at or above each channel's level in turn — under the shipped
+default (`'stable:true,beta:true,alpha:true'`) the **stable** pass runs
+first, so this resolves to the newest *stable* build, not merely the newest
+outright — modelled by `newestUpdateCandidate`. On Cloth Config's all-stable
+1.20.1 line the two predicates happen to agree (there's no beta/alpha to
+diverge on), which is exactly why this project was picked and exactly why
+"install-latest and update converge on the same build" is expected to pass —
+see the next section for what a divergence there would actually mean.
+
+#### The channel-divergence hypothesis behind "install-latest and update converge"
+
+The fourth test's whole point is that these two paths **could** disagree.
+Because install applies no channel filter at all while update prefers the
+newest stable first, a project whose newest compatible build happens to be a
+beta would install that beta via the addon page's main button, and then have
+`find_mod_update` offer an *older stable* build as the "update" — a downgrade
+presented as an upgrade. Exactly one candidate project (JEI) was rejected
+for this reason: its entire 1.20.1 line is beta-only, which would have made
+this test fail by design rather than by regression. If this test ever goes
+red on Cloth Config specifically, treat it as a product finding to triage
+first — not a test to patch to tolerate the divergence — since Cloth Config's
+1.20.1 line was independently confirmed stable-only before it was chosen.
+
+#### The pagination completeness guard (CurseForge)
+
+`getModFiles` is paginated; a truncated page silently produces a "newest of
+what we happened to see" answer instead of "newest that exists" — worse than
+no assertion at all, since it fails silently rather than loudly.
+`resolutionCapture.ts`'s `toCandidatesFromCurseforgeResponse` checks the
+response envelope's own `pagination.totalCount` against how many file
+entries actually came back and throws, naming both numbers, if they disagree,
+before any candidate is ever handed to an assertion.
+`install_latest_curseforge_mod` itself requests `page_size: 200`, so a
+project whose filtered file count exceeds that is a real limit of the shipped
+app, not merely of this test — the guard's job is to make that limit loud
+rather than let it silently corrupt an oracle.
+
+#### Known gaps
+
+- **Channel-preference resolution is untested.** `find_mod_update` walks
+  `AppConfiguration.mod_channels` (default
+  `'stable:true,beta:true,alpha:true'`, a real column with an rspc surface in
+  `api/settings.rs`) to decide which channel to prefer, but nothing in the
+  shipped frontend renders a control for it — no test in this suite (or the
+  app itself, as far as this suite can tell) ever drives a non-default
+  channel configuration through the update path. The stable-first walk is
+  exercised only via the default, never via an instance configured to prefer
+  beta or alpha first.
+- **`find_mod_update`'s CurseForge/Modrinth candidate fetch is asymmetric on
+  multi-loader instances.** For CurseForge, it filters by only the *first*
+  modloader in the instance's configured list
+  (`version.modloaders.iter().next()`, a single `mod_loader_type` value —
+  CurseForge's API only accepts one). For Modrinth, it sends the instance's
+  *entire* modloader list (`loaders: Vec<String>`). An instance that only
+  ever has one modloader configured never exercises this difference, and
+  neither does this suite — no test here drives a multi-loader instance
+  through the update path, so this asymmetry is real (read directly off
+  `managers/instance/mods.rs:616-716`) but structurally unverified.
+- **Backend filter parameters are unobservable from the renderer.** Every
+  request-scoping check in this file (`resolveForInstance`'s/
+  `resolveForInstanceCurseforge`'s `scopedRequestUrl`) only proves the
+  frontend's own `modplatforms.*` rspc call carried the instance's Minecraft
+  version/loader — never that the Rust core's own outbound HTTP call to
+  Modrinth/CurseForge was filtered the same way. That call happens entirely
+  inside the core process and never passes through the renderer, so it is
+  structurally invisible to a Playwright test. The jar-parsed `modloaders`
+  check (loader) and the cross-instance differ assertion (ordering) are what
+  actually stand between a silently dropped backend-side filter and a green
+  suite — not the request-scoping check, which only catches the frontend
+  half of that chain.
+
 ## Persistence tests
 
 `persistence.spec.ts` proves that what the launcher writes survives a real
@@ -759,6 +930,19 @@ regardless of local defaults.
 - Combined: **roughly 5.0 minutes** of e2e test time per OS, plus the unit
   suite's few seconds.
 
+`modResolution.spec.ts`'s four tests (added after this section was last
+measured) bring the suite to **39 tests total**. Not folded into the
+bullets above as a precise re-measurement — this wave's own isolated runs
+(this branch, this session) put the whole file at roughly **9 minutes**
+under reasonable network conditions (two install-path tests against real
+Modrinth/CurseForge searches and two full loader installs, plus two
+update-path tests each doing a real install-then-update round trip), so the
+full-suite total is closer to **~14 minutes** than the ~5.0 minutes above.
+Real third-party network variance dominates this file's wall-clock far more
+than anything else in the suite — see "Third-party flakiness is observed,
+not theoretical" below, which predates this wave but applies to it at least
+as much as to `modInstall.spec.ts`.
+
 `.github/workflows/all_os.yml` runs this on three OS jobs (`ubuntu-22.04`,
 `windows-2022`, `macos-14`) **in parallel**, each with its own 80-minute job
 timeout, each forcing `workers: 1` the same way. Only Linux was directly
@@ -831,3 +1015,8 @@ behavior, not evidence the suite itself is broken.
 - Skin fetches still reach `textures.minecraft.net` and will fail for the
   synthetic profile. Harmless — they only log.
 - The browser-OAuth enrollment path is not covered; the suite uses device code.
+- Mod update-path channel-preference resolution is untested (no shipped UI
+  for `AppConfiguration.mod_channels`), and `find_mod_update`'s CurseForge
+  candidate fetch is asymmetric with its Modrinth counterpart on multi-loader
+  instances — see "Known gaps" under `modResolution.spec.ts`'s own section
+  above for both.
