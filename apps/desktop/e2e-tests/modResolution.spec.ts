@@ -23,6 +23,7 @@ import {
   captureCurseforgeVersions,
   captureModrinthVersions,
   parseCurseforgeVersionsInput,
+  parseModrinthVersionsInput,
   type VersionLists
 } from "./helpers/resolutionCapture.js"
 import {
@@ -118,11 +119,32 @@ const matchesClothConfig = (mod: InstalledMod) =>
 /** `InstalledMod.curseforgeProjectId` is a number (Task 3), while the
  *  fixture constant is kept as a string alongside its Modrinth sibling
  *  (`helpers/resolutionFixtures.ts`) — converted once here rather than at
- *  every call site. A mod installed via CurseForge never populates
- *  `modrinthProjectId` (`RawModResponse.modrinth` is `null` for that install
- *  path — `managers/instance/mods.rs`'s `list_mods` only fills the platform
- *  fields that actually apply), so this is a genuinely different matcher
- *  from `matchesClothConfig` above, not an alias for it. */
+ *  every call site.
+ *
+ *  This is a genuinely different matcher from `matchesClothConfig` above,
+ *  but NOT because a CurseForge-installed mod's `modrinthProjectId` stays
+ *  null forever — it doesn't. `list_mods` (`managers/instance/mods.rs:210-222`)
+ *  fills the `modrinth` block from the `mr_project_id` column regardless of
+ *  which platform originally installed the file, and that column is
+ *  populated by a hash-based background pass that is itself install-path-
+ *  blind: `instance_mods_needing_mr_refresh`
+ *  (`crates/carbon_repos/src/repos/mod_file_cache.rs:354-360`) selects every
+ *  instance mod lacking a Modrinth cache row with no platform filter at all,
+ *  and `ModrinthModCacher` resolves each by content hash via
+ *  `get_versions_from_hash`
+ *  (`managers/metadata/cache/modrinth/mod.rs:131-161,201-203`). A
+ *  CurseForge-installed Cloth Config jar that happens to be byte-identical
+ *  to a Modrinth-published one will acquire a `modrinthProjectId` once that
+ *  pass runs.
+ *
+ *  This matcher stays safe anyway, for two independent reasons: (1) it keys
+ *  on `curseforgeProjectId`, which is populated directly at CurseForge
+ *  install time and is never touched by the Modrinth refresh pass, so a
+ *  later `modrinthProjectId` backfill is simply irrelevant to it; and (2)
+ *  `matchesClothConfig` (the Modrinth matcher, used by test 1) and this
+ *  matcher never race in practice — test 1 runs first and its `finally`
+ *  block deletes its own Modrinth-matched mod before test 2 installs
+ *  anything via CurseForge. */
 const CURSEFORGE_PROJECT_ID = Number(RESOLUTION_PROJECT_CURSEFORGE_ID)
 const matchesClothConfigCurseforge = (mod: InstalledMod) =>
   mod.curseforgeProjectId === CURSEFORGE_PROJECT_ID
@@ -243,13 +265,21 @@ async function resolveForInstance(
   // filtered by loader is the jar-parsed `modloaders` check further down
   // (parsed from the downloaded file itself) plus the cross-instance differ
   // assertion in the test body.
+  //
+  // Decoded via `parseModrinthVersionsInput` rather than a raw substring
+  // match on the URL: `url.includes(loader)` alone would have a false-green
+  // path a fixture swap could reactivate (a "forge" check would also match a
+  // "neoforge"-scoped URL), the same class of hole the CurseForge check
+  // below closes with `parseCurseforgeVersionsInput` — reusing that
+  // structural-decode approach rather than a second, different fix.
   let scopedRequestUrl: string | undefined
   const onResponse = (r: Response) => {
     const url = r.url()
+    if (!url.includes("modplatforms.modrinth.getProjectVersions")) return
+    const input = parseModrinthVersionsInput(url)
     if (
-      url.includes("modplatforms.modrinth.getProjectVersions") &&
-      url.includes(MC_VERSION) &&
-      url.includes(loader)
+      input?.game_versions?.includes(MC_VERSION) &&
+      input?.loaders?.some((l) => l.toLowerCase() === loader)
     ) {
       scopedRequestUrl = url
     }
@@ -416,11 +446,23 @@ async function resolveForInstance(
  * 2. **The compatibility oracle's `unfiltered` list is not a full,
  *    all-Minecraft-versions catalogue the way Modrinth's is** — see
  *    `resolutionCapture.ts`'s CurseForge doc comment for why (no
- *    unauthenticated direct-fetch route exists for CurseForge) and for why
- *    that makes the Minecraft-version half of compatibility an *existence*
- *    check here rather than a `gameVersions.includes(MC_VERSION)` check —
- *    the latter would be tautological against a list that is itself
- *    game-version-scoped by construction.
+ *    unauthenticated direct-fetch route exists for CurseForge). Because that
+ *    list is itself fetched with `gameVersion=${MC_VERSION}`, a
+ *    `gameVersions.includes(MC_VERSION)` check against an entry drawn from
+ *    it would be tautological, so this function only checks *existence* —
+ *    is the installed file id present in this list at all. That existence
+ *    check is a lookup guard, not a Minecraft-version compatibility
+ *    assertion: it cannot catch a broken CurseForge `gameVersion` filter,
+ *    because the same `gameVersion` parameter that would let a
+ *    wrong-Minecraft-version file through CurseForge's own filtering feeds
+ *    both the scoped request (ordering) and this oracle's request alike — a
+ *    file a broken filter admitted would be admitted into both, and this
+ *    check would stay green. That axis of coverage — did the platform's own
+ *    game-version filter return a build that doesn't actually declare this
+ *    Minecraft version — is Modrinth-only (`resolveForInstance`'s
+ *    `unfilteredRecord.gameVersions` check, fed by a direct fetch of every
+ *    version ever published), precisely because CurseForge has no
+ *    unauthenticated oracle available to this test process.
  */
 async function resolveForInstanceCurseforge(
   inst: ResolutionInstance,
@@ -448,6 +490,14 @@ async function resolveForInstanceCurseforge(
   // this file does not repeat.
   let scopedRequestUrl: string | undefined
   const onResponse = (r: Response) => {
+    // Query-name guard first, matching `captureCurseforgeVersions`'s own
+    // listener (`resolutionCapture.ts`) — without it, any other in-flight
+    // response carrying an `?input=` shaped like `{query:{gameVersion,
+    // modLoaderType}}` would also parse successfully here. Not exploitable
+    // today (`modplatforms.unifiedSearch`, the only other candidate, sends
+    // `gameVersions`/`modloaders` at the top level, not nested under
+    // `query`), but this keeps the guard from depending on that staying true.
+    if (!r.url().includes("modplatforms.curseforge.getModFiles")) return
     const input = parseCurseforgeVersionsInput(r.url())
     if (
       input?.query.gameVersion === MC_VERSION &&
@@ -535,10 +585,14 @@ async function resolveForInstanceCurseforge(
       `resolveForInstanceCurseforge (${loader}): installed file id ` +
         `"${curseforgeFileIdStr}" is not present at all in the ` +
         `game-version-scoped, loader-unfiltered file list for Minecraft ` +
-        `${MC_VERSION} — either install_latest_curseforge_mod's own ` +
-        "game-version re-check picked a file for the wrong Minecraft " +
-        "version, or this test's oracle is out of sync with what the app " +
-        "actually installed."
+        `${MC_VERSION} — the installed id does not correspond to anything ` +
+        "CurseForge serves for this project at this Minecraft version at " +
+        "all (this test's oracle may be out of sync with what the app " +
+        "actually installed). NOTE: this is a lookup guard, not a " +
+        "Minecraft-version compatibility assertion — it cannot by itself " +
+        "prove CurseForge's own gameVersion filter is correct, since that " +
+        "same filter parameter feeds this oracle's own request too (see " +
+        "this function's own doc comment)."
     )
   }
   if (!unfilteredRecord.loaders.includes(loader)) {

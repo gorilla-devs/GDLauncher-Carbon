@@ -97,12 +97,69 @@ const SCOPED_MARKER = "game_version"
 const CAPTURE_TIMEOUT = 30_000
 const SETTLE_WINDOW = 1_000
 
+/** The `input` object `InfiniteScrollVersionsQueryWrapper`'s Modrinth branch
+ *  serialises as `modplatforms.modrinth.getProjectVersions`'s rspc query
+ *  param (`components/InfiniteScrollVersionsQueryWrapper/index.tsx:135-143`).
+ *  `game_versions`/`loaders` are each omitted entirely (not merely `null`)
+ *  when the corresponding `versionsQuery` field is unset, mirroring
+ *  `SCOPED_MARKER`'s own doc comment above. */
+export interface ModrinthGetProjectVersionsInput {
+  project_id: string
+  game_versions?: string[]
+  loaders?: string[]
+}
+
+/**
+ * Decodes a `modplatforms.modrinth.getProjectVersions` request URL's rspc
+ * `?input=` param back into the object the frontend serialised, the same
+ * approach `parseCurseforgeVersionsInput` below uses for its own platform —
+ * see that function's doc comment for why a raw substring match on the URL
+ * is unsound (loader names can collide as substrings of one another) and
+ * why decoding structurally instead closes that hole for good. Returns
+ * `undefined` for a URL that isn't a well-formed `getProjectVersions` call,
+ * the same convention `parseCurseforgeVersionsInput` follows.
+ */
+export function parseModrinthVersionsInput(
+  url: string
+): ModrinthGetProjectVersionsInput | undefined {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return undefined
+  }
+  const raw = parsed.searchParams.get("input")
+  if (raw == null) return undefined
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return undefined
+  }
+  if (typeof value !== "object" || value === null || !("project_id" in value)) {
+    return undefined
+  }
+  return value as ModrinthGetProjectVersionsInput
+}
+
 /** Modrinth's public, unauthenticated REST API — distinct from the app's own
  *  proxied `modplatforms.modrinth.*` rspc routes, which this helper also
  *  listens to (for `scoped`) elsewhere in this function. No API key: this
  *  project's own live check (task-5-report.md) confirmed a plain `GET`
  *  against `/project/:id/version` returns 200 with no auth header. */
 const MODRINTH_API_BASE = "https://api.modrinth.com/v2"
+
+/** Modrinth's API guidelines ask requests to identify themselves with a
+ *  descriptive User-Agent and rate-limit generic/unidentified ones — this is
+ *  a direct fetch outside the app's own request pipeline, so nothing else
+ *  sets one. */
+const MODRINTH_USER_AGENT =
+  "gorilla-devs/GDLauncher-Carbon-e2e-tests (+https://github.com/gorilla-devs/GDLauncher-Carbon)"
+
+/** Node's `fetch` has no request deadline of its own — a hung connection
+ *  would otherwise stall until this `retries: 0` suite's 15-minute Playwright
+ *  ceiling instead of failing fast with this module's own named error. */
+const DIRECT_FETCH_TIMEOUT_MS = 30_000
 
 /**
  * `run` drives whatever UI navigation the caller needs (typically opening
@@ -222,13 +279,22 @@ async function fetchUnfilteredDirect(
   // bare `TypeError: fetch failed` with an empty `AggregateError` cause and
   // no call-site information at all — confirmed live (task-5-report.md) —
   // which is indistinguishable from a dozen other possible failures without
-  // this context.
-  const response = await fetch(url).catch((cause) => {
+  // this context. `AbortSignal.timeout` rejects the same fetch promise (with
+  // a `TimeoutError`/`AbortError` DOMException, not a bare hang), so it lands
+  // in this same `.catch` and comes out as this same named error rather than
+  // an unlabelled abort — this suite runs with `retries: 0`, so a hung
+  // connection must fail on its own terms, not stall until Playwright's
+  // 15-minute ceiling.
+  const response = await fetch(url, {
+    headers: { "user-agent": MODRINTH_USER_AGENT },
+    signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS)
+  }).catch((cause) => {
     throw new Error(
       `captureModrinthVersions: direct Modrinth fetch for project ` +
         `"${projectId}" (${url}) failed before a response was even ` +
         "received — almost certainly a network-level failure (DNS, " +
-        "connection reset, timeout), not an HTTP error status",
+        `connection reset, or exceeding this fetch's own ` +
+        `${DIRECT_FETCH_TIMEOUT_MS}ms timeout), not an HTTP error status`,
       { cause }
     )
   })
@@ -283,12 +349,26 @@ async function fetchUnfilteredDirect(
  * unfailable tautology this suite's central rule warns against, so
  * `modResolution.spec.ts`'s CurseForge test does not make that assertion —
  * only an *existence* check (is the installed file id present in this list
- * at all) plus the loader check. The existence check is not vacuous the same
- * way: if `install_latest_curseforge_mod`'s own game-version re-check
- * (`.find(|value| value.game_versions.contains(&version))`,
- * `managers/instance/mods.rs`) ever picked a file for the wrong Minecraft
- * version, that file's id would not appear in this Minecraft-version-scoped
- * oracle at all, so the existence check would genuinely fail.
+ * at all) plus the loader check. That omission is correct, but the existence
+ * check is NOT a substitute compatibility assertion for the Minecraft-version
+ * axis — it is a lookup guard, and the two catch different things. Given the
+ * test's own ordering assertion has already passed, the installed id is a
+ * member of the app's loader-scoped `getModFiles` response, which shares the
+ * exact same `gameVersion` request parameter as this loader-unfiltered
+ * oracle. For CurseForge to have installed a file for the wrong Minecraft
+ * version, its `gameVersion` filter would already have to be returning that
+ * file — and since this oracle is fetched with the identical `gameVersion`
+ * parameter, the same broken filter would let it into this list too, so the
+ * existence check would stay green. It genuinely does catch a different,
+ * real failure mode: the installed id not corresponding to anything
+ * CurseForge serves for this project at this Minecraft version at all (e.g.
+ * a stale id, or a mismatch against the wrong project). Coverage for "did
+ * CurseForge's own `gameVersion` filter return a build that doesn't actually
+ * declare this Minecraft version" does not exist on the CurseForge side —
+ * that axis is covered only on Modrinth, via `resolveForInstance`'s direct,
+ * unfiltered fetch of every version the project has ever published,
+ * precisely because CurseForge has no unauthenticated oracle available to
+ * this test process.
  *
  * **Whether CurseForge shares Modrinth's caching problem — checked live,
  * not assumed symmetric:** `InfiniteScrollVersionsQueryWrapper` is the exact

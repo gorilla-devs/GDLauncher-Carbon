@@ -120,6 +120,13 @@ describe("channel mapping", () => {
     // suggests an integer reaches the renderer. Task 1 confirmed live that
     // it does not — it arrives as a string. If that ever changes, this must
     // fail loudly rather than silently mapping to an unintended channel.
-    expect(() => curseforgeChannel(1 as unknown as string)).toThrow()
+    //
+    // A bare `.toThrow()` can't tell this `typeof` guard apart from
+    // `(1).toLowerCase` throwing its own native `TypeError` regardless —
+    // pinned to the guard's own message so this only passes when the guard
+    // itself actually fired.
+    expect(() => curseforgeChannel(1 as unknown as string)).toThrow(
+      /expected a string/i
+    )
   })
 })

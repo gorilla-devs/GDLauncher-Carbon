@@ -597,10 +597,17 @@ single mistake this whole suite is built to make impossible:
 2. **Compatibility** — "is the build the app actually installed genuinely
    compatible with this instance" — comes from `unfiltered`: for Modrinth, a
    direct, unauthenticated fetch of every version the project has ever
-   published (`GET /v2/project/:id/version`); for CurseForge, a
+   published (`GET /v2/project/:id/version`), asserted against on both the
+   Minecraft-version and loader axes; for CurseForge, a
    loader-unfiltered-but-still-game-version-scoped `getModFiles` request
    driven through the addon page's "Override Filters" control (CurseForge has
    no unauthenticated equivalent of Modrinth's direct-fetch escape hatch).
+   Because that CurseForge oracle is itself fetched scoped to the instance's
+   own Minecraft version, only the loader axis is actually asserted there —
+   the CurseForge test has **no assertion capable of catching a broken
+   CurseForge `gameVersion` filter** (a file it wrongly admitted would be
+   admitted into this oracle's own request too, since both share the same
+   parameter). That axis of coverage is Modrinth-only.
 3. **Loader** — parsed from the **downloaded jar's own manifest**
    (`fabric.mod.json`/`mods.toml`/`quilt.mod.json`), never from either
    platform's API — the one check that would still catch a broken filter even
