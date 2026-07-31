@@ -100,7 +100,13 @@ pub enum LaunchState {
     Preparing(VisualTaskId),
     Running {
         start_time: DateTime<Utc>,
-        log_id: GameLogId,
+        /// `None` for an adopted session — see `adopted`.
+        log_id: Option<GameLogId>,
+        /// Launched by a previous launcher session and picked back up at
+        /// startup. This core owns neither the process's stdout nor its exit
+        /// status, so there is no log and no exit code; the one action such an
+        /// instance offers is Stop.
+        adopted: bool,
     },
     Deleting,
 }

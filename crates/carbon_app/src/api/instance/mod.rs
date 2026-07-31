@@ -1557,7 +1557,12 @@ enum LaunchState {
     Preparing(FETaskId),
     Running {
         start_time: DateTime<Utc>,
-        log_id: i32,
+        /// `null` for an adopted session — see `adopted`.
+        log_id: Option<i32>,
+        /// Launched by a previous launcher session: this core does not own the
+        /// process, so there is no live log to open and no exit code to
+        /// report. Stop still works, through the pid.
+        adopted: bool,
     },
     Deleting,
 }
@@ -2017,9 +2022,14 @@ impl From<domain::LaunchState> for LaunchState {
             },
             domain::Queued(task) => Self::Queued(task.into()),
             domain::Preparing(task) => Self::Preparing(task.into()),
-            domain::Running { start_time, log_id } => Self::Running {
+            domain::Running {
                 start_time,
-                log_id: log_id.0,
+                log_id,
+                adopted,
+            } => Self::Running {
+                start_time,
+                log_id: log_id.map(|id| id.0),
+                adopted,
             },
             domain::Deleting => Self::Deleting,
         }

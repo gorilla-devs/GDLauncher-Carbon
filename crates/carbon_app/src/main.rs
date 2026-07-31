@@ -320,27 +320,25 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     );
 
     // Graceful shutdown on external termination: without this, a running
-    // server's JVM or game process is orphaned whenever this core process is
-    // killed instead of exiting through its own request handling (an
-    // external `kill`, Ctrl+C while running `pnpm watch:core`, or Electron's
-    // normal-quit path). By product decision the game is tied to the
-    // launcher's lifecycle just like a server (whose own JVM already gets
-    // `kill_on_drop(true)` in `LocalServerProvider::start`), so it gets the
-    // same shutdown treatment here. Each `shutdown_running` bounds itself to
-    // ~3s; running them concurrently rather than sequentially keeps the
-    // total wait bounded by the slower of the two rather than their sum, so
-    // this task always resolves and exits well inside the ~5s Electron
-    // waits before force killing the core.
+    // server's JVM is orphaned whenever this core process is killed instead
+    // of exiting through its own request handling (an external `kill`,
+    // Ctrl+C while running `pnpm watch:core`, or Electron's normal-quit
+    // path).
+    //
+    // Servers only, deliberately. A local server is infrastructure the
+    // launcher hosts, so it stops with the launcher; a *game* is the user's
+    // session, and closing the launcher mid-game does not end it. A game
+    // that outlives this process is recorded in its instance's pidfile and
+    // picked back up by the next startup's reconciliation
+    // (`InstanceManager::scan_instances`).
+    //
+    // `shutdown_running` bounds itself to ~3s, so this task always resolves
+    // and exits well inside the ~5s Electron waits before force killing the
+    // core.
     tokio::spawn(async move {
         wait_for_termination_signal().await;
-        info!(
-            "Termination signal received, shutting down running servers and instances before exit"
-        );
-        futures::future::join(
-            app2.server_manager().shutdown_running(),
-            app2.instance_manager().shutdown_running(),
-        )
-        .await;
+        info!("Termination signal received, shutting down running servers before exit");
+        app2.server_manager().shutdown_running().await;
         // Through `flush_and_exit` rather than a bare `std::process::exit`
         // so the `info!` line just above reaches disk before the process
         // dies, the same reasoning as the fatal-DB-error exit in

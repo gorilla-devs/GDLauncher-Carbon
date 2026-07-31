@@ -3,7 +3,9 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { _electron as electron } from "playwright"
 import type { ElectronApplication, Page } from "playwright"
-import type { TestInfo } from "@playwright/test"
+import { expect, type TestInfo } from "@playwright/test"
+import { byTestId, TEST_IDS } from "../helpers/selectors.js"
+import { isPidAlive } from "../helpers/processes.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -256,6 +258,85 @@ async function waitForPidExit(
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+  }
+}
+
+/**
+ * Quits the launcher the way a user does while a game is running, and returns
+ * once both the Electron main process and the core it spawned are gone.
+ *
+ * Two things make this different from `app.close()`, and both were found the
+ * hard way:
+ *
+ * 1. **A close while a game runs does not close anything.** `main/index.ts`'s
+ *    `win.on("close")` calls `preventDefault()` and asks the renderer for the
+ *    `WindowCloseWarning` modal instead; the modal's confirm button
+ *    (`window.closeWindow()`) is the only thing that finishes the quit. An
+ *    `app.close()` here waits on an exit the modal is holding up — observed
+ *    leaving the app alive twenty minutes later.
+ * 2. **`app.close()` cannot be awaited afterwards either.** Playwright pairs
+ *    it with `attemptToGracefullyClose` and resolves on the spawned process's
+ *    `close` event; against an app already quitting itself, that was observed
+ *    hanging for the rest of the test budget with the core long since exited.
+ *
+ * So the exit is observed where it actually happens — the OS pids — and the
+ * caller must treat its `ElectronApplication` as dead on return and never
+ * call `close()` on it.
+ *
+ * Throws if the core pid cannot be read: without it there is no way to tell a
+ * game that outlived the launcher from one that merely outraced its shutdown.
+ */
+export async function quitLauncherMidGame(
+  current: { app: ElectronApplication; page: Page },
+  { timeoutMs = 60_000 } = {}
+): Promise<void> {
+  const electronPid = current.app.process().pid
+  if (electronPid == null) {
+    throw new Error(
+      "quitLauncherMidGame: Playwright reported no pid for the Electron process"
+    )
+  }
+
+  const corePid = await getCoreProcessId(current.app)
+  if (corePid == null) {
+    throw new Error(
+      "quitLauncherMidGame: could not read the core process id — cannot " +
+        "confirm the launcher actually exited"
+    )
+  }
+
+  // The window-manager's X, as the main process sees it.
+  await current.app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.close()
+  })
+
+  const confirm = current.page.locator(
+    byTestId(TEST_IDS.windowCloseWarningQuit)
+  )
+  await expect(
+    confirm,
+    "closing the launcher mid-game did not raise the close warning — the " +
+      "quit path this drives no longer exists"
+  ).toBeVisible()
+
+  // The click destroys the window that is handling it, so Playwright's own
+  // post-click bookkeeping can land on an already-closed page and reject.
+  // Swallowed rather than guarded because the click having taken effect is
+  // exactly what the two waits below assert.
+  await confirm.click().catch(() => {})
+
+  for (const [name, pid] of [
+    ["core", corePid],
+    ["Electron main process", electronPid]
+  ] as const) {
+    await expect
+      .poll(() => isPidAlive(pid), {
+        timeout: timeoutMs,
+        message:
+          `the ${name} (pid ${pid}) was still alive ${timeoutMs}ms after ` +
+          "the quit was confirmed"
+      })
+      .toBe(false)
   }
 }
 

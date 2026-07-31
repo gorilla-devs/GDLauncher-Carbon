@@ -126,6 +126,7 @@ import {
 import { startHarness, stopHarness, type Harness } from "./fixtures/mockIdp.js"
 import { seedDatabase, type SeedState } from "./helpers/dbSeed.js"
 import { byTestId, TEST_IDS } from "./helpers/selectors.js"
+import { isPidAlive, pidRuntimePathMatches } from "./helpers/processes.js"
 
 interface Launched {
   app: ElectronApplication
@@ -554,66 +555,10 @@ function pidsForBinary(binaryPath: string): number[] {
   }
 }
 
-/**
- * The env var `launchApp` sets on every spawned app/core process to point it
- * at its own isolated runtime path (`fixtures/electronApp.ts`'s
- * `LaunchOptions`/`env` block; read back by `main/index.ts` and forwarded to
- * the core's own `--gdl_runtime_path` argv). Duplicated here as a literal
- * rather than imported: `electronApp.ts` does not export it as a named
- * constant either, so this matches that file's own style rather than adding
- * a constant neither side otherwise needs.
- */
-const RUNTIME_PATH_ENV_VAR = "GDL_RUNTIME_PATH"
-
-/**
- * Best-effort check that `pid` was actually launched with `GDL_RUNTIME_PATH`
- * set to `runtimePath` — the only thing that ties a process matching the
- * app/core binary path back to *this* harness's own launch rather than some
- * other one, since the runtime path is passed via env
- * (`electronApp.ts`'s `launchApp`), not argv, and `pidsForBinary`'s
- * `pgrep -f`/`tasklist` can only match on the binary path itself.
- *
- * `ps e` (BSD-syntax, supported natively by both Linux's `procps` and
- * macOS's own `ps` — not a GNU-only extension) appends the process's
- * environment to its command-line output, the same general mechanism
- * `pidsForBinary` already relies on to find the process at all. Substring
- * search rather than parsing into discrete `KEY=VALUE` pairs: `ps`'s own
- * output has no unambiguous delimiter between adjacent env vars once values
- * can contain spaces, and an exact `KEY=value` substring is already
- * specific enough that a false positive would require another env var whose
- * value happens to contain this exact `GDL_RUNTIME_PATH=<path>` text, which
- * is not a realistic risk for a throwaway temp directory name.
- *
- * Any failure (the pid raced away between `pidsForBinary` finding it and
- * this running, `ps` behaving unexpectedly, an unsupported platform) is
- * reported as "cannot confirm" rather than thrown — a caller sweeping up
- * leaked processes should treat that as "leave it alone", not "assume it's
- * mine and kill it anyway".
- */
-function pidRuntimePathMatches(pid: number, runtimePath: string): boolean {
-  try {
-    const output = execSync(`ps e -ww -p ${pid}`, { encoding: "utf8" })
-    return output.includes(`${RUNTIME_PATH_ENV_VAR}=${runtimePath}`)
-  } catch {
-    return false
-  }
-}
-
-/**
- * `process.kill(pid, 0)` is Node's documented cross-platform existence
- * probe (same technique `electronApp.ts`'s `waitForPidExit` uses): signal
- * `0` sends nothing, it just asks the OS whether `pid` is still addressable.
- * `ESRCH` is the only error that means "gone" — anything else (`EPERM`, a
- * pid that exists but isn't ours to signal) means the pid is still alive.
- */
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== "ESRCH"
-  }
-}
+/* `pidRuntimePathMatches` and `isPidAlive` live in `helpers/processes.js`,
+   shared with `stopHarness`'s game-JVM sweep. `pidsForBinary` above stays
+   local: it is the only one of the three with a Windows (`tasklist`) path,
+   which the shared module deliberately does not have. */
 
 /**
  * Polls until a process matching the app or core binary appears that was not

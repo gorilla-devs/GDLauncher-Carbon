@@ -26,6 +26,26 @@ async function writeConfig(body: unknown): Promise<void> {
 }
 
 describe("readInstanceConfig", () => {
+  it("reads seconds_played, defaulting to 0 when the key is absent", async () => {
+    await writeConfig({
+      _version: "1",
+      name: "gdl-e2e-played",
+      seconds_played: 4242,
+      game_configuration: { version: { release: "1.20.1", modloaders: [] } }
+    })
+    expect((await readInstanceConfig(instanceRoot)).secondsPlayed).toBe(4242)
+
+    // `#[serde(default)]` on the Rust side: an instance that has never been
+    // played can legitimately omit the key, and that is 0 rather than a
+    // malformed file.
+    await writeConfig({
+      _version: "1",
+      name: "gdl-e2e-played",
+      game_configuration: { version: { release: "1.20.1", modloaders: [] } }
+    })
+    expect((await readInstanceConfig(instanceRoot)).secondsPlayed).toBe(0)
+  })
+
   it("reads name and release version off a standard v1 config", async () => {
     await writeConfig({
       _version: "1",

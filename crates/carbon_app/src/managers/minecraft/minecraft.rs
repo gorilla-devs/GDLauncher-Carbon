@@ -802,10 +802,12 @@ pub async fn launch_minecraft(
 
     command_exec.stdout(std::process::Stdio::piped());
     command_exec.stderr(std::process::Stdio::piped());
-    // Tie the game to the launcher session: if the owning run task is torn
-    // down while the game is still alive, the process is killed rather than
-    // orphaned (the same guarantee the server JVM already has).
-    command_exec.kill_on_drop(true);
+    // Deliberately no `kill_on_drop(true)` here: dropping the handle must not
+    // end the user's game. A game outlives the launcher session that started
+    // it, and the pidfile written immediately after this spawn is how the
+    // next core finds it again. A local server is the opposite — launcher-
+    // hosted infrastructure — and keeps `kill_on_drop` in
+    // `LocalServerProvider::start`.
 
     let child = command_exec.args(command_args);
 

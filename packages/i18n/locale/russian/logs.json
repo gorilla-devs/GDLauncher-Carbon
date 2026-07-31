@@ -1,5 +1,6 @@
 {
   "_trn_no_logs": "Логов нет",
+  "_trn_adopted_no_live_log": "-------- [ UNTRANSLATED ] -------- Launched by a previous session — log unavailable",
   "_trn_all_sessions": "Все сессии",
   "_trn_no_log_sessions_available": "Нет доступных логов сессий",
   "_trn_copy": "Копировать логи",

@@ -21,6 +21,9 @@ interface Props {
   setQuery: SetStoreFunction<LogQuery>
   logSearchResults: FESearchResult[] | undefined
   isActive: boolean
+  /** The instance is running a game a previous launcher session started, so
+   *  there is no live log for it — see the notice this renders. */
+  adopted: boolean
   isLoading: boolean
   scrollToBottom: () => void
   onScroll: () => void
@@ -338,6 +341,20 @@ const LogsContent = (props: Props) => {
           <div>
             <Trans key="ui:_trn_live" />
           </div>
+        </div>
+      </Show>
+      {/* Mutually exclusive with the "live" indicator above: a session this
+          launcher started has one, an adopted one has this. The past sessions
+          listed in the sidebar are still readable — only the currently running
+          one has no log, because the pipe it would have been read from died
+          with the launcher session that opened it. */}
+      <Show when={props.adopted}>
+        <div
+          class="bg-darkSlate-800 text-lightSlate-600 border-darkSlate-600 border-b-solid flex shrink-0 items-center gap-2 border-b px-4 py-2 text-sm"
+          data-testid="instance-adopted-no-live-log"
+        >
+          <div class="i-hugeicons:information-circle h-4 w-4 shrink-0" />
+          <Trans key="logs:_trn_adopted_no_live_log" />
         </div>
       </Show>
       <div

@@ -1,5 +1,6 @@
 {
   "_trn_no_logs": "Aucun log disponible",
+  "_trn_adopted_no_live_log": "-------- [ UNTRANSLATED ] -------- Launched by a previous session — log unavailable",
   "_trn_all_sessions": "Toutes les sessions",
   "_trn_no_log_sessions_available": "Aucune session de log disponible",
   "_trn_copy": "Copier les logs",

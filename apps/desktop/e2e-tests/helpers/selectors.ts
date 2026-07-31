@@ -152,6 +152,23 @@ export const TEST_IDS = Object.freeze({
   // dialog to accidentally gate other flows on).
   settingsReducedMotionToggle: "settings-reduced-motion-toggle",
 
+  // The confirm control on `WindowCloseWarning`, the modal raised when the
+  // launcher is closed while a game is running. Clicking it is the only way
+  // the quit ever completes: `main/index.ts`'s `win.on("close")` calls
+  // `preventDefault()` and shows the modal instead, and this button's
+  // `window.closeWindow()` is what destroys the window. A `@gd/ui` `Button`,
+  // which forwards unknown props, so the anchor reaches the real
+  // `<button>` — unlike the `Checkbox` beside it (hazard 1 in this file's
+  // header), which is why only this control carries one.
+  windowCloseWarningQuit: "window-close-warning-quit",
+
+  // The Log tab's notice that the running game came from a previous launcher
+  // session and has no live log (`Tabs/Log/LogsContent.tsx`). Rendered only
+  // when the instance is Running with `adopted: true`, so its presence is the
+  // frontend's whole observable answer to "was this instance adopted" — a
+  // plain `<div>`, so neither hazard in this file's header applies.
+  instanceAdoptedNoLiveLog: "instance-adopted-no-live-log",
+
   // The DB recovery ladder (`packages/preload/loading.ts`'s `fatalError`/
   // `backwardsMigrationError`, rendered into `#appFatalCrash` by
   // `packages/main/index.ts`'s failure path). Neither hazard above applies

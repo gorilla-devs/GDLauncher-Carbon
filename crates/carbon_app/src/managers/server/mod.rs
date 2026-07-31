@@ -411,9 +411,14 @@ impl ManagerRef<'_, ServerManager> {
                 orphan_pid::PidReconcileAction::RemoveStale => {
                     provider::remove_pid_file(&root).await;
                 }
-                orphan_pid::PidReconcileAction::KillOrphan => {
-                    // Safe: KillOrphan is only ever produced from `Some(pid)`.
-                    let pid = pid.expect("KillOrphan implies a recorded pid");
+                orphan_pid::PidReconcileAction::StillRunning => {
+                    // A server is launcher-hosted infrastructure and does not
+                    // outlive the launcher, so a live one here is an orphan to
+                    // clean up — the opposite of `InstanceManager`, which
+                    // adopts the game it finds.
+                    //
+                    // Safe: StillRunning is only ever produced from `Some(pid)`.
+                    let pid = pid.expect("StillRunning implies a recorded pid");
                     warn!(
                         "Server {} has an orphaned java process (pid {}) still running from a previous session — killing it",
                         server_id, pid

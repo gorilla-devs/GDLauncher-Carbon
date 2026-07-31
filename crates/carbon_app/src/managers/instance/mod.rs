@@ -1,7 +1,7 @@
 use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
 use self::log::GameLog;
-use self::run::{LaunchState, PersistenceManager};
+use self::run::{LaunchState, PersistenceManager, RunningInstance};
 use super::ManagerRef;
 use super::metadata::cache;
 use super::modplatforms::curseforge::CurseForge;
@@ -131,10 +131,15 @@ const ILLEGAL_NAMES: &[&str] = &[
 /// than inside the data dir, so a reinstall/repair that wipes `instance/`
 /// doesn't touch it, and deleting the instance (which removes the whole
 /// root) cleans it up for free. Both the writer (`run`, right after the game
-/// process is spawned) and the reader (`reap_orphaned_instances_under`, on
-/// every core startup) compute the pidfile path from the same
+/// process is spawned) and the reader (`reconcile_running_instances_under`,
+/// on every core startup) compute the pidfile path from the same
 /// `InstancePath::get_root()` / directory-scan root, so they always agree
 /// on the location.
+///
+/// This file is the only channel by which a restarted core can learn that a
+/// game it did not spawn is still running: `LaunchState` lives in memory and
+/// dies with the process that held it, so without the pidfile a game that
+/// outlived the launcher would be invisible to the instance it belongs to.
 const PID_FILE_NAME: &str = ".gdl_instance.pid";
 
 fn sanitize_name(name: &str) -> String {
@@ -188,15 +193,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let scan_start = std::time::Instant::now();
 
         // Before scanning populates the in-memory instance map, reconcile
-        // every on-disk instance's pidfile against the live process table: a
-        // game JVM left running by a session this core did not shut down
-        // cleanly (crash, force-quit, Windows TerminateProcess) is otherwise
-        // invisible here and keeps running forever, orphaned from any
-        // instance the app can see. `LaunchState` is in-memory only (never
-        // persisted), so unlike servers there is no "mark Stopped"
-        // reconciliation needed here — the scan below already yields every
-        // instance as freshly Inactive.
-        self.reap_orphaned_instances().await;
+        // every on-disk instance's pidfile against the live process table.
+        // `LaunchState` is in-memory only (never persisted), so the scan
+        // below yields every instance as freshly Inactive and the pidfile is
+        // the only surviving record that a game is still running — from a
+        // session that ended without stopping it, most often because the user
+        // closed the launcher. Each one found is applied to its instance as
+        // it is inserted below, so the map is never briefly wrong about it.
+        let adopted = self.reconcile_running_instances().await;
 
         let instance_cache = instance_repo::get_all_instances(&self.app.db).await?;
         tracing::debug!(
@@ -216,6 +220,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let updates_semaphore = Arc::new(tokio::sync::Semaphore::new(20));
         let mut scanned_count: u32 = 0;
+        // Instances that came out of this scan running a game this core does
+        // not own. Collected because nothing else will ever observe those
+        // processes exiting — there is no `child.wait()` behind them — so
+        // they need the liveness poller started for them.
+        let mut adopted_ids: Vec<InstanceId> = Vec::new();
 
         while let Some(dir) = stream.next_entry().await? {
             let path = dir.path();
@@ -266,6 +275,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 data.state = old_data.state;
             }
 
+            // A game this core did not spawn, still running: present the
+            // instance as Running with no channel to signal and no log to
+            // read (see `RunningInstance::adopted`). Guarded on the state
+            // rather than applied unconditionally so a rescan can never
+            // replace a state this core does own — the line above carries an
+            // already-Running instance forward, and overwriting it here would
+            // throw away its `kill_tx` and strand the process.
+            if let Some(game) = adopted.get(&instance.shortpath).copied() {
+                if let InstanceType::Valid(data) = &mut instance.type_ {
+                    if matches!(data.state, LaunchState::Inactive { .. }) {
+                        data.state = LaunchState::Running(RunningInstance::adopted(
+                            game.pid,
+                            game.start_time,
+                            Utc::now(),
+                        ));
+                        adopted_ids.push(instance_id);
+                    }
+                }
+            }
+
             instances.insert(instance_id, instance);
             drop(instances);
 
@@ -306,6 +335,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
+
+        if !adopted_ids.is_empty() {
+            self.watch_adopted_instances(adopted_ids);
+        }
 
         Ok(())
     }
@@ -392,12 +425,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     /// Reconcile every on-disk instance's pidfile against the live process
-    /// table, killing any pid that is still alive AND still looks like a
-    /// java process (an orphaned game JVM this core recorded but never
-    /// cleaned up), and otherwise just discarding a stale/reused pid.
-    /// Entirely best-effort: every failure is logged and swallowed so this
-    /// can never fail or delay startup scanning.
-    async fn reap_orphaned_instances(self) {
+    /// table, returning the games still running — by shortpath, because this
+    /// runs before any instance id exists — and discarding stale or reused
+    /// pids. Entirely best-effort: every failure is logged and swallowed so
+    /// this can never fail or delay startup scanning.
+    async fn reconcile_running_instances(self) -> HashMap<String, AdoptedGame> {
         let instances_root = self
             .app
             .settings_manager()
@@ -405,7 +437,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get_instances()
             .to_path();
 
-        reap_orphaned_instances_under(&instances_root).await;
+        reconcile_running_instances_under(&instances_root).await
     }
 
     pub async fn list_groups(self) -> anyhow::Result<Vec<ListGroup>> {
@@ -2998,27 +3030,46 @@ pub struct InvalidGroupIdError(GroupId);
 #[error("attempted to get data of an invalid instance")]
 pub struct InvalidInstanceDataError;
 
+/// A game process found still running when the core started: one this core
+/// did not spawn, belonging to an instance that must therefore be presented
+/// as running without a handle to the process behind it.
+#[derive(Debug, Clone, Copy)]
+struct AdoptedGame {
+    pid: u32,
+    /// Taken from the pidfile's mtime, which is written immediately after the
+    /// spawn and so approximates the launch time to within a second — near
+    /// enough to keep playtime accounting roughly right across a restart
+    /// instead of resetting it.
+    start_time: DateTime<Utc>,
+}
+
 /// Reconcile every instance directory directly under `instances_root`
-/// against the live process table. Free function (not tied to
+/// against the live process table, returning the games that are still
+/// running keyed by shortpath. Free function (not tied to
 /// `ManagerRef`/`InstanceManager`) so it is unit-testable against a plain
 /// temp directory laid out like the real instances root, without needing a
 /// full `App`.
 ///
-/// Mirrors `ServerManager::clean_up_orphaned_servers`: a pid sysinfo
-/// confirms is still alive AND still looks like java is killed directly
-/// (there is no live handle/channel to it here — the process is orphaned
-/// from a session this core did not shut down cleanly, possibly a previous
-/// process entirely); anything else just has its stale pidfile removed.
-async fn reap_orphaned_instances_under(instances_root: &Path) {
+/// Deliberately the opposite of `ServerManager::clean_up_orphaned_servers`,
+/// which kills what it finds: a pid sysinfo confirms is still alive AND
+/// still looks like java is the user's own game, left running by a session
+/// that ended without it — most often because they closed the launcher. It
+/// is adopted rather than killed, and its pidfile is kept, since that file
+/// stays the only record of the process for as long as it lives. Anything
+/// else (dead pid, or a live pid the process table says is no longer java,
+/// meaning the number was reused) just has its stale pidfile removed.
+async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<String, AdoptedGame> {
+    let mut adopted: HashMap<String, AdoptedGame> = HashMap::new();
+
     let mut entries = match tokio::fs::read_dir(instances_root).await {
         Ok(entries) => entries,
         Err(e) => {
             warn!(
-                "Failed to read instances directory {} for orphan pid reap: {}",
+                "Failed to read instances directory {} to reconcile running games: {}",
                 instances_root.display(),
                 e
             );
-            return;
+            return adopted;
         }
     };
 
@@ -3033,7 +3084,7 @@ async fn reap_orphaned_instances_under(instances_root: &Path) {
             Ok(None) => break,
             Err(e) => {
                 warn!(
-                    "Failed to read an instances directory entry during orphan pid reap: {}",
+                    "Failed to read an instances directory entry while reconciling running games: {}",
                     e
                 );
                 break;
@@ -3072,9 +3123,9 @@ async fn reap_orphaned_instances_under(instances_root: &Path) {
         system.refresh_processes(ProcessesToUpdate::Some(&pids));
     }
 
-    // Pass 2: reconcile. Every instance with a recorded pid gets its
-    // pidfile removed one way or another; only a pid sysinfo confirms is
-    // still alive AND still java is killed first.
+    // Pass 2: reconcile. A pid that is dead, or alive but no longer java,
+    // leaves nothing behind but a stale file to remove; one that is still a
+    // live JVM is a game to adopt, and its pidfile stays exactly where it is.
     for (shortpath, root, pid) in recorded {
         let is_live_java = pid
             .map(|p| orphan_pid::is_live_java_process(&system, p))
@@ -3085,22 +3136,30 @@ async fn reap_orphaned_instances_under(instances_root: &Path) {
             orphan_pid::PidReconcileAction::RemoveStale => {
                 orphan_pid::remove_pid_file(&root, PID_FILE_NAME).await;
             }
-            orphan_pid::PidReconcileAction::KillOrphan => {
-                // Safe: KillOrphan is only ever produced from `Some(pid)`.
-                let pid = pid.expect("KillOrphan implies a recorded pid");
-                warn!(
-                    "Instance {} has an orphaned game process (pid {}) still running from a previous session — killing it",
+            orphan_pid::PidReconcileAction::StillRunning => {
+                // Safe: StillRunning is only ever produced from `Some(pid)`.
+                let pid = pid.expect("StillRunning implies a recorded pid");
+
+                // Falling back to "now" only understates how long the game has
+                // been up; it never invents playtime that was not played.
+                let start_time =
+                    tokio::fs::metadata(orphan_pid::pid_file_path(&root, PID_FILE_NAME))
+                        .await
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .map(DateTime::<Utc>::from)
+                        .unwrap_or_else(Utc::now);
+
+                info!(
+                    "Instance {} still has a game running (pid {}) from a previous launcher session — adopting it",
                     shortpath, pid
                 );
-                if let Some(process) = system.process(Pid::from_u32(pid)) {
-                    if !process.kill() {
-                        warn!("Failed to signal orphaned instance process (pid {})", pid);
-                    }
-                }
-                orphan_pid::remove_pid_file(&root, PID_FILE_NAME).await;
+                adopted.insert(shortpath, AdoptedGame { pid, start_time });
             }
         }
     }
+
+    adopted
 }
 
 /// Outcome of checking whether an instance may be deleted, given its launch state.
@@ -3893,16 +3952,17 @@ mod test {
         Ok(())
     }
 
-    // --- orphan pid reap (instance-specific) -----------------------------
+    // --- startup pid reconciliation (instance-specific) ------------------
     //
     // The pidfile read/write/remove lifecycle and the `reconcile_pid` /
     // `is_live_java_process` decision logic themselves are tested generically
-    // in `managers::orphan_pid`. These exercise `reap_orphaned_instances_under`
-    // end to end against a plain temp directory laid out like the real
-    // instances root, using the actual `.gdl_instance.pid` file name.
+    // in `managers::orphan_pid`. These exercise
+    // `reconcile_running_instances_under` end to end against a plain temp
+    // directory laid out like the real instances root, using the actual
+    // `.gdl_instance.pid` file name.
 
     #[tokio::test]
-    async fn reap_orphaned_instances_removes_pidfile_for_a_dead_recorded_pid() {
+    async fn reconcile_running_instances_removes_pidfile_for_a_dead_recorded_pid() {
         let dir = tempfile::tempdir().unwrap();
         let instance_root = dir.path().join("some-instance");
         tokio::fs::create_dir_all(&instance_root).await.unwrap();
@@ -3910,8 +3970,9 @@ mod test {
         let dead_pid = u32::MAX - 100;
         super::orphan_pid::write_pid_file(&instance_root, super::PID_FILE_NAME, dead_pid).await;
 
-        super::reap_orphaned_instances_under(dir.path()).await;
+        let adopted = super::reconcile_running_instances_under(dir.path()).await;
 
+        assert!(adopted.is_empty(), "a dead pid must not be adopted");
         assert_eq!(
             super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
                 .await
@@ -3922,7 +3983,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn reap_orphaned_instances_removes_pidfile_for_a_live_non_java_pid_without_killing() {
+    async fn reconcile_running_instances_removes_pidfile_for_a_live_non_java_pid_without_killing() {
         let dir = tempfile::tempdir().unwrap();
         let instance_root = dir.path().join("some-instance");
         tokio::fs::create_dir_all(&instance_root).await.unwrap();
@@ -3931,8 +3992,12 @@ mod test {
         let own_pid = std::process::id();
         super::orphan_pid::write_pid_file(&instance_root, super::PID_FILE_NAME, own_pid).await;
 
-        super::reap_orphaned_instances_under(dir.path()).await;
+        let adopted = super::reconcile_running_instances_under(dir.path()).await;
 
+        assert!(
+            adopted.is_empty(),
+            "a live pid that is not java is a reused pid number, never a game to adopt"
+        );
         assert_eq!(
             super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
                 .await
@@ -3940,8 +4005,8 @@ mod test {
             None,
             "a live non-java recorded pid's pidfile must still be removed"
         );
-        // Confirms the reap never tried to kill anything here: this test's
-        // own process is still alive to make this assertion at all.
+        // Confirms reconciliation never tried to kill anything here: this
+        // test's own process is still alive to make this assertion at all.
         assert!(
             sysinfo::System::new_all()
                 .process(sysinfo::Pid::from_u32(own_pid))
@@ -3949,15 +4014,78 @@ mod test {
         );
     }
 
+    /// A live process whose name is `java`, without needing a JRE installed:
+    /// `sysinfo` reports the executable's own name, so copying any
+    /// long-running binary to a file called `java` and running that produces
+    /// a process indistinguishable from a game JVM as far as
+    /// `is_live_java_process` is concerned — which is precisely the input the
+    /// adoption branch turns on.
+    ///
+    /// Unix-only, like the `sleep` it borrows. The branch it covers is
+    /// platform-independent.
+    #[cfg(unix)]
+    async fn spawn_fake_jvm(dir: &std::path::Path) -> tokio::process::Child {
+        let fake = dir.join("java");
+        tokio::fs::copy("/bin/sleep", &fake).await.unwrap();
+
+        tokio::process::Command::new(&fake)
+            .arg("60")
+            // Never outlive the test, however it ends.
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap()
+    }
+
+    #[cfg(unix)]
     #[tokio::test]
-    async fn reap_orphaned_instances_ignores_instances_with_no_pidfile() {
+    async fn reconcile_running_instances_adopts_a_live_game_instead_of_killing_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let instance_root = dir.path().join("some-instance");
+        tokio::fs::create_dir_all(&instance_root).await.unwrap();
+
+        let bin_dir = tempfile::tempdir().unwrap();
+        let mut fake_jvm = spawn_fake_jvm(bin_dir.path()).await;
+        let pid = fake_jvm.id().expect("fake jvm must have a pid");
+
+        super::orphan_pid::write_pid_file(&instance_root, super::PID_FILE_NAME, pid).await;
+
+        let adopted = super::reconcile_running_instances_under(dir.path()).await;
+
+        let game = adopted
+            .get("some-instance")
+            .expect("a live game JVM must be reported for adoption, not killed");
+        assert_eq!(game.pid, pid);
+
+        // The process is the user's session and must survive being found.
+        assert!(
+            sysinfo::System::new_all()
+                .process(sysinfo::Pid::from_u32(pid))
+                .is_some(),
+            "reconciliation killed the adopted game process"
+        );
+        // And the pidfile has to stay: for as long as that process lives it
+        // is the only record of it, and a later startup needs it too.
+        assert_eq!(
+            super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
+                .await
+                .unwrap(),
+            Some(pid),
+            "an adopted game's pidfile must be left in place"
+        );
+
+        fake_jvm.kill().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn reconcile_running_instances_ignores_instances_with_no_pidfile() {
         let dir = tempfile::tempdir().unwrap();
         let instance_root = dir.path().join("some-instance");
         tokio::fs::create_dir_all(&instance_root).await.unwrap();
 
         // Must not panic/fail when there's simply nothing to reconcile.
-        super::reap_orphaned_instances_under(dir.path()).await;
+        let adopted = super::reconcile_running_instances_under(dir.path()).await;
 
+        assert!(adopted.is_empty());
         assert_eq!(
             super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
                 .await
@@ -3967,15 +4095,17 @@ mod test {
     }
 
     #[tokio::test]
-    async fn reap_orphaned_instances_under_tolerates_a_missing_directory() {
+    async fn reconcile_running_instances_under_tolerates_a_missing_directory() {
         // Pointing at a directory that doesn't exist at all (e.g. a fresh
         // install with no instances yet) must not panic or hang.
         let bogus_root = std::path::Path::new("/nonexistent/gdl-test-instances-root");
-        tokio::time::timeout(
+        let adopted = tokio::time::timeout(
             std::time::Duration::from_secs(1),
-            super::reap_orphaned_instances_under(bogus_root),
+            super::reconcile_running_instances_under(bogus_root),
         )
         .await
-        .expect("reap_orphaned_instances_under must not hang on a missing directory");
+        .expect("reconcile_running_instances_under must not hang on a missing directory");
+
+        assert!(adopted.is_empty());
     }
 }

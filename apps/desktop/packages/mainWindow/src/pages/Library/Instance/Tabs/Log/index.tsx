@@ -55,6 +55,18 @@ const Logs = () => {
     queryKey: ["instance.getLogs", parseInt(params.id, 10)]
   }))
 
+  const instanceDetails = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
+  }))
+
+  /** Running a game a previous launcher session started. That session owned
+   *  the stdout pipe and took it with it, so there is no live log to select —
+   *  which would otherwise read as the log simply having failed to load. */
+  const isAdoptedRunning = () => {
+    const state = instanceDetails.data?.state
+    return state?.state === "running" && state.value.adopted
+  }
+
   const isActive = () =>
     availableLogEntries.data?.find((log) => log.id === selectedLog())?.active
 
@@ -191,6 +203,7 @@ const Logs = () => {
         setQuery={setQuery}
         logSearchResults={logSearchResults.data}
         isActive={isActive() || false}
+        adopted={isAdoptedRunning()}
         isLoading={isLoading()}
         scrollToBottom={scrollToBottom}
         onScroll={handleScroll}

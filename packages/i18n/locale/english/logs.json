@@ -1,5 +1,6 @@
 {
   "_trn_no_logs": "No Logs Available",
+  "_trn_adopted_no_live_log": "Launched by a previous session — log unavailable",
   "_trn_all_sessions": "All Sessions",
   "_trn_no_log_sessions_available": "No Log Sessions Available",
   "_trn_copy": "Copy logs",

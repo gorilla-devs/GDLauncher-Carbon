@@ -84,6 +84,7 @@ const WindowCloseWarning = (props: ModalProps) => {
           <Button
             type="secondary"
             class="w-full"
+            data-testid="window-close-warning-quit"
             onClick={() => {
               window.closeWindow()
             }}

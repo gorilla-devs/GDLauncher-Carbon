@@ -49,6 +49,12 @@ export interface OnDiskInstanceConfig {
    *  and the untagged `Custom(String)` variant). */
   mcVersion: string | null
   modloaders: OnDiskModLoader[]
+  /** `seconds_played` — the launcher's own running total for this instance,
+   *  rewritten by `update_playtime` (`managers/instance/mod.rs`) on every
+   *  bank. `#[serde(default)]` on the Rust side, so an instance that has
+   *  never been played may omit the key entirely; read as 0 in that case
+   *  rather than treated as a malformed file. */
+  secondsPlayed: number
 }
 
 interface RawStandardVersion {
@@ -58,6 +64,7 @@ interface RawStandardVersion {
 
 interface RawV1Config {
   name?: string
+  seconds_played?: number
   game_configuration?: {
     version?: RawStandardVersion | string | null
   }
@@ -110,6 +117,8 @@ export async function readInstanceConfig(
   return {
     name: parsed.name,
     mcVersion: isStandard ? (version.release ?? null) : null,
-    modloaders: isStandard ? (version.modloaders ?? []) : []
+    modloaders: isStandard ? (version.modloaders ?? []) : [],
+    secondsPlayed:
+      typeof parsed.seconds_played === "number" ? parsed.seconds_played : 0
   }
 }

@@ -2,16 +2,20 @@
 //!
 //! Both the server manager and the instance (game) manager record the pid of
 //! the java process they spawn in a small marker file next to that
-//! server/instance's own data, so that if this core exits without shutting
-//! the process down cleanly (crash, force-quit, Windows `TerminateProcess`)
-//! the next startup can detect and kill the orphaned JVM instead of leaving
-//! it running forever. The read/write/remove operations and the "is this
-//! pid still a live java process" / "what should happen to this recorded
-//! pid" decisions are security-relevant — a wrong call either leaks a
-//! running JVM forever or kills an unrelated process that reused the pid —
-//! and are identical between the two callers, so they live here once,
-//! parameterized by the pidfile name each caller uses (`.gdl_server.pid` /
-//! `.gdl_instance.pid`).
+//! server/instance's own data, so that a core which exits without shutting
+//! the process down through its own launch task (crash, force-quit, Windows
+//! `TerminateProcess`, or simply the user closing the launcher) leaves the
+//! next startup able to find that JVM again.
+//!
+//! Finding it is shared; what to do about it is not. A local server is
+//! infrastructure the launcher hosts, so `ServerManager` kills a server JVM
+//! it finds still running. A game is the user's session, so
+//! `InstanceManager` adopts it instead, showing the instance as running with
+//! a working Stop. Everything up to and including "is this pid still a live
+//! java process" is the same either way, and is security-relevant — a wrong
+//! call either leaks a running JVM forever or acts on an unrelated process
+//! that reused the pid — so it lives here once, parameterized by the pidfile
+//! name each caller uses (`.gdl_server.pid` / `.gdl_instance.pid`).
 
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
@@ -77,23 +81,29 @@ pub enum PidReconcileAction {
     /// was reused by something unrelated) — the stale file is removed, but
     /// nothing is killed.
     RemoveStale,
-    /// The recorded pid is alive and still a java process: an orphaned JVM
-    /// left over from a session this core did not shut down cleanly.
-    KillOrphan,
+    /// The recorded pid is alive and still a java process: a JVM left over
+    /// from a session this core did not shut down through its own launch
+    /// task. Acting on it is the caller's decision and differs by kind —
+    /// `ServerManager` kills it, `InstanceManager` adopts it (see this
+    /// module's own doc comment for why they differ).
+    StillRunning,
 }
 
-/// Decide what to do with a recorded pid. Deliberately split out from the
+/// Decide what a recorded pid represents. Deliberately split out from the
 /// sysinfo lookup so this branch is unit-testable without a real process
 /// table: `is_live_java` is the caller's answer to "is this pid currently
 /// alive and running as java", however it determined that.
 ///
-/// Killing only ever requires BOTH a pid that was actually recorded AND
-/// sysinfo confirming it currently looks like a JVM — a name mismatch (pid
-/// reused by an unrelated process) always falls back to `RemoveStale`.
+/// `StillRunning` — the only outcome either caller ever acts on rather than
+/// just cleaning up after — requires BOTH a pid that was actually recorded
+/// AND sysinfo confirming it currently looks like a JVM. A name mismatch
+/// (pid reused by an unrelated process) always falls back to `RemoveStale`,
+/// so neither the kill nor the adoption can ever land on a stranger's
+/// process.
 pub fn reconcile_pid(recorded_pid: Option<u32>, is_live_java: bool) -> PidReconcileAction {
     match recorded_pid {
         None => PidReconcileAction::NoPidFile,
-        Some(_) if is_live_java => PidReconcileAction::KillOrphan,
+        Some(_) if is_live_java => PidReconcileAction::StillRunning,
         Some(_) => PidReconcileAction::RemoveStale,
     }
 }
@@ -197,10 +207,11 @@ mod tests {
             PidReconcileAction::RemoveStale
         );
 
-        // A recorded pid that's alive AND still java: an orphaned JVM.
+        // A recorded pid that's alive AND still java: a JVM from a session
+        // this core did not shut down. Each caller decides what that means.
         assert_eq!(
             reconcile_pid(Some(1234), true),
-            PidReconcileAction::KillOrphan
+            PidReconcileAction::StillRunning
         );
     }
 
