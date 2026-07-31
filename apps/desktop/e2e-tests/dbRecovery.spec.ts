@@ -225,7 +225,14 @@ async function launchAgainstHarness(harness: Harness): Promise<Launched> {
     // at the local mock rather than the real production API — same
     // reasoning as `fixtures/index.ts`'s `freshApp`. Never a real network
     // dependency for a suite that is entirely about the DB open path.
-    baseApi: `${harness.mock.url}/gdl`
+    baseApi: `${harness.mock.url}/gdl`,
+    // Same reasoning one step further: without this the updater reads the
+    // packaged `app-update.yml` and dials whatever is listening on port
+    // 9000. These tests assert on the core's `_STATUS_:` stdout rather than
+    // on the UI, so a failed check cannot fail them — it just means the one
+    // spec here that needs no network at all is the one still depending on
+    // what happens to hold a local port.
+    e2eUpdateFeed: `${harness.mock.url}/updates/`
   }
   return launchApp(opts)
 }

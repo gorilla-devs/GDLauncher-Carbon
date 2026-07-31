@@ -14,6 +14,7 @@ import {
   readProvisionConfig,
   type ProvisionedUser
 } from "./gdlAccount.js"
+import { killGameProcesses } from "../helpers/processes.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -222,6 +223,20 @@ export async function stopHarness(
     },
     async () => {
       preserveDebugLogs(harness)
+    },
+    async () => {
+      // A running game outlives the launcher by design, so closing the app no
+      // longer ends it — teardown is the only thing between a test that
+      // failed mid-launch and a Minecraft JVM running until reboot. Runs
+      // before the runtime path is deleted, since that path is what
+      // identifies the process as ours.
+      const killed = killGameProcesses(harness.runtimePath)
+      if (killed.length > 0) {
+        console.log(
+          `stopHarness: killed ${killed.length} leftover game process(es): ` +
+            killed.join(", ")
+        )
+      }
     },
     async () => {
       // `force: true` only suppresses ENOENT. On Windows the core module is

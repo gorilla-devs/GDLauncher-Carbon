@@ -2,6 +2,11 @@
 name = "carbon_app"
 version = "0.0.0"
 edition = "2024"
+# `src/bin/panic_hook_probe.rs` is a second binary in this package, which makes
+# a bare `cargo run -p carbon_app` ambiguous — and that is the exact form both
+# `pnpm codegen` and `pnpm watch:core` use. Naming the real one here keeps those
+# working while the probe stays runnable as `--bin panic_hook_probe`.
+default-run = "carbon_app"
 
 [dependencies]
 semver = "1.0.25"

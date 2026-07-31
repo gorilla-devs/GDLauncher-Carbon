@@ -482,6 +482,7 @@ const General = () => {
           <RightHandSide>
             <div class="flex flex-col items-center gap-2">
               <Button
+                data-testid="settings-cache-cleanup-open"
                 type="secondary"
                 size="small"
                 rounded={false}

@@ -502,3 +502,37 @@ describe("gdl proxy to api-test mounted under a base path", () => {
     )
   })
 })
+
+describe("update feed", () => {
+  it("serves a channel file reporting a version no newer than any build", async () => {
+    const res = await fetch(`${mock.url}/updates/latest-linux.yml`)
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-type")).toContain("text/yaml")
+    // 0.0.0 is the lowest semver there is, so electron-updater compares it
+    // against whatever version the packaged app under test reports and
+    // concludes there is nothing newer — without this file having to know
+    // that version. `allowDowngrade` is false on the stable channel
+    // (`autoUpdater.ts` sets it from the channel comparison), so a lower
+    // remote version means "no update", not "downgrade".
+    expect(body).toMatch(/^version:\s*0\.0\.0$/m)
+    // electron-updater parses this into an UpdateInfo before it compares
+    // versions; a channel file missing the fields it dereferences throws
+    // instead of resolving to "up to date", which is the same error toast
+    // this feed exists to prevent.
+    expect(body).toMatch(/^files:$/m)
+    expect(body).toMatch(/^\s+-\s+url:\s+\S+$/m)
+    expect(body).toMatch(/^\s+sha512:\s+\S+$/m)
+    expect(body).toMatch(/^\s+size:\s+\d+$/m)
+    expect(body).toMatch(/^path:\s+\S+$/m)
+    expect(body).toMatch(/^releaseDate:\s+'/m)
+  })
+
+  it("serves the arch-suffixed channel file electron-updater asks for on arm64", async () => {
+    const res = await fetch(`${mock.url}/updates/latest-linux-arm64.yml`)
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toMatch(/^version:\s*0\.0\.0$/m)
+  })
+})

@@ -62,7 +62,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
           runtimePath: harness.runtimePath,
           baseApi: `${harness.mock.url}/gdl`,
           e2eAuthBase: harness.mock.url,
-          e2eEntitlementKey: harness.entitlementKeyPath
+          e2eEntitlementKey: harness.entitlementKeyPath,
+          e2eUpdateFeed: `${harness.mock.url}/updates/`
         })
 
         try {
@@ -91,7 +92,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
           runtimePath: harness.runtimePath,
           baseApi: `${harness.mock.url}/gdl`,
           e2eAuthBase: harness.mock.url,
-          e2eEntitlementKey: harness.entitlementKeyPath
+          e2eEntitlementKey: harness.entitlementKeyPath,
+          e2eUpdateFeed: `${harness.mock.url}/updates/`
         })
 
         try {

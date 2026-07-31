@@ -67,6 +67,13 @@ export interface LaunchOptions {
   baseApi?: string
   e2eAuthBase?: string
   e2eEntitlementKey?: string
+  /** Base URL the auto-updater should read its channel file from — the mock
+   *  server's `/updates/` mount (see `mock-idp/server.ts`'s
+   *  `UPDATE_CHANNEL_YAML`). Passed per launch rather than baked into the
+   *  packaged `app-update.yml` because the mock listens on an ephemeral port,
+   *  and because that file is one shared resource inside the package that
+   *  every worker would otherwise be rewriting under the others. */
+  e2eUpdateFeed?: string
 }
 
 /**
@@ -115,6 +122,10 @@ export async function launchApp(opts: LaunchOptions): Promise<{
 
   if (opts.e2eEntitlementKey) {
     args.push("--gdl_e2e_entitlement_key", opts.e2eEntitlementKey)
+  }
+
+  if (opts.e2eUpdateFeed) {
+    args.push("--gdl_e2e_update_feed", opts.e2eUpdateFeed)
   }
 
   console.log("Launching Electron from:", binaryPath)

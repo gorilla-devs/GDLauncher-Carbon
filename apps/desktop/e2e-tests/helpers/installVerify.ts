@@ -337,3 +337,40 @@ export async function verifyLibrariesPresent(
 
   return problems.length ? failResult(problems) : okResult()
 }
+
+/**
+ * The counterpart to `verifyLibrariesPresent`: asserts that none of
+ * `relativePaths` exists under `runtimePath/libraries`.
+ *
+ * Exists so a test can prove a deletion actually happened before asserting
+ * that something restored it. Without that middle assertion, a "regenerated
+ * after being wiped" test passes exactly as happily in the case where the
+ * wipe never occurred and the files were simply never touched — which is the
+ * failure mode, not the success one.
+ */
+export async function verifyLibrariesAbsent(
+  runtimePath: string,
+  relativePaths: string[]
+): Promise<VerifyResult> {
+  const results = await mapConcurrent(
+    relativePaths,
+    CONCURRENCY,
+    async (relativePath) => {
+      const libraryPath = path.join(runtimePath, "libraries", relativePath)
+      return {
+        relativePath,
+        libraryPath,
+        exists: await pathExists(libraryPath)
+      }
+    }
+  )
+
+  const problems = results
+    .filter((r) => r.exists)
+    .map(
+      (r) =>
+        `expected ${r.relativePath} to have been deleted, but ${r.libraryPath} still exists`
+    )
+
+  return problems.length ? failResult(problems) : okResult()
+}

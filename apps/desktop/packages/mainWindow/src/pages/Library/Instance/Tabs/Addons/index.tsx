@@ -112,6 +112,14 @@ const Addons = () => {
       Object.keys(addonData.enabledAddonTypes) as AddonType[]
     ).filter((t) => addonData.enabledAddonTypes[t])
     if (enabled.length === 1) return enabled[0]
+    // `hasModloaders()` reads a field off `instanceDetails.data`, so it is
+    // false in two different situations: the instance genuinely has no
+    // modloaders, and the query has not resolved yet. Only the first of them
+    // means shaders. Treat a still-loading instance as modded — mods are the
+    // common case, this is a one-shot navigation decision that no later
+    // update can walk back, and a modded instance sent to the shaders
+    // catalogue finds nothing there.
+    if (!routeData.instanceDetails.data) return "mods"
     return hasModloaders() ? "mods" : "shaders"
   }
 

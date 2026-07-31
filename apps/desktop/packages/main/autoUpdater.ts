@@ -44,9 +44,31 @@ function releaseAutoUpdaterLock() {
   autoUpdaterLock = false
 }
 
-export default function initAutoUpdater() {
+/**
+ * Points the updater at `feedUrl` instead of the packaged `app-update.yml`.
+ *
+ * Only the e2e harness passes one (`--gdl_e2e_update_feed`), so it can serve
+ * a channel file from its own mock rather than leaving every launch to fail
+ * its update check against an unreachable release server. A failed check is
+ * not inert: it raises an 8-second error toast over the login screen, which
+ * an automated click then has to wait out.
+ *
+ * `provider: "generic"` matches what `.electron-builder.config.cjs` publishes
+ * with, so the override changes where the channel file is fetched from and
+ * nothing about how it is interpreted.
+ */
+function applyUpdateFeedOverride(feedUrl: string): void {
+  autoUpdater.setFeedURL({ provider: "generic", url: feedUrl })
+  log.info("[updater] Feed URL overridden:", feedUrl)
+}
+
+export default function initAutoUpdater(updateFeedOverride?: string | null) {
   log.transports.file.level = "info"
   autoUpdater.logger = log
+
+  if (updateFeedOverride) {
+    applyUpdateFeedOverride(updateFeedOverride)
+  }
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
   // Disable differential download - the CDN doesn't support HTTP range requests

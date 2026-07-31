@@ -41,6 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "インスタンスのJava引数",
   "_trn_instance_settings.prepend_global_java_args": "グローバルJava引数をインスタンスの追加Java引数の前に付加 (以下の {GLOBAL_JAVA_ARGS})",
   "_trn_instance_settings.java_path_profile": "インスタンスのJavaパス / プロファイル",
+  "_trn_instance_settings.java_override_mismatch": "-------- [ UNTRANSLATED ] -------- The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
   "_trn_system_profiles": "システムプロファイル",
   "_trn_custom_profiles": "カスタムプロファイル",
   "_trn_profile_used_in_mc_versions": "このプロファイルは以下のMinecraftバージョンで使用されています",

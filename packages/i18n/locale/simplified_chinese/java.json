@@ -41,6 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "实例 Java 参数",
   "_trn_instance_settings.prepend_global_java_args": "在实例额外的 Java 参数前添加全局 Java 参数（下方为 {GLOBAL_JAVA_ARGS}）",
   "_trn_instance_settings.java_path_profile": "实例 Java 路径 / 配置",
+  "_trn_instance_settings.java_override_mismatch": "-------- [ UNTRANSLATED ] -------- The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
   "_trn_system_profiles": "系统配置",
   "_trn_custom_profiles": "自定义配置",
   "_trn_profile_used_in_mc_versions": "此配置用于以下 Minecraft 版本",

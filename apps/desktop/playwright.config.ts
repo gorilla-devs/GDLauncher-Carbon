@@ -50,8 +50,28 @@ const config: PlaywrightTestConfig = {
      A red build from a third-party flake is the accepted cost. Investigate
      it, or re-run it by hand — do not raise this number. */
   retries: 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* One worker everywhere, and this is a correctness setting rather than a
+     performance one — do not make it conditional.
+
+     Two independent reasons. First, the suite's ordering invariants assume
+     it: `fixtures/installedInstance.ts` documents three load-bearing
+     dependencies that hold only because Playwright runs spec files in
+     alphabetical order through a single worker. Spread the files across
+     workers and each gets its own runtime path in its own order, so those
+     guarantees quietly stop applying — the assertions they protect still
+     run, and still pass, while no longer proving what they were written to
+     prove.
+
+     Second, every test here drives a real launcher against real CDNs. N
+     workers means N packaged apps concurrently downloading Minecraft assets,
+     JREs, libraries and mods. Measured on a 32-core host, where Playwright's
+     default picked 9: three failures, all of them saturation
+     (`UnknownHostException` thrown from inside a spawned Forge processor
+     JVM, and a failed JRE download) — versus a fully green run serialized.
+     It is not even a speed trade: 6.5 minutes at one worker against 4.8 at
+     nine, because the contention costs back most of what the parallelism
+     wins. */
+  workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */

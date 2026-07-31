@@ -78,6 +78,50 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(payload)
 }
 
+/**
+ * electron-updater's generic provider asks for `<channel>-<platform>.yml`,
+ * with the arch appended on anything but x64 — `latest-linux.yml`,
+ * `latest-linux-arm64.yml`, and the `beta-`/`alpha-` variants the release
+ * channel picks between (`autoUpdater.ts` sets `autoUpdater.channel`). All of
+ * them get the same answer here; which one a run asks for depends on the host
+ * and the settings row, and none of that changes what this feed is for.
+ */
+const UPDATE_CHANNEL_FILE = /^\/updates\/[a-z]+-[a-z0-9-]+\.yml$/
+
+/**
+ * A channel file reporting the lowest version semver has.
+ *
+ * The app under test compares this against its own version and finds nothing
+ * newer, so `checkForUpdates` resolves to `update-not-available` instead of
+ * erroring — which is the point: a failed check raises an 8-second error
+ * toast (`utils/updater.tsx`'s `case "error"`) that sits over the login
+ * screen's continue button, and Playwright's click waits out the whole toast
+ * before the button can receive the pointer event.
+ *
+ * `0.0.0` rather than the packaged version because nothing here knows what
+ * that is: electron-builder stamps it into the app at package time. Reporting
+ * the floor works against any build. It reads as a downgrade rather than an
+ * update, which is equally "nothing to do" while `allowDowngrade` is false —
+ * and it is false on the stable channel, since `autoUpdater.ts` derives it
+ * from `selectedChannelNumber < currentChannelNumber`.
+ *
+ * The `files`/`path`/`sha512`/`releaseDate` fields are here because
+ * electron-updater parses this into an `UpdateInfo` before it compares
+ * versions. A file missing them throws out of the parse, which surfaces as
+ * the same error toast this exists to prevent. Their values are never
+ * dereferenced on the no-update path — nothing is ever downloaded — so the
+ * digest is a placeholder rather than a real hash of anything.
+ */
+const UPDATE_CHANNEL_YAML = `version: 0.0.0
+files:
+  - url: gdlauncher-0.0.0.AppImage
+    sha512: ${"A".repeat(86)}==
+    size: 1
+path: gdlauncher-0.0.0.AppImage
+sha512: ${"A".repeat(86)}==
+releaseDate: '2020-01-01T00:00:00.000Z'
+`
+
 export async function startMockServer(
   opts: MockServerOptions
 ): Promise<MockServer> {
@@ -136,6 +180,13 @@ export async function startMockServer(
 
     if (route === "/__control/requests") {
       json(res, 200, { requests: seen })
+      return
+    }
+
+    // --- update feed ---------------------------------------------------
+    if (UPDATE_CHANNEL_FILE.test(route)) {
+      res.writeHead(200, { "content-type": "text/yaml" })
+      res.end(UPDATE_CHANNEL_YAML)
       return
     }
 

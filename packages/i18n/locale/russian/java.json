@@ -41,6 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "Аргументы JVM для этого экземпляра",
   "_trn_instance_settings.prepend_global_java_args": "Добавлять глобальные аргументы Java перед дополнительными аргументами экземпляра ({GLOBAL_JAVA_ARGS} ниже)",
   "_trn_instance_settings.java_path_profile": "Путь / профиль Java экземпляра",
+  "_trn_instance_settings.java_override_mismatch": "-------- [ UNTRANSLATED ] -------- The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
   "_trn_system_profiles": "Системные профили",
   "_trn_custom_profiles": "Пользовательские профили",
   "_trn_profile_used_in_mc_versions": "Этот профиль используется в следующих версиях Minecraft",

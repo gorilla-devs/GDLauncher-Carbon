@@ -15,12 +15,20 @@ import { queryClient, rspc } from "@/utils/rspcClient"
 import { formatBytes } from "@/utils/formatBytes"
 import { setCleanupRunning } from "./state"
 
+/** `checked` is rendered as `data-checked` purely so the state is readable
+ *  from outside: the `Checkbox` this row wraps renders no queryable input,
+ *  and it forwards no props of its own, so the row is the only place a
+ *  scope's on/off state can be observed. */
 const ClickableRow = (props: {
   onToggle: () => void
+  testId: string
+  checked: boolean
   children: JSX.Element
 }) => {
   return (
     <div
+      data-testid={props.testId}
+      data-checked={String(props.checked)}
       class={`hover:bg-darkSlate-700/50 flex cursor-pointer items-start gap-3 px-4 py-3 ${PRESS_CLASSES}`}
       onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
       onPointerUp={(e) => {
@@ -139,7 +147,11 @@ const CacheCleanup = (props: ModalProps) => {
             </div>
 
             <div class="bg-darkSlate-800 divide-darkSlate-700 flex flex-col divide-y rounded">
-              <ClickableRow onToggle={() => setGdlauncher((v) => !v)}>
+              <ClickableRow
+                testId="cache-cleanup-scope-gdlauncher"
+                checked={gdlauncher()}
+                onToggle={() => setGdlauncher((v) => !v)}
+              >
                 <div class="pointer-events-none">
                   <Checkbox checked={gdlauncher()} />
                 </div>
@@ -160,7 +172,11 @@ const CacheCleanup = (props: ModalProps) => {
                 </div>
               </ClickableRow>
 
-              <ClickableRow onToggle={() => setMinecraft((v) => !v)}>
+              <ClickableRow
+                testId="cache-cleanup-scope-minecraft"
+                checked={minecraft()}
+                onToggle={() => setMinecraft((v) => !v)}
+              >
                 <div class="pointer-events-none">
                   <Checkbox checked={minecraft()} />
                 </div>
@@ -190,6 +206,7 @@ const CacheCleanup = (props: ModalProps) => {
                 <Trans key="modals:_trn_cache_cleanup.cancel" />
               </Button>
               <Button
+                data-testid="cache-cleanup-start"
                 type="primary"
                 disabled={!canSubmit() || startMutation.isPending}
                 loading={startMutation.isPending}
@@ -232,7 +249,10 @@ const CacheCleanup = (props: ModalProps) => {
           </Match>
 
           <Match when={phase() === "done"}>
-            <div class="flex flex-col items-center gap-4 py-8">
+            <div
+              data-testid="cache-cleanup-done"
+              class="flex flex-col items-center gap-4 py-8"
+            >
               <div class="i-hugeicons:checkmark-circle-02 text-green-400 h-12 w-12" />
               <div class="text-lg font-medium">
                 <Trans key="modals:_trn_cache_cleanup.done_title" />

@@ -179,6 +179,30 @@ export function readPartialVersionInfo(
   ) as CachedPartialVersionInfo
 }
 
+/**
+ * Every `PartialVersionInfoCache` id beginning with `prefix`, in insertion
+ * order.
+ *
+ * Lets a caller that let the app choose a loader build discover which one it
+ * chose, rather than pinning a version string that the loader's own release
+ * cadence will invalidate. On a runtime path where exactly one instance of a
+ * given loader has been installed, `listPartialVersionInfoIds(rt, "forge-")`
+ * returns exactly that build's cache id — which is also why the caller should
+ * assert the length rather than blindly taking `[0]`.
+ */
+export function listPartialVersionInfoIds(
+  runtimePath: string,
+  prefix: string
+): string[] {
+  return withConfigDb(runtimePath, (db) => {
+    const rows = db
+      .prepare(`SELECT id FROM PartialVersionInfoCache WHERE id LIKE ?`)
+      .all(`${prefix}%`) as { id: string }[]
+
+    return rows.map((row) => row.id)
+  })
+}
+
 /** The subset of `carbon_repos::repos::instance::InstanceRow` the e2e suite
  *  needs off it: `id` is the numeric `FEInstanceId` the rspc API takes for
  *  every per-instance call (e.g. `InstallMod.instance_id`,

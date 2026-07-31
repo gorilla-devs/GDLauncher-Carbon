@@ -72,6 +72,26 @@ export const TEST_IDS = Object.freeze({
   onboardingNext: "onboarding-next",
   onboardingSkip: "onboarding-skip",
 
+  // Cache Cleanup (Settings -> General -> "Clean up", and the modal it
+  // opens). The two scope rows are anchored on the modal's own local
+  // `ClickableRow` wrapper rather than on the `Checkbox` inside them:
+  // `@gd/ui`'s `Checkbox` forwards no unknown props at all (hazard 1 in
+  // this file's header), so a testid placed on it is dropped silently and
+  // with no type error. Each row also exposes `data-checked`, which is the
+  // only readable signal of that scope's state — the `Checkbox` renders no
+  // queryable input either, so there is nothing else to assert against.
+  //
+  // The two `Button` anchors need no such workaround: `@gd/ui`'s `Button`
+  // does spread unknown props onto the real `<button>` (the same reason
+  // `helpers/mods.ts` can select on `button[type="primary"]`).
+  settingsCacheCleanupOpen: "settings-cache-cleanup-open",
+  cacheCleanupScopeGdlauncher: "cache-cleanup-scope-gdlauncher",
+  cacheCleanupScopeMinecraft: "cache-cleanup-scope-minecraft",
+  cacheCleanupStart: "cache-cleanup-start",
+  // Rendered only by the modal's `phase() === "done"` branch, so its
+  // presence is the completion signal a caller waits on.
+  cacheCleanupDone: "cache-cleanup-done",
+
   // Search: the expanded query input on `/search` (same testid on the
   // collapsed trigger input too, since only one of the pair is ever
   // mounted at a time).

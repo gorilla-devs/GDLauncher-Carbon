@@ -8,6 +8,7 @@ import {
   sha1OfFile,
   verifyAssetIndex,
   verifyClientJar,
+  verifyLibrariesAbsent,
   verifyLibrariesPresent
 } from "./installVerify.js"
 
@@ -486,5 +487,43 @@ describe("sampleKeys", () => {
   it("caps the sample at the requested size", () => {
     const keys = Array.from({ length: 1000 }, (_, i) => `key-${i}`)
     expect(sampleKeys(keys, 20)).toHaveLength(20)
+  })
+})
+
+describe("verifyLibrariesAbsent", () => {
+  it("verifies clean when none of the paths exist", async () => {
+    const result = await verifyLibrariesAbsent(runtimePath, [
+      "net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-client.jar",
+      "org/ow2/asm/asm/9.3/asm-9.3.jar"
+    ])
+    expect(result).toEqual({ ok: true, problems: [] })
+  })
+
+  it("reports every path that still exists, not just the first", async () => {
+    const goneA = "org/ow2/asm/asm/9.3/asm-9.3.jar"
+    const stillThereA =
+      "net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-client.jar"
+    const stillThereB =
+      "net/minecraft/client/1.20.1/client-1.20.1-srg.jar"
+
+    await writeLibrary(runtimePath, stillThereA, Buffer.from("jar bytes"))
+    await writeLibrary(runtimePath, stillThereB, Buffer.from("jar bytes"))
+
+    const result = await verifyLibrariesAbsent(runtimePath, [
+      goneA,
+      stillThereA,
+      stillThereB
+    ])
+
+    expect(result.ok).toBe(false)
+    expect(result.problems).toHaveLength(2)
+    expect(result.problems.some((p) => p.includes(stillThereA))).toBe(true)
+    expect(result.problems.some((p) => p.includes(stillThereB))).toBe(true)
+    expect(result.problems.some((p) => p.includes(goneA))).toBe(false)
+  })
+
+  it("verifies clean on an empty path list", async () => {
+    const result = await verifyLibrariesAbsent(runtimePath, [])
+    expect(result).toEqual({ ok: true, problems: [] })
   })
 })

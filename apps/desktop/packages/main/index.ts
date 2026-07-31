@@ -246,6 +246,7 @@ const allowMultipleInstances = validateArgument(
 const overrideBaseApi = validateArgument("--gdl_override_base_api")
 const e2eAuthBase = validateArgument("--gdl_e2e_auth_base")
 const e2eEntitlementKey = validateArgument("--gdl_e2e_entitlement_key")
+const e2eUpdateFeed = validateArgument("--gdl_e2e_update_feed")
 
 if (!allowMultipleInstances) {
   if (!app.requestSingleInstanceLock()) {
@@ -1662,7 +1663,7 @@ app.whenReady().then(async () => {
     }
   )
 
-  initAutoUpdater()
+  initAutoUpdater(e2eUpdateFeed?.value)
 })
 
 app.on("window-all-closed", async () => {

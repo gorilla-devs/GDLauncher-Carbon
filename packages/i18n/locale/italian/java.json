@@ -41,6 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "Argomenti Java Istanza",
   "_trn_instance_settings.prepend_global_java_args": "Anteponi argomenti Java globali prima degli argomenti Java extra istanza ({GLOBAL_JAVA_ARGS} sotto)",
   "_trn_instance_settings.java_path_profile": "Percorso Java Istanza / Profilo",
+  "_trn_instance_settings.java_override_mismatch": "-------- [ UNTRANSLATED ] -------- The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
   "_trn_system_profiles": "Profili di Sistema",
   "_trn_custom_profiles": "Profili Personalizzati",
   "_trn_profile_used_in_mc_versions": "Questo profilo è usato nelle seguenti versioni di Minecraft",

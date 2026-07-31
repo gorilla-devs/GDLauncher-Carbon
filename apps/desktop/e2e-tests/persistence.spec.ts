@@ -126,23 +126,36 @@ async function goToLibrary(page: Page): Promise<void> {
 }
 
 /**
- * Waits for a fresh `instance.getInstanceDetails` response to land, having
- * registered the listener before `action` runs so a response that fires
- * during `action` is never missed.
+ * Runs `action`, then gives a fresh `instance.getInstanceDetails` response up
+ * to `DETAILS_SETTLE_TIMEOUT` to land — registering the listener before
+ * `action` runs so a response that fires during it is never missed.
  *
- * Exists to close a real race this task found live, not a defensive
- * guess: `Addons/index.tsx`'s `defaultSearchType()` — what "Add Addons"
- * uses to pick the search page's content-type filter — reads
- * `hasModloaders()`, which reads `instance.getInstanceDetails`'s own
- * `modloaders` field. On a warm worker (every other spec in this suite)
- * that query is long since cached by the time "Add Addons" is ever
- * clicked. On this spec's cold, single-use runtime path it is not: clicking
- * straight through from `openInstanceAddons` (which only waits on the
- * sibling `instance.getInstanceMods` query, never this one) raced
- * `defaultSearchType()` against the still-in-flight `getInstanceDetails`
- * fetch, lost, and sent the search to the Shaders tab instead of Mods —
- * observed directly, not theorized.
+ * Mitigates a real race this suite found live, not a defensive guess:
+ * `Addons/index.tsx`'s `defaultSearchType()` — what "Add Addons" uses to pick
+ * the search page's content-type filter — reads `hasModloaders()`, which
+ * reads `instance.getInstanceDetails`'s own `modloaders` field. On a warm
+ * worker (every other spec in this suite) that query is long since cached by
+ * the time "Add Addons" is ever clicked. On this spec's cold, single-use
+ * runtime path it is not: clicking straight through from `openInstanceAddons`
+ * (which only waits on the sibling `instance.getInstanceMods` query, never
+ * this one) raced `defaultSearchType()` against the still-in-flight
+ * `getInstanceDetails` fetch, lost, and sent the search to the Shaders tab
+ * instead of Mods — observed directly, not theorized.
+ *
+ * Deliberately does not fail when no response arrives in time. What this
+ * function wants is for the details query to have *settled*, and "an HTTP
+ * request crossed the wire" is a side channel for that, not the thing itself
+ * — a request that is merely slow (measured at 1.8s and 2.9s on a healthy
+ * host, but unbounded on a loaded one, since the core answers it while
+ * competing with its own background downloads) would fail a launcher that is
+ * working perfectly. The property that actually matters is asserted where it
+ * is observable, on the outcome rather than the transport: `searchForMod`
+ * checks that "Add Addons" landed on the mods search route. A lost race
+ * therefore still fails the test — with a message naming this race — and a
+ * slow one no longer does.
  */
+const DETAILS_SETTLE_TIMEOUT = 15_000
+
 async function waitForInstanceDetailsResponse(
   page: Page,
   action: () => Promise<void>
@@ -154,7 +167,11 @@ async function waitForInstanceDetailsResponse(
   page.on("response", onResponse)
   try {
     await action()
-    await expect.poll(() => settled, { timeout: 15_000 }).toBe(true)
+    await expect
+      .poll(() => settled, { timeout: DETAILS_SETTLE_TIMEOUT })
+      .toBe(true)
+  } catch {
+    // Intentionally swallowed — see this function's doc comment.
   } finally {
     page.off("response", onResponse)
   }
@@ -246,7 +263,8 @@ test.describe("state survives a restart", () => {
       runtimePath: harness.runtimePath,
       baseApi: `${harness.mock.url}/gdl`,
       e2eAuthBase: harness.mock.url,
-      e2eEntitlementKey: harness.entitlementKeyPath
+      e2eEntitlementKey: harness.entitlementKeyPath,
+      e2eUpdateFeed: `${harness.mock.url}/updates/`
     }
 
     let current: {

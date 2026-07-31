@@ -260,6 +260,32 @@ export async function searchForMod(
 ): Promise<void> {
   await byPrimaryButton(page, "Add Addons").click()
 
+  // "Add Addons" picks the search page's content type from
+  // `Addons/index.tsx`'s `defaultSearchType()`, which falls back to
+  // `hasModloaders() ? "mods" : "shaders"` — and `hasModloaders()` reads
+  // `instance.getInstanceDetails.modloaders`. On a cold app that query can
+  // still be in flight when this click lands, in which case the app navigates
+  // to the *shaders* search instead and every later step in this helper
+  // searches the wrong catalogue: the query returns no rows (or the wrong
+  // ones) and the failure surfaces as a mystifying "no search-result-row",
+  // several steps downstream of its cause. `gotoSearchPage`
+  // (`Addons/hooks/useAddonMutations.tsx`) encodes the choice directly in the
+  // route it navigates to — `/search/mod` vs `/search/shader` — so the route
+  // is where a lost race is both visible and unambiguous. Asserted on the
+  // rendered outcome rather than on the `getInstanceDetails` response that
+  // decides it, so a details query that is simply slow cannot fail a healthy
+  // app; only actually landing on the wrong catalogue can.
+  await expect
+    .poll(() => page.url(), {
+      message:
+        `searchForMod: "Add Addons" did not land on the mods search route. ` +
+        `The app navigates to /search/shader instead of /search/mod when ` +
+        `instance.getInstanceDetails has not resolved by the time the ` +
+        `button is clicked (Addons/index.tsx defaultSearchType), so this ` +
+        `search would have run against the wrong catalogue`
+    })
+    .toMatch(/#\/search\/mod(?:[?/]|$)/)
+
   const platformTestId =
     opts.platform === "curseforge"
       ? TEST_IDS.searchPlatformCurseforge

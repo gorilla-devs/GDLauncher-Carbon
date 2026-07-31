@@ -7,11 +7,14 @@ use anyhow::Context;
 use carbon_net::{Checksum, DownloadOptions, Downloadable, Progress};
 use carbon_repos::db_exec::Db;
 use carbon_rt_path::{ManagedJavasPath, TempPath};
+use reqwest_middleware::ClientBuilder;
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 use strum::IntoEnumIterator;
 use tokio::{
@@ -371,6 +374,44 @@ async fn fetch_package_sha256(package_uuid: &str) -> Option<String> {
 }
 
 const AZUL_BASE_URL: &str = "https://api.azul.com/metadata/v1/zulu/packages/";
+
+/// Ceiling on a single Azul request. Azul normally answers in well under a
+/// second, so this is generous headroom rather than an expected duration — but
+/// it must exist: see `azul_client` for why an unbounded attempt makes the
+/// retry actively harmful.
+const AZUL_REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Retries per request, on top of the initial attempt.
+const AZUL_MAX_RETRIES: u32 = 3;
+
+/// A retrying HTTP client for the Azul metadata API.
+///
+/// `get_all_versions` spawns one request chain per `JavaOs` x `JavaArch`
+/// (3 x 4 = 12) and joins them with `task.await??`, which is fail-fast: a
+/// single transient failure among the twelve aborts the entire JRE version
+/// resolution and reaches the user as a failed instance install. With no retry
+/// at all, even a 3% per-request failure rate makes that `1 - 0.97^12` — about
+/// a 31% chance of failing outright, matching the roughly one-in-three rate
+/// observed live.
+///
+/// Both halves are load-bearing and neither works alone. Retrying without a
+/// per-attempt timeout does not bound failure, it multiplies it: a server that
+/// accepts and never answers would stall every attempt in turn. The fail-fast
+/// join in `get_all_versions` is deliberately left as it is — a genuinely
+/// unavailable Azul should fail loudly rather than silently yield a partial
+/// version map.
+fn azul_client(
+    timeout: Duration,
+    max_retries: u32,
+) -> anyhow::Result<reqwest_middleware::ClientWithMiddleware> {
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(max_retries);
+
+    Ok(
+        ClientBuilder::new(reqwest::Client::builder().timeout(timeout).build()?)
+            .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+            .build(),
+    )
+}
 struct AzulAPI;
 
 impl AzulAPI {
@@ -386,7 +427,7 @@ impl AzulAPI {
                 let arch = arch.clone();
                 let arced_rwlock_results = rwlock_results.clone();
                 tasks.push(tokio::spawn(async move {
-                    let versions = Self::get_all_by_os_arch(&os, &arch).await?;
+                    let versions = Self::get_all_by_os_arch(&os, &arch, AZUL_BASE_URL).await?;
 
                     let mut results = arced_rwlock_results.write().await;
                     let os = results
@@ -436,13 +477,16 @@ impl AzulAPI {
     async fn get_all_by_os_arch(
         os: &JavaOs,
         arch: &JavaArch,
+        base_url: &str,
     ) -> anyhow::Result<Vec<AzulZuluVersion>> {
         let mut results: Vec<AzulZuluVersion> = Vec::new();
         let mut page = 1;
 
+        let client = azul_client(AZUL_REQUEST_TIMEOUT, AZUL_MAX_RETRIES)?;
+
         loop {
             let url = format!(
-                "{AZUL_BASE_URL}?java_package_type=jre&javafx_bundled=false&release_status=ga&availability_types=CA&archive_type=zip&page={}&os={}&arch={}",
+                "{base_url}?java_package_type=jre&javafx_bundled=false&release_status=ga&availability_types=CA&archive_type=zip&page={}&os={}&arch={}",
                 page,
                 match os {
                     JavaOs::Windows => "windows",
@@ -457,7 +501,7 @@ impl AzulAPI {
                 }
             );
 
-            let req = reqwest::get(&url).await?;
+            let req = client.get(&url).send().await?;
 
             let pagination: Pagination = serde_json::from_str(
                 req.headers()
@@ -510,6 +554,116 @@ mod test {
         let versions = AzulAPI::get_all_versions().await.unwrap();
 
         assert!(!versions.is_empty());
+    }
+
+    /// One page of a well-formed Azul list response.
+    fn azul_page_body() -> String {
+        serde_json::json!([{
+            "package_uuid": "11111111-2222-3333-4444-555555555555",
+            "name": "zulu17.50.19-ca-jre17.0.11-linux_x64.zip",
+            "java_version": [17, 0, 11],
+            "openjdk_build_number": 9,
+            "latest": true,
+            "download_url": "https://example.invalid/zulu.zip",
+            "product": "zulu",
+            "distro_version": [17, 50, 19],
+            "availability_type": "CA"
+        }])
+        .to_string()
+    }
+
+    /// Regression test for the fixture-install failure that made the e2e suite
+    /// unable to go green: `get_all_versions` fans out one request per
+    /// `JavaOs` x `JavaArch` combination (3 x 4 = 12) and joins them with
+    /// `task.await??`, which is fail-fast. With no retry on the individual
+    /// request, a single transient failure among the twelve aborted the whole
+    /// JRE version resolution and surfaced to the user as a failed instance
+    /// install. At a 3% per-request failure rate that is `1 - 0.97^12` — about
+    /// a 31% chance of failing the whole resolution, which matches the roughly
+    /// one-in-three rate observed live.
+    ///
+    /// Asserts the transient 500 is retried rather than propagated. Serves the
+    /// failure first and the success second; mockito hands each request to the
+    /// first matching mock that has not yet met its expected hit count, so the
+    /// retry is what reaches the second mock.
+    #[tokio::test]
+    async fn get_all_by_os_arch_retries_a_transient_failure() {
+        let mut server = mockito::Server::new_async().await;
+
+        let failing = server
+            .mock("GET", mockito::Matcher::Any)
+            .with_status(500)
+            .expect(1)
+            .create_async()
+            .await;
+
+        let succeeding = server
+            .mock("GET", mockito::Matcher::Any)
+            .with_status(200)
+            .with_header("X-Pagination", r#"{"total":1,"total_pages":1}"#)
+            .with_body(azul_page_body())
+            .expect(1)
+            .create_async()
+            .await;
+
+        let base_url = format!("{}/", server.url());
+        let result =
+            AzulAPI::get_all_by_os_arch(&JavaOs::Linux, &JavaArch::X86_64, &base_url).await;
+
+        let versions = result.expect(
+            "a single transient 500 must be retried, not propagated — without a retry-enabled \
+             client this is the failure that aborts all twelve concurrent requests via the \
+             fail-fast `task.await??` join in get_all_versions",
+        );
+        assert_eq!(versions.len(), 1);
+
+        failing.assert_async().await;
+        succeeding.assert_async().await;
+    }
+
+    /// Regression test for a defect introduced by the retry above: retrying a
+    /// request whose individual attempts are unbounded does not bound failure,
+    /// it multiplies it. `reqwest::Client::new()` sets no timeout, so a server
+    /// that accepts the connection and then never answers would hang each of
+    /// the attempts in turn -- turning one indefinite stall into several, and
+    /// blowing budgets far downstream (the e2e harness allows 11 minutes for an
+    /// instance install).
+    ///
+    /// Drives a listener that accepts and never responds. The call must return
+    /// an error promptly rather than hang; the assertion is the outer
+    /// `tokio::time::timeout`, which fires only if the client is unbounded.
+    /// Short timeout/retry values are passed so the test stays fast — the
+    /// behaviour under test is that the bound exists and is honoured, not its
+    /// production magnitude.
+    #[tokio::test]
+    async fn azul_client_bounds_each_attempt_against_a_stalled_server() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        // Accept connections and hold them open without ever writing a
+        // response. Held in a Vec so the sockets are not dropped (a dropped
+        // socket would close the connection and let the client fail fast for
+        // the wrong reason).
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                held.push(stream);
+            }
+        });
+
+        let client = azul_client(Duration::from_millis(400), 1).unwrap();
+
+        let call = client.get(format!("http://{addr}/")).send();
+        let outcome = tokio::time::timeout(Duration::from_secs(20), call).await;
+
+        let result = outcome.expect(
+            "the request must be bounded by its own timeout and return, not hang — an unbounded \
+             client turns each retry into another indefinite stall",
+        );
+        assert!(
+            result.is_err(),
+            "a server that never responds must surface as an error"
+        );
     }
 
     #[test]
