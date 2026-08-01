@@ -465,16 +465,24 @@ makes installing something other than latest possible at all
 (never trusting API order) and picks the second-newest, so exactly one
 already-confirmed-newer build exists for the later update to move to.
 
-**Limitation, stated honestly rather than papered over**: the Versions tab's
-list is virtualized (`@tanstack/solid-virtual`), so only rows near the
-viewport are mounted in the DOM. `installAddonVersion` asserts the target
-row is actually visible before doing anything else, with a message that
-names this exact risk, but there is no scrolling fallback — a version that
-sorts outside the initial mount-plus-overscan window will fail there. This
-works today because every version list this suite reaches is small (~16–27
-rows once scoped to the instance's own Minecraft version and loader) and
-mounts without scrolling; reaching further back into a project's history
-would need a scrolling helper that does not exist yet.
+**Reaching a version outside the initial viewport**: the Versions tab's list
+is virtualized (`@tanstack/solid-virtual`), so only rows near the viewport
+are mounted in the DOM. `installAddonVersion` calls `helpers/mods.ts`'s
+`scrollVersionRowIntoView` first, which scrolls the virtualizer's own scroll
+parent — found the same way `Versions/index.tsx` finds it, by walking up for
+the first ancestor with `overflow(-y): auto|scroll` — a viewport at a time,
+driving both the virtualizer and, once it bottoms out, the infinite query's
+next page, until the target row mounts. Bounded, not unlimited: it gives up
+after 40 scroll steps, or immediately once the list's real bottom is
+confirmed (a scroll that doesn't move, plus one settle window for a further
+page that never arrives) with the row still unfound — either way with a
+message naming which of the two happened, how many rows were mounted, and
+how far down the container it got, so a genuinely absent version fails
+distinctly from one merely still out of reach. Reaching further back into a
+project's history is now a matter of that 40-step bound, not of a missing
+mechanism — every version list this suite reaches today (~16–27 rows once
+scoped to the instance's own Minecraft version and loader) is well within
+it.
 
 **The CurseForge equivalent of this test is deliberately not implemented.**
 `openAddonVersions`'s CurseForge branch (`modplatforms.curseforge.getModFiles`)

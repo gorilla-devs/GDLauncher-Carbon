@@ -159,9 +159,10 @@ const RowContainer = (props: Props & AdditionalProps) => {
                     splitPosition={
                       props.modVersion.serverPackFileId ? "left" : undefined
                     }
+                    testId="modpack-version-download-button"
                   />
                   <Show when={props.modVersion.serverPackFileId}>
-                    <div class="w-px self-stretch bg-primary-700 shrink-0" />
+                    <div class="bg-primary-700 w-px shrink-0 self-stretch" />
                     <ServerPackDownloadButton
                       addon={props.project}
                       fileId={fileId()}

@@ -137,10 +137,11 @@ export const TEST_IDS = Object.freeze({
   // keyed by the platform's own file/version id via `byAddonVersionRow` —
   // the same id `ModDownloadButton`'s `fileId` prop installs. This list is
   // virtualized (`@tanstack/solid-virtual`): only rows near the viewport are
-  // ever mounted, so a target id must already be rendered (no scrolling
-  // helper exists here) — confirmed live that a ~16-entry, already-filtered
-  // single-Minecraft-version list mounts in full without scrolling,
-  // which is the only shape this suite relies on.
+  // ever mounted, so a query against this id only resolves once the target
+  // has actually been scrolled into range. `helpers/mods.ts`'s
+  // `scrollVersionRowIntoView` is what gets a row that far down mounted —
+  // scrolling the virtualizer's own scroll parent and, past its end, paging
+  // the infinite query, up to 40 viewport steps before giving up.
   addonVersionRow: "addon-version-row",
   // Settings > General's "Potato mode" (`reducedMotion`) toggle
   // (`pages/Settings/General.tsx`), used by `persistence.spec.ts` as the
@@ -195,7 +196,71 @@ export const TEST_IDS = Object.freeze({
   // `textContent` (never interpolated as HTML; see `loading.ts`'s own
   // comment on why). Used to assert which status event actually drove the
   // screen, independent of which buttons happen to be present.
-  recoveryErrorDetail: "recovery-error-detail"
+  recoveryErrorDetail: "recovery-error-detail",
+
+  /** The addon page's modpack install button — `AddonExplore`'s header
+   *  instance in `pages/AddonViewPage/index.tsx`. Gated only on
+   *  `project.data?.type === "modpack"`, never on which sub-tab is active, so
+   *  it is persistent chrome present on all four
+   *  (Overview/Versions/Changelog/Screenshots) — the tabs render as
+   *  `props.children` underneath it. Single-match because the Versions tab's
+   *  per-row buttons carry a different id, `modpackVersionDownloadButton`,
+   *  not this one — an unscoped query for this id on the Versions tab would
+   *  otherwise resolve to this button plus one per rendered row. The
+   *  sticky-header duplicate a few lines below stays unanchored: it is
+   *  mounted simultaneously with this button and only CSS-toggled, so a
+   *  shared anchor would double-match. */
+  modpackDownloadButton: "modpack-download-button",
+  /** The modpack install button rendered once per virtualized row on the
+   *  addon page's Versions tab (`components/Browser/RowContainer.tsx`) — a
+   *  different id from the header's `modpackDownloadButton` above because
+   *  both are simultaneously mounted whenever the Versions tab is open. A row
+   *  can also render a `ServerPackDownloadButton` beside it (CurseForge packs
+   *  that ship a separate server pack), which is why this carries its own
+   *  dedicated id rather than being reached as "the row's one descendant
+   *  button" the way `ModDownloadButton`/`InstallButton` rows are — that
+   *  selector would be ambiguous here. Scope a query under
+   *  `byAddonVersionRow(fileId)` to reach one specific build's button. */
+  modpackVersionDownloadButton: "modpack-version-download-button",
+  /** The version dropdown's trigger in the change-version modal. Click it to
+   *  open the listbox before querying for an option. */
+  modpackVersionSelect: "modpack-version-select",
+  /** One option in that listbox, carrying `data-version-id` — a Modrinth
+   *  version id or a CurseForge file id. On a plain `<div>` inside
+   *  `SelectItem` rather than on the component, per hazard 1. */
+  modpackVersionOption: "modpack-version-option",
+  modpackVersionUpdateConfirm: "modpack-version-update-confirm",
+  /** Instance Settings, modpack block. `unlock` is only rendered while the
+   *  instance is locked, and there is no re-lock control anywhere in the
+   *  shipped UI — unlocking is one-way. */
+  instanceSettingsUnlock: "instance-settings-unlock",
+  instanceSettingsUnpair: "instance-settings-unpair",
+  instanceSettingsChangeVersion: "instance-settings-change-version",
+  /** Opens the instance page's overflow menu (`Library/Instance/index.tsx`'s
+   *  `menuItems()`) — the reinstall entry below only resolves once this has
+   *  been clicked. On the `@gd/ui` `Button` (`as="div"`) nested inside
+   *  `DropdownMenuTrigger`, not the trigger itself — `Button` is already
+   *  confirmed elsewhere in this file to spread unknown props onto whatever
+   *  element `as` renders (hazard 1 does not apply to it). */
+  instanceMenuTrigger: "instance-menu-trigger",
+  /** Reinstall lives in the instance page's overflow menu
+   *  (`Library/Instance/index.tsx`'s `menuItems()`), NOT in the Settings tab
+   *  with the three above — hence the different prefix. The menu must be
+   *  opened (`instanceMenuTrigger`) before this resolves. */
+  instanceMenuReinstall: "instance-menu-reinstall",
+  confirmReinstallConfirm: "confirm-reinstall-confirm",
+  // The confirm control on `Confirmation`
+  // (`ModalsManager/modals/Confirmation`), which `ModalsManager/index.tsx`
+  // registers under both `unlock_confirmation` and `unpair_confirmation` for
+  // the same component. Only the unpair path is reachable today —
+  // `Instance/Tabs/Settings/index.tsx`'s unlock button mutates directly and
+  // has its own `openModal("unlock_confirmation", ...)` call commented out —
+  // so this id is named for the one flow it actually gates. Re-enabling the
+  // unlock modal would put both flows' confirm buttons behind this same id.
+  confirmUnpairConfirm: "confirm-unpair-confirm",
+  /** The Addons tab's "Add Addons" button, which `Tabs/Addons/index.tsx`
+   *  disables while the instance's modpack is locked. */
+  addonsAddButton: "addons-add-button"
 })
 
 export function byTestId(id: string): string {
@@ -233,4 +298,13 @@ export function byModRow(filename: string): string {
  */
 export function byAddonVersionRow(fileId: string): string {
   return `[data-testid="${TEST_IDS.addonVersionRow}"][data-file-id="${fileId}"]`
+}
+
+/**
+ * One option in the change-version modal's listbox, located by the
+ * platform's own version id (a Modrinth version id or a CurseForge file id).
+ * The listbox must be open — click `TEST_IDS.modpackVersionSelect` first.
+ */
+export function byModpackVersionOption(versionId: string): string {
+  return `[data-testid="${TEST_IDS.modpackVersionOption}"][data-version-id="${versionId}"]`
 }

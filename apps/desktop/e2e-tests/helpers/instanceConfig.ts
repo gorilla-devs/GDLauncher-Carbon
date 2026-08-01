@@ -31,6 +31,23 @@
  * `name` and `game_configuration`) is flattened alongside it, not nested
  * under a variant key, so this reads `name`/`game_configuration` straight off
  * the parsed top level.
+ *
+ * `modpack` (`v1::Instance.modpack: Option<ModpackInfo>`) is a second field
+ * at that same top level, read the same way. Its shape is easy to get wrong
+ * by analogy with `GameResolution` elsewhere in `v1.rs` (`#[serde(tag =
+ * "type", content = "value")]`, a wrapped representation) — `Modpack` instead
+ * carries plain `#[serde(tag = "platform")]`, **no `content`**, on a newtype
+ * variant wrapping a struct (`Curseforge(CurseforgeModpack)` /
+ * `Modrinth(ModrinthModpack)`), which is the internally-tagged form serde
+ * merges flat: the tag sits alongside the variant's own fields, not wrapping
+ * them under a `"value"` key. `ModpackInfo` then `#[serde(flatten)]`s that
+ * `Modpack` together with its own `locked: bool`. So on disk this is one flat
+ * object — `{ "platform": "Modrinth", "project_id": "...", "version_id":
+ * "...", "locked": true }` (CurseForge: `"platform": "Curseforge"`,
+ * `"project_id"`/`"file_id"` as JSON numbers, `u32` on the Rust side) — never
+ * `{ modpack: { platform, value: { ... } }, locked }`. Confirmed both by
+ * reading `v1.rs` directly and against a live installed instance's
+ * `instance.json` (see `modpackInstall.spec.ts`).
  */
 
 import fs from "node:fs/promises"
@@ -39,6 +56,33 @@ import path from "node:path"
 export interface OnDiskModLoader {
   type: string
   version: string
+}
+
+/** `v1::ModpackInfo` flattened with `v1::Modpack`, read off `instance.json`'s
+ *  `modpack` key — see this file's module doc comment for the exact wire
+ *  shape and why it is not the `{ modpack: { platform, value } }` nesting a
+ *  naive read of `v1.rs`'s sibling `GameResolution` enum would suggest.
+ *  Platform-specific fields follow `helpers/mods.ts`'s `InstalledMod`
+ *  convention (paired `modrinthX`/`curseforgeX` fields, the inapplicable pair
+ *  `null`) rather than a single polymorphic field, for the same reason: the
+ *  two platforms' id types genuinely differ (Modrinth's are strings,
+ *  CurseForge's are `u32`s), so keeping them separate avoids a lossy coercion
+ *  at the read site. */
+export interface OnDiskModpackInfo {
+  platform: "modrinth" | "curseforge"
+  /** Set only when `platform === "modrinth"`. */
+  modrinthProjectId: string | null
+  /** Set only when `platform === "modrinth"` — the specific version the
+   *  instance is pinned to (`ModrinthModpack.version_id`). */
+  modrinthVersionId: string | null
+  /** Set only when `platform === "curseforge"`. */
+  curseforgeProjectId: number | null
+  /** Set only when `platform === "curseforge"` — the specific file the
+   *  instance is pinned to (`CurseforgeModpack.file_id`). */
+  curseforgeFileId: number | null
+  /** One-way once set: `unlockModpack` (`helpers/modpacks.ts`) can flip this
+   *  to `false`, but the shipped UI has no control to flip it back. */
+  locked: boolean
 }
 
 export interface OnDiskInstanceConfig {
@@ -55,11 +99,28 @@ export interface OnDiskInstanceConfig {
    *  never been played may omit the key entirely; read as 0 in that case
    *  rather than treated as a malformed file. */
   secondsPlayed: number
+  /** `null` for a plain (non-modpack) instance — `v1::Instance.modpack` is
+   *  `Option<ModpackInfo>` and `#[serde(default)]`, so the key may also be
+   *  entirely absent, treated identically to an explicit `null`. */
+  modpack: OnDiskModpackInfo | null
 }
 
 interface RawStandardVersion {
   release?: string
   modloaders?: OnDiskModLoader[]
+}
+
+/** Raw wire shape of `instance.json`'s `modpack` key — see this file's module
+ *  doc comment. `project_id` is typed as the union of both platforms' wire
+ *  types (Modrinth: JSON string; CurseForge: JSON number, `u32` on the Rust
+ *  side) since which one is present depends on the sibling `platform` field,
+ *  not on this field alone. */
+interface RawModpackInfo {
+  platform?: "Curseforge" | "Modrinth"
+  project_id?: string | number
+  version_id?: string
+  file_id?: number
+  locked?: boolean
 }
 
 interface RawV1Config {
@@ -68,6 +129,56 @@ interface RawV1Config {
   game_configuration?: {
     version?: RawStandardVersion | string | null
   }
+  modpack?: RawModpackInfo | null
+}
+
+/**
+ * Maps `RawModpackInfo` (the wire shape) to `OnDiskModpackInfo` (this
+ * module's own shape — see its doc comment for why the two platforms get
+ * separate, paired fields). `configPath` is only for the thrown message.
+ *
+ * Throws on a `platform` value that is neither `"Curseforge"` nor
+ * `"Modrinth"` rather than silently mapping it to one or the other —
+ * `readInstanceConfig`'s own "never a vacuous result" stance (see its doc
+ * comment) applies just as much to a field that parses into the *wrong*
+ * platform silently as it does to the file being unreadable outright: a
+ * caller comparing `platform === "modrinth"` would otherwise just read
+ * `false` for a genuine schema drift instead of getting a named failure.
+ */
+function parseModpack(
+  raw: RawModpackInfo | null | undefined,
+  configPath: string
+): OnDiskModpackInfo | null {
+  if (!raw) return null
+
+  if (raw.platform === "Modrinth") {
+    return {
+      platform: "modrinth",
+      modrinthProjectId:
+        typeof raw.project_id === "string" ? raw.project_id : null,
+      modrinthVersionId: raw.version_id ?? null,
+      curseforgeProjectId: null,
+      curseforgeFileId: null,
+      locked: raw.locked ?? false
+    }
+  }
+  if (raw.platform === "Curseforge") {
+    return {
+      platform: "curseforge",
+      modrinthProjectId: null,
+      modrinthVersionId: null,
+      curseforgeProjectId:
+        typeof raw.project_id === "number" ? raw.project_id : null,
+      curseforgeFileId: raw.file_id ?? null,
+      locked: raw.locked ?? false
+    }
+  }
+
+  throw new Error(
+    `readInstanceConfig: ${configPath} has a "modpack" object with an ` +
+      `unrecognised "platform" (got ${JSON.stringify(raw.platform)}) — ` +
+      'expected "Curseforge" or "Modrinth"'
+  )
 }
 
 /**
@@ -119,6 +230,7 @@ export async function readInstanceConfig(
     mcVersion: isStandard ? (version.release ?? null) : null,
     modloaders: isStandard ? (version.modloaders ?? []) : [],
     secondsPlayed:
-      typeof parsed.seconds_played === "number" ? parsed.seconds_played : 0
+      typeof parsed.seconds_played === "number" ? parsed.seconds_played : 0,
+    modpack: parseModpack(parsed.modpack, configPath)
   }
 }

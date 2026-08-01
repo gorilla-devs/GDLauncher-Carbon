@@ -209,6 +209,7 @@ const Settings = () => {
             <Show when={routeData.instanceDetails.data?.modpack?.locked}>
               <Button
                 type="secondary"
+                data-testid="instance-settings-unlock"
                 onClick={() => {
                   searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                   // modalsContext?.openModal(
@@ -240,6 +241,7 @@ const Settings = () => {
             </Show>
             <Button
               type="secondary"
+              data-testid="instance-settings-unpair"
               onClick={() => {
                 searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                 modalsContext?.openModal(
@@ -258,6 +260,7 @@ const Settings = () => {
             </Button>
             <Button
               type="secondary"
+              data-testid="instance-settings-change-version"
               onClick={() => {
                 modalsContext?.openModal(
                   {

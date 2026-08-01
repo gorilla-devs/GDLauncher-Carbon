@@ -305,7 +305,7 @@ const AddonExplore = (props: { children?: any }) => {
 
   return (
     <div class="bg-darkSlate-800 relative flex h-full flex-col">
-      <div class="h-58 max-h-58 min-h-58 flex flex-col items-stretch justify-between transition-all ease-spring">
+      <div class="h-58 max-h-58 min-h-58 ease-spring flex flex-col items-stretch justify-between transition-all">
         <div class="relative h-full">
           <div class="from-darkSlate-700 absolute left-0 right-0 top-0 z-20 h-full bg-gradient-to-t from-30%" />
           <div
@@ -320,7 +320,7 @@ const AddonExplore = (props: { children?: any }) => {
               onClick={() => {
                 navigator.prev()
               }}
-              icon={<div class="i-hugeicons:arrow-left-01 text-2xl h-6 w-6" />}
+              icon={<div class="i-hugeicons:arrow-left-01 h-6 w-6 text-2xl" />}
               size="small"
               type="secondary"
             >
@@ -344,7 +344,7 @@ const AddonExplore = (props: { children?: any }) => {
                     window.openExternalLink(`${baseUrl}${project.data?.slug}`)
                   }}
                 >
-                  <div class="i-hugeicons:link-square-02 text-xl h-6 w-6" />
+                  <div class="i-hugeicons:link-square-02 h-6 w-6 text-xl" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -411,7 +411,7 @@ const AddonExplore = (props: { children?: any }) => {
                       </div>
                     </Show>
                     <div class="border-darkSlate-500 flex items-center gap-2 border-r-2 px-2">
-                      <div class="i-hugeicons:clock-01 text-lg h-5 w-5" />
+                      <div class="i-hugeicons:clock-01 h-5 w-5 text-lg" />
                       <Switch>
                         <Match when={!isFetching()}>
                           <Show when={project.data?.releaseDate}>
@@ -461,9 +461,10 @@ const AddonExplore = (props: { children?: any }) => {
                                 ? "left"
                                 : undefined
                             }
+                            testId="modpack-download-button"
                           />
                           <Show when={project.data?.serverPackFileId}>
-                            <div class="w-px self-stretch bg-primary-700 shrink-0" />
+                            <div class="bg-primary-700 w-px shrink-0 self-stretch" />
                             <ServerPackDownloadButton
                               addon={project.data}
                               splitPosition="right"
@@ -495,7 +496,7 @@ const AddonExplore = (props: { children?: any }) => {
       </div>
       <div class="bg-darkSlate-800 sticky top-0">
         <div class="flex justify-center px-6 py-0">
-          <div class="bg-darkSlate-800 flex-1 min-w-0">
+          <div class="bg-darkSlate-800 min-w-0 flex-1">
             <div
               ref={(el) => {
                 refStickyTabs = el
@@ -505,7 +506,7 @@ const AddonExplore = (props: { children?: any }) => {
               <div class="my-2 flex h-14 items-center justify-between">
                 <div class="flex items-center">
                   <div
-                    class="overflow-hidden transition-all duration-150 ease-spring flex items-center"
+                    class="ease-spring flex items-center overflow-hidden transition-all duration-150"
                     classList={{
                       "w-14 mr-4 opacity-100": isSticky(),
                       "w-0 mr-0 opacity-0": !isSticky()
@@ -545,7 +546,7 @@ const AddonExplore = (props: { children?: any }) => {
                   </div>
                 </div>
                 <div
-                  class="overflow-hidden transition-all duration-150 ease-spring flex items-center justify-end"
+                  class="ease-spring flex items-center justify-end overflow-hidden transition-all duration-150"
                   classList={{
                     "w-14 ml-4 opacity-100": isSticky(),
                     "w-0 ml-0 opacity-0": !isSticky()
@@ -558,6 +559,11 @@ const AddonExplore = (props: { children?: any }) => {
                       }
                     >
                       <div class="flex items-center">
+                        {/* Sticky-header duplicate of the button above, for
+                            the same addon — deliberately not given a
+                            `testId`, since both are mounted at once (only
+                            toggled via width/opacity as the header sticks) and
+                            a shared anchor would give tests two matches. */}
                         <ModpackDownloadButton
                           addon={project.data}
                           size="small"
@@ -567,7 +573,7 @@ const AddonExplore = (props: { children?: any }) => {
                           }
                         />
                         <Show when={project.data?.serverPackFileId}>
-                          <div class="w-px self-stretch bg-primary-700 shrink-0" />
+                          <div class="bg-primary-700 w-px shrink-0 self-stretch" />
                           <ServerPackDownloadButton
                             addon={project.data}
                             size="small"
@@ -614,7 +620,7 @@ const AddonExplore = (props: { children?: any }) => {
                 />
               </Show>
             </div>
-            <div class="z-0 flex flex-1 flex-col px-0 pt-4 min-w-0">
+            <div class="z-0 flex min-w-0 flex-1 flex-col px-0 pt-4">
               <StickyHeaderHeightContext.Provider value={stickyHeaderHeight}>
                 <ModContextProvider mod={project}>
                   {props.children}

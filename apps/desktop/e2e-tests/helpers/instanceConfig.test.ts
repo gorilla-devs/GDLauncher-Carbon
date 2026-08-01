@@ -119,4 +119,90 @@ describe("readInstanceConfig", () => {
       /no string "name" field/
     )
   })
+
+  it("reads modpack as null for a plain (non-modpack) instance", async () => {
+    await writeConfig({
+      _version: "1",
+      name: "plain-instance",
+      game_configuration: {}
+    })
+
+    expect((await readInstanceConfig(instanceRoot)).modpack).toBeNull()
+  })
+
+  it("reads a Modrinth modpack — flat, no modpack/value nesting", async () => {
+    await writeConfig({
+      _version: "1",
+      name: "mr-pack-instance",
+      game_configuration: {},
+      // The real wire shape (v1::ModpackInfo #[serde(flatten)]-ing
+      // v1::Modpack, tag = "platform", no `content`): platform/project_id/
+      // version_id/locked all sit on one flat object, never nested under a
+      // second "modpack" key or a "value" wrapper — see this module's own
+      // doc comment for why that's easy to get wrong by analogy with
+      // GameResolution's `tag = "type", content = "value"` sibling enum.
+      modpack: {
+        platform: "Modrinth",
+        project_id: "MNW3LUwK",
+        version_id: "eGIPjEwN",
+        locked: true
+      }
+    })
+
+    expect((await readInstanceConfig(instanceRoot)).modpack).toEqual({
+      platform: "modrinth",
+      modrinthProjectId: "MNW3LUwK",
+      modrinthVersionId: "eGIPjEwN",
+      curseforgeProjectId: null,
+      curseforgeFileId: null,
+      locked: true
+    })
+  })
+
+  it("reads a CurseForge modpack — numeric project/file ids", async () => {
+    await writeConfig({
+      _version: "1",
+      name: "cf-pack-instance",
+      game_configuration: {},
+      modpack: {
+        platform: "Curseforge",
+        project_id: 520990,
+        file_id: 4713831,
+        locked: false
+      }
+    })
+
+    expect((await readInstanceConfig(instanceRoot)).modpack).toEqual({
+      platform: "curseforge",
+      modrinthProjectId: null,
+      modrinthVersionId: null,
+      curseforgeProjectId: 520990,
+      curseforgeFileId: 4713831,
+      locked: false
+    })
+  })
+
+  it("defaults locked to false when the key is absent", async () => {
+    await writeConfig({
+      _version: "1",
+      name: "unlocked-by-omission",
+      game_configuration: {},
+      modpack: { platform: "Modrinth", project_id: "abc", version_id: "def" }
+    })
+
+    expect((await readInstanceConfig(instanceRoot)).modpack?.locked).toBe(false)
+  })
+
+  it("throws when modpack.platform is neither Curseforge nor Modrinth", async () => {
+    await writeConfig({
+      _version: "1",
+      name: "bad-platform-instance",
+      game_configuration: {},
+      modpack: { platform: "Technic", project_id: "abc" }
+    })
+
+    await expect(readInstanceConfig(instanceRoot)).rejects.toThrow(
+      /unrecognised "platform"/
+    )
+  })
 })

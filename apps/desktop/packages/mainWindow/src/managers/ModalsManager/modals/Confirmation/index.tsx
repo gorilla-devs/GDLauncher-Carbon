@@ -39,6 +39,7 @@ const Confirmation = (props: ModalProps) => {
           </Button>
           <Button
             type="secondary"
+            data-testid="confirm-unpair-confirm"
             onClick={() => {
               if (data().instanceState === "unlock") {
                 updateInstanceMutation.mutate({

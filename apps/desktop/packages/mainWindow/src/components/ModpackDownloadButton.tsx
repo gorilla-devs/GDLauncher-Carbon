@@ -19,6 +19,11 @@ interface ModDownloadButtonProps {
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
   splitPosition?: "left" | "right"
+  /** Opt-in anchor for the rendered download button, mirroring
+   *  `ModDownloadButton`'s own `testId` prop. Left unset everywhere this
+   *  component can render more than one instance for different modpacks at
+   *  once; see the call sites for which ones set it and why. */
+  testId?: string
 }
 
 const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
@@ -119,6 +124,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
       <TooltipTrigger>
         <div class="relative">
           <Button
+            data-testid={props.testId}
             disabled={loading()}
             size={props.size || "medium"}
             onClick={handleDownload}

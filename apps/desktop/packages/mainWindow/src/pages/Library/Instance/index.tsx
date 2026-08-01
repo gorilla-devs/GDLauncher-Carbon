@@ -387,6 +387,7 @@ const Instance = (props: { children?: any }) => {
     label: string | JSX.Element
     action: () => void
     disabled?: boolean
+    testId?: string
   }[] => [
     {
       icon: "i-hugeicons:pencil-edit-01",
@@ -428,6 +429,7 @@ const Instance = (props: { children?: any }) => {
       icon: "i-hugeicons:refresh",
       label: t("instances:_trn_instance_settings.reinstall"),
       disabled: !hasModpack(),
+      testId: "instance-menu-reinstall",
       action: () => {
         modalsContext?.openModal(
           { name: "confirmReinstall" },
@@ -627,6 +629,7 @@ const Instance = (props: { children?: any }) => {
                 <DropdownMenuTrigger class="b-0 bg-transparent p-0">
                   <Button
                     as="div"
+                    data-testid="instance-menu-trigger"
                     rounded
                     class="h-full w-full"
                     size="small"
@@ -644,6 +647,7 @@ const Instance = (props: { children?: any }) => {
               <For each={menuItems()}>
                 {(item) => (
                   <DropdownMenuItem
+                    data-testid={item.testId}
                     onSelect={item.action}
                     disabled={item.disabled}
                   >

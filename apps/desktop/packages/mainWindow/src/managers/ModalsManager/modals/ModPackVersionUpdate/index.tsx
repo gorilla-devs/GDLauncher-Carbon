@@ -173,7 +173,11 @@ const ModPackVersionUpdate = (props: ModalProps) => {
               )
               return (
                 <SelectItem item={itemProps.item}>
-                  <div class="flex w-full justify-between">
+                  <div
+                    class="flex w-full justify-between"
+                    data-testid="modpack-version-option"
+                    data-version-id={itemProps.item.rawValue}
+                  >
                     <span>{version?.name}</span>
                     <Show when={version?.isCurrent}>
                       <span class="text-green-500">
@@ -185,7 +189,10 @@ const ModPackVersionUpdate = (props: ModalProps) => {
               )
             }}
           >
-            <SelectTrigger class="bg-darkSlate-800 w-full">
+            <SelectTrigger
+              class="bg-darkSlate-800 w-full"
+              data-testid="modpack-version-select"
+            >
               <SelectValue<string>>
                 {(state) => {
                   const selectedId = state.selectedOption()
@@ -217,6 +224,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             </Button>
             <Button
               type="primary"
+              data-testid="modpack-version-update-confirm"
               onClick={handleUpdate}
               disabled={!selectedVersion()}
             >

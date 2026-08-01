@@ -86,6 +86,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                 <TooltipTrigger>
                   <Button
                     type="primary"
+                    data-testid="addons-add-button"
                     size="small"
                     onClick={props.onAddAddons}
                     disabled={props.addButtonDisabled}
@@ -103,6 +104,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
           >
             <Button
               type="primary"
+              data-testid="addons-add-button"
               size="small"
               onClick={props.onAddAddons}
               disabled={props.addButtonDisabled}

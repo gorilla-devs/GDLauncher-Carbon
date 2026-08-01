@@ -737,6 +737,165 @@ export function pickOlderVersion(
   return sorted[1]
 }
 
+/** How long one virtualizer scroll step is given to mount its new rows and,
+ *  when it hits the bottom, for the infinite query to deliver another page.
+ *  Short by design, since it is paid up to `maxSteps` times in the worst
+ *  case (a version genuinely absent from the list) — deliberately not tied
+ *  to `openAddonVersions`'s own 1000ms settle window, which times a
+ *  different race (Modrinth's double-fired scoped query after a tab
+ *  switch), not a scroll-triggered `fetchNextPage`. */
+const VERSION_PAGE_SETTLE = 200
+
+/** How long a row that has mounted is given to become visible after being
+ *  scrolled to. Short: at this point the element exists and the only work
+ *  left is layout. */
+const VERSION_ROW_TIMEOUT = 5_000
+
+/**
+ * Scrolls an addon's Versions tab until the row for `fileId` mounts.
+ *
+ * The list is virtualized (`@tanstack/solid-virtual`, `estimateSize: 70`,
+ * `overscan: 5`) over an infinite query, so only rows near the viewport exist
+ * in the DOM at all, and a row far enough down needs both scrolling *and* a
+ * further page fetch before it appears. Scrolling the virtualizer's own
+ * scroll parent — found by walking up for the first ancestor with
+ * `overflow(-y): auto|scroll`, the same predicate `Versions/index.tsx`'s own
+ * `getScrollElement` uses — is what advances both. The starting point
+ * differs, though: the component walks up from `versionsContainerRef` (the
+ * tab's own outer wrapper), while this walks up from a mounted
+ * `addon-version-row`, several levels deeper — through the virtualizer's
+ * absolutely-positioned sizer `<div>` and the `flex-1 px-6` wrapper around
+ * it. The two walks land on the same element only because neither
+ * intervening wrapper sets `overflow-y` today; a future style change that
+ * gave one of them scroll would make this walk stop early and scroll the
+ * wrong, non-scrolling element instead of the real container — a hazard
+ * worth knowing about even though nothing live triggers it now.
+ *
+ * Not every caller's own setup guarantees a row has already painted before
+ * this runs. `openAddonVersions` does (it waits for one itself), but
+ * `modResolution.spec.ts`'s update test instead reaches this through
+ * `helpers/resolutionCapture.ts`'s `captureModrinthVersions`, which only
+ * waits for the scoped network response to settle and never queries the DOM
+ * at all — unlike its CurseForge sibling `captureCurseforgeVersions`, which
+ * does wait for a row (confirmed by reading both). So this waits for a
+ * first row itself, up to the same `VERSIONS_RESPONSE_TIMEOUT` the flat
+ * `expect(row).toBeVisible(...)` precondition this helper replaced used to
+ * wait — preserving that precondition's guarantee for every caller, rather
+ * than narrowing it to zero retry for whichever one doesn't already provide
+ * it upstream.
+ *
+ * Bounded and loud: `maxSteps` viewport-sized scrolls, then a failure naming
+ * the id, how many rows ended up mounted, and how far down the container it
+ * got. A silent give-up here would look identical to "the version does not
+ * exist", which is a materially different bug — so this distinguishes three
+ * outcomes (found; bottom of the list reached without finding it; step
+ * budget exhausted) with its own message, rather than one generic timeout
+ * covering all three.
+ */
+export async function scrollVersionRowIntoView(
+  page: Page,
+  fileId: string,
+  opts: { maxSteps?: number } = {}
+): Promise<void> {
+  const maxSteps = opts.maxSteps ?? 40
+  const target = page.locator(byAddonVersionRow(fileId))
+  let lastScrollTop = 0
+
+  // Shared by the fast path below and the post-settle recheck inside the
+  // bottom-reached branch, so a row found either way is confirmed and
+  // returned the same way. Load-bearing, not cosmetic — see that branch's
+  // own comment for why `continue`ing back to the loop instead of calling
+  // this directly is a real bug, not just a style choice.
+  const confirmFound = async (): Promise<void> => {
+    await target.scrollIntoViewIfNeeded()
+    await expect(target).toBeVisible({ timeout: VERSION_ROW_TIMEOUT })
+  }
+
+  // See the doc comment above: not every caller's own setup already proves
+  // a row painted, so this does — before spending any of the scroll-step
+  // budget below, and bounded the same way the old precondition was.
+  await expect(page.locator(byTestId(TEST_IDS.addonVersionRow)).first(), {
+    message:
+      `scrollVersionRowIntoView: no version row of any kind ever mounted ` +
+      `while looking for "${fileId}" — the Versions list may not have ` +
+      "rendered yet"
+  }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
+
+  for (let step = 0; step < maxSteps; step++) {
+    if ((await target.count()) > 0) {
+      await confirmFound()
+      return
+    }
+
+    const advanced = await page.evaluate(() => {
+      const row = document.querySelector('[data-testid="addon-version-row"]')
+      let el: HTMLElement | null = row as HTMLElement | null
+      while (el?.parentElement) {
+        const style = window.getComputedStyle(el.parentElement)
+        const oy = style.overflowY
+        if (
+          style.overflow === "auto" ||
+          style.overflow === "scroll" ||
+          oy === "auto" ||
+          oy === "scroll"
+        ) {
+          const box = el.parentElement
+          const before = box.scrollTop
+          box.scrollTop = before + box.clientHeight
+          return { before, after: box.scrollTop, height: box.clientHeight }
+        }
+        el = el.parentElement
+      }
+      return null
+    })
+
+    if (!advanced) {
+      throw new Error(
+        `scrollVersionRowIntoView: could not find the Versions list's ` +
+          `scroll container while looking for version row "${fileId}" — ` +
+          "its rows may have been replaced by a re-render since the wait " +
+          "above, which only proves some row existed once"
+      )
+    }
+    lastScrollTop = advanced.after
+
+    // A scroll that did not move means the bottom is reached and no further
+    // page is coming. Give the infinite query one settle window to prove
+    // otherwise before declaring the id absent. Calling `confirmFound`
+    // directly here (rather than `continue`ing back to the loop) matters on
+    // the *last* permitted iteration specifically: `continue` re-runs the
+    // `for` statement's own update/condition, which on that iteration
+    // increments `step` to `maxSteps` and exits the loop instead of
+    // re-entering the body — falling into the unconditional post-loop throw
+    // one line after this branch already confirmed the row exists.
+    if (advanced.after === advanced.before) {
+      await page.waitForTimeout(VERSION_PAGE_SETTLE)
+      if ((await target.count()) > 0) {
+        await confirmFound()
+        return
+      }
+      const mounted = await page
+        .locator(byTestId(TEST_IDS.addonVersionRow))
+        .count()
+      throw new Error(
+        `scrollVersionRowIntoView: version row "${fileId}" was not found ` +
+          `after scrolling to the bottom of the Versions list (${mounted} ` +
+          `rows mounted, scrollTop ${advanced.after}) — the version may ` +
+          "not exist for this project"
+      )
+    }
+
+    await page.waitForTimeout(VERSION_PAGE_SETTLE)
+  }
+
+  const mounted = await page.locator(byTestId(TEST_IDS.addonVersionRow)).count()
+  throw new Error(
+    `scrollVersionRowIntoView: version row "${fileId}" did not mount ` +
+      `within ${maxSteps} scroll steps (${mounted} rows mounted, scrollTop ` +
+      `${lastScrollTop})`
+  )
+}
+
 /** How long installing one specific version off the Versions tab is given to
  *  report success — mirrors `INSTALL_TIMEOUT`, the same real-CDN-download
  *  bound `installModIntoInstance` uses for the addon page's main button. */
@@ -756,25 +915,17 @@ const VERSION_INSTALL_TIMEOUT = 120_000
  * rows near the viewport, while `pickOlderVersion` picks by `datePublished`
  * order — an order that happens to match the API's (and thus the DOM's
  * mount) order today, but nothing guarantees it stays that way. So this
- * asserts the target row is actually mounted before doing anything else,
- * with a message that names the version and the reason it might not be —
- * turning a generic timeout into a diagnosis rather than a confusing hang.
+ * calls `scrollVersionRowIntoView` first, which drives the virtualizer's own
+ * scroll parent — and, once it bottoms out, the infinite query's next page —
+ * until the target row mounts, rather than assuming `openAddonVersions`
+ * already left it on screen.
  */
 export async function installAddonVersion(
   page: Page,
   version: AddonVersionSummary
 ): Promise<void> {
+  await scrollVersionRowIntoView(page, version.fileId)
   const row = page.locator(byAddonVersionRow(version.fileId))
-  await expect(row, {
-    message:
-      `installAddonVersion: version "${version.fileId}" (published ` +
-      `${version.datePublished}) never mounted in the Versions tab's DOM. ` +
-      "This list is virtualized and only mounts rows near the viewport; " +
-      "pickOlderVersion picks by datePublished order, which is not " +
-      "guaranteed to match the DOM's mount order. This helper has no " +
-      "scrolling fallback, so a version outside the initial mount + " +
-      "overscan window will fail exactly like this."
-  }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
   // Not just `row.locator("button")`: a version row resolves to three
   // `<button>`s — the row's own name `Tooltip`'s trigger, the install
   // button's `Tooltip` trigger (Kobalte renders both as real `<button>`

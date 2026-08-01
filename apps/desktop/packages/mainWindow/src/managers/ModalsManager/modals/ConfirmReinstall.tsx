@@ -101,6 +101,7 @@ const ConfirmReinstall = (props: ModalProps) => {
           </Button>
           <Button
             type="secondary"
+            data-testid="confirm-reinstall-confirm"
             onClick={() => {
               modalsContext?.closeModal()
               navigateAwayIfInsideDetail()
