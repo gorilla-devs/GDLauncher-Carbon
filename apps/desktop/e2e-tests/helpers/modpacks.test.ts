@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest"
+import { createHash } from "node:crypto"
 import { deflateRawSync } from "node:zlib"
 import { crc32 } from "node:zlib"
 import { packPaths, parseMrpackIndex, type PackIndex } from "./modpacks.js"
+
+/** Matches `parseMrpackIndex`'s own hash choice for override content — see
+ *  `PackOverrideFile`'s doc comment for why sha256. */
+function sha256(body: string): string {
+  return createHash("sha256").update(Buffer.from(body, "utf8")).digest("hex")
+}
 
 /** Builds a minimal, spec-conformant ZIP with every entry compressed by
  *  `method` — 0 (stored, where the "compressed" bytes are just the raw
@@ -96,6 +103,16 @@ describe("parseMrpackIndex", () => {
     ])
   })
 
+  it("pairs every override with a sha256 of its own raw bytes", () => {
+    const overrideFiles = [...parseMrpackIndex(zip).overrideFiles].sort(
+      (a, b) => a.path.localeCompare(b.path)
+    )
+    expect(overrideFiles).toEqual([
+      { path: "config/nested/y.txt", sha256: sha256("hi") },
+      { path: "config/x.json", sha256: sha256("{}") }
+    ])
+  })
+
   it("reads the minecraft version and the loader off dependencies", () => {
     const index = parseMrpackIndex(zip)
     expect(index.minecraft).toBe("1.20.1")
@@ -116,6 +133,7 @@ describe("parseMrpackIndex", () => {
         { path: "mods/b.jar", sha512: "cc", size: 456 }
       ],
       overrides: ["config/x.json"],
+      overrideFiles: [{ path: "config/x.json", sha256: sha256("{}") }],
       minecraft: "1.20.1",
       loader: { type: "fabric", version: "0.16.14" }
     })
@@ -169,6 +187,10 @@ describe("packPaths", () => {
     const index: PackIndex = {
       files: [{ path: "mods/a.jar", sha512: "aa", size: 1 }],
       overrides: ["config/x.json", "mods/a.jar"],
+      overrideFiles: [
+        { path: "config/x.json", sha256: sha256("{}") },
+        { path: "mods/a.jar", sha256: sha256("dup") }
+      ],
       minecraft: "1.20.1",
       loader: { type: "fabric", version: "0.16.14" }
     }

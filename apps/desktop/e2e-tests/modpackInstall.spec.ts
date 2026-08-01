@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 import { expect, test } from "./fixtures/index.js"
@@ -80,12 +81,28 @@ import {
  * `/library` (dropping `instanceId`) before the next spec runs — so by the
  * time this file's first test calls `openModpackPage`, that reset effect has
  * already fired and put `projectType` back to `"modpack"`, undoing the
- * "leak" before it could ever reach here. The gap `openModpackPage` documents
- * is real in isolation (a standalone, non-instance-scoped search for some
- * other type, never followed by a drop back to an instanceId-less route,
- * would leave it unreset) but is not reachable through any ordering this
- * suite's own specs actually produce today. Left unguarded per the brief's
- * own instruction for this outcome: no `data-testid` added to
+ * "leak" before it could ever reach here.
+ *
+ * The gap is dormant, not absent: two concrete vectors would still reach it,
+ * and neither is exercised by any spec in this suite today, so this needs
+ * re-checking before either is ever added (four more modpack specs are
+ * planned against this same assumption):
+ *
+ * 1. **A server-scoped search.** The reset effect keys only on
+ *    `selectedInstanceId()`, never `selectedServerId()`. A search reached
+ *    from a server's Addons tab (`selectedServerId()` set, `selectedInstanceId()`
+ *    never touched at all) that leaves `projectType` on something other than
+ *    `"modpack"` would never trigger the set-to-unset transition this reset
+ *    depends on.
+ * 2. **Direct `AddonTypeDropdown` use on a bare `/search`.** Picking a
+ *    non-modpack type with no instance or server id in the URL sets
+ *    `projectType` via `params.type` (`handleTypeChange`'s
+ *    `navigator.navigate`) while `selectedInstanceId()` was never set to
+ *    begin with — so `prevInstanceId !== selectedInstanceId()` never
+ *    transitions from a real id to `undefined`, and the reset never fires
+ *    either.
+ *
+ * Left unguarded deliberately: no `data-testid` added to
  * `AddonTypeDropdown`, `openModpackPage` untouched, no rebuild for this.
  *
  * ## The CurseForge decision
@@ -102,11 +119,30 @@ import {
  * untracked extras, no missing entries), every recorded hash must still
  * match what is on disk, `instance.json` must record the pinned project/file
  * ids and `modpack.locked === true`, and the resolved Minecraft version must
- * be non-empty with a Fabric loader (`boosted-fps` is Fabric-only). This
- * proves internal consistency and platform-id bookkeeping but — unlike the
- * Modrinth test — cannot prove the pack's *content* landed correctly (e.g. a
- * byte-for-byte wrong file with a self-consistent packinfo entry would not be
- * caught here).
+ * be non-empty with a Fabric loader (`boosted-fps` is Fabric-only).
+ *
+ * **This is a genuine asymmetry with the Modrinth test, not merely a
+ * documented one.** The Modrinth test verifies file *content*: it hashes the
+ * on-disk bytes (sha512) and compares against the pack's own `.mrpack`
+ * index — an oracle wholly external to the app, independent of anything it
+ * computed itself. packinfo cannot substitute for that here, and the reason
+ * is not just "no index exists" — `packinfo::scan_dir`
+ * (`managers/instance/modpack/packinfo/scan.rs`, called from
+ * `process_modpack` in `modpack.rs`) hashes the **staging** directory copy of
+ * each file, *before* it is renamed into its final location
+ * (`instance_prep_path.get_data_path()` at that point in the pipeline is the
+ * staging path, confirmed by reading `process_modpack` directly — the
+ * rename itself happens later, in `process_modpack_staging`). So
+ * `classifyPackinfo`'s later comparison checks on-disk bytes against a hash
+ * derived from those exact same bytes: self-referential, and only ever able
+ * to catch a change made *after* install (a user edit), never a bug that
+ * staged the wrong bytes in the first place. A resolver bug that fetched a
+ * different-but-same-sized build, or a download truncated then padded back
+ * to the right length, would satisfy every assertion in the CurseForge test
+ * below with no signal at all. What that test *does* prove — internal
+ * consistency (packinfo's own bookkeeping matches disk) and platform-id/
+ * lock-state correctness — is real, but strictly less than content
+ * verification.
  *
  * ## A fixture bug found and fixed in this task
  *
@@ -157,11 +193,23 @@ test.describe("modpack install", () => {
       const index = await fetchMrpackIndex(versionId!)
       const tree = await snapshotTree(path.join(root, "instance"))
 
-      // Every declared file is present at its declared size.
+      // Every declared file is present at its declared size AND hashes to
+      // exactly what the pack's own index says — sha512, computed here
+      // straight off the on-disk bytes, never through packinfo. packinfo
+      // cannot stand in for this: its own hash is computed from the staging
+      // copy before the final rename (see the module doc comment), so it can
+      // never tell a wrong-but-same-sized file from a right one. This sha512
+      // check is the one place in either test that verifies content against
+      // a source the app itself did not compute.
       for (const file of index.files) {
         const entry = tree.get(file.path)
         expect(entry, `pack file missing from disk: ${file.path}`).toBeDefined()
         expect(entry!.size, `wrong size for ${file.path}`).toBe(file.size)
+        const bytes = await fs.promises.readFile(
+          path.join(root, "instance", file.path)
+        )
+        const sha512 = createHash("sha512").update(bytes).digest("hex")
+        expect(sha512, `wrong sha512 for ${file.path}`).toBe(file.sha512)
       }
 
       // Every override landed at its stripped path.

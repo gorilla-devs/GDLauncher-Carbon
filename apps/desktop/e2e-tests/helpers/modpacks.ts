@@ -17,6 +17,7 @@
  * handful of entries.
  */
 
+import { createHash } from "node:crypto"
 import { inflateRawSync } from "node:zlib"
 import { expect, type Page } from "@playwright/test"
 import {
@@ -37,13 +38,35 @@ export interface PackFile {
   size: number
 }
 
+export interface PackOverrideFile {
+  /** Forward-slash path, `overrides/` prefix stripped — same value as the
+   *  matching entry in `PackIndex.overrides`. */
+  path: string
+  /** sha256 of the override's raw bytes, exactly as they sit in the
+   *  archive. `modrinth.index.json` declares no hash at all for anything
+   *  under `overrides/` (only `files[]` carries one, from Modrinth's own
+   *  CDN record), so this is computed here, from the same in-memory bytes
+   *  `overrides` is already built from — the archive itself is the only
+   *  available source of truth for what actually gets extracted. sha256
+   *  rather than sha512 (unlike `PackFile`) so a caller can compare this
+   *  directly against `instanceTree.ts`'s `TreeEntry.sha256` without a
+   *  second read-and-hash of the file on disk. */
+  sha256: string
+}
+
 export interface PackIndex {
   /** Files the pack declares by hash — for Modrinth, everything under
    *  `files[]` in `modrinth.index.json`. Paths are forward-slash and have no
    *  leading slash. */
   files: PackFile[]
-  /** Paths extracted from `overrides/`, with the prefix stripped. */
+  /** Paths extracted from `overrides/`, with the prefix stripped. Kept as a
+   *  plain path list — every existing caller wants only that — with content
+   *  hashes available in parallel via `overrideFiles`. */
   overrides: string[]
+  /** `overrides`, paired with each file's content hash. Same paths, same
+   *  order, computed together in `parseMrpackIndex` so the two can never
+   *  drift apart. */
+  overrideFiles: PackOverrideFile[]
   minecraft: string
   loader: { type: string; version: string }
 }
@@ -148,15 +171,24 @@ export function parseMrpackIndex(zip: Buffer): PackIndex {
     )
   }
 
+  // Built once, together, so `overrides` and `overrideFiles` can never
+  // disagree on which paths exist — `overrides` is derived from this rather
+  // than computed by a second, separate filter.
+  const overrideFiles: PackOverrideFile[] = entries
+    .filter((e) => e.name.startsWith("overrides/") && !e.name.endsWith("/"))
+    .map((e) => ({
+      path: e.name.slice("overrides/".length),
+      sha256: createHash("sha256").update(e.body).digest("hex")
+    }))
+
   return {
     files: index.files.map((f) => ({
       path: f.path,
       sha512: f.hashes.sha512,
       size: f.fileSize
     })),
-    overrides: entries
-      .filter((e) => e.name.startsWith("overrides/") && !e.name.endsWith("/"))
-      .map((e) => e.name.slice("overrides/".length)),
+    overrides: overrideFiles.map((f) => f.path),
+    overrideFiles,
     minecraft: index.dependencies.minecraft,
     loader: {
       type: loaderKey[1],
@@ -204,8 +236,18 @@ export async function fetchMrpackIndex(versionId: string): Promise<PackIndex> {
 }
 
 /** How long a real modpack search against the live platform is given to
- *  return the pack. Mirrors `mods.ts`'s `SEARCH_RESULTS_TIMEOUT`. */
-const MODPACK_SEARCH_TIMEOUT = 30_000
+ *  return the pack. Mirrors `mods.ts`'s `SEARCH_RESULTS_TIMEOUT` — same
+ *  90_000, same reason: re-measured directly against Modrinth's search
+ *  endpoint (2026-08-01, independent of the app), a query's first-ever hit
+ *  is genuinely cold at ~30.2s, while every later hit for that *same* query
+ *  is warm at ~0.08s. The previous 30_000 sat exactly on that cold-path
+ *  boundary and failed deterministically on a fresh query — the common case
+ *  here, since this suite's specs each search a different pack. 90_000 is
+ *  ~3x the measured cold path, not a guess. This deliberately makes a
+ *  genuinely broken search take longer to fail — the correct trade (a slow
+ *  red beats a false red from a cold cache) — so don't "optimise" this back
+ *  down without re-measuring the cold path first. */
+const MODPACK_SEARCH_TIMEOUT = 90_000
 
 /** How long the library is given to show the tile the install just created.
  *  `ModpackDownloadButton` navigates to `/library` from its `prepareInstance`
@@ -399,9 +441,52 @@ export async function installModpackLatest(
   return name
 }
 
+/** How long a single attempt at the addon page's Versions tab is given to
+ *  settle before `installModpackVersion` decides the route bounced back to
+ *  `/library` and retries the whole search-and-navigate sequence. Generous
+ *  next to the bounce this guards against, confirmed live to land
+ *  within roughly 150ms of reaching `/addon/:id/:platform/versions`. */
+const VERSIONS_TAB_SETTLE_WINDOW = 1_000
+
+/** How many bounced attempts `installModpackVersion` tolerates before giving
+ *  up. Mirrors `OPEN_INSTANCE_MAX_ATTEMPTS`'s own budget for the analogous,
+ *  already-documented instance-route bounce. */
+const VERSIONS_TAB_MAX_ATTEMPTS = 5
+
+/** The addon page's Versions sub-route, on either platform. */
+const ADDON_VERSIONS_ROUTE_PATTERN =
+  /#\/addon\/[^/]+\/[^/]+\/versions(?:[/?]|$)/
+
 /** Installs one specific pack version via the addon page's Versions tab —
  *  `ModpackDownloadButton` *with* a `fileId`. Returns the instance's display
- *  name, which for this path is the **version** name, not the project title. */
+ *  name, which for this path is the **version** name, not the project title.
+ *
+ * Retries the whole search-and-navigate sequence (not merely the tab click)
+ * on two distinct failure shapes seen live, both only against a
+ * completely fresh, first-ever session — never reproduced against the
+ * shared, already-warmed-up `authenticatedApp` fixture `modpackInstall.spec.ts`
+ * uses for this same driver:
+ *
+ * 1. **A silent bounce.** The route reaches `/addon/:id/:platform/versions`
+ *    and then, well before any `addon-version-row` mounts, navigates back to
+ *    `/library` on its own — no error, no user action. Confirmed via direct
+ *    `page.url()` polling, not inferred from a downstream timeout. This is
+ *    the same *class* of bug `openInstance` already retries around for the
+ *    instance-route equivalent (`Library/Instance/index.tsx`'s
+ *    `routeData.instancesUngrouped` guard navigating back to `/library`
+ *    before the instance is in the just-loaded list).
+ * 2. **`openModpackPage` itself throwing** — most often its search-result-row
+ *    wait timing out with zero results ever rendered. Unlike (1) this is not
+ *    silent, so it is caught here rather than left to propagate on the first
+ *    attempt.
+ *
+ * Both read, from the outside, like `scrollVersionRowIntoView` (or
+ * `openModpackPage`) timing out for no reason, which is exactly why this
+ * wraps and retries the *whole* sequence rather than papering over either
+ * symptom with a longer timeout at its own call site. Not reproduced on the
+ * Overview-button install path (`installModpackLatest`, the Modrinth
+ * test), which never navigates to the `/versions` sub-route — left
+ * unguarded there pending evidence it also needs it. */
 export async function installModpackVersion(
   page: Page,
   query: string,
@@ -411,10 +496,42 @@ export async function installModpackVersion(
   await page.click(byTestId(TEST_IDS.navbarLogo))
   const before = await tileNames(page)
 
-  await openModpackPage(page, query, platform)
-  // Same mechanism `openAddonVersions` uses — the tab bar is a real
-  // `role="tab"` list, so no anchor is needed or wanted here.
-  await page.getByRole("tab", { name: "Versions" }).click()
+  let landed = false
+  let lastFailure: unknown
+  for (let attempt = 1; attempt <= VERSIONS_TAB_MAX_ATTEMPTS; attempt++) {
+    try {
+      await page.click(byTestId(TEST_IDS.navbarLogo))
+      await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
+
+      await openModpackPage(page, query, platform)
+      // Same mechanism `openAddonVersions` uses — the tab bar is a real
+      // `role="tab"` list, so no anchor is needed or wanted here.
+      await page.getByRole("tab", { name: "Versions" }).click()
+
+      await page.waitForTimeout(VERSIONS_TAB_SETTLE_WINDOW)
+      if (ADDON_VERSIONS_ROUTE_PATTERN.test(page.url())) {
+        landed = true
+        break
+      }
+      lastFailure = new Error(
+        `attempt ${attempt}: reached the Versions tab click but the route ` +
+          `was at ${page.url()} (not .../versions) ` +
+          `${VERSIONS_TAB_SETTLE_WINDOW}ms later — a silent bounce back to ` +
+          "/library"
+      )
+    } catch (error) {
+      lastFailure = error
+    }
+  }
+
+  if (!landed) {
+    throw new Error(
+      "installModpackVersion: could not reach a stable " +
+        `/addon/.../versions route for "${fileId}" across ` +
+        `${VERSIONS_TAB_MAX_ATTEMPTS} attempts`,
+      { cause: lastFailure }
+    )
+  }
 
   await scrollVersionRowIntoView(page, fileId)
   // `modpackVersionDownloadButton`, NOT `modpackDownloadButton`: the addon

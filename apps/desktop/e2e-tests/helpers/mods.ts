@@ -119,10 +119,20 @@ interface RawModResponse {
 
 /** How long a real search against the live CurseForge/Modrinth APIs (via the
  *  proxied backend) is given to return at least one result. Mirrors
- *  `helpers/instances.ts`'s `LOADER_VERSION_WAIT_TIMEOUT` — generous next to
- *  the observed live latency (a couple of seconds),
- *  bounded well under the 15-minute test ceiling. */
-const SEARCH_RESULTS_TIMEOUT = 30_000
+ *  `helpers/instances.ts`'s `LOADER_VERSION_WAIT_TIMEOUT`. Measured directly
+ *  against Modrinth's search endpoint (2026-08-01, three probes, independent
+ *  of the app): a query's first-ever hit is genuinely cold and took 30.2s,
+ *  while every later hit for that *same* query took 0.08s. A 30s bound sits
+ *  exactly on that cold-path boundary and fails deterministically whenever a
+ *  spec's search happens to be the first hit for its query string — the
+ *  common case here, since this suite's specs mostly each search a different
+ *  mod/pack. 90_000 is ~3x the measured cold path, not a
+ *  guess, and still bounded well under the 15-minute test ceiling. This
+ *  deliberately makes a genuinely broken search take longer to fail — the
+ *  correct trade (a slow red beats a false red from a cold cache) — so
+ *  don't "optimise" this back down without re-measuring the cold path
+ *  first. */
+const SEARCH_RESULTS_TIMEOUT = 90_000
 
 /** How long a real mod download+install (against the live CDN) is given to
  *  finish. Both mods this suite installs are a few MB, so this is generous
@@ -751,6 +761,15 @@ const VERSION_PAGE_SETTLE = 200
  *  left is layout. */
 const VERSION_ROW_TIMEOUT = 5_000
 
+/** How long the scroll-container lookup below tolerates finding zero rows
+ *  mounted before concluding the container is genuinely unreachable, rather
+ *  than throwing on the first miss. A wide enough infinite query can tear
+ *  down every mounted row and remount a fresh batch in the brief gap between
+ *  the entry wait (below) resolving and the very next lookup — a momentary
+ *  re-render, not an absent container — and this only needs to outlast that
+ *  gap, not a real page fetch (`VERSION_PAGE_SETTLE` is what times those). */
+const CONTAINER_LOOKUP_RETRY_WINDOW = 2_000
+
 /**
  * Scrolls an addon's Versions tab until the row for `fileId` mounts.
  *
@@ -827,34 +846,54 @@ export async function scrollVersionRowIntoView(
       return
     }
 
-    const advanced = await page.evaluate(() => {
-      const row = document.querySelector('[data-testid="addon-version-row"]')
-      let el: HTMLElement | null = row as HTMLElement | null
-      while (el?.parentElement) {
-        const style = window.getComputedStyle(el.parentElement)
-        const oy = style.overflowY
-        if (
-          style.overflow === "auto" ||
-          style.overflow === "scroll" ||
-          oy === "auto" ||
-          oy === "scroll"
-        ) {
-          const box = el.parentElement
-          const before = box.scrollTop
-          box.scrollTop = before + box.clientHeight
-          return { before, after: box.scrollTop, height: box.clientHeight }
+    const lookupScrollContainer = () =>
+      page.evaluate(() => {
+        const row = document.querySelector('[data-testid="addon-version-row"]')
+        let el: HTMLElement | null = row as HTMLElement | null
+        while (el?.parentElement) {
+          const style = window.getComputedStyle(el.parentElement)
+          const oy = style.overflowY
+          if (
+            style.overflow === "auto" ||
+            style.overflow === "scroll" ||
+            oy === "auto" ||
+            oy === "scroll"
+          ) {
+            const box = el.parentElement
+            const before = box.scrollTop
+            box.scrollTop = before + box.clientHeight
+            return { before, after: box.scrollTop, height: box.clientHeight }
+          }
+          el = el.parentElement
         }
-        el = el.parentElement
+        return null
+      })
+
+    let advanced = await lookupScrollContainer()
+
+    // A miss here does not by itself mean the container is gone for good —
+    // see CONTAINER_LOOKUP_RETRY_WINDOW's doc comment. Retried, bounded, and
+    // re-checked against a freshly (re)mounted row each time, rather than
+    // thrown on the first miss.
+    if (!advanced) {
+      const retryDeadline = Date.now() + CONTAINER_LOOKUP_RETRY_WINDOW
+      while (!advanced && Date.now() < retryDeadline) {
+        await page
+          .locator(byTestId(TEST_IDS.addonVersionRow))
+          .first()
+          .waitFor({ state: "attached", timeout: 200 })
+          .catch(() => {})
+        advanced = await lookupScrollContainer()
       }
-      return null
-    })
+    }
 
     if (!advanced) {
       throw new Error(
         `scrollVersionRowIntoView: could not find the Versions list's ` +
           `scroll container while looking for version row "${fileId}" — ` +
           "its rows may have been replaced by a re-render since the wait " +
-          "above, which only proves some row existed once"
+          "above, which only proves some row existed once, and stayed " +
+          `unreachable for the full ${CONTAINER_LOOKUP_RETRY_WINDOW}ms retry window`
       )
     }
     lastScrollTop = advanced.after
