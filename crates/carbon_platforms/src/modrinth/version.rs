@@ -132,6 +132,11 @@ pub struct LatestVersionsBody {
     pub algorithm: HashAlgorithm,
     pub loaders: Vec<String>,
     pub game_versions: Vec<String>,
+    /// Restricts the answer to these release channels. Absent from Modrinth's
+    /// published schema for this route but honoured by it, and omitted from the
+    /// request entirely when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_types: Option<Vec<VersionType>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

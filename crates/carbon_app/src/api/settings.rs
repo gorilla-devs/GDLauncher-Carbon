@@ -16,10 +16,11 @@ use crate::{
         router::router,
     },
     app_version::APP_VERSION,
-    managers::{App, prisma_client::is_in_beta_prompt_cohort},
+    managers::{App, db_bootstrap::is_in_beta_prompt_cohort},
     mirror_into,
 };
-use carbon_repos::db::frontend_preference;
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::frontend_preference;
 use chrono::{DateTime, Duration, Utc};
 use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
@@ -39,16 +40,9 @@ mod preference_keys {
 
 /// Returns true if the user has permanently dismissed the insufficient
 /// memory warning shown when launching an instance.
-pub async fn is_memory_warning_dismissed(
-    db: &carbon_repos::db::PrismaClient,
-) -> anyhow::Result<bool> {
-    let pref = db
-        .frontend_preference()
-        .find_unique(frontend_preference::key::equals(
-            preference_keys::MEMORY_WARNING_DISMISSED.to_string(),
-        ))
-        .exec()
-        .await?;
+pub async fn is_memory_warning_dismissed(db: &carbon_repos::db_exec::Db) -> anyhow::Result<bool> {
+    let pref =
+        frontend_preference::get_preference(db, preference_keys::MEMORY_WARNING_DISMISSED).await?;
 
     Ok(pref.map(|p| p.value == "true").unwrap_or(false))
 }
@@ -137,14 +131,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // First Launch endpoints
         query IS_FIRST_LAUNCH[app, _args: ()] {
-            let db = &app.prisma_client;
-
-            let pref = db
-                .frontend_preference()
-                .find_unique(frontend_preference::key::equals(
-                    preference_keys::FIRST_LAUNCH_COMPLETED.to_string()
-                ))
-                .exec()
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::FIRST_LAUNCH_COMPLETED,)
                 .await?;
 
             // First launch is true if the key is absent (not completed yet)
@@ -152,19 +139,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation COMPLETE_FIRST_LAUNCH[app, _args: ()] {
-            let db = &app.prisma_client;
-
-            db.frontend_preference()
-                .upsert(
-                    frontend_preference::key::equals(preference_keys::FIRST_LAUNCH_COMPLETED.to_string()),
-                    frontend_preference::create(
-                        preference_keys::FIRST_LAUNCH_COMPLETED.to_string(),
-                        "true".to_string(),
-                        vec![]
-                    ),
-                    vec![frontend_preference::value::set("true".to_string())],
-                )
-                .exec()
+            frontend_preference::upsert_preference(&app.db, preference_keys::FIRST_LAUNCH_COMPLETED,
+                    "true",
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             // Invalidate related queries
@@ -176,14 +153,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // Changelog endpoints
         query SHOULD_SHOW_CHANGELOG[app, _args: ()] {
-            let db = &app.prisma_client;
-
-            let pref = db
-                .frontend_preference()
-                .find_unique(frontend_preference::key::equals(
-                    preference_keys::LAST_SEEN_VERSION.to_string()
-                ))
-                .exec()
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::LAST_SEEN_VERSION,)
                 .await?;
 
             // Show changelog if no version stored or version differs from current
@@ -194,19 +164,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation MARK_CHANGELOG_SEEN[app, _args: ()] {
-            let db = &app.prisma_client;
-
-            db.frontend_preference()
-                .upsert(
-                    frontend_preference::key::equals(preference_keys::LAST_SEEN_VERSION.to_string()),
-                    frontend_preference::create(
-                        preference_keys::LAST_SEEN_VERSION.to_string(),
-                        APP_VERSION.to_string(),
-                        vec![]
-                    ),
-                    vec![frontend_preference::value::set(APP_VERSION.to_string())],
-                )
-                .exec()
+            frontend_preference::upsert_preference(&app.db, preference_keys::LAST_SEEN_VERSION,
+                    APP_VERSION,
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             // Invalidate so the query returns fresh data
@@ -217,32 +177,16 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // Beta Prompt endpoints
         query SHOULD_SHOW_BETA_PROMPT[app, _args: ()] {
-            let db = &app.prisma_client;
             let config = app.settings_manager().get_settings().await?;
 
             // Load preferences from database
-            let first_launch_pref = db
-                .frontend_preference()
-                .find_unique(frontend_preference::key::equals(
-                    preference_keys::FIRST_LAUNCH_COMPLETED.to_string()
-                ))
-                .exec()
+            let first_launch_pref = frontend_preference::get_preference(&app.db, preference_keys::FIRST_LAUNCH_COMPLETED,)
                 .await?;
 
-            let dismissed_pref = db
-                .frontend_preference()
-                .find_unique(frontend_preference::key::equals(
-                    preference_keys::BETA_PROMPT_DISMISSED.to_string()
-                ))
-                .exec()
+            let dismissed_pref = frontend_preference::get_preference(&app.db, preference_keys::BETA_PROMPT_DISMISSED,)
                 .await?;
 
-            let last_shown_pref = db
-                .frontend_preference()
-                .find_unique(frontend_preference::key::equals(
-                    preference_keys::BETA_PROMPT_LAST_SHOWN.to_string()
-                ))
-                .exec()
+            let last_shown_pref = frontend_preference::get_preference(&app.db, preference_keys::BETA_PROMPT_LAST_SHOWN,)
                 .await?;
 
             // Build state for decision logic
@@ -264,39 +208,20 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation DISMISS_BETA_PROMPT_PERMANENTLY[app, _args: ()] {
-            let db = &app.prisma_client;
-
-            db.frontend_preference()
-                .upsert(
-                    frontend_preference::key::equals(preference_keys::BETA_PROMPT_DISMISSED.to_string()),
-                    frontend_preference::create(
-                        preference_keys::BETA_PROMPT_DISMISSED.to_string(),
-                        "true".to_string(),
-                        vec![]
-                    ),
-                    vec![frontend_preference::value::set("true".to_string())],
-                )
-                .exec()
+            frontend_preference::upsert_preference(&app.db, preference_keys::BETA_PROMPT_DISMISSED,
+                    "true",
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             Ok(())
         }
 
         mutation REMIND_BETA_PROMPT_LATER[app, _args: ()] {
-            let db = &app.prisma_client;
             let now = Utc::now().to_rfc3339();
 
-            db.frontend_preference()
-                .upsert(
-                    frontend_preference::key::equals(preference_keys::BETA_PROMPT_LAST_SHOWN.to_string()),
-                    frontend_preference::create(
-                        preference_keys::BETA_PROMPT_LAST_SHOWN.to_string(),
-                        now.clone(),
-                        vec![]
-                    ),
-                    vec![frontend_preference::value::set(now)],
-                )
-                .exec()
+            frontend_preference::upsert_preference(&app.db, preference_keys::BETA_PROMPT_LAST_SHOWN,
+                    &now,
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             Ok(())
@@ -304,14 +229,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // Onboarding Tips endpoints
         query GET_SEEN_ONBOARDING_TIPS[app, _args: ()] {
-            let db = &app.prisma_client;
-
-            let pref = db
-                .frontend_preference()
-                .find_unique(frontend_preference::key::equals(
-                    preference_keys::ONBOARDING_TIPS_SEEN.to_string()
-                ))
-                .exec()
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::ONBOARDING_TIPS_SEEN,)
                 .await?;
 
             match pref {
@@ -321,15 +239,8 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation MARK_ONBOARDING_TIP_SEEN[app, tip_id: String] {
-            let db = &app.prisma_client;
-
             // Get existing tips
-            let pref = db
-                .frontend_preference()
-                .find_unique(frontend_preference::key::equals(
-                    preference_keys::ONBOARDING_TIPS_SEEN.to_string()
-                ))
-                .exec()
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::ONBOARDING_TIPS_SEEN,)
                 .await?;
 
             let mut tips: Vec<String> = match pref {
@@ -344,17 +255,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             let value = serde_json::to_string(&tips)?;
 
-            db.frontend_preference()
-                .upsert(
-                    frontend_preference::key::equals(preference_keys::ONBOARDING_TIPS_SEEN.to_string()),
-                    frontend_preference::create(
-                        preference_keys::ONBOARDING_TIPS_SEEN.to_string(),
-                        value.clone(),
-                        vec![]
-                    ),
-                    vec![frontend_preference::value::set(value)],
-                )
-                .exec()
+            frontend_preference::upsert_preference(&app.db, preference_keys::ONBOARDING_TIPS_SEEN,
+                    &value,
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             // Invalidate so the query returns fresh data
@@ -364,13 +267,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation RESET_ONBOARDING_TIPS[app, _args: ()] {
-            let db = &app.prisma_client;
-
-            db.frontend_preference()
-                .delete(frontend_preference::key::equals(
-                    preference_keys::ONBOARDING_TIPS_SEEN.to_string()
-                ))
-                .exec()
+            frontend_preference::delete_preference(&app.db, preference_keys::ONBOARDING_TIPS_SEEN,)
                 .await
                 .ok(); // Ignore if not found
 
@@ -396,14 +293,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // Search sidebar docked state
         query GET_SEARCH_SIDEBAR_DOCKED[app, _args: ()] {
-            let db = &app.prisma_client;
-
-            let pref = db
-                .frontend_preference()
-                .find_unique(frontend_preference::key::equals(
-                    preference_keys::SEARCH_SIDEBAR_DOCKED.to_string()
-                ))
-                .exec()
+            let pref = frontend_preference::get_preference(&app.db, preference_keys::SEARCH_SIDEBAR_DOCKED,)
                 .await?;
 
             // Default to true (docked) if no preference stored
@@ -414,22 +304,11 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation SET_SEARCH_SIDEBAR_DOCKED[app, docked: bool] {
-            let db = &app.prisma_client;
             let value = if docked { "true" } else { "false" }.to_string();
 
-            db.frontend_preference()
-                .upsert(
-                    frontend_preference::key::equals(
-                        preference_keys::SEARCH_SIDEBAR_DOCKED.to_string()
-                    ),
-                    frontend_preference::create(
-                        preference_keys::SEARCH_SIDEBAR_DOCKED.to_string(),
-                        value.clone(),
-                        vec![]
-                    ),
-                    vec![frontend_preference::value::set(value)],
-                )
-                .exec()
+            frontend_preference::upsert_preference(&app.db, preference_keys::SEARCH_SIDEBAR_DOCKED,
+                    &value,
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             app.invalidate(GET_SEARCH_SIDEBAR_DOCKED, None);
@@ -438,26 +317,15 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         // Insufficient memory warning dismissal
         query GET_MEMORY_WARNING_DISMISSED[app, _args: ()] {
-            is_memory_warning_dismissed(&app.prisma_client).await
+            is_memory_warning_dismissed(&app.db).await
         }
 
         mutation SET_MEMORY_WARNING_DISMISSED[app, dismissed: bool] {
-            let db = &app.prisma_client;
             let value = if dismissed { "true" } else { "false" }.to_string();
 
-            db.frontend_preference()
-                .upsert(
-                    frontend_preference::key::equals(
-                        preference_keys::MEMORY_WARNING_DISMISSED.to_string()
-                    ),
-                    frontend_preference::create(
-                        preference_keys::MEMORY_WARNING_DISMISSED.to_string(),
-                        value.clone(),
-                        vec![]
-                    ),
-                    vec![frontend_preference::value::set(value)],
-                )
-                .exec()
+            frontend_preference::upsert_preference(&app.db, preference_keys::MEMORY_WARNING_DISMISSED,
+                    &value,
+                    DbDateTime(Utc::now().fixed_offset()),)
                 .await?;
 
             app.invalidate(GET_MEMORY_WARNING_DISMISSED, None);
@@ -682,10 +550,12 @@ struct FESettings {
     gdl_account_id: Option<String>,
 }
 
-impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
+impl TryFrom<carbon_repos::repos::app_configuration::AppConfigurationRow> for FESettings {
     type Error = anyhow::Error;
 
-    fn try_from(data: carbon_repos::db::app_configuration::Data) -> Result<Self, Self::Error> {
+    fn try_from(
+        data: carbon_repos::repos::app_configuration::AppConfigurationRow,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             theme: data.theme,
             language: data.language,

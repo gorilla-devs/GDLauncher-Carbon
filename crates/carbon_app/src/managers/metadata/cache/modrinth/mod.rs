@@ -1,28 +1,109 @@
 use super::{BundleSender, CacheEntityId, ModplatformCacher, UpdateNotifier};
 use crate::domain::instance::InstanceId;
-use crate::domain::instance::info::ModLoaderType;
+use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::managers::App;
+use crate::managers::instance::InstanceType;
 use anyhow::anyhow;
 use carbon_platforms::ModChannel;
-use carbon_platforms::modrinth::search::VersionIDs;
 use carbon_platforms::modrinth::version::Version;
 use carbon_platforms::modrinth::{
     project::Project,
     responses::{ProjectsResponse, TeamResponse, VersionHashesResponse},
     search::{ProjectIDs, TeamIDs, VersionHashesQuery},
-    version::HashAlgorithm,
+    version::{HashAlgorithm, LatestVersionsBody, VersionType},
 };
-use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter, StringFilter};
-use carbon_repos::db::{
-    mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-    modrinth_mod_image_cache as mrimgdb, server_mod_file_cache as sfcdb,
-};
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::mod_file_cache as mfcdb;
+use carbon_repos::repos::mod_metadata as metarepo;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 use tracing::{debug, error, trace, warn};
 
 pub mod modpack;
+
+/// The game version and loaders an entity runs, as Modrinth spells them.
+///
+/// Update paths are only ever read filtered by this pair, so it is also the only
+/// filter worth asking the API about. `None` when the entity has no usable
+/// version yet, in which case update paths are left alone.
+async fn target_compatibility(
+    app: &App,
+    entity_id: CacheEntityId,
+) -> Option<(Vec<String>, Vec<String>)> {
+    match entity_id {
+        CacheEntityId::Instance(instance_id) => {
+            let instance_manager = app.instance_manager();
+            let instances = instance_manager.instances.read().await;
+            let instance = instances.get(&instance_id)?;
+
+            let InstanceType::Valid(data) = &instance.type_ else {
+                return None;
+            };
+
+            let Some(GameVersion::Standard(version)) = data.game_version() else {
+                return None;
+            };
+
+            let loaders = version
+                .modloaders
+                .iter()
+                .map(|loader| loader.type_.to_string().to_lowercase())
+                .collect::<Vec<_>>();
+
+            (!loaders.is_empty()).then(|| (vec![version.release.clone()], loaders))
+        }
+        CacheEntityId::Server(server_id) => {
+            let server = carbon_repos::repos::server::get_server(&app.db, server_id)
+                .await
+                .ok()??;
+
+            let loader = server.modloader_type?;
+
+            Some((vec![server.game_version], vec![loader.to_lowercase()]))
+        }
+    }
+}
+
+/// The `gamever,loader,channel` triples an installed file can be updated along,
+/// in the `;`-separated form the cache stores and the mod list parses back.
+///
+/// `candidates` are the versions the platform reported as compatible with what
+/// the entity runs. A candidate only describes an update when it belongs to the
+/// same project and was published after the installed file: the newest version
+/// for this entity's game version can predate a file installed for another one.
+fn build_update_paths(installed: &Version, project_id: &str, candidates: &[Version]) -> String {
+    let mut paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
+
+    let updates = candidates.iter().filter(|candidate| {
+        candidate.project_id == project_id
+            && candidate.id != installed.id
+            && candidate.date_published > installed.date_published
+    });
+
+    for update in updates {
+        for game_version in &update.game_versions {
+            for loader in &update.loaders {
+                let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
+                    continue;
+                };
+
+                paths.insert((game_version, loader, update.version_type.into()));
+            }
+        }
+    }
+
+    paths
+        .into_iter()
+        .map(|(gamever, loader, channel)| {
+            format!(
+                "{gamever},{},{}",
+                loader.to_string().to_lowercase(),
+                channel.as_str(),
+            )
+        })
+        .join(";")
+}
 
 pub struct ModrinthModCacher;
 
@@ -43,60 +124,33 @@ impl ModplatformCacher for ModrinthModCacher {
         entity_id: CacheEntityId,
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()> {
+        // Worlds are directories with name-derived pseudo-hashes, so there is
+        // nothing to match on the platform (instance variant excludes them). A
+        // file needs a refresh when its metadata has no Modrinth cache row, or
+        // one cached more than a day ago.
+        let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
         let modlist = match entity_id {
-            CacheEntityId::Instance(instance_id) => app
-                .prisma_client
-                .mod_file_cache()
-                .find_many(vec![
-                    fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                    // Worlds are directories with name-derived pseudo-hashes,
-                    // so there is nothing to match on the platform.
-                    fcdb::WhereParam::AddonType(StringFilter::Not(
-                        crate::domain::instance::AddonType::Worlds
-                            .to_db_string()
-                            .to_string(),
-                    )),
-                    fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
-                        mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                        )),
-                    ])]),
-                ])
-                .with(fcdb::metadata::fetch())
-                .exec()
-                .await?
-                .into_iter()
-                .map(|m| {
-                    let metadata = m
-                        .metadata
-                        .expect("metadata was queried with mod cache yet is not present");
-                    let sha512 = hex::encode(&metadata.sha_512);
-                    (sha512.clone(), (metadata.id, sha512))
-                })
-                .collect::<Vec<_>>(),
-            CacheEntityId::Server(server_id) => app
-                .prisma_client
-                .server_mod_file_cache()
-                .find_many(vec![
-                    sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
-                    sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
-                        mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                        )),
-                    ])]),
-                ])
-                .with(sfcdb::metadata::fetch())
-                .exec()
-                .await?
-                .into_iter()
-                .map(|m| {
-                    let metadata = m
-                        .metadata
-                        .expect("metadata was queried with server mod cache yet is not present");
-                    let sha512 = hex::encode(&metadata.sha_512);
-                    (sha512.clone(), (metadata.id, sha512))
-                })
-                .collect::<Vec<_>>(),
+            CacheEntityId::Instance(instance_id) => {
+                let instance_id_val = *instance_id;
+                mfcdb::instance_mods_needing_mr_refresh(&app.db, instance_id_val, cutoff)
+                    .await?
+                    .into_iter()
+                    .map(|m| {
+                        let sha512 = hex::encode(&m.sha512);
+                        (sha512.clone(), (m.metadata_id, sha512))
+                    })
+                    .collect::<Vec<_>>()
+            }
+            CacheEntityId::Server(server_id) => {
+                mfcdb::server_mods_needing_mr_refresh(&app.db, server_id, cutoff)
+                    .await?
+                    .into_iter()
+                    .map(|m| {
+                        let sha512 = hex::encode(&m.sha512);
+                        (sha512.clone(), (m.metadata_id, sha512))
+                    })
+                    .collect::<Vec<_>>()
+            }
         };
 
         let mcm = app.meta_cache_manager();
@@ -130,6 +184,8 @@ impl ModplatformCacher for ModrinthModCacher {
         }
 
         drop(failed_instances);
+
+        let target_compat = target_compatibility(app, entity_id).await;
 
         let fut = async {
             while !modlist.is_empty() {
@@ -174,27 +230,42 @@ impl ModplatformCacher for ModrinthModCacher {
 
                 let mpm = app.modplatforms_manager();
 
-                let combined_versions_list = projects_response
-                    .iter()
-                    .map(|project| &project.versions)
-                    .flatten()
-                    .map(|v| v.clone())
-                    .collect::<Vec<_>>();
+                // Update paths are only ever read filtered by what the entity runs,
+                // so let the server pick the newest version for that game version
+                // and loader. Fetching every version every project ever published
+                // costs hundreds of requests and answers the same question.
+                //
+                // Each channel is asked separately: a mod whose newest build is a
+                // beta may still have a newer stable one than the installed file,
+                // and which of them counts as an update is the user's choice.
+                let combined_versions_response = match &target_compat {
+                    Some((game_versions, loaders)) => {
+                        let mut newest_per_channel = Vec::new();
 
-                let mpm = app.modplatforms_manager();
-                // Run version-batch requests sequentially so each one passes
-                // through the throttle. join_all here would race past it.
-                let mut combined_versions_response = Vec::new();
-                for chunk in combined_versions_list.chunks(350) {
-                    mcm.modrinth_throttle.acquire().await;
-                    let resp = mpm
-                        .modrinth
-                        .get_versions(VersionIDs {
-                            ids: chunk.to_vec(),
-                        })
-                        .await?;
-                    combined_versions_response.extend(resp.0);
-                }
+                        for version_type in
+                            [VersionType::Release, VersionType::Beta, VersionType::Alpha]
+                        {
+                            mcm.modrinth_throttle.acquire().await;
+                            let latest = mpm
+                                .modrinth
+                                .get_latest_versions_from_hashes(&LatestVersionsBody {
+                                    hashes: sha512_hashes.clone(),
+                                    algorithm: HashAlgorithm::SHA512,
+                                    loaders: loaders.clone(),
+                                    game_versions: game_versions.clone(),
+                                    version_types: Some(vec![version_type]),
+                                })
+                                .await?;
+
+                            newest_per_channel.extend(latest.0.into_values());
+                        }
+
+                        newest_per_channel
+                    }
+                    // Without a known game version and loader there is nothing to
+                    // ask for; mods are still cached, only update paths are skipped.
+                    None => Vec::new(),
+                };
 
                 sender.send((
                     sha512_hashes,
@@ -299,100 +370,33 @@ impl ModplatformCacher for ModrinthModCacher {
     }
 
     async fn cache_icons(app: &App, entity_id: CacheEntityId, update_notifier: &UpdateNotifier) {
-        // Collect (filename, project_id, version_id, image_row) for mods needing icon updates.
-        let modlist: Vec<(String, String, String, _)> = match entity_id {
+        // Collect the files whose Modrinth logo is stale (upToDate = 0) for mods
+        // needing icon updates, from the appropriate file cache table.
+        let result = match entity_id {
             CacheEntityId::Instance(instance_id) => {
-                let result = app
-                    .prisma_client
-                    .mod_file_cache()
-                    .find_many(vec![
-                        fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                        fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(vec![
-                            mrdb::WhereParam::LogoImageIs(vec![mrimgdb::WhereParam::UpToDate(
-                                IntFilter::Equals(0),
-                            )]),
-                        ])]),
-                    ])
-                    .with(
-                        fcdb::metadata::fetch()
-                            .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-                    )
-                    .exec()
-                    .await;
-
-                match result {
-                    Ok(list) => list
-                        .into_iter()
-                        .map(|file| {
-                            let meta = file
-                                .metadata
-                                .expect("metadata was ensured present but not returned");
-                            let mr = meta
-                                .modrinth
-                                .flatten()
-                                .expect("modrinth was ensured present but not returned");
-                            let row = mr
-                                .logo_image
-                                .flatten()
-                                .expect("mod image was ensured present but not returned");
-                            (file.filename, mr.project_id, mr.version_id, row)
-                        })
-                        .collect(),
-                    Err(e) => {
-                        error!({ error = ?e }, "error querying database for updated modrinth mod icons list");
-                        return;
-                    }
-                }
+                let instance_id_val = *instance_id;
+                mfcdb::instance_mods_stale_mr_logo(&app.db, instance_id_val).await
             }
             CacheEntityId::Server(server_id) => {
-                let result = app
-                    .prisma_client
-                    .server_mod_file_cache()
-                    .find_many(vec![
-                        sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
-                        sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(vec![
-                            mrdb::WhereParam::LogoImageIs(vec![mrimgdb::WhereParam::UpToDate(
-                                IntFilter::Equals(0),
-                            )]),
-                        ])]),
-                    ])
-                    .with(
-                        sfcdb::metadata::fetch()
-                            .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-                    )
-                    .exec()
-                    .await;
+                mfcdb::server_mods_stale_mr_logo(&app.db, server_id).await
+            }
+        };
 
-                match result {
-                    Ok(list) => list
-                        .into_iter()
-                        .map(|file| {
-                            let meta = file
-                                .metadata
-                                .expect("metadata was ensured present but not returned");
-                            let mr = meta
-                                .modrinth
-                                .flatten()
-                                .expect("modrinth was ensured present but not returned");
-                            let row = mr
-                                .logo_image
-                                .flatten()
-                                .expect("mod image was ensured present but not returned");
-                            (file.filename, mr.project_id, mr.version_id, row)
-                        })
-                        .collect(),
-                    Err(e) => {
-                        error!({ error = ?e }, "error querying database for updated modrinth mod icons list");
-                        return;
-                    }
-                }
+        let modlist: Vec<mfcdb::MrLogoRefreshRow> = match result {
+            Ok(list) => list,
+            Err(e) => {
+                error!({ error = ?e }, "error querying database for updated modrinth mod icons list");
+                return;
             }
         };
 
         let app = &app;
         let futures = modlist
             .into_iter()
-            .map(|(filename, project_id, version_id, row)| async move {
+            .map(|row| async move {
+                let filename = row.filename;
+                let project_id = row.project_id;
+                let version_id = row.version_id;
                 let mcm = app.meta_cache_manager();
 
                 {
@@ -439,16 +443,7 @@ impl ModplatformCacher for ModrinthModCacher {
 
                     drop(scale_guard);
 
-                    app.prisma_client.modrinth_mod_image_cache()
-                        .update(
-                            mrimgdb::UniqueWhereParam::MetadataIdEquals(row.metadata_id.clone()),
-                            vec![
-                                mrimgdb::SetParam::SetUpToDate(1),
-                                mrimgdb::SetParam::SetData(Some(image))
-                            ]
-                        )
-                        .exec()
-                        .await?;
+                    metarepo::mark_mr_image_downloaded(&app.db, &row.metadata_id, &image).await?;
 
 
                     let _ = update_notifier.send(entity_id);
@@ -487,134 +482,164 @@ async fn cache_modrinth_meta_unchecked(
     authors: String,
     versions: &[Version],
 ) -> anyhow::Result<()> {
-    let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
+    let update_paths = build_update_paths(version, &project.id, versions);
 
-    let mut versions_sorted = versions.iter().collect::<Vec<_>>();
-    versions_sorted.sort_by(|f1, f2| Ord::cmp(&f2.date_published, &f1.date_published));
-
-    for other_version in versions_sorted {
-        if other_version.project_id != project.id
-            || other_version.id == version.id
-            || !version
-                .game_versions
-                .iter()
-                .any(|v| other_version.game_versions.contains(v))
-            || !version
-                .loaders
-                .iter()
-                .any(|l| other_version.loaders.contains(l))
+    {
+        let metadata_id = metadata_id.clone();
+        if let Ok(Some(existing_entry)) =
+            metarepo::get_mr_cache_by_metadata(&app.db, &metadata_id).await
         {
-            break;
-        }
-
-        for game_version in &other_version.game_versions {
-            for loader in &other_version.loaders {
-                let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
-                    continue;
-                };
-
-                file_update_paths.insert((game_version, loader, other_version.version_type.into()));
+            if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
+                return Ok(());
             }
         }
     }
 
-    let update_paths = file_update_paths
-        .into_iter()
-        .map(|(gamever, loader, channel)| {
-            format!(
-                "{gamever},{},{}",
-                loader.to_string().to_lowercase(),
-                channel.as_str(),
-            )
-        })
-        .join(";");
+    let release_type = ModChannel::from(version.version_type) as i32;
+    let project_id = project.id.clone();
+    let version_id = version.id.clone();
+    let title = project.title.clone();
+    let version_name = version.name.clone();
+    let urlslug = project.slug.clone();
+    let description = project.description.clone();
+    let sha512_owned = sha512.clone();
+    let authors_owned = authors.clone();
+    let update_paths_owned = update_paths.clone();
+    let filename_owned = filename.clone();
+    let file_url_owned = file_url.clone();
+    let metadata_id_owned = metadata_id.clone();
 
-    if let Ok(Some(existing_entry)) = app
-        .prisma_client
-        .modrinth_mod_cache()
-        .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
-            metadata_id.clone(),
-        ))
-        .exec()
-        .await
-    {
-        if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
-            return Ok(());
-        }
-    }
-
-    let cache_result = app
-        .prisma_client
-        .modrinth_mod_cache()
-        .upsert(
-            mrdb::UniqueWhereParam::ProjectIdVersionIdEquals(
-                project.id.clone(),
-                version.id.clone(),
-            ),
-            mrdb::create(
-                sha512.clone(),
-                project.id.clone(),
-                version.id.clone(),
-                project.title.clone(),
-                version.name.clone(),
-                project.slug.clone(),
-                project.description.clone(),
-                authors.clone(),
-                ModChannel::from(version.version_type) as i32,
-                update_paths.clone(),
-                filename.clone(),
-                file_url.clone(),
-                chrono::Utc::now().into(),
-                metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
-                Vec::new(),
-            ),
-            vec![
-                mrdb::SetParam::SetSha512(sha512.clone()),
-                mrdb::SetParam::SetProjectId(project.id.clone()),
-                mrdb::SetParam::SetVersionId(version.id.clone()),
-                mrdb::SetParam::SetTitle(project.title.clone()),
-                mrdb::SetParam::SetVersion(version.name.clone()),
-                mrdb::SetParam::SetUrlslug(project.slug.clone()),
-                mrdb::SetParam::SetDescription(project.description.clone()),
-                mrdb::SetParam::SetAuthors(authors.clone()),
-                mrdb::SetParam::SetReleaseType(ModChannel::from(version.version_type) as i32),
-                mrdb::SetParam::SetUpdatePaths(update_paths.clone()),
-                mrdb::SetParam::SetFilename(filename.clone()),
-                mrdb::SetParam::SetFileUrl(file_url.clone()),
-                mrdb::SetParam::SetCachedAt(chrono::Utc::now().into()),
-            ],
-        )
-        .exec()
-        .await?;
+    // The composite `(projectId, versionId)` conflict may land on a row that
+    // owns a different `metadataId`; the upsert returns the surviving one so the
+    // image row attaches to the correct metadata.
+    let result_metadata_id = metarepo::upsert_mr_mod_cache(
+        &app.db,
+        sha512_owned,
+        project_id,
+        version_id,
+        title,
+        version_name,
+        urlslug,
+        description,
+        authors_owned,
+        release_type,
+        update_paths_owned,
+        filename_owned,
+        file_url_owned,
+        DbDateTime(chrono::Utc::now().fixed_offset()),
+        metadata_id_owned,
+    )
+    .await?;
 
     if let Some(icon_url) = &project.icon_url {
-        if let Err(e) = app
-            .prisma_client
-            .modrinth_mod_image_cache()
-            .upsert(
-                mrimgdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
-                mrimgdb::create(
-                    icon_url.clone(),
-                    mrdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
-                    vec![
-                        mrimgdb::SetParam::SetUpToDate(0), // Mark as needing download
-                        mrimgdb::SetParam::SetData(None),
-                    ],
-                ),
-                vec![
-                    mrimgdb::SetParam::SetUrl(icon_url.clone()),
-                    mrimgdb::SetParam::SetUpToDate(0), // Mark as needing download on update
-                ],
-            )
-            .exec()
-            .await
-        {
+        let url = icon_url.clone();
+        let image_metadata_id = result_metadata_id.clone();
+        if let Err(e) = metarepo::upsert_mr_image(&app.db, &image_metadata_id, &url).await {
             warn!(
                 "Failed to upsert modrinth image for metadata_id {}: {:?}",
-                cache_result.metadata_id, e
+                result_metadata_id, e
             );
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use carbon_platforms::modrinth::UtcDateTime;
+    use carbon_platforms::modrinth::version::VersionType;
+
+    fn version(id: &str, project: &str, day: u32, version_type: VersionType) -> Version {
+        Version {
+            name: id.to_string(),
+            version_number: id.to_string(),
+            changelog: None,
+            dependencies: Vec::new(),
+            game_versions: vec!["1.20.1".to_string()],
+            version_type,
+            loaders: vec!["forge".to_string()],
+            featured: false,
+            status: None,
+            requested_status: None,
+            id: id.to_string(),
+            project_id: project.to_string(),
+            author_id: "author".to_string(),
+            date_published: format!("2026-01-{day:02}T00:00:00Z")
+                .parse::<UtcDateTime>()
+                .unwrap(),
+            downloads: 0,
+            files: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn no_update_paths_without_candidates() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+
+        assert_eq!(build_update_paths(&installed, "project", &[]), "");
+    }
+
+    #[test]
+    fn the_installed_version_is_not_an_update_of_itself() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+
+        assert_eq!(
+            build_update_paths(&installed, "project", &[installed.clone()]),
+            ""
+        );
+    }
+
+    #[test]
+    fn only_versions_published_after_the_installed_one_are_updates() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+        let older = version("older", "project", 5, VersionType::Release);
+        let newer = version("newer", "project", 20, VersionType::Release);
+
+        assert_eq!(build_update_paths(&installed, "project", &[older]), "");
+        assert_eq!(
+            build_update_paths(&installed, "project", &[newer]),
+            "1.20.1,forge,stable"
+        );
+    }
+
+    /// Every project's versions used to be walked as one list, which collected
+    /// nothing as soon as another project's version came first.
+    #[test]
+    fn versions_of_other_projects_are_ignored_without_hiding_later_ones() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+        // Published later than the real update and distinguishable, so including
+        // it would both hide the update and show up in the result.
+        let mut foreign = version("foreign", "other-project", 30, VersionType::Release);
+        foreign.game_versions = vec!["1.19.2".to_string()];
+        let newer = version("newer", "project", 20, VersionType::Release);
+
+        assert_eq!(
+            build_update_paths(&installed, "project", &[foreign, newer]),
+            "1.20.1,forge,stable"
+        );
+    }
+
+    #[test]
+    fn each_channel_is_reported_so_the_allowed_one_can_be_picked() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+        let stable = version("stable", "project", 20, VersionType::Release);
+        let beta = version("beta", "project", 30, VersionType::Beta);
+
+        let paths = build_update_paths(&installed, "project", &[stable, beta]);
+        let mut paths = paths.split(';').collect::<Vec<_>>();
+        paths.sort();
+
+        assert_eq!(paths, vec!["1.20.1,forge,beta", "1.20.1,forge,stable"]);
+    }
+
+    #[test]
+    fn unknown_loaders_are_skipped() {
+        let installed = version("installed", "project", 10, VersionType::Release);
+        let mut newer = version("newer", "project", 20, VersionType::Release);
+        newer.loaders = vec!["not-a-loader".to_string()];
+
+        assert_eq!(build_update_paths(&installed, "project", &[newer]), "");
+    }
 }

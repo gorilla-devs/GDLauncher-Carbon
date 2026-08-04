@@ -342,8 +342,13 @@ impl ManagerRef<'_, InstanceManager> {
             let gdl_logs_path = instance_path.get_gdl_logs_path();
 
             // Same retention as the launcher's own __gdl_logs__; these files previously
-            // accumulated forever.
-            crate::logger::cleanup_old_logs(&gdl_logs_path, 10);
+            // accumulated forever. Deleting can involve huge files, so keep the blocking
+            // fs work off the async runtime.
+            let cleanup_path = gdl_logs_path.clone();
+            let _ = tokio::task::spawn_blocking(move || {
+                crate::logger::cleanup_old_logs(&cleanup_path, 10);
+            })
+            .await;
 
             Some(gdl_logs_path.join(format!("{}.log", log_file_name)))
         } else {

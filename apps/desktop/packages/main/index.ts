@@ -46,10 +46,10 @@ let overwolfReady = false
 let pendingEmail: string | null | undefined = null
 
 function setOverwolfEmail(email: string) {
-  if (overwolfReady && (app as any).overwolf) {
+  if (overwolfReady && app.overwolf) {
     try {
       const hashes = hashEmailForOverwolf(email)
-      ;(app as any).overwolf.setUserEmailHashes(hashes)
+      app.overwolf.setUserEmailHashes(hashes)
       console.log("GDL account email hashes sent to Overwolf")
     } catch (error) {
       console.error("Failed to set email hashes:", error)
@@ -60,9 +60,9 @@ function setOverwolfEmail(email: string) {
 }
 
 function clearOverwolfEmail() {
-  if (overwolfReady && (app as any).overwolf) {
+  if (overwolfReady && app.overwolf) {
     try {
-      ;(app as any).overwolf.setUserEmailHashes({})
+      app.overwolf.setUserEmailHashes({})
       console.log("GDL account email hashes cleared")
     } catch (error) {
       console.error("Failed to clear email hashes:", error)
@@ -294,6 +294,9 @@ export type CoreModule = () => Promise<
   | {
       type: "error"
       logs: Log[]
+      // Present only for `DB_DOWNGRADE_FAILED`: the pre-downgrade snapshot the
+      // failure screen can offer to restore.
+      snapshotPath?: string
     }
   | {
       type: "backwardsMigration"
@@ -410,7 +413,10 @@ const loadCoreModule: CoreModule = () =>
 
       for (const row of rows) {
         if (row.startsWith("_STATUS_:")) {
-          const rightPart = row.split(":")[1]
+          // Strip only the `_STATUS_:` prefix rather than splitting on every
+          // colon: a payload may itself contain a colon (a Windows snapshot
+          // path like `C:\...` in `DB_DOWNGRADE_FAILED|C:\...`).
+          const rightPart = row.slice("_STATUS_:".length)
           const parts = rightPart.split("|")
           const event = parts[0]
           const port: number = parts[1] as unknown as number
@@ -445,6 +451,36 @@ const loadCoreModule: CoreModule = () =>
             console.log("[CORE] Backwards migration detected")
             resolve({
               type: "backwardsMigration"
+            })
+          } else if (event === "DB_DOWNGRADED") {
+            // A newer database was stepped back to this build's version and
+            // verified. Non-fatal: startup continues to READY.
+            console.log("[CORE] Database downgraded to this version")
+          } else if (
+            event === "DB_MIGRATION_FAILED" ||
+            event === "DB_DIVERGED" ||
+            event === "DB_CORRUPT" ||
+            event === "DB_DOWNGRADE_FAILED"
+          ) {
+            // Fatal database outcomes (spec §13). The core emits exactly one of
+            // these then exits; surface the failure screen with the recovery
+            // ladder. `DB_DOWNGRADE_FAILED` carries a pre-downgrade snapshot
+            // path, which unlocks the "Restore snapshot" step.
+            const snapshotPath =
+              event === "DB_DOWNGRADE_FAILED" ? parts[1] : undefined
+            console.error(
+              `[CORE] Fatal database error: ${event}${snapshotPath ? ` (snapshot: ${snapshotPath})` : ""}`
+            )
+            resolve({
+              type: "error",
+              logs: [
+                ...logs,
+                {
+                  type: "error",
+                  message: `Database error: ${event}`
+                }
+              ],
+              snapshotPath
             })
           } else {
             let progress = 0
@@ -606,8 +642,8 @@ const loadCoreModule: CoreModule = () =>
 
 const coreModule = loadCoreModule()
 
-if ((app as any).overwolf) {
-  ;(app as any).overwolf.disableAnonymousAnalytics()
+if (app.overwolf) {
+  app.overwolf.disableAnonymousAnalytics()
   console.log("Overwolf anonymous analytics disabled")
 }
 
@@ -630,6 +666,7 @@ for (const deepLinkProtocol of deepLinkProtocols) {
 
 let lastDisplay: Display | null = null
 let pendingDisplayChange = false
+let adSizeFallbackTimeout: NodeJS.Timeout | null = null
 
 let isSpawningWindow = false
 
@@ -692,6 +729,11 @@ async function createWindow(): Promise<BrowserWindow> {
   win.on("closed", () => {
     win = null
     pendingDisplayChange = false
+
+    if (adSizeFallbackTimeout) {
+      clearTimeout(adSizeFallbackTimeout)
+      adSizeFallbackTimeout = null
+    }
   })
 
   const applyAdLayoutForCurrentDisplay = () => {
@@ -709,15 +751,16 @@ async function createWindow(): Promise<BrowserWindow> {
     win?.setMinimumSize(minWidth, minHeight)
 
     // Grow to satisfy the new minimums and stay within the display, but never
-    // shrink a window the user made larger
+    // shrink a window the user made larger. When the work area is smaller than
+    // the minimums, the minimums win (matching setMinimumSize above).
     const workArea = display.workArea
-    const targetWidth = Math.min(
-      Math.max(bounds.width, minWidth),
-      workArea.width
+    const targetWidth = Math.max(
+      Math.min(bounds.width, workArea.width),
+      minWidth
     )
-    const targetHeight = Math.min(
-      Math.max(bounds.height, minHeight),
-      workArea.height
+    const targetHeight = Math.max(
+      Math.min(bounds.height, workArea.height),
+      minHeight
     )
     if (targetWidth !== bounds.width || targetHeight !== bounds.height) {
       win?.setSize(targetWidth, targetHeight)
@@ -745,8 +788,30 @@ async function createWindow(): Promise<BrowserWindow> {
       // Linux never emits `moved`, so apply immediately there
       if (process.platform === "linux") {
         applyAdLayoutForCurrentDisplay()
+        return
       }
     }
+
+    if (!pendingDisplayChange) {
+      return
+    }
+
+    // Fallback for moves that never emit `moved` on Windows (Win+Shift+Arrow,
+    // programmatic setPosition, OS relocation on monitor unplug): debounce past
+    // the last `move`. During an interactive drag `moved` fires on release and
+    // cancels this. A >400ms mid-drag pause could let the timer elapse, but in
+    // practice Windows starves libuv timers inside the modal move loop, so the
+    // callback only runs after the drag ends; if that ever changes, the resize
+    // would fight the drag (the snap-to-seam issue handled below).
+    if (adSizeFallbackTimeout) {
+      clearTimeout(adSizeFallbackTimeout)
+    }
+    adSizeFallbackTimeout = setTimeout(() => {
+      adSizeFallbackTimeout = null
+      if (pendingDisplayChange) {
+        applyAdLayoutForCurrentDisplay()
+      }
+    }, 400)
   })
 
   // Resizing while the user is still dragging fights the OS drag loop and makes
@@ -754,6 +819,11 @@ async function createWindow(): Promise<BrowserWindow> {
   // interactive move ends on Windows (on macOS it's an alias of `move`), so the
   // new ad layout is applied only after the drag is released.
   win.on("moved", () => {
+    if (adSizeFallbackTimeout) {
+      clearTimeout(adSizeFallbackTimeout)
+      adSizeFallbackTimeout = null
+    }
+
     if (pendingDisplayChange) {
       applyAdLayoutForCurrentDisplay()
     }
@@ -890,16 +960,8 @@ ipcMain.handle("relaunch", async () => {
 ipcMain.handle("deleteDbAndRestart", async () => {
   console.log("deleting database and restarting app...")
 
-  const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
-
-  try {
-    await fs.unlink(dbPath)
-    console.log("database deleted successfully")
-  } catch {
-    // File might not exist, that's ok
-    console.log("database file not found or already deleted")
-  }
-
+  // Kill the core FIRST: on Windows, unlinking a file the core still holds
+  // open fails, so the process must exit before we delete the database.
   try {
     const _coreModule = await coreModule
     if (_coreModule.type === "success") {
@@ -909,9 +971,69 @@ ipcMain.handle("deleteDbAndRestart", async () => {
     // No op
   }
 
+  const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
+
+  // Delete the database, its WAL/SHM sidecars, and any stale pre-downgrade
+  // snapshot — leaving a sidecar behind would let SQLite reconstruct the old
+  // (broken) state on relaunch. Relaunch then lands on the fresh baseline path.
+  const targets = [
+    dbPath,
+    `${dbPath}-wal`,
+    `${dbPath}-shm`,
+    path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.pre-downgrade.db")
+  ]
+  for (const target of targets) {
+    try {
+      await fs.unlink(target)
+      console.log(`deleted ${target}`)
+    } catch {
+      // File might not exist, that's ok
+    }
+  }
+
   app.relaunch()
   app.exit()
 })
+
+ipcMain.handle(
+  "restoreDbSnapshotAndRestart",
+  async (_event, snapshotPath: string) => {
+    console.log(`restoring database from snapshot ${snapshotPath}...`)
+
+    // Kill the core FIRST so the database file is not held open while we
+    // overwrite it (same Windows open-file constraint as the reset path).
+    try {
+      const _coreModule = await coreModule
+      if (_coreModule.type === "success") {
+        _coreModule.result.kill()
+      }
+    } catch {
+      // No op
+    }
+
+    const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
+
+    try {
+      await fs.copyFile(snapshotPath, dbPath)
+      console.log("snapshot restored over gdl_conf.db")
+    } catch (e) {
+      console.error("failed to restore snapshot:", e)
+    }
+
+    // Drop the WAL/SHM sidecars so the restored file is opened as-is rather
+    // than replayed against the pre-restore log.
+    for (const suffix of ["-wal", "-shm"]) {
+      try {
+        await fs.unlink(`${dbPath}${suffix}`)
+      } catch {
+        // File might not exist, that's ok
+      }
+    }
+
+    app.relaunch()
+    app.exit()
+  }
+)
 
 ipcMain.handle("getAdSize", async () => {
   const currentDisplay = screen.getDisplayMatching(win?.getBounds()!)
@@ -964,15 +1086,19 @@ ipcMain.handle("openFolder", async (_, path) => {
 })
 
 ipcMain.handle("openCMPWindow", async () => {
-  if ((app as any).overwolf?.openCMPWindow) {
-    ;(app as any).overwolf.openCMPWindow()
+  if (app.overwolf?.openCMPWindow) {
+    app.overwolf.openCMPWindow()
     return true
   }
   return false
 })
 
 ipcMain.handle("isCMPWindowAvailable", async () => {
-  return !!(app as any).overwolf?.openCMPWindow
+  // Availability means "can the CMP window open at all" (i.e. an ow-electron
+  // build with the overwolf API injected). Deliberately NOT `isCMPRequired()`:
+  // that is country-dependent, and users outside CMP-required regions must
+  // still be able to manage their consent.
+  return !!app.overwolf?.openCMPWindow
 })
 
 ipcMain.handle("closeWindow", async () => {
@@ -1224,6 +1350,7 @@ ipcMain.handle("getCoreModule", async () => {
   return {
     type: cm.type,
     logs: cm.type === "error" ? cm.logs : undefined,
+    snapshotPath: cm.type === "error" ? cm.snapshotPath : undefined,
     port: cm.type === "success" ? cm.result.port : undefined,
     apiToken: cm.type === "success" ? cm.result.apiToken : undefined
   }
@@ -1245,7 +1372,7 @@ app.whenReady().then(async () => {
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID)
 
   // Mark Overwolf as ready and apply any pending email
-  if ((app as any).overwolf && process.env.OVERWOLF_APP_UID) {
+  if (app.overwolf && process.env.OVERWOLF_APP_UID) {
     overwolfReady = true
     applyPendingEmail()
   }

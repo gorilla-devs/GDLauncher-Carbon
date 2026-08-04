@@ -9,7 +9,6 @@ import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useLocation } from "@solidjs/router"
 import useSearchContext from "./SearchInputContext"
-import { rspc } from "@/utils/rspcClient"
 import { useTransContext } from "@gd/i18n"
 import { getAddonTypeIcon } from "@/utils/addonIcons"
 
@@ -20,72 +19,36 @@ interface AddonTypeOption {
   path: string
 }
 
+// The addon types users can actually browse. `FEUnifiedSearchType` also carries
+// "plugin" and "unknown", which have no label and are never offered as options.
+const LABEL_KEYS = {
+  modpack: "search:_trn_modpacks",
+  mod: "search:_trn_mods",
+  shader: "search:_trn_shaders",
+  resourcePack: "search:_trn_resource_packs",
+  datapack: "search:_trn_data_packs",
+  world: "search:_trn_worlds"
+} as const
+
+type BrowsableAddonType = keyof typeof LABEL_KEYS
+
 export function AddonTypeDropdown() {
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
   const location = useLocation()
   const [t] = useTransContext()
 
-  const instanceId = () => searchContext?.selectedInstanceId() || NaN
-
-  const instance = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceDetails", instanceId()],
-    enabled: !isNaN(instanceId()) && instanceId() > 0
-  }))
-
-  const addonTypeOptions: () => AddonTypeOption[] = () => {
-    let options: AddonTypeOption[] = []
-
-    if (!instanceId()) {
-      options.push({
-        label: t("search:_trn_modpacks"),
-        value: "modpack",
-        icon: getAddonTypeIcon("modpack"),
-        path: "/search/modpack"
-      })
-    }
-
-    if (
-      !instanceId() ||
-      (instanceId() && (instance.data?.modloaders?.length ?? 0) > 0)
-    ) {
-      options.push({
-        label: t("search:_trn_mods"),
-        value: "mod",
-        icon: getAddonTypeIcon("mod"),
-        path: "/search/mod"
-      })
-    }
-
-    options = options.concat([
-      {
-        label: t("search:_trn_shaders"),
-        value: "shader",
-        icon: getAddonTypeIcon("shader"),
-        path: "/search/shader"
-      },
-      {
-        label: t("search:_trn_resource_packs"),
-        value: "resourcePack",
-        icon: getAddonTypeIcon("resourcePack"),
-        path: "/search/resourcePack"
-      },
-      {
-        label: t("search:_trn_data_packs"),
-        value: "datapack",
-        icon: getAddonTypeIcon("datapack"),
-        path: "/search/datapack"
-      },
-      {
-        label: t("search:_trn_worlds"),
-        value: "world",
-        icon: getAddonTypeIcon("world"),
-        path: "/search/world"
-      }
-    ])
-
-    return options
-  }
+  // Which types are offered depends on what the search is adding to (nothing,
+  // an instance, or a server); the search context owns that rule.
+  const addonTypeOptions: () => AddonTypeOption[] = () =>
+    (searchContext?.allowedAddonTypes() ?? [])
+      .filter((value): value is BrowsableAddonType => value in LABEL_KEYS)
+      .map((value) => ({
+        label: t(LABEL_KEYS[value]),
+        value,
+        icon: getAddonTypeIcon(value),
+        path: `/search/${value}`
+      }))
 
   const currentType = () => searchContext?.searchQuery().projectType
 

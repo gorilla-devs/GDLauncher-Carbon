@@ -15,12 +15,9 @@ use carbon_platforms::curseforge::filters::ModFilesParametersQuery;
 use carbon_platforms::curseforge::filters::ModParameters;
 use carbon_platforms::curseforge::filters::ModsParameters;
 use carbon_platforms::curseforge::filters::ModsParametersBody;
-use carbon_repos::db::read_filters::DateTimeFilter;
-use carbon_repos::db::read_filters::{IntFilter, StringFilter};
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
-    mod_metadata as metadb, server_mod_file_cache as sfcdb,
-};
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::mod_file_cache as mfcdb;
+use carbon_repos::repos::mod_metadata as metarepo;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -51,64 +48,27 @@ impl ModplatformCacher for CurseforgeModCacher {
         entity_id: CacheEntityId,
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()> {
+        // Worlds are directories with name-derived pseudo-hashes, so there is
+        // nothing to match on the platform (instance variant excludes them; the
+        // server table has no world addons). A file needs a refresh when its
+        // metadata has no CurseForge cache row, or one cached more than a day ago.
+        let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
         let modlist = match entity_id {
-            CacheEntityId::Instance(instance_id) => app
-                .prisma_client
-                .mod_file_cache()
-                .find_many(vec![
-                    fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                    // Worlds are directories with name-derived pseudo-hashes,
-                    // so there is nothing to match on the platform.
-                    fcdb::WhereParam::AddonType(StringFilter::Not(
-                        crate::domain::instance::AddonType::Worlds
-                            .to_db_string()
-                            .to_string(),
-                    )),
-                    fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIsNot(vec![
-                        cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                        )),
-                    ])]),
-                ])
-                .with(fcdb::metadata::fetch())
-                .exec()
-                .await?
-                .into_iter()
-                .map(|m| {
-                    let metadata = m
-                        .metadata
-                        .expect("metadata was queried with mod cache yet is not present");
-                    (
-                        metadata.murmur_2 as u32,
-                        (metadata.id, metadata.murmur_2 as u32),
-                    )
-                })
-                .collect::<Vec<_>>(),
-            CacheEntityId::Server(server_id) => app
-                .prisma_client
-                .server_mod_file_cache()
-                .find_many(vec![
-                    sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
-                    sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIsNot(vec![
-                        cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                        )),
-                    ])]),
-                ])
-                .with(sfcdb::metadata::fetch())
-                .exec()
-                .await?
-                .into_iter()
-                .map(|m| {
-                    let metadata = m
-                        .metadata
-                        .expect("metadata was queried with server mod cache yet is not present");
-                    (
-                        metadata.murmur_2 as u32,
-                        (metadata.id, metadata.murmur_2 as u32),
-                    )
-                })
-                .collect::<Vec<_>>(),
+            CacheEntityId::Instance(instance_id) => {
+                let instance_id_val = *instance_id;
+                mfcdb::instance_mods_needing_cf_refresh(&app.db, instance_id_val, cutoff)
+                    .await?
+                    .into_iter()
+                    .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
+                    .collect::<Vec<_>>()
+            }
+            CacheEntityId::Server(server_id) => {
+                mfcdb::server_mods_needing_cf_refresh(&app.db, server_id, cutoff)
+                    .await?
+                    .into_iter()
+                    .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
+                    .collect::<Vec<_>>()
+            }
         };
 
         let mcm = app.meta_cache_manager();
@@ -265,101 +225,33 @@ impl ModplatformCacher for CurseforgeModCacher {
     }
 
     async fn cache_icons(app: &App, entity_id: CacheEntityId, update_notifier: &UpdateNotifier) {
-        // Collect (filename, project_id, file_id, image_row) for all mods needing icon updates.
-        // We query the appropriate file cache table depending on entity type.
-        let modlist: Vec<(String, i32, i32, _)> = match entity_id {
+        // Collect the files whose CurseForge logo is stale (upToDate = 0) for all
+        // mods needing icon updates, from the appropriate file cache table.
+        let result = match entity_id {
             CacheEntityId::Instance(instance_id) => {
-                let result = app
-                    .prisma_client
-                    .mod_file_cache()
-                    .find_many(vec![
-                        fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                        fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIs(vec![
-                            cfdb::WhereParam::LogoImageIs(vec![cfimgdb::WhereParam::UpToDate(
-                                IntFilter::Equals(0),
-                            )]),
-                        ])]),
-                    ])
-                    .with(
-                        fcdb::metadata::fetch()
-                            .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch())),
-                    )
-                    .exec()
-                    .await;
-
-                match result {
-                    Ok(list) => list
-                        .into_iter()
-                        .map(|file| {
-                            let meta = file
-                                .metadata
-                                .expect("metadata was ensured present but not returned");
-                            let cf = meta
-                                .curseforge
-                                .flatten()
-                                .expect("curseforge was ensured present but not returned");
-                            let row = cf
-                                .logo_image
-                                .flatten()
-                                .expect("mod image was ensured present but not returned");
-                            (file.filename, cf.project_id, cf.file_id, row)
-                        })
-                        .collect(),
-                    Err(e) => {
-                        error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
-                        return;
-                    }
-                }
+                let instance_id_val = *instance_id;
+                mfcdb::instance_mods_stale_cf_logo(&app.db, instance_id_val).await
             }
             CacheEntityId::Server(server_id) => {
-                let result = app
-                    .prisma_client
-                    .server_mod_file_cache()
-                    .find_many(vec![
-                        sfcdb::WhereParam::ServerId(IntFilter::Equals(server_id)),
-                        sfcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIs(
-                            vec![cfdb::WhereParam::LogoImageIs(vec![
-                                cfimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
-                            ])],
-                        )]),
-                    ])
-                    .with(
-                        sfcdb::metadata::fetch()
-                            .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch())),
-                    )
-                    .exec()
-                    .await;
+                mfcdb::server_mods_stale_cf_logo(&app.db, server_id).await
+            }
+        };
 
-                match result {
-                    Ok(list) => list
-                        .into_iter()
-                        .map(|file| {
-                            let meta = file
-                                .metadata
-                                .expect("metadata was ensured present but not returned");
-                            let cf = meta
-                                .curseforge
-                                .flatten()
-                                .expect("curseforge was ensured present but not returned");
-                            let row = cf
-                                .logo_image
-                                .flatten()
-                                .expect("mod image was ensured present but not returned");
-                            (file.filename, cf.project_id, cf.file_id, row)
-                        })
-                        .collect(),
-                    Err(e) => {
-                        error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
-                        return;
-                    }
-                }
+        let modlist: Vec<mfcdb::CfLogoRefreshRow> = match result {
+            Ok(list) => list,
+            Err(e) => {
+                error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
+                return;
             }
         };
 
         let app = &app;
         let futures = modlist
             .into_iter()
-            .map(|(filename, project_id, file_id, row)| async move {
+            .map(|row| async move {
+                let filename = row.filename;
+                let project_id = row.project_id;
+                let file_id = row.file_id;
                 let mcm = app.meta_cache_manager();
 
                 {
@@ -407,16 +299,7 @@ impl ModplatformCacher for CurseforgeModCacher {
 
                     drop(scale_guard);
 
-                    app.prisma_client.curse_forge_mod_image_cache()
-                        .update(
-                            cfimgdb::UniqueWhereParam::MetadataIdEquals(row.metadata_id.clone()),
-                            vec![
-                                cfimgdb::SetParam::SetUpToDate(1),
-                                cfimgdb::SetParam::SetData(Some(image))
-                            ]
-                        )
-                        .exec()
-                        .await?;
+                    metarepo::mark_cf_image_downloaded(&app.db, &row.metadata_id, &image).await?;
 
 
                     let _ = update_notifier.send(entity_id);
@@ -520,82 +403,56 @@ async fn cache_curseforge_meta_unchecked(
         })
         .join(";");
 
-    if let Ok(Some(existing_entry)) = app
-        .prisma_client
-        .curse_forge_mod_cache()
-        .find_unique(cfdb::UniqueWhereParam::MetadataIdEquals(
-            metadata_id.clone(),
-        ))
-        .exec()
-        .await
     {
-        if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
-            return Ok(());
+        let metadata_id = metadata_id.clone();
+        if let Ok(Some(existing_entry)) =
+            metarepo::get_cf_cache_by_metadata(&app.db, &metadata_id).await
+        {
+            if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
+                return Ok(());
+            }
         }
     }
 
-    let cache_result = app
-        .prisma_client
-        .curse_forge_mod_cache()
-        .upsert(
-            cfdb::UniqueWhereParam::ProjectIdFileIdEquals(modinfo.id as i32, fileinfo.id as i32),
-            cfdb::create(
-                murmur2 as i32,
-                modinfo.id as i32,
-                fileinfo.id as i32,
-                modinfo.name.clone(),
-                fileinfo.display_name.clone(),
-                modinfo.slug.clone(),
-                modinfo.summary.clone(),
-                modinfo.authors.iter().map(|a| &a.name).join(", "),
-                ModChannel::from(fileinfo.release_type) as i32,
-                update_paths.clone(),
-                chrono::Utc::now().into(),
-                metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
-                Vec::new(),
-            ),
-            vec![
-                cfdb::SetParam::SetMurmur2(murmur2 as i32),
-                cfdb::SetParam::SetProjectId(modinfo.id as i32),
-                cfdb::SetParam::SetFileId(fileinfo.id as i32),
-                cfdb::SetParam::SetName(modinfo.name.clone()),
-                cfdb::SetParam::SetVersion(fileinfo.display_name.clone()),
-                cfdb::SetParam::SetUrlslug(modinfo.slug.clone()),
-                cfdb::SetParam::SetSummary(modinfo.summary.clone()),
-                cfdb::SetParam::SetAuthors(modinfo.authors.iter().map(|a| &a.name).join(", ")),
-                cfdb::SetParam::SetReleaseType(ModChannel::from(fileinfo.release_type) as i32),
-                cfdb::SetParam::SetUpdatePaths(update_paths.clone()),
-                cfdb::SetParam::SetCachedAt(chrono::Utc::now().into()),
-            ],
-        )
-        .exec()
-        .await?;
+    let name = modinfo.name.clone();
+    let version = fileinfo.display_name.clone();
+    let urlslug = modinfo.slug.clone();
+    let summary = modinfo.summary.clone();
+    let authors = modinfo.authors.iter().map(|a| &a.name).join(", ");
+    let release_type = ModChannel::from(fileinfo.release_type) as i32;
+    let project_id = modinfo.id as i32;
+    let file_id = fileinfo.id as i32;
+    let murmur2 = murmur2 as i32;
+    let update_paths = update_paths.clone();
+    let metadata_id_owned = metadata_id.clone();
+
+    // The composite `(projectId, fileId)` conflict may land on a row that owns
+    // a different `metadataId`; the upsert returns the surviving one so the
+    // image row attaches to the correct metadata.
+    let result_metadata_id = metarepo::upsert_cf_mod_cache(
+        &app.db,
+        murmur2,
+        project_id,
+        file_id,
+        name,
+        version,
+        urlslug,
+        summary,
+        authors,
+        release_type,
+        update_paths,
+        DbDateTime(chrono::Utc::now().fixed_offset()),
+        metadata_id_owned,
+    )
+    .await?;
 
     if let Some(logo) = &modinfo.logo {
-        if let Err(e) = app
-            .prisma_client
-            .curse_forge_mod_image_cache()
-            .upsert(
-                cfimgdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
-                cfimgdb::create(
-                    logo.url.clone(),
-                    cfdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
-                    vec![
-                        cfimgdb::SetParam::SetUpToDate(0), // Mark as needing download
-                        cfimgdb::SetParam::SetData(None),
-                    ],
-                ),
-                vec![
-                    cfimgdb::SetParam::SetUrl(logo.url.clone()),
-                    cfimgdb::SetParam::SetUpToDate(0), // Mark as needing download on update
-                ],
-            )
-            .exec()
-            .await
-        {
+        let url = logo.url.clone();
+        let image_metadata_id = result_metadata_id.clone();
+        if let Err(e) = metarepo::upsert_cf_image(&app.db, &image_metadata_id, &url).await {
             warn!(
                 "Failed to upsert curseforge image for metadata_id {}: {:?}",
-                cache_result.metadata_id, e
+                result_metadata_id, e
             );
         }
     }

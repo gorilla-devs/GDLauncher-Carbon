@@ -1,6 +1,16 @@
 import { spawn } from "child_process"
 import { createServer, build } from "vite"
 import electron from "@overwolf/ow-electron"
+import dotenv from "dotenv"
+
+// The spawned Electron process inherits process.env, so the root .env has to be
+// loaded before it is read below. ow-electron reads OW_CLI_EMAIL/OW_CLI_API_KEY
+// from the environment to authenticate dev mode, without which the gaming
+// packages (GEP, Overlay, Recorder) do not load.
+dotenv.config({
+  path: "../../.env",
+  quiet: true
+})
 
 let electronProcess = null
 /**

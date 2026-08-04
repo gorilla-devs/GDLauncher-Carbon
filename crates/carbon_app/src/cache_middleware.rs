@@ -1,10 +1,8 @@
 use crate::managers::UnsafeAppRef;
 use anyhow::anyhow;
 use axum::http::Extensions;
-use carbon_repos::db::{
-    http_cache::{SetParam, WhereParam},
-    read_filters::StringFilter,
-};
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::http_cache as http_cache_repo;
 use chrono::{DateTime, Duration, Utc};
 use reqwest::{Method, Request, Response, ResponseBuilderExt, StatusCode, Url, header::HeaderMap};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
@@ -85,12 +83,8 @@ impl Middleware for CacheMiddleware {
         let mut cached = if method != Method::GET {
             None
         } else {
-            app.prisma_client
-                .http_cache()
-                .find_first(vec![WhereParam::Url(StringFilter::Equals(
-                    req_url_str.clone(),
-                ))])
-                .exec()
+            let url_for_read = req_url_str.clone();
+            http_cache_repo::get_cached(&app.db, &url_for_read)
                 .await
                 .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?
         };
@@ -231,25 +225,18 @@ impl Middleware for CacheMiddleware {
             // downloads) from ever entering HTTPCache, which is what caused
             // the 60-80GB db bloat reports.
             if body.len() <= MAX_CACHEABLE_BODY_BYTES {
-                let _ = app
-                    .prisma_client
-                    ._batch((
-                        app.prisma_client.http_cache().delete_many(vec![
-                            // will not fail when not found
-                            WhereParam::Url(StringFilter::Equals(url_str.clone())),
-                        ]),
-                        app.prisma_client.http_cache().create(
-                            url_str,
-                            status,
-                            body.to_vec(),
-                            vec![
-                                SetParam::SetExpiresAt(expires.map(Into::into)),
-                                SetParam::SetLastModified(last_modified),
-                                SetParam::SetEtag(etag),
-                            ],
-                        ),
-                    ))
-                    .await;
+                let body_for_write = body.to_vec();
+                let expires_at = expires.map(|e| DbDateTime(e.into()));
+                let _ = http_cache_repo::replace_cached(
+                    &app.db,
+                    url_str,
+                    status,
+                    body_for_write,
+                    expires_at,
+                    last_modified,
+                    etag,
+                )
+                .await;
             }
 
             match build_cached(status, body.to_vec(), &response_headers, &url, false) {

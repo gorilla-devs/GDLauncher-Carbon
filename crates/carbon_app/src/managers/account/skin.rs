@@ -1,7 +1,6 @@
 use super::api::McSkin as ApiSkin;
 use crate::managers::ManagerRef;
 use anyhow::ensure;
-use carbon_repos::db::{self, read_filters::StringFilter};
 use image::{GenericImageView, ImageFormat};
 use std::io::Cursor;
 use thiserror::Error;
@@ -11,34 +10,21 @@ pub struct SkinManager {}
 impl ManagerRef<'_, SkinManager> {
     /// Load an account skin from the DB, or download it if not cached.
     pub async fn get_skin(self, uuid: String) -> anyhow::Result<Skin> {
-        use db::skin::{UniqueWhereParam, WhereParam};
+        use carbon_repos::repos::{account as account_repo, skin as skin_repo};
 
-        let account = self
-            .app
-            .prisma_client
-            .account()
-            .find_unique(db::account::UniqueWhereParam::UuidEquals(uuid.clone()))
-            .exec()
+        let account = account_repo::get_account(&self.app.db, &uuid)
             .await?
             .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
 
         let skin_id = match account.skin_id.as_ref() {
-            Some(x) => x,
-            None => DefaultSkin::from_uuid(uuid.clone()).skin_id(),
+            Some(x) => x.clone(),
+            None => DefaultSkin::from_uuid(uuid.clone()).skin_id().to_string(),
         };
 
-        let cached_skin = self
-            .app
-            .prisma_client
-            .skin()
-            .find_unique(UniqueWhereParam::IdEquals(skin_id.to_string()))
-            .exec()
-            .await?;
+        let cached_skin = skin_repo::get_skin(&self.app.db, &skin_id).await?;
 
         Ok(match cached_skin {
-            Some(skin) => Skin {
-                data: skin.skin.into(),
-            },
+            Some(skin) => Skin { data: skin.skin },
             None => {
                 let skin = match account.access_token.as_ref() {
                     Some(token) => super::api::get_profile(&self.app.reqwest_client, token)
@@ -62,27 +48,13 @@ impl ManagerRef<'_, SkinManager> {
                     .bytes()
                     .await?;
 
-                self.app
-                    .prisma_client
-                    ._batch((
-                        // won't error on 0 deleted
-                        self.app
-                            .prisma_client
-                            .skin()
-                            .delete_many(vec![WhereParam::Id(StringFilter::Equals(
-                                skin.id.clone(),
-                            ))]),
-                        self.app.prisma_client.skin().create(
-                            skin.id.clone(),
-                            skin_data.to_vec(),
-                            vec![],
-                        ),
-                        self.app.prisma_client.account().update(
-                            db::account::UniqueWhereParam::UuidEquals(uuid),
-                            vec![db::account::SetParam::SetSkinId(Some(skin.id.clone()))],
-                        ),
-                    ))
-                    .await?;
+                skin_repo::replace_skin_and_link_account(
+                    &self.app.db,
+                    skin.id.clone(),
+                    skin_data.to_vec(),
+                    uuid,
+                )
+                .await?;
 
                 Skin {
                     data: skin_data.to_vec(),

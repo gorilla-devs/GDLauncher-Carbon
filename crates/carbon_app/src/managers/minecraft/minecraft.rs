@@ -10,9 +10,12 @@ use crate::{
     },
 };
 use anyhow::Context;
-use carbon_repos::db::{PrismaClient, app_configuration::pre_launch_hook};
-use carbon_repos::pcr::QueryError;
+use carbon_repos::db_error::DbError;
+use carbon_repos::db_exec::Db;
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::version_meta;
 use carbon_rt_path::{InstancePath, RuntimePath};
+use chrono::Utc;
 use daedalus::minecraft::{
     Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
     VersionManifest,
@@ -36,7 +39,7 @@ pub enum VersionError {
     #[error("Could not fetch version meta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Could not execute db query: {0}")]
-    QueryError(#[from] QueryError),
+    QueryError(#[from] DbError),
 }
 
 #[derive(Error, Debug)]
@@ -44,7 +47,7 @@ pub enum MinecraftManifestError {
     #[error("Could not fetch minecraft manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Manifest database query error: {0}")]
-    DBQueryError(#[from] QueryError),
+    DBQueryError(#[from] DbError),
 }
 
 pub async fn get_manifest(
@@ -68,7 +71,7 @@ pub async fn get_manifest(
 }
 
 pub async fn get_version(
-    db_client: Arc<PrismaClient>,
+    db: &Db,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     mc_version: &str,
     meta_base_url: &Url,
@@ -109,21 +112,13 @@ pub async fn get_version(
         let parsed = serde_json::from_slice::<VersionInfo>(&version_meta)
             .with_context(|| format!("Failed to parse minecraft version from `{}`", url.clone()))?;
 
-        db_client
-            .version_info_cache()
-            .upsert(
-                carbon_repos::db::version_info_cache::id::equals(mc_version.to_string()),
-                carbon_repos::db::version_info_cache::create(
-                    mc_version.to_string(),
-                    version_meta.to_vec(),
-                    vec![],
-                ),
-                vec![carbon_repos::db::version_info_cache::version_info::set(
-                    version_meta.to_vec(),
-                )],
-            )
-            .exec()
-            .await?;
+        version_meta::upsert_version_info(
+            db,
+            &mc_version.to_string(),
+            &version_meta,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
 
         Ok(parsed)
     };
@@ -131,12 +126,8 @@ pub async fn get_version(
     match update_cache().await {
         Ok(parsed) => Ok(parsed),
         Err(err) => {
-            let db_cache = db_client
-                .version_info_cache()
-                .find_unique(carbon_repos::db::version_info_cache::id::equals(
-                    mc_version.to_string(),
-                ))
-                .exec()
+            let mc_version_owned = mc_version.to_string();
+            let db_cache = version_meta::get_version_info(db, &mc_version_owned)
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
@@ -164,7 +155,7 @@ pub async fn get_version(
 }
 
 pub async fn get_lwjgl_meta(
-    db_client: Arc<PrismaClient>,
+    db: &Db,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     version_info: &VersionInfo,
     meta_base_url: &Url,
@@ -228,21 +219,13 @@ pub async fn get_lwjgl_meta(
 
         let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
-        db_client
-            .lwjgl_meta_cache()
-            .upsert(
-                carbon_repos::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
-                carbon_repos::db::lwjgl_meta_cache::create(
-                    db_entry_name.clone(),
-                    lwjgl.to_vec(),
-                    vec![],
-                ),
-                vec![carbon_repos::db::lwjgl_meta_cache::lwjgl::set(
-                    lwjgl.to_vec(),
-                )],
-            )
-            .exec()
-            .await?;
+        version_meta::upsert_lwjgl_meta(
+            db,
+            &db_entry_name,
+            &lwjgl,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
 
         Ok(parsed)
     };
@@ -250,13 +233,8 @@ pub async fn get_lwjgl_meta(
     match update_cache().await {
         Ok(parsed) => Ok(parsed),
         Err(err) => {
-            let db_cache = db_client
-                .lwjgl_meta_cache()
-                .find_unique(carbon_repos::db::lwjgl_meta_cache::id::equals(format!(
-                    "{}-{}",
-                    version_info_lwjgl_requirement.uid, lwjgl_suggest
-                )))
-                .exec()
+            let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
+            let db_cache = version_meta::get_lwjgl_meta(db, &db_entry_name)
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
@@ -776,14 +754,38 @@ pub async fn launch_minecraft(
         _ => None,
     };
 
+    // On Windows, launch the game with javaw.exe rather than java.exe. The vanilla
+    // launcher uses javaw, and game-capture / injection tools (OBS, Insights, Medal,
+    // ...) key off the javaw.exe process name; the console-subsystem java.exe can
+    // also flash a console window. Redirected stdout/stderr are still delivered to
+    // javaw, so the in-app log viewer is unaffected. Fall back to the original
+    // binary when a sibling javaw.exe isn't present.
+    #[cfg(target_os = "windows")]
+    let launch_java_path = {
+        let original = std::path::Path::new(&java_component.path);
+        match original.file_name().and_then(|n| n.to_str()) {
+            Some(name) if name.eq_ignore_ascii_case("java.exe") => {
+                let javaw = original.with_file_name("javaw.exe");
+                if javaw.is_file() {
+                    javaw.to_string_lossy().into_owned()
+                } else {
+                    java_component.path.clone()
+                }
+            }
+            _ => java_component.path.clone(),
+        }
+    };
+    #[cfg(not(target_os = "windows"))]
+    let launch_java_path = java_component.path.clone();
+
     let (main_command, command_args) = match wrapper_tokens {
         Some(mut tokens) => {
             let program = tokens.remove(0);
-            tokens.push(java_component.path.clone());
+            tokens.push(launch_java_path);
             tokens.extend(startup_command);
             (program, tokens)
         }
-        None => (java_component.path.clone(), startup_command),
+        None => (launch_java_path, startup_command),
     };
 
     let logged_command = match &secret_to_redact {
@@ -958,7 +960,7 @@ mod tests {
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            app.prisma_client.clone(),
+            &app.db,
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version,
             &app.minecraft_manager().meta_base_url,
@@ -987,7 +989,7 @@ mod tests {
             .unwrap();
 
         let assets_dir = crate::managers::minecraft::assets::get_assets_dir(
-            app.prisma_client.clone(),
+            &app.db,
             reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version.asset_index,
             runtime_path.get_assets(),
@@ -1092,7 +1094,7 @@ mod tests {
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            app.prisma_client.clone(),
+            &app.db,
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version,
             &app.minecraft_manager().meta_base_url,

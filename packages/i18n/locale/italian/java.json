@@ -52,7 +52,7 @@
   "_trn_confirm_change_runtime_path_already_used_text": "Sei sicuro di voler cambiare il percorso runtime? Poiché la cartella di destinazione è già in uso, questo semplicemente cambierà la configurazione del percorso runtime e nessun file verrà spostato o copiato.",
   "_trn_applying_new_runtime_path": "Applicazione del nuovo percorso runtime...",
   "_trn_do_not_close_app": "Non chiudere l'app. Si riavvierà automaticamente una volta finito.",
-  "_trn_do_not_close_app_or_pc_title": "Migrazione in corso — non chiudere l'app né spegnere il PC",
+  "_trn_do_not_close_app_or_pc_title": "Migrazione in corso: non chiudere l'app né spegnere il PC",
   "_trn_do_not_close_app_or_pc_body": "Chiudere il launcher o spegnere il computer durante la migrazione lascerà i dati divisi tra la vecchia e la nuova posizione. L'app si riavvierà automaticamente una volta finito.",
   "_trn_migration_errored": "La migrazione del percorso runtime non è riuscita. Lo stato potrebbe essere corrotto. Fai clic <0>qui</0> per ulteriori informazioni su come procedere.",
   "_trn_scanning_files": "Scansione dei file...",

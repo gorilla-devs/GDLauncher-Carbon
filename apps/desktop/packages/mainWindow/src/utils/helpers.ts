@@ -207,7 +207,10 @@ const MODLOADER_DISPLAY_NAMES: Record<string, string> = {
   forge: "Forge",
   neoforge: "NeoForge",
   fabric: "Fabric",
-  quilt: "Quilt"
+  quilt: "Quilt",
+  liteloader: "LiteLoader",
+  optifine: "OptiFine",
+  bungeecord: "BungeeCord"
 }
 
 export const getModloaderDisplayName = (loader: string | null | undefined) => {

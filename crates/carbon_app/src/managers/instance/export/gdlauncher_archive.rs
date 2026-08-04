@@ -18,10 +18,7 @@ use carbon_platforms::gdlauncher::manifest::schema::v1::{
     FileHashes, GameDependencies, Manifest, ModloaderDependency, ModloaderType, ModpackSource,
     PackFile, PlatformFile,
 };
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
-};
+use carbon_repos::repos::mod_file_cache as mfcdb;
 use chrono::Utc;
 use std::{collections::HashMap, fs::File, io::Write, path::Path, path::PathBuf, sync::Arc};
 use tokio::sync::watch;
@@ -164,56 +161,31 @@ pub async fn export_gdlauncher(
                             .await?;
 
                         // Query ModFileCache for tracked files
-                        let cached_files = app
-                            .prisma_client
-                            .mod_file_cache()
-                            .find_many(vec![fcdb::instance_id::equals(*instance_id)])
-                            .with(
-                                fcdb::metadata::fetch()
-                                    .with(metadb::curseforge::fetch())
-                                    .with(metadb::modrinth::fetch()),
-                            )
-                            .exec()
-                            .await?;
+                        let instance_id_val = *instance_id;
+                        let cached_files =
+                            mfcdb::get_instance_gdl_export_files(&app.db, instance_id_val).await?;
 
-                        for cached_file in cached_files {
+                        for row in cached_files {
                             // Check if in filter
-                            if !folder_filter.contains_key(&cached_file.filename) {
+                            if !folder_filter.contains_key(&row.filename) {
                                 continue;
                             }
 
-                            let Some(metadata) = cached_file.metadata else {
-                                continue;
-                            };
-
                             // Check if file has platform data in cache - if yes, it's resolvable
                             // This avoids making network calls for every file during export
-                            let has_curseforge = metadata
-                                .curseforge
-                                .as_ref()
-                                .map(|o| o.is_some())
-                                .unwrap_or(false);
-                            let has_modrinth = metadata
-                                .modrinth
-                                .as_ref()
-                                .map(|o| o.is_some())
-                                .unwrap_or(false);
-                            let can_resolve = has_curseforge || has_modrinth;
+                            let can_resolve =
+                                row.cf_project_id.is_some() || row.mr_project_id.is_some();
 
                             // Build hashes from metadata
-                            let sha512 = hex::encode(&metadata.sha_512);
-                            let sha1 = hex::encode(&metadata.sha_1);
-                            let murmur2 = metadata.murmur_2 as u32;
-
                             let hashes = FileHashes {
-                                sha512,
-                                sha1,
-                                murmur2,
+                                sha512: hex::encode(&row.sha512),
+                                sha1: hex::encode(&row.sha1),
+                                murmur2: row.murmur2 as u32,
                             };
 
                             if can_resolve {
                                 // Remove from filter so it's NOT bundled in overrides
-                                folder_filter.remove(&cached_file.filename);
+                                folder_filter.remove(&row.filename);
                                 pack_files.push(PackFile::Platform(PlatformFile { hashes }));
                             }
                             // Non-resolvable files remain in filter and get bundled in overrides

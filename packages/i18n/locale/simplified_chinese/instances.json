@@ -317,7 +317,7 @@
   "_trn_share_errors.instance_too_large": "实例太大，无法分享",
   "_trn_share_errors.too_large_detail": "此实例大小为 {{size}}，但分享限制为 {{limit}}。",
   "_trn_share_errors.too_large_folders": "最大的文件夹",
-  "_trn_share_errors.too_large_hint": "移除您不需要分享的内容——资源包、光影包和世界通常是最大的。",
+  "_trn_share_errors.too_large_hint": "移除您不需要分享的内容：资源包、光影包和世界通常是最大的。",
   "_trn_share_errors.background_rejected": "您的实例图标被内容审核拒绝。请选择不同的图标并重试。",
   "_trn_share_errors.background_moderation_unavailable": "内容审核暂时不可用。请一分钟后重试。",
   "_trn_share_errors.background_rate_limited": "您近期上传的图片过多。请稍等片刻再试。",

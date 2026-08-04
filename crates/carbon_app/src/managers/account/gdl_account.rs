@@ -203,6 +203,11 @@ impl InstanceShareError {
                 "INVALID_IMAGE_FORMAT" => Self::InvalidImageFormat,
                 _ => Self::Unknown(resp.error.message),
             }
+        } else if status == StatusCode::REQUEST_TIMEOUT {
+            // Infrastructure timeouts (a proxy or tower TimeoutLayer cutting a
+            // long poll) reply 408 with no error JSON. Treat them like the
+            // typed UPLOAD_TIMEOUT so callers re-poll instead of failing.
+            Self::UploadTimeout
         } else {
             Self::Unknown(format!("HTTP {}: {}", status.as_u16(), body))
         }
@@ -633,12 +638,18 @@ impl GDLAccountTask {
                 .send()
                 .await?;
 
-            if resp.status() == cloudflare_timeout_status {
-                tracing::warn!("Account validation timed out. Retrying...");
+            // The server's wait is a long poll: 408 means its window expired
+            // before the account was verified, 524 means Cloudflare cut the
+            // request first. Both mean "not verified yet" — poll again.
+            if resp.status() == cloudflare_timeout_status
+                || resp.status() == StatusCode::REQUEST_TIMEOUT
+            {
+                tracing::debug!("Account validation wait window expired, re-polling");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 continue;
             }
 
-            resp.bytes().await?;
+            resp.error_for_status()?;
 
             return Ok(());
         }
@@ -1409,5 +1420,43 @@ impl GDLAccountTask {
 
         let result: BackgroundResponse = handle_instance_share_response(resp).await?;
         Ok(result.background_url)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bodyless_408_maps_to_upload_timeout() {
+        // Infrastructure timeouts (a proxy or tower TimeoutLayer cutting a
+        // long poll) reply 408 with an empty body instead of enderium's error
+        // JSON. They must map to the typed timeout so callers re-poll instead
+        // of surfacing an unknown error.
+        let err = InstanceShareError::from_response(StatusCode::REQUEST_TIMEOUT, "");
+        assert!(
+            matches!(err, InstanceShareError::UploadTimeout),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn typed_upload_timeout_body_maps_to_upload_timeout() {
+        let body =
+            r#"{"error":{"code":"UPLOAD_TIMEOUT","message":"Upload did not complete in time"}}"#;
+        let err = InstanceShareError::from_response(StatusCode::REQUEST_TIMEOUT, body);
+        assert!(
+            matches!(err, InstanceShareError::UploadTimeout),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn unparseable_non_timeout_body_stays_unknown() {
+        let err = InstanceShareError::from_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "<html>bad gateway</html>",
+        );
+        assert!(matches!(err, InstanceShareError::Unknown(_)), "got {err:?}");
     }
 }

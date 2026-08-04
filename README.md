@@ -103,7 +103,7 @@ At this point make sure you have pnpm installed:
 
 ### Run app in dev mode
 
-First of all you'll need to generate the prisma code and rspc bindings. To do that run
+First of all you'll need to generate the rspc bindings. To do that run
 
 `pnpm codegen`
 
@@ -120,9 +120,9 @@ Now open a new terminal and run the actual app
 
 To generate a new migration please run
 
-`pnpm prisma:migrate --name {migration_name}`
+`cargo run -p carbon_repos --bin new_migration -- {migration_name}`
 
-Replace `{migration_name}` with the name of the migration you want to create.
+Replace `{migration_name}` with the name of the migration you want to create. Run it once to scaffold the migration directory, write the forward SQL in the generated `migration.sql`, then run it again to derive the down migration and print the entry to add to `get_migrations()`.
 
 ## 🔍 Test
 

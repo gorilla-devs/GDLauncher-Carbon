@@ -4,7 +4,7 @@ use crate::{
     api::keys::java::GET_SETUP_MANAGED_JAVA_PROGRESS,
     domain::java::{JavaArch, JavaOs, JavaVendor, JavaVersion},
 };
-use carbon_repos::db::PrismaClient;
+use carbon_repos::db_exec::Db;
 use carbon_rt_path::{ManagedJavasPath, TempPath};
 use serde::Serialize;
 use std::{
@@ -79,7 +79,7 @@ pub trait Managed {
         tmp_path: TempPath,
         base_managed_java_path: ManagedJavasPath,
         java_checker: &G,
-        db_client: &Arc<PrismaClient>,
+        db: &Db,
         progress_report: Sender<Step>,
     ) -> anyhow::Result<String>;
 
@@ -144,7 +144,7 @@ impl ManagedService {
                 let tmp_path = app.settings_manager().runtime_path.get_temp();
                 let base_managed_java_path =
                     app.settings_manager().runtime_path.get_managed_javas();
-                let db_client = &app.prisma_client.clone();
+                let db = app.db.clone();
 
                 let (sender, mut recv) = tokio::sync::watch::channel(Step::Idle);
 
@@ -171,7 +171,7 @@ impl ManagedService {
                         tmp_path,
                         base_managed_java_path,
                         &RealJavaChecker,
-                        db_client,
+                        &db,
                         sender,
                     )
                     .await?

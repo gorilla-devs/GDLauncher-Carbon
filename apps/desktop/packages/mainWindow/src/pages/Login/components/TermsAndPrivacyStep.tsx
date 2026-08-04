@@ -60,9 +60,11 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
         <p class="text-lightSlate-400 m-0 mb-3 text-sm leading-relaxed">
           <Trans key="auth:_trn_login.cmp_notice_paragraph1" />
         </p>
-        <p class="text-lightSlate-400 m-0 mb-3 text-sm leading-relaxed">
-          <Trans key="auth:_trn_login.cmp_instructions" />
-        </p>
+        <Show when={cmpAvailable()}>
+          <p class="text-lightSlate-400 m-0 mb-3 text-sm leading-relaxed">
+            <Trans key="auth:_trn_login.cmp_instructions" />
+          </p>
+        </Show>
         <p class="text-lightSlate-500 m-0 text-xs leading-relaxed">
           <Trans key="auth:_trn_login.purposes_we_use" />{" "}
           <Trans key="auth:_trn_login.we_value_privacy_text5" />

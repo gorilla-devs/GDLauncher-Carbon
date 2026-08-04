@@ -14,7 +14,14 @@ import {
   SelectValue
 } from "@gd/ui"
 import { useSearchParams } from "@solidjs/router"
-import { Match, Show, Switch, createMemo, createSignal } from "solid-js"
+import {
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createMemo,
+  createSignal
+} from "solid-js"
 import { createStore } from "solid-js/store"
 import { rspc } from "@/utils/rspcClient"
 import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper"
@@ -106,6 +113,25 @@ const ExploreVersionsNavbar = (props: Props) => {
     if (!value) return "All modloaders"
     return value
   }
+
+  // The instance-derived defaults can be unsupported by this addon (e.g. a Forge
+  // instance opening a Fabric-only mod). Left as-is they'd filter every version out
+  // and render a blank selector, so reset such values to "all" once the addon's
+  // supported sets are known.
+  createEffect(() => {
+    const loader = infiniteQuery.query.modLoaderType
+    if (loader && !modloaders().includes(loader)) {
+      infiniteQuery.setQuery({ modLoaderType: null })
+    }
+  })
+
+  createEffect(() => {
+    const supported = props.supportedGameVersions
+    const gameVersion = infiniteQuery.query.gameVersion
+    if (gameVersion && supported?.length && !supported.includes(gameVersion)) {
+      infiniteQuery.setQuery({ gameVersion: null })
+    }
+  })
 
   const filteredGameVersions = createMemo(() => {
     const snapshot = gameVersionFilters.snapshot

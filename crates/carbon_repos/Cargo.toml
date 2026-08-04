@@ -4,11 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-prisma-client-rust = { workspace = true, features = [
-  "sqlite-create-many",
-  "sqlite",
-  "migrations",
-], default-features = false }
+carbon_macro = { path = "../carbon_macro" }
+paste = "1.0"
 serde = { workspace = true, features = ["derive", "rc"] }
-rusqlite = { version = "0.25.4", features = ["bundled"] }
-rusqlite_migration = "1.0.2"
+rusqlite = { version = "0.40.1", features = ["bundled", "hooks", "column_metadata"] }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true }

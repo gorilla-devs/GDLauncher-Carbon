@@ -2,124 +2,98 @@ use super::{discovery::Discovery, java_checker::JavaChecker};
 use crate::domain::java::{
     JavaArch, JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName,
 };
-use carbon_repos::db::{PrismaClient, read_filters::StringFilter};
-use std::{path::PathBuf, sync::Arc};
+use carbon_repos::db_exec::Db;
+use carbon_repos::repos::java as java_repo;
+use std::collections::HashSet;
+use std::path::PathBuf;
 use strum::IntoEnumIterator;
 use tracing::{info, trace, warn};
 
+/// Collects the set of `Java.path` values that any `JavaProfile` currently links
+/// to, used to decide whether a broken java may be deleted or must be kept and
+/// marked invalid.
+async fn java_paths_used_in_profiles(db: &Db) -> anyhow::Result<HashSet<String>> {
+    let paths = java_repo::get_profile_linked_java_paths(db)
+        .await?
+        .into_iter()
+        .map(|row| row.path)
+        .collect();
+
+    Ok(paths)
+}
+
 #[tracing::instrument(level = "trace", skip(db))]
 async fn get_java_component_from_db(
-    db: &PrismaClient,
+    db: &Db,
     path: String,
-) -> anyhow::Result<Option<carbon_repos::db::java::Data>> {
-    let res = db
-        .java()
-        .find_unique(carbon_repos::db::java::UniqueWhereParam::PathEquals(path))
-        .exec()
-        .await?;
-
-    Ok(res)
+) -> anyhow::Result<Option<java_repo::JavaRow>> {
+    Ok(java_repo::get_java_by_path(db, &path).await?)
 }
 
 #[tracing::instrument(level = "trace", skip(db))]
 pub async fn upsert_java_component_to_db(
-    db: &Arc<PrismaClient>,
+    db: &Db,
     java_component: JavaComponent,
 ) -> anyhow::Result<String> {
     let already_existing_component =
         get_java_component_from_db(db, java_component.path.clone()).await?;
 
-    let already_existing_component = already_existing_component
-        .map(|data| {
-            (
-                JavaComponent::try_from(data.clone()),
-                data.is_valid,
-                data.id,
-            )
-        })
-        .and_then(|res| {
-            let resp = res.0.ok();
+    let already_existing_component = already_existing_component.and_then(|row| {
+        let id = row.id.clone();
+        JavaComponent::try_from(row)
+            .ok()
+            .map(|component| (component, id))
+    });
 
-            match resp {
-                Some(val) => Some((val, res.1, res.2)),
-                None => None,
-            }
-        });
-
-    if let Some((component, is_valid, id)) = already_existing_component {
+    if let Some((component, id)) = already_existing_component {
         if component == java_component {
-            db.java()
-                .update(
-                    carbon_repos::db::java::id::equals(id.clone()),
-                    vec![carbon_repos::db::java::is_valid::set(true)],
-                )
-                .exec()
-                .await?;
+            java_repo::set_java_validity(db, &id, true).await?;
 
-            return Ok(id);
+            Ok(id)
         } else {
             // Same path, changed Java: update the existing row in place (for example a JDK
             // upgraded at a fixed install path). `path` is unique and the row id is preserved,
             // so this replaces the stored metadata, including a changed major version, instead
             // of failing the scan.
-            db.java()
-                .update(
-                    carbon_repos::db::java::id::equals(id.clone()),
-                    vec![
-                        carbon_repos::db::java::major::set(java_component.version.major as i32),
-                        carbon_repos::db::java::full_version::set(
-                            java_component.version.to_string(),
-                        ),
-                        carbon_repos::db::java::arch::set(java_component.arch.to_string()),
-                        carbon_repos::db::java::os::set(java_component.os.to_string()),
-                        carbon_repos::db::java::vendor::set(java_component.vendor),
-                        carbon_repos::db::java::is_valid::set(true),
-                    ],
-                )
-                .exec()
+            let major = java_component.version.major as i32;
+            let full_version = java_component.version.to_string();
+            let arch = java_component.arch.to_string();
+            let os = java_component.os.to_string();
+            let vendor = java_component.vendor;
+            java_repo::update_java_component(db, &id, major, &full_version, &arch, &os, &vendor)
                 .await?;
 
-            return Ok(id);
+            Ok(id)
         }
     } else {
-        let res = db
-            .java()
-            .create(
-                java_component.path,
-                java_component.version.major as i32,
-                java_component.version.to_string(),
-                java_component._type.to_string(),
-                java_component.os.to_string(),
-                java_component.arch.to_string(),
-                java_component.vendor,
-                vec![],
-            )
-            .exec()
-            .await?;
+        let row = java_repo::JavaRow {
+            id: uuid::Uuid::new_v4().to_string(),
+            path: java_component.path,
+            major: java_component.version.major as i32,
+            full_version: java_component.version.to_string(),
+            r#type: java_component._type.to_string(),
+            os: java_component.os.to_string(),
+            arch: java_component.arch.to_string(),
+            vendor: java_component.vendor,
+            is_valid: true,
+        };
+        let id = row.id.clone();
+        java_repo::insert_java(db, row).await?;
 
-        Ok(res.id)
+        Ok(id)
     }
 }
 
 #[tracing::instrument(level = "trace", skip(db))]
-async fn update_java_component_in_db_to_invalid(
-    db: &Arc<PrismaClient>,
-    path: String,
-) -> anyhow::Result<()> {
-    db.java()
-        .update(
-            carbon_repos::db::java::UniqueWhereParam::PathEquals(path),
-            vec![carbon_repos::db::java::SetParam::SetIsValid(false)],
-        )
-        .exec()
-        .await?;
+async fn update_java_component_in_db_to_invalid(db: &Db, path: String) -> anyhow::Result<()> {
+    java_repo::set_java_validity_by_path(db, &path, false).await?;
 
     Ok(())
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub async fn scan_and_sync_local<T, G>(
-    db: &Arc<PrismaClient>,
+    db: &Db,
     discovery: &T,
     java_checker: &G,
 ) -> anyhow::Result<()>
@@ -135,12 +109,7 @@ where
         t_discover.elapsed().as_secs_f64()
     );
 
-    let java_profiles = db
-        .java_profile()
-        .find_many(vec![])
-        .with(carbon_repos::db::java_profile::java::fetch())
-        .exec()
-        .await?;
+    let used_java_paths = java_paths_used_in_profiles(db).await?;
 
     for local_java in &local_javas {
         trace!("Analyzing local java: {:?}", local_java);
@@ -174,20 +143,12 @@ where
             }
         }
 
-        let is_java_used_in_profile = java_profiles.iter().any(|profile| {
-            let Some(java) = profile.java.as_ref() else {
-                return false;
-            };
-            let Some(java) = java.as_ref() else {
-                return false;
-            };
-            let java_path = java.path.clone();
-            java_path == resolved_java_path.display().to_string()
-        });
+        let is_java_used_in_profile =
+            used_java_paths.contains(&resolved_java_path.display().to_string());
 
         match (java_bin_info, db_entry) {
             // If it is valid, check whether it's in the DB
-            (Ok(java_component), Some(db_entry)) => {
+            (Ok(java_component), Some(_db_entry)) => {
                 trace!("Java is valid: {:?}", java_component);
                 upsert_java_component_to_db(db, java_component).await?;
             }
@@ -208,12 +169,8 @@ where
                         )
                         .await?;
                     } else {
-                        db.java()
-                            .delete(carbon_repos::db::java::UniqueWhereParam::PathEquals(
-                                resolved_java_path.display().to_string(),
-                            ))
-                            .exec()
-                            .await?;
+                        let path = resolved_java_path.display().to_string();
+                        java_repo::delete_java_by_path(db, &path).await?;
                     }
                 }
             }
@@ -221,13 +178,8 @@ where
     }
 
     // Cleanup unscanned local javas (if they are not default)
-    let local_javas_from_db = db
-        .java()
-        .find_many(vec![carbon_repos::db::java::r#type::equals(
-            JavaComponentType::Local.to_string(),
-        )])
-        .exec()
-        .await?;
+    let local_type = JavaComponentType::Local.to_string();
+    let local_javas_from_db = java_repo::get_java_by_type(db, &local_type).await?;
 
     for local_java_from_db in local_javas_from_db {
         trace!(
@@ -242,28 +194,13 @@ where
             continue;
         }
 
-        let is_used_in_profile = java_profiles
-            .iter()
-            .filter_map(|profile| {
-                let Some(java) = profile.java.as_ref() else {
-                    return None;
-                };
-                let Some(java) = java else {
-                    return None;
-                };
-                Some(java.path.clone())
-            })
-            .any(|java_profile_path| local_java_from_db.path == java_profile_path);
+        let is_used_in_profile = used_java_paths.contains(&local_java_from_db.path);
 
         if is_used_in_profile {
             update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
         } else {
-            db.java()
-                .delete(carbon_repos::db::java::UniqueWhereParam::PathEquals(
-                    local_java_from_db.path,
-                ))
-                .exec()
-                .await?;
+            let path = local_java_from_db.path;
+            java_repo::delete_java_by_path(db, &path).await?;
         }
     }
 
@@ -271,17 +208,12 @@ where
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub async fn scan_and_sync_custom<G>(db: &Arc<PrismaClient>, java_checker: &G) -> anyhow::Result<()>
+pub async fn scan_and_sync_custom<G>(db: &Db, java_checker: &G) -> anyhow::Result<()>
 where
     G: JavaChecker,
 {
-    let custom_javas = db
-        .java()
-        .find_many(vec![carbon_repos::db::java::WhereParam::Type(
-            StringFilter::Equals(JavaComponentType::Custom.to_string()),
-        )])
-        .exec()
-        .await?;
+    let custom_type = JavaComponentType::Custom.to_string();
+    let custom_javas = java_repo::get_java_by_type(db, &custom_type).await?;
 
     for custom_java in custom_javas {
         let java_bin_info = java_checker
@@ -301,7 +233,7 @@ where
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub async fn scan_and_sync_managed<T, G>(
-    db: &Arc<PrismaClient>,
+    db: &Db,
     discovery: &T,
     java_checker: &G,
 ) -> anyhow::Result<()>
@@ -309,20 +241,10 @@ where
     T: Discovery,
     G: JavaChecker,
 {
-    let managed_javas = db
-        .java()
-        .find_many(vec![carbon_repos::db::java::r#type::equals(
-            JavaComponentType::Managed.to_string(),
-        )])
-        .exec()
-        .await?;
+    let managed_type = JavaComponentType::Managed.to_string();
+    let managed_javas = java_repo::get_java_by_type(db, &managed_type).await?;
 
-    let java_profiles = db
-        .java_profile()
-        .find_many(vec![])
-        .with(carbon_repos::db::java_profile::java::fetch())
-        .exec()
-        .await?;
+    let used_java_paths = java_paths_used_in_profiles(db).await?;
 
     for managed_java in &managed_javas {
         let java_bin_info = java_checker
@@ -332,16 +254,7 @@ where
             )
             .await;
 
-        let is_java_used_in_profile = java_profiles.iter().any(|profile| {
-            let Some(java) = profile.java.as_ref() else {
-                return false;
-            };
-            let Some(java) = java.as_ref() else {
-                return false;
-            };
-            let java_path = java.path.clone();
-            java_path == managed_java.path
-        });
+        let is_java_used_in_profile = used_java_paths.contains(&managed_java.path);
 
         info!(
             "java {} is used in profile: {}",
@@ -349,7 +262,7 @@ where
         );
 
         match (java_bin_info, managed_java.is_valid) {
-            (Ok(java_component), true) => {}
+            (Ok(_java_component), true) => {}
             (Ok(java_component), false) => {
                 upsert_java_component_to_db(db, java_component).await?;
             }
@@ -357,22 +270,14 @@ where
                 if is_java_used_in_profile {
                     update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
                 } else {
-                    db.java()
-                        .delete(carbon_repos::db::java::path::equals(
-                            managed_java.path.clone(),
-                        ))
-                        .exec()
-                        .await?;
+                    let path = managed_java.path.clone();
+                    java_repo::delete_java_by_path(db, &path).await?;
                 }
             }
             (Err(_), false) => {
                 if !is_java_used_in_profile {
-                    db.java()
-                        .delete(carbon_repos::db::java::UniqueWhereParam::PathEquals(
-                            managed_java.path.clone(),
-                        ))
-                        .exec()
-                        .await?;
+                    let path = managed_java.path.clone();
+                    java_repo::delete_java_by_path(db, &path).await?;
                 }
             }
         }
@@ -398,19 +303,16 @@ where
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result<()> {
-    let all_javas = db.java().find_many(vec![]).exec().await?;
+pub async fn sync_system_java_profiles(db: &Db) -> anyhow::Result<()> {
+    let all_javas = java_repo::get_all_java(db).await?;
 
     let is32bit = std::env::consts::ARCH == "x86" || std::env::consts::ARCH == "arm";
 
     for profile in SystemJavaProfileName::iter() {
         trace!("Syncing system java profile: {}", profile.to_string());
-        let java_in_profile = db
-            .java_profile()
-            .find_unique(carbon_repos::db::java_profile::name::equals(
-                profile.to_string(),
-            ))
-            .exec()
+        let profile_name = profile.to_string();
+        let name_for_lookup = profile_name.clone();
+        let java_in_profile = java_repo::get_profile(db, &name_for_lookup)
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -450,15 +352,8 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
                     java.path,
                     profile.to_string()
                 );
-                db.java_profile()
-                    .update(
-                        carbon_repos::db::java_profile::name::equals(profile.to_string()),
-                        vec![carbon_repos::db::java_profile::java::connect(
-                            carbon_repos::db::java::id::equals(java.id.clone()),
-                        )],
-                    )
-                    .exec()
-                    .await?;
+                let name = profile.to_string();
+                java_repo::set_profile_java(db, &name, Some(&java.id)).await?;
                 break;
             }
         }
@@ -486,11 +381,16 @@ mod test {
         },
         setup_managers_for_test,
     };
+    use carbon_repos::repos::java as java_repo;
+
+    async fn all_javas(db: &carbon_repos::db_exec::Db) -> Vec<java_repo::JavaRow> {
+        java_repo::get_all_java(db).await.unwrap()
+    }
 
     #[tokio::test]
     async fn test_add_component_to_db() {
         let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
+        let db = &app.db;
 
         let java_path = "/usr/bin/java2".to_string();
 
@@ -502,28 +402,23 @@ mod test {
             os: JavaOs::Linux,
             vendor: "Azul Systems, Inc.".to_string(),
         };
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
         assert_eq!(java_components.len(), 0);
 
         upsert_java_component_to_db(db, java_component.clone())
             .await
             .unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
         assert_eq!(java_components.len(), 1);
         assert_eq!(java_components[0].path, "/usr/bin/java2");
         assert!(java_components[0].is_valid);
 
-        db.java()
-            .update(
-                carbon_repos::db::java::path::equals(java_path.clone()),
-                vec![carbon_repos::db::java::is_valid::set(false)],
-            )
-            .exec()
+        java_repo::set_java_validity_by_path(db, &java_path, false)
             .await
             .unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
         assert_eq!(java_components.len(), 1);
         assert!(!java_components[0].is_valid);
 
@@ -531,7 +426,7 @@ mod test {
             .await
             .unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
         assert_eq!(java_components.len(), 1);
         assert!(java_components[0].is_valid);
 
@@ -550,7 +445,7 @@ mod test {
         // place rather than failing, so an in-place JDK upgrade does not break the scan.
         assert!(result.is_ok());
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
         assert_eq!(java_components.len(), 1);
         assert_eq!(java_components[0].path, java_path);
         assert_eq!(java_components[0].major, 9);
@@ -560,7 +455,7 @@ mod test {
     #[tokio::test]
     async fn test_scan_and_sync_local() {
         let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
+        let db = &app.db;
 
         let discovery = &MockDiscovery;
         let java_checker = &MockJavaChecker;
@@ -595,7 +490,7 @@ mod test {
             .await
             .unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
 
         println!("{:?}", java_components);
 
@@ -607,7 +502,7 @@ mod test {
     /// If it's used in a profile, it will be set as invalid
     async fn test_scan_and_sync_local_broken_javas() {
         let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
+        let db = &app.db;
         let discovery = &MockDiscovery;
         let java_checker = &MockJavaCheckerInvalid;
 
@@ -636,16 +531,8 @@ mod test {
             .await
             .unwrap();
 
-        db.java_profile()
-            .update(
-                carbon_repos::db::java_profile::name::equals(
-                    SystemJavaProfileName::Legacy.to_string(),
-                ),
-                vec![carbon_repos::db::java_profile::java::connect(
-                    carbon_repos::db::java::id::equals(java_id),
-                )],
-            )
-            .exec()
+        let profile_name = SystemJavaProfileName::Legacy.to_string();
+        java_repo::set_profile_java(db, &profile_name, Some(&java_id))
             .await
             .unwrap();
 
@@ -653,7 +540,7 @@ mod test {
             .await
             .unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
 
         assert_eq!(java_components.len(), 1);
 
@@ -663,7 +550,7 @@ mod test {
     #[tokio::test]
     async fn test_scan_and_sync_managed_broken_javas() {
         let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
+        let db = &app.db;
         let java_checker = &MockJavaCheckerInvalid;
         let discovery = &MockDiscovery;
 
@@ -691,16 +578,8 @@ mod test {
             .await
             .unwrap();
 
-        db.java_profile()
-            .update(
-                carbon_repos::db::java_profile::name::equals(
-                    SystemJavaProfileName::Legacy.to_string(),
-                ),
-                vec![carbon_repos::db::java_profile::java::connect(
-                    carbon_repos::db::java::id::equals(java_id),
-                )],
-            )
-            .exec()
+        let profile_name = SystemJavaProfileName::Legacy.to_string();
+        java_repo::set_profile_java(db, &profile_name, Some(&java_id))
             .await
             .unwrap();
 
@@ -708,7 +587,7 @@ mod test {
             .await
             .unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
 
         assert_eq!(java_components.len(), 1);
 
@@ -718,7 +597,7 @@ mod test {
     #[tokio::test]
     async fn test_scan_and_sync_custom_broken_javas() {
         let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
+        let db = &app.db;
         let java_checker = &MockJavaCheckerInvalid;
 
         let component_to_add = JavaComponent {
@@ -745,22 +624,14 @@ mod test {
             .await
             .unwrap();
 
-        db.java_profile()
-            .update(
-                carbon_repos::db::java_profile::name::equals(
-                    SystemJavaProfileName::Legacy.to_string(),
-                ),
-                vec![carbon_repos::db::java_profile::java::connect(
-                    carbon_repos::db::java::id::equals(java_id),
-                )],
-            )
-            .exec()
+        let profile_name = SystemJavaProfileName::Legacy.to_string();
+        java_repo::set_profile_java(db, &profile_name, Some(&java_id))
             .await
             .unwrap();
 
         scan_and_sync_custom(db, java_checker).await.unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
 
         assert_eq!(java_components.len(), 2);
 
@@ -772,7 +643,7 @@ mod test {
     #[tokio::test]
     async fn test_scan_and_sync_managed_on_disk_but_not_on_database() {
         let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
+        let db = &app.db;
         let discovery = &MockDiscovery;
         let java_checker = &MockJavaChecker;
 
@@ -780,7 +651,7 @@ mod test {
             .await
             .unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
 
         assert_eq!(java_components.len(), 3);
         for java_component in java_components {
@@ -791,150 +662,109 @@ mod test {
     #[tokio::test]
     async fn test_sync_system_java_profiles_with_profiles() {
         let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
+        let db = &app.db;
 
         JavaManager::ensure_profiles_in_db(db).await.unwrap();
 
         // manually set one of the profiles to non-system to make sure it gets updated to system
-        db.java_profile()
-            .update(
-                carbon_repos::db::java_profile::name::equals(
-                    SystemJavaProfileName::Legacy.to_string(),
-                ),
-                vec![carbon_repos::db::java_profile::is_system_profile::set(
-                    false,
-                )],
-            )
-            .exec()
+        let legacy_name = SystemJavaProfileName::Legacy.to_string();
+        java_repo::upsert_profile(db, &legacy_name, false)
             .await
             .unwrap();
 
-        db.java()
-            .create_many(vec![
-                (
-                    "my_path1".to_string(),
-                    8,
-                    "1.8.0_282".to_string(),
-                    "local".to_string(),
-                    "linux".to_string(),
-                    "x86_64".to_string(),
-                    "Azul Systems, Inc.".to_string(),
-                    vec![],
-                ),
-                (
-                    "my_path2".to_string(),
-                    17,
-                    "17.0.1".to_string(),
-                    "local".to_string(),
-                    "linux".to_string(),
-                    "x86_64".to_string(),
-                    "Azul Systems, Inc.".to_string(),
-                    vec![],
-                ),
-                (
-                    "my_path3".to_string(),
-                    14,
-                    "14.0.1".to_string(),
-                    "local".to_string(),
-                    "linux".to_string(),
-                    "x86_64".to_string(),
-                    "Azul Systems, Inc.".to_string(),
-                    vec![carbon_repos::db::java::SetParam::SetIsValid(false)],
-                ),
-            ])
-            .exec()
-            .await
-            .unwrap();
+        let seed_javas = [
+            java_repo::JavaRow {
+                id: uuid::Uuid::new_v4().to_string(),
+                path: "my_path1".to_string(),
+                major: 8,
+                full_version: "1.8.0_282".to_string(),
+                r#type: "local".to_string(),
+                os: "linux".to_string(),
+                arch: "x86_64".to_string(),
+                vendor: "Azul Systems, Inc.".to_string(),
+                is_valid: true,
+            },
+            java_repo::JavaRow {
+                id: uuid::Uuid::new_v4().to_string(),
+                path: "my_path2".to_string(),
+                major: 17,
+                full_version: "17.0.1".to_string(),
+                r#type: "local".to_string(),
+                os: "linux".to_string(),
+                arch: "x86_64".to_string(),
+                vendor: "Azul Systems, Inc.".to_string(),
+                is_valid: true,
+            },
+            java_repo::JavaRow {
+                id: uuid::Uuid::new_v4().to_string(),
+                path: "my_path3".to_string(),
+                major: 14,
+                full_version: "14.0.1".to_string(),
+                r#type: "local".to_string(),
+                os: "linux".to_string(),
+                arch: "x86_64".to_string(),
+                vendor: "Azul Systems, Inc.".to_string(),
+                is_valid: false,
+            },
+        ];
+        for java in seed_javas {
+            java_repo::insert_java(db, java).await.unwrap();
+        }
 
         JavaManager::ensure_profiles_in_db(db).await.unwrap();
         sync_system_java_profiles(db).await.unwrap();
 
-        let all_profiles = db.java_profile().find_many(vec![]).exec().await.unwrap();
+        let all_profiles = java_repo::get_all_profiles(db).await.unwrap();
         assert!(all_profiles.iter().all(|profile| profile.is_system_profile));
 
         // Expect 8 and 17 to be there, but not 14 since it's invalid and 16 because not provided
-        let legacy_profile = db
-            .java_profile()
-            .find_unique(
-                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::Legacy.to_string(),
-                ),
-            )
-            .with(carbon_repos::db::java_profile::java::fetch())
-            .exec()
+        let legacy_name = SystemJavaProfileName::Legacy.to_string();
+        let legacy_profile = java_repo::get_profile(db, &legacy_name)
             .await
             .unwrap()
             .unwrap();
 
         info!("{:?}", legacy_profile);
 
-        assert!(legacy_profile.java.flatten().is_some());
+        assert!(legacy_profile.java_id.is_some());
 
-        let alpha_profile = db
-            .java_profile()
-            .find_unique(
-                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::Alpha.to_string(),
-                ),
-            )
-            .with(carbon_repos::db::java_profile::java::fetch())
-            .exec()
+        let alpha_name = SystemJavaProfileName::Alpha.to_string();
+        let alpha_profile = java_repo::get_profile(db, &alpha_name)
             .await
             .unwrap()
             .unwrap();
 
-        assert!(alpha_profile.java.flatten().is_none());
+        assert!(alpha_profile.java_id.is_none());
 
-        let beta_profile = db
-            .java_profile()
-            .find_unique(
-                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::Beta.to_string(),
-                ),
-            )
-            .with(carbon_repos::db::java_profile::java::fetch())
-            .exec()
+        let beta_name = SystemJavaProfileName::Beta.to_string();
+        let beta_profile = java_repo::get_profile(db, &beta_name)
             .await
             .unwrap()
             .unwrap();
 
-        assert!(beta_profile.java.flatten().is_some());
+        assert!(beta_profile.java_id.is_some());
 
-        let gamma_profile = db
-            .java_profile()
-            .find_unique(
-                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::Gamma.to_string(),
-                ),
-            )
-            .with(carbon_repos::db::java_profile::java::fetch())
-            .exec()
+        let gamma_name = SystemJavaProfileName::Gamma.to_string();
+        let gamma_profile = java_repo::get_profile(db, &gamma_name)
             .await
             .unwrap()
             .unwrap();
 
-        assert!(gamma_profile.java.flatten().is_some());
+        assert!(gamma_profile.java_id.is_some());
 
-        let minecraft_exe_profile = db
-            .java_profile()
-            .find_unique(
-                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::MinecraftJavaExe.to_string(),
-                ),
-            )
-            .with(carbon_repos::db::java_profile::java::fetch())
-            .exec()
+        let minecraft_exe_name = SystemJavaProfileName::MinecraftJavaExe.to_string();
+        let minecraft_exe_profile = java_repo::get_profile(db, &minecraft_exe_name)
             .await
             .unwrap()
             .unwrap();
 
-        assert!(minecraft_exe_profile.java.flatten().is_none());
+        assert!(minecraft_exe_profile.java_id.is_none());
     }
 
     #[tokio::test]
     async fn test_upsert_java_component_to_db_different_java_configuration() {
         let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
+        let db = &app.db;
 
         let discovery = &MockDiscovery;
         let java_checker = &MockJavaChecker;
@@ -969,7 +799,7 @@ mod test {
             .await
             .unwrap();
 
-        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        let java_components = all_javas(db).await;
 
         assert_eq!(java_components.len(), 3);
 

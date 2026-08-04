@@ -14,7 +14,7 @@ use carbon_platforms::modrinth::{
         ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID, TeamIDs,
         VersionHashesQuery, VersionID, VersionIDs,
     },
-    version::{ModrinthPackDependencies, Version},
+    version::{LatestVersionsBody, ModrinthPackDependencies, Version, VersionType},
 };
 use reqwest_middleware::ClientWithMiddleware;
 use std::{collections::HashSet, sync::Arc};
@@ -31,6 +31,16 @@ pub const MODRINTH_API_BASE: &str = "https://api.modrinth.com/v2/";
 impl Modrinth {
     pub fn new(client: reqwest_middleware::ClientWithMiddleware) -> Self {
         let base_url = String::from(MODRINTH_API_BASE);
+        Self {
+            client,
+            base_url: base_url.parse().expect("Invalid base URL"),
+        }
+    }
+
+    /// Points the client at a stand-in for the API, so request shape can be
+    /// asserted without depending on live data.
+    #[cfg(test)]
+    fn with_base_url(client: reqwest_middleware::ClientWithMiddleware, base_url: &str) -> Self {
         Self {
             client,
             base_url: base_url.parse().expect("Invalid base URL"),
@@ -190,6 +200,27 @@ impl Modrinth {
             .send()
             .await?
             .json_with_context_reporting("modrinth::get_versions_from_hash")
+            .await?;
+        Ok(versions)
+    }
+
+    /// Returns the newest version matching the given loaders and game versions for
+    /// each hash, letting the server answer "is there an update" in a single request
+    /// instead of the client fetching every version a project has ever published.
+    #[tracing::instrument(skip(self))]
+    pub async fn get_latest_versions_from_hashes(
+        &self,
+        body: &LatestVersionsBody,
+    ) -> anyhow::Result<VersionHashesResponse> {
+        let url = self.base_url.join("version_files/update")?;
+
+        let versions = self
+            .client
+            .post(url.as_str())
+            .body(reqwest::Body::from(serde_json::to_string(body)?))
+            .send()
+            .await?
+            .json_with_context_reporting("modrinth::get_latest_versions_from_hashes")
             .await?;
         Ok(versions)
     }
@@ -556,6 +587,174 @@ mod test {
             .ok_or_else(|| anyhow::anyhow!("Hash not found"))?;
         assert!(result.project_id == "u6dRKJwZ");
         assert!(result.name == "1.0.1 for 1.8");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_latest_versions_from_hashes() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = iridium_client::get_client(crate::util::base_api::get_base_api_env!()).build();
+        let modrinth = Modrinth::new(client);
+
+        // Sodium 0.4.2 for 1.19.x; newer builds for the same loaders and game
+        // versions exist, so the response must point at a later version.
+        let hash = "95589fcca80f77aca8e38634927bfb7a5bd5b31b7f34c09352cc7724541b9efe\
+                    8bbe1d7c1a39afcdbf67fa38f5871355ccb56817027bf6028255393c7174e450"
+            .to_string();
+        let installed = modrinth
+            .get_versions_from_hash(&VersionHashesQuery {
+                hashes: vec![hash.clone()],
+                algorithm: HashAlgorithm::SHA512,
+            })
+            .await?;
+
+        let installed = installed
+            .get(&hash)
+            .ok_or_else(|| anyhow::anyhow!("Hash not found"))?;
+
+        let latest = modrinth
+            .get_latest_versions_from_hashes(&LatestVersionsBody {
+                hashes: vec![hash.clone()],
+                algorithm: HashAlgorithm::SHA512,
+                loaders: installed.loaders.clone(),
+                game_versions: installed.game_versions.clone(),
+                version_types: None,
+            })
+            .await?;
+
+        let latest = latest
+            .get(&hash)
+            .ok_or_else(|| anyhow::anyhow!("No latest version returned for hash"))?;
+
+        assert_eq!(latest.project_id, installed.project_id);
+        assert_ne!(
+            latest.id, installed.id,
+            "a newer version exists, so the update endpoint must not return the installed one"
+        );
+        assert!(latest.date_published > installed.date_published);
+        Ok(())
+    }
+
+    /// The channel filter is only useful if it actually reaches the wire, and a
+    /// serialisation change would drop it silently. Uses a stand-in for the API
+    /// so it keeps holding regardless of what any project publishes.
+    #[tokio::test]
+    async fn test_version_types_is_sent_on_the_wire() -> anyhow::Result<()> {
+        use super::*;
+
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/version_files/update")
+            .match_body(mockito::Matcher::PartialJson(serde_json::json!({
+                "version_types": ["beta"],
+                "loaders": ["forge"],
+                "game_versions": ["1.20.1"],
+            })))
+            .with_status(200)
+            .with_body("{}")
+            .expect(1)
+            .create_async()
+            .await;
+
+        let client = iridium_client::get_client(crate::util::base_api::get_base_api_env!()).build();
+        let modrinth = Modrinth::with_base_url(client, &format!("{}/", server.url()));
+
+        modrinth
+            .get_latest_versions_from_hashes(&LatestVersionsBody {
+                hashes: vec!["hash".to_string()],
+                algorithm: HashAlgorithm::SHA512,
+                loaders: vec!["forge".to_string()],
+                game_versions: vec!["1.20.1".to_string()],
+                version_types: Some(vec![VersionType::Beta]),
+            })
+            .await?;
+
+        mock.assert_async().await;
+        Ok(())
+    }
+
+    /// An unset filter has to be left out of the body rather than sent as null,
+    /// which the API rejects.
+    #[test]
+    fn test_absent_version_types_is_omitted_from_the_body() {
+        use super::*;
+
+        let body = LatestVersionsBody {
+            hashes: vec!["hash".to_string()],
+            algorithm: HashAlgorithm::SHA512,
+            loaders: vec!["forge".to_string()],
+            game_versions: vec!["1.20.1".to_string()],
+            version_types: None,
+        };
+
+        let serialized = serde_json::to_string(&body).unwrap();
+
+        assert!(
+            !serialized.contains("version_types"),
+            "unset channel filter must not appear in the body: {serialized}"
+        );
+    }
+
+    /// `version_types` is absent from Modrinth's published schema for this route
+    /// even though the server implements it, so update paths would silently lose
+    /// their per channel meaning if the API ever stopped honouring it.
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_latest_versions_from_hashes_honours_version_types() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = iridium_client::get_client(crate::util::base_api::get_base_api_env!()).build();
+        let modrinth = Modrinth::new(client);
+
+        // Autochef's Delight for Forge 1.20.1: its newest build is a pre-release
+        // and its newest stable one is older, so an ignored filter cannot produce
+        // the same answer for both channels. Dormant since 2025, and versions are
+        // not unpublished, so both channels keep resolving.
+        let hash = "81fa997c75fbd524fcbdad6731a99b702de1a66f6c2b25d4df1dd9fc24bb74e6\
+                    96cb4000019a61812d77e59674784b3b1270e203e7e8dc16c4992eceb0278b5c"
+            .to_string();
+
+        let query = async |version_type: VersionType| {
+            modrinth
+                .get_latest_versions_from_hashes(&LatestVersionsBody {
+                    hashes: vec![hash.clone()],
+                    algorithm: HashAlgorithm::SHA512,
+                    loaders: vec!["forge".to_string()],
+                    game_versions: vec!["1.20.1".to_string()],
+                    version_types: Some(vec![version_type]),
+                })
+                .await
+        };
+
+        let stable = query(VersionType::Release).await?;
+        let stable = stable
+            .get(&hash)
+            .ok_or_else(|| anyhow::anyhow!("no stable build returned"))?;
+
+        let prerelease = query(VersionType::Beta).await?;
+        let prerelease = prerelease
+            .get(&hash)
+            .ok_or_else(|| anyhow::anyhow!("no pre-release build returned"))?;
+
+        assert_eq!(
+            stable.version_type,
+            VersionType::Release,
+            "asked for stable builds, got {:?}",
+            stable.version_type
+        );
+        assert_eq!(
+            prerelease.version_type,
+            VersionType::Beta,
+            "asked for pre-release builds, got {:?}",
+            prerelease.version_type
+        );
+        assert_ne!(
+            stable.id, prerelease.id,
+            "both channels resolved to the same version, so the filter was ignored"
+        );
+
         Ok(())
     }
 }

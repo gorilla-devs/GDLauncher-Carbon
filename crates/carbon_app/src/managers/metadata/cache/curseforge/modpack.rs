@@ -3,17 +3,14 @@ use crate::{
     managers::{App, metadata::cache},
 };
 use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
-use carbon_repos::db;
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::modpack_cache as modpackdb;
 use tracing::error;
 
 pub async fn get_modpack_icon(app: &App, curseforge: CurseforgeModpack) -> anyhow::Result<Vec<u8>> {
-    app.prisma_client
-        .curse_forge_modpack_image_cache()
-        .find_unique(db::curse_forge_modpack_image_cache::project_id_file_id(
-            curseforge.project_id as i32,
-            curseforge.file_id as i32,
-        ))
-        .exec()
+    let project_id = curseforge.project_id as i32;
+    let file_id = curseforge.file_id as i32;
+    modpackdb::get_cf_modpack_logo(&app.db, project_id, file_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("No icon found for modpack"))?
         .data
@@ -24,21 +21,9 @@ pub async fn get_modpack_metadata(
     app: &App,
     curseforge: CurseforgeModpack,
 ) -> anyhow::Result<InstanceModpackInfo> {
-    let cache_entry = app
-        .prisma_client
-        .curse_forge_modpack_cache()
-        .find_unique(db::curse_forge_modpack_cache::project_id_file_id(
-            curseforge.project_id as i32,
-            curseforge.file_id as i32,
-        ))
-        .with(db::curse_forge_modpack_cache::logo_image::fetch())
-        .exec()
-        .await?;
-
-    let logo = cache_entry
-        .as_ref()
-        .and_then(|cache_entry| cache_entry.logo_image.as_ref())
-        .and_then(|logo_image| logo_image.as_ref().map(|logo_image| logo_image));
+    let project_id = curseforge.project_id as i32;
+    let file_id = curseforge.file_id as i32;
+    let cache_entry = modpackdb::get_cf_modpack(&app.db, project_id, file_id).await?;
 
     let is_entry_up_to_date = cache_entry
         .as_ref()
@@ -48,7 +33,7 @@ pub async fn get_modpack_metadata(
         .unwrap_or(false);
 
     let has_cache_entry = cache_entry.is_some();
-    let has_cache_logo = logo.is_some();
+    let has_cache_logo = cache_entry.as_ref().map(|e| e.has_logo).unwrap_or(false);
 
     if has_cache_entry && is_entry_up_to_date {
         let Some(cache_entry) = cache_entry else {
@@ -59,11 +44,7 @@ pub async fn get_modpack_metadata(
             name: cache_entry.modpack_name,
             version_name: cache_entry.version_name,
             url_slug: cache_entry.url_slug,
-            has_image: cache_entry
-                .logo_image
-                .flatten()
-                .map(|logo| logo.data.is_some())
-                .unwrap_or(false),
+            has_image: cache_entry.logo_data.is_some(),
         });
     } else {
         let app = app.clone();
@@ -119,57 +100,28 @@ pub async fn get_modpack_metadata(
 
             let icon_bytes_is_some = icon_bytes.is_some();
 
-            app.prisma_client
-                .curse_forge_modpack_cache()
-                .upsert(
-                    db::curse_forge_modpack_cache::project_id_file_id(
-                        curseforge.project_id as i32,
-                        curseforge.file_id as i32,
-                    ),
-                    db::curse_forge_modpack_cache::create(
-                        curseforge.project_id as i32,
-                        curseforge.file_id as i32,
-                        name.clone(),
-                        file_name.clone(),
-                        slug.clone(),
-                        vec![],
-                    ),
-                    vec![
-                        db::curse_forge_modpack_cache::modpack_name::set(name.clone()),
-                        db::curse_forge_modpack_cache::version_name::set(file_name.clone()),
-                        db::curse_forge_modpack_cache::url_slug::set(slug.clone()),
-                    ],
-                )
-                .exec()
-                .await?;
+            modpackdb::upsert_cf_modpack(
+                &app.db,
+                project_id,
+                file_id,
+                &name,
+                &file_name,
+                &slug,
+                DbDateTime(chrono::Utc::now().fixed_offset()),
+            )
+            .await?;
 
             if icon_bytes_is_some || has_cache_logo {
-                app.prisma_client
-                    .curse_forge_modpack_image_cache()
-                    .upsert(
-                        db::curse_forge_modpack_image_cache::project_id_file_id(
-                            curseforge.project_id as i32,
-                            curseforge.file_id as i32,
-                        ),
-                        db::curse_forge_modpack_image_cache::create(
-                            url.clone().unwrap_or_default(),
-                            db::curse_forge_modpack_cache::project_id_file_id(
-                                curseforge.project_id as i32,
-                                curseforge.file_id as i32,
-                            ),
-                            vec![db::curse_forge_modpack_image_cache::data::set(
-                                icon_bytes.clone().map(|icon_bytes| icon_bytes.to_vec()),
-                            )],
-                        ),
-                        vec![
-                            db::curse_forge_modpack_image_cache::url::set(url.unwrap_or_default()),
-                            db::curse_forge_modpack_image_cache::data::set(
-                                icon_bytes.map(|icon_bytes| icon_bytes.to_vec()),
-                            ),
-                        ],
-                    )
-                    .exec()
-                    .await?;
+                let image_url = url.clone().unwrap_or_default();
+                let image_data = icon_bytes.clone().map(|icon_bytes| icon_bytes.to_vec());
+                modpackdb::upsert_cf_modpack_image(
+                    &app.db,
+                    project_id,
+                    file_id,
+                    &image_url,
+                    image_data.as_deref(),
+                )
+                .await?;
             }
 
             Ok::<_, anyhow::Error>((addon, addon_file, icon_bytes_is_some))
@@ -186,11 +138,7 @@ pub async fn get_modpack_metadata(
                         name: cache_entry.modpack_name,
                         version_name: cache_entry.version_name,
                         url_slug: cache_entry.url_slug,
-                        has_image: cache_entry
-                            .logo_image
-                            .flatten()
-                            .map(|logo| logo.data.is_some())
-                            .unwrap_or(false),
+                        has_image: cache_entry.logo_data.is_some(),
                     });
                 }
 

@@ -1002,46 +1002,19 @@ pub fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             axum::routing::get(
                 |State(app): State<Arc<AppInner>>,
                  Query(query): Query<ServerModIconQuery>| async move {
-                    use carbon_repos::db::{
-                        server_mod_file_cache as sfcdb,
-                        mod_metadata as metadb,
-                        curse_forge_mod_cache as cfdb,
-                        modrinth_mod_cache as mrdb,
-                    };
+                    use carbon_repos::repos::mod_file_cache as mfcdb;
 
-                    let entry = app
-                        .prisma_client
-                        .server_mod_file_cache()
-                        .find_unique(sfcdb::UniqueWhereParam::IdEquals(query.mod_id.clone()))
-                        .with(
-                            sfcdb::metadata::fetch()
-                                .with(metadb::logo_image::fetch())
-                                .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                                .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-                        )
-                        .exec()
+                    let mod_id = query.mod_id.clone();
+                    let entry = mfcdb::get_server_mod_icon_data(&app.db, &mod_id)
                         .await
                         .map_err(|e| FeError::from_anyhow(&e.into()).make_axum())?
                         .ok_or_else(|| FeError::from_anyhow(
                             &anyhow::anyhow!("Server mod not found: {}", query.mod_id)
                         ).make_axum())?;
 
-                    let metadata = entry.metadata
-                        .ok_or_else(|| FeError::from_anyhow(
-                            &anyhow::anyhow!("broken db state")
-                        ).make_axum())?;
-
                     // Try all platforms in priority order (curseforge → modrinth → metadata)
                     // since ServerAddon only has a single has_image flag
-                    let cf_icon = metadata.curseforge.flatten()
-                        .and_then(|cf| cf.logo_image.flatten())
-                        .and_then(|img| img.data);
-                    let mr_icon = metadata.modrinth.flatten()
-                        .and_then(|mr| mr.logo_image.flatten())
-                        .and_then(|img| img.data);
-                    let meta_icon = metadata.logo_image.flatten().map(|m| m.data);
-
-                    let icon = cf_icon.or(mr_icon).or(meta_icon);
+                    let icon = entry.cf_data.or(entry.mr_data).or(entry.local_data);
 
                     let res = match icon {
                         Some(data) => (StatusCode::OK, data),

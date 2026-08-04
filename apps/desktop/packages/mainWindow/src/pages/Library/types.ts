@@ -42,11 +42,12 @@ export interface FolderData {
 /**
  * A virtual group for accordion mode.
  * Groups are computed based on instancesGroupBy setting (modloader, gameVersion, modplatform).
+ * Instance groups hold ListInstance tiles; server groups hold ListServer tiles.
  */
-export interface VirtualGroup {
+export interface VirtualGroup<T = ListInstance> {
   id: string | number | null
   name: string
-  instances: ListInstance[]
+  instances: T[]
 }
 
 /**

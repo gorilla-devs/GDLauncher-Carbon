@@ -26,24 +26,10 @@ export function List() {
   const serverId = () => searchContext?.selectedServerId() || NaN
   const serverAddons = () => searchContext?.selectedServerAddons
 
-  const instance = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceDetails", instanceId()],
-    enabled: !isNaN(instanceId()) && instanceId() > 0
-  }))
-
-  const defaultFallbackType: () => FEUnifiedSearchType = () => {
-    // Standalone search (no add-to-instance/server context): the natural
-    // landing tab is modpacks.
-    if (!instanceId() && !serverId()) {
-      return "modpack"
-    }
-    // Note the parens: `length ?? 0 > 0` would parse as
-    // `length ?? (0 > 0)` and silently rely on `0` being falsy.
-    if ((instance?.data?.modloaders?.length ?? 0) > 0) {
-      return "mod"
-    }
-    return "shader"
-  }
+  // Landing tab for the current target (nothing / instance / server). Owned by
+  // the search context so the tab strip, the grid and this list agree.
+  const defaultFallbackType: () => FEUnifiedSearchType = () =>
+    searchContext?.defaultAddonType() ?? "modpack"
 
   const type = () => {
     // Explicit URL segment always wins.
@@ -61,10 +47,10 @@ export function List() {
   // URL). Without this the tab can render unselected ("blank") when the
   // URL omits :type and we fell back to defaultFallbackType().
   //
-  // Wrapped in createEffect because `type()` reads `instance.data.modloaders`
-  // which loads asynchronously after mount — a one-shot evaluation in the
-  // component body would lock in the pre-load fallback ("shader") and never
-  // re-sync once the modloader info arrives.
+  // Wrapped in createEffect because `type()` depends on the instance/server
+  // details query, which resolves asynchronously after mount — a one-shot
+  // evaluation in the component body would lock in the pre-load fallback and
+  // never re-sync once the modloader info arrives.
   createEffect(() => {
     const resolvedType = type()
     if (resolvedType !== searchContext?.searchQuery().projectType) {

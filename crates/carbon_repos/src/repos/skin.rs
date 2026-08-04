@@ -1,0 +1,82 @@
+//! Repository queries for the `Skin` table.
+
+use crate::db_error::DbResult;
+use crate::db_exec::{Db, WriteAccess};
+use crate::queries;
+use crate::registry::QueryCheck;
+
+#[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
+pub struct SkinRow {
+    pub id: String,
+    pub skin: Vec<u8>,
+}
+
+queries! {
+    fn get_skin(id: &str) -> Option<SkinRow> =
+        "SELECT id, skin FROM Skin WHERE id = :id";
+}
+
+/// The three statements executed by `replace_skin_and_link_account`, kept as
+/// consts so the checker validates the exact SQL the fn runs.
+const DELETE_SKIN_SQL: &str = "DELETE FROM Skin WHERE id = :id";
+const INSERT_SKIN_SQL: &str = "INSERT INTO Skin (id, skin) VALUES (:id, :skin)";
+const UPDATE_ACCOUNT_SKIN_SQL: &str = "UPDATE Account SET skinId = :id WHERE uuid = :uuid";
+
+/// Replaces the cached skin `skin_id` with `skin_data` and links it to
+/// `account_uuid`, in one transaction: a `DELETE`, then an `INSERT`, then the
+/// account `UPDATE`. The `DELETE` tolerates a missing row, so no existence
+/// check is needed before it.
+pub async fn replace_skin_and_link_account(
+    db: &Db,
+    skin_id: String,
+    skin_data: Vec<u8>,
+    account_uuid: String,
+) -> DbResult<()> {
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        tx.execute(DELETE_SKIN_SQL, rusqlite::named_params! { ":id": skin_id })?;
+        tx.execute(
+            INSERT_SKIN_SQL,
+            rusqlite::named_params! { ":id": skin_id, ":skin": skin_data },
+        )?;
+        tx.execute(
+            UPDATE_ACCOUNT_SKIN_SQL,
+            rusqlite::named_params! { ":id": skin_id, ":uuid": account_uuid },
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .await
+}
+
+const DELETE_SKIN_CHECK: QueryCheck = QueryCheck {
+    name: "replace_skin_and_link_account::delete_skin",
+    sql: DELETE_SKIN_SQL,
+    params: &[":id"],
+    columns: None,
+    class: crate::registry::class_of(DELETE_SKIN_SQL),
+};
+const INSERT_SKIN_CHECK: QueryCheck = QueryCheck {
+    name: "replace_skin_and_link_account::insert_skin",
+    sql: INSERT_SKIN_SQL,
+    params: &[":id", ":skin"],
+    columns: None,
+    class: crate::registry::class_of(INSERT_SKIN_SQL),
+};
+const UPDATE_ACCOUNT_SKIN_CHECK: QueryCheck = QueryCheck {
+    name: "replace_skin_and_link_account::update_account_skin",
+    sql: UPDATE_ACCOUNT_SKIN_SQL,
+    params: &[":id", ":uuid"],
+    columns: None,
+    class: crate::registry::class_of(UPDATE_ACCOUNT_SKIN_SQL),
+};
+
+/// Every checkable query in this module: the macro-generated `QUERIES` plus
+/// the three hand-written statements inside `replace_skin_and_link_account`.
+pub fn all_queries() -> Vec<QueryCheck> {
+    let mut all: Vec<QueryCheck> = QUERIES.to_vec();
+    all.push(DELETE_SKIN_CHECK);
+    all.push(INSERT_SKIN_CHECK);
+    all.push(UPDATE_ACCOUNT_SKIN_CHECK);
+    all
+}

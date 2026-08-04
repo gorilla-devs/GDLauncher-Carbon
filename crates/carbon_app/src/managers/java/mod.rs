@@ -16,18 +16,15 @@ use crate::{
     managers::java::java_checker::RealJavaChecker,
 };
 use anyhow::bail;
-use carbon_repos::{
-    db::PrismaClient,
-    pcr::{QueryError, prisma_errors::query_engine::UniqueKeyViolation},
-};
+use carbon_repos::db_exec::Db;
+use carbon_repos::repos::java as java_repo;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 use strum::IntoEnumIterator;
 use tokio::sync::{Mutex, watch};
-use tracing::{debug, error, trace};
+use tracing::debug;
 
 mod constants;
 pub mod discovery;
@@ -48,57 +45,30 @@ impl JavaManager {
         }
     }
 
-    pub async fn ensure_profiles_in_db(db_client: &PrismaClient) -> anyhow::Result<()> {
+    pub async fn ensure_profiles_in_db(db: &Db) -> anyhow::Result<()> {
         debug!("Ensuring system java profiles are in db");
-        for profile in SystemJavaProfileName::iter() {
-            let exists = db_client
-                .java_profile()
-                .find_unique(carbon_repos::db::java_profile::name::equals(
-                    profile.to_string(),
-                ))
-                .exec()
-                .await?;
-
-            if exists.is_some() {
-                let exists = exists.unwrap();
-                if !exists.is_system_profile {
-                    db_client
-                        .java_profile()
-                        .update(
-                            carbon_repos::db::java_profile::name::equals(profile.to_string()),
-                            vec![carbon_repos::db::java_profile::is_system_profile::set(true)],
-                        )
-                        .exec()
-                        .await?;
-                }
-            } else {
-                let creation: Result<carbon_repos::db::java_profile::Data, QueryError> = db_client
-                    .java_profile()
-                    .create(
-                        profile.to_string(),
-                        vec![carbon_repos::db::java_profile::is_system_profile::set(true)],
-                    )
-                    .exec()
-                    .await;
-
-                match creation {
-                    Err(error) => {
-                        error!("Error creating profile {profile:?}: {error}");
-                        return Err(error.into());
-                    }
-                    Ok(_) => {
-                        trace!("Profile {profile:?} created");
-                    }
-                }
+        // Interleaved app logic: iterates the SystemJavaProfileName domain enum
+        // (a carbon_app type) and seeds every profile, so it stays an explicit
+        // closure with `_conn` forms. The upserts run in one writer dispatch,
+        // so no other write interleaves; they run in ONE transaction —
+        // all-or-nothing: a failure rolls the whole group back and readers
+        // never observe an intermediate state. `_conn` forms on the tx guard.
+        db.write(|mut conn| {
+            let tx = conn.transaction()?;
+            for profile in SystemJavaProfileName::iter() {
+                java_repo::upsert_profile_conn(&tx, &profile.to_string(), true)?;
             }
-        }
+            tx.commit()?;
+            Ok(())
+        })
+        .await?;
 
         Ok(())
     }
 
     pub async fn scan_and_sync<T, G>(
         auto_manage_java_system_profiles: bool,
-        db: &Arc<PrismaClient>,
+        db: &Db,
         discovery: &T,
         java_checker: &G,
     ) -> anyhow::Result<()>
@@ -142,8 +112,7 @@ impl JavaManager {
 
 impl ManagerRef<'_, JavaManager> {
     pub async fn get_available_javas(&self) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
-        let db = &self.app.prisma_client;
-        let all_javas = db.java().find_many(vec![]).exec().await?;
+        let all_javas = java_repo::get_all_java(&self.app.db).await?;
 
         let mut result = HashMap::new();
 
@@ -157,11 +126,7 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn get_java_profiles(&self) -> anyhow::Result<Vec<JavaProfile>> {
-        let db = &self.app.prisma_client;
-        let all_profiles = db
-            .java_profile()
-            .find_many(vec![])
-            .exec()
+        let all_profiles = java_repo::get_all_profiles(&self.app.db)
             .await?
             .into_iter()
             .map(JavaProfile::try_from)
@@ -204,27 +169,9 @@ impl ManagerRef<'_, JavaManager> {
         }
 
         if let Some(java_id) = java_id {
-            self.app
-                .prisma_client
-                .java_profile()
-                .update(
-                    carbon_repos::db::java_profile::name::equals(profile_name.to_string()),
-                    vec![carbon_repos::db::java_profile::java::connect(
-                        carbon_repos::db::java::id::equals(java_id),
-                    )],
-                )
-                .exec()
-                .await?;
+            java_repo::set_profile_java(&self.app.db, &profile_name, Some(&java_id)).await?;
         } else {
-            self.app
-                .prisma_client
-                .java_profile()
-                .update(
-                    carbon_repos::db::java_profile::name::equals(profile_name.to_string()),
-                    vec![carbon_repos::db::java_profile::java::disconnect()],
-                )
-                .exec()
-                .await?;
+            java_repo::set_profile_java(&self.app.db, &profile_name, None).await?;
         }
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
@@ -247,30 +194,26 @@ impl ManagerRef<'_, JavaManager> {
 
         let java_id = java_id.ok_or_else(|| anyhow::anyhow!("java_id is required"))?;
 
-        let exists = self
-            .app
-            .prisma_client
-            .java_profile()
-            .find_unique(carbon_repos::db::java_profile::name::equals(
-                profile_name.clone(),
-            ))
-            .exec()
-            .await?;
+        let name_for_lookup = profile_name.clone();
+        let exists = java_repo::get_profile(&self.app.db, &name_for_lookup).await?;
 
         if exists.is_some() {
             anyhow::bail!("Profile with name {} already exists", profile_name);
         }
 
+        // Two statements (create the profile, then link its java) run in one
+        // writer dispatch and ONE transaction — all-or-nothing: the profile and
+        // its java link land together or not at all, and readers never observe
+        // an intermediate state. `_conn` forms on the tx guard.
         self.app
-            .prisma_client
-            .java_profile()
-            .create(
-                profile_name,
-                vec![carbon_repos::db::java_profile::java::connect(
-                    carbon_repos::db::java::id::equals(java_id),
-                )],
-            )
-            .exec()
+            .db
+            .write(move |mut conn| {
+                let tx = conn.transaction()?;
+                java_repo::upsert_profile_conn(&tx, &profile_name, false)?;
+                java_repo::set_profile_java_conn(&tx, &profile_name, Some(&java_id))?;
+                tx.commit()?;
+                Ok(())
+            })
             .await?;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
@@ -292,12 +235,7 @@ impl ManagerRef<'_, JavaManager> {
             anyhow::bail!("Auto manage java is enabled");
         }
 
-        self.app
-            .prisma_client
-            .java_profile()
-            .delete(carbon_repos::db::java_profile::name::equals(profile_name))
-            .exec()
-            .await?;
+        java_repo::delete_profile(&self.app.db, &profile_name).await?;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
 
@@ -312,33 +250,25 @@ impl ManagerRef<'_, JavaManager> {
         )
         .await?;
 
-        let exists = self
-            .app
-            .prisma_client
-            .java()
-            .find_unique(carbon_repos::db::java::path::equals(path.clone()))
-            .exec()
-            .await?;
+        let path_for_lookup = path.clone();
+        let exists = java_repo::get_java_by_path(&self.app.db, &path_for_lookup).await?;
 
         if exists.is_some() {
             anyhow::bail!("Java with path {} already exists", path);
         }
 
-        self.app
-            .prisma_client
-            .java()
-            .create(
-                java.path,
-                java.version.major as i32,
-                java.version.to_string(),
-                java._type.to_string(),
-                java.os.to_string(),
-                java.arch.to_string(),
-                java.vendor,
-                vec![],
-            )
-            .exec()
-            .await?;
+        let row = java_repo::JavaRow {
+            id: uuid::Uuid::new_v4().to_string(),
+            path: java.path,
+            major: java.version.major as i32,
+            full_version: java.version.to_string(),
+            r#type: java._type.to_string(),
+            os: java.os.to_string(),
+            arch: java.arch.to_string(),
+            vendor: java.vendor,
+            is_valid: true,
+        };
+        java_repo::insert_java(&self.app.db, row).await?;
 
         self.app.invalidate(GET_AVAILABLE_JAVAS, None);
 
@@ -346,12 +276,8 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
-        let java_from_db = self
-            .app
-            .prisma_client
-            .java()
-            .find_unique(carbon_repos::db::java::id::equals(java_id.clone()))
-            .exec()
+        let id_for_lookup = java_id.clone();
+        let java_from_db = java_repo::get_java_by_id(&self.app.db, &id_for_lookup)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Java with id {} not found", java_id.clone()))?;
 
@@ -359,12 +285,8 @@ impl ManagerRef<'_, JavaManager> {
 
         match java_component_type {
             JavaComponentType::Custom => {
-                self.app
-                    .prisma_client
-                    .java()
-                    .delete(carbon_repos::db::java::id::equals(java_id))
-                    .exec()
-                    .await?;
+                let id = java_id.clone();
+                java_repo::delete_java(&self.app.db, &id).await?;
             }
             JavaComponentType::Managed => {
                 let root_managed_path = self
@@ -387,12 +309,8 @@ impl ManagerRef<'_, JavaManager> {
                     std::fs::remove_dir_all(managed_java_dir)?;
                 }
 
-                self.app
-                    .prisma_client
-                    .java()
-                    .delete(carbon_repos::db::java::id::equals(java_id))
-                    .exec()
-                    .await?;
+                let id = java_id.clone();
+                java_repo::delete_java(&self.app.db, &id).await?;
             }
             JavaComponentType::Local => {
                 anyhow::bail!("Java with id {} is local. Cannot delete.", java_id.clone());
@@ -410,30 +328,14 @@ impl ManagerRef<'_, JavaManager> {
         self,
         target_profile: SystemJavaProfileName,
     ) -> anyhow::Result<Option<JavaComponent>> {
-        use carbon_repos::db::{java, java_profile};
-
-        let profile = self
-            .app
-            .prisma_client
-            .java_profile()
-            .find_many(vec![
-                carbon_repos::db::java_profile::is_system_profile::equals(true),
-            ])
-            .exec()
+        let target_name = target_profile.to_string();
+        let profile = java_repo::get_profile(&self.app.db, &target_name)
             .await?
-            .into_iter()
-            .find(|profile| profile.name == target_profile.to_string())
+            .filter(|profile| profile.is_system_profile)
             .ok_or_else(|| anyhow::anyhow!("Profile not found"))?;
 
         let java = match profile.java_id {
-            Some(java_id) => {
-                self.app
-                    .prisma_client
-                    .java()
-                    .find_unique(java::id::equals(java_id))
-                    .exec()
-                    .await?
-            }
+            Some(java_id) => java_repo::get_java_by_id(&self.app.db, &java_id).await?,
             None => None,
         };
 
@@ -455,34 +357,34 @@ impl ManagerRef<'_, JavaManager> {
                             err
                         );
 
-                        let all_profiles_using_this_java = self
-                            .app
-                            .prisma_client
-                            .java_profile()
-                            .find_many(vec![java_profile::java_id::equals(Some(java.id.clone()))])
-                            .exec()
-                            .await?;
+                        let java_id = java.id.clone();
+                        let id_for_read = java_id.clone();
+                        let names_to_disconnect: Vec<String> =
+                            java_repo::get_all_profiles(&self.app.db)
+                                .await?
+                                .into_iter()
+                                .filter(|profile| {
+                                    profile.java_id.as_deref() == Some(id_for_read.as_str())
+                                })
+                                .map(|profile| profile.name)
+                                .collect();
 
-                        for profile in all_profiles_using_this_java {
-                            self.app
-                                .prisma_client
-                                .java_profile()
-                                .update(
-                                    java_profile::name::equals(profile.name.to_string()),
-                                    vec![java_profile::java::disconnect()],
-                                )
-                                .exec()
-                                .await?;
-                        }
-
+                        // Interleaved app logic: unlink the computed set of
+                        // profiles then flip the java's validity. Runs in one
+                        // writer dispatch and ONE transaction — all-or-nothing:
+                        // a failure rolls the whole group back and readers never
+                        // observe an intermediate state. `_conn` forms on the tx guard.
                         self.app
-                            .prisma_client
-                            .java()
-                            .update(
-                                java::id::equals(java.id.clone()),
-                                vec![java::is_valid::set(false)],
-                            )
-                            .exec()
+                            .db
+                            .write(move |mut conn| {
+                                let tx = conn.transaction()?;
+                                for name in names_to_disconnect {
+                                    java_repo::set_profile_java_conn(&tx, &name, None)?;
+                                }
+                                java_repo::set_java_validity_conn(&tx, &java_id, false)?;
+                                tx.commit()?;
+                                Ok(())
+                            })
                             .await?;
 
                         None
@@ -509,8 +411,6 @@ impl ManagerRef<'_, JavaManager> {
         update_target_profile: bool,
         progress: Option<watch::Sender<Step>>,
     ) -> anyhow::Result<Option<JavaComponent>> {
-        use carbon_repos::db::java::UniqueWhereParam;
-
         static LOCK: Mutex<()> = Mutex::const_new(());
         let _guard = LOCK.lock().await;
 
@@ -548,13 +448,8 @@ impl ManagerRef<'_, JavaManager> {
             )
             .await?;
 
-        let java = self
-            .app
-            .prisma_client
-            .java()
-            .find_unique(carbon_repos::db::java::id::equals(id.clone()))
-            .exec()
-            .await?;
+        let id_for_lookup = id.clone();
+        let java = java_repo::get_java_by_id(&self.app.db, &id_for_lookup).await?;
 
         let java = match java {
             Some(java) => RealJavaChecker::get_bin_info(
@@ -568,28 +463,15 @@ impl ManagerRef<'_, JavaManager> {
         };
 
         if update_target_profile {
-            self.app
-                .prisma_client
-                .java_profile()
-                .update(
-                    carbon_repos::db::java_profile::name::equals(target_profile.to_string()),
-                    vec![carbon_repos::db::java_profile::java::connect(
-                        carbon_repos::db::java::id::equals(id.clone()),
-                    )],
-                )
-                .exec()
-                .await?;
+            let target_name = target_profile.to_string();
+            java_repo::set_profile_java(&self.app.db, &target_name, Some(&id)).await?;
 
-            let system_profiles_in_db = self
-                .app
-                .prisma_client
-                .java_profile()
-                .find_many(vec![
-                    carbon_repos::db::java_profile::is_system_profile::equals(true),
-                ])
-                .exec()
-                .await?;
+            let system_profiles_in_db = java_repo::get_all_profiles(&self.app.db)
+                .await?
+                .into_iter()
+                .filter(|profile| profile.is_system_profile);
 
+            let mut names_to_connect: Vec<String> = Vec::new();
             for system_profile in system_profiles_in_db {
                 let system_profile_name = SystemJavaProfileName::try_from(&*system_profile.name)?;
                 if system_profile_name == target_profile
@@ -599,16 +481,22 @@ impl ManagerRef<'_, JavaManager> {
                     continue;
                 }
 
+                names_to_connect.push(system_profile.name);
+            }
+
+            if !names_to_connect.is_empty() {
+                let id_for_connect = id.clone();
+                // Interleaved app logic: link every compatible system profile to
+                // the freshly installed java in one writer dispatch, so no other
+                // write interleaves. Uses `_conn` forms inside the closure.
                 self.app
-                    .prisma_client
-                    .java_profile()
-                    .update(
-                        carbon_repos::db::java_profile::name::equals(system_profile.name),
-                        vec![carbon_repos::db::java_profile::java::connect(
-                            carbon_repos::db::java::id::equals(id.clone()),
-                        )],
-                    )
-                    .exec()
+                    .db
+                    .write(move |conn| {
+                        for name in names_to_connect {
+                            java_repo::set_profile_java_conn(&conn, &name, Some(&id_for_connect))?;
+                        }
+                        Ok(())
+                    })
                     .await?;
             }
             self.app.invalidate(GET_JAVA_PROFILES, None);
@@ -765,15 +653,12 @@ mod test {
             .unwrap()
             .unwrap();
 
-        let profiles_in_db = app
-            .prisma_client
-            .java_profile()
-            .find_many(vec![
-                carbon_repos::db::java_profile::is_system_profile::equals(true),
-            ])
-            .exec()
+        let profiles_in_db = carbon_repos::repos::java::get_all_profiles(&app.db)
             .await
-            .unwrap();
+            .unwrap()
+            .into_iter()
+            .filter(|p| p.is_system_profile)
+            .collect::<Vec<_>>();
 
         assert_eq!(
             profiles_in_db
@@ -817,16 +702,16 @@ mod test {
             )
             .await
             .unwrap();
-        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+        let count = carbon_repos::repos::java::count_java(&app.db)
+            .await
+            .unwrap();
         assert_eq!(count, 1);
 
-        let from_db = app
-            .prisma_client
-            .java()
-            .find_first(vec![])
-            .exec()
+        let from_db = carbon_repos::repos::java::get_all_java(&app.db)
             .await
             .unwrap()
+            .into_iter()
+            .next()
             .unwrap();
 
         assert!(std::path::Path::new(&from_db.path).exists());
@@ -838,21 +723,20 @@ mod test {
 
         assert!(result_first_delete.is_ok());
 
-        app.prisma_client
-            .app_configuration()
-            .update(
-                carbon_repos::db::app_configuration::id::equals(0),
-                vec![
-                    carbon_repos::db::app_configuration::auto_manage_java_system_profiles::set(
-                        false,
-                    ),
-                ],
-            )
-            .exec()
+        app.db
+            .write(|conn| {
+                let patch = carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                    auto_manage_java_system_profiles: Some(false),
+                    ..Default::default()
+                };
+                Ok(patch.build().map(|q| q.execute(&conn)).transpose()?)
+            })
             .await
             .unwrap();
 
-        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+        let count = carbon_repos::repos::java::count_java(&app.db)
+            .await
+            .unwrap();
         assert_eq!(count, 0);
 
         assert!(!std::path::Path::new(&from_db.path).exists());

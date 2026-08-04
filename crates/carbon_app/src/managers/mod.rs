@@ -13,7 +13,6 @@ pub use app::AppInner;
 use crate::api::InvalidationEvent;
 use crate::api::keys::Key;
 use crate::managers::settings::SettingsManager;
-use carbon_repos::db::PrismaClient;
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
@@ -24,6 +23,7 @@ use self::server::ServerManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
+pub(crate) mod db_bootstrap;
 pub mod download;
 pub mod instance;
 pub mod java;
@@ -31,7 +31,6 @@ pub(crate) mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;
-pub(crate) mod prisma_client;
 pub mod rich_presence;
 pub mod server;
 mod settings;
@@ -55,7 +54,7 @@ mod app {
         api::{CoreModuleStatus, update_core_module_status},
         cache_middleware, domain,
         iridium_client::get_client,
-        managers::{prisma_client::DatabaseError, settings::terms_and_privacy::TermsAndPrivacy},
+        managers::{db_bootstrap::DatabaseError, settings::terms_and_privacy::TermsAndPrivacy},
     };
 
     use self::java::{
@@ -81,7 +80,7 @@ mod app {
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
-        pub(crate) prisma_client: Arc<PrismaClient>,
+        pub(crate) db: Arc<carbon_repos::db_exec::Db>,
         task_manager: VisualTaskManager,
         system_info_manager: SystemInfoManager,
         rich_presence_manager: rich_presence::RichPresenceManager,
@@ -110,29 +109,41 @@ mod app {
                     .map_err(DatabaseError::TermsAndPrivacy)
                     .ok();
 
-            let db_client = match prisma_client::load_and_migrate(
+            let loaded_db = match db_bootstrap::load_and_migrate(
                 runtime_path.clone(),
                 latest_tos_privacy_checksum.clone(),
             )
             .await
             {
-                Ok(client) => Arc::new(client),
+                Ok(loaded_db) => loaded_db,
                 Err(e) => {
-                    // Check if this is a backwards migration error
+                    // Fatal DB outcomes already emitted their `_STATUS_:` line
+                    // through the funnel (spec §13); Electron shows the recovery
+                    // ladder from that line. Exit cleanly so the status line is
+                    // the single signal rather than burying it under a panic
+                    // backtrace.
                     if e.downcast_ref::<DatabaseError>()
-                        .map(|e| matches!(e, DatabaseError::BackwardsMigration))
+                        .map(|e| e.is_emitted_db_status())
                         .unwrap_or(false)
                     {
-                        // Exit gracefully - the status message was already printed
-                        error!("Backwards migration detected, exiting gracefully");
+                        error!("Fatal database error; status already emitted, exiting gracefully");
                         std::process::exit(2);
                     }
                     error!("Database migration failed: {}", e);
                     panic!("Database migration failed: {}", e);
                 }
             };
+            let db = loaded_db.db;
 
             update_core_module_status(CoreModuleStatus::LoadAndMigrate);
+
+            // CurseForge rejects unauthenticated CDN downloads, so the key has to reach the
+            // downloader as well as the API client.
+            carbon_net::set_curseforge_api_key(env!(
+                "CURSEFORGE_API_KEY",
+                "missing curseforge env api key"
+            ))
+            .expect("Failed to parse CURSEFORGE_API_KEY as header value");
 
             let app = unsafe {
                 let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
@@ -159,14 +170,10 @@ mod app {
                     instance_manager: InstanceManager::new(),
                     server_manager: ServerManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
-                    metrics_manager: MetricsManager::new(
-                        Arc::clone(&db_client),
-                        http_client.clone(),
-                        gdl_base_api.clone(),
-                    ),
+                    metrics_manager: MetricsManager::new(http_client.clone(), gdl_base_api.clone()),
                     invalidation_channel,
                     reqwest_client: http_client.clone(),
-                    prisma_client: Arc::clone(&db_client),
+                    db,
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
                     rich_presence_manager: rich_presence::RichPresenceManager::new(),

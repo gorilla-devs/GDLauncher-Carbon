@@ -13,6 +13,7 @@ import type { Procedures } from "@gd/core_module"
 import { toast } from "@gd/ui"
 import { i18n } from "@gd/i18n"
 import { dispatchBannedEvent } from "./bannedEventBridge"
+import { NETWORK_ERROR_RE, THROTTLE_ERROR_RE } from "./errorClassification"
 import {
   dispatchMemoryWarningEvent,
   type InsufficientMemoryData
@@ -79,12 +80,6 @@ export class RSPCError extends Error {
 // exact URL/endpoint in the message; everything else dedups on its exact text.
 // ---------------------------------------------------------------------------
 
-const NETWORK_ERROR_RE =
-  /error sending request|failed to make network request|error trying to connect|connection (refused|reset|closed|error)|dns error|timed out|timeout|network unreachable|no address associated/i
-
-const THROTTLE_ERROR_RE =
-  /\b429\b|too many requests|too many api errors|temporarily blocked|\b503\b|service unavailable/i
-
 // Mutations get a short cooldown so a deliberate user retry still gives
 // feedback, while a bulk operation ("Update All") can't burst dozens of
 // identical toasts.
@@ -97,13 +92,15 @@ function showDedupedErrorToast(display: string, source: "query" | "mutation") {
   let message = display
   let description: string | undefined
 
+  // `|| display` covers errors fired before i18n has initialized, where t()
+  // returns undefined
   if (NETWORK_ERROR_RE.test(display)) {
     key = "network"
-    message = i18n.t("errors:_trn_network_error_toast")
+    message = i18n.t("errors:_trn_network_error_toast") || display
     description = display
   } else if (THROTTLE_ERROR_RE.test(display)) {
     key = "throttle"
-    message = i18n.t("errors:_trn_rate_limited_toast")
+    message = i18n.t("errors:_trn_rate_limited_toast") || display
     description = display
   }
 
@@ -126,7 +123,29 @@ function showDedupedErrorToast(display: string, source: "query" | "mutation") {
   }
 
   errorToastLastShown.set(key, now)
-  toast.error(message, description ? { description } : undefined)
+
+  // The full technical error is what users need when reporting a bug, but a
+  // friendly network/throttle toast hides it behind a generic message. Offer a
+  // one-click copy of the raw `display` regardless of how the toast is worded.
+  const copyAction = {
+    label: i18n.t("general:_trn_copy") || "Copy",
+    onClick: () => {
+      navigator.clipboard
+        .writeText(display)
+        .then(() =>
+          toast.success(
+            i18n.t("general:_trn_general_copied_to_clipboard") ||
+              "Copied to clipboard"
+          )
+        )
+        .catch(() => {})
+    }
+  }
+
+  toast.error(message, {
+    action: copyAction,
+    ...(description && { description })
+  })
 }
 
 // ---------------------------------------------------------------------------

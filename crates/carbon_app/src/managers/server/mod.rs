@@ -9,9 +9,9 @@ use crate::domain::server::{
 };
 use crate::domain::vtask::VisualTaskId;
 use anyhow::{Context, anyhow, bail};
-use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::db::{self, read_filters::IntFilter};
-use carbon_repos::pcr::Direction;
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::mod_file_cache as mfcdb;
+use carbon_repos::repos::server::{self as server_repo, IndexShift, ServerPatch};
 use chrono::Utc;
 use dashmap::DashMap;
 use std::collections::HashMap;
@@ -135,13 +135,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     async fn load_servers(self) -> anyhow::Result<()> {
-        let db_servers = self
-            .app
-            .prisma_client
-            .server()
-            .find_many(vec![])
-            .exec()
-            .await?;
+        let db_servers = server_repo::get_all_servers(&self.app.db).await?;
 
         let mut servers = self.servers.write().await;
         for db_server in db_servers {
@@ -167,12 +161,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn get_default_group(self) -> anyhow::Result<ServerGroupId> {
-        let config = self
-            .app
-            .prisma_client
-            .app_configuration()
-            .find_unique(db::app_configuration::id::equals(0))
-            .exec()
+        let config = carbon_repos::repos::app_configuration::get_app_configuration(&self.app.db)
             .await?
             .ok_or_else(|| anyhow!("App configuration not found"))?;
 
@@ -180,13 +169,7 @@ impl ManagerRef<'_, ServerManager> {
             Some(id) => Ok(ServerGroupId(id)),
             None => {
                 // Find the first group
-                let group = self
-                    .app
-                    .prisma_client
-                    .server_group()
-                    .find_first(vec![])
-                    .order_by(db::server_group::OrderByParam::GroupIndex(Direction::Asc))
-                    .exec()
+                let group = server_repo::first_server_group_ordered_by_group_index(&self.app.db)
                     .await?
                     .ok_or_else(|| anyhow!("No server group found"))?;
 
@@ -196,18 +179,24 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn list_groups(self) -> anyhow::Result<Vec<server::ServerGroup>> {
-        let groups = self
+        let (groups, all_servers) = self
             .app
-            .prisma_client
-            .server_group()
-            .find_many(vec![])
-            .order_by(db::server_group::OrderByParam::GroupIndex(Direction::Asc))
-            .with(
-                db::server_group::servers::fetch(vec![])
-                    .order_by(db::server::OrderByParam::Index(Direction::Asc)),
-            )
-            .exec()
+            .db
+            .read(|conn| {
+                // reads share one WAL snapshot
+                let snap = conn.snapshot()?;
+                let groups = server_repo::get_all_server_groups_ordered_by_group_index_conn(&snap)?;
+                let servers = server_repo::get_all_servers_ordered_by_index_conn(&snap)?;
+                Ok((groups, servers))
+            })
             .await?;
+
+        // Nest servers under their group, preserving the index-asc order the
+        // query returned them in.
+        let mut servers_by_group: HashMap<i32, Vec<server_repo::ServerRow>> = HashMap::new();
+        for s in all_servers {
+            servers_by_group.entry(s.group_id).or_default().push(s);
+        }
 
         let active_servers = self.servers.read().await;
 
@@ -218,8 +207,8 @@ impl ManagerRef<'_, ServerManager> {
                 name: group.name,
                 group_index: group.group_index,
                 library_position: group.library_position,
-                servers: group
-                    .servers
+                servers: servers_by_group
+                    .remove(&group.id)
                     .unwrap_or_default()
                     .into_iter()
                     .filter(|s| active_servers.contains_key(&ServerId(s.id)))
@@ -288,46 +277,33 @@ impl ManagerRef<'_, ServerManager> {
         // Newly created servers appear at the TOP of their group — pick an
         // index strictly smaller than the current minimum so ascending
         // sort on `index` puts the new row first.
-        let min_index: Option<i32> = self
-            .app
-            .prisma_client
-            .server()
-            .find_first(vec![db::server::group_id::equals(group_id.0)])
-            .order_by(db::server::OrderByParam::Index(Direction::Asc))
-            .exec()
-            .await?
-            .map(|s| s.index);
+        let group_id_val = group_id.0;
+        let min_index: Option<i32> =
+            server_repo::min_index_server_in_group(&self.app.db, group_id_val)
+                .await?
+                .map(|s| s.index);
         let next_index = min_index.map(|n| n - 1).unwrap_or(0);
 
-        // If the new server is in the default group, also give it a
+        // If the new server is in the default server group, also give it a
         // library_position that sorts above every existing server or
         // folder at the library's top level.
         let default_group_id = self.clone().get_default_group().await?;
         let library_position = if group_id == default_group_id {
-            let min_server_pos: Option<i32> = self
+            let default_id = default_group_id.0;
+            let (min_server_pos, min_group_pos) = self
                 .app
-                .prisma_client
-                .server()
-                .find_first(vec![
-                    db::server::group_id::equals(default_group_id.0),
-                    db::server::library_position::not(None),
-                ])
-                .order_by(db::server::OrderByParam::LibraryPosition(Direction::Asc))
-                .exec()
-                .await?
-                .and_then(|s| s.library_position);
-
-            let min_group_pos: Option<i32> = self
-                .app
-                .prisma_client
-                .server_group()
-                .find_first(vec![db::server_group::library_position::not(None)])
-                .order_by(db::server_group::OrderByParam::LibraryPosition(
-                    Direction::Asc,
-                ))
-                .exec()
-                .await?
-                .and_then(|g| g.library_position);
+                .db
+                .read(move |conn| {
+                    // reads share one WAL snapshot
+                    let snap = conn.snapshot()?;
+                    let srv =
+                        server_repo::min_library_position_server_in_group_conn(&snap, default_id)?
+                            .and_then(|s| s.library_position);
+                    let grp = server_repo::min_library_position_server_group_conn(&snap)?
+                        .and_then(|g| g.library_position);
+                    Ok((srv, grp))
+                })
+                .await?;
 
             let current_min = match (min_server_pos, min_group_pos) {
                 (Some(a), Some(b)) => Some(a.min(b)),
@@ -341,38 +317,40 @@ impl ManagerRef<'_, ServerManager> {
         };
 
         // Create DB record
-        let mut extra_params = vec![
-            db::server::port::set(port),
-            db::server::modloader_type::set(modloader_type.clone()),
-            db::server::modloader_version::set(modloader_version.clone()),
-            db::server::server_type::set(if modloader_type.is_some() {
-                "modded".to_string()
-            } else {
-                "vanilla".to_string()
-            }),
-        ];
-        if let Some(pos) = library_position {
-            extra_params.push(db::server::library_position::set(Some(pos)));
-        }
-
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .create(
-                name.clone(),
-                shortpath.clone(),
-                next_index,
-                db::server_group::id::equals(group_id.0),
-                game_version.clone(),
-                extra_params,
-            )
-            .exec()
-            .await?;
+        let server_type = if modloader_type.is_some() {
+            "modded".to_string()
+        } else {
+            "vanilla".to_string()
+        };
+        let (name_c, shortpath_c, game_version_c, modloader_type_c, modloader_version_c) = (
+            name.clone(),
+            shortpath.clone(),
+            game_version.clone(),
+            modloader_type.clone(),
+            modloader_version.clone(),
+        );
+        let new_id = server_repo::insert_server(
+            &self.app.db,
+            name_c,
+            shortpath_c,
+            next_index,
+            group_id_val,
+            game_version_c,
+            port,
+            server_type,
+            modloader_type_c,
+            modloader_version_c,
+            None,
+            None,
+            None,
+            library_position,
+            DbDateTime(Utc::now().into()),
+        )
+        .await?;
 
         drop(_index_guard);
 
-        let server_id = ServerId(db_server.id);
+        let server_id = ServerId(new_id as i32);
 
         // Create a visual task for install progress
         let task = VisualTask::new(Translation::ServerTaskInstall {
@@ -554,45 +532,32 @@ impl ManagerRef<'_, ServerManager> {
         let _index_guard = self.index_lock.lock().await;
 
         // Top-of-group insertion: pick an index smaller than the current min
-        let min_index: Option<i32> = self
-            .app
-            .prisma_client
-            .server()
-            .find_first(vec![db::server::group_id::equals(group_id.0)])
-            .order_by(db::server::OrderByParam::Index(Direction::Asc))
-            .exec()
-            .await?
-            .map(|s| s.index);
+        let group_id_val = group_id.0;
+        let min_index: Option<i32> =
+            server_repo::min_index_server_in_group(&self.app.db, group_id_val)
+                .await?
+                .map(|s| s.index);
         let next_index = min_index.map(|n| n - 1).unwrap_or(0);
 
         // If placing in the default group, also bump library_position to
         // sort above all existing top-level items.
         let default_group_id = self.clone().get_default_group().await?;
         let library_position = if group_id == default_group_id {
-            let min_server_pos: Option<i32> = self
+            let default_id = default_group_id.0;
+            let (min_server_pos, min_group_pos) = self
                 .app
-                .prisma_client
-                .server()
-                .find_first(vec![
-                    db::server::group_id::equals(default_group_id.0),
-                    db::server::library_position::not(None),
-                ])
-                .order_by(db::server::OrderByParam::LibraryPosition(Direction::Asc))
-                .exec()
-                .await?
-                .and_then(|s| s.library_position);
-
-            let min_group_pos: Option<i32> = self
-                .app
-                .prisma_client
-                .server_group()
-                .find_first(vec![db::server_group::library_position::not(None)])
-                .order_by(db::server_group::OrderByParam::LibraryPosition(
-                    Direction::Asc,
-                ))
-                .exec()
-                .await?
-                .and_then(|g| g.library_position);
+                .db
+                .read(move |conn| {
+                    // reads share one WAL snapshot
+                    let snap = conn.snapshot()?;
+                    let srv =
+                        server_repo::min_library_position_server_in_group_conn(&snap, default_id)?
+                            .and_then(|s| s.library_position);
+                    let grp = server_repo::min_library_position_server_group_conn(&snap)?
+                        .and_then(|g| g.library_position);
+                    Ok((srv, grp))
+                })
+                .await?;
 
             let current_min = match (min_server_pos, min_group_pos) {
                 (Some(a), Some(b)) => Some(a.min(b)),
@@ -605,36 +570,30 @@ impl ManagerRef<'_, ServerManager> {
             None
         };
 
-        let mut extra_params = vec![
-            db::server::port::set(port),
-            db::server::server_type::set("modded".to_string()),
-            db::server::modpack_platform::set(Some(modpack_platform)),
-            db::server::modpack_project_id::set(Some(modpack_project_id)),
-            db::server::modpack_file_id::set(Some(modpack_file_id)),
-        ];
-        if let Some(pos) = library_position {
-            extra_params.push(db::server::library_position::set(Some(pos)));
-        }
-
         // Create DB record with a placeholder game_version — will be updated after processing
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .create(
-                name.clone(),
-                shortpath.clone(),
-                next_index,
-                db::server_group::id::equals(group_id.0),
-                "unknown".to_string(),
-                extra_params,
-            )
-            .exec()
-            .await?;
+        let (name_c, shortpath_c) = (name.clone(), shortpath.clone());
+        let new_id = server_repo::insert_server(
+            &self.app.db,
+            name_c,
+            shortpath_c,
+            next_index,
+            group_id_val,
+            "unknown".to_string(),
+            port,
+            "modded".to_string(),
+            None,
+            None,
+            Some(modpack_platform),
+            Some(modpack_project_id),
+            Some(modpack_file_id),
+            library_position,
+            DbDateTime(Utc::now().into()),
+        )
+        .await?;
 
         drop(_index_guard);
 
-        let server_id = ServerId(db_server.id);
+        let server_id = ServerId(new_id as i32);
 
         // Create a visual task for install progress
         let task = VisualTask::new(Translation::ServerTaskInstallFromModpack {
@@ -663,16 +622,13 @@ impl ManagerRef<'_, ServerManager> {
                             if let Err(e) = tokio::fs::write(&icon_path, &bytes).await {
                                 warn!("Failed to write server icon: {}", e);
                             } else {
-                                let _ = self
-                                    .app
-                                    .prisma_client
-                                    .server()
-                                    .update(
-                                        db::server::id::equals(server_id.0),
-                                        vec![db::server::icon_revision::set(Some(1))],
-                                    )
-                                    .exec()
-                                    .await;
+                                let sid = server_id.0;
+                                let _ = server_repo::set_server_icon_revision(
+                                    &self.app.db,
+                                    sid,
+                                    Some(1),
+                                )
+                                .await;
                             }
                         }
                     }
@@ -778,31 +734,64 @@ impl ManagerRef<'_, ServerManager> {
                     t_download_jar.complete_opaque();
                 }
 
-                // Install modloader only if detected. Complete the pre-created subtask
-                // either way to reach 100%.
-                if let (Some(ml_type), Some(ml_version)) =
-                    (&pack_result.modloader_type, &pack_result.modloader_version)
-                {
-                    let java_path = app
-                        .java_manager()
-                        .find_java_for_server_version(
-                            &pack_result.game_version,
-                            Some(ml_type.as_str()),
-                        )
-                        .await
-                        .context("Cannot install modloader: no Java available")?;
+                // Install the modloader if one was detected. Complete the
+                // pre-created subtask either way to reach 100%.
+                if let Some(ml_type) = &pack_result.modloader_type {
+                    let ml_version = pack_result.modloader_version.as_deref();
 
-                    let launch_config = modloader_install::install_modloader(
-                        &app.reqwest_client,
+                    // Most server packs arrive with the loader already unpacked.
+                    // Reuse it rather than re-downloading and re-running the
+                    // installer over the top of it.
+                    let existing = modloader_install::existing_install_launch_config(
                         &server_path,
-                        &pack_result.game_version,
                         ml_type,
                         ml_version,
-                        &java_path,
-                        Some(&t_install_modloader),
                     )
-                    .await
-                    .context(format!("Failed to install {} {}", ml_type, ml_version))?;
+                    .await;
+
+                    let launch_config = match existing {
+                        Some(config) => {
+                            info!(
+                                "Server pack ships {} pre-installed, skipping installer",
+                                ml_type
+                            );
+                            t_install_modloader.complete_opaque();
+                            config
+                        }
+                        None => {
+                            // Not pre-installed, so we have to run the installer —
+                            // which needs an exact version. Failing here is much
+                            // better than booting a vanilla server that modded
+                            // clients cannot join.
+                            let ml_version = ml_version.ok_or_else(|| {
+                                anyhow!(
+                                    "Server pack requires {} but ships neither an installed copy nor a version to install",
+                                    ml_type
+                                )
+                            })?;
+
+                            let java_path = app
+                                .java_manager()
+                                .find_java_for_server_version(
+                                    &pack_result.game_version,
+                                    Some(ml_type.as_str()),
+                                )
+                                .await
+                                .context("Cannot install modloader: no Java available")?;
+
+                            modloader_install::install_modloader(
+                                &app.reqwest_client,
+                                &server_path,
+                                &pack_result.game_version,
+                                ml_type,
+                                ml_version,
+                                &java_path,
+                                Some(&t_install_modloader),
+                            )
+                            .await
+                            .context(format!("Failed to install {} {}", ml_type, ml_version))?
+                        }
+                    };
 
                     modloader_launch::save_launch_config(&server_path, &launch_config).await?;
                 } else {
@@ -823,19 +812,15 @@ impl ManagerRef<'_, ServerManager> {
                 }
 
                 // Update DB with detected versions
-                let _ = app
-                    .prisma_client
-                    .server()
-                    .update(
-                        db::server::id::equals(server_id.0),
-                        vec![
-                            db::server::game_version::set(pack_result.game_version),
-                            db::server::modloader_type::set(pack_result.modloader_type),
-                            db::server::modloader_version::set(pack_result.modloader_version),
-                        ],
-                    )
-                    .exec()
-                    .await;
+                let sid = server_id.0;
+                let _ = server_repo::set_server_game_version_and_modloader(
+                    &app.db,
+                    sid,
+                    &pack_result.game_version,
+                    pack_result.modloader_type.as_deref(),
+                    pack_result.modloader_version.as_deref(),
+                )
+                .await;
 
                 Ok(())
             }
@@ -893,12 +878,7 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Pull the modpack info we stored at create time.
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -1035,12 +1015,7 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_SERVER_DETAILS, None);
 
         // Delete from DB
-        self.app
-            .prisma_client
-            .server()
-            .delete(db::server::id::equals(id.0))
-            .exec()
-            .await?;
+        server_repo::delete_server(&self.app.db, id.0).await?;
 
         // Delete files
         let shortpath = {
@@ -1103,12 +1078,7 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Get server info from DB
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -1219,16 +1189,12 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Update last_started in DB
-        let _ = self
-            .app
-            .prisma_client
-            .server()
-            .update(
-                db::server::id::equals(id.0),
-                vec![db::server::last_started::set(Some(Utc::now().into()))],
-            )
-            .exec()
-            .await;
+        let _ = server_repo::set_server_last_started(
+            &self.app.db,
+            id.0,
+            Some(DbDateTime(Utc::now().into())),
+        )
+        .await;
 
         // Pre-warm CPU metrics tracking so the first WebSocket poll gets non-zero values.
         // sysinfo needs two refresh calls to compute cpu_usage delta.
@@ -1263,10 +1229,7 @@ impl ManagerRef<'_, ServerManager> {
                 server.state = ServerState::Stopped { failed_task: None };
 
                 // Check auto_restart setting from DB
-                app.prisma_client
-                    .server()
-                    .find_unique(db::server::id::equals(id.0))
-                    .exec()
+                server_repo::get_server(&app.db, id.0)
                     .await
                     .ok()
                     .flatten()
@@ -1422,12 +1385,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn accept_eula(self, id: ServerId) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1460,12 +1418,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn server_details(self, id: ServerId) -> anyhow::Result<ServerDetails> {
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1512,34 +1465,34 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn update_server(self, update: ServerSettingsUpdate) -> anyhow::Result<()> {
-        let mut params = Vec::new();
+        let mut patch = ServerPatch::default();
 
         if let Some(name) = update.name {
-            params.push(db::server::name::set(name));
+            patch.name = Some(name);
         }
         if let Some(xmx) = update.xmx {
-            params.push(db::server::xmx::set(xmx));
+            patch.xmx = Some(xmx);
         }
         if let Some(xms) = update.xms {
-            params.push(db::server::xms::set(xms));
+            patch.xms = Some(xms);
         }
         if let Some(extra_args) = update.extra_java_args {
-            params.push(db::server::extra_java_args::set(
-                extra_args.unwrap_or_default(),
-            ));
+            patch.extra_java_args = Some(extra_args.unwrap_or_default());
         }
         if let Some(auto_restart) = update.auto_restart {
-            params.push(db::server::auto_restart::set(auto_restart));
+            patch.auto_restart = Some(auto_restart);
         }
 
-        if !params.is_empty() {
-            self.app
-                .prisma_client
-                .server()
-                .update(db::server::id::equals(update.server_id.0), params)
-                .exec()
-                .await?;
-        }
+        let server_id = update.server_id.0;
+        self.app
+            .db
+            .write(move |conn| {
+                if let Some(q) = patch.build(server_id) {
+                    q.execute(&conn)?;
+                }
+                Ok(())
+            })
+            .await?;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -1552,12 +1505,7 @@ impl ManagerRef<'_, ServerManager> {
         self,
         id: ServerId,
     ) -> anyhow::Result<std::collections::BTreeMap<String, String>> {
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1580,12 +1528,7 @@ impl ManagerRef<'_, ServerManager> {
         id: ServerId,
         updates: std::collections::HashMap<String, String>,
     ) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1612,32 +1555,33 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Sync core fields back to DB for list display
-        let mut db_params = Vec::new();
+        let mut patch = ServerPatch::default();
         if let Some(port) = btree_updates.get("server-port") {
             if let Ok(port) = port.parse::<i32>() {
-                db_params.push(db::server::port::set(port));
+                patch.port = Some(port);
             }
         }
         if let Some(motd) = btree_updates.get("motd") {
-            db_params.push(db::server::motd::set(motd.clone()));
+            patch.motd = Some(motd.clone());
         }
         if let Some(max_players) = btree_updates.get("max-players") {
             if let Ok(max_players) = max_players.parse::<i32>() {
-                db_params.push(db::server::max_players::set(max_players));
+                patch.max_players = Some(max_players);
             }
         }
         if let Some(online_mode) = btree_updates.get("online-mode") {
-            db_params.push(db::server::online_mode::set(online_mode == "true"));
+            patch.online_mode = Some(online_mode == "true");
         }
 
-        if !db_params.is_empty() {
-            self.app
-                .prisma_client
-                .server()
-                .update(db::server::id::equals(id.0), db_params)
-                .exec()
-                .await?;
-        }
+        self.app
+            .db
+            .write(move |conn| {
+                if let Some(q) = patch.build(id.0) {
+                    q.execute(&conn)?;
+                }
+                Ok(())
+            })
+            .await?;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -1651,12 +1595,7 @@ impl ManagerRef<'_, ServerManager> {
         id: ServerId,
         list: PlayerListFile,
     ) -> anyhow::Result<Vec<T>> {
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -1740,51 +1679,18 @@ impl ManagerRef<'_, ServerManager> {
 
     /// List server addons from database cache. Triggers caching if needed.
     pub async fn list_server_addons(self, id: ServerId) -> anyhow::Result<Vec<ServerAddon>> {
-        use carbon_repos::db::{
-            curse_forge_mod_cache as cfdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-            server_mod_file_cache as sfcdb,
-        };
-
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Query from cache with metadata joins
         // Caching is handled by the queue system (triggered on install, startup, and tab navigation)
-        let cached_mods = self
-            .app
-            .prisma_client
-            .server_mod_file_cache()
-            .find_many(vec![sfcdb::server_id::equals(id.0)])
-            .with(
-                sfcdb::metadata::fetch()
-                    .with(metadb::logo_image::fetch())
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
-            .exec()
-            .await?;
+        let cached_mods = mfcdb::get_server_mods_full(&self.app.db, id.0).await?;
 
         let mut addons: Vec<ServerAddon> = cached_mods
             .into_iter()
-            .filter_map(|entry| {
-                let metadata = match entry.metadata.as_ref() {
-                    Some(m) => m,
-                    None => {
-                        warn!(
-                            "ServerModFileCache entry {} has no metadata, skipping",
-                            entry.id
-                        );
-                        return None;
-                    }
-                };
-
-                let display_name = metadata.name.clone().unwrap_or_else(|| {
+            .map(|entry| {
+                let display_name = entry.meta_name.clone().unwrap_or_else(|| {
                     entry
                         .filename
                         .trim_end_matches(".jar")
@@ -1792,36 +1698,17 @@ impl ManagerRef<'_, ServerManager> {
                         .to_string()
                 });
 
-                let has_local_image = metadata
-                    .logo_image
-                    .as_ref()
-                    .and_then(|opt| opt.as_ref())
-                    .is_some();
-
-                let cf = metadata.curseforge.as_ref().and_then(|opt| opt.as_ref());
-                let mr = metadata.modrinth.as_ref().and_then(|opt| opt.as_ref());
-
-                let has_cf_image = cf
-                    .and_then(|c| c.logo_image.as_ref())
-                    .and_then(|opt| opt.as_ref())
-                    .is_some();
-
-                let has_mr_image = mr
-                    .and_then(|m| m.logo_image.as_ref())
-                    .and_then(|opt| opt.as_ref())
-                    .is_some();
-
-                Some(ServerAddon {
+                ServerAddon {
                     id: entry.id,
                     filename: entry.filename,
                     display_name,
                     enabled: entry.enabled,
                     addon_type: entry.addon_type,
                     file_size: entry.filesize,
-                    has_image: has_local_image || has_cf_image || has_mr_image,
-                    curseforge_project_id: cf.map(|c| c.project_id as u32),
-                    modrinth_project_id: mr.map(|m| m.project_id.clone()),
-                })
+                    has_image: entry.has_local_image || entry.has_cf_image || entry.has_mr_image,
+                    curseforge_project_id: entry.cf_project_id.map(|c| c as u32),
+                    modrinth_project_id: entry.mr_project_id,
+                }
             })
             .collect();
 
@@ -1838,24 +1725,13 @@ impl ManagerRef<'_, ServerManager> {
         addon_id: String,
         enabled: bool,
     ) -> anyhow::Result<()> {
-        use carbon_repos::db::server_mod_file_cache as sfcdb;
-
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Look up the cache entry to get the filename
-        let cache_entry = self
-            .app
-            .prisma_client
-            .server_mod_file_cache()
-            .find_unique(sfcdb::UniqueWhereParam::IdEquals(addon_id.clone()))
-            .exec()
+        let lookup_id = addon_id.clone();
+        let cache_entry = mfcdb::get_server_mod_file_cache_by_id(&self.app.db, &lookup_id)
             .await?
             .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
 
@@ -1911,16 +1787,13 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Update cache entry's enabled state directly (no re-hash needed)
-        let _ = self
-            .app
-            .prisma_client
-            .server_mod_file_cache()
-            .update(
-                sfcdb::UniqueWhereParam::IdEquals(addon_id),
-                vec![sfcdb::enabled::set(enabled)],
-            )
-            .exec()
-            .await;
+        let _ = mfcdb::update_server_mod_file_enabled(
+            &self.app.db,
+            &addon_id,
+            enabled,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await;
 
         self.app.invalidate(GET_SERVER_ADDONS, None);
 
@@ -1929,24 +1802,13 @@ impl ManagerRef<'_, ServerManager> {
 
     /// Delete a server addon file
     pub async fn delete_server_addon(self, id: ServerId, addon_id: String) -> anyhow::Result<()> {
-        use carbon_repos::db::server_mod_file_cache as sfcdb;
-
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
         // Look up the cache entry to get the filename
-        let cache_entry = self
-            .app
-            .prisma_client
-            .server_mod_file_cache()
-            .find_unique(sfcdb::UniqueWhereParam::IdEquals(addon_id.clone()))
-            .exec()
+        let lookup_id = addon_id.clone();
+        let cache_entry = mfcdb::get_server_mod_file_cache_by_id(&self.app.db, &lookup_id)
             .await?
             .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
 
@@ -1986,13 +1848,7 @@ impl ManagerRef<'_, ServerManager> {
         tokio::fs::remove_file(&file_path).await?;
 
         // Remove cache entry
-        let _ = self
-            .app
-            .prisma_client
-            .server_mod_file_cache()
-            .delete(sfcdb::UniqueWhereParam::IdEquals(addon_id))
-            .exec()
-            .await;
+        let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &addon_id).await;
 
         // GC orphaned metadata
         self.app.meta_cache_manager().gc_mod_metadata().await;
@@ -2014,12 +1870,7 @@ impl ManagerRef<'_, ServerManager> {
         use carbon_net::{Checksum, DownloadOptions, Downloadable};
         use carbon_platforms::curseforge::filters::ModFileParameters;
 
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2105,12 +1956,7 @@ impl ManagerRef<'_, ServerManager> {
     ) -> anyhow::Result<VisualTaskId> {
         use carbon_platforms::curseforge::filters::{ModFilesParameters, ModFilesParametersQuery};
 
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2161,12 +2007,7 @@ impl ManagerRef<'_, ServerManager> {
         use carbon_net::{Checksum, DownloadOptions, Downloadable};
         use carbon_platforms::modrinth::search::VersionID;
 
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2243,12 +2084,7 @@ impl ManagerRef<'_, ServerManager> {
         use carbon_platforms::modrinth::project::ProjectVersionsFilters;
         use carbon_platforms::modrinth::search::ProjectID;
 
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2283,12 +2119,7 @@ impl ManagerRef<'_, ServerManager> {
         list: PlayerListFile,
         entries: &[T],
     ) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
 
@@ -2304,15 +2135,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn set_favorite(self, id: ServerId, favorite: bool) -> anyhow::Result<()> {
-        self.app
-            .prisma_client
-            .server()
-            .update(
-                db::server::id::equals(id.0),
-                vec![db::server::favorite::set(favorite)],
-            )
-            .exec()
-            .await?;
+        server_repo::set_server_favorite(&self.app.db, id.0, favorite).await?;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -2377,12 +2200,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn open_folder(self, id: ServerId) -> anyhow::Result<()> {
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -2444,26 +2262,13 @@ impl ManagerRef<'_, ServerManager> {
             .context("Failed to write server icon")?;
 
         // Bump iconRevision
-        let db_server = self
-            .app
-            .prisma_client
-            .server()
-            .find_unique(db::server::id::equals(id.0))
-            .exec()
+        let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found in database"))?;
 
         let new_revision = db_server.icon_revision.unwrap_or(0) + 1;
 
-        self.app
-            .prisma_client
-            .server()
-            .update(
-                db::server::id::equals(id.0),
-                vec![db::server::icon_revision::set(Some(new_revision))],
-            )
-            .exec()
-            .await?;
+        server_repo::set_server_icon_revision(&self.app.db, id.0, Some(new_revision)).await?;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -2499,19 +2304,12 @@ impl ManagerRef<'_, ServerManager> {
         server_id: ServerId,
         target: ServerMoveTarget,
     ) -> anyhow::Result<()> {
-        use db::server::{SetParam, UniqueWhereParam, WhereParam};
-
         let _index_lock = self.index_lock.lock().await;
 
         let default_group_id = self.get_default_group().await?;
 
         let (start_group, start_idx, start_library_pos) = {
-            let server = self
-                .app
-                .prisma_client
-                .server()
-                .find_unique(UniqueWhereParam::IdEquals(server_id.0))
-                .exec()
+            let server = server_repo::get_server(&self.app.db, server_id.0)
                 .await?
                 .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -2524,55 +2322,33 @@ impl ManagerRef<'_, ServerManager> {
 
         let (target_group, target_idx, target_library_pos) = match target {
             ServerMoveTarget::BeforeServer(target_id) => {
-                let srv = self
-                    .app
-                    .prisma_client
-                    .server()
-                    .find_unique(UniqueWhereParam::IdEquals(target_id.0))
-                    .exec()
+                let srv = server_repo::get_server(&self.app.db, target_id.0)
                     .await?
                     .ok_or_else(|| anyhow!("Target server not found in database"))?;
 
                 (ServerGroupId(srv.group_id), srv.index, srv.library_position)
             }
             ServerMoveTarget::EndOfGroup(group) => {
-                let target_idx = self
-                    .app
-                    .prisma_client
-                    .server()
-                    .count(vec![WhereParam::GroupId(IntFilter::Equals(group.0))])
-                    .exec()
-                    .await? as i32;
+                let group_val = group.0;
+                let target_idx =
+                    server_repo::count_servers_in_group(&self.app.db, group_val).await? as i32;
 
                 let lib_pos = if group == default_group_id {
-                    let max_server_pos = self
+                    let (max_server_pos, max_group_pos) = self
                         .app
-                        .prisma_client
-                        .server()
-                        .find_first(vec![
-                            WhereParam::GroupId(IntFilter::Equals(group.0)),
-                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(
-                                None,
-                            )),
-                        ])
-                        .order_by(db::server::OrderByParam::LibraryPosition(Direction::Desc))
-                        .exec()
-                        .await?
-                        .and_then(|s| s.library_position);
-
-                    let max_group_pos = self
-                        .app
-                        .prisma_client
-                        .server_group()
-                        .find_first(vec![db::server_group::WhereParam::LibraryPosition(
-                            db::read_filters::IntNullableFilter::Not(None),
-                        )])
-                        .order_by(db::server_group::OrderByParam::LibraryPosition(
-                            Direction::Desc,
-                        ))
-                        .exec()
-                        .await?
-                        .and_then(|g| g.library_position);
+                        .db
+                        .read(move |conn| {
+                            // reads share one WAL snapshot
+                            let snap = conn.snapshot()?;
+                            let srv = server_repo::max_library_position_server_in_group_conn(
+                                &snap, group_val,
+                            )?
+                            .and_then(|s| s.library_position);
+                            let grp = server_repo::max_library_position_server_group_conn(&snap)?
+                                .and_then(|g| g.library_position);
+                            Ok((srv, grp))
+                        })
+                        .await?;
 
                     let max_pos = max_server_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0));
                     Some(max_pos + 1)
@@ -2583,12 +2359,8 @@ impl ManagerRef<'_, ServerManager> {
                 (group, target_idx, lib_pos)
             }
             ServerMoveTarget::BeforeGroup(group_id) => {
-                let target_folder = self
-                    .app
-                    .prisma_client
-                    .server_group()
-                    .find_unique(db::server_group::UniqueWhereParam::IdEquals(group_id.0))
-                    .exec()
+                let folder_id = group_id.0;
+                let target_folder = server_repo::get_server_group(&self.app.db, folder_id)
                     .await?
                     .ok_or_else(|| anyhow!("Server group not found in database"))?;
 
@@ -2596,56 +2368,38 @@ impl ManagerRef<'_, ServerManager> {
                     .library_position
                     .ok_or_else(|| anyhow!("Target folder has no libraryPosition"))?;
 
-                let target_idx = self
-                    .app
-                    .prisma_client
-                    .server()
-                    .count(vec![WhereParam::GroupId(IntFilter::Equals(
-                        default_group_id.0,
-                    ))])
-                    .exec()
-                    .await? as i32;
+                let default_id = default_group_id.0;
+                let target_idx =
+                    server_repo::count_servers_in_group(&self.app.db, default_id).await? as i32;
 
                 (default_group_id, target_idx, Some(lib_pos))
             }
         };
 
-        let index_shifts = if start_group == target_group {
+        let index_shifts: Vec<IndexShift> = if start_group == target_group {
             vec![match (start_idx, target_idx) {
-                (start, target) if start < target => self.app.prisma_client.server().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(target_group.0)),
-                        WhereParam::Index(IntFilter::Gt(start)),
-                        WhereParam::Index(IntFilter::Lt(target)),
-                    ],
-                    vec![SetParam::DecrementIndex(1)],
-                ),
-                (start, target) if start > target => self.app.prisma_client.server().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(target_group.0)),
-                        WhereParam::Index(IntFilter::Gte(target)),
-                        WhereParam::Index(IntFilter::Lt(start)),
-                    ],
-                    vec![SetParam::IncrementIndex(1)],
-                ),
+                (start, target) if start < target => IndexShift::DownExclusive {
+                    group_id: target_group.0,
+                    gt: start,
+                    lt: target,
+                },
+                (start, target) if start > target => IndexShift::UpRange {
+                    group_id: target_group.0,
+                    gte: target,
+                    lt: start,
+                },
                 _ => return Ok(()),
             }]
         } else {
             vec![
-                self.app.prisma_client.server().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(start_group.0)),
-                        WhereParam::Index(IntFilter::Gt(start_idx)),
-                    ],
-                    vec![SetParam::DecrementIndex(1)],
-                ),
-                self.app.prisma_client.server().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(target_group.0)),
-                        WhereParam::Index(IntFilter::Gte(target_idx)),
-                    ],
-                    vec![SetParam::IncrementIndex(1)],
-                ),
+                IndexShift::DownAfter {
+                    group_id: start_group.0,
+                    gt: start_idx,
+                },
+                IndexShift::UpFrom {
+                    group_id: target_group.0,
+                    gte: target_idx,
+                },
             ]
         };
 
@@ -2655,49 +2409,39 @@ impl ManagerRef<'_, ServerManager> {
             target_idx
         };
 
-        let mut update_params = vec![
-            SetParam::SetGroupId(target_group.0),
-            SetParam::SetIndex(final_idx),
-        ];
-
         let new_library_pos = if target_group == default_group_id {
             target_library_pos
         } else {
             None
         };
 
-        update_params.push(SetParam::SetLibraryPosition(new_library_pos));
-
+        let default_id = default_group_id.0;
         // If moving TO default group and inserting before an item, shift library positions
         if target_group == default_group_id {
             if let Some(target_lib_pos) = target_library_pos {
                 if start_library_pos != Some(target_lib_pos) {
+                    let sid = server_id.0;
+                    // Two shifts run in one writer dispatch so no other write
+                    // interleaves; they run in ONE transaction —
+                    // all-or-nothing: a failure rolls the whole group back and readers
+                    // never observe an intermediate state. `_conn` forms on the tx guard.
                     self.app
-                        .prisma_client
-                        .server()
-                        .update_many(
-                            vec![
-                                WhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                                WhereParam::LibraryPosition(
-                                    db::read_filters::IntNullableFilter::Gte(target_lib_pos),
-                                ),
-                                WhereParam::Id(db::read_filters::IntFilter::Not(server_id.0)),
-                            ],
-                            vec![SetParam::IncrementLibraryPosition(1)],
-                        )
-                        .exec()
-                        .await?;
-
-                    self.app
-                        .prisma_client
-                        .server_group()
-                        .update_many(
-                            vec![db::server_group::WhereParam::LibraryPosition(
-                                db::read_filters::IntNullableFilter::Gte(target_lib_pos),
-                            )],
-                            vec![db::server_group::SetParam::IncrementLibraryPosition(1)],
-                        )
-                        .exec()
+                        .db
+                        .write(move |mut conn| {
+                            let tx = conn.transaction()?;
+                            server_repo::shift_server_library_positions_up_in_group_except_conn(
+                                &tx,
+                                default_id,
+                                target_lib_pos,
+                                sid,
+                            )?;
+                            server_repo::shift_all_server_group_library_positions_up_from_conn(
+                                &tx,
+                                target_lib_pos,
+                            )?;
+                            tx.commit()?;
+                            Ok(())
+                        })
                         .await?;
                 }
             }
@@ -2706,45 +2450,40 @@ impl ManagerRef<'_, ServerManager> {
         // If moving FROM default group, shift library positions to fill the gap
         if start_group == default_group_id && target_group != default_group_id {
             if let Some(start_lib_pos) = start_library_pos {
+                // Two shifts run in one writer dispatch so no other write
+                // interleaves; they run in ONE transaction —
+                // all-or-nothing: a failure rolls the whole group back and readers
+                // never observe an intermediate state. `_conn` forms on the tx guard.
                 self.app
-                    .prisma_client
-                    .server()
-                    .update_many(
-                        vec![
-                            WhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                            WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Gt(
-                                start_lib_pos,
-                            )),
-                        ],
-                        vec![SetParam::DecrementLibraryPosition(1)],
-                    )
-                    .exec()
-                    .await?;
-
-                self.app
-                    .prisma_client
-                    .server_group()
-                    .update_many(
-                        vec![db::server_group::WhereParam::LibraryPosition(
-                            db::read_filters::IntNullableFilter::Gt(start_lib_pos),
-                        )],
-                        vec![db::server_group::SetParam::DecrementLibraryPosition(1)],
-                    )
-                    .exec()
+                    .db
+                    .write(move |mut conn| {
+                        let tx = conn.transaction()?;
+                        server_repo::shift_server_library_positions_down_in_group_conn(
+                            &tx,
+                            default_id,
+                            start_lib_pos,
+                        )?;
+                        server_repo::shift_all_server_group_library_positions_down_after_conn(
+                            &tx,
+                            start_lib_pos,
+                        )?;
+                        tx.commit()?;
+                        Ok(())
+                    })
                     .await?;
             }
         }
 
-        self.app
-            .prisma_client
-            ._batch((
-                index_shifts,
-                self.app
-                    .prisma_client
-                    .server()
-                    .update(UniqueWhereParam::IdEquals(server_id.0), update_params),
-            ))
-            .await?;
+        let final_group = target_group.0;
+        server_repo::move_server_tx(
+            &self.app.db,
+            index_shifts,
+            server_id.0,
+            final_group,
+            final_idx,
+            new_library_pos,
+        )
+        .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -2753,30 +2492,16 @@ impl ManagerRef<'_, ServerManager> {
         // server after moving one out: a one-server folder is pointless,
         // so its last server also returns to the default group.
         if start_group != default_group_id && start_group != target_group {
-            let remaining_count = self
-                .app
-                .prisma_client
-                .server()
-                .count(vec![WhereParam::GroupId(IntFilter::Equals(start_group.0))])
-                .exec()
-                .await?;
+            let start_group_id = start_group.0;
+            let remaining_count =
+                server_repo::count_servers_in_group(&self.app.db, start_group_id).await?;
 
             if remaining_count == 0 {
-                self.app
-                    .prisma_client
-                    .server_group()
-                    .delete(db::server_group::UniqueWhereParam::IdEquals(start_group.0))
-                    .exec()
-                    .await?;
+                server_repo::delete_server_group(&self.app.db, start_group_id).await?;
                 self.app.invalidate(GET_GROUPS, None);
             } else if remaining_count == 1 {
-                if let Some(last) = self
-                    .app
-                    .prisma_client
-                    .server()
-                    .find_first(vec![WhereParam::GroupId(IntFilter::Equals(start_group.0))])
-                    .exec()
-                    .await?
+                if let Some(last) =
+                    server_repo::first_server_in_group(&self.app.db, start_group_id).await?
                 {
                     // Moving the last server out empties the group, which the
                     // recursive call's branch above then deletes. Release the
@@ -2799,19 +2524,12 @@ impl ManagerRef<'_, ServerManager> {
         group: ServerGroupId,
         target: ServerGroupMoveTarget,
     ) -> anyhow::Result<()> {
-        use db::server::{SetParam as ServerSetParam, WhereParam as ServerWhereParam};
-        use db::server_group::{SetParam, UniqueWhereParam, WhereParam};
-
         let _index_lock = self.index_lock.lock().await;
 
         let default_group_id = self.get_default_group().await?;
 
-        let moving_group = self
-            .app
-            .prisma_client
-            .server_group()
-            .find_unique(UniqueWhereParam::IdEquals(group.0))
-            .exec()
+        let group_val = group.0;
+        let moving_group = server_repo::get_server_group(&self.app.db, group_val)
             .await?
             .ok_or_else(|| anyhow!("Server group not found in database"))?;
 
@@ -2819,12 +2537,8 @@ impl ManagerRef<'_, ServerManager> {
 
         let target_pos = match target {
             ServerGroupMoveTarget::BeforeGroup(target_group_id) => {
-                let target_group = self
-                    .app
-                    .prisma_client
-                    .server_group()
-                    .find_unique(UniqueWhereParam::IdEquals(target_group_id.0))
-                    .exec()
+                let target_id = target_group_id.0;
+                let target_group = server_repo::get_server_group(&self.app.db, target_id)
                     .await?
                     .ok_or_else(|| anyhow!("Target server group not found in database"))?;
 
@@ -2833,12 +2547,7 @@ impl ManagerRef<'_, ServerManager> {
                 })?
             }
             ServerGroupMoveTarget::BeforeServer(server_id) => {
-                let server = self
-                    .app
-                    .prisma_client
-                    .server()
-                    .find_unique(db::server::UniqueWhereParam::IdEquals(server_id.0))
-                    .exec()
+                let server = server_repo::get_server(&self.app.db, server_id.0)
                     .await?
                     .ok_or_else(|| anyhow!("Server not found in database"))?;
 
@@ -2853,34 +2562,22 @@ impl ManagerRef<'_, ServerManager> {
                     .ok_or_else(|| anyhow!("Server has no libraryPosition"))?
             }
             ServerGroupMoveTarget::EndOfLibrary => {
-                let max_server_pos: Option<i32> = self
+                let default_id = default_group_id.0;
+                let (max_server_pos, max_group_pos) = self
                     .app
-                    .prisma_client
-                    .server()
-                    .find_first(vec![
-                        ServerWhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                        ServerWhereParam::LibraryPosition(
-                            db::read_filters::IntNullableFilter::Not(None),
-                        ),
-                    ])
-                    .order_by(db::server::OrderByParam::LibraryPosition(Direction::Desc))
-                    .exec()
-                    .await?
-                    .and_then(|s| s.library_position);
-
-                let max_group_pos: Option<i32> = self
-                    .app
-                    .prisma_client
-                    .server_group()
-                    .find_first(vec![WhereParam::LibraryPosition(
-                        db::read_filters::IntNullableFilter::Not(None),
-                    )])
-                    .order_by(db::server_group::OrderByParam::LibraryPosition(
-                        Direction::Desc,
-                    ))
-                    .exec()
-                    .await?
-                    .and_then(|g| g.library_position);
+                    .db
+                    .read(move |conn| {
+                        // reads share one WAL snapshot
+                        let snap = conn.snapshot()?;
+                        let srv = server_repo::max_library_position_server_in_group_conn(
+                            &snap, default_id,
+                        )?
+                        .and_then(|s| s.library_position);
+                        let grp = server_repo::max_library_position_server_group_conn(&snap)?
+                            .and_then(|g| g.library_position);
+                        Ok((srv, grp))
+                    })
+                    .await?;
 
                 let max_pos = max_server_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0));
                 max_pos + 1
@@ -2895,125 +2592,85 @@ impl ManagerRef<'_, ServerManager> {
             return Ok(());
         }
 
+        let default_id = default_group_id.0;
         if start_pos < target_pos {
             // Moving forward: shift items in (start, target] down by 1
+            let target_upper = target_pos - 1;
+            // Three writes run in one writer dispatch so no other write
+            // interleaves; they run in ONE transaction —
+            // all-or-nothing: a failure rolls the whole group back and readers
+            // never observe an intermediate state. `_conn` forms on the tx guard.
             self.app
-                .prisma_client
-                .server_group()
-                .update_many(
-                    vec![
-                        WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Gt(
-                            start_pos,
-                        )),
-                        WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Lte(
-                            target_pos - 1,
-                        )),
-                    ],
-                    vec![SetParam::DecrementLibraryPosition(1)],
-                )
-                .exec()
-                .await?;
-
-            self.app
-                .prisma_client
-                .server()
-                .update_many(
-                    vec![
-                        ServerWhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                        ServerWhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Gt(
-                            start_pos,
-                        )),
-                        ServerWhereParam::LibraryPosition(
-                            db::read_filters::IntNullableFilter::Lte(target_pos - 1),
-                        ),
-                    ],
-                    vec![ServerSetParam::DecrementLibraryPosition(1)],
-                )
-                .exec()
-                .await?;
-
-            self.app
-                .prisma_client
-                .server_group()
-                .update(
-                    UniqueWhereParam::IdEquals(group.0),
-                    vec![SetParam::SetLibraryPosition(Some(target_pos - 1))],
-                )
-                .exec()
+                .db
+                .write(move |mut conn| {
+                    let tx = conn.transaction()?;
+                    server_repo::shift_server_group_library_positions_down_conn(
+                        &tx,
+                        start_pos,
+                        target_upper,
+                    )?;
+                    server_repo::shift_server_library_positions_down_scoped_conn(
+                        &tx,
+                        default_id,
+                        start_pos,
+                        target_upper,
+                    )?;
+                    server_repo::set_server_group_library_position_conn(
+                        &tx,
+                        group_val,
+                        Some(target_upper),
+                    )?;
+                    tx.commit()?;
+                    Ok(())
+                })
                 .await?;
         } else {
             // Moving backward: shift items in [target, start) up by 1
+            // Three writes run in one writer dispatch so no other write
+            // interleaves; they run in ONE transaction —
+            // all-or-nothing: a failure rolls the whole group back and readers
+            // never observe an intermediate state. `_conn` forms on the tx guard.
             self.app
-                .prisma_client
-                .server_group()
-                .update_many(
-                    vec![
-                        WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Gte(
-                            target_pos,
-                        )),
-                        WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Lt(
-                            start_pos,
-                        )),
-                    ],
-                    vec![SetParam::IncrementLibraryPosition(1)],
-                )
-                .exec()
-                .await?;
-
-            self.app
-                .prisma_client
-                .server()
-                .update_many(
-                    vec![
-                        ServerWhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                        ServerWhereParam::LibraryPosition(
-                            db::read_filters::IntNullableFilter::Gte(target_pos),
-                        ),
-                        ServerWhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Lt(
-                            start_pos,
-                        )),
-                    ],
-                    vec![ServerSetParam::IncrementLibraryPosition(1)],
-                )
-                .exec()
-                .await?;
-
-            self.app
-                .prisma_client
-                .server_group()
-                .update(
-                    UniqueWhereParam::IdEquals(group.0),
-                    vec![SetParam::SetLibraryPosition(Some(target_pos))],
-                )
-                .exec()
+                .db
+                .write(move |mut conn| {
+                    let tx = conn.transaction()?;
+                    server_repo::shift_server_group_library_positions_up_conn(
+                        &tx, target_pos, start_pos,
+                    )?;
+                    server_repo::shift_server_library_positions_up_scoped_conn(
+                        &tx, default_id, target_pos, start_pos,
+                    )?;
+                    server_repo::set_server_group_library_position_conn(
+                        &tx,
+                        group_val,
+                        Some(target_pos),
+                    )?;
+                    tx.commit()?;
+                    Ok(())
+                })
                 .await?;
         }
 
         // Keep groupIndex in sync
-        let all_groups = self
-            .app
-            .prisma_client
-            .server_group()
-            .find_many(vec![WhereParam::LibraryPosition(
-                db::read_filters::IntNullableFilter::Not(None),
-            )])
-            .order_by(db::server_group::OrderByParam::LibraryPosition(
-                Direction::Asc,
-            ))
-            .exec()
-            .await?;
+        let all_groups =
+            server_repo::get_server_groups_with_library_position_ordered(&self.app.db).await?;
 
-        for (idx, g) in all_groups.iter().enumerate() {
-            self.app
-                .prisma_client
-                .server_group()
-                .update(
-                    UniqueWhereParam::IdEquals(g.id),
-                    vec![SetParam::SetGroupIndex(idx as i32)],
-                )
-                .exec()
-                .await?;
-        }
+        // Interleaved app logic: restamp every group's index from the ordered
+        // in-memory list. Runs in one writer dispatch, so no other write
+        // interleaves; they run in ONE transaction —
+        // all-or-nothing: a failure rolls the whole group back and readers
+        // never observe an intermediate state. `_conn` forms on the tx guard.
+        self.app
+            .db
+            .write(move |mut conn| {
+                let tx = conn.transaction()?;
+                for (idx, g) in all_groups.iter().enumerate() {
+                    server_repo::set_server_group_index_conn(&tx, g.id, idx as i32)?;
+                }
+                tx.commit()?;
+                Ok(())
+            })
+            .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -3022,17 +2679,8 @@ impl ManagerRef<'_, ServerManager> {
 
     /// Generate a unique folder name by appending (1), (2), etc. if needed.
     async fn generate_unique_folder_name(&self, base_name: &str) -> anyhow::Result<String> {
-        use db::server_group::WhereParam;
-
-        let existing = self
-            .app
-            .prisma_client
-            .server_group()
-            .find_first(vec![WhereParam::Name(StringFilter::Equals(
-                base_name.to_string(),
-            ))])
-            .exec()
-            .await?;
+        let base = base_name.to_string();
+        let existing = server_repo::find_server_group_by_name(&self.app.db, &base).await?;
 
         if existing.is_none() {
             return Ok(base_name.to_string());
@@ -3041,15 +2689,8 @@ impl ManagerRef<'_, ServerManager> {
         let mut counter = 1;
         loop {
             let candidate = format!("{} ({})", base_name, counter);
-            let exists = self
-                .app
-                .prisma_client
-                .server_group()
-                .find_first(vec![WhereParam::Name(StringFilter::Equals(
-                    candidate.clone(),
-                ))])
-                .exec()
-                .await?;
+            let candidate_q = candidate.clone();
+            let exists = server_repo::find_server_group_by_name(&self.app.db, &candidate_q).await?;
 
             if exists.is_none() {
                 return Ok(candidate);
@@ -3059,68 +2700,41 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn create_server_group(self, name: String) -> anyhow::Result<ServerGroupId> {
-        use db::server_group::WhereParam;
-
-        let group_count = self
-            .app
-            .prisma_client
-            .server_group()
-            .count(vec![])
-            .exec()
-            .await? as i32;
+        let group_count = server_repo::count_server_groups(&self.app.db).await? as i32;
 
         let default_group_id = self.get_default_group().await?;
 
-        // Calculate next libraryPosition
-        let max_server_pos: Option<i32> = self
+        // Calculate next libraryPosition.
+        let default_id = default_group_id.0;
+        let (max_server_pos, max_group_pos) = self
             .app
-            .prisma_client
-            .server()
-            .find_first(vec![
-                db::server::WhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                db::server::WhereParam::LibraryPosition(db::read_filters::IntNullableFilter::Not(
-                    None,
-                )),
-            ])
-            .order_by(db::server::OrderByParam::LibraryPosition(Direction::Desc))
-            .exec()
-            .await?
-            .and_then(|s| s.library_position);
-
-        let max_group_pos: Option<i32> = self
-            .app
-            .prisma_client
-            .server_group()
-            .find_first(vec![WhereParam::LibraryPosition(
-                db::read_filters::IntNullableFilter::Not(None),
-            )])
-            .order_by(db::server_group::OrderByParam::LibraryPosition(
-                Direction::Desc,
-            ))
-            .exec()
-            .await?
-            .and_then(|g| g.library_position);
+            .db
+            .read(move |conn| {
+                // reads share one WAL snapshot
+                let snap = conn.snapshot()?;
+                let srv =
+                    server_repo::max_library_position_server_in_group_conn(&snap, default_id)?
+                        .and_then(|s| s.library_position);
+                let grp = server_repo::max_library_position_server_group_conn(&snap)?
+                    .and_then(|g| g.library_position);
+                Ok((srv, grp))
+            })
+            .await?;
 
         let next_library_pos = max_server_pos.unwrap_or(0).max(max_group_pos.unwrap_or(0)) + 1;
 
-        let group = self
-            .app
-            .prisma_client
-            .server_group()
-            .create(
-                name,
-                group_count,
-                vec![db::server_group::SetParam::SetLibraryPosition(Some(
-                    next_library_pos,
-                ))],
-            )
-            .exec()
-            .await?;
+        let group_id = server_repo::insert_server_group(
+            &self.app.db,
+            name,
+            group_count,
+            Some(next_library_pos),
+        )
+        .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
 
-        Ok(ServerGroupId(group.id))
+        Ok(ServerGroupId(group_id as i32))
     }
 
     pub async fn create_server_group_at_position(
@@ -3128,62 +2742,48 @@ impl ManagerRef<'_, ServerManager> {
         name: String,
         target_position: i32,
     ) -> anyhow::Result<ServerGroupId> {
-        let group_count = self
-            .app
-            .prisma_client
-            .server_group()
-            .count(vec![])
-            .exec()
-            .await? as i32;
+        let group_count = server_repo::count_server_groups(&self.app.db).await? as i32;
 
         let default_group_id = self.get_default_group().await?;
 
         // Shift all items with library_position >= target_position up by 1
-        self.app
-            .prisma_client
-            .server()
-            .update_many(
-                vec![
-                    db::server::WhereParam::GroupId(IntFilter::Equals(default_group_id.0)),
-                    db::server::WhereParam::LibraryPosition(
-                        db::read_filters::IntNullableFilter::Gte(target_position),
-                    ),
-                ],
-                vec![db::server::SetParam::IncrementLibraryPosition(1)],
-            )
-            .exec()
-            .await?;
-
-        self.app
-            .prisma_client
-            .server_group()
-            .update_many(
-                vec![db::server_group::WhereParam::LibraryPosition(
-                    db::read_filters::IntNullableFilter::Gte(target_position),
-                )],
-                vec![db::server_group::SetParam::IncrementLibraryPosition(1)],
-            )
-            .exec()
-            .await?;
-
-        let group = self
+        // (the server shift is scoped to the default group), then create the
+        // group at the target position.
+        let default_id = default_group_id.0;
+        // Interleaved app logic: shift existing items up then insert the new
+        // group at the freed position. Runs in one writer dispatch, so no other
+        // write interleaves; they run in ONE transaction —
+        // all-or-nothing: a failure rolls the whole group back and readers
+        // never observe an intermediate state. `_conn` forms on the tx guard.
+        let group_id = self
             .app
-            .prisma_client
-            .server_group()
-            .create(
-                name,
-                group_count,
-                vec![db::server_group::SetParam::SetLibraryPosition(Some(
+            .db
+            .write(move |mut conn| {
+                let tx = conn.transaction()?;
+                server_repo::shift_server_library_positions_up_in_group_conn(
+                    &tx,
+                    default_id,
                     target_position,
-                ))],
-            )
-            .exec()
+                )?;
+                server_repo::shift_all_server_group_library_positions_up_from_conn(
+                    &tx,
+                    target_position,
+                )?;
+                let id = server_repo::insert_server_group_conn(
+                    &tx,
+                    &name,
+                    group_count,
+                    Some(target_position),
+                )?;
+                tx.commit()?;
+                Ok(id)
+            })
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
 
-        Ok(ServerGroupId(group.id))
+        Ok(ServerGroupId(group_id as i32))
     }
 
     pub async fn create_folder_from_servers(
@@ -3199,13 +2799,7 @@ impl ManagerRef<'_, ServerManager> {
 
         let target_library_pos = if let Some(target_id) = target_server_id {
             let default_group_id = self.get_default_group().await?;
-            let target_server = self
-                .app
-                .prisma_client
-                .server()
-                .find_unique(db::server::UniqueWhereParam::IdEquals(target_id.0))
-                .exec()
-                .await?;
+            let target_server = server_repo::get_server(&self.app.db, target_id.0).await?;
 
             target_server
                 .filter(|s| s.group_id == default_group_id.0)
@@ -3236,13 +2830,8 @@ impl ManagerRef<'_, ServerManager> {
         let _index_lock = self.index_lock.lock().await;
 
         // Get all servers in default group and sort by name
-        let servers = self
-            .app
-            .prisma_client
-            .server()
-            .find_many(vec![db::server::group_id::equals(default_group_id.0)])
-            .exec()
-            .await?;
+        let default_id = default_group_id.0;
+        let servers = server_repo::get_servers_by_group(&self.app.db, default_id).await?;
 
         let mut sortable_servers: Vec<(i32, String)> =
             servers.iter().map(|s| (s.id, s.name.clone())).collect();
@@ -3250,13 +2839,7 @@ impl ManagerRef<'_, ServerManager> {
 
         // Non-default server groups, sorted by name — rendered after
         // ungrouped servers in the library.
-        let groups = self
-            .app
-            .prisma_client
-            .server_group()
-            .find_many(vec![])
-            .exec()
-            .await?;
+        let groups = server_repo::get_all_server_groups(&self.app.db).await?;
 
         let mut sortable_groups: Vec<(i32, String)> = groups
             .iter()
@@ -3271,39 +2854,34 @@ impl ManagerRef<'_, ServerManager> {
         // `index` leaves drag-reordered rows frozen. Stamp both fields so
         // the new order is visible whether library_position is set or not.
         let mut group_updates = Vec::new();
-        group_updates.push(self.app.prisma_client.server_group().update(
-            db::server_group::UniqueWhereParam::IdEquals(default_group_id.0),
-            vec![db::server_group::group_index::set(0)],
-        ));
+        group_updates.push(server_repo::ServerGroupArrange {
+            id: default_group_id.0,
+            group_index: 0,
+            library_position: None,
+            set_library_position: false,
+        });
         for (i, (group_id, _)) in sortable_groups.iter().enumerate() {
             let p = i as i32;
-            group_updates.push(self.app.prisma_client.server_group().update(
-                db::server_group::UniqueWhereParam::IdEquals(*group_id),
-                vec![
-                    db::server_group::group_index::set((i + 1) as i32),
-                    db::server_group::library_position::set(Some(p)),
-                ],
-            ));
-        }
-        if !group_updates.is_empty() {
-            self.app.prisma_client._batch(group_updates).await?;
+            group_updates.push(server_repo::ServerGroupArrange {
+                id: *group_id,
+                group_index: (i + 1) as i32,
+                library_position: Some(p),
+                set_library_position: true,
+            });
         }
 
         let server_base = sortable_groups.len() as i32;
-        let mut updates = Vec::new();
+        let mut server_updates = Vec::new();
         for (i, (server_id, _)) in sortable_servers.iter().enumerate() {
             let p = server_base + i as i32;
-            updates.push(self.app.prisma_client.server().update(
-                db::server::UniqueWhereParam::IdEquals(*server_id),
-                vec![
-                    db::server::index::set(p),
-                    db::server::library_position::set(Some(p)),
-                ],
-            ));
+            server_updates.push(server_repo::ServerArrange {
+                id: *server_id,
+                index: p,
+                library_position: Some(p),
+            });
         }
-        if !updates.is_empty() {
-            self.app.prisma_client._batch(updates).await?;
-        }
+
+        server_repo::arrange_server_library_tx(&self.app.db, group_updates, server_updates).await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -3316,17 +2894,7 @@ impl ManagerRef<'_, ServerManager> {
         group: ServerGroupId,
         name: String,
     ) -> anyhow::Result<()> {
-        use db::server_group::{SetParam, UniqueWhereParam};
-
-        self.app
-            .prisma_client
-            .server_group()
-            .update(
-                UniqueWhereParam::IdEquals(group.0),
-                vec![SetParam::SetName(name)],
-            )
-            .exec()
-            .await?;
+        server_repo::set_server_group_name(&self.app.db, group.0, &name).await?;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -3335,57 +2903,24 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     pub async fn delete_server_group(self, group: ServerGroupId) -> anyhow::Result<()> {
-        use db::{server, server_group};
-
         let _index_lock = self.index_lock.lock().await;
 
-        let any_servers = self
-            .app
-            .prisma_client
-            .server()
-            .count(vec![server::WhereParam::GroupId(IntFilter::Equals(
-                group.0,
-            ))])
-            .exec()
-            .await?
-            != 0;
+        let group_id = group.0;
+        let any_servers = server_repo::count_servers_in_group(&self.app.db, group_id).await? != 0;
 
         if any_servers {
             let default_group = self.get_default_group().await?;
 
-            let base_index = self
-                .app
-                .prisma_client
-                .server()
-                .count(vec![server::WhereParam::GroupId(IntFilter::Equals(
-                    default_group.0,
-                ))])
-                .exec()
-                .await?;
+            // Server-side oddity (preserved verbatim): base_index counts the
+            // DEFAULT group, not the group being deleted.
+            let default_id = default_group.0;
+            let base_index =
+                server_repo::count_servers_in_group(&self.app.db, default_id).await? as i32;
 
-            self.app
-                .prisma_client
-                ._batch((
-                    self.app.prisma_client.server().update_many(
-                        vec![server::WhereParam::GroupId(IntFilter::Equals(group.0))],
-                        vec![
-                            server::SetParam::SetGroupId(default_group.0),
-                            server::SetParam::IncrementIndex(base_index as i32),
-                        ],
-                    ),
-                    self.app
-                        .prisma_client
-                        .server_group()
-                        .delete(server_group::UniqueWhereParam::IdEquals(group.0)),
-                ))
+            server_repo::delete_server_group_tx(&self.app.db, group_id, default_id, base_index)
                 .await?;
         } else {
-            self.app
-                .prisma_client
-                .server_group()
-                .delete(server_group::UniqueWhereParam::IdEquals(group.0))
-                .exec()
-                .await?;
+            server_repo::delete_server_group(&self.app.db, group_id).await?;
         }
 
         self.app.invalidate(GET_GROUPS, None);

@@ -238,6 +238,16 @@ pub struct ServerAddon {
 /// Launch configuration for modded servers, persisted to modloader_config.json
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LaunchConfig {
+    /// Java argument file to expand at launch (e.g.
+    /// "libraries/net/neoforged/neoforge/21.1.77/unix_args.txt"), relative to
+    /// the data dir. Passed to the JVM as `@<path>`, which is how Forge's and
+    /// NeoForge's own run.sh/run.bat launch a server. The JVM tokenizes the
+    /// file itself, so the module path, main class and game args all come from
+    /// it and none of the other fields are needed.
+    ///
+    /// Takes precedence over `main_class` and `jar_path` when set.
+    #[serde(default)]
+    pub args_file: Option<String>,
     /// Override for server.jar path (e.g. "fabric-server-launch.jar"), relative to data dir
     pub jar_path: Option<String>,
     /// Override main class (Forge/NeoForge use this)
@@ -253,11 +263,20 @@ pub struct LaunchConfig {
 impl LaunchConfig {
     pub fn vanilla() -> Self {
         Self {
+            args_file: None,
             jar_path: None,
             main_class: None,
             classpath: Vec::new(),
             extra_jvm_args: Vec::new(),
             extra_game_args: Vec::new(),
+        }
+    }
+
+    /// Launch via a Forge/NeoForge argument file.
+    pub fn from_args_file(relative_path: String) -> Self {
+        Self {
+            args_file: Some(relative_path),
+            ..Self::vanilla()
         }
     }
 }

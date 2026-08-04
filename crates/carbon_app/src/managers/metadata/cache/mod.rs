@@ -6,13 +6,11 @@ use crate::managers::App;
 use crate::managers::ManagerRef;
 use crate::managers::vtask::VisualTask;
 use anyhow::anyhow;
-use carbon_repos::db::read_filters::BytesFilter;
-use carbon_repos::db::read_filters::IntFilter;
-use carbon_repos::db::read_filters::StringFilter;
-use carbon_repos::db::{
-    mod_file_cache as fcdb, mod_metadata as metadb, server_mod_file_cache as sfcdb,
-};
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::mod_file_cache as mfcdb;
+use carbon_repos::repos::mod_metadata as metarepo;
 use carbon_rt_path::InstancesPath;
+use chrono::Utc;
 use curseforge::CurseforgeModCacher;
 use futures::Future;
 use futures::join;
@@ -830,30 +828,14 @@ impl ManagerRef<'_, MetaCacheManager> {
                 .send_modify(|targets| targets.revoke_target(entity_id)),
         );
 
-        let _ = self
-            .app
-            .prisma_client
-            .mod_file_cache()
-            .delete_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
-                *instance_id,
-            ))])
-            .exec()
-            .await;
+        let instance_id_val = *instance_id;
+        let _ = mfcdb::delete_mod_file_cache_by_instance(&self.app.db, instance_id_val).await;
 
         self.gc_mod_metadata().await;
     }
 
     pub async fn gc_mod_metadata(self) {
-        let _ = self
-            .app
-            .prisma_client
-            .mod_metadata()
-            .delete_many(vec![
-                metadb::WhereParam::CachedFilesNone(Vec::new()),
-                metadb::WhereParam::ServerCachedFilesNone(Vec::new()),
-            ])
-            .exec()
-            .await;
+        let _ = metarepo::gc_orphan_metadata(&self.app.db).await;
     }
 
     // this will need further refactoring. left for later.
@@ -1254,23 +1236,19 @@ impl ManagerRef<'_, MetaCacheManager> {
         result: &ModFileParseResult,
         mod_filename: &str,
     ) -> anyhow::Result<String> {
-        let dbmeta = self
-            .app
-            .prisma_client
-            .mod_metadata()
-            .find_first(vec![
-                metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(result.sha512))),
-                metadb::WhereParam::Murmur2(IntFilter::Equals(result.murmur2 as i32)),
-            ])
-            .exec()
-            .await?;
+        let sha512 = Vec::from(result.sha512);
+        let murmur2 = result.murmur2 as i32;
 
-        let (meta_id, meta_insert, logo_insert) = match dbmeta {
-            Some(meta) => (meta.id, None, None),
+        let dbmeta = metarepo::find_metadata_by_hashes(&self.app.db, &sha512, murmur2).await?;
+
+        let meta_id = match dbmeta {
+            Some(meta) => meta.id,
             None => {
                 let meta_id = Uuid::new_v4().to_string();
 
-                let logo_insert = match &result.image_data {
+                // Scale the icon (if any) before touching the database — the
+                // insert runs on the writer thread and cannot await.
+                let logo_data: Option<Vec<u8>> = match &result.image_data {
                     Some(image_data) => {
                         let permit = self
                             .image_scale_semaphore
@@ -1288,14 +1266,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                         drop(permit);
 
                         match logo {
-                            Ok(Some(data)) => {
-                                Some(self.app.prisma_client.local_mod_image_cache().create(
-                                    data,
-                                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                                    Vec::new(),
-                                ))
-                            }
-                            Ok(None) => None,
+                            Ok(scaled) => scaled,
                             Err(e) => {
                                 error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
                                 None
@@ -1305,46 +1276,59 @@ impl ManagerRef<'_, MetaCacheManager> {
                     None => None,
                 };
 
-                let meta_insert = self.app.prisma_client.mod_metadata().create(
-                    meta_id.clone(),
-                    result.murmur2 as i32,
-                    Vec::from(result.sha512),
-                    Vec::from(result.sha1),
-                    result
-                        .meta
-                        .as_ref()
-                        .map(|meta| &meta.modloaders)
-                        .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
-                        .unwrap_or(String::new()),
-                    match &result.meta {
-                        Some(meta) => vec![
-                            metadb::SetParam::SetName(meta.name.clone()),
-                            metadb::SetParam::SetModid(meta.modid.clone()),
-                            metadb::SetParam::SetVersion(meta.version.clone()),
-                            metadb::SetParam::SetDescription(meta.description.clone()),
-                            metadb::SetParam::SetAuthors(meta.authors.clone()),
-                        ],
-                        None => vec![
-                            metadb::SetParam::SetName(None),
-                            metadb::SetParam::SetModid(None),
-                            metadb::SetParam::SetVersion(None),
-                            metadb::SetParam::SetDescription(None),
-                            metadb::SetParam::SetAuthors(None),
-                        ],
-                    },
-                );
+                let sha1 = Vec::from(result.sha1);
+                let modloaders = result
+                    .meta
+                    .as_ref()
+                    .map(|meta| &meta.modloaders)
+                    .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
+                    .unwrap_or(String::new());
+                let (name, modid, version, description, authors) = match &result.meta {
+                    Some(meta) => (
+                        meta.name.clone(),
+                        meta.modid.clone(),
+                        meta.version.clone(),
+                        meta.description.clone(),
+                        meta.authors.clone(),
+                    ),
+                    None => (None, None, None, None, None),
+                };
 
-                (meta_id, Some(meta_insert), logo_insert)
+                let meta_id_owned = meta_id.clone();
+                // Interleaved app logic: insert the metadata row and, only when
+                // a logo was scaled, its local image. Runs in one writer
+                // dispatch, so no other write interleaves; they run in ONE transaction —
+                // all-or-nothing: a failure rolls the whole group back and readers
+                // never observe an intermediate state. `_conn` forms on the tx guard.
+                self.app
+                    .db
+                    .write(move |mut conn| {
+                        let tx = conn.transaction()?;
+                        metarepo::insert_metadata_conn(
+                            &tx,
+                            &meta_id_owned,
+                            murmur2,
+                            &sha512,
+                            &sha1,
+                            &modloaders,
+                            name.as_deref(),
+                            modid.as_deref(),
+                            version.as_deref(),
+                            description.as_deref(),
+                            authors.as_deref(),
+                            DbDateTime(Utc::now().fixed_offset()),
+                        )?;
+                        if let Some(data) = logo_data {
+                            metarepo::insert_local_image_conn(&tx, &meta_id_owned, &data)?;
+                        }
+                        tx.commit()?;
+                        Ok(())
+                    })
+                    .await?;
+
+                meta_id
             }
         };
-
-        if let Some(meta_insert) = meta_insert {
-            meta_insert.exec().await?;
-        }
-
-        if let Some(logo_insert) = logo_insert {
-            logo_insert.exec().await?;
-        }
 
         Ok(meta_id)
     }
@@ -1370,31 +1354,22 @@ impl ManagerRef<'_, MetaCacheManager> {
         };
         let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
 
-        self.app
-            .prisma_client
-            .mod_file_cache()
-            .upsert(
-                fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                    *instance_id,
-                    mod_filename.to_string(),
-                ),
-                fcdb::create(
-                    carbon_repos::db::instance::UniqueWhereParam::IdEquals(*instance_id),
-                    mod_filename.to_string(),
-                    result.content_len as i32,
-                    enabled,
-                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                    vec![fcdb::SetParam::SetAddonType(addon_type.clone())],
-                ),
-                vec![
-                    fcdb::SetParam::SetFilesize(result.content_len as i32),
-                    fcdb::SetParam::SetEnabled(enabled),
-                    fcdb::SetParam::SetMetadataId(meta_id.clone()),
-                    fcdb::SetParam::SetAddonType(addon_type),
-                ],
-            )
-            .exec()
-            .await?;
+        let instance_id_val = *instance_id;
+        let filename_owned = mod_filename.to_string();
+        let filesize = result.content_len as i32;
+        let addon_type_owned = addon_type.clone();
+        let meta_id_owned = meta_id.clone();
+        mfcdb::upsert_mod_file_cache(
+            &self.app.db,
+            instance_id_val,
+            filename_owned,
+            filesize,
+            enabled,
+            addon_type_owned,
+            meta_id_owned,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
 
         Ok(meta_id)
     }
@@ -1413,33 +1388,21 @@ impl ManagerRef<'_, MetaCacheManager> {
             .await?;
         let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
 
-        self.app
-            .prisma_client
-            .server_mod_file_cache()
-            .upsert(
-                sfcdb::UniqueWhereParam::ServerIdFilenameEquals(
-                    server_id,
-                    mod_filename.to_string(),
-                ),
-                sfcdb::create(
-                    carbon_repos::db::server::UniqueWhereParam::IdEquals(server_id),
-                    mod_filename.to_string(),
-                    result.content_len as i32,
-                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                    vec![
-                        sfcdb::SetParam::SetEnabled(enabled),
-                        sfcdb::SetParam::SetAddonType(addon_type.clone()),
-                    ],
-                ),
-                vec![
-                    sfcdb::SetParam::SetFilesize(result.content_len as i32),
-                    sfcdb::SetParam::SetEnabled(enabled),
-                    sfcdb::SetParam::SetMetadataId(meta_id.clone()),
-                    sfcdb::SetParam::SetAddonType(addon_type),
-                ],
-            )
-            .exec()
-            .await?;
+        let filename_owned = mod_filename.to_string();
+        let filesize = result.content_len as i32;
+        let addon_type_owned = addon_type.clone();
+        let meta_id_owned = meta_id.clone();
+        mfcdb::upsert_server_mod_file_cache(
+            &self.app.db,
+            server_id,
+            filename_owned,
+            filesize,
+            enabled,
+            addon_type_owned,
+            meta_id_owned,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
 
         Ok(meta_id)
     }
@@ -1455,13 +1418,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         let server_path = runtime_path.get_servers().get_server_path(server_shortpath);
 
         // Get existing cache entries
-        let cached = self
-            .app
-            .prisma_client
-            .server_mod_file_cache()
-            .find_many(vec![sfcdb::server_id::equals(server_id)])
-            .exec()
-            .await?;
+        let cached = mfcdb::get_server_mod_files_by_server(&self.app.db, server_id).await?;
 
         let cached_map: HashMap<String, (i32, bool)> = cached
             .iter()
@@ -1507,13 +1464,8 @@ impl ManagerRef<'_, MetaCacheManager> {
             .collect();
 
         for entry in &stale {
-            let _ = self
-                .app
-                .prisma_client
-                .server_mod_file_cache()
-                .delete(sfcdb::UniqueWhereParam::IdEquals(entry.id.clone()))
-                .exec()
-                .await;
+            let entry_id = entry.id.clone();
+            let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &entry_id).await;
         }
 
         // Cache new/changed files
@@ -1621,13 +1573,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
         let cache_instance = |instance_id: InstanceId| async move {
             let app2 = app.clone();
             let cached_entries = tokio::spawn(async move {
-                app2.prisma_client
-                    .mod_file_cache()
-                    .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
-                        *instance_id,
-                    ))])
-                    .exec()
-                    .await
+                let instance_id_val = *instance_id;
+                mfcdb::get_mod_files_by_instance(&app2.db, instance_id_val).await
             });
 
             let instance_manager = app.instance_manager();
@@ -1783,14 +1730,13 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             continue;
                         }
                     } else {
-                        app.prisma_client
-                            .mod_file_cache()
-                            .delete(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                                *instance_id,
-                                entry.filename,
-                            ))
-                            .exec()
-                            .await?;
+                        let instance_id_val = *instance_id;
+                        mfcdb::delete_mod_file_cache_by_instance_filename(
+                            &app.db,
+                            instance_id_val,
+                            &entry.filename,
+                        )
+                        .await?;
                     }
 
                     has_outdated_entries = true;
@@ -1931,12 +1877,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                                 cache_instance(instance_id).await
                             }
                             CacheEntityId::Server(server_id) => {
-                                let db_server = app.prisma_client
-                                    .server()
-                                    .find_unique(carbon_repos::db::server::UniqueWhereParam::IdEquals(server_id))
-                                    .exec()
-                                    .await
-                                    .map_err(anyhow::Error::from)?
+                                let db_server = carbon_repos::repos::server::get_server(&app.db, server_id)
+                                    .await?
                                     .ok_or_else(|| anyhow!("Server {} not found", server_id))?;
                                 app.meta_cache_manager()
                                     .cache_server_local(server_id, &db_server.shortpath)

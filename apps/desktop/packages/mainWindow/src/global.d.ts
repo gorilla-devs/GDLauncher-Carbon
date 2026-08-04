@@ -25,7 +25,11 @@ interface CheckForUpdatesResult {
 
 declare global {
   interface Window {
-    fatalError: (error: string | Log[], moduleName?: string) => void
+    fatalError: (
+      error: string | Log[],
+      moduleName?: string,
+      snapshotPath?: string
+    ) => void
     backwardsMigrationError: () => void
     ipcRenderer: import("electron").IpcRenderer
     report: any
@@ -65,6 +69,7 @@ declare global {
       | {
           type: "error"
           logs: Log[]
+          snapshotPath?: string
         }
       | {
           type: "backwardsMigration"

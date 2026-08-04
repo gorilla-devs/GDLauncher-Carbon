@@ -317,7 +317,7 @@
   "_trn_share_errors.instance_too_large": "La instancia es demasiado grande para compartir",
   "_trn_share_errors.too_large_detail": "Esta instancia ocupa {{size}}, pero los compartidos están limitados a {{limit}}.",
   "_trn_share_errors.too_large_folders": "Carpetas más grandes",
-  "_trn_share_errors.too_large_hint": "Elimina lo que no necesites compartir — los paquetes de recursos, los paquetes de shaders y los mundos suelen ser los más grandes.",
+  "_trn_share_errors.too_large_hint": "Elimina lo que no necesites compartir: los paquetes de recursos, los paquetes de shaders y los mundos suelen ser los más grandes.",
   "_trn_share_errors.background_rejected": "El icono de tu instancia fue rechazado por la moderación de contenido. Elige un icono diferente e inténtalo de nuevo.",
   "_trn_share_errors.background_moderation_unavailable": "La moderación de contenido no está disponible temporalmente. Inténtalo de nuevo en un minuto.",
   "_trn_share_errors.background_rate_limited": "Has subido demasiadas imágenes recientemente. Espera un poco antes de intentarlo de nuevo.",

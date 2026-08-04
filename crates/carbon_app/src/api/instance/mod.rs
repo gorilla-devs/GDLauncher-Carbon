@@ -300,7 +300,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             };
 
             let memory_check_dismissed = crate::api::settings::is_memory_warning_dismissed(
-                &app.prisma_client,
+                &app.db,
             ).await.unwrap_or(false);
 
             if !args.skip_memory_check && !memory_check_dismissed {

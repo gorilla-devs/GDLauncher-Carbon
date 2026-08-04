@@ -134,9 +134,14 @@ pub async fn process_curseforge_server_pack(
         .context("Failed to create temp directory")?;
     let zip_path = temp_dir.join(&file_info.data.file_name);
 
-    let response = app
-        .reqwest_client
-        .get(download_url)
+    let mut request = app.reqwest_client.get(download_url);
+    // CurseForge rejects unauthenticated CDN downloads; this fetch streams directly
+    // instead of going through carbon_net's downloader, so attach the key here too.
+    if let Some(api_key) = carbon_net::curseforge_cdn_auth(download_url) {
+        request = request.header("x-api-key", api_key);
+    }
+
+    let response = request
         .send()
         .await
         .context("Failed to download server pack")?;
@@ -643,43 +648,93 @@ async fn detect_game_version_from_files(_data_path: &Path, cf_game_versions: &[S
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Detect modloader type from extracted server pack files.
+/// Read the newest loader version directory under `libraries/<vendor_path>/`.
+///
+/// Modern Forge (1.17+) and every NeoForge version install into a Maven-style
+/// tree with the loader version as the leaf directory
+/// (`libraries/net/neoforged/neoforge/21.1.77/`), and ship no versioned jar at
+/// the data root at all. Server packs distributed pre-installed therefore have
+/// to be recognised from this path.
+async fn loader_version_from_libraries(data_path: &Path, vendor_path: &str) -> Option<String> {
+    let vendor_dir = vendor_path
+        .split('/')
+        .fold(data_path.join("libraries"), |acc, segment| {
+            acc.join(segment)
+        });
+
+    let mut versions: Vec<String> = Vec::new();
+    let mut entries = tokio::fs::read_dir(&vendor_dir).await.ok()?;
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        if !entry.path().is_dir() {
+            continue;
+        }
+        if let Some(version) = entry.file_name().to_str() {
+            versions.push(version.to_string());
+        }
+    }
+
+    versions.sort();
+    versions.pop()
+}
+
+/// Extract the loader version from a root-level jar such as
+/// `neoforge-21.1.77-installer.jar` or `forge-1.20.1-47.4.10-universal.jar`.
+fn loader_version_from_jar_name(name: &str, prefix: &str) -> Option<String> {
+    let rest = name.strip_prefix(prefix)?.strip_suffix(".jar")?;
+    // Installer/universal/shim jars all encode the same version; strip the role
+    // suffix so we are left with something the installer URLs accept.
+    let rest = ["-installer", "-universal", "-shim", "-server"]
+        .iter()
+        .find_map(|suffix| rest.strip_suffix(suffix))
+        .unwrap_or(rest);
+
+    (!rest.is_empty()).then(|| rest.to_string())
+}
+
+/// Detect modloader type and version from extracted server pack files.
+///
+/// Handles both shapes a server pack arrives in: already installed (the loader
+/// unpacked under `libraries/`, or a self-contained Fabric/Quilt launcher jar),
+/// and bare (only the installer jar shipped at the root).
 async fn detect_modloader_from_files(data_path: &Path) -> (Option<String>, Option<String>) {
-    let fabric_jar = data_path.join("fabric-server-launch.jar");
-    if fabric_jar.exists() {
+    // Pre-installed Forge/NeoForge — check before the root-jar scan, since these
+    // packs frequently ship no versioned jar at the root whatsoever.
+    if let Some(version) = loader_version_from_libraries(data_path, "net/neoforged/neoforge").await
+    {
+        return (Some("neoforge".to_string()), Some(version));
+    }
+
+    if let Some(version) =
+        loader_version_from_libraries(data_path, "net/minecraftforge/forge").await
+    {
+        return (Some("forge".to_string()), Some(version));
+    }
+
+    // Fabric and Quilt ship a self-contained launcher jar with no version in the
+    // name. The loader is already installed, so a missing version is fine here.
+    if data_path.join("fabric-server-launch.jar").exists() {
         return (Some("fabric".to_string()), None);
     }
 
-    if let Ok(mut entries) = tokio::fs::read_dir(data_path).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("neoforge-") && name.ends_with(".jar") {
-                let version = name
-                    .strip_prefix("neoforge-")
-                    .and_then(|s| s.strip_suffix(".jar"))
-                    .map(|s| s.to_string());
-                return (Some("neoforge".to_string()), version);
-            }
-        }
-    }
-
-    if let Ok(mut entries) = tokio::fs::read_dir(data_path).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("forge-") && name.ends_with(".jar") {
-                let version = name
-                    .strip_prefix("forge-")
-                    .and_then(|s| s.strip_suffix(".jar"))
-                    .map(|s| s.strip_suffix("-installer").unwrap_or(s))
-                    .map(|s| s.to_string());
-                return (Some("forge".to_string()), version);
-            }
-        }
-    }
-
-    let quilt_jar = data_path.join("quilt-server-launch.jar");
-    if quilt_jar.exists() {
+    if data_path.join("quilt-server-launch.jar").exists() {
         return (Some("quilt".to_string()), None);
+    }
+
+    // Bare pack: the loader still has to be installed from a root-level jar.
+    if let Ok(mut entries) = tokio::fs::read_dir(data_path).await {
+        let mut forge_version = None;
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if let Some(version) = loader_version_from_jar_name(&name, "neoforge-") {
+                return (Some("neoforge".to_string()), Some(version));
+            }
+            if forge_version.is_none() {
+                forge_version = loader_version_from_jar_name(&name, "forge-");
+            }
+        }
+        if let Some(version) = forge_version {
+            return (Some("forge".to_string()), Some(version));
+        }
     }
 
     (None, None)
@@ -734,6 +789,125 @@ mod tests {
         assert!(!is_save_path("dim"));
         // Non-DIM names that happen to start with d/i/m are not saves
         assert!(!is_save_path("dimension-config"));
+    }
+
+    /// Layout produced by `neoforge-<ver>-installer.jar --installServer`, which
+    /// is what a pre-installed NeoForge server pack contains: libraries tree,
+    /// run scripts, and no versioned jar at the data root.
+    fn write_preinstalled_neoforge(data_path: &Path, version: &str) {
+        let loader_dir = data_path
+            .join("libraries/net/neoforged/neoforge")
+            .join(version);
+        std::fs::create_dir_all(&loader_dir).unwrap();
+        std::fs::write(loader_dir.join("unix_args.txt"), "-p libraries/foo.jar").unwrap();
+        std::fs::write(loader_dir.join("win_args.txt"), "-p libraries/foo.jar").unwrap();
+        std::fs::write(data_path.join("run.sh"), "#!/bin/sh").unwrap();
+        std::fs::write(data_path.join("user_jvm_args.txt"), "-Xmx4G").unwrap();
+        std::fs::create_dir_all(data_path.join("mods")).unwrap();
+    }
+
+    #[tokio::test]
+    async fn detects_preinstalled_neoforge_server_pack() {
+        // Regression: NeoForge server packs ship no `neoforge-*.jar` at the
+        // root, so filename sniffing reported them as vanilla. The server then
+        // booted vanilla and modded clients were rejected with "you are trying
+        // to connect to a server that is not running NeoForge".
+        let dir = tempfile::tempdir().unwrap();
+        write_preinstalled_neoforge(dir.path(), "21.1.77");
+
+        let (loader, version) = detect_modloader_from_files(dir.path()).await;
+
+        assert_eq!(loader.as_deref(), Some("neoforge"));
+        assert_eq!(version.as_deref(), Some("21.1.77"));
+    }
+
+    #[tokio::test]
+    async fn detects_preinstalled_forge_server_pack() {
+        let dir = tempfile::tempdir().unwrap();
+        let loader_dir = dir
+            .path()
+            .join("libraries/net/minecraftforge/forge/1.20.1-47.4.10");
+        std::fs::create_dir_all(&loader_dir).unwrap();
+        std::fs::write(loader_dir.join("unix_args.txt"), "-p libraries/foo.jar").unwrap();
+
+        let (loader, version) = detect_modloader_from_files(dir.path()).await;
+
+        assert_eq!(loader.as_deref(), Some("forge"));
+        assert_eq!(version.as_deref(), Some("1.20.1-47.4.10"));
+    }
+
+    #[tokio::test]
+    async fn detects_bare_neoforge_installer_jar() {
+        // Some packs ship only the installer and expect it to be run.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("neoforge-21.1.77-installer.jar"), b"jar").unwrap();
+
+        let (loader, version) = detect_modloader_from_files(dir.path()).await;
+
+        assert_eq!(loader.as_deref(), Some("neoforge"));
+        // The `-installer` suffix must not leak into the version, or the maven
+        // URL built from it 404s.
+        assert_eq!(version.as_deref(), Some("21.1.77"));
+    }
+
+    #[tokio::test]
+    async fn detects_fabric_and_quilt_launcher_jars() {
+        let fabric = tempfile::tempdir().unwrap();
+        std::fs::write(fabric.path().join("fabric-server-launch.jar"), b"jar").unwrap();
+        assert_eq!(
+            detect_modloader_from_files(fabric.path())
+                .await
+                .0
+                .as_deref(),
+            Some("fabric")
+        );
+
+        let quilt = tempfile::tempdir().unwrap();
+        std::fs::write(quilt.path().join("quilt-server-launch.jar"), b"jar").unwrap();
+        assert_eq!(
+            detect_modloader_from_files(quilt.path()).await.0.as_deref(),
+            Some("quilt")
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_no_modloader_for_a_vanilla_server_pack() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("server.jar"), b"jar").unwrap();
+        std::fs::create_dir_all(dir.path().join("world")).unwrap();
+
+        let (loader, version) = detect_modloader_from_files(dir.path()).await;
+
+        assert_eq!(loader, None);
+        assert_eq!(version, None);
+    }
+
+    #[test]
+    fn jar_name_version_strips_role_suffixes() {
+        let cases = [
+            ("neoforge-21.1.77.jar", "neoforge-", "21.1.77"),
+            ("neoforge-21.1.77-installer.jar", "neoforge-", "21.1.77"),
+            (
+                "forge-1.20.1-47.4.10-universal.jar",
+                "forge-",
+                "1.20.1-47.4.10",
+            ),
+            ("forge-1.20.1-47.4.10-shim.jar", "forge-", "1.20.1-47.4.10"),
+        ];
+
+        for (name, prefix, expected) in cases {
+            assert_eq!(
+                loader_version_from_jar_name(name, prefix).as_deref(),
+                Some(expected),
+                "parsing {name}"
+            );
+        }
+
+        // A NeoForge jar must not be mistaken for a Forge one.
+        assert_eq!(
+            loader_version_from_jar_name("neoforge-21.1.77.jar", "forge-"),
+            None
+        );
     }
 
     #[test]

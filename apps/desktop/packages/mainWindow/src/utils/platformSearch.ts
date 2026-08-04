@@ -671,7 +671,44 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     )
   })
 
+  // Which addon types make sense for whatever the search is adding to.
+  //
+  // Servers only ever consume mods and datapacks — `listServerAddons` scans
+  // exactly those two directories, and every install path writes into `mods/`,
+  // so offering shaders or resource packs here would drop them into the
+  // server's mods folder. Modpacks are excluded for instances and servers
+  // alike: picking one from an "add addons" browse creates a whole new
+  // instance/server rather than adding anything to the current one.
+  const allowedAddonTypes = createMemo<FEUnifiedSearchType[]>(() => {
+    if (selectedServerId()) {
+      // A server with no modloader can still run datapacks, but not mods.
+      return selectedServer.data?.modloaderType
+        ? ["mod", "datapack"]
+        : ["datapack"]
+    }
+
+    if (selectedInstanceId()) {
+      const types: FEUnifiedSearchType[] = []
+      if ((selectedInstance.data?.modloaders?.length ?? 0) > 0) {
+        types.push("mod")
+      }
+      return [...types, "shader", "resourcePack", "datapack", "world"]
+    }
+
+    return ["modpack", "mod", "shader", "resourcePack", "datapack", "world"]
+  })
+
+  // The type to land on when entering the browser without an explicit one.
+  const defaultAddonType = createMemo<FEUnifiedSearchType>(() => {
+    const allowed = allowedAddonTypes()
+    // Standalone browsing opens on modpacks; an add-to-target browse opens on
+    // mods when the target can take them.
+    return allowed[0]
+  })
+
   return {
+    allowedAddonTypes,
+    defaultAddonType,
     allRows,
     isLoading,
     isInitialLoading,

@@ -1,8 +1,11 @@
 use super::META_VERSION;
 use crate::managers::java::utils::PATH_SEPARATOR;
 use anyhow::{Context, bail};
-use carbon_repos::{db::PrismaClient, pcr::QueryError};
+use carbon_repos::dbtypes::DbDateTime;
+use carbon_repos::repos::version_meta;
+use carbon_repos::{db_error::DbError, db_exec::Db};
 use carbon_rt_path::{InstancePath, LibrariesPath};
+use chrono::Utc;
 use daedalus::{
     GradleSpecifier,
     modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry},
@@ -11,7 +14,6 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    sync::Arc,
 };
 use thiserror::Error;
 use tokio::{process::Command, sync::Mutex};
@@ -23,7 +25,7 @@ pub enum NeoForgeManifestError {
     #[error("Could not fetch neoforge manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Manifest database query error: {0}")]
-    DBQueryError(#[from] QueryError),
+    DBQueryError(#[from] DbError),
 }
 
 pub async fn get_manifest(
@@ -43,7 +45,7 @@ pub async fn get_manifest(
 }
 
 pub async fn get_version(
-    db_client: Arc<PrismaClient>,
+    db: &Db,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     neoforge_version: &str,
     meta_base_url: &Url,
@@ -89,23 +91,13 @@ pub async fn get_version(
                 )
             })?;
 
-        db_client
-            .partial_version_info_cache()
-            .upsert(
-                carbon_repos::db::partial_version_info_cache::id::equals(db_entry_name.clone()),
-                carbon_repos::db::partial_version_info_cache::create(
-                    db_entry_name.clone(),
-                    version_bytes.to_vec(),
-                    vec![],
-                ),
-                vec![
-                    carbon_repos::db::partial_version_info_cache::partial_version_info::set(
-                        version_bytes.to_vec(),
-                    ),
-                ],
-            )
-            .exec()
-            .await?;
+        version_meta::upsert_partial_version_info(
+            db,
+            &db_entry_name,
+            &version_bytes,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
 
         Ok(parsed)
     };
@@ -113,12 +105,7 @@ pub async fn get_version(
     match update_cache().await {
         Ok(parsed) => Ok(parsed),
         Err(err) => {
-            let db_cache = db_client
-                .partial_version_info_cache()
-                .find_unique(carbon_repos::db::partial_version_info_cache::id::equals(
-                    db_entry_name.clone(),
-                ))
-                .exec()
+            let db_cache = version_meta::get_partial_version_info(db, &db_entry_name)
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 

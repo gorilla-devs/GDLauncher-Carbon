@@ -5,7 +5,7 @@ use crate::{
 };
 use anyhow::Context;
 use carbon_net::{DownloadOptions, Downloadable, Progress};
-use carbon_repos::db::PrismaClient;
+use carbon_repos::db_exec::Db;
 use carbon_rt_path::{ManagedJavasPath, TempPath};
 use serde::Deserialize;
 use std::{
@@ -27,14 +27,14 @@ pub struct AzulZulu {
 
 #[async_trait::async_trait]
 impl Managed for AzulZulu {
-    #[instrument(skip(self, java_checker, db_client, progress_report))]
+    #[instrument(skip(self, java_checker, db, progress_report))]
     async fn setup<G: JavaChecker + Send + Sync>(
         &self,
         version: &ManagedJavaVersion,
         tmp_path: TempPath,
         base_managed_java_path: ManagedJavasPath,
         java_checker: &G,
-        db_client: &Arc<PrismaClient>,
+        db: &Db,
         progress_report: Sender<Step>,
     ) -> anyhow::Result<String> {
         let progress_report = Arc::new(progress_report);
@@ -96,7 +96,7 @@ impl Managed for AzulZulu {
 
             let progress_report_clone = progress_report.clone();
             let version_name = version.name.clone();
-            let main_binary_path = spawn_blocking(move || {
+            let (main_binary_path, install_root) = spawn_blocking(move || {
                 let total_archive_files = archive.len() as u64;
 
                 let root_dir = {
@@ -132,6 +132,16 @@ impl Managed for AzulZulu {
                     base_managed_java_path.to_path().join(removed_extension)
                 };
 
+                // Directory to wipe if this install turns out unusable. Always a
+                // per-install subdirectory (base/<root_dir> in the single-root case,
+                // where java_managed_path is the managed-javas root itself), never
+                // the managed-javas root, so cleanup can't take out other JREs.
+                let install_root = if is_single_root_dir {
+                    java_managed_path.join(&root_dir)
+                } else {
+                    java_managed_path.clone()
+                };
+
                 std::fs::create_dir_all(&java_managed_path).with_context(|| {
                     format!("Could not create directory: {:?}", &java_managed_path)
                 })?;
@@ -144,6 +154,18 @@ impl Managed for AzulZulu {
                         Some(path) => Path::new(&java_managed_path).join(path),
                         None => continue,
                     };
+
+                    // Skip symlink entries. The JRE zip ships convenience aliases
+                    // (e.g. bin -> zulu-.../Contents/Home/bin) as symlinks whose body
+                    // is just the target-path text; writing that as a regular file
+                    // corrupts the tree. The real bin/java is a regular file, so this
+                    // must run before main-binary detection to avoid selecting a link.
+                    if file
+                        .unix_mode()
+                        .is_some_and(|mode| mode & 0o170000 == 0o120000)
+                    {
+                        continue;
+                    }
 
                     if (*file.name()).ends_with("bin/java")
                         || (*file.name()).ends_with("bin/java.exe")
@@ -201,13 +223,16 @@ impl Managed for AzulZulu {
                     progress_report_clone.send(Step::Extracting(i as u64, total_archive_files))?;
                 }
 
-                main_binary_path.ok_or_else(|| anyhow::anyhow!("No main binary found"))
+                let main_binary_path =
+                    main_binary_path.ok_or_else(|| anyhow::anyhow!("No main binary found"))?;
+
+                Ok::<_, anyhow::Error>((main_binary_path, install_root))
             })
             .await??;
 
             progress_report.send(Step::Done)?;
 
-            Ok::<_, anyhow::Error>(main_binary_path)
+            Ok::<_, anyhow::Error>((main_binary_path, install_root))
         };
 
         let delete = std::fs::remove_file(&downloadable.path);
@@ -216,28 +241,43 @@ impl Managed for AzulZulu {
             tracing::warn!("Could not delete downloaded file: {}", e);
         }
 
-        let main_binary_path = {
-            let tmp = result?;
-            match dunce::canonicalize(&tmp) {
-                Ok(p) => p,
-                Err(_) => tmp,
-            }
+        let (main_binary_path, install_root) = result?;
+        let main_binary_path = match dunce::canonicalize(&main_binary_path) {
+            Ok(p) => p,
+            Err(_) => main_binary_path,
         };
 
-        let java_component = java_checker
+        let java_component = match java_checker
             .get_bin_info(
                 &main_binary_path,
                 crate::domain::java::JavaComponentType::Managed,
             )
             .await
-            .with_context(|| {
-                format!(
-                    "Could not get bin info for main binary: {:?}",
-                    &main_binary_path
-                )
-            })?;
+        {
+            Ok(component) => component,
+            Err(e) => {
+                // A partially or incorrectly extracted JRE would otherwise persist and
+                // fail every launch — the size-based skip in the extraction loop never
+                // re-writes an existing same-size file, so it can't self-heal. Remove
+                // the install directory to force a clean re-download on the next try.
+                if let Err(rm) = std::fs::remove_dir_all(&install_root) {
+                    tracing::warn!(
+                        "Could not clean up unusable managed JRE at {:?}: {}",
+                        install_root,
+                        rm
+                    );
+                }
 
-        let java_id = upsert_java_component_to_db(db_client, java_component).await?;
+                return Err(e).with_context(|| {
+                    format!(
+                        "Could not get bin info for main binary: {:?}",
+                        &main_binary_path
+                    )
+                });
+            }
+        };
+
+        let java_id = upsert_java_component_to_db(db, java_component).await?;
 
         Ok(java_id)
     }

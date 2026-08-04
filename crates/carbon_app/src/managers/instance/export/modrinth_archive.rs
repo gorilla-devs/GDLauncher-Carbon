@@ -21,7 +21,7 @@ use carbon_platforms::modrinth::version::{
 use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
 
-use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use carbon_repos::repos::mod_file_cache as mfcdb;
 
 use super::ZipMode;
 
@@ -104,34 +104,22 @@ pub async fn export_modrinth(
                         .override_caching_and_wait(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), false, true)
                         .await?;
 
-                    let mods2 = app
-                        .prisma_client
-                        .mod_file_cache()
-                        .find_many(vec![fcdb::instance_id::equals(*instance_id)])
-                        .with(fcdb::metadata::fetch().with(metadb::modrinth::fetch()))
-                        .exec()
-                        .await?
-                        .into_iter()
-                        .filter_map(|m| {
-                            let Some(metadata) = m.metadata else {
-                                return None;
-                            };
+                    let instance_id_val = *instance_id;
+                    let cached =
+                        mfcdb::get_instance_mr_export_files(&app.db, instance_id_val).await?;
 
-                            let Some(Some(modrinth)) = metadata.modrinth else {
-                                return None;
-                            };
+                    let mods2 = cached.into_iter().filter_map(|row| {
+                        let Some(file_url) = row.mr_file_url else {
+                            return None;
+                        };
 
-                            match mods_filter.remove(&m.filename) {
-                                Some(_) => Some((
-                                    m.filename.clone(),
-                                    m.filesize,
-                                    metadata.sha_512,
-                                    metadata.sha_1,
-                                    modrinth.file_url,
-                                )),
-                                None => None,
+                        match mods_filter.remove(&row.filename) {
+                            Some(_) => {
+                                Some((row.filename, row.filesize, row.sha512, row.sha1, file_url))
                             }
-                        });
+                            None => None,
+                        }
+                    });
 
                     mods.extend(mods2);
                 }
