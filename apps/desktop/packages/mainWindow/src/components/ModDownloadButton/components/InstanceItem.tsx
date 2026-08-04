@@ -64,7 +64,7 @@ export const InstanceItem = (props: InstanceItemProps) => {
                 props.isInstalled && !props.isLoading && !props.instance.locked
               }
             >
-              <span class="ml-1 text-green-400">
+              <span class="ml-1 text-green-400 whitespace-nowrap">
                 <Trans key="instances:_trn_status_installed" />
               </span>
             </Show>

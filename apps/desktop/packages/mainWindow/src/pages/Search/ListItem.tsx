@@ -133,7 +133,7 @@ export function ListItem(props: SearchResultItemProps) {
               >
                 <Switch>
                   <Match when={props.isInstalled}>
-                    <div class="flex items-center gap-2 text-xl font-bold text-green-500">
+                    <div class="flex items-center gap-2 text-xl font-bold text-green-500 whitespace-nowrap">
                       <div class="i-hugeicons:tick-02 text-xl" />
                       <Trans key="instances:_trn_status_installed" />
                     </div>

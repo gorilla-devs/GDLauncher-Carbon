@@ -115,45 +115,45 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger>
-        <div class="relative">
-          <Button
-            disabled={loading()}
-            size={props.size || "medium"}
-            onClick={handleDownload}
-            class={
-              props.splitPosition === "left"
-                ? "!rounded-r-none"
-                : props.splitPosition === "right"
-                  ? "!rounded-l-none"
-                  : ""
-            }
-          >
-            <Show when={loading()}>
-              <Spinner />
+  <Tooltip>
+    <TooltipTrigger>
+      <div class="relative">
+        <Button
+          disabled={loading()}
+          size={props.size || "medium"}
+          onClick={handleDownload}
+          class={`!h-auto !py-2 ${
+            props.splitPosition === "left"
+              ? "!rounded-r-none"
+              : props.splitPosition === "right"
+                ? "!rounded-l-none"
+                : ""
+          }`}
+        >
+          <Show when={loading()}>
+            <Spinner />
+          </Show>
+          <Show when={!loading()}>
+            <Show
+              when={props.iconOnly}
+              fallback={
+                <div class="flex items-center gap-1.5 whitespace-nowrap">
+                  <div class="i-hugeicons:download-02" />
+                  <Trans key="instances:_trn_download" />
+                </div>
+              }
+            >
+              <div class="i-hugeicons:download-02 text-xl" />
             </Show>
-            <Show when={!loading()}>
-              <Show
-                when={props.iconOnly}
-                fallback={
-                  <div class="flex items-center gap-1.5">
-                    <div class="i-hugeicons:download-02" />
-                    <Trans key="instances:_trn_download" />
-                  </div>
-                }
-              >
-                <div class="i-hugeicons:download-02 text-xl" />
-              </Show>
-            </Show>
-          </Button>
-        </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <Trans key="instances:_trn_download_instance" />
-      </TooltipContent>
-    </Tooltip>
-  )
+          </Show>
+        </Button>
+      </div>
+    </TooltipTrigger>
+    <TooltipContent>
+      <Trans key="instances:_trn_download_instance" />
+    </TooltipContent>
+  </Tooltip>
+)
 }
 
 export default ModpackDownloadButton
