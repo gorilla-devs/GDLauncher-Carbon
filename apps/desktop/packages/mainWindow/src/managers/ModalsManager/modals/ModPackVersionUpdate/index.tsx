@@ -37,25 +37,49 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     mutationKey: ["instance.changeModpack"]
   }))
 
-  // Pure reactive memo - no side effects
-  const modpackData = createMemo(() => {
-    const modpack = instance.data?.modpack?.modpack
-    if (!modpack) return null
+  // Pure reactive memo - no side effects.
+  //
+  // `equals` is load-bearing, not an optimisation. `instance.getInstanceDetails`
+  // is invalidated continuously while any task runs on the instance, and each
+  // invalidation hands back a fresh object — so without a comparator this memo
+  // allocates a new `{platform, projectId, fileId}` every time and notifies,
+  // even when the pinned modpack has not changed at all. That cascades:
+  // `versions` recomputes into a new array, `options` below changes identity,
+  // and `Select` tears down and rebuilds its listbox items. The visible effect
+  // is that the open dropdown destroys and recreates the row under the user's
+  // cursor, mid-click, for as long as a task is in flight — which is exactly
+  // when someone is most likely to be changing versions.
+  //
+  // Comparing the three fields stops the cascade at its source: an
+  // invalidation that does not actually change the pinned pack no longer
+  // propagates. Same primitive `DragContext.tsx` uses for the same reason.
+  const modpackData = createMemo(
+    () => {
+      const modpack = instance.data?.modpack?.modpack
+      if (!modpack) return null
 
-    if (modpack.type === "curseforge") {
-      return {
-        platform: "curseforge" as const,
-        projectId: modpack.value.project_id,
-        fileId: modpack.value.file_id
+      if (modpack.type === "curseforge") {
+        return {
+          platform: "curseforge" as const,
+          projectId: modpack.value.project_id,
+          fileId: modpack.value.file_id
+        }
+      } else {
+        return {
+          platform: "modrinth" as const,
+          projectId: modpack.value.project_id,
+          fileId: modpack.value.version_id
+        }
       }
-    } else {
-      return {
-        platform: "modrinth" as const,
-        projectId: modpack.value.project_id,
-        fileId: modpack.value.version_id
-      }
+    },
+    undefined,
+    {
+      equals: (prev, next) =>
+        prev?.platform === next?.platform &&
+        prev?.projectId === next?.projectId &&
+        prev?.fileId === next?.fileId
     }
-  })
+  )
 
   const currentPlatform = createMemo(() => modpackData()?.platform)
 

@@ -583,7 +583,16 @@ export interface AddonVersionSummary {
 
 /** How long the addon page's Versions tab is given to answer with the
  *  project's version list — a real network round trip to the proxied
- *  backend, same order of magnitude as `SEARCH_RESULTS_TIMEOUT`. */
+ *  backend.
+ *
+ *  **Deliberately still 30s while `SEARCH_RESULTS_TIMEOUT` is 90s, and not a
+ *  stale copy of it.** They cover different endpoints: search goes through
+ *  Modrinth's Typesense layer, which was measured at 30.204s cold on
+ *  2026-08-01 and forced that constant up; `getProjectVersions` is a plain
+ *  unpaginated read that has never been observed anywhere near this bound.
+ *  This value has never been measured directly, though, so if it ever starts
+ *  failing, measure the cold path before raising it — do not simply copy
+ *  whatever `SEARCH_RESULTS_TIMEOUT` happens to be. */
 const VERSIONS_RESPONSE_TIMEOUT = 30_000
 
 /**

@@ -75,5 +75,35 @@ export const MODPACK_MR_V_MID = "8QjqOzvP"
 export const MODPACK_MR_V_OLD = "PVccZjDs"
 
 export const MODPACK_CF_PROJECT = "520990"
+/** 1.2.0 — the version change target, and the only file
+ *  `modpackInstall.spec.ts` installs. */
 export const MODPACK_CF_FILE = "4713831"
+/**
+ * 1.1.9 — the version `modpackCurseforgeVersion.spec.ts` upgrades *from*.
+ *
+ * `boosted-fps` (`520990`) has exactly three 1.20.1 Fabric files, all under
+ * 4.2 MiB: `4713831` (1.2.0), this one, and `4584315` (1.1.8). Measured live
+ * against the CurseForge API on 2026-08-01, `4595849` -> `4713831` is
+ * mods +7 / -6 / =13, overrides +2 / -2, and **6 of the 18 shared override
+ * paths have genuinely different bytes**:
+ * `config/fabric/indigo-renderer.properties`, `config/immediatelyfast.json`,
+ * `config/iris.properties`, `config/modernfix-mixins.properties`,
+ * `config/sodium-options.json`, `options.txt`.
+ *
+ * That last figure is why this pair is worth having. `remarkably` has *zero*
+ * changed-bytes files across its own bump — a pure add/remove delta — which
+ * is what left `modpackLifecycle.spec.ts` with no spare pristine candidates
+ * and forced its `deleteReturning` case onto `/options.txt`. This pair
+ * exercises the replace path properly.
+ *
+ * This pack also ships two jars **as overrides**
+ * (`overrides/mods/iris-mc1.20-1.6.4.jar` and
+ * `overrides/mods/sodium-fabric-mc1.20-0.4.10+build.27(2).jar`, both present
+ * in 1.1.9 and dropped by 1.2.0) rather than declaring them in
+ * `manifest.json`. Overrides are re-extracted unconditionally
+ * (`minecraft/curseforge.rs`, mirroring `modrinth.rs:321-379`), so unlike
+ * declared files they are never skip-optimised — a shape the Modrinth
+ * fixture does not have at all.
+ */
+export const MODPACK_CF_FILE_OLD = "4595849"
 export const MODPACK_CF_QUERY = "boosted fps performance optimized"

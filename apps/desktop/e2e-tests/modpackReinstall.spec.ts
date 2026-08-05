@@ -180,15 +180,11 @@ import {
  * `stopHarness`, the final safety net if the graceful in-body stop below
  * never runs at all.
  *
- * **`installModpackVersionRetrying`** is a local copy of the identical
- * wrapper `modpackLock.spec.ts` already carries (not extracted into
- * `helpers/modpacks.ts`, per that file's own "verified, do not reimplement"
- * instruction) around a real, reproducible gap: `installModpackVersion`'s own
- * `scrollVersionRowIntoView` call sits outside its own retry loop
- * (`helpers/modpacks.ts:537`), so it gets zero retries against
- * `InfiniteScrollVersionsQueryWrapper` unconditionally refetching on the
- * `instanceId === undefined` branch a modpack's standalone search page always
- * takes. Applied to both tests here defensively, since both call it.
+ * `installModpackVersion` retries reaching and clicking the version row
+ * internally (`helpers/modpacks.ts`), so this file does not wrap it. It used
+ * to: a local `installModpackVersionRetrying` retried the *whole* install,
+ * which turned one lost row into a double install — see that helper's own
+ * comment for the full-suite run that demonstrated it.
  *
  * **Sabotage results.** Three, each one surgical edit against a provably
  * clean build, each reverted and sha256-confirmed byte-identical to HEAD
@@ -227,32 +223,6 @@ import {
  *      predicts.
  */
 
-async function installModpackVersionRetrying(
-  page: Page,
-  query: string,
-  platform: "curseforge" | "modrinth",
-  fileId: string,
-  attempts = 3
-): Promise<string> {
-  let lastError: unknown
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      return await installModpackVersion(page, query, platform, fileId)
-    } catch (error) {
-      lastError = error
-      console.error(
-        `installModpackVersionRetrying: attempt ${attempt}/${attempts} for ` +
-          `"${fileId}" failed:`,
-        error
-      )
-    }
-  }
-  throw new Error(
-    `installModpackVersionRetrying: "${fileId}" failed ${attempts} times in a row`,
-    { cause: lastError }
-  )
-}
-
 /** Mirrors `gameLaunch.spec.ts`'s `FIRST_OUTPUT_TIMEOUT` /
  *  `modpackLifecycle.spec.ts`'s `LAUNCH_TIMEOUT`. */
 const LAUNCH_TIMEOUT = 180_000
@@ -269,7 +239,7 @@ test.describe("modpack reinstall", () => {
     let name: string | undefined
     try {
       const index = await fetchMrpackIndex(MODPACK_MR_V_MID)
-      name = await installModpackVersionRetrying(
+      name = await installModpackVersion(
         page,
         MODPACK_MR_QUERY,
         "modrinth",
@@ -439,7 +409,7 @@ test.describe("modpack reinstall", () => {
       await completeLogin(page, harness)
       await dismissStartupModals(page)
 
-      name = await installModpackVersionRetrying(
+      name = await installModpackVersion(
         page,
         MODPACK_MR_QUERY,
         "modrinth",

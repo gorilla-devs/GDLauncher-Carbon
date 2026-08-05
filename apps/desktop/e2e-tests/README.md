@@ -671,9 +671,10 @@ rather than let it silently corrupt an oracle.
 
 ## Modpack tests
 
-Five spec files cover the modpack lifecycle end to end. All five verify on
-disk — against the pack's own `.mrpack` index, `packinfo.json`, and the
-install audit — never by trusting what the app renders about the same fact.
+Eight spec files cover the modpack lifecycle end to end. All eight verify on
+disk — against the pack's own `.mrpack` index, `packinfo.json`, the install
+audit, or a twin instance — never by trusting what the app renders about the
+same fact.
 
 | File | Tests | What it proves | Wall-clock |
 |---|---|---|---|
@@ -682,6 +683,9 @@ install audit — never by trusting what the app renders about the same fact.
 | `modpackSaveGuard.spec.ts` | 1 | `SkipReplaceReason::InSaveFolder` actually stops a version change deleting a pack-tracked file under `saves/`. | ~51s |
 | `modpackLock.spec.ts` | 4 | A fresh install starts locked; unlocking flips the flag and unblocks Addons; unpairing drops the association entirely. | ~4 min |
 | `modpackReinstall.spec.ts` | 2 | Reinstall restores a *deleted* pack file but preserves a *damaged* one, and is refused outright while the game is running. | ~1.8 min |
+| `modpackCurseforgeVersion.spec.ts` | 1 | A **CurseForge** version change lands the instance byte-identical to a fresh install of the same target file. | ~1.2 min |
+| `modpackChangeVersionGuard.spec.ts` | 1 | A version change started mid-game is **deferred, not cancelled** — it applies itself on the next launch. | ~1.1 min |
+| `modpackInterruptedStaging.spec.ts` | 2 | A download killed by a core crash resumes on the next launch; a lost packinfo promotion strands the new files as untouchable. | ~2.1 min |
 
 Two of the five own their harness instead of using the shared
 `authenticatedApp` fixture: `modpackLifecycle` and `modpackReinstall`'s second
@@ -838,6 +842,63 @@ is packinfo-against-itself and therefore always matches, so **every**
 `.files`-declared mod is skip-optimised unconditionally and a deleted mod can
 never come back, however the UI labels the action.
 
+### The twin-instance oracle, and why CurseForge needs one
+
+Every other assertion in this suite has an oracle external to the app: the
+Modrinth tests fetch the version's own `.mrpack` index live and compare bytes
+against it. That does not port to CurseForge, for two independent reasons.
+
+First, `packinfo.json` cannot substitute. `packinfo::scan_dir` hashes the
+**staging** copy of each file, *before* the rename into its final location, so
+comparing on-disk bytes against packinfo is self-referential — it can catch a
+change made after the install (a user edit), never a bug that staged the wrong
+bytes in the first place. Second, CurseForge file downloads require an
+`x-api-key` (see the 2026-07-19 CDN incident) that this suite does not hold in
+standalone mode, so there is no index to fetch.
+
+`modpackCurseforgeVersion.spec.ts` solves it with a **twin instance**: install
+the target file fresh, snapshot it, delete it, then build a second instance at
+the older file and version-change it onto the same target. The twin was
+produced by the *install* path, so it is genuinely external to the
+*version-change* path under test, and it needs no API key. What that buys is
+the property that matters most about the whole feature and that nothing here
+proved before — **a version change lands you where a fresh install of the
+target would have** — confirmed byte-for-byte across 60-odd paths.
+
+The twin is built and torn down *before* the subject exists, which is not
+fussiness. `next_folder` (`managers/instance/mod.rs:1563`) de-duplicates an
+instance's **shortpath**, but nothing de-duplicates its **display name**, so
+two installs of one modpack produce two rows with an identical `name`. That
+breaks `newestTileName` (it diffs tile names and would see no new one),
+`byInstanceName` (two tiles under strict mode), and `readInstanceByName`
+(which throws outright on a duplicate, deliberately).
+
+### Why the interrupted-apply case is reconstructed, not raced
+
+`modpackInterruptedStaging.spec.ts` crashes the core for real in its first
+test — `SIGKILL` mid-download, no cleanup — because that window is seconds
+wide for a 28 MiB pack. It does **not** do the same for the apply phase, which
+is one md5 pass plus a handful of renames. Racing that would be flaky, and
+`retries: 0` turns flaky into a red build; there is also no log signal to time
+against, since the core's `debug!`/`trace!` output does not reach this suite's
+stdout capture — only `_STATUS_:` lines do.
+
+So the second test reproduces the *consequence* instead, exactly and without a
+synthetic `.setup/`. Promotion is the last step: `process_modpack` writes its
+scan to `tmp-packinfo.json` and only renames it over `packinfo.json` at
+`run/modpack.rs:899`, after the apply. A crash during the apply therefore
+leaves the **old** packinfo describing files that are already the **new**
+version on disk — which is what you get by completing a version change and
+then restoring the packinfo you saved beforehand.
+
+That test runs on **CurseForge** while its sibling runs on Modrinth, and the
+split is load-bearing rather than incidental. It needs at least one file whose
+bytes genuinely differ between the two versions, since that is the only kind
+that can sit in the stale record under one hash and on disk under another.
+`remarkably` has none — its delta is pure add/remove — so against that pack the
+misclassification set would come back empty and the assertion would be vacuous.
+`boosted-fps` `4595849` → `4713831` has six measured such paths.
+
 ### Why `modpackSaveGuard` seeds state
 
 `SkipReplaceReason::InSaveFolder` only fires for a path that is **already in
@@ -870,12 +931,13 @@ at runtime rather than assuming one survived.
 
 ### Product findings this wave pins but does not fix
 
-Four, all found by building these tests, none fixed here. Findings 2–4 are
-pinned by an assertion, so the suite goes red if the behaviour changes —
-**including if someone fixes it**. That is deliberate: a test wave is the
-wrong place to change product behaviour, and each of these needs a product
-decision. Finding 1 is half-pinned: the `reinstall_modpack` side is covered,
-the `change_modpack` side is traced from source and covered by nothing.
+Six, all found by building these tests, none fixed here. Every one is pinned
+by an assertion, so the suite goes red if the behaviour changes — **including
+if someone fixes it**. That is deliberate: a test wave is the wrong place to
+change product behaviour, and each of these needs a product decision. Each
+pinning assertion carries a message saying so, naming the fix it would be
+reacting to and telling whoever hits it to update the test rather than delete
+it.
 
 1. **`change_modpack` leaks a `.setup/` that defers the version change to the
    next launch.** `reinstall_modpack` refuses outright while the instance is
@@ -893,7 +955,11 @@ the `change_modpack` side is traced from source and covered by nothing.
    `reinstall_modpack`'s guard is exactly what prevents the same leak on its
    own path — which is why `modpackReinstall.spec.ts`'s refusal test asserts
    on `.setup/`'s absence rather than only on the instance still running.
-   Traced from source; the `change_modpack` half is uncovered by any test.
+   Both halves are now covered: the guarded path by `modpackReinstall.spec.ts`,
+   the unguarded one by `modpackChangeVersionGuard.spec.ts`, which observes the
+   whole sequence live — the leak, the second call bailing on
+   "Instance has not completed the setup phase", and the change applying itself
+   unprompted on the next launch.
 2. **A user-deleted pack file is silently reinstated** when the target version
    still ships it and something was staged for that path — the two passes are
    independent, so pass 1's `deleted by user` decision does not stop pass 2
@@ -919,7 +985,30 @@ the `change_modpack` side is traced from source and covered by nothing.
    `modpackLifecycle.spec.ts` pins those nine by name in
    `KNOWN_STALE_SURVIVORS_AFTER_DOWNGRADE`, as a bidirectional `toEqual`, so
    the assertion catches that set *growing* and also catches one spuriously
-   disappearing.
+   disappearing. **Platform-independent**, confirmed on CurseForge by
+   `modpackCurseforgeVersion.spec.ts`: the version-changed instance's packinfo
+   is missing entries a fresh install records, while every one of those files
+   is still on disk and byte-correct. It is a property of `scan_dir` itself,
+   not of one platform's downloader.
+5. **A refused version change tells the user nothing.** `handleUpdate`
+   (`ModPackVersionUpdate/index.tsx:126-151`) awaits the mutation and only
+   afterwards calls `closeModal()` and `navigate("/library")`. There is no
+   `catch` anywhere on that path, so when `change_modpack` rejects — which is
+   what happens mid-game — both are skipped: the modal stays open, unchanged,
+   with no toast, no inline error, and no hint that a change is now pending on
+   disk. The user is looking at a dialog that appears to have ignored the
+   button they pressed. Pinned by `modpackChangeVersionGuard.spec.ts`, which
+   asserts the route never leaves the instance detail.
+6. **An interrupted apply strands the new files as untouchable.** Because
+   `packinfo.json` is promoted last (`run/modpack.rs:899`), a crash during the
+   apply leaves the old record describing files that are already the new
+   version on disk. Their md5 no longer matches, so the next pass classes them
+   `ModifiedByUser` and skips them — permanently. The instance sits
+   half-upgraded, and the repair action a user would reach for is precisely the
+   one that refuses to touch them. Pinned by
+   `modpackInterruptedStaging.spec.ts`'s second test, which asserts both that
+   the misclassification happens and that the skipped files' bytes are left
+   untouched.
 
 ### Search timeouts are measured, not guessed
 
@@ -1297,21 +1386,29 @@ behavior, not evidence the suite itself is broken.
   candidate fetch is asymmetric with its Modrinth counterpart on multi-loader
   instances — see "Known gaps" under `modResolution.spec.ts`'s own section
   above for both.
-- **CurseForge modpack version changes are uncovered.** CurseForge is
-  installed once and never upgraded; every version-change, lock and reinstall
-  test runs on Modrinth, whose version API is unpaginated. CurseForge's
-  `getModFiles` *is* paginated, so its version-list path is a genuinely
-  different mechanism, not a symmetric one — the same reason
-  `openAddonVersions`'s CurseForge branch was deleted rather than kept as
-  unexercised coverage.
 - **Modpack export and import are uncovered.** Both ship real surfaces
   (`InstanceExport`'s modal and `ImportEntity`'s scan/target mutations), and
-  no test in this suite drives either.
-- **Interrupted staging is uncovered.** Every modpack test lets the pipeline
-  run to completion; nothing kills the app mid-staging and asserts what a
-  half-written `.setup/` leaves behind, or that the next launch recovers from
-  it. `reinstall_modpack`'s own doc comment describes that poisoned state as
-  the thing it exists to fix, so the recovery path is real and untested.
+  no test in this suite drives either. That includes `.gdlpack`, GDL's own
+  format, which has a real importer (`importer/gdlpack.rs`) and a real export
+  path.
+- **Server packs are uncovered.** `ServerPackDownloadButton` renders beside
+  the download button on CurseForge version rows — `selectors.ts` already
+  documents it as the reason the row button needs its own anchor — and nothing
+  ever clicks it.
+- **The modpack update-check appears to be dead code.**
+  `check_curseforge_modpack_updates` / `check_modrinth_modpack_updates` are
+  spawned per instance on refresh (`managers/instance/mod.rs:312-324`) with
+  errors explicitly discarded, and they write `modpack_update_curseforge` /
+  `modpack_update_modrinth`. Neither field appears in `api/`, in `domain/`, or
+  anywhere in `mainWindow` — the `has_update` that does reach the API is on the
+  *Mod* struct, a different feature. So this fires two live platform requests
+  per modpack instance and nothing consumes the result. Not a coverage gap:
+  there is no UI to test. Worth confirming before it grows one.
+- **Interrupting the *apply* phase is uncovered**, as opposed to the download
+  phase, which `modpackInterruptedStaging.spec.ts` does crash for real. Its
+  consequence is covered by reconstruction (see above), but no test kills the
+  core between `staging-packinfo.json` appearing and `modpack-complete` being
+  written. Doing so reliably would need a test-only hook in product code.
 - **Further addon topics are unstarted**: dependency resolution inside a
   modpack instance, disk/DB consistency for pack-owned mods, and metadata
   caching. Those need their own design.

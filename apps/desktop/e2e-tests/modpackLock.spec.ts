@@ -1,6 +1,5 @@
 import fs from "node:fs"
 import path from "node:path"
-import type { Page } from "playwright"
 import { expect, test } from "./fixtures/index.js"
 import { attachCoreLogOnFailure } from "./fixtures/electronApp.js"
 import { byTestId, TEST_IDS } from "./helpers/selectors.js"
@@ -210,32 +209,6 @@ import { verifyModInstalled } from "./helpers/modVerify.js"
  * already uses everywhere a UI signal races a backend effect (`expect.poll`),
  * rather than trusting either helper's return as proof of anything on disk.
  */
-async function installModpackVersionRetrying(
-  page: Page,
-  query: string,
-  platform: "curseforge" | "modrinth",
-  fileId: string,
-  attempts = 3
-): Promise<string> {
-  let lastError: unknown
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      return await installModpackVersion(page, query, platform, fileId)
-    } catch (error) {
-      lastError = error
-      console.error(
-        `installModpackVersionRetrying: attempt ${attempt}/${attempts} for ` +
-          `"${fileId}" failed:`,
-        error
-      )
-    }
-  }
-  throw new Error(
-    `installModpackVersionRetrying: "${fileId}" failed ${attempts} times in a row`,
-    { cause: lastError }
-  )
-}
-
 test.describe("modpack lock, unlock and unpair", () => {
   test.describe.configure({ mode: "serial" })
 
@@ -246,7 +219,7 @@ test.describe("modpack lock, unlock and unpair", () => {
 
   test.beforeAll(async ({ authenticatedApp }) => {
     const { page, harness } = authenticatedApp
-    name = await installModpackVersionRetrying(
+    name = await installModpackVersion(
       page,
       MODPACK_MR_QUERY,
       "modrinth",

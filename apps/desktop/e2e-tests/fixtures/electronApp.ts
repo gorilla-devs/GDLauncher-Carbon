@@ -230,8 +230,13 @@ export async function getCoreProcessId(
  * bounded to ~3s, before calling `std::process::exit(0)` — genuinely
  * variable, and a wait that isn't tied to the real exit would either race a
  * slow shutdown or waste time on a fast one.
+ *
+ * Exported so a spec that kills the core *itself* can wait for the kill to
+ * land before acting on the result — `modpackInterruptedStaging.spec.ts`
+ * SIGKILLs the core mid-download and must know the process is really gone
+ * before it inspects the half-written `.setup/` it left behind.
  */
-async function waitForPidExit(
+export async function waitForPidExit(
   pid: number,
   { timeoutMs = 15_000, pollIntervalMs = 50 } = {}
 ): Promise<void> {

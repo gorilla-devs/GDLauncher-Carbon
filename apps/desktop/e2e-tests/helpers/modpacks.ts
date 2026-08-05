@@ -246,7 +246,14 @@ export async function fetchMrpackIndex(versionId: string): Promise<PackIndex> {
  *  ~3x the measured cold path, not a guess. This deliberately makes a
  *  genuinely broken search take longer to fail — the correct trade (a slow
  *  red beats a false red from a cold cache) — so don't "optimise" this back
- *  down without re-measuring the cold path first. */
+ *  down without re-measuring the cold path first.
+ *
+ *  One caveat the "warm at ~0.08s" figure hides: **a fast repeat is not
+ *  necessarily a cached success.** Modrinth caches its own 5xx as readily as
+ *  a 200 — observed 2026-08-01, the literal query `"fabric api"` returned
+ *  HTTP 500 (`Typesense search failed: Request Timeout`) cold at 30.2s and
+ *  then served that same 500 at 0.08s, while a control query returned 200.
+ *  No timeout value can fix that; it is a genuine red. */
 const MODPACK_SEARCH_TIMEOUT = 90_000
 
 /** How long the library is given to show the tile the install just created.
@@ -494,9 +501,16 @@ export async function installModpackVersion(
   fileId: string
 ): Promise<string> {
   await page.click(byTestId(TEST_IDS.navbarLogo))
+  // Wait for the grid before snapshotting. `tileNames` on a still-rendering
+  // library returns a short list, and every name that appears afterwards then
+  // reads as "created by this install" — which surfaced as
+  // `newestTileName` reporting `saw 2: ["Boosted FPS-1.1.9.zip",
+  // "gdl-e2e-mods-fabric"]`, the second being another spec's fixture instance
+  // that simply had not painted yet.
+  await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
   const before = await tileNames(page)
 
-  let landed = false
+  let clicked = false
   let lastFailure: unknown
   for (let attempt = 1; attempt <= VERSIONS_TAB_MAX_ATTEMPTS; attempt++) {
     try {
@@ -509,41 +523,58 @@ export async function installModpackVersion(
       await page.getByRole("tab", { name: "Versions" }).click()
 
       await page.waitForTimeout(VERSIONS_TAB_SETTLE_WINDOW)
-      if (ADDON_VERSIONS_ROUTE_PATTERN.test(page.url())) {
-        landed = true
-        break
+      if (!ADDON_VERSIONS_ROUTE_PATTERN.test(page.url())) {
+        lastFailure = new Error(
+          `attempt ${attempt}: reached the Versions tab click but the route ` +
+            `was at ${page.url()} (not .../versions) ` +
+            `${VERSIONS_TAB_SETTLE_WINDOW}ms later — a silent bounce back to ` +
+            "/library"
+        )
+        continue
       }
-      lastFailure = new Error(
-        `attempt ${attempt}: reached the Versions tab click but the route ` +
-          `was at ${page.url()} (not .../versions) ` +
-          `${VERSIONS_TAB_SETTLE_WINDOW}ms later — a silent bounce back to ` +
-          "/library"
-      )
+
+      // Inside the loop, deliberately. `scrollVersionRowIntoView` used to sit
+      // below it, so reaching the route was retried but *finding the row* was
+      // not — and the row is the part that fails, because
+      // `InfiniteScrollVersionsQueryWrapper` unconditionally refetches on the
+      // `instanceId === undefined` branch a modpack's standalone search page
+      // always takes. Callers papered over that with a wrapper that retried
+      // this whole function, which is strictly worse: a scroll failure then
+      // re-ran the *install*, and a full-suite run on 2026-08-02 produced
+      // exactly that cascade — attempt 1 lost the row, attempt 2 created an
+      // instance and tripped `newestTileName` with "saw 2", attempt 3 found
+      // nothing new and gave up. Retrying navigate-and-find here keeps the
+      // retry scoped to the part that is actually flaky.
+      await scrollVersionRowIntoView(page, fileId)
+
+      // `modpackVersionDownloadButton`, NOT `modpackDownloadButton`: the addon
+      // page's header button is persistent chrome on every sub-tab including
+      // this one, so the two carry different ids. Scoping
+      // under the row is still required — the id is one-per-row — and a row may
+      // also hold a `ServerPackDownloadButton`, which is why the row's button
+      // has its own id rather than being selected as "the row's one button".
+      //
+      // Once this click lands the loop MUST stop: past this point an install is
+      // genuinely in flight, and retrying would create a second instance.
+      await page
+        .locator(byAddonVersionRow(fileId))
+        .locator(byTestId(TEST_IDS.modpackVersionDownloadButton))
+        .click()
+      clicked = true
+      break
     } catch (error) {
       lastFailure = error
     }
   }
 
-  if (!landed) {
+  if (!clicked) {
     throw new Error(
-      "installModpackVersion: could not reach a stable " +
-        `/addon/.../versions route for "${fileId}" across ` +
-        `${VERSIONS_TAB_MAX_ATTEMPTS} attempts`,
+      `installModpackVersion: could not reach and click version "${fileId}" ` +
+        `across ${VERSIONS_TAB_MAX_ATTEMPTS} attempts — either the Versions ` +
+        "route kept bouncing back to /library, or the row never mounted",
       { cause: lastFailure }
     )
   }
-
-  await scrollVersionRowIntoView(page, fileId)
-  // `modpackVersionDownloadButton`, NOT `modpackDownloadButton`: the addon
-  // page's header button is persistent chrome on every sub-tab including this
-  // one, so the two carry different ids. Scoping under
-  // the row is still required — the id is one-per-row — and a row may also
-  // hold a `ServerPackDownloadButton`, which is why the row's button has its
-  // own id rather than being selected as "the row's one button".
-  await page
-    .locator(byAddonVersionRow(fileId))
-    .locator(byTestId(TEST_IDS.modpackVersionDownloadButton))
-    .click()
 
   const name = await newestTileName(page, before)
   await waitForInstallComplete(page, name)
@@ -667,6 +698,80 @@ export async function openInstanceSettings(
   await page.getByRole("tab", { name: "Settings" }).click()
 }
 
+/** Settle window after opening the version select, before clicking an option.
+ *
+ *  The modal's option list re-renders as its `getProjectVersions` /
+ *  `getModFiles` query resolves *underneath the already-open dropdown*, so a
+ *  row a locator has resolved can be destroyed and recreated before the click
+ *  lands. Playwright reports it as "element is not stable" twice followed by
+ *  "element was detached from the DOM".
+ *
+ *  Observed on three separate specs during the 2026-08-02 wave — including
+ *  through this helper itself — so it is a property of the modal, not of any
+ *  one caller. It is *not* caused by a running game: it reproduces with
+ *  nothing launched. */
+const VERSION_OPTION_SETTLE = 1_500
+
+/** Per-attempt bound on the option click. Deliberately well under
+ *  `playwright.config.ts`'s 60s `actionTimeout` so a detached row is retried
+ *  rather than spending the whole budget on one doomed click. */
+const VERSION_OPTION_CLICK_TIMEOUT = 15_000
+
+/** How many times the select-and-pick is retried. Four, because a local
+ *  three-attempt wrapper was observed exhausting itself under full-suite
+ *  load. */
+const VERSION_OPTION_MAX_ATTEMPTS = 4
+
+/**
+ * Picks a version inside the **already-open** version modal and confirms.
+ *
+ * Split out and retried rather than clicking select-then-option back to back:
+ * see `VERSION_OPTION_SETTLE` for the detach this exists to survive. The
+ * select is reopened only when the wanted option is not already showing — a
+ * retry can arrive with the dropdown still open, and clicking the trigger
+ * again would toggle it shut.
+ *
+ * Exported because two specs must drive the modal *without*
+ * `changeModpackVersion`'s trailing `waitForInstallComplete` — they expect the
+ * change to be refused, or they kill the core mid-flight — and they should not
+ * each carry their own copy of this retry. One modal quirk, one workaround.
+ */
+export async function pickModpackVersionAndConfirm(
+  page: Page,
+  versionId: string
+): Promise<void> {
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= VERSION_OPTION_MAX_ATTEMPTS; attempt++) {
+    try {
+      const option = page.locator(byModpackVersionOption(versionId))
+      if (!(await option.isVisible().catch(() => false))) {
+        await page.click(byTestId(TEST_IDS.modpackVersionSelect))
+        await page.waitForTimeout(VERSION_OPTION_SETTLE)
+      }
+      await option.click({ timeout: VERSION_OPTION_CLICK_TIMEOUT })
+      await page.click(byTestId(TEST_IDS.modpackVersionUpdateConfirm))
+      return
+    } catch (error) {
+      lastError = error
+      console.error(
+        `pickModpackVersionAndConfirm: attempt ${attempt}/` +
+          `${VERSION_OPTION_MAX_ATTEMPTS} for "${versionId}" failed:`,
+        error
+      )
+      // Close whatever is open so the next attempt starts from a known state.
+      await page.keyboard.press("Escape").catch(() => {})
+    }
+  }
+
+  throw new Error(
+    `changeModpackVersion: could not select version "${versionId}" in ` +
+      `${VERSION_OPTION_MAX_ATTEMPTS} attempts — the modal's option list kept ` +
+      "detaching, or the version is not offered for this instance",
+    { cause: lastError }
+  )
+}
+
 /**
  * Changes an instance's modpack version through the shipped modal.
  *
@@ -674,6 +779,14 @@ export async function openInstanceSettings(
  * `changeModpack` resolves — which is *before* the resulting task has done
  * any work — so this waits for the instance to leave `inactive` and come
  * back, the same signal `waitForInstallComplete` uses for a first install.
+ *
+ * Note that `handleUpdate` only closes and navigates once the mutation
+ * *resolves*: there is no `catch` on that path, so a **rejected** change
+ * leaves the modal open on the instance's Settings route with nothing shown
+ * to the user. Callers that expect a refusal must not use this helper — it
+ * ends in `waitForInstallComplete`, which such a call never reaches. See
+ * `modpackChangeVersionGuard.spec.ts`, which drives the modal itself for
+ * exactly that reason.
  */
 export async function changeModpackVersion(
   page: Page,
@@ -682,9 +795,7 @@ export async function changeModpackVersion(
 ): Promise<void> {
   await openInstanceSettings(page, instanceName)
   await page.click(byTestId(TEST_IDS.instanceSettingsChangeVersion))
-  await page.click(byTestId(TEST_IDS.modpackVersionSelect))
-  await page.click(byModpackVersionOption(versionId))
-  await page.click(byTestId(TEST_IDS.modpackVersionUpdateConfirm))
+  await pickModpackVersionAndConfirm(page, versionId)
 
   await waitForInstallComplete(page, instanceName)
 }
