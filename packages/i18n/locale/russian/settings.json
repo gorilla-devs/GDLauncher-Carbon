@@ -33,6 +33,8 @@
   "_trn_potato_mode_text": "У вас слабый ПК? Не беда! Включите этот режим, и все анимации и спецэффекты будут отключены.",
   "_trn_deletion_through_recycle_bin_title": "Удаление в корзину",
   "_trn_deletion_through_recycle_bin_text": "При удалении экземпляров перемещать файлы в корзину вместо безвозвратного удаления.",
+  "_trn_show_world_deletion_warning_title": "-------- [ UNTRANSLATED ] -------- Confirm before deleting a world",
+  "_trn_show_world_deletion_warning_text": "-------- [ UNTRANSLATED ] -------- Ask for confirmation before deleting a world addon, since its save data cannot be recovered.",
   "_trn_rerun_onboarding": "Запустить начальное обучение заново",
   "_trn_game_resolution": "Разрешение игры",
   "_trn_width": "Ширина",

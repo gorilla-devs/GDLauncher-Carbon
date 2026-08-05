@@ -33,6 +33,8 @@
   "_trn_potato_mode_text": "您的电脑配置较差？无需担心！我们为您考虑到了。启用此项后，所有动画和特效都会被禁用。",
   "_trn_deletion_through_recycle_bin_title": "通过回收站删除",
   "_trn_deletion_through_recycle_bin_text": "启用此项可将实例移至回收站，而不是永久删除。",
+  "_trn_show_world_deletion_warning_title": "-------- [ UNTRANSLATED ] -------- Confirm before deleting a world",
+  "_trn_show_world_deletion_warning_text": "-------- [ UNTRANSLATED ] -------- Ask for confirmation before deleting a world addon, since its save data cannot be recovered.",
   "_trn_rerun_onboarding": "重新运行引导",
   "_trn_game_resolution": "游戏分辨率",
   "_trn_width": "宽",

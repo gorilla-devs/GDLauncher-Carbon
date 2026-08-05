@@ -187,6 +187,9 @@ keys! {
         // Memory warning dismissal
         GET_MEMORY_WARNING_DISMISSED                = "getMemoryWarningDismissed";
         SET_MEMORY_WARNING_DISMISSED                = "setMemoryWarningDismissed";
+        // World deletion confirmation dismissal
+        GET_WORLD_DELETION_WARNING_DISMISSED        = "getWorldDeletionWarningDismissed";
+        SET_WORLD_DELETION_WARNING_DISMISSED        = "setWorldDeletionWarningDismissed";
         // Cache cleanup
         GET_DB_SIZE                                 = "getDbSize";
         GET_CACHE_SIZES                             = "getCacheSizes";

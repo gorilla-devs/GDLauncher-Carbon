@@ -6,6 +6,9 @@ import { createColumnHelper } from "@tanstack/solid-table"
 interface EnabledColumnConfig {
   onToggle: (row: any) => void
   isDisabled?: () => boolean
+  /** Per-row: render no control at all for this row (as opposed to
+   *  `isDisabled`, which renders a greyed-out Switch with a tooltip). */
+  isHidden?: (row: any) => boolean
   disabledTooltip?: JSX.Element
 }
 
@@ -20,6 +23,7 @@ export const createEnabledColumn = (config: EnabledColumnConfig) => {
     size: 100,
     cell: (props) => {
       const row = props.row.original
+      if (config.isHidden?.(row)) return null
       return (
         <div class="hidden md:flex">
           <Show

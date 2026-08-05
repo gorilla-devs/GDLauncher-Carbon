@@ -27,6 +27,40 @@ use std::borrow::Cow;
 use std::str::FromStr;
 use thiserror::Error;
 
+/// Removes an addon's on-disk form — whichever of its enabled/disabled
+/// spellings exists — and reports whether anything was removed.
+///
+/// `is_directory` is true only for `AddonType::Worlds`. A world is installed by
+/// extracting its zip into `saves/` and deleting the zip
+/// (`managers/instance/installer/mod.rs`'s `post_process`), so the thing on
+/// disk is a directory and `remove_file` cannot touch it. Before this existed,
+/// a world delete removed nothing while the caller dropped the cache row
+/// anyway, so the entry vanished from the UI and the next scan re-inserted it
+/// from the still-present directory.
+async fn remove_addon_from_disk(
+    enabled_path: &std::path::Path,
+    disabled_path: &std::path::Path,
+    is_directory: bool,
+) -> anyhow::Result<bool> {
+    for path in [enabled_path, disabled_path] {
+        let Ok(meta) = tokio::fs::metadata(path).await else {
+            continue;
+        };
+
+        if is_directory {
+            if meta.is_dir() {
+                tokio::fs::remove_dir_all(path).await?;
+                return Ok(true);
+            }
+        } else if meta.is_file() {
+            tokio::fs::remove_file(path).await?;
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
 impl ManagerRef<'_, InstanceManager> {
     async fn ensure_modpack_not_locked(&self, instance_id: InstanceId) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
@@ -386,6 +420,9 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
+        let addon_type =
+            domain::AddonType::from_db_string(&m.addon_type).unwrap_or(domain::AddonType::Mods);
+
         let mut disabled_path = {
             let instance_path = self
                 .app
@@ -394,9 +431,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .get_instances()
                 .get_instance_path(shortpath);
 
-            domain::AddonType::from_db_string(&m.addon_type)
-                .unwrap_or(domain::AddonType::Mods)
-                .get_folder_path(&instance_path)
+            addon_type.get_folder_path(&instance_path)
         };
 
         let enabled_path = disabled_path.join(&m.filename);
@@ -405,10 +440,25 @@ impl ManagerRef<'_, InstanceManager> {
         disabled.push_str(".disabled");
         disabled_path.push(disabled);
 
-        if enabled_path.is_file() {
-            tokio::fs::remove_file(enabled_path).await?;
-        } else if disabled_path.is_file() {
-            tokio::fs::remove_file(disabled_path).await?;
+        let removed = remove_addon_from_disk(
+            &enabled_path,
+            &disabled_path,
+            addon_type == domain::AddonType::Worlds,
+        )
+        .await?;
+
+        // Removing nothing is fine when there is nothing left to remove — the
+        // user may have deleted the file by hand, and dropping the stale cache
+        // row is the correct reconciliation. It is NOT fine when the addon is
+        // still sitting there: that means the removal failed, and dropping the
+        // row would hide it from the UI until the next scan resurrected it.
+        if !removed && (enabled_path.exists() || disabled_path.exists()) {
+            bail!(
+                "refusing to drop the cache row for addon {} ({:?}): it is still on disk at {}",
+                m.id,
+                addon_type,
+                enabled_path.display()
+            );
         }
 
         // Delete cache entry directly instead of re-scanning
@@ -1029,5 +1079,90 @@ mod test {
         assert_ne!(mods[0].curseforge, None);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::remove_addon_from_disk;
+
+    #[tokio::test]
+    async fn removes_a_world_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let world = dir.path().join("MyWorld");
+        std::fs::create_dir_all(world.join("region")).unwrap();
+        std::fs::write(world.join("level.dat"), b"x").unwrap();
+
+        let removed = remove_addon_from_disk(&world, &dir.path().join("MyWorld.disabled"), true)
+            .await
+            .unwrap();
+
+        assert!(removed, "a world directory must be reported as removed");
+        assert!(
+            !world.exists(),
+            "the world directory must be gone from disk"
+        );
+    }
+
+    #[tokio::test]
+    async fn removes_an_enabled_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("pack.zip");
+        std::fs::write(&file, b"x").unwrap();
+
+        let removed = remove_addon_from_disk(&file, &dir.path().join("pack.zip.disabled"), false)
+            .await
+            .unwrap();
+
+        assert!(removed);
+        assert!(!file.exists());
+    }
+
+    #[tokio::test]
+    async fn removes_a_disabled_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let disabled = dir.path().join("pack.zip.disabled");
+        std::fs::write(&disabled, b"x").unwrap();
+
+        let removed = remove_addon_from_disk(&dir.path().join("pack.zip"), &disabled, false)
+            .await
+            .unwrap();
+
+        assert!(removed);
+        assert!(!disabled.exists());
+    }
+
+    #[tokio::test]
+    async fn reports_nothing_removed_when_absent() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let removed = remove_addon_from_disk(
+            &dir.path().join("gone.zip"),
+            &dir.path().join("gone.zip.disabled"),
+            false,
+        )
+        .await
+        .unwrap();
+
+        assert!(!removed, "an already-absent addon reports nothing removed");
+    }
+
+    // Guards the flag itself: a non-world addon whose path happens to be a
+    // directory must not be blown away with remove_dir_all.
+    #[tokio::test]
+    async fn leaves_a_directory_alone_for_file_addons() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("weird");
+        std::fs::create_dir(&path).unwrap();
+
+        let removed = remove_addon_from_disk(&path, &dir.path().join("weird.disabled"), false)
+            .await
+            .unwrap();
+
+        assert!(!removed);
+        assert!(
+            path.exists(),
+            "a directory must survive a file-addon delete"
+        );
     }
 }

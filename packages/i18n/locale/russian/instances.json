@@ -408,5 +408,11 @@
   "_trn_server_rename_save": "Сохранить",
   "_trn_server_rename_cancel": "Отмена",
   "_trn_server_create": "Создать сервер",
-  "_trn_server_create_title": "Создание нового сервера"
+  "_trn_server_create_title": "Создание нового сервера",
+  "_trn_confirm_world_deletion_title": "-------- [ UNTRANSLATED ] -------- Delete this world?",
+  "_trn_confirm_world_deletion_body": "-------- [ UNTRANSLATED ] -------- \"{{name}}\" will be permanently deleted, including every save in it. This cannot be undone.",
+  "_trn_confirm_world_deletion_body_plural": "-------- [ UNTRANSLATED ] -------- {{count}} worlds will be permanently deleted, including every save in them. This cannot be undone.",
+  "_trn_confirm_world_deletion_dont_ask": "-------- [ UNTRANSLATED ] -------- Don't ask me again",
+  "_trn_confirm_world_deletion_cancel": "-------- [ UNTRANSLATED ] -------- Cancel",
+  "_trn_confirm_world_deletion_confirm": "-------- [ UNTRANSLATED ] -------- Delete world"
 }

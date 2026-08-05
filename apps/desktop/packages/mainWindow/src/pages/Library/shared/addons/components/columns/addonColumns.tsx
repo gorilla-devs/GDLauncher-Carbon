@@ -12,6 +12,7 @@ import {
   createEnabledColumn,
   createDeleteColumn
 } from "./index"
+import { supportsEnableToggle } from "../../addonCapabilities"
 
 /**
  * Unified column config for both Instance and Server addon tables.
@@ -300,6 +301,7 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     createEnabledColumn({
       onToggle: config.onToggleMod,
       isDisabled: config.isLocked,
+      isHidden: (row) => !supportsEnableToggle(row.addon_type),
       disabledTooltip: lockedTooltip
     }),
 

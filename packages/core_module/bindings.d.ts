@@ -86,6 +86,7 @@ export type Procedures = {
         { key: "settings.getSeenOnboardingTips", input: never, result: string[] } | 
         { key: "settings.getSettings", input: never, result: FESettings } | 
         { key: "settings.getTermsOfServiceBody", input: never, result: string } | 
+        { key: "settings.getWorldDeletionWarningDismissed", input: never, result: boolean } | 
         { key: "settings.isFirstLaunch", input: never, result: boolean } | 
         { key: "settings.shouldShowBetaPrompt", input: never, result: boolean } | 
         { key: "settings.shouldShowChangelog", input: never, result: boolean } | 
@@ -207,25 +208,20 @@ export type Procedures = {
         { key: "settings.setMemoryWarningDismissed", input: boolean, result: null } | 
         { key: "settings.setSearchSidebarDocked", input: boolean, result: null } | 
         { key: "settings.setSettings", input: FESettingsUpdate, result: null } | 
+        { key: "settings.setWorldDeletionWarningDismissed", input: boolean, result: null } | 
         { key: "vtask.dismissTask", input: FETaskId, result: null },
     subscriptions: never
 };
+
+export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
 
 export type FEUnifiedSearchType = "mod" | "modpack" | "resourcePack" | "shader" | "world" | "plugin" | "datapack" | "unknown"
 
 export type MRFETeamID = string
 
-export type MRFEDependencyType = "required" | "optional" | "incompatible" | "embedded" | "unknown"
+export type ModSources = { channels: ModChannelWithUsage[]; platform_blacklist: ModPlatform[] }
 
-/**
- * Per-scope cache footprint reported by `getCacheSizes`. `gdlauncher`
- * covers what the GDLauncher-cache cleanup wipes (DB files, temp, logs);
- * `minecraft` covers the Minecraft-cache cleanup (assets, libraries,
- * natives). Sum is the total
- * the Settings row displays — splitting per-scope lets the cleanup modal
- * label each option with its real reclaim estimate.
- */
-export type CacheSizes = { gdlauncher: number; minecraft: number }
+export type MRFEDependencyType = "required" | "optional" | "incompatible" | "embedded" | "unknown"
 
 export type FESearchResult = { entry_index: number; pos: number; len: number }
 
@@ -252,13 +248,9 @@ export type CFFEModSearchParameters = { query: CFFEModSearchParametersQuery }
 
 export type MemoryRange = { min_mb: number; max_mb: number }
 
-export type ModChannelWithUsage = { channel: ModChannel; allow_updates: boolean }
-
 export type FEMetricsEvent = { event_name: "page_view"; data: string } | { event_name: "featured_modpack_installed"; data: { campaign_id: string; item_id: string } } | { event_name: "changelog_viewed" }
 
 export type FEDisplayNameHistoryEntry = { displayName: string; changedAt: string }
-
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; downloadDependencies: boolean; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showAppCloseWarning: boolean; showFeatured: boolean; instancesSortBy: InstancesSortBy | null; instancesSortByAsc: boolean; instancesGroupBy: InstancesGroupBy | null; instancesGroupByAsc: boolean; instancesDuplicateFavorites: boolean; instancesTileSize: number; deletionThroughRecycleBin: boolean; xmx: number; xms: number; preLaunchHook: string | null; wrapperCommand: string | null; postExitHook: string | null; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJavaSystemProfiles: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; gdlAccountId: string | null }
 
 export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVersion[] }
 
@@ -277,6 +269,8 @@ export type MoveInstanceTarget = { BeforeInstance: FEInstanceId } | { BeginningO
 export type FEMoveServerGroupTarget = { beforeGroup: FEServerGroupId } | { beforeServer: FEServerId } | "endOfLibrary"
 
 export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource; install_deps: boolean; replaces_mod: string | null }
+
+export type FESettingsUpdate = { theme?: Set<string> | null; language?: Set<string> | null; reducedMotion?: Set<boolean> | null; discordIntegration?: Set<boolean> | null; releaseChannel?: Set<FEReleaseChannel> | null; concurrentDownloads?: Set<number> | null; downloadDependencies?: Set<boolean> | null; instancesSortBy?: Set<InstancesSortBy | null> | null; instancesSortByAsc?: Set<boolean> | null; instancesGroupBy?: Set<InstancesGroupBy | null> | null; instancesGroupByAsc?: Set<boolean> | null; instancesDuplicateFavorites?: Set<boolean> | null; instancesTileSize?: Set<number> | null; deletionThroughRecycleBin?: Set<boolean> | null; showFeatured?: Set<boolean> | null; xmx?: Set<number> | null; xms?: Set<number> | null; preLaunchHook?: Set<string | null> | null; wrapperCommand?: Set<string | null> | null; postExitHook?: Set<string | null> | null; launcherActionOnGameLaunch?: Set<FELauncherActionOnGameLaunch> | null; showAppCloseWarning?: Set<boolean> | null; gameResolution?: Set<GameResolution | null> | null; javaCustomArgs?: Set<string> | null; autoManageJavaSystemProfiles?: Set<boolean> | null; modSources?: Set<ModSources> | null; termsAndPrivacyAccepted?: Set<boolean> | null; gdlAccountId?: Set<string | null> | null }
 
 export type ImportEntry = { Valid: ImportableInstance } | { Invalid: InvalidImportEntry }
 
@@ -318,6 +312,12 @@ export type FEModrinthSearchIndex = "relevance" | "downloads" | "follows" | "new
 export type MRFEVersionFile = { hashes: MRFEHashes; url: string; filename: string; primary: boolean; size: number; file_type: MRFEAdditionalFileType | null }
 
 export type CFFEFilesParameters = { body: CFFEFilesParametersBody }
+
+/**
+ * Grouping criteria for accordion mode (virtual grouping).
+ * When instancesGroupBy is null, folders mode is used (real folders with drag-drop).
+ */
+export type InstancesGroupBy = "modloader" | "gameVersion" | "modplatform"
 
 export type FEUploadProfileIcon = { uuid: string; iconPath: string }
 
@@ -390,6 +390,18 @@ export type FEJavaOverride = { Profile: string | null } | { Path: string | null 
 
 export type CreateFolderFromInstances = { instances: FEInstanceId[]; targetInstanceId?: FEInstanceId | null }
 
+export type ModPlatform = "Curseforge" | "Modrinth"
+
+/**
+ * Per-scope cache footprint reported by `getCacheSizes`. `gdlauncher`
+ * covers what the GDLauncher-cache cleanup wipes (DB files, temp, logs);
+ * `minecraft` covers the Minecraft-cache cleanup (assets, libraries,
+ * natives). Sum is the total
+ * the Settings row displays — splitting per-scope lets the cleanup modal
+ * label each option with its real reclaim estimate.
+ */
+export type CacheSizes = { gdlauncher: number; minecraft: number }
+
 export type ConfigurationParseError = { type_: ConfigurationParseErrorType; message: string; line: number; config_text: string }
 
 export type FEManagedJavaOs = "windows" | "linux" | "macOs"
@@ -436,8 +448,6 @@ export type FEUnifiedModLoaderType = "forge" | "neoforge" | "fabric" | "quilt" |
 
 export type MoveGroupTarget = { BeforeGroup: FEGroupId } | { BeforeInstance: FEInstanceId } | "EndOfLibrary"
 
-export type ModPlatform = "Curseforge" | "Modrinth"
-
 export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
 
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
@@ -449,6 +459,8 @@ export type CFFEHashAlgo = "sha1" | "md5"
 export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 
 export type BannedIpEntry = { ip: string; created: string; source: string; expires: string; reason: string }
+
+export type FEReleaseChannel = "stable" | "alpha" | "beta"
 
 export type ShaderLoaderKind = "Iris" | "Oculus" | "OptiFine"
 
@@ -510,8 +522,6 @@ export type FEReportShareArgs = { shareCode: string; reportType: string; reason?
 
 export type MRFEProjectIDs = string[]
 
-export type GameResolution = { type: "Standard"; value: [number, number] } | { type: "Custom"; value: [number, number] }
-
 export type StandardVersion = { release: string; modloaders: ModLoader[] }
 
 export type BanPlayerRequest = { serverId: FEServerId; username: string; reason: string | null }
@@ -562,9 +572,16 @@ export type SetServerFavorite = { id: FEServerId; favorite: boolean }
 
 export type FEUnifiedSearchResult = { title: string; slug: string; description: string; imageUrl: string | null; highResImageUrl: string | null; downloadsCount: number; id: string; releaseDate: string; lastUpdated: string; platform: FEUnifiedPlatform; type: FEUnifiedSearchType; authors: FEUnifiedAuthor[]; websiteUrl: string | null; categories: FEUnifiedCategoryId[]; screenshotUrls: string[]; minecraftVersions: string[]; loaders?: FEUnifiedModLoaderType[]; versions: string[] | null; mainFileId: string | null; serverPackFileId: string | null }
 
-export type FESettingsUpdate = { theme?: Set<string> | null; language?: Set<string> | null; reducedMotion?: Set<boolean> | null; discordIntegration?: Set<boolean> | null; releaseChannel?: Set<FEReleaseChannel> | null; concurrentDownloads?: Set<number> | null; downloadDependencies?: Set<boolean> | null; instancesSortBy?: Set<InstancesSortBy | null> | null; instancesSortByAsc?: Set<boolean> | null; instancesGroupBy?: Set<InstancesGroupBy | null> | null; instancesGroupByAsc?: Set<boolean> | null; instancesDuplicateFavorites?: Set<boolean> | null; instancesTileSize?: Set<number> | null; deletionThroughRecycleBin?: Set<boolean> | null; showFeatured?: Set<boolean> | null; xmx?: Set<number> | null; xms?: Set<number> | null; preLaunchHook?: Set<string | null> | null; wrapperCommand?: Set<string | null> | null; postExitHook?: Set<string | null> | null; launcherActionOnGameLaunch?: Set<FELauncherActionOnGameLaunch> | null; showAppCloseWarning?: Set<boolean> | null; gameResolution?: Set<GameResolution | null> | null; javaCustomArgs?: Set<string> | null; autoManageJavaSystemProfiles?: Set<boolean> | null; modSources?: Set<ModSources> | null; termsAndPrivacyAccepted?: Set<boolean> | null; gdlAccountId?: Set<string | null> | null }
-
 export type GameLogEntry = { id: GameLogId; instance_id: FEInstanceId; active: boolean; timestamp: string; file_size: number | null }
+
+/**
+ * Two-tier cleanup selection. `gdlauncher` wipes the cache tables, temp dir,
+ * and log dir — fast, low-impact, the next browse/launch refills only what
+ * the user actually touches. `minecraft` additionally clears `assets`,
+ * `libraries`, and `natives` — those are also re-downloadable but cost
+ * the user a multi-GB re-download on next launch, so it's opt-in.
+ */
+export type CacheCleanupSelection = { gdlauncher: boolean; minecraft: boolean }
 
 export type Announcement = { title: string; content: string; type: AnnouncementType; version_req: string | null; start_date: string | null; end_date: string | null }
 
@@ -575,8 +592,6 @@ export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 export type LaunchState = { state: "inactive"; value: { failed_task: FETaskId | null } } | { state: "queued"; value: FETaskId } | { state: "preparing"; value: FETaskId } | { state: "running"; value: { start_time: string; log_id: number | null; adopted: boolean } } | { state: "deleting" }
 
 export type Set<T> = { Set: T }
-
-export type FEReleaseChannel = "stable" | "alpha" | "beta"
 
 export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
 
@@ -649,6 +664,8 @@ export type FEGDLAccountStatus = { status: "valid"; value: FEGDLAccount } | { st
 
 export type FEModSearchResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
 
+export type ModChannelWithUsage = { channel: ModChannel; allow_updates: boolean }
+
 /**
  * Sort criteria for instances in accordion mode (virtual grouping).
  * When instancesSortBy is null, manual ordering is used (libraryPosition).
@@ -660,21 +677,6 @@ export type FEUnifiedCategories = { modrinth: { [key: string]: FEUnifiedCategory
 export type CFFEModFileChangelogParameters = { modId: number; fileId: number }
 
 export type EnrollmentError = { errorType: EnrollmentErrorType; title: string; description: string; recoverySteps: string[]; supportLink: string; xboxError?: XboxError | null }
-
-/**
- * Grouping criteria for accordion mode (virtual grouping).
- * When instancesGroupBy is null, folders mode is used (real folders with drag-drop).
- */
-export type InstancesGroupBy = "modloader" | "gameVersion" | "modplatform"
-
-/**
- * Two-tier cleanup selection. `gdlauncher` wipes the cache tables, temp dir,
- * and log dir — fast, low-impact, the next browse/launch refills only what
- * the user actually touches. `minecraft` additionally clears `assets`,
- * `libraries`, and `natives` — those are also re-downloadable but cost
- * the user a multi-GB re-download on next launch, so it's opt-in.
- */
-export type CacheCleanupSelection = { gdlauncher: boolean; minecraft: boolean }
 
 export type MoveServerGroup = { group: FEServerGroupId; target: FEMoveServerGroupTarget }
 
@@ -693,6 +695,8 @@ export type MRFESearchIndex = "relevance" | "downloads" | "follows" | "newest" |
 export type CFFEFileDependency = { modId: number; relationType: CFFEFileRelationType }
 
 export type InstallLatestMod = { instance_id: FEInstanceId; mod_source: LatestModSource }
+
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; downloadDependencies: boolean; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showAppCloseWarning: boolean; showFeatured: boolean; instancesSortBy: InstancesSortBy | null; instancesSortByAsc: boolean; instancesGroupBy: InstancesGroupBy | null; instancesGroupByAsc: boolean; instancesDuplicateFavorites: boolean; instancesTileSize: number; deletionThroughRecycleBin: boolean; xmx: number; xms: number; preLaunchHook: string | null; wrapperCommand: string | null; postExitHook: string | null; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJavaSystemProfiles: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; gdlAccountId: string | null }
 
 export type MRFEDependency = { version_id: string | null; project_id: string | null; file_name: string | null; dependency_type: MRFEDependencyType }
 
@@ -731,6 +735,8 @@ export type FEServerDetails = { id: FEServerId; name: string; favorite: boolean;
 export type RenameServerGroup = { group: FEServerGroupId; name: string }
 
 export type ListInstanceStatus = { status: "valid"; value: ValidListInstance } | { status: "invalid"; value: InvalidListInstance }
+
+export type GameResolution = { type: "Standard"; value: [number, number] } | { type: "Custom"; value: [number, number] }
 
 export type AnnouncementType = "info" | "warning" | "error"
 
@@ -776,11 +782,7 @@ export type FEModsResponse = { data: CFFEMod[]; pagination: CFFEPagination | nul
 
 export type Modpack = { type: "curseforge"; value: CurseforgeModpack } | { type: "modrinth"; value: ModrinthModpack }
 
-export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
-
 export type CFFEModFilesParameters = { modId: number; query: CFFEModFilesParametersQuery }
-
-export type ModChannel = "Alpha" | "Beta" | "Stable"
 
 export type ServerModSource = { Curseforge: ServerCurseforgeMod } | { Modrinth: ServerModrinthMod }
 
@@ -803,6 +805,8 @@ export type InstanceFolder = "Root" | "Data" | "Mods" | "Configs" | "Screenshots
 export type FEInstanceModpackInfo = { name: string; version_name: string; url_slug: string; has_image: boolean }
 
 export type MRFETeamResponse = MRFETeamMember[]
+
+export type ModChannel = "Alpha" | "Beta" | "Stable"
 
 export type FEUnifiedEnvironment = "server" | "client"
 
@@ -828,8 +832,6 @@ export type FEManagedJavaArch = "x64" | "x86" | "arm32" | "arm64"
 export type AddPlayerRequest = { serverId: FEServerId; username: string }
 
 export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
-
-export type ModSources = { channels: ModChannelWithUsage[]; platform_blacklist: ModPlatform[] }
 
 export type FELaunchInstanceArgs = { id: FEInstanceId; skipMemoryCheck?: boolean }
 

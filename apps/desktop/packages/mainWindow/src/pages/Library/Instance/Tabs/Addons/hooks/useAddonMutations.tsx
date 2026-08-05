@@ -3,6 +3,7 @@ import { rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { Mod as ModType, AddonType } from "@gd/core_module/bindings"
 import { useModal } from "@/managers/ModalsManager"
+import { requiresDeletionConfirmation } from "@/pages/Library/shared/addons/addonCapabilities"
 import { onCleanup } from "solid-js"
 
 export const useAddonMutations = (
@@ -25,6 +26,9 @@ export const useAddonMutations = (
   const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
   const modalsContext = useModal()
+  const worldWarningDismissed = rspc.createQuery(() => ({
+    queryKey: ["settings.getWorldDeletionWarningDismissed"]
+  }))
 
   // Track active polling intervals for cleanup
   const activeIntervals = new Set<number>()
@@ -123,7 +127,7 @@ export const useAddonMutations = (
     }
   }
 
-  const handleDeleteMod = async (mod: ModType) => {
+  const performDeleteMod = async (mod: ModType) => {
     // Deselect the addon being deleted
     setRowSelection((prev) => {
       const next = { ...prev }
@@ -148,7 +152,25 @@ export const useAddonMutations = (
     }
   }
 
-  const handleDeleteSelected = async (selectedMods: ModType[]) => {
+  const handleDeleteMod = async (mod: ModType) => {
+    if (
+      requiresDeletionConfirmation(mod.addon_type) &&
+      !worldWarningDismissed.data
+    ) {
+      modalsContext?.openModal(
+        { name: "confirmWorldDeletion" },
+        {
+          worldName: mod.filename,
+          onConfirm: () => void performDeleteMod(mod)
+        }
+      )
+      return
+    }
+
+    await performDeleteMod(mod)
+  }
+
+  const performDeleteSelected = async (selectedMods: ModType[]) => {
     // Clear selection (all selected items are being deleted)
     setRowSelection({})
 
@@ -173,6 +195,26 @@ export const useAddonMutations = (
       // Rollback optimistic update on error
       optimisticUpdates.rollbackToServerState()
     }
+  }
+
+  const handleDeleteSelected = async (selectedMods: ModType[]) => {
+    const worldsSelected = selectedMods.filter((mod) =>
+      requiresDeletionConfirmation(mod.addon_type)
+    )
+
+    if (worldsSelected.length > 0 && !worldWarningDismissed.data) {
+      modalsContext?.openModal(
+        { name: "confirmWorldDeletion" },
+        {
+          worldName: worldsSelected[0].filename,
+          worldCount: worldsSelected.length,
+          onConfirm: () => void performDeleteSelected(selectedMods)
+        }
+      )
+      return
+    }
+
+    await performDeleteSelected(selectedMods)
   }
 
   const handleOpenFolder = () => {

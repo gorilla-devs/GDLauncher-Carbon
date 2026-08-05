@@ -408,5 +408,11 @@
   "_trn_server_rename_save": "Save",
   "_trn_server_rename_cancel": "Cancel",
   "_trn_server_create": "New Server",
-  "_trn_server_create_title": "Create New Server"
+  "_trn_server_create_title": "Create New Server",
+  "_trn_confirm_world_deletion_title": "Delete this world?",
+  "_trn_confirm_world_deletion_body": "\"{{name}}\" will be permanently deleted, including every save in it. This cannot be undone.",
+  "_trn_confirm_world_deletion_body_plural": "{{count}} worlds will be permanently deleted, including every save in them. This cannot be undone.",
+  "_trn_confirm_world_deletion_dont_ask": "Don't ask me again",
+  "_trn_confirm_world_deletion_cancel": "Cancel",
+  "_trn_confirm_world_deletion_confirm": "Delete world"
 }

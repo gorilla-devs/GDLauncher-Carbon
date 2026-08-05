@@ -33,6 +33,8 @@
   "_trn_potato_mode_text": "Hai un PC lento? Non preoccuparti! Abbiamo tutto quello che ti serve. Abilita questo e tutte le animazioni e gli effetti speciali saranno disabilitati.",
   "_trn_deletion_through_recycle_bin_title": "Eliminazione tramite Cestino",
   "_trn_deletion_through_recycle_bin_text": "Abilita questo per spostare le istanze nel cestino invece di eliminarle permanentemente.",
+  "_trn_show_world_deletion_warning_title": "-------- [ UNTRANSLATED ] -------- Confirm before deleting a world",
+  "_trn_show_world_deletion_warning_text": "-------- [ UNTRANSLATED ] -------- Ask for confirmation before deleting a world addon, since its save data cannot be recovered.",
   "_trn_rerun_onboarding": "Riavvia Onboarding",
   "_trn_game_resolution": "Risoluzione Gioco",
   "_trn_width": "Larghezza",

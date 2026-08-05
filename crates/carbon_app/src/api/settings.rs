@@ -7,9 +7,10 @@ use crate::{
                 CLEANUP_CACHES, COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY,
                 GET_CACHE_SIZES, GET_DB_SIZE, GET_MEMORY_WARNING_DISMISSED,
                 GET_PRIVACY_STATEMENT_BODY, GET_SEARCH_SIDEBAR_DOCKED, GET_SEEN_ONBOARDING_TIPS,
-                GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, IS_FIRST_LAUNCH, MARK_CHANGELOG_SEEN,
-                MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER, RESET_ONBOARDING_TIPS,
-                SET_MEMORY_WARNING_DISMISSED, SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS,
+                GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, GET_WORLD_DELETION_WARNING_DISMISSED,
+                IS_FIRST_LAUNCH, MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN,
+                REMIND_BETA_PROMPT_LATER, RESET_ONBOARDING_TIPS, SET_MEMORY_WARNING_DISMISSED,
+                SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS, SET_WORLD_DELETION_WARNING_DISMISSED,
                 SHOULD_SHOW_BETA_PROMPT, SHOULD_SHOW_CHANGELOG,
             },
         },
@@ -36,6 +37,7 @@ mod preference_keys {
     pub const ONBOARDING_TIPS_SEEN: &str = "onboarding_tips_seen";
     pub const SEARCH_SIDEBAR_DOCKED: &str = "search_sidebar_docked";
     pub const MEMORY_WARNING_DISMISSED: &str = "memory_warning_dismissed";
+    pub const WORLD_DELETION_WARNING_DISMISSED: &str = "world_deletion_warning_dismissed";
 }
 
 /// Returns true if the user has permanently dismissed the insufficient
@@ -43,6 +45,20 @@ mod preference_keys {
 pub async fn is_memory_warning_dismissed(db: &carbon_repos::db_exec::Db) -> anyhow::Result<bool> {
     let pref =
         frontend_preference::get_preference(db, preference_keys::MEMORY_WARNING_DISMISSED).await?;
+
+    Ok(pref.map(|p| p.value == "true").unwrap_or(false))
+}
+
+/// Returns true if the user has permanently dismissed the confirmation shown
+/// before deleting a world addon. Worlds are the only addon whose deletion
+/// destroys user data irrecoverably, which is why this confirmation exists at
+/// all and why it is not asked for every addon type.
+pub async fn is_world_deletion_warning_dismissed(
+    db: &carbon_repos::db_exec::Db,
+) -> anyhow::Result<bool> {
+    let pref =
+        frontend_preference::get_preference(db, preference_keys::WORLD_DELETION_WARNING_DISMISSED)
+            .await?;
 
     Ok(pref.map(|p| p.value == "true").unwrap_or(false))
 }
@@ -329,6 +345,23 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await?;
 
             app.invalidate(GET_MEMORY_WARNING_DISMISSED, None);
+            Ok(())
+        }
+
+        // World deletion confirmation dismissal
+        query GET_WORLD_DELETION_WARNING_DISMISSED[app, _args: ()] {
+            is_world_deletion_warning_dismissed(&app.db).await
+        }
+
+        mutation SET_WORLD_DELETION_WARNING_DISMISSED[app, dismissed: bool] {
+            let value = if dismissed { "true" } else { "false" }.to_string();
+
+            frontend_preference::upsert_preference(&app.db, preference_keys::WORLD_DELETION_WARNING_DISMISSED,
+                    &value,
+                    DbDateTime(Utc::now().fixed_offset()),)
+                .await?;
+
+            app.invalidate(GET_WORLD_DELETION_WARNING_DISMISSED, None);
             Ok(())
         }
     }

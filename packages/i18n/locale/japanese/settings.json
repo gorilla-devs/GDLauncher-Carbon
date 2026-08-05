@@ -33,6 +33,8 @@
   "_trn_potato_mode_text": "PCのスペックが低くても大丈夫。有効にすると、すべてのアニメーションと特殊効果が無効になります。",
   "_trn_deletion_through_recycle_bin_title": "ゴミ箱経由で削除",
   "_trn_deletion_through_recycle_bin_text": "有効にすると、インスタンスを完全削除せずゴミ箱に移動します。",
+  "_trn_show_world_deletion_warning_title": "-------- [ UNTRANSLATED ] -------- Confirm before deleting a world",
+  "_trn_show_world_deletion_warning_text": "-------- [ UNTRANSLATED ] -------- Ask for confirmation before deleting a world addon, since its save data cannot be recovered.",
   "_trn_rerun_onboarding": "オンボーディングを再実行",
   "_trn_game_resolution": "ゲーム解像度",
   "_trn_width": "幅",

@@ -33,6 +33,8 @@
   "_trn_potato_mode_text": "¿Tienes un PC lento? ¡No te preocupes! Te tenemos cubierto. Habilita esto y todas las animaciones y efectos especiales se deshabilitarán.",
   "_trn_deletion_through_recycle_bin_title": "Eliminación a través de la papelera",
   "_trn_deletion_through_recycle_bin_text": "Habilita esto para mover instancias a la papelera en lugar de eliminarlas permanentemente.",
+  "_trn_show_world_deletion_warning_title": "-------- [ UNTRANSLATED ] -------- Confirm before deleting a world",
+  "_trn_show_world_deletion_warning_text": "-------- [ UNTRANSLATED ] -------- Ask for confirmation before deleting a world addon, since its save data cannot be recovered.",
   "_trn_rerun_onboarding": "Volver a ejecutar la incorporación",
   "_trn_game_resolution": "Resolución del juego",
   "_trn_width": "Ancho",
