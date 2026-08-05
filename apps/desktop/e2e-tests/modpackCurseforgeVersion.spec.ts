@@ -94,11 +94,13 @@ import {
  * Neither instance is ever launched, so nothing rewrites configs and every
  * packinfo entry stays pristine by construction.
  *
- * `installModpackVersion` retries reaching and clicking the version row
- * internally (`helpers/modpacks.ts`), so this file does not wrap it. It used
- * to: a local `installModpackVersionRetrying` retried the *whole* install,
- * which turned one lost row into a double install — see that helper's own
- * comment for the full-suite run that demonstrated it.
+ * `installModpackVersion` asserts its way to the version row rather than
+ * retrying towards it (`helpers/modpacks.ts`), so this file does not wrap it.
+ * Wrapping it is actively wrong here: a local `installModpackVersionRetrying`
+ * once retried the *whole* install, which turned one lost row into a double
+ * install. The row loss it was covering was
+ * `InfiniteScrollVersionsQueryWrapper` tearing the list down on an unchanged
+ * scope, and that is fixed in the product now.
  *
  * **Sabotage result.** `run/modpack.rs`'s pass-1 deletion branch — the
  * `tokio::fs::remove_file(original_file)` that removes a pristine file the

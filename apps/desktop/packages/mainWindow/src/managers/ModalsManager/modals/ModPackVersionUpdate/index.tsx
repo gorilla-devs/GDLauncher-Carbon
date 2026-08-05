@@ -147,6 +147,24 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     )
   })
 
+  // The `options` array `Select` receives, with an identity that only changes
+  // when the ids themselves do.
+  //
+  // Load-bearing for the same reason `modpackData`'s comparator is. Inlining
+  // `versions().map(v => v.id)` as the prop allocates a new array every time
+  // `versions` recomputes — and `versions` recomputes on every refetch of
+  // `getModFiles`/`getProjectVersions`, including refetches that return byte
+  // for byte what was already on screen. `Select` keys its listbox off that
+  // identity, so it tore items down and rebuilt them under an open dropdown,
+  // destroying the row the user's cursor was over mid-click. The `isLoading`
+  // guard below does not cover this: `isLoading` is only true for the *first*
+  // load, so a refetch leaves the Select mounted and swaps its options out
+  // underneath.
+  const versionIds = createMemo(() => versions().map((v) => v.id), undefined, {
+    equals: (prev, next) =>
+      prev.length === next.length && prev.every((id, i) => id === next[i])
+  })
+
   const handleUpdate = async () => {
     const version = selectedVersion()
     const data = modpackData()
@@ -188,7 +206,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
           <Select
             value={selectedVersion()}
             onChange={(value) => value && setSelectedVersion(value)}
-            options={versions().map((v) => v.id)}
+            options={versionIds()}
             placeholder=""
             disallowEmptySelection={true}
             itemComponent={(itemProps) => {

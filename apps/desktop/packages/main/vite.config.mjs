@@ -15,7 +15,17 @@ export default defineConfig(({ mode }) => {
 
   const definitions = {
     __APP_VERSION__: JSON.stringify(appVersion),
-    __SHOWCASE_MODE__: JSON.stringify(process.env.VITE_SHOWCASE_MODE === "true")
+    __SHOWCASE_MODE__: JSON.stringify(
+      process.env.VITE_SHOWCASE_MODE === "true"
+    ),
+    // The Electron-side counterpart of the core's `e2e` cargo feature, set
+    // only by the `build:*-e2e` scripts. The core simply ignores the e2e CLI
+    // flags when built without that feature, which is why those need no gate
+    // here — but `--gdl_e2e_update_feed` is consumed by this process, so
+    // without this it would be honoured by shipped builds too, letting
+    // anyone who can influence the launcher's command line point
+    // auto-update at a server they control.
+    __E2E_BUILD__: JSON.stringify(process.env.GDL_E2E_BUILD === "true")
   }
 
   if (isDev) {

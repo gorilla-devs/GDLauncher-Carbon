@@ -1,6 +1,10 @@
 // Intentionally putting this on top to catch any potential error in dependencies as well
 
 declare const __SHOWCASE_MODE__: boolean
+/** True only in builds produced by the `build:*-e2e` scripts — the Electron
+ *  counterpart of the core's `e2e` cargo feature. See this file's use of it
+ *  and `packages/main/vite.config.mjs`. */
+declare const __E2E_BUILD__: boolean
 
 console.log("Initializing application...")
 
@@ -246,7 +250,18 @@ const allowMultipleInstances = validateArgument(
 const overrideBaseApi = validateArgument("--gdl_override_base_api")
 const e2eAuthBase = validateArgument("--gdl_e2e_auth_base")
 const e2eEntitlementKey = validateArgument("--gdl_e2e_entitlement_key")
-const e2eUpdateFeed = validateArgument("--gdl_e2e_update_feed")
+// Gated at the build, not merely parsed and ignored. Unlike the two flags
+// above — which are forwarded to the core and are inert unless it was built
+// with the `e2e` cargo feature — this one is consumed by this process and
+// hands electron-updater a new feed URL. In a shipped build that is an
+// update-channel redirect available to anyone who can influence the
+// launcher's command line (an edited shortcut or .desktop file), and on
+// Linux the integrity check is the sha512 from that same feed, so it does
+// not help. `__E2E_BUILD__` is false in every released artifact, and the
+// argument is not even read there.
+const e2eUpdateFeed = __E2E_BUILD__
+  ? validateArgument("--gdl_e2e_update_feed")
+  : null
 
 if (!allowMultipleInstances) {
   if (!app.requestSingleInstanceLock()) {
@@ -1261,7 +1276,15 @@ function assertSafeRuntimeTarget(target: string) {
           "C:\\ProgramData"
         ]
       : process.platform === "darwin"
-        ? ["/System", "/Library", "/usr", "/bin", "/sbin", "/etc", "/Applications"]
+        ? [
+            "/System",
+            "/Library",
+            "/usr",
+            "/bin",
+            "/sbin",
+            "/etc",
+            "/Applications"
+          ]
         : [
             "/usr",
             "/bin",

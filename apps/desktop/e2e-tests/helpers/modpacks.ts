@@ -448,17 +448,12 @@ export async function installModpackLatest(
   return name
 }
 
-/** How long a single attempt at the addon page's Versions tab is given to
- *  settle before `installModpackVersion` decides the route bounced back to
- *  `/library` and retries the whole search-and-navigate sequence. Generous
- *  next to the bounce this guards against, confirmed live to land
- *  within roughly 150ms of reaching `/addon/:id/:platform/versions`. */
+/** How long the addon page's Versions route is watched before it is trusted.
+ *  A bounce back to `/library` lands within roughly 150ms of reaching
+ *  `/addon/:id/:platform/versions` (confirmed live), so a second is
+ *  generous — checking only the first navigation would be fooled by the
+ *  bounce itself, which really does reach the versions route first. */
 const VERSIONS_TAB_SETTLE_WINDOW = 1_000
-
-/** How many bounced attempts `installModpackVersion` tolerates before giving
- *  up. Mirrors `OPEN_INSTANCE_MAX_ATTEMPTS`'s own budget for the analogous,
- *  already-documented instance-route bounce. */
-const VERSIONS_TAB_MAX_ATTEMPTS = 5
 
 /** The addon page's Versions sub-route, on either platform. */
 const ADDON_VERSIONS_ROUTE_PATTERN =
@@ -468,32 +463,22 @@ const ADDON_VERSIONS_ROUTE_PATTERN =
  *  `ModpackDownloadButton` *with* a `fileId`. Returns the instance's display
  *  name, which for this path is the **version** name, not the project title.
  *
- * Retries the whole search-and-navigate sequence (not merely the tab click)
- * on two distinct failure shapes seen live, both only against a
- * completely fresh, first-ever session — never reproduced against the
- * shared, already-warmed-up `authenticatedApp` fixture `modpackInstall.spec.ts`
- * uses for this same driver:
+ * Asserts its way to the version row rather than retrying towards it. Two
+ * failures could motivate a retry here; neither justifies one:
  *
- * 1. **A silent bounce.** The route reaches `/addon/:id/:platform/versions`
- *    and then, well before any `addon-version-row` mounts, navigates back to
- *    `/library` on its own — no error, no user action. Confirmed via direct
- *    `page.url()` polling, not inferred from a downstream timeout. This is
- *    the same *class* of bug `openInstance` already retries around for the
- *    instance-route equivalent (`Library/Instance/index.tsx`'s
- *    `routeData.instancesUngrouped` guard navigating back to `/library`
- *    before the instance is in the just-loaded list).
- * 2. **`openModpackPage` itself throwing** — most often its search-result-row
- *    wait timing out with zero results ever rendered. Unlike (1) this is not
- *    silent, so it is caught here rather than left to propagate on the first
- *    attempt.
- *
- * Both read, from the outside, like `scrollVersionRowIntoView` (or
- * `openModpackPage`) timing out for no reason, which is exactly why this
- * wraps and retries the *whole* sequence rather than papering over either
- * symptom with a longer timeout at its own call site. Not reproduced on the
- * Overview-button install path (`installModpackLatest`, the Modrinth
- * test), which never navigates to the `/versions` sub-route — left
- * unguarded there pending evidence it also needs it. */
+ * 1. **A silent bounce** back to `/library` after reaching
+ *    `/addon/:id/:platform/versions`, with no error and no user action.
+ *    Instrumenting every navigation to `/library` across three specs found
+ *    no such bounce: each one leaving that route came from
+ *    `ModpackDownloadButton`'s own mutation `onSuccess`, which is the
+ *    install starting and is supposed to navigate. Nothing reproduces the
+ *    bounce, so the settle-window check below is now an assertion — if it
+ *    is real, it fails the build instead of costing a silent retry.
+ * 2. **The row never mounting**, which was real and is fixed:
+ *    `InfiniteScrollVersionsQueryWrapper`'s query is gated on the resolved
+ *    scope and only tears the list down when that scope really moves,
+ *    instead of `removeQueries`-ing and refetching on every pass of its
+ *    scoping effect. */
 export async function installModpackVersion(
   page: Page,
   query: string,
@@ -510,93 +495,47 @@ export async function installModpackVersion(
   await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
   const before = await tileNames(page)
 
-  let clicked = false
-  let lastFailure: unknown
-  for (let attempt = 1; attempt <= VERSIONS_TAB_MAX_ATTEMPTS; attempt++) {
-    try {
-      await page.click(byTestId(TEST_IDS.navbarLogo))
-      await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
+  await openModpackPage(page, query, platform)
+  // Same mechanism `openAddonVersions` uses — the tab bar is a real
+  // `role="tab"` list, so no anchor is needed or wanted here.
+  await page.getByRole("tab", { name: "Versions" }).click()
 
-      await openModpackPage(page, query, platform)
-      // Same mechanism `openAddonVersions` uses — the tab bar is a real
-      // `role="tab"` list, so no anchor is needed or wanted here.
-      await page.getByRole("tab", { name: "Versions" }).click()
+  await page.waitForTimeout(VERSIONS_TAB_SETTLE_WINDOW)
+  expect(page.url(), {
+    message:
+      "installModpackVersion: the Versions tab click reached the route and " +
+      `then left it — ${VERSIONS_TAB_SETTLE_WINDOW}ms later the app was at ` +
+      `${page.url()}. That is the silent bounce back to /library, and it is ` +
+      "supposed to be fixed; do not paper over it with a retry"
+  }).toMatch(ADDON_VERSIONS_ROUTE_PATTERN)
 
-      await page.waitForTimeout(VERSIONS_TAB_SETTLE_WINDOW)
-      if (!ADDON_VERSIONS_ROUTE_PATTERN.test(page.url())) {
-        lastFailure = new Error(
-          `attempt ${attempt}: reached the Versions tab click but the route ` +
-            `was at ${page.url()} (not .../versions) ` +
-            `${VERSIONS_TAB_SETTLE_WINDOW}ms later — a silent bounce back to ` +
-            "/library"
-        )
-        continue
-      }
+  await scrollVersionRowIntoView(page, fileId)
 
-      // Inside the loop, deliberately. `scrollVersionRowIntoView` used to sit
-      // below it, so reaching the route was retried but *finding the row* was
-      // not — and the row is the part that fails, because
-      // `InfiniteScrollVersionsQueryWrapper` unconditionally refetches on the
-      // `instanceId === undefined` branch a modpack's standalone search page
-      // always takes. Callers papered over that with a wrapper that retried
-      // this whole function, which is strictly worse: a scroll failure then
-      // re-ran the *install*, and a full-suite run on 2026-08-02 produced
-      // exactly that cascade — attempt 1 lost the row, attempt 2 created an
-      // instance and tripped `newestTileName` with "saw 2", attempt 3 found
-      // nothing new and gave up. Retrying navigate-and-find here keeps the
-      // retry scoped to the part that is actually flaky.
-      await scrollVersionRowIntoView(page, fileId)
-
-      // `modpackVersionDownloadButton`, NOT `modpackDownloadButton`: the addon
-      // page's header button is persistent chrome on every sub-tab including
-      // this one, so the two carry different ids. Scoping
-      // under the row is still required — the id is one-per-row — and a row may
-      // also hold a `ServerPackDownloadButton`, which is why the row's button
-      // has its own id rather than being selected as "the row's one button".
-      //
-      // Once this click lands the loop MUST stop: past this point an install is
-      // genuinely in flight, and retrying would create a second instance.
-      await page
-        .locator(byAddonVersionRow(fileId))
-        .locator(byTestId(TEST_IDS.modpackVersionDownloadButton))
-        .click()
-      clicked = true
-      break
-    } catch (error) {
-      lastFailure = error
-    }
-  }
-
-  if (!clicked) {
-    throw new Error(
-      `installModpackVersion: could not reach and click version "${fileId}" ` +
-        `across ${VERSIONS_TAB_MAX_ATTEMPTS} attempts — either the Versions ` +
-        "route kept bouncing back to /library, or the row never mounted",
-      { cause: lastFailure }
-    )
-  }
+  // `modpackVersionDownloadButton`, NOT `modpackDownloadButton`: the addon
+  // page's header button is persistent chrome on every sub-tab including
+  // this one, so the two carry different ids. Scoping
+  // under the row is still required — the id is one-per-row — and a row may
+  // also hold a `ServerPackDownloadButton`, which is why the row's button
+  // has its own id rather than being selected as "the row's one button".
+  await page
+    .locator(byAddonVersionRow(fileId))
+    .locator(byTestId(TEST_IDS.modpackVersionDownloadButton))
+    .click()
 
   const name = await newestTileName(page, before)
   await waitForInstallComplete(page, name)
   return name
 }
 
-/** How long a single attempt at opening an instance's detail page is given to
- *  land before `openInstance` decides the click bounced (or never navigated
- *  at all) and retries. Short on purpose: the bounce this guards against is a
- *  second, near-immediate navigation back to `/library`, not a slow render —
- *  see `openInstance`'s doc comment. */
-const OPEN_INSTANCE_ATTEMPT_TIMEOUT = 5_000
+/** How long the tile click is given to reach the instance route at all.
+ *  Bounds a slow render or an unclickable tile, nothing subtler — the bounce
+ *  is caught by the settle window below, not by this. */
+const OPEN_INSTANCE_NAV_TIMEOUT = 15_000
 
 /** How long a landed navigation is watched before trusting it — long enough
- *  to catch `Library/Instance/index.tsx`'s `createEffect` firing its bounce
- *  once `routeData.instancesUngrouped.data` resolves, short next to
- *  `OPEN_INSTANCE_ATTEMPT_TIMEOUT`. */
+ *  to catch `Library/Instance/index.tsx`'s `createEffect` firing a bounce
+ *  once `routeData.instancesUngrouped.data` resolves. */
 const OPEN_INSTANCE_SETTLE_WINDOW = 500
-
-/** How many bounced attempts `openInstance` tolerates before giving up.
- *  A throwaway probe needed 4 retries against this exact race. */
-const OPEN_INSTANCE_MAX_ATTEMPTS = 8
 
 /** An instance detail page's own route, on any tab — `/library/<id>`,
  *  optionally followed by `/addons`, `/settings`, `/logs`, or a query string.
@@ -605,76 +544,63 @@ const OPEN_INSTANCE_MAX_ATTEMPTS = 8
 const INSTANCE_ROUTE_PATTERN = /#\/library\/\d+(?:[/?]|$)/
 
 /**
- * Opens `instanceName`'s detail page from the library grid, retrying a
- * bounced click.
+ * Opens `instanceName`'s detail page from the library grid, and asserts it
+ * stays open.
  *
- * `Library/Instance/index.tsx` has a `createEffect` that navigates straight
- * back to `/library` whenever the route's instance id is not yet present in
- * `routeData.instancesUngrouped.data` — so clicking a just-created instance's
- * tile can land on the detail route for one render and then get yanked back
- * to the library before a caller can act on it. This is pre-existing product
- * behaviour (nothing here works around it in product code) — a throwaway
- * probe needed four retries to get past it, which is why every
- * driver in this file that opens an instance's detail page goes through this
- * instead of a bare tile click: none of them should inherit a flaky first
- * click.
+ * It does not retry a bounced click. The theory that would motivate one —
+ * `Library/Instance/index.tsx`'s `createEffect` navigating back to
+ * `/library` whenever the route's instance id is missing from
+ * `routeData.instancesUngrouped.data` — is backed by no recorded
+ * observation: instrumenting the effect (and every navigation to
+ * `/library`) across three specs, two of them against a fresh first-ever
+ * session, produced no bounce at all, and the effect never navigated once.
+ * A retry would be insurance against something nothing can reproduce.
  *
- * "Landed" requires the URL to reach `INSTANCE_ROUTE_PATTERN` *and* still be
- * there after `OPEN_INSTANCE_SETTLE_WINDOW` — checking only the first
- * navigation would be fooled by the bounce itself, which is a real (if
- * momentary) navigation to the detail route immediately followed by a second
- * one back to `/library`.
+ * So it asserts instead. The effect is narrow, too — it does not treat an
+ * unparseable id or a mid-refetch list as proof of deletion — and
+ * if a tile ever does bounce, this must fail and say so rather than quietly
+ * clicking a second time and hiding it for another year.
  *
- * The loop distinguishes, and the exhausted-attempts error names, two
- * genuinely different failure modes rather than reporting one generic
- * "bounced" for both: `waitForURL` itself timing out (the click never
- * navigated to the instance route at all — a wrong `instanceName`, an
- * unclickable tile, or a slow render) versus a navigation that landed and
- * then genuinely bounced back (the race this function exists to retry).
- * Only the second is a bounce, and this path is never exercised by this
- * suite's own runs — exactly where a misleading
- * message would cost the most if it ever fires for real.
+ * Staying open is the assertion, not merely arriving. The bounce is a real
+ * navigation to the detail route immediately followed by a second one back
+ * to `/library`, so checking only the first would be fooled by it — hence
+ * the settle window between the two checks.
+ *
+ * The two failure modes are still named separately, because they point
+ * somewhere completely different: never reaching the route at all means a
+ * wrong `instanceName`, an unclickable tile or a slow render, while reaching
+ * it and leaving means the bounce is back.
  */
 export async function openInstance(
   page: Page,
   instanceName: string
 ): Promise<void> {
-  let neverNavigated = 0
-  let bounced = 0
+  await page.click(byTestId(TEST_IDS.navbarLogo))
+  await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
+  await page.click(byInstanceName(instanceName))
 
-  for (let attempt = 1; attempt <= OPEN_INSTANCE_MAX_ATTEMPTS; attempt++) {
-    await page.click(byTestId(TEST_IDS.navbarLogo))
-    await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
-    await page.click(byInstanceName(instanceName))
+  await page
+    .waitForURL(INSTANCE_ROUTE_PATTERN, {
+      timeout: OPEN_INSTANCE_NAV_TIMEOUT
+    })
+    .catch(() => {
+      throw new Error(
+        `openInstance: clicking "${instanceName}"'s tile never reached the ` +
+          `instance route within ${OPEN_INSTANCE_NAV_TIMEOUT}ms (still at ` +
+          `${page.url()}). That is not the /library bounce — look at the ` +
+          "instance name, the tile, or render time"
+      )
+    })
 
-    const landed = await page
-      .waitForURL(INSTANCE_ROUTE_PATTERN, {
-        timeout: OPEN_INSTANCE_ATTEMPT_TIMEOUT
-      })
-      .then(() => true)
-      .catch(() => false)
-    if (!landed) {
-      neverNavigated++
-      continue
-    }
-
-    await page.waitForTimeout(OPEN_INSTANCE_SETTLE_WINDOW)
-    if (INSTANCE_ROUTE_PATTERN.test(page.url())) {
-      return
-    }
-    bounced++
-  }
-
-  throw new Error(
-    `openInstance: "${instanceName}"'s tile never stayed open across ` +
-      `${OPEN_INSTANCE_MAX_ATTEMPTS} attempts (${bounced} landed on the ` +
-      "instance route and then bounced back to /library — " +
-      "Library/Instance/index.tsx's createEffect racing " +
-      `routeData.instancesUngrouped.data; ${neverNavigated} never reached ` +
-      `the instance route at all within ${OPEN_INSTANCE_ATTEMPT_TIMEOUT}ms ` +
-      "each, which points at something else — a wrong instance name, an " +
-      "unclickable tile, or a slow render, not this race) — giving up"
-  )
+  await page.waitForTimeout(OPEN_INSTANCE_SETTLE_WINDOW)
+  expect(page.url(), {
+    message:
+      `openInstance: "${instanceName}"'s detail page opened and then ` +
+      `bounced back to ${page.url()} within ` +
+      `${OPEN_INSTANCE_SETTLE_WINDOW}ms — Library/Instance/index.tsx's ` +
+      "createEffect is navigating away again; fix it there rather than " +
+      "retrying the click here"
+  }).toMatch(INSTANCE_ROUTE_PATTERN)
 }
 
 /** Opens `instanceName`'s Settings tab. Leaves the page there — nothing
@@ -698,78 +624,37 @@ export async function openInstanceSettings(
   await page.getByRole("tab", { name: "Settings" }).click()
 }
 
-/** Settle window after opening the version select, before clicking an option.
- *
- *  The modal's option list re-renders as its `getProjectVersions` /
- *  `getModFiles` query resolves *underneath the already-open dropdown*, so a
- *  row a locator has resolved can be destroyed and recreated before the click
- *  lands. Playwright reports it as "element is not stable" twice followed by
- *  "element was detached from the DOM".
- *
- *  Observed on three separate specs during the 2026-08-02 wave — including
- *  through this helper itself — so it is a property of the modal, not of any
- *  one caller. It is *not* caused by a running game: it reproduces with
- *  nothing launched. */
-const VERSION_OPTION_SETTLE = 1_500
-
-/** Per-attempt bound on the option click. Deliberately well under
- *  `playwright.config.ts`'s 60s `actionTimeout` so a detached row is retried
- *  rather than spending the whole budget on one doomed click. */
+/** Bound on reaching a specific version option once the select is open. Well
+ *  under `playwright.config.ts`'s 60s `actionTimeout` so a genuinely missing
+ *  option fails in seconds rather than burning the test's budget. */
 const VERSION_OPTION_CLICK_TIMEOUT = 15_000
-
-/** How many times the select-and-pick is retried. Four, because a local
- *  three-attempt wrapper was observed exhausting itself under full-suite
- *  load. */
-const VERSION_OPTION_MAX_ATTEMPTS = 4
 
 /**
  * Picks a version inside the **already-open** version modal and confirms.
  *
- * Split out and retried rather than clicking select-then-option back to back:
- * see `VERSION_OPTION_SETTLE` for the detach this exists to survive. The
- * select is reopened only when the wanted option is not already showing — a
- * retry can arrive with the dropdown still open, and clicking the trigger
- * again would toggle it shut.
+ * Clicks straight through — open the select, click the option, confirm — with
+ * no settle window and no retry. Both would be needed if the modal's option
+ * list were rebuilt whenever `getModFiles`/`getProjectVersions` refetched:
+ * a freshly allocated `options` array reaching `Select` destroys and
+ * recreates a row a locator has already resolved, before the click lands
+ * ("element is not stable", then "element was detached from the DOM", seen
+ * on three separate specs). `ModPackVersionUpdate` derives that array
+ * through a memo whose identity only changes when the ids do, so the listbox
+ * survives a refetch and there is nothing to settle for.
  *
  * Exported because two specs must drive the modal *without*
  * `changeModpackVersion`'s trailing `waitForInstallComplete` — they expect the
- * change to be refused, or they kill the core mid-flight — and they should not
- * each carry their own copy of this retry. One modal quirk, one workaround.
+ * change to be refused, or they kill the core mid-flight.
  */
 export async function pickModpackVersionAndConfirm(
   page: Page,
   versionId: string
 ): Promise<void> {
-  let lastError: unknown
-
-  for (let attempt = 1; attempt <= VERSION_OPTION_MAX_ATTEMPTS; attempt++) {
-    try {
-      const option = page.locator(byModpackVersionOption(versionId))
-      if (!(await option.isVisible().catch(() => false))) {
-        await page.click(byTestId(TEST_IDS.modpackVersionSelect))
-        await page.waitForTimeout(VERSION_OPTION_SETTLE)
-      }
-      await option.click({ timeout: VERSION_OPTION_CLICK_TIMEOUT })
-      await page.click(byTestId(TEST_IDS.modpackVersionUpdateConfirm))
-      return
-    } catch (error) {
-      lastError = error
-      console.error(
-        `pickModpackVersionAndConfirm: attempt ${attempt}/` +
-          `${VERSION_OPTION_MAX_ATTEMPTS} for "${versionId}" failed:`,
-        error
-      )
-      // Close whatever is open so the next attempt starts from a known state.
-      await page.keyboard.press("Escape").catch(() => {})
-    }
-  }
-
-  throw new Error(
-    `changeModpackVersion: could not select version "${versionId}" in ` +
-      `${VERSION_OPTION_MAX_ATTEMPTS} attempts — the modal's option list kept ` +
-      "detaching, or the version is not offered for this instance",
-    { cause: lastError }
-  )
+  await page.click(byTestId(TEST_IDS.modpackVersionSelect))
+  await page
+    .locator(byModpackVersionOption(versionId))
+    .click({ timeout: VERSION_OPTION_CLICK_TIMEOUT })
+  await page.click(byTestId(TEST_IDS.modpackVersionUpdateConfirm))
 }
 
 /**

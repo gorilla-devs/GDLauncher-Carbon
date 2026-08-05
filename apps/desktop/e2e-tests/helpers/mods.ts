@@ -616,23 +616,21 @@ const VERSIONS_RESPONSE_TIMEOUT = 30_000
  * CurseForge update test should write that branch fresh, against
  * CurseForge's real paginated behavior confirmed live, not inherit this.
  *
- * This list ends up scoped to the instance's own Minecraft version and
- * loader, but not on the *first* fetch: `InfiniteScrollVersionsQueryWrapper`
- * mounts its query as soon as the addon page knows its `modId` — before it
- * knows the instance's version at all — so the very first request goes out
- * unfiltered (confirmed live: 1165 versions for Fabric API across every
- * Minecraft release), and only a second request,
- * fired from a `createEffect` once `instance.getInstanceDetails` resolves,
- * carries `game_versions`/`loaders` (confirmed live: 27 versions, all
- * `"1.20.1"`/`"fabric"`, for the same project). Both requests share the same
- * TanStack Query key, so nothing about the query name or timing tells them
- * apart — only the request URL itself does (the scoped one is the only one
- * carrying a `game_versions` param), which is what this waits for
- * specifically rather than "whatever answers next" (a `waitForResponse`
- * race against the unfiltered request was tried and observed to
- * intermittently win). Listening from before the
- * click, not after, is what makes this deterministic instead of just
- * narrowing the same race.
+ * This list is scoped to the instance's own Minecraft version and loader.
+ * `InfiniteScrollVersionsQueryWrapper` gates its query on that scope, so the
+ * request only goes out once `instance.getInstanceDetails` has resolved and
+ * it carries `game_versions`/`loaders` from the start — which is what this
+ * matches on, by the `game_version` param the request URL carries.
+ *
+ * Matching the URL rather than the query name is still deliberate. The query
+ * name is shared by every fetch for this project, so it cannot distinguish
+ * them, and an unscoped request reaching the wire again would mean the gate
+ * has regressed: unscoped, this call returns 1165 versions for Fabric API
+ * where the instance matches 27, and renders all of them until the scoped
+ * answer replaces the list under whoever is already clicking it. Waiting on
+ * `game_version` specifically keeps that failure visible instead of silently
+ * accepting whichever response is first.
+ * Listening from before the click, not after, is what makes it deterministic.
  *
  * Also waits for at least one row to mount in the DOM
  * (`TEST_IDS.addonVersionRow`), since `installAddonVersion` needs it there,
@@ -663,18 +661,17 @@ export async function openAddonVersions(
         `"${TEST_IDS.addonVersionRow}" row ever mounted`
     }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
 
-    // The scoped request is fired from an effect chained behind its own
-    // `instance.getInstanceDetails` round trip, so it can still be in
-    // flight once the (unfiltered) first render's rows are already
-    // visible. Worse, the effect has been observed to fire it *twice* in a
-    // row (see the "last, not first" comment below) — each firing replaces
-    // the whole virtualized row set, which raced a caller's click on a
-    // specific row hard enough to fail it outright (element detached
-      // mid-click). So this
-    // does not return the instant one scoped response lands; it waits for
-    // the count to stop changing for a full `SETTLE_WINDOW` first, so a
-    // caller that immediately clicks into the returned list isn't racing a
-    // second re-render still in flight.
+    // One scoped response is not necessarily the last one: once the addon's
+    // supported loaders are known, `ExploreVersionsNavbar` resets a loader
+    // filter the addon does not offer (a Forge instance opening a
+    // Fabric-only mod), and that legitimately refetches — still scoped, so
+    // still counted here. Each refetch replaces the whole virtualized row
+    // set, which raced a caller's click on a specific row hard enough to
+    // fail it outright (element detached mid-click). So this does not return
+    // the instant one scoped
+    // response lands; it waits for the count to stop changing for a full
+    // `SETTLE_WINDOW`, so a caller that immediately clicks into the returned
+    // list isn't racing a re-render still in flight.
     const deadline = Date.now() + VERSIONS_RESPONSE_TIMEOUT
     const SETTLE_WINDOW = 1_000
     let lastCount = 0
@@ -765,6 +762,19 @@ export function pickOlderVersion(
  *  switch), not a scroll-triggered `fetchNextPage`. */
 const VERSION_PAGE_SETTLE = 200
 
+/** How long a scroll that hit the bottom waits for the infinite query to
+ *  deliver another page before concluding the list really has ended.
+ *
+ *  Sized for a real network round trip, unlike `VERSION_PAGE_SETTLE`, because
+ *  it is paid at most once per genuine end-of-list rather than once per
+ *  scroll step. CurseForge's version list is paginated
+ *  (`InfiniteScrollVersionsQueryWrapper`'s `getNextPageParam`, 20 per page),
+ *  and a `fetchNextPage` goes through the proxied backend to CurseForge —
+ *  200ms was never enough for one, which is how a version that simply had not
+ *  been paged in yet got reported as "may not exist" (seen once in a full
+ *  run: `4713831`, 24 rows mounted). */
+const VERSION_PAGE_LOAD_TIMEOUT = 15_000
+
 /** How long a row that has mounted is given to become visible after being
  *  scrolled to. Short: at this point the element exists and the only work
  *  left is layout. */
@@ -820,6 +830,55 @@ const CONTAINER_LOOKUP_RETRY_WINDOW = 2_000
  * budget exhausted) with its own message, rather than one generic timeout
  * covering all three.
  */
+/**
+ * Waits for the Versions list to grow past `previousScrollHeight`, i.e. for
+ * the infinite query's next page to render.
+ *
+ * Returns true if it grew, false if it stayed put for the whole
+ * `VERSION_PAGE_LOAD_TIMEOUT` — which is the only evidence available that the
+ * list has genuinely ended rather than being mid-fetch.
+ *
+ * Re-walks up from a row each poll rather than caching the container element:
+ * the list is virtualized, so the row a handle was taken from can be unmounted
+ * between polls. Missing the container is treated as "no growth yet, keep
+ * polling" — a momentary re-render, not an answer.
+ */
+async function waitForListGrowth(
+  page: Page,
+  previousScrollHeight: number
+): Promise<boolean> {
+  const deadline = Date.now() + VERSION_PAGE_LOAD_TIMEOUT
+
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(VERSION_PAGE_SETTLE)
+
+    const scrollHeight = await page.evaluate(() => {
+      const row = document.querySelector('[data-testid="addon-version-row"]')
+      let el: HTMLElement | null = row as HTMLElement | null
+      while (el?.parentElement) {
+        const style = window.getComputedStyle(el.parentElement)
+        const oy = style.overflowY
+        if (
+          style.overflow === "auto" ||
+          style.overflow === "scroll" ||
+          oy === "auto" ||
+          oy === "scroll"
+        ) {
+          return el.parentElement.scrollHeight
+        }
+        el = el.parentElement
+      }
+      return null
+    })
+
+    if (scrollHeight !== null && scrollHeight > previousScrollHeight) {
+      return true
+    }
+  }
+
+  return false
+}
+
 export async function scrollVersionRowIntoView(
   page: Page,
   fileId: string,
@@ -871,7 +930,12 @@ export async function scrollVersionRowIntoView(
             const box = el.parentElement
             const before = box.scrollTop
             box.scrollTop = before + box.clientHeight
-            return { before, after: box.scrollTop, height: box.clientHeight }
+            return {
+              before,
+              after: box.scrollTop,
+              height: box.clientHeight,
+              scrollHeight: box.scrollHeight
+            }
           }
           el = el.parentElement
         }
@@ -922,6 +986,23 @@ export async function scrollVersionRowIntoView(
         await confirmFound()
         return
       }
+
+      // A scroll that cannot move means one of two things, and `scrollTop`
+      // alone cannot tell them apart: the list has genuinely ended, or it has
+      // ended *so far* while `fetchNextPage` is still in flight. Treating both
+      // as "ended" is how a paged-out version gets reported as non-existent.
+      //
+      // Growth of the container's `scrollHeight` is the signal a page landed —
+      // it rises as soon as the new rows render, whether or not any of them is
+      // mounted in the viewport, so it does not depend on the virtualizer's
+      // choices the way a mounted-row count would.
+      const grew = await waitForListGrowth(page, advanced.scrollHeight)
+      if ((await target.count()) > 0) {
+        await confirmFound()
+        return
+      }
+      if (grew) continue
+
       const mounted = await page
         .locator(byTestId(TEST_IDS.addonVersionRow))
         .count()

@@ -279,3 +279,107 @@ async fn deleting_a_server_clears_its_file_cache_without_fk_enforcement() {
         "the server's cache rows must be cleared without relying on the cascade"
     );
 }
+
+/// An in-flight CurseForge metadata cache write, landing after the instance
+/// that owned the mod was deleted, fails on the
+/// `CurseForgeModCache.metadataId -> ModMetadata.id` foreign key.
+///
+/// This is the DB-level half of a real defect seen in a full e2e run (48
+/// violations logged from `metadata/cache/mod.rs`'s `save_batch`). The cache
+/// pass captures `metadata_id` values up front and then does a CurseForge
+/// network round trip before saving; if the instance is deleted inside that
+/// window, `remove_instance` -> `delete_instance_tx` -> `gc_orphan_metadata`
+/// reclaims the now-unreferenced `ModMetadata` row, and the save lands on a
+/// parent that no longer exists.
+///
+/// Deterministic on purpose: the production race is a timing window, but the
+/// *consequence* of it is exactly this ordering, so it can be asserted without
+/// racing anything. The app-side handler must treat this as a benign "the mod
+/// is gone, nothing to cache" outcome — what it must NOT do is what it does
+/// today, which is add the mod's murmur2 to `ignored_remote_cf_hashes` and
+/// refuse to cache that fingerprint for the rest of the session.
+#[tokio::test]
+async fn cf_cache_write_for_gced_metadata_violates_the_fk() {
+    let (_d, db) = migrated_fk_on().await;
+
+    let g = inst::insert_group(&db, "g".into(), 0, None).await.unwrap() as i32;
+    let iid = inst::add_instance_tx(&db, "i".into(), "sp".into(), 0, g, None)
+        .await
+        .unwrap() as i32;
+    seed_metadata(&db, "meta1").await;
+    mfc::upsert_mod_file_cache(
+        &db,
+        iid,
+        "mod.jar".into(),
+        1,
+        true,
+        "mod".into(),
+        "meta1".into(),
+        now(),
+    )
+    .await
+    .unwrap();
+
+    // What the cache pass is holding while it waits on CurseForge.
+    let in_flight_metadata_id = "meta1";
+
+    // The window closes: the instance goes away and its metadata is reclaimed.
+    inst::delete_instance_tx(&db, iid).await.unwrap();
+    meta::gc_orphan_metadata(&db).await.unwrap();
+    assert_eq!(
+        count(&db, "SELECT COUNT(*) FROM ModMetadata WHERE id = 'meta1'").await,
+        0,
+        "precondition: the orphaned metadata row must actually be reclaimed"
+    );
+
+    // The save lands.
+    let result = meta::upsert_cf_mod_cache(
+        &db,
+        1,
+        100,
+        200,
+        "name".into(),
+        "1.0.0".into(),
+        "slug".into(),
+        "summary".into(),
+        "authors".into(),
+        1,
+        "".into(),
+        now(),
+        in_flight_metadata_id.to_string(),
+    )
+    .await;
+
+    let err = result.expect_err(
+        "caching a mod whose ModMetadata was GC'd must not silently succeed — \
+         if this starts passing, the FK edge changed and the app-side handling \
+         below needs revisiting",
+    );
+    let msg = format!("{err:#}");
+    assert!(
+        msg.to_lowercase().contains("foreign key"),
+        "expected a FOREIGN KEY violation, got: {msg}"
+    );
+
+    // The classifier the app-side handler branches on must recognise this
+    // exact error. If it stops doing so, the CurseForge cacher silently goes
+    // back to blacklisting the mod's fingerprint for the whole session.
+    assert!(
+        err.is_foreign_key_violation(),
+        "DbError::is_foreign_key_violation must classify the real error the \
+         cache write produces, got: {msg}"
+    );
+}
+
+/// The FK classifier must not swallow unrelated write failures — those are
+/// the ones the CurseForge cacher *should* still treat as a bad mod.
+#[test]
+fn non_fk_db_errors_are_not_classified_as_foreign_key_violations() {
+    use carbon_repos::db_error::DbError;
+
+    assert!(!DbError::Closed.is_foreign_key_violation());
+    assert!(!DbError::Conversion("bad row".into()).is_foreign_key_violation());
+    assert!(
+        !DbError::Sqlite(rusqlite::Error::QueryReturnedNoRows).is_foreign_key_violation()
+    );
+}

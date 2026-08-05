@@ -180,11 +180,13 @@ import {
  * `stopHarness`, the final safety net if the graceful in-body stop below
  * never runs at all.
  *
- * `installModpackVersion` retries reaching and clicking the version row
- * internally (`helpers/modpacks.ts`), so this file does not wrap it. It used
- * to: a local `installModpackVersionRetrying` retried the *whole* install,
- * which turned one lost row into a double install — see that helper's own
- * comment for the full-suite run that demonstrated it.
+ * `installModpackVersion` asserts its way to the version row rather than
+ * retrying towards it (`helpers/modpacks.ts`), so this file does not wrap it.
+ * Wrapping it is actively wrong here: a local `installModpackVersionRetrying`
+ * once retried the *whole* install, which turned one lost row into a double
+ * install. The row loss it was covering was
+ * `InfiniteScrollVersionsQueryWrapper` tearing the list down on an unchanged
+ * scope, and that is fixed in the product now.
  *
  * **Sabotage results.** Three, each one surgical edit against a provably
  * clean build, each reverted and sha256-confirmed byte-identical to HEAD

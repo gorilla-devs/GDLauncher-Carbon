@@ -157,35 +157,21 @@ import { verifyModInstalled } from "./helpers/modVerify.js"
  * `Set: true` is exactly what test 2's `locked).toBe(false)` assertion
  * exists to catch.
  *
- * **A pre-existing gap in `installModpackVersion` itself, found live running
- * this file, worked around locally rather than touched.** Its own retry loop
- * (`VERSIONS_TAB_MAX_ATTEMPTS`) covers landing on the Versions tab route, but
- * the `scrollVersionRowIntoView` call immediately after it is not inside
- * that loop, and has no settle-window protection against
- * `InfiniteScrollVersionsQueryWrapper`'s own scoping `createEffect`
- * (`components/InfiniteScrollVersionsQueryWrapper/index.tsx`) wiping and
- * refetching the whole row set out from under it — unlike `openAddonVersions`
- * (`helpers/mods.ts`), which explicitly waits for that same effect's request
- * count to settle before ever returning, for exactly this reason (see its own
- * doc comment). Hit reproducibly this session: 9 consecutive identical
- * failures — `scrollVersionRowIntoView`'s "may have been replaced by a
- * re-render" message, same version id, same call site — and confirmed to be
- * this gap and not this file's own doing by re-running the already-committed,
- * previously-green `modpackSaveGuard.spec.ts` against the identical
- * `installModpackVersion(MODPACK_MR_QUERY, "modrinth", MODPACK_MR_V_MID)`
- * call: it failed the same way, at the same line, in the same session. Not a
- * live-service issue either — a full response log covering the whole install
- * (`page.on("response")`) showed zero non-2xx Modrinth responses; the one
- * console "Failed to load resource: 500" that kept appearing traces to the
- * app's own unrelated YouTube embed, not to anything this suite talks to.
- * `installModpackVersionRetrying` below retries the *whole* call (never
- * partial — every failure mode observed here happens before an instance is
- * ever created, so a retry always starts clean from
- * `installModpackVersion`'s own `navbarLogo` reset), the same "just re-run
- * it" mitigation this suite's own README prescribes for exactly this class
- * of issue, applied locally in this file rather than by hand between
- * invocations. This is additive code in this file only — `helpers/modpacks.ts`
- * itself is untouched, per the brief's "verified, do not reimplement it".
+ * **This file is why `InfiniteScrollVersionsQueryWrapper`'s scoping effect
+ * got fixed.** Running it hit 9 consecutive identical failures —
+ * `scrollVersionRowIntoView`'s "may have been replaced by a re-render", same
+ * version id, same call site — because that effect wiped and refetched the
+ * whole row set on every pass, including passes where the resolved scope had
+ * not changed at all. Confirmed to be the product and not this file by
+ * re-running the already-green `modpackSaveGuard.spec.ts` against the
+ * identical `installModpackVersion(MODPACK_MR_QUERY, "modrinth",
+ * MODPACK_MR_V_MID)` call: same failure, same line, same session. Not a
+ * live-service issue either — a full `page.on("response")` log over the whole
+ * install showed zero non-2xx Modrinth responses, and the one console
+ * "Failed to load resource: 500" traces to the app's unrelated YouTube embed.
+ * The query is now gated on that scope and only tears the list down when the
+ * scope really moves, so `installModpackVersion` asserts its way to the row
+ * instead of retrying towards it, and this file calls it directly.
  *
  * **A second pre-existing gap, in `unlockModpack`/`unpairModpack` this time,
  * also worked around locally.** `Settings/index.tsx`'s `updateInstanceMutation`

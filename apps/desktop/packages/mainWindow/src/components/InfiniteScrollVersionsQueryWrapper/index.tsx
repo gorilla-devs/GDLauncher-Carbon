@@ -16,6 +16,25 @@ const supportsModloader = (type?: FEUnifiedSearchType) => {
   return type ? !noModloaderTypes.includes(type) : true
 }
 
+/** The instance scope a version list is filtered by. `undefined` on either
+ *  field means "no filter", which is what an addon page opened outside any
+ *  instance legitimately resolves to — distinct from the scope not being
+ *  known yet, which `InstanceScope | undefined` carries instead. */
+interface InstanceScope {
+  modLoaderType: string | null | undefined
+  gameVersion: string | null | undefined
+}
+
+/** Treats every "no filter" spelling as one value. This module resolves a
+ *  missing filter to `undefined`, `versionsDefaultQuery` starts it at `null`,
+ *  and `ExploreVersionsNavbar` clears it back to `null` — comparing them
+ *  strictly would read an unchanged scope as a change and tear the list down
+ *  for nothing. */
+const sameFilter = (
+  a: string | null | undefined,
+  b: string | null | undefined
+) => (a ?? null) === (b ?? null)
+
 export interface VersionRowType {
   data: VersionRowTypeData[]
   index: number
@@ -71,6 +90,10 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   }>()
   const searchContext = useSearchContext()
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(null)
+
+  /** The instance scope this page's versions must be filtered by, once known.
+   *  Gates the query below — see `enabled`. */
+  const [scope, setScope] = createSignal<InstanceScope | undefined>(undefined)
 
   const infiniteQuery = createInfiniteQuery(() => ({
     queryKey: ["modplatforms.versions", props.modId, props.modplatform],
@@ -188,11 +211,60 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
 
       return (hasNextPage && index + pageSize) || null
     },
-    enabled: !!props.modId
+    /* Gated on the resolved scope, not just the id. `queryFn` reads its
+       filters off `versionsQuery` when it runs rather than from the query
+       key, so firing before the instance's loader and game version are known
+       sends an *unfiltered* request — measured live at 1165 versions for
+       Fabric API against an instance that matches 27 — and renders every one
+       of them until a second, scoped request replaces the list underneath
+       whoever is already clicking it. */
+    enabled: !!props.modId && scope() !== undefined
   }))
 
   const setQueryWrapper = (newValue: Partial<typeof versionsQuery>) => {
     setVersionsQuery(newValue)
+    rspcContext.queryClient.removeQueries({
+      queryKey: ["modplatforms.versions", props.modId, props.modplatform]
+    })
+    infiniteQuery.refetch()
+  }
+
+  /**
+   * Applies the instance scope resolved by the effect below.
+   *
+   * Separate from `setQueryWrapper` — which backs the context's `setQuery`
+   * and runs when a user actually changes a filter — because this runs on
+   * every pass of a reactive effect, and `removeQueries` drops the cached
+   * pages, which unmounts every row. Doing that for a scope that did not
+   * change is what let a click land on a detached row: `props.addonType`
+   * arrives from a query, so the effect below runs at least twice per page
+   * open, and on an addon page opened outside an instance both passes
+   * resolve to the very same empty scope.
+   */
+  const applyScope = (next: InstanceScope) => {
+    const current = scope()
+    if (
+      current &&
+      sameFilter(current.modLoaderType, next.modLoaderType) &&
+      sameFilter(current.gameVersion, next.gameVersion)
+    ) {
+      return
+    }
+
+    // Before `setScope`, so the store `queryFn` reads is already current by
+    // the time flipping `enabled` lets the query run.
+    setVersionsQuery({
+      modLoaderType: next.modLoaderType,
+      gameVersion: next.gameVersion
+    })
+
+    const firstResolution = current === undefined
+    setScope(next)
+
+    // That first resolution flips `enabled` true, which fires the initial
+    // request by itself — refetching here too would duplicate it.
+    if (firstResolution) return
+
     rspcContext.queryClient.removeQueries({
       queryKey: ["modplatforms.versions", props.modId, props.modplatform]
     })
@@ -210,21 +282,25 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       rspcContext.client
         .query(["instance.getInstanceDetails", instanceId])
         .then((details) => {
-          setQueryWrapper({
+          applyScope({
             modLoaderType: supportsModloader(addonType)
-              ? details?.modloaders[0].type_
+              ? // `?.` on the element: a vanilla instance has no modloaders,
+                // and indexing an empty array here used to throw straight
+                // into the `catch` below, losing the game-version filter too.
+                details?.modloaders[0]?.type_
               : undefined,
             gameVersion: details?.version
           })
         })
         .catch((_err) => {
-          // Error fetching instance details
+          // Resolve the scope regardless. It gates the query, so leaving it
+          // unset after a failed lookup would hold the list on its skeleton
+          // forever; an unfiltered list is what this page showed before the
+          // gate existed, and is the right thing to fall back to.
+          applyScope({ modLoaderType: undefined, gameVersion: undefined })
         })
     } else {
-      setQueryWrapper({
-        modLoaderType: undefined,
-        gameVersion: undefined
-      })
+      applyScope({ modLoaderType: undefined, gameVersion: undefined })
     }
   })
 
@@ -237,7 +313,11 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       return versionsQuery
     },
     get isLoading() {
-      return infiniteQuery.isLoading
+      // An unresolved scope means the query is deliberately not running yet
+      // (see `enabled`). Reporting "not loading" there would flash
+      // "no versions found" over a list that is about to arrive — the
+      // Versions tab picks its skeleton off exactly this flag.
+      return scope() === undefined || infiniteQuery.isLoading
     },
     setQuery: setQueryWrapper,
     allRows,

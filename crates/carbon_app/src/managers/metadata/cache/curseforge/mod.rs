@@ -15,6 +15,7 @@ use carbon_platforms::curseforge::filters::ModFilesParametersQuery;
 use carbon_platforms::curseforge::filters::ModParameters;
 use carbon_platforms::curseforge::filters::ModsParameters;
 use carbon_platforms::curseforge::filters::ModsParametersBody;
+use carbon_repos::db_error::DbError;
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_repos::repos::mod_metadata as metarepo;
@@ -213,9 +214,37 @@ impl ModplatformCacher for CurseforgeModCacher {
                 .await;
 
                 if let Err(e) = r {
-                    error!({ error = ?e, metadata_id, file_id = ?fp_match.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
+                    // A vanished parent is not a bad mod. This batch captured
+                    // its `metadataId`s before making a CurseForge round trip,
+                    // and an instance deleted inside that window takes its
+                    // `ModFileCache` rows with it, after which
+                    // `gc_orphan_metadata` reclaims the `ModMetadata` row this
+                    // write references. Nothing is wrong with the mod and
+                    // there is nothing left to cache for it here.
+                    //
+                    // Blacklisting on that is actively harmful: the ignore set
+                    // is keyed by fingerprint and lives for the whole session,
+                    // so one unrelated deletion would stop the *same mod* ever
+                    // being cached again — including for instances that still
+                    // have it installed, and including installs that have not
+                    // happened yet. Observed in a full e2e run as 48
+                    // violations followed by a mod install that never
+                    // completed. See `carbon_repos`'
+                    // `cf_cache_write_for_gced_metadata_violates_the_fk`.
+                    if e.chain().any(|cause| {
+                        cause
+                            .downcast_ref::<DbError>()
+                            .is_some_and(DbError::is_foreign_key_violation)
+                    }) {
+                        debug!(
+                            { metadata_id, file_id = ?fp_match.file.id },
+                            "Skipping curseforge mod metadata for a mod whose metadata row was reclaimed while this batch was in flight"
+                        );
+                    } else {
+                        error!({ error = ?e, metadata_id, file_id = ?fp_match.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
 
-                    mcm.ignored_remote_cf_hashes.write().await.insert(murmur2);
+                        mcm.ignored_remote_cf_hashes.write().await.insert(murmur2);
+                    }
                 }
                 }
             })
