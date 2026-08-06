@@ -94,7 +94,11 @@ const Intro = (props: StepProps) => {
           <Trans key="content:_trn_shader_loader_cancel" />
         </Button>
         <div class="flex gap-2">
-          <Button type="secondary" onClick={continueWithout}>
+          <Button
+            data-testid="shader-loader-continue-anyway"
+            type="secondary"
+            onClick={continueWithout}
+          >
             <Trans key="content:_trn_shader_loader_continue_anyway" />
           </Button>
           <Button type="primary" onClick={startAutoSetup}>

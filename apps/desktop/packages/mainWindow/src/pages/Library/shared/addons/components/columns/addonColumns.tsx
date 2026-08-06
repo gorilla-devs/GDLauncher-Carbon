@@ -301,7 +301,12 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     createEnabledColumn({
       onToggle: config.onToggleMod,
       isDisabled: config.isLocked,
-      isHidden: (row) => !supportsEnableToggle(row.addon_type),
+      // Through `config.getAddonType`, never `row.addon_type` directly: the
+      // two tables this file serves carry the field under different names
+      // (the instance's rspc `Mod` uses `addon_type`, the server's
+      // `ServerAddon` uses `addonType`), which is what that accessor exists
+      // to absorb.
+      isHidden: (row) => !supportsEnableToggle(config.getAddonType(row)),
       disabledTooltip: lockedTooltip
     }),
 

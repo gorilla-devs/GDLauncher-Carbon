@@ -26,17 +26,35 @@
  * file, not assumed from source alone.
  */
 
+import fs from "node:fs"
 import { expect, type Page } from "@playwright/test"
 import {
+  byAddonTypeOption,
   byAddonVersionRow,
   byInstanceName,
   byModRow,
   byTestId,
   TEST_IDS
 } from "./selectors.js"
-import { listModFiles } from "./modVerify.js"
 
 export type ModPlatform = "curseforge" | "modrinth"
+
+/**
+ * `AddonType`'s serialised wire form (`crates/carbon_app/src/domain/instance/mod.rs`,
+ * `#[serde(rename_all = "lowercase")]`) — every value `Mod.addon_type` can
+ * carry, i.e. `"mods"` plus this suite's own `NonModAddonType`
+ * (`helpers/addonFixtures.ts`). Kept as an independent literal union here
+ * rather than importing that type: `mods.ts` is the more foundational file
+ * (every mod spec depends on it; only `addonPlacement.spec.ts` depends on
+ * `addonFixtures.ts`), so it carries its own copy of the wire values instead
+ * of reaching "upward" for a narrower helper's type.
+ */
+export type ModAddonType =
+  | "mods"
+  | "resourcepacks"
+  | "shaders"
+  | "datapacks"
+  | "worlds"
 
 /**
  * The subset of the `Mod` struct (`crates/carbon_app/src/api/instance/mod.rs`)
@@ -53,6 +71,14 @@ export interface InstalledMod {
   filename: string
   fileSize: number
   enabled: boolean
+  /** `Mod.addon_type` (`crates/carbon_app/src/api/instance/mod.rs`) — which
+   *  on-disk folder this file actually lives in
+   *  (`AddonType::get_folder_path`), not merely which catalogue tab the
+   *  search that found it used. Every mod every spec before
+   *  `addonPlacement.spec.ts` has installed happens to be `"mods"` (the only
+   *  type any of them ever installs), so this is the first reader of any
+   *  other value. */
+  addonType: ModAddonType
   curseforgeProjectId: number | null
   modrinthProjectId: string | null
   /** `modrinth.version_id` (`ModrinthModMetadata.version_id`,
@@ -111,6 +137,7 @@ interface RawModResponse {
   filename: string
   file_size: number
   enabled: boolean
+  addon_type: ModAddonType
   curseforge?: { project_id: number; file_id: number } | null
   modrinth?: { project_id: string; version_id: string } | null
   metadata?: { sha_1?: string | null; modloaders?: string[] | null } | null
@@ -137,8 +164,11 @@ const SEARCH_RESULTS_TIMEOUT = 90_000
 /** How long a real mod download+install (against the live CDN) is given to
  *  finish. Both mods this suite installs are a few MB, so this is generous
  *  headroom for CI network variance, not a reflection of expected
- *  wall-clock. */
-const INSTALL_TIMEOUT = 120_000
+ *  wall-clock. Exported so a caller
+ *  supplying `installModIntoInstance`'s `waitForCompletion` (e.g.
+ *  `addonPlacement.spec.ts`'s disk poll for a world install) can bound it by
+ *  the same figure rather than carrying a second copy of this number. */
+export const INSTALL_TIMEOUT = 120_000
 
 /** How long a fresh `instance.getInstanceMods` response is awaited after
  *  navigating onto the instance's Addons tab. The query has no configured
@@ -248,6 +278,7 @@ export async function openInstanceAddons(
     filename: m.filename,
     fileSize: m.file_size,
     enabled: m.enabled,
+    addonType: m.addon_type,
     curseforgeProjectId: m.curseforge?.project_id ?? null,
     modrinthProjectId: m.modrinth?.project_id ?? null,
     modrinthVersionId: m.modrinth?.version_id ?? null,
@@ -258,15 +289,72 @@ export async function openInstanceAddons(
   }))
 }
 
+/** How long `dismissSearchOnboardingTip` waits for the spotlight overlay to
+ *  appear before concluding this tip has already been seen (the common case
+ *  after the first call in a worker). `OnboardingTip`'s own click handler
+ *  fires on a 200ms delay (`EnhancedSearchBar.tsx`'s `delay={200}`), so this
+ *  needs to clear that plus render time — generous margin over it, not a
+ *  tuned minimum. Independent copy of `helpers/modpacks.ts`'s constant of the
+ *  same name and value — see `dismissSearchOnboardingTip`'s doc comment for
+ *  why this file carries its own rather than importing that one. */
+const ONBOARDING_TIP_WAIT = 1_000
+
+/**
+ * Dismisses the `search-input-syntax` onboarding tip
+ * (`components/Onboarding/SpotlightOverlay.tsx`) if the click that just
+ * landed on `AddonTypeDropdown`'s trigger triggered it. A no-op, bounded by
+ * `ONBOARDING_TIP_WAIT`, when the tip does not appear (already seen, or
+ * `settings.isFirstLaunch` never resolved to `false` — see
+ * `OnboardingContext.tsx`'s `isEnabled`).
+ *
+ * Dismissed via Escape (`SpotlightOverlay`'s own `keydown` handler calls
+ * `onboarding.hideTip()`), not a click on the backdrop or its popover:
+ * neither carries a `data-testid`, and Escape needs no selector at all.
+ *
+ * `helpers/modpacks.ts`'s `openModpackPage` carries an identically-named,
+ * identically-implemented private function for the identical hazard — that
+ * one guards a click on `TEST_IDS.searchInput`, this one guards
+ * `searchForMod`'s click on `TEST_IDS.addonTypeDropdownTrigger`, both
+ * descendants of the same `OnboardingTip`-wrapped div in
+ * `EnhancedSearchBar.tsx`. Kept as two small, independent copies rather than
+ * one shared export: `mods.ts` is the more foundational of the two files
+ * (every mod spec depends on it; only the modpack specs depend on
+ * `modpacks.ts`), so importing "downward" from there would be the wrong
+ * direction, and this is the first place in `mods.ts` that ever makes a real
+ * `.click()` inside that region — see `searchForMod`'s `searchType` branch
+ * below, the one caller.
+ */
+async function dismissSearchOnboardingTip(page: Page): Promise<void> {
+  const overlay = page.locator("div.fixed.inset-0.z-99999").first()
+  const appeared = await overlay
+    .waitFor({ state: "visible", timeout: ONBOARDING_TIP_WAIT })
+    .then(() => true)
+    .catch(() => false)
+  if (!appeared) return
+
+  await page.keyboard.press("Escape")
+  await overlay.waitFor({ state: "hidden", timeout: 5_000 })
+}
+
 /**
  * From an instance's Addons tab (must be called right after
  * `openInstanceAddons` — see this module's doc comment for why), clicks
- * "Add Addons", selects `platform`, and searches for `query`, waiting for at
- * least one live result.
+ * "Add Addons", selects `platform`, optionally switches the search page's
+ * content-type filter, and searches for `query`, waiting for at least one
+ * live result.
+ *
+ * `opts.searchType` is optional and left undefined by every mod spec that
+ * predates `addonPlacement.spec.ts` — their behaviour is unchanged. It takes
+ * a `FEUnifiedSearchType` (`@gd/core_module/bindings`, not imported here —
+ * see this module's doc comment on why `mods.ts` carries no dependency on the
+ * frontend bindings package) other than `"mod"`, e.g. `"resourcePack"`,
+ * `"shader"`, `"datapack"`, `"world"`: `addonPlacement.spec.ts` passes
+ * `ADDON_FIXTURES[].searchType` (`helpers/addonFixtures.ts`) to reach a
+ * catalogue other than the mod/shader default "Add Addons" lands on.
  */
 export async function searchForMod(
   page: Page,
-  opts: { platform: ModPlatform; query: string }
+  opts: { platform: ModPlatform; query: string; searchType?: string }
 ): Promise<void> {
   await byPrimaryButton(page, "Add Addons").click()
 
@@ -295,6 +383,45 @@ export async function searchForMod(
         `search would have run against the wrong catalogue`
     })
     .toMatch(/#\/search\/mod(?:[?/]|$)/)
+
+  if (opts.searchType && opts.searchType !== "mod") {
+    // `AddonTypeDropdown` (`components/AddonTypeDropdown.tsx`) is the search
+    // page's content-type filter — switching it is the only way to reach a
+    // catalogue other than the mod/shader default "Add Addons" landed on
+    // above. Its trigger lives inside `EnhancedSearchBar`'s `OnboardingTip`-
+    // wrapped div (see `TEST_IDS.addonTypeDropdownTrigger`'s doc comment),
+    // and this is the first *real* click `searchForMod` ever makes inside
+    // that region — every other interaction here is a `.fill()`, or a click
+    // outside it — so it carries the identical one-shot onboarding-tip
+    // hazard `openModpackPage` (`helpers/modpacks.ts`) already documents.
+    await page.click(byTestId(TEST_IDS.addonTypeDropdownTrigger))
+
+    const option = page.locator(byAddonTypeOption(opts.searchType))
+    await expect(option, {
+      message:
+        `searchForMod: "${opts.searchType}" is not offered by ` +
+        "AddonTypeDropdown for this search — allowedAddonTypes " +
+        "(utils/platformSearch.ts) may have changed which types an " +
+        "instance-scoped search offers"
+    }).toBeVisible()
+    await option.click()
+
+    // Dismiss now — after the option click, not before it — so an Escape
+    // meant only for the onboarding overlay cannot also close the dropdown
+    // before its option gets clicked (the overlay's own delay is 200ms, and
+    // this function does nothing else in between the two clicks above).
+    // Safe to call unconditionally: a bounded no-op once the tip has been
+    // seen, which is every call after the first in a given worker.
+    await dismissSearchOnboardingTip(page)
+
+    await expect
+      .poll(() => page.url(), {
+        message:
+          `searchForMod: choosing "${opts.searchType}" in AddonTypeDropdown ` +
+          "did not navigate the search page's URL to match"
+      })
+      .toMatch(new RegExp(`#/search/${opts.searchType}(?:[?/]|$)`))
+  }
 
   const platformTestId =
     opts.platform === "curseforge"
@@ -361,6 +488,23 @@ export async function openAddonPage(
   ).toBeVisible()
 }
 
+/** Upper bound on how long the `ShaderLoaderSetup` wizard's "Continue
+ *  anyway" control is given to become visible, checked **concurrently**
+ *  with (not sequentially before) the install's own completion wait —
+ *  see `installModIntoInstance`'s doc comment for why this must be a race,
+ *  not an upfront await. Only the branch that actually detects a real
+ *  sighting ever resolves; if the wizard never appears, this bound is what
+ *  stops that detector from listening forever, not a cost anything else
+ *  waits on. `maybeOpenShaderWizard`
+ *  (`ModDownloadButton/hooks/useModInstallation.ts`) makes a real
+ *  `instance.checkShaderRequirements` round trip before deciding whether to
+ *  open the modal at all — a local rspc call, not a network one, but real
+ *  IPC rather than a synchronous UI toggle — so this carries more margin
+ *  than `ONBOARDING_TIP_WAIT`'s 1s. Confirmed live (`addonPlacement.spec.ts`'s
+ *  two shader fixtures) that the wizard, when it does appear, does so in
+ *  well under this bound. */
+const SHADER_WIZARD_WAIT = 5_000
+
 /**
  * Clicks the addon page's install button and waits for it to report success.
  * `instanceName` is not otherwise used (the page is already scoped to a
@@ -382,10 +526,86 @@ export async function openAddonPage(
  * in a previous test (every spec here deliberately swallows cleanup errors
  * when the body already failed), which would otherwise make this a silent
  * no-op against an already-installed mod.
+ *
+ * A **shader** install additionally routes through the `ShaderLoaderSetup`
+ * wizard instead of installing directly whenever the target instance has no
+ * shader-loading mod (Iris/Oculus) already present — confirmed live
+ * (`addonPlacement.spec.ts`'s curseforge-shaders case, run against the bare
+ * Fabric `installedInstance` fixture): the click above completes, but
+ * `maybeOpenShaderWizard` returns `true` and `handleDownload` returns before
+ * ever calling the install mutation, so nothing happens on the Rust side at
+ * all and the button silently never leaves "Download" — no console error, no
+ * core log line, no rejected promise anywhere. `addon.type !== "shader"`
+ * short-circuits this for every other addon type, so the wizard locator
+ * itself never becomes visible for them.
+ *
+ * That check is **raced** against the real completion signal below
+ * (`Promise.race`), not awaited up front before it. Awaiting it first would
+ * make every call pay `SHADER_WIZARD_WAIT` unconditionally: the locator
+ * predictably never appears for any other addon type, so the wait would run
+ * to its own timeout before the completion wait even started, landing a
+ * flat, fixed 5s tax on every one of this function's other call sites
+ * (`modInstall.spec.ts`, `modLifecycle.spec.ts`, `modResolution.spec.ts`,
+ * `persistence.spec.ts`, `modpackLock.spec.ts`, ...), none of which this
+ * task touches otherwise. Racing it instead means the two checks run
+ * concurrently: whichever settles first — the install's own completion (the
+ * common case, and usually well inside `SHADER_WIZARD_WAIT` for the small
+ * files this suite installs) or a genuine sighting of the wizard — decides
+ * what happens
+ * next, and the loser is simply abandoned rather than paid for. When the
+ * wizard does win the race, this clicks "Continue anyway"
+ * (`TEST_IDS.shaderLoaderContinueAnyway`) — installs just the shader file,
+ * the closest match to what a single "Download" click already does for
+ * every other addon type — never "Auto setup" (installs a whole extra
+ * loader mod, a different feature this helper does not exercise) — and then
+ * falls through to the very same completion wait every other install
+ * already uses.
+ *
+ * A **world** install (`fixture.addonType === "worlds"` in
+ * `addonPlacement.spec.ts`) never reports success via the button's text at
+ * all, by design — `ModDownloadButton`'s own comment states it plainly ("For
+ * worlds: show toast when loading finishes (since they never show as
+ * installed)"), because `isInstalled()` structurally can never match one. A
+ * mod/resourcepack/shader/datapack keeps a stable platform file id to
+ * compare an installed row against; a world does not, because
+ * `CurseforgeModInstaller::post_process` (`managers/instance/installer/mod.rs`)
+ * extracts the downloaded zip into `saves/` and deletes it, so what ends up
+ * on disk is an extracted folder with no on-disk trace of the file id that
+ * was installed.
+ *
+ * The obvious next candidate — `InstallButton`'s own loading spinner, which
+ * every addon type's install sets while its mutation is in flight, not just
+ * worlds' — turns out **not** to be reliable for a world either, confirmed
+ * live: `addonPlacement.spec.ts`'s curseforge-worlds case downloaded and
+ * extracted its file correctly (verified independently on disk) while the
+ * spinner never registered as visible at all, even briefly, within 15s of
+ * the click. Root cause traced to `ModDownloadButton`'s own
+ * "watch for installation completion" `createEffect`: for `isWorld`, its
+ * `setLoading(false)` guard is `installed || (isWorld && taskId() === null)`
+ * — `taskId()` reads `null` both *before* `installLatestModMutation`
+ * resolves with a real one and *after* the vtask poll clears it back to
+ * `null` on completion, and this effect cannot tell those two apart. The
+ * mutation call synchronously flips `loading` to `true`, which immediately
+ * re-runs this same effect while `taskId()` is still `null` from before the
+ * mutation resolved, and `isWorld && taskId() === null` promptly flips it
+ * back to `false` in the same reactive tick — a real, independent frontend
+ * bug (missing in-progress feedback on a world install), not a test timing
+ * issue, and out of scope for this suite to fix.
+ *
+ * So a world needs a completion signal from outside the button entirely:
+ * `opts.waitForCompletion`, an optional caller-supplied check awaited
+ * instead of the text-based wait below. `addonPlacement.spec.ts` passes one
+ * that polls the real target directory it already resolved for its own
+ * placement assertion — disk state even the frontend bug above cannot
+ * misreport. Left undefined by every caller that predates the world case, so
+ * their behaviour (the text-based wait) is unchanged.
  */
 export async function installModIntoInstance(
   page: Page,
-  opts: { instanceName: string }
+  opts: {
+    instanceName: string
+    waitForCompletion?: () => Promise<void>
+  }
 ): Promise<void> {
   const installButton = page.locator(byTestId(TEST_IDS.addonInstallButton))
   await expect(installButton).toBeVisible()
@@ -399,11 +619,48 @@ export async function installModIntoInstance(
 
   await installButton.click()
 
-  await expect(installButton, {
-    message:
-      `installModIntoInstance: install button for "${opts.instanceName}" ` +
-      `never reported success (expected its text to read "Downloaded")`
-  }).toHaveText(/downloaded/i, { timeout: INSTALL_TIMEOUT })
+  const continueAnyway = page.locator(
+    byTestId(TEST_IDS.shaderLoaderContinueAnyway)
+  )
+
+  // Started before the race below, not inside it: this is the same promise
+  // the wizard branch falls through to afterward, so an install that never
+  // shows the wizard at all is satisfied by this one wait alone, and an
+  // install that does show it resumes waiting on this exact operation
+  // (already in flight) rather than starting a second, fresh one.
+  const completion: Promise<void> = opts.waitForCompletion
+    ? opts.waitForCompletion()
+    : expect(installButton, {
+        message:
+          `installModIntoInstance: install button for "${opts.instanceName}" ` +
+          `never reported success (expected its text to read "Downloaded")`
+      }).toHaveText(/downloaded/i, { timeout: INSTALL_TIMEOUT })
+
+  // Resolves to "wizard" only on a genuine sighting. A "never appeared"
+  // outcome is deliberately left pending forever (its own `waitFor`
+  // rejection is swallowed) rather than resolved to some "false" sentinel —
+  // resolving it at all on that path would let it win the race below purely
+  // by timing out, which is exactly the fixed-cost bug this replaced. Only
+  // `completion` settling (by resolving or rejecting) can end the race for
+  // every install the wizard never touches.
+  const wizardAppeared = new Promise<"wizard">((resolve) => {
+    continueAnyway
+      .waitFor({ state: "visible", timeout: SHADER_WIZARD_WAIT })
+      .then(() => resolve("wizard"))
+      .catch(() => {
+        /* never appeared within the window — let `completion` decide */
+      })
+  })
+
+  const winner = await Promise.race([
+    wizardAppeared,
+    completion.then(() => "completed" as const)
+  ])
+
+  if (winner === "wizard") {
+    await continueAnyway.click()
+    await completion
+  }
 }
 
 /** Envelope every rspc response in this app shares — see
@@ -525,12 +782,24 @@ export async function deleteModViaUi(
  * The leftover check must look for both the base name and the `.disabled`
  * variant. `toRemove.filename` is the app's cached *base* name — the backend
  * never writes the `.disabled` suffix into that column
- * (`managers/instance/mods.rs:333-337`) — while `listModFiles` returns real
- * on-disk names, including a suffixed one after a disable. A check against
- * the base name alone can never go red for the one path that actually leaves
- * the file disabled, because `delete_mod`
- * (`managers/instance/mods.rs:408-412`) removes whichever variant is present
+ * (`managers/instance/mods.rs`'s `enable_mod`) — while the directory listing
+ * below returns real on-disk names, including a suffixed one after a disable.
+ * A check against the base name alone can never go red for the one path that
+ * actually leaves the file disabled, because `delete_mod`
+ * (`managers/instance/mods.rs`) removes whichever variant is present
  * regardless.
+ *
+ * That listing is a plain, extension-agnostic `fs.readdirSync`, deliberately
+ * **not** `listModFiles` (`helpers/modVerify.ts`), which by its own doc
+ * comment filters unconditionally to `.jar`/`.jar.disabled`. That filter is
+ * correct for its other callers (every one of them checks a `mods/` folder),
+ * but it made this check structurally incapable of going red for any non-mod
+ * addon: a resource pack's `.zip`, or a world's extracted directory, can
+ * never appear in a jar-only result, so a genuine leftover passed silently.
+ * `addonLifecycle.spec.ts` carried a local re-check for exactly this reason;
+ * the check lives here instead so the next non-mod spec inherits it rather
+ * than the hole, and so the suite has one leftover check to keep in sync
+ * rather than two.
  *
  * Deliberately does not chase down dependency jars a platform declares
  * alongside the target mod: every install this suite performs sends
@@ -555,7 +824,7 @@ export async function cleanupInstalledMod(
 
   await deleteModViaUi(page, toRemove.filename)
 
-  const remaining = await listModFiles(modsDir)
+  const remaining = fs.existsSync(modsDir) ? fs.readdirSync(modsDir) : []
   const leftoverName = remaining.find(
     (name) =>
       name === toRemove.filename || name === `${toRemove.filename}.disabled`

@@ -61,6 +61,28 @@ async fn remove_addon_from_disk(
     Ok(false)
 }
 
+/// Rejects an enable/disable toggle for an addon type that cannot express one.
+///
+/// Disabling appends `.disabled` to the name inside the type's folder, which is
+/// coherent for a file and incoherent for a world: a save is a directory,
+/// Minecraft still reads a renamed one, and our own scanner
+/// (`managers/metadata/cache/mod.rs`) re-reports `<name>.disabled` as a *new,
+/// enabled* world — leaving a duplicate row the UI has no control to undo.
+/// The frontend already declines to offer the control
+/// (`pages/Library/shared/addons/addonCapabilities.ts`'s `supportsEnableToggle`);
+/// this is the same rule where it cannot be routed around.
+fn ensure_toggleable(addon_type: domain::AddonType) -> anyhow::Result<()> {
+    if addon_type == domain::AddonType::Worlds {
+        bail!(
+            "worlds cannot be enabled or disabled: a save is a directory, and \
+             renaming it to <name>.disabled neither hides it from Minecraft nor \
+             from our own scanner, which re-reports it as a new, enabled world"
+        );
+    }
+
+    Ok(())
+}
+
 impl ManagerRef<'_, InstanceManager> {
     async fn ensure_modpack_not_locked(&self, instance_id: InstanceId) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
@@ -351,6 +373,11 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
 
+        let addon_type =
+            domain::AddonType::from_db_string(&m.addon_type).unwrap_or(domain::AddonType::Mods);
+
+        ensure_toggleable(addon_type)?;
+
         let mut disabled_path = {
             let instance_path = self
                 .app
@@ -359,9 +386,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .get_instances()
                 .get_instance_path(shortpath);
 
-            domain::AddonType::from_db_string(&m.addon_type)
-                .unwrap_or(domain::AddonType::Mods)
-                .get_folder_path(&instance_path)
+            addon_type.get_folder_path(&instance_path)
         };
 
         let enabled_path = disabled_path.join(&m.filename);
@@ -452,13 +477,28 @@ impl ManagerRef<'_, InstanceManager> {
         // row is the correct reconciliation. It is NOT fine when the addon is
         // still sitting there: that means the removal failed, and dropping the
         // row would hide it from the UI until the next scan resurrected it.
-        if !removed && (enabled_path.exists() || disabled_path.exists()) {
-            bail!(
-                "refusing to drop the cache row for addon {} ({:?}): it is still on disk at {}",
-                m.id,
-                addon_type,
-                enabled_path.display()
-            );
+        //
+        // Both spellings are probed, and the message names whichever one
+        // actually survived: an addon left behind under its `.disabled` name
+        // reported as still sitting at its enabled path sends whoever reads
+        // the error looking at a path that does not exist.
+        if !removed {
+            let survivor = if tokio::fs::metadata(&enabled_path).await.is_ok() {
+                Some(&enabled_path)
+            } else if tokio::fs::metadata(&disabled_path).await.is_ok() {
+                Some(&disabled_path)
+            } else {
+                None
+            };
+
+            if let Some(survivor) = survivor {
+                bail!(
+                    "refusing to drop the cache row for addon {} ({:?}): it is still on disk at {}",
+                    m.id,
+                    addon_type,
+                    survivor.display()
+                );
+            }
         }
 
         // Delete cache entry directly instead of re-scanning
@@ -1084,7 +1124,112 @@ mod test {
 
 #[cfg(test)]
 mod tests {
-    use super::remove_addon_from_disk;
+    use super::{ensure_toggleable, remove_addon_from_disk};
+    use crate::domain::instance::AddonType;
+    use crate::domain::instance::info;
+    use crate::managers::instance::InstanceVersionSource;
+    use carbon_repos::dbtypes::DbDateTime;
+    use carbon_repos::repos::mod_file_cache as mfcdb;
+    use carbon_repos::repos::mod_metadata as metarepo;
+    use chrono::Utc;
+    use std::collections::HashSet;
+
+    #[test]
+    fn rejects_toggling_a_world() {
+        let err = ensure_toggleable(AddonType::Worlds)
+            .expect_err("a world must not be enableable/disableable");
+
+        assert!(
+            err.to_string().contains("worlds cannot be enabled"),
+            "the rejection must say why, got: {err}"
+        );
+    }
+
+    // Pins the guard at its call site rather than only as a standalone predicate:
+    // deleting the `ensure_toggleable` call in `enable_mod` must make this fail.
+    // Without it, enabling/disabling a `worlds` row renames `saves/MyWorld` to
+    // `saves/MyWorld.disabled`, which the scanner then re-reports as a new,
+    // enabled world with no control to undo it.
+    #[tokio::test]
+    async fn enable_mod_rejects_a_world() {
+        let app = crate::setup_managers_for_test().await;
+
+        let group = app.instance_manager().get_default_group().await.unwrap();
+        let instance_id = app
+            .instance_manager()
+            .create_instance(
+                group,
+                String::from("test"),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.20.1"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await
+            .unwrap();
+
+        let now = DbDateTime(Utc::now().fixed_offset());
+        metarepo::insert_metadata(
+            &app.db,
+            "world-metadata",
+            0,
+            b"sha512",
+            b"sha1",
+            "vanilla",
+            None,
+            None,
+            None,
+            None,
+            None,
+            now,
+        )
+        .await
+        .unwrap();
+
+        mfcdb::upsert_mod_file_cache(
+            &app.db,
+            *instance_id,
+            String::from("MyWorld"),
+            0,
+            true,
+            AddonType::Worlds.to_db_string().to_string(),
+            String::from("world-metadata"),
+            now,
+        )
+        .await
+        .unwrap();
+
+        let row = mfcdb::get_mod_file_cache_by_instance_filename(&app.db, *instance_id, "MyWorld")
+            .await
+            .unwrap()
+            .expect("the seeded ModFileCache row for the world must be found");
+
+        let err = app
+            .instance_manager()
+            .enable_mod(instance_id, row.id, false)
+            .await
+            .expect_err("enable_mod must reject toggling a world");
+
+        assert!(
+            err.to_string().contains("worlds cannot be enabled"),
+            "must fail via the toggle guard, got: {err}"
+        );
+    }
+
+    #[test]
+    fn allows_toggling_every_file_backed_addon() {
+        for addon_type in AddonType::all()
+            .into_iter()
+            .filter(|t| *t != AddonType::Worlds)
+        {
+            ensure_toggleable(addon_type)
+                .unwrap_or_else(|e| panic!("{addon_type:?} must stay toggleable, got: {e}"));
+        }
+    }
 
     #[tokio::test]
     async fn removes_a_world_directory() {

@@ -71,7 +71,10 @@ export function AddonTypeDropdown() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger class="text-lightSlate-50 hover:bg-darkSlate-600 data-[expanded]:bg-darkSlate-600 flex items-center gap-2 rounded px-2.5 py-1.5 transition-colors hover:text-white data-[expanded]:text-white">
+      <DropdownMenuTrigger
+        data-testid="addon-type-dropdown-trigger"
+        class="text-lightSlate-50 hover:bg-darkSlate-600 data-[expanded]:bg-darkSlate-600 flex items-center gap-2 rounded px-2.5 py-1.5 transition-colors hover:text-white data-[expanded]:text-white"
+      >
         <div class={`${currentOption()?.icon} text-lg`} />
         <span class="text-sm font-medium">{currentOption()?.label}</span>
         <div class="i-hugeicons:arrow-down-01 text-xs shrink-0" />
@@ -80,6 +83,8 @@ export function AddonTypeDropdown() {
         <For each={addonTypeOptions()}>
           {(option) => (
             <DropdownMenuItem
+              data-testid="addon-type-dropdown-option"
+              data-addon-type={option.value}
               onClick={() => handleTypeChange(option)}
               class="flex items-center gap-2"
               classList={{

@@ -208,6 +208,11 @@ export const useAddonMutations = (
         {
           worldName: worldsSelected[0].filename,
           worldCount: worldsSelected.length,
+          // Confirming deletes the whole selection, not only the worlds in
+          // it — the dialog is raised *because* a world is among them, but
+          // `performDeleteSelected` below removes every selected addon. The
+          // dialog names that total so it describes what the button does.
+          totalCount: selectedMods.length,
           onConfirm: () => void performDeleteSelected(selectedMods)
         }
       )

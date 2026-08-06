@@ -410,9 +410,13 @@
   "_trn_server_create": "Nouveau serveur",
   "_trn_server_create_title": "Créer un nouveau serveur",
   "_trn_confirm_world_deletion_title": "-------- [ UNTRANSLATED ] -------- Delete this world?",
+  "_trn_confirm_world_deletion_title_plural": "-------- [ UNTRANSLATED ] -------- Delete these worlds?",
   "_trn_confirm_world_deletion_body": "-------- [ UNTRANSLATED ] -------- \"{{name}}\" will be permanently deleted, including every save in it. This cannot be undone.",
   "_trn_confirm_world_deletion_body_plural": "-------- [ UNTRANSLATED ] -------- {{count}} worlds will be permanently deleted, including every save in them. This cannot be undone.",
+  "_trn_confirm_world_deletion_body_selection": "-------- [ UNTRANSLATED ] -------- Confirming deletes everything currently selected — {{count}} addons in total.",
   "_trn_confirm_world_deletion_dont_ask": "-------- [ UNTRANSLATED ] -------- Don't ask me again",
   "_trn_confirm_world_deletion_cancel": "-------- [ UNTRANSLATED ] -------- Cancel",
-  "_trn_confirm_world_deletion_confirm": "-------- [ UNTRANSLATED ] -------- Delete world"
+  "_trn_confirm_world_deletion_confirm": "-------- [ UNTRANSLATED ] -------- Delete world",
+  "_trn_confirm_world_deletion_confirm_plural": "-------- [ UNTRANSLATED ] -------- Delete worlds",
+  "_trn_confirm_world_deletion_confirm_selection": "-------- [ UNTRANSLATED ] -------- Delete {{count}} addons"
 }

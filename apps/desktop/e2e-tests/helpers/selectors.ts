@@ -133,6 +133,26 @@ export const TEST_IDS = Object.freeze({
   modRowToggle: "mod-row-toggle",
   modRowDelete: "mod-row-delete",
   modRowUpdate: "mod-row-update",
+  // Entries in the Addons tab's own right-click menu
+  // (`Library/Instance/Tabs/Addons/index.tsx`), single-selection branch —
+  // a second route to the same actions the row's inline controls offer, and
+  // the one a world's missing enable toggle has to be checked against
+  // separately (hiding the column control alone left this menu still
+  // offering it). Neither hazard in this file's header applies: `@gd/ui`'s
+  // `ContextMenuItem` spreads unrecognised props onto Kobalte's polymorphic
+  // `Menu.Item`, which renders a real, full-size `<div role="menuitem">` —
+  // `worldLifecycle.spec.ts` proves the forwarding really happens by
+  // asserting `addonContextDelete` is visible in the same open menu it
+  // asserts `addonContextToggle` is absent from, so a testid silently
+  // dropped by a future refactor fails loudly instead of passing the
+  // absence check for the wrong reason.
+  //
+  // The menu must be opened first (right-click a `modRow`), and only one of
+  // the two branches is ever mounted (`selectionCount() === 1` vs. the
+  // multi-select fallback), so the multi-select entries — which carry no
+  // anchors — can never double-match these.
+  addonContextToggle: "addon-context-toggle",
+  addonContextDelete: "addon-context-delete",
   // A row in the addon page's Versions tab (`AddonViewPage/Versions/index.tsx`),
   // keyed by the platform's own file/version id via `byAddonVersionRow` —
   // the same id `ModDownloadButton`'s `fileId` prop installs. This list is
@@ -260,7 +280,55 @@ export const TEST_IDS = Object.freeze({
   confirmUnpairConfirm: "confirm-unpair-confirm",
   /** The Addons tab's "Add Addons" button, which `Tabs/Addons/index.tsx`
    *  disables while the instance's modpack is locked. */
-  addonsAddButton: "addons-add-button"
+  addonsAddButton: "addons-add-button",
+
+  worldDeletionConfirm: "world-deletion-confirm",
+  worldDeletionDontAsk: "world-deletion-dont-ask",
+  settingsWorldDeletionWarning: "settings-world-deletion-warning",
+
+  /** `AddonTypeDropdown`'s trigger (`components/AddonTypeDropdown.tsx`) — the
+   *  search page's content-type filter, e.g. mods vs. shaders vs. resource
+   *  packs. `DropdownMenuTrigger` is Kobalte's own `Menu.Trigger`, confirmed
+   *  by reading `menu-trigger.tsx` to spread unrecognised props onto its
+   *  polymorphic `Button.Root` render, so this anchor reaches a real
+   *  clickable element directly — no hazard-1 wrinkle here, unlike
+   *  `Checkbox`/`Radio`/`Switch`. Click this, then query
+   *  `addonTypeDropdownOption` below for the option to select.
+   *
+   *  Lives inside `EnhancedSearchBar`'s `OnboardingTip`-wrapped div (same
+   *  wrapper `searchInput` sits in), so a real `.click()` on it can trigger
+   *  the one-shot `search-input-syntax` tip — see `helpers/mods.ts`'s
+   *  `dismissSearchOnboardingTip` for the guard `searchForMod` applies right
+   *  after using this. */
+  addonTypeDropdownTrigger: "addon-type-dropdown-trigger",
+  /** One option in that dropdown's listbox, carrying `data-addon-type` — the
+   *  option's own `FEUnifiedSearchType` value (e.g. `"resourcePack"`,
+   *  `"shader"`, `"datapack"`, `"world"`), not the plural `AddonType`
+   *  addon-type string `helpers/mods.ts`'s `InstalledMod.addonType` reads off
+   *  an installed row (`ADDON_FIXTURES`'s own `searchType` field doc comment
+   *  in `helpers/addonFixtures.ts` notes the same singular/plural split).
+   *  `DropdownMenuContent` renders through `DropdownMenuPrimitive.Portal`, so
+   *  this option is not itself a descendant of the `OnboardingTip`-wrapped
+   *  div the trigger above lives in — only the trigger click carries that
+   *  hazard. The dropdown must be open first — use `byAddonTypeOption`. */
+  addonTypeDropdownOption: "addon-type-dropdown-option",
+
+  /** The "Continue anyway" control on `ShaderLoaderSetup`'s intro step
+   *  (`managers/ModalsManager/modals/ShaderLoaderSetup/index.tsx`) — one of
+   *  three choices (Cancel / Continue anyway / Auto setup) a shader install
+   *  is routed through instead of installing directly whenever
+   *  `instance.checkShaderRequirements` reports anything other than
+   *  `"LoaderPresent"` (`ModDownloadButton`'s `maybeOpenShaderWizard`,
+   *  `hooks/useModInstallation.ts`). Only this one choice carries an
+   *  anchor — `helpers/mods.ts`'s `installModIntoInstance` clicks it to
+   *  install just the shader file, the closest match to what every other
+   *  addon type's single "Download" click already does; the other two
+   *  (cancel entirely, or auto-install a recommended loader alongside it)
+   *  are a different feature this suite does not otherwise exercise, so
+   *  they carry no anchor per this file's "only what a test must click"
+   *  rule. On a `@gd/ui` `Button`, confirmed elsewhere in this file to
+   *  spread unknown props onto the real `<button>` — no hazard-1 wrinkle. */
+  shaderLoaderContinueAnyway: "shader-loader-continue-anyway"
 })
 
 export function byTestId(id: string): string {
@@ -307,4 +375,15 @@ export function byAddonVersionRow(fileId: string): string {
  */
 export function byModpackVersionOption(versionId: string): string {
   return `[data-testid="${TEST_IDS.modpackVersionOption}"][data-version-id="${versionId}"]`
+}
+
+/**
+ * One option in `AddonTypeDropdown`'s listbox, located by its own
+ * `FEUnifiedSearchType` value (see `TEST_IDS.addonTypeDropdownOption`'s doc
+ * comment for why that, not the plural `AddonType`, is the key). The
+ * dropdown must already be open — click `TEST_IDS.addonTypeDropdownTrigger`
+ * first.
+ */
+export function byAddonTypeOption(searchType: string): string {
+  return `[data-testid="${TEST_IDS.addonTypeDropdownOption}"][data-addon-type="${searchType}"]`
 }

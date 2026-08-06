@@ -260,6 +260,20 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     // Track loading state changes
     setWasLoading(isCurrentlyLoading)
 
+    // KNOWN BUG (worlds only): `isWorld && taskId() === null` conflates "the
+    // install has not started yet" with "the install finished". `taskId()`
+    // reads `null` both before `installLatestModMutation` resolves with a real
+    // one and after the vtask poll clears it on completion, and this effect
+    // cannot tell those apart. `handleDownload` flips `loading` true
+    // synchronously, which re-runs this effect while `taskId()` is still null
+    // from before the mutation resolved, so the branch below immediately flips
+    // it back to false — a world install shows no in-progress feedback at all.
+    // Confirmed live: the spinner never becomes visible even briefly while a
+    // world downloads and extracts correctly (`installModIntoInstance`'s doc
+    // comment, `apps/desktop/e2e-tests/helpers/mods.ts`, records the
+    // measurement and the completion signal the e2e suite uses instead).
+    // Fixing it needs a real "started" signal distinct from `taskId`, not a
+    // tweak to this condition.
     if (installed || (isWorld && taskId() === null)) {
       setLoading(false)
       setTaskId(null)
