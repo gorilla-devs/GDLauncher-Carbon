@@ -12,6 +12,8 @@ Files that could not be replaced:
      original md5: 00112233445566778899aabbccddeeff
      current md5:  ffeeddccbbaa99887766554433221100
  - /saves/world/level.dat: files in /saves will never be modified
+ - /mods/twin.jar: disabled by user
+ - /config/already.json: already present
 
 Files deleted:
  - /mods/old.jar
@@ -21,11 +23,20 @@ Files replaced:
  - /mods/common.jar
 
 Files created:
- - instance/mods/new.jar
+ - /mods/new.jar
+
+Files unchanged:
+ - /mods/steady.jar
+
+Files re-enabled:
+ - /mods/reenabled.jar
+
+Files removed at user request:
+ - /mods/pruned.jar
 `
 
 describe("parseInstallAudit", () => {
-  it("parses all three skip reasons, with md5s on the modified one", () => {
+  it("parses all five skip reasons, with md5s on the modified one", () => {
     expect(parseInstallAudit(FULL).skipped).toEqual([
       { file: "/mods/gone.jar", reason: "deleted-by-user" },
       {
@@ -34,21 +45,34 @@ describe("parseInstallAudit", () => {
         originalMd5: "00112233445566778899aabbccddeeff",
         currentMd5: "ffeeddccbbaa99887766554433221100"
       },
-      { file: "/saves/world/level.dat", reason: "in-save-folder" }
+      { file: "/saves/world/level.dat", reason: "in-save-folder" },
+      { file: "/mods/twin.jar", reason: "disabled-by-user" },
+      { file: "/config/already.json", reason: "already-present" }
     ])
   })
 
-  it("parses the three plain lists", () => {
+  it("parses the six plain lists", () => {
     const audit = parseInstallAudit(FULL)
     expect(audit.deleted).toEqual(["/mods/old.jar", "/config/dropped.json"])
     expect(audit.replaced).toEqual(["/mods/common.jar"])
-    expect(audit.created).toEqual(["instance/mods/new.jar"])
+    expect(audit.created).toEqual(["/mods/new.jar"])
+    expect(audit.unchanged).toEqual(["/mods/steady.jar"])
+    expect(audit.reEnabled).toEqual(["/mods/reenabled.jar"])
+    expect(audit.userRemoved).toEqual(["/mods/pruned.jar"])
   })
 
   it("returns empty sections for an audit that decided nothing", () => {
     expect(
       parseInstallAudit("GDLauncher Modpack Install/Update Audit\n")
-    ).toEqual({ skipped: [], deleted: [], replaced: [], created: [] })
+    ).toEqual({
+      skipped: [],
+      deleted: [],
+      replaced: [],
+      created: [],
+      unchanged: [],
+      reEnabled: [],
+      userRemoved: []
+    })
   })
 
   it("keeps a colon in a filename out of the reason", () => {
@@ -114,7 +138,10 @@ describe("readInstallAudit", () => {
       skipped: [],
       deleted: [],
       replaced: [],
-      created: []
+      created: [],
+      unchanged: [],
+      reEnabled: [],
+      userRemoved: []
     })
   })
 })

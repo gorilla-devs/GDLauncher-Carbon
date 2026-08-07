@@ -327,7 +327,7 @@ const Tile = (props: Props) => {
                       class="flex items-center gap-2"
                       onClick={() => {
                         modalsContext?.openModal(
-                          { name: "confirmReinstall" },
+                          { name: "repairModpack" },
                           {
                             id: props.instance.id,
                             name: props.instance.name,
@@ -343,7 +343,7 @@ const Tile = (props: Props) => {
                       }
                     >
                       <div class="i-hugeicons:refresh h-4 w-4" />
-                      {t("instances:_trn_instance_settings.reinstall")}
+                      {t("instances:_trn_instance_settings.repair")}
                     </ContextMenuItem>
                   </ContextMenuSubContent>
                 </ContextMenuPortal>

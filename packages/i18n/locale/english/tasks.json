@@ -32,6 +32,8 @@
   "_trn_instance_task_generating_pack_info": "Generating pack info",
   "_trn_instance_task_launch_waiting": "Waiting for other instances to launch",
   "_trn_instance_task_prepare": "Preparing {{name}}",
+  "_trn_instance_task_check_pack_origin": "Checking file origins for {{name}}",
+  "_trn_instance_task_check_pack_origin_versions": "Checking pack versions",
   "_trn_instance_task_launch_apply_staged_patches": "Applying staged patches",
   "_trn_finalizing_import": "Finalizing import",
   "_trn_server_task_install": "Installing server {{server_name}}",

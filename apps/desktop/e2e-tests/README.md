@@ -929,18 +929,17 @@ launches the game must partition with `classifyPackinfo` **after** the launch
 and **before** any mutation, and pick its edit target from the pristine list
 at runtime rather than assuming one survived.
 
-### Product findings this wave pins but does not fix
+### Product findings this wave pinned, now all fixed
 
-Six, all found by building these tests, none fixed here. Every one is pinned
-by an assertion, so the suite goes red if the behaviour changes — **including
-if someone fixes it**. That is deliberate: a test wave is the wrong place to
-change product behaviour, and each of these needs a product decision. Each
-pinning assertion carries a message saying so, naming the fix it would be
-reacting to and telling whoever hits it to update the test rather than delete
-it.
+Six, all found by building these tests. None were fixed by that same
+test-writing wave — each was pinned by an assertion instead, deliberately: a
+test wave is the wrong place to change product behaviour, and each needed its
+own product decision first. Every one has since been fixed by a later task;
+each entry below still names the assertion that pins it, which now proves the
+fix holds rather than merely recording the bug.
 
 1. **`change_modpack` leaks a `.setup/` that defers the version change to the
-   next launch.** `reinstall_modpack` refuses outright while the instance is
+   next launch.** `repair_modpack` refuses outright while the instance is
    launching, queued, running or being deleted
    (`managers/instance/modpack/mod.rs:210-217`); `change_modpack` has no such
    guard. The consequence is *not* a mid-game `mods/` rewrite — both route
@@ -952,7 +951,7 @@ it.
    cancelled, it is **deferred**: the next legitimate launch finds the file
    and applies it. Until then every further `change_modpack` call bails with
    "Instance has not completed the setup phase", because `.setup` now exists.
-   `reinstall_modpack`'s guard is exactly what prevents the same leak on its
+   `repair_modpack`'s guard is exactly what prevents the same leak on its
    own path — which is why `modpackReinstall.spec.ts`'s refusal test asserts
    on `.setup/`'s absence rather than only on the instance still running.
    Both halves are now covered: the guarded path by `modpackReinstall.spec.ts`,
@@ -960,6 +959,9 @@ it.
    whole sequence live — the leak, the second call bailing on
    "Instance has not completed the setup phase", and the change applying itself
    unprompted on the next launch.
+   **Fixed:** `change_modpack` now carries the same `LaunchState` guard as
+   reinstall and cleans up `.setup` on failure; refusals render an inline
+   error in the version modal (`modpack-version-update-error`).
 2. **A user-deleted pack file is silently reinstated** when the target version
    still ships it and something was staged for that path — the two passes are
    independent, so pass 1's `deleted by user` decision does not stop pass 2
@@ -967,12 +969,32 @@ it.
    sections at once**, `Files that could not be replaced:` *and*
    `Files created:`. "User-deleted stays deleted" is only true for a file the
    target version drops.
+   **Fixed:** `process_modpack_staging` now reconciles every path through a
+   single planner (`apply_plan::plan`) that decides each path exactly once,
+   instead of two independent passes. A user-deleted path decides
+   `Keep`/`DeletedByUser` and stays that way — there is no second,
+   independent pass left to recreate it, and the audit records it in one
+   section only.
 3. **Reinstall repairs a missing file but not a damaged one.** A truncated
    file still exists and its md5 no longer matches packinfo, so pass 1 classes
    it `ModifiedByUser` and pass 2 skips it because the path is occupied. A
    *deleted* file is restored. So the repair a user is most likely to want —
    "this jar is broken, give me a clean copy" — is the one reinstall does not
    perform, while the UI presents it as a general repair action.
+   **Fixed:** `repair_modpack` now writes a `.setup/repair` marker
+   (`RepairMarkerFile`) that switches the whole pipeline into a true repair,
+   rather than reconciling as an ordinary version change onto the same
+   version. `process_modpack` swaps its skip-optimisation oracle for a live
+   disk scan (`disk_scan::scan_instance_as_packinfo`) whenever the marker is
+   present, so a damaged or deleted file's real bytes — not the record —
+   decide whether a fresh copy needs fetching; a corrupt or missing file can
+   no longer skip-optimise away. `process_modpack_staging` then selects
+   `apply_plan::ApplyMode::Repair`, which reconciles every pack-tracked path
+   against the target version alone: present-but-wrong becomes
+   `Replace`/`RepairOverwrote`, missing becomes `Create`/`RepairRestored` —
+   the same treatment for both, restoring a missing file and repairing a
+   damaged one, with no remaining asymmetry. Pinned by
+   `modpackReinstall.spec.ts`.
 4. **`packinfo::scan_dir` drops files unchanged between versions.** This is
    the serious one, because its consequence is closest to data loss. The
    skip-if-unchanged optimisation above means an unchanged file is never
@@ -990,6 +1012,16 @@ it.
    is missing entries a fresh install records, while every one of those files
    is still on disk and byte-correct. It is a property of `scan_dir` itself,
    not of one platform's downloader.
+   **Fixed:** `process_modpack`'s snapshot block (`run/modpack.rs`) now
+   merges the skip-oracle's hash back into the freshly scanned packinfo for
+   every skip-optimised path, right after the `scan_dir` call. A "skipped"
+   path is, by construction of the skip condition itself, one where the
+   oracle's recorded hash already equals the target version's declared hash
+   — so the merge is not a guess, it is the target's own hash. packinfo.json
+   is complete after every version change, in both directions, confirmed on
+   both Modrinth (`modpackLifecycle.spec.ts`, `KNOWN_STALE_SURVIVORS_AFTER_DOWNGRADE`
+   removed — nothing survives undeleted any more) and CurseForge
+   (`modpackCurseforgeVersion.spec.ts`).
 5. **A refused version change tells the user nothing.** `handleUpdate`
    (`ModPackVersionUpdate/index.tsx:126-151`) awaits the mutation and only
    afterwards calls `closeModal()` and `navigate("/library")`. There is no
@@ -999,8 +1031,12 @@ it.
    disk. The user is looking at a dialog that appears to have ignored the
    button they pressed. Pinned by `modpackChangeVersionGuard.spec.ts`, which
    asserts the route never leaves the instance detail.
+   **Fixed:** `change_modpack` now carries the same `LaunchState` guard as
+   reinstall and cleans up `.setup` on failure; refusals render an inline
+   error in the version modal (`modpack-version-update-error`).
 6. **An interrupted apply strands the new files as untouchable.** Because
-   `packinfo.json` is promoted last (`run/modpack.rs:899`), a crash during the
+   `packinfo.json` is promoted last, after `execute_plan` applies the whole
+   plan (`run/modpack.rs`), a crash during the
    apply leaves the old record describing files that are already the new
    version on disk. Their md5 no longer matches, so the next pass classes them
    `ModifiedByUser` and skips them — permanently. The instance sits
@@ -1009,6 +1045,17 @@ it.
    `modpackInterruptedStaging.spec.ts`'s second test, which asserts both that
    the misclassification happens and that the skipped files' bytes are left
    untouched.
+   **Fixed:** `repair_modpack`'s repair mode (see finding #3 above)
+   resolves each path by deciding it against the *target* version alone —
+   `apply_plan::decide_repair` never consults the stale `old` record for a
+   path `target` still ships, unlike `ApplyMode::VersionChange`. A file the
+   crash already landed correctly now decides `Keep`/`Unchanged` (disk
+   already equals target) instead of `ModifiedByUser`, resolving the
+   misclassification rather than merely detecting it. Running the repair
+   also promotes a fresh `packinfo.json` at the end of the same pass, like
+   any other reinstall, so the stale record itself is corrected too, not
+   just papered over for one more launch. Pinned by
+   `modpackInterruptedStaging.spec.ts`'s second test.
 
 ### Search timeouts are measured, not guessed
 

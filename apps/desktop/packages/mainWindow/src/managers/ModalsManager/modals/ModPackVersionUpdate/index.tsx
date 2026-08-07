@@ -165,28 +165,36 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       prev.length === next.length && prev.every((id, i) => id === next[i])
   })
 
+  const [updateError, setUpdateError] = createSignal<string | null>(null)
+
   const handleUpdate = async () => {
     const version = selectedVersion()
     const data = modpackData()
     const id = instanceId()
     if (!version || !data || !id) return
 
-    await changeModpackMutation.mutateAsync({
-      instance: id,
-      modpack: {
-        type: data.platform,
-        value:
-          data.platform === "curseforge"
-            ? {
-                project_id: data.projectId,
-                file_id: parseInt(version)
-              }
-            : {
-                project_id: data.projectId.toString(),
-                version_id: version
-              }
-      } as Modpack
-    })
+    setUpdateError(null)
+    try {
+      await changeModpackMutation.mutateAsync({
+        instance: id,
+        modpack: {
+          type: data.platform,
+          value:
+            data.platform === "curseforge"
+              ? {
+                  project_id: data.projectId,
+                  file_id: parseInt(version)
+                }
+              : {
+                  project_id: data.projectId.toString(),
+                  version_id: version
+                }
+        } as Modpack
+      })
+    } catch (e) {
+      setUpdateError(e instanceof Error ? e.message : String(e))
+      return
+    }
 
     modalContext?.closeModal()
     navigator.navigate("/library")
@@ -255,6 +263,18 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             <SelectContent />
           </Select>
 
+          <Show when={updateError()}>
+            <div
+              data-testid="modpack-version-update-error"
+              class="mt-2 rounded-lg border border-red-600/30 bg-red-900/20 p-3 text-sm text-red-300"
+            >
+              <div class="font-semibold">
+                <Trans key="instances:_trn_change_version_failed" />
+              </div>
+              <div class="mt-1 break-words">{updateError()}</div>
+            </div>
+          </Show>
+
           <div class="flex justify-between">
             <Button
               type="secondary"
@@ -268,7 +288,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
               type="primary"
               data-testid="modpack-version-update-confirm"
               onClick={handleUpdate}
-              disabled={!selectedVersion()}
+              disabled={!selectedVersion() || changeModpackMutation.isPending}
             >
               {t("instances:_trn_instance_modal_instance_update")}
             </Button>

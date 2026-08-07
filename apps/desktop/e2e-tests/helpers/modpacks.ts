@@ -2,7 +2,7 @@
  * Everything the modpack specs need that is not an assertion: reading a pack
  * version's own index (so expectations are derived rather than hardcoded),
  * and driving the shipped UI for install, version change, unlock, unpair and
- * reinstall.
+ * repair.
  *
  * The index half is deliberately split into a pure parser
  * (`parseMrpackIndex`, unit-tested against an in-memory zip) and a thin
@@ -719,23 +719,23 @@ export async function unpairModpack(
   ).toHaveCount(0)
 }
 
-/** Reinstall lives in the instance page's overflow menu, not the Settings
- *  tab — see `TEST_IDS.instanceMenuReinstall`. The menu must be opened first,
+/** Repair lives in the instance page's overflow menu, not the Settings
+ *  tab — see `TEST_IDS.instanceMenuRepair`. The menu must be opened first,
  *  and the entry is `disabled: !hasModpack()`, so this throws a named error
  *  on a non-modpack instance rather than clicking nothing. */
-export async function reinstallModpack(
+export async function repairModpack(
   page: Page,
   instanceName: string
 ): Promise<void> {
   await openInstance(page, instanceName)
   await page.click(byTestId(TEST_IDS.instanceMenuTrigger))
-  const entry = page.locator(byTestId(TEST_IDS.instanceMenuReinstall))
+  const entry = page.locator(byTestId(TEST_IDS.instanceMenuRepair))
   await expect(
     entry,
-    `the reinstall menu entry was disabled for "${instanceName}" — the ` +
+    `the repair menu entry was disabled for "${instanceName}" — the ` +
       `instance has no modpack association`
   ).toBeEnabled()
   await entry.click()
-  await page.click(byTestId(TEST_IDS.confirmReinstallConfirm))
+  await page.click(byTestId(TEST_IDS.repairModpackConfirm))
   await waitForInstallComplete(page, instanceName)
 }

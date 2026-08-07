@@ -99,7 +99,9 @@ keys! {
         GET_ALL_INSTANCES                           = "getAllInstances";
         CREATE_INSTANCE                             = "createInstance";
         CHANGE_MODPACK                              = "changeModpack";
-        REINSTALL_MODPACK                           = "reinstallModpack";
+        REPAIR_MODPACK                              = "repairModpack";
+        GET_REPAIR_PREVIEW                          = "getRepairPreview";
+        CHECK_PACK_ORIGIN                           = "checkPackOrigin";
         LOAD_ICON_URL                               = "loadIconUrl";
         DELETE_GROUP                                = "deleteGroup";
         DELETE_GROUP_WITH_INSTANCES                 = "deleteGroupWithInstances";

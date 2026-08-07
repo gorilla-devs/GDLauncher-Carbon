@@ -23,7 +23,7 @@ import {
   fetchMrpackIndex,
   installModpackVersion,
   openInstance,
-  reinstallModpack
+  repairModpack
 } from "./helpers/modpacks.js"
 import {
   MODPACK_MR_QUERY,
@@ -32,138 +32,83 @@ import {
 } from "./helpers/modpackFixtures.js"
 
 /**
- * Covers "Reinstall" — the instance overflow menu's repair action
- * (`Library/Instance/index.tsx`'s `menuItems()`, `instanceMenuReinstall`) —
- * which re-runs the modpack download/staging pipeline against the instance's
- * own **current** version. Two behaviours, one test each:
+ * Covers "Repair" — the instance overflow menu's repair action
+ * (`Library/Instance/index.tsx`'s `menuItems()`, `instanceMenuRepair`) —
+ * which re-runs the modpack download/staging pipeline, in true repair mode,
+ * against the instance's own **current** version. Two behaviours, one test
+ * each:
  *
- * 1. It repairs a missing pack file but preserves a damaged one — the exact
- *    same asymmetry, not a fix, per the controller's ruling below.
+ * 1. It restores a pack file the user deleted AND repairs one they damaged —
+ *    the same treatment for both, not an asymmetry.
  * 2. It refuses to run at all while the instance is launching, queued,
- *    running, or being deleted (`modpack/mod.rs:210-217`'s `LaunchState`
- *    match inside `reinstall_modpack`), so it can never race a live
- *    `.setup/` directory a running instance depends on.
+ *    running, or being deleted (`modpack/mod.rs`'s `LaunchState` match inside
+ *    `repair_modpack`), so it can never race a live `.setup/` directory a
+ *    running instance depends on.
  *
- * **The repair/preserve asymmetry, traced through
- * `run/modpack.rs:747-823`.** `process_modpack_staging` decides file by file
- * in two independent passes: a first loop over `packinfo.files` that can only
- * ever *skip* a file (never repair one on its own), and a second loop that
- * walks whatever physically landed in the staging directory and moves a
- * staged file into any path that is currently empty.
+ * **Mechanism.** `repair_modpack` writes a `.setup/repair` marker
+ * (`RepairMarkerFile`, JSON) alongside `change-pack-version.json`.
+ * `process_modpack` (`run/modpack.rs`) checks for that marker before
+ * deciding the skip-optimisation oracle it hands to the platform prep
+ * functions: marker present -> `disk_scan::scan_instance_as_packinfo`, a
+ * live scan of what is actually on disk right now; marker absent -> the
+ * recorded `packinfo.json`, unchanged from an ordinary version change.
+ * `process_modpack_staging` selects `apply_plan::ApplyMode::Repair` whenever
+ * the marker was present. Together these mean a deleted or damaged path is
+ * never skip-optimised away — its disk bytes (if any exist at all) cannot
+ * match the pack manifest's declared hash, so a fresh copy is always
+ * re-fetched into staging — and `apply_plan::decide_repair` then reconciles
+ * every pack-tracked path against the **target** version alone, regardless
+ * of what the possibly-stale `old` record says: present-and-correct stays
+ * `Keep`/`Unchanged`; present-but-wrong (with a staged replacement) becomes
+ * `Replace`/`RepairOverwrote`; missing (with a staged replacement) becomes
+ * `Create`/`RepairRestored`. `apply_plan::plan` decides each path exactly
+ * once, so there is a single `PlanEntry` — and a single audit line — per
+ * path, never two independent passes that can contradict each other.
  *
- *   - A **truncated/corrupted** file still exists on disk and its md5 no
- *     longer matches packinfo's recorded value, so the first loop classes it
- *     `ModifiedByUser` (`:776-783`) and `continue`s — never replaced, and the
- *     second loop's own guard (`:815`, `!original_file.exists()`) is false
- *     for it regardless, since the path is occupied. **Reinstall does not
- *     repair a corrupted file; it preserves the corruption as a user
- *     modification.**
- *   - A **deleted** file hits `DeletedByUser` (`:759-764`) and is skipped by
- *     the first loop the same way, but the second loop *does* recreate it —
- *     its path is empty, so `!original_file.exists()` is true — **provided
- *     something was actually staged at that path in the first place.**
- *
- * That proviso is the one thing neither the plan nor the brief's own Step 1
- * sample code accounts for, and it materially changed which files this test
- * can use — see the next two sections.
- *
- * **Corollary, found empirically writing this test and not previously
- * documented anywhere in this wave: on a same-version reinstall specifically
- * (as opposed to a genuine version change), a `.files`-declared mod can
- * *never* be resurrected once deleted — only an override can.** The staging
- * directory starts empty (`modpack.rs:336`) and is filled two ways:
- * downloads (`modrinth.rs:261-319`) and unconditional override extraction
- * (`modrinth.rs:321-379`, no packinfo check at all, ever). A download is
- * skipped — nothing physically staged — whenever packinfo's already-recorded
- * hash for that path matches what the *target* version declares
- * (`modrinth.rs:277-289`'s `existing_path`/`skip` optimization, the same one
- * `modpackLifecycle.spec.ts` and `modpackLock.spec.ts` already document for a
- * genuine version bump). Reinstall's target version is, by definition, the
- * instance's own current version, so that comparison is packinfo-against-
- * itself and trivially always matches for any file the user has not
- * corrupted the *record* of — meaning **every** `.files`-declared mod is
- * skip-optimized on every reinstall, unconditionally, regardless of what is
- * or is not on disk. A deleted mod therefore has nothing staged for the
- * second loop to find, and stays deleted forever: confirmed live, deleting a
- * pristine mod and reinstalling left it absent, with an empty `Files
- * created:` section and no `Files deleted:` entry either — the pipeline
- * simply never touches it again. An override has no such optimization, so it
- * is *always* freshly re-extracted into staging on every pass and is always
- * available for the second loop to move into a path the user emptied.
- * Confirmed the other direction too: deleting a pristine override and
- * reinstalling brought it back byte-identical, audited in *both*
- * `Files that could not be replaced:` (`deleted by user`) and
- * `Files created:` — the same "two independent passes, so a deletion is
- * silently reinstated" oddity `modpackLifecycle.spec.ts` already pins for a
- * version change, now confirmed for a same-version reinstall too. This is
- * why `deletedKey` below is drawn from `index.overrides`, not `/mods/` as
- * the brief's Step 1 snippet does — literally following the brief here would
- * pin a false claim about reinstall specifically (it would still be true for
- * a genuine version change, which is a different code path this file does
- * not exercise).
- *
- * **`corruptKey` and `editKey` are overrides too, not mods, for a second and
- * separate reason: sabotage provability.** A truncated *mod* is genuinely,
- * correctly left untouched by real code (confirmed live, same as an
- * override) — but proving that assertion is load-bearing needs a sabotage
- * that can flip it, and the natural one-token sabotage here (disabling the
- * `ModifiedByUser` md5 comparison at `:776`) only defeats the *decision*, not
- * the skip-optimization that governs whether anything is staged to repair
- * *with*. Against a mod, nothing is ever staged (see above), so disabling
- * the md5 check changes nothing observable — the assertion would stay green
- * under a real behavioural regression, which is worse than not having it.
- * Against an override, a correct staged copy is *always* waiting, so
- * disabling the check lets it silently overwrite the "corruption" — a real,
- * provable flip. Using overrides for all three keys, rather than mixing in a
- * mod, is what makes one surgical sabotage (`:776`) able to prove both the
- * "truncated -> not repaired" and "edited -> preserved" halves in a single
- * pass, and keeps the mechanism identical across all three assertions rather
- * than needing three different stories.
- *
- * Every key is picked at runtime from `classifyPackinfo`'s own `pristine`
- * list, cross-referenced against the live `.mrpack` index's own `overrides`
- * — never a hardcoded filename — and each carries a named
+ * Every key this test mutates is picked at runtime from `classifyPackinfo`'s
+ * own `pristine` list, cross-referenced against the live `.mrpack` index's
+ * own `overrides` — never a hardcoded filename — and each carries a named
  * `toBeDefined()` check (never a bare `!`) so a future re-pin of
  * `modpackFixtures.ts` fails loudly here instead of throwing an unrelated
- * `TypeError`.
+ * `TypeError`. They are drawn from overrides rather than `.files`-declared
+ * mods only because overrides are simplest to seed (extracted unconditionally
+ * on every pass, `modrinth.rs`'s override loop has no packinfo/oracle check
+ * at all) — not because of any remaining behavioural difference: repair's
+ * disk-scanned oracle means a deleted or damaged mod is re-fetched into
+ * staging exactly like a deleted or damaged override is, so either would
+ * prove the same three assertions below.
  *
- * **The audit's path-format split** (`Files created:` carries
- * staging-relative, no-leading-slash, `instance/`-prefixed paths; the other
- * three sections carry packinfo's own leading-slash keys — see
- * `helpers/installAudit.ts`'s module doc) is normalised at every comparison
- * site below with the same `.replace(/^instance\//, "")` this suite already
- * uses elsewhere, so a comparison against the wrong format cannot pass
- * vacuously.
- *
- * **Test 2 — refused while running.** Not implemented with `reinstallModpack`
+ * **Test 2 — refused while running.** Not implemented with `repairModpack`
  * (`helpers/modpacks.ts`): that helper's last step is
  * `waitForInstallComplete`, which is exactly what must never be reached here
  * — the whole point is that the mutation is rejected before it touches
  * anything. This drives the same three clicks
- * (`instanceMenuTrigger` -> `instanceMenuReinstall` -> `confirmReinstallConfirm`)
+ * (`instanceMenuTrigger` -> `instanceMenuRepair` -> `repairModpackConfirm`)
  * directly and asserts the refusal instead: the tile must still read
- * `running`, and `.setup/` — which `reinstall_modpack` only ever creates
+ * `running`, and `.setup/` — which `repair_modpack` only ever creates
  * *after* its `LaunchState::Inactive` guard — must not exist.
  *
  * **`.setup/`'s absence is the load-bearing half of that pair, and the
- * still-running check is only corroborating.** `reinstall_modpack`'s guard is
+ * still-running check is only corroborating.** `repair_modpack`'s guard is
  * defence in depth over `prepare_game`'s own
  * `LaunchState::Running(_) => bail!` (`run/mod.rs:194-196`), which every path
- * into this feature ends at. Remove `reinstall_modpack`'s guard and
+ * into this feature ends at. Remove `repair_modpack`'s guard and
  * `prepare_game` still refuses, so the instance genuinely does stay running
- * and the first assertion stays green — but by then `reinstall_modpack` has
+ * and the first assertion stays green — but by then `repair_modpack` has
  * already `remove_dir_all`'d and recreated `.setup/` and written
  * `change-pack-version.json` into it, on a live instance. That leak is what
  * this test actually detects, and it is the same leak `change_modpack`
  * exhibits unguarded today (see the README's product findings): a mid-game
  * version change is not cancelled, it is deferred to the next launch.
- * `ConfirmReinstall.tsx`'s
+ * `RepairModpack/index.tsx`'s
  * `navigateAwayIfInsideDetail()` runs synchronously on the confirm click,
- * before the mutation is even dispatched, and unconditionally navigates back
- * to `/library` regardless of whether the mutation later succeeds or fails —
- * which is what lets this test read the tile's `data-instance-state`
- * straight off the library grid afterward, the same way
- * `waitForInstallComplete` itself relies on for a real reinstall.
+ * before the mutation is even dispatched. It only navigates when the current
+ * route is inside the instance's own detail page, which this flow guarantees
+ * by calling `openInstance` first — so it fires here regardless of whether
+ * the mutation later succeeds or fails, navigating back to `/library`, which
+ * is what lets this test read the tile's `data-instance-state` straight off
+ * the library grid afterward, the same way `waitForInstallComplete` itself
+ * relies on for a real reinstall.
  *
  * **Own harness for test 2 only, like `modpackLifecycle.spec.ts` —
  * not test 1.** Test 2 leaves a real JVM running and must be free to kill it
@@ -187,42 +132,6 @@ import {
  * install. The row loss it was covering was
  * `InfiniteScrollVersionsQueryWrapper` tearing the list down on an unchanged
  * scope, and that is fixed in the product now.
- *
- * **Sabotage results.** Three, each one surgical edit against a provably
- * clean build, each reverted and sha256-confirmed byte-identical to HEAD
- * before the next.
- *   1. **`run/modpack.rs:776`**, forcing the `ModifiedByUser` md5 comparison
- *      to always match (`if false` in place of
- *      `original_md5 != oldfilehash.md5`). Red at the truncated-file
- *      assertion: *"reinstall repaired a truncated pack file"*,
- *      `Expected: 0 / Received: 54` — 54 being the pristine override's real
- *      size, so it was genuinely re-staged over. Because that assertion sits
- *      below them, this also proves the five above it execute and pass
- *      against a changed product: audit-not-null, deleted-restored,
- *      declared-sha256 match, `Files created:`, and `deleted-by-user`.
- *   2. **`run/modpack.rs:815`**, the staging walk's file creation, gated so
- *      it fires only on a reinstall:
- *      `&& !instance_root.join("packinfo.json").exists()`. Red at
- *      *"reinstall did not restore a pack file the user had deleted"*,
- *      `Received: undefined`.
- *
- *      The gate is **not** decoration. Disabling that guard outright — the
- *      obvious sabotage, and the one first attempted — does not weaken a
- *      reinstall at all; it stops the instance ever installing, and this test
- *      dies at its own precondition with zero assertions executed.
- *      `process_modpack` writes its scan to `tmp-packinfo.json`
- *      (`run/modpack.rs:638`) and only renames it to `packinfo.json` at :899,
- *      *after* the staging apply, so on a **fresh install** the packinfo read
- *      at :739-743 returns `None`, the packinfo pass is skipped entirely, and
- *      the staging walk is performing 100% of the file placement. Gating on
- *      `packinfo.json` existing is what confines the sabotage to the
- *      second-and-later passes.
- *   3. **`modpack/mod.rs:210-217`**, deleting `reinstall_modpack`'s
- *      `LaunchState` refusal (`_ => { bail!(…) }` → `_ => {}`). Red at
- *      *"reinstall created .setup/ even though the instance was running"*,
- *      `Expected: false / Received: true` — with test 2's still-running
- *      assertion above it passing, exactly as the section on that pair
- *      predicts.
  */
 
 /** Mirrors `gameLaunch.spec.ts`'s `FIRST_OUTPUT_TIMEOUT` /
@@ -233,7 +142,7 @@ const LAUNCH_TIMEOUT = 180_000
 const STOP_TIMEOUT = 60_000
 
 test.describe("modpack reinstall", () => {
-  test("reinstalling restores a deleted pack file but preserves a damaged one", async ({
+  test("reinstalling restores a deleted pack file and repairs a damaged one", async ({
     authenticatedApp
   }, testInfo) => {
     const { page, harness } = authenticatedApp
@@ -251,9 +160,9 @@ test.describe("modpack reinstall", () => {
       const root = path.join(harness.runtimePath, "instances", shortpath)
       const data = path.join(root, "instance")
 
-      // All three keys are pristine OVERRIDES, not mods — see the module doc
-      // comment for why a mod cannot prove either half of this test on a
-      // same-version reinstall.
+      // All three keys are pristine OVERRIDES — see the module doc comment
+      // for why (simplest to seed; no remaining behavioural difference from
+      // a `.files`-declared mod under repair).
       const status = await classifyPackinfo(root)
       const overridePaths = new Set(index.overrides)
       const overrideCandidates = status.pristine.filter((k) =>
@@ -293,15 +202,18 @@ test.describe("modpack reinstall", () => {
       const editedBody = "e2e-reinstall-edit\n"
       await fs.promises.writeFile(packinfoDataPath(root, editKey), editedBody)
 
-      await reinstallModpack(page, name)
+      await repairModpack(page, name)
 
       const after = await snapshotTree(data)
       const audit = await readInstallAudit(root)
       expect(audit, "reinstall wrote no install audit").not.toBeNull()
 
       // Deleted -> restored: byte-identical to both the pristine copy that
-      // existed before the sabotage and the pack's own declared content, and
-      // recorded as created.
+      // existed before the deletion and the pack's own declared content, and
+      // recorded as created. `render_audit` writes the plan's own path
+      // (packinfo-style, leading slash) into every section now — no more
+      // staging-relative format to normalise away — so `deletedKey` is
+      // compared as-is, never `.slice(1)`'d, against `created`/`replaced`.
       expect(
         after.get(deletedKey.slice(1))?.sha256,
         "reinstall did not restore a pack file the user had deleted"
@@ -311,36 +223,49 @@ test.describe("modpack reinstall", () => {
         "the restored file's bytes do not match the pack's own declared content"
       ).toBe(deletedDeclared!.sha256)
       expect(
-        audit!.created.map((p) => p.replace(/^instance\//, "")),
+        audit!.created,
         `audit did not record creating ${deletedKey}`
-      ).toContain(deletedKey.slice(1))
+      ).toContain(deletedKey)
       expect(
-        audit!.skipped.find((s) => s.file === deletedKey)?.reason,
-        `audit reason for ${deletedKey}`
-      ).toBe("deleted-by-user")
+        audit!.skipped.some((s) => s.file === deletedKey),
+        `${deletedKey} was restored by the plan, so it must not also appear ` +
+          "in the skipped section — repair decides each path exactly once, " +
+          "unlike the old two-independent-passes pipeline"
+      ).toBe(false)
 
-      // Truncated -> NOT repaired. Pinned deliberately; see the module doc
-      // comment for why this is correct behaviour, not a bug.
+      // Truncated -> repaired: non-empty again, byte-identical to its own
+      // pristine original (captured into `before` before the truncation),
+      // and recorded as replaced, not skipped.
       expect(
         after.get(corruptKey.slice(1))?.size,
-        "reinstall repaired a truncated pack file — the product behaviour " +
-          "this test pins has changed, which is good news but needs the " +
-          "assertion and the module doc comment updated rather than deleted"
-      ).toBe(0)
+        "reinstall did not repair a truncated pack file"
+      ).toBeGreaterThan(0)
       expect(
-        audit!.skipped.find((s) => s.file === corruptKey)?.reason,
-        `audit reason for ${corruptKey}`
-      ).toBe("modified-by-user")
+        after.get(corruptKey.slice(1))?.sha256,
+        "the repaired file's bytes do not match its own pristine original"
+      ).toBe(before.get(corruptKey.slice(1))?.sha256)
+      expect(
+        audit!.replaced,
+        `audit did not record repairing ${corruptKey}`
+      ).toContain(corruptKey)
 
-      // Edited config -> preserved.
+      // Edited config -> reset to the pack's own bytes, not preserved.
+      const editedFileNow = await fs.promises.readFile(
+        packinfoDataPath(root, editKey),
+        "utf8"
+      )
       expect(
-        await fs.promises.readFile(packinfoDataPath(root, editKey), "utf8"),
-        "reinstall overwrote a user-edited config"
-      ).toBe(editedBody)
+        editedFileNow,
+        "reinstall left the user's edit in place instead of repairing it"
+      ).not.toBe(editedBody)
       expect(
-        audit!.skipped.find((s) => s.file === editKey)?.reason,
-        `audit reason for ${editKey}`
-      ).toBe("modified-by-user")
+        after.get(editKey.slice(1))?.sha256,
+        "the reset file's bytes do not match its own pristine original"
+      ).toBe(before.get(editKey.slice(1))?.sha256)
+      expect(
+        audit!.replaced,
+        `audit did not record repairing ${editKey}`
+      ).toContain(editKey)
     } catch (error) {
       bodyFailed = true
       throw error
@@ -359,8 +284,8 @@ test.describe("modpack reinstall", () => {
             throw cleanupError
           }
           console.error(
-            'cleanup for "reinstalling restores a deleted pack file but ' +
-              'preserves a damaged one" also failed:',
+            'cleanup for "reinstalling restores a deleted pack file and ' +
+              'repairs a damaged one" also failed:',
             cleanupError
           )
         }
@@ -437,24 +362,24 @@ test.describe("modpack reinstall", () => {
         "the instance never reached the running state after GAME_LAUNCHED"
       ).toHaveAttribute("data-instance-state", "running")
 
-      // Drive the overflow menu directly — NOT reinstallModpack, which
+      // Drive the overflow menu directly — NOT repairModpack, which
       // awaits waitForInstallComplete, exactly what must NOT happen when the
       // mutation is refused. openInstance is the same navigation
-      // reinstallModpack itself uses internally; only the wait afterward is
+      // repairModpack itself uses internally; only the wait afterward is
       // skipped.
       await openInstance(page, name)
       await page.click(byTestId(TEST_IDS.instanceMenuTrigger))
-      const entry = page.locator(byTestId(TEST_IDS.instanceMenuReinstall))
+      const entry = page.locator(byTestId(TEST_IDS.instanceMenuRepair))
       await expect(
         entry,
-        `the reinstall menu entry was disabled for "${name}" — the instance ` +
+        `the repair menu entry was disabled for "${name}" — the instance ` +
           "has no modpack association"
       ).toBeEnabled()
       await entry.click()
-      await page.click(byTestId(TEST_IDS.confirmReinstallConfirm))
+      await page.click(byTestId(TEST_IDS.repairModpackConfirm))
 
       // The mutation rejects; the instance must still be running and its
-      // files untouched. `confirmReinstallConfirm`'s click synchronously
+      // files untouched. `repairModpackConfirm`'s click synchronously
       // navigates back to /library (see the module doc comment), which is
       // what makes the tile locator resolve here.
       await expect(

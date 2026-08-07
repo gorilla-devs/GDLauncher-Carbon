@@ -99,9 +99,9 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
     title: t("modals:_trn_confirm_instance_deletion")
   },
-  confirmReinstall: {
-    component: lazy(() => import("./modals/ConfirmReinstall")),
-    title: t("modals:_trn_confirm_reinstall")
+  repairModpack: {
+    component: lazy(() => import("./modals/RepairModpack")),
+    title: t("modals:_trn_repair_modpack")
   },
   confirmBatchInstanceDeletion: {
     component: lazy(() => import("./modals/ConfirmBatchInstanceDeletion")),

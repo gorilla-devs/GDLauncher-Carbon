@@ -72,24 +72,25 @@ import {
  * ## What is asserted, and what a failure means
  *
  * The tree comparison is exact, path-for-path and sha256-for-sha256. It is
- * predicted from reading `process_modpack_staging`: files only OLD ships are
- * pristine, in packinfo, and absent from the target's
- * `staging-packinfo.json`, so pass 1 deletes them; files only the target
- * ships are staged and land via pass 2; shared files whose bytes differ are
+ * predicted from reading `process_modpack_staging`: the apply planner
+ * (`apply_plan::plan`, `crates/carbon_app/src/managers/instance/modpack/apply_plan.rs`)
+ * reconciles `old ∪ target` against disk and staged content in a single pass
+ * — files only OLD ships are pristine and get deleted, files only the target
+ * ships are staged and get created, shared files whose bytes differ are
  * replaced. **A divergence here is a finding, not a broken assertion** —
- * characterise it and pin it the way `modpackLifecycle.spec.ts` pins
- * `KNOWN_STALE_SURVIVORS_AFTER_DOWNGRADE`, rather than loosening this to
- * `toContain`.
+ * characterise it and pin it the way `modpackLifecycle.spec.ts` pins its own
+ * findings, rather than loosening this to `toContain`.
  *
- * `packinfo.json` is expected to diverge even though the tree does not, and
- * that is asserted rather than ignored. `scan_dir` rebuilds packinfo from
- * what physically landed in staging, and the skip-if-unchanged optimisation
- * never stages a file whose recorded hash already matches the target's — so
- * every file unchanged across the bump drops out of the version-changed
- * instance's packinfo while a fresh install records all of them. That is wave
- * 1's finding 4, shown here on the CurseForge path for the first time. Each
- * dropped entry is then checked to still be *on disk and correct*, because a
- * lost packinfo entry must not be allowed to quietly mean a lost file.
+ * `packinfo.json` is expected to match the twin's exactly, and that is
+ * asserted rather than assumed. `scan_dir` still rebuilds packinfo from
+ * what physically landed in staging, and the skip-if-unchanged download
+ * optimisation still means a file whose recorded hash already matches the
+ * target's is never re-staged — but `process_modpack`'s snapshot block now
+ * merges the skip-oracle's hash back in for every such skip-optimised path
+ * before packinfo is written, so nothing drops out of the version-changed
+ * instance's packinfo. Confirmed
+ * here on the CurseForge path, independent of the Modrinth-side confirmation
+ * in `modpackLifecycle.spec.ts`.
  *
  * Neither instance is ever launched, so nothing rewrites configs and every
  * packinfo entry stays pristine by construction.
@@ -206,8 +207,14 @@ test.describe("curseforge modpack version change", () => {
         "the version change altered the instance's lock state"
       ).toBe(beforeConfig.modpack?.locked)
 
-      // packinfo diverges even though the tree does not — finding 4, on the
-      // CurseForge path.
+      // packinfo now matches the tree — finding 4 (scan_dir dropping files
+      // unchanged between versions, `helpers/packinfo.js`) is fixed:
+      // `process_modpack`'s snapshot block merges the skip-oracle's hash
+      // back in for every skip-optimised path, so the version-changed
+      // instance's packinfo is exactly the same set of paths a fresh
+      // install of the same target produces — the per-key bytes check this
+      // needs is subsumed by the strict tree assertion above, which already
+      // proves every path's bytes are correct.
       const subjectPackinfo = await readPackinfo(subjectRoot)
       const missing = [...twinPackinfo.keys()]
         .filter((k) => !subjectPackinfo.has(k))
@@ -223,19 +230,11 @@ test.describe("curseforge modpack version change", () => {
           "new behaviour"
       ).toEqual([])
       expect(
-        missing.length,
-        "packinfo lost NO entries across a version change — finding 4 " +
-          "(scan_dir dropping files unchanged between versions) appears to " +
-          "have been fixed, which is good news but needs this assertion and " +
-          "the README's product findings updated rather than deleted"
-      ).toBeGreaterThan(0)
-      for (const key of missing) {
-        expect(
-          subjectTree.get(key.slice(1))?.sha256,
-          `${key} dropped out of packinfo, but its bytes must still be on ` +
-            "disk and correct — a lost packinfo entry must not mean a lost file"
-        ).toBe(twinTree.get(key.slice(1))?.sha256)
-      }
+        missing,
+        "packinfo lost entries across a version change — the skip-optimised " +
+          "merge fix (process_modpack's snapshot block, run/modpack.rs) " +
+          "regressed"
+      ).toEqual([])
     } catch (error) {
       bodyFailed = true
       throw error

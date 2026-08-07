@@ -189,6 +189,8 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
     // Instance tasks - only include ones with actual translations
     'InstanceTaskLaunch': 'tasks:_trn_instance_task_launch',
     'InstanceTaskPrepare': 'tasks:_trn_instance_task_prepare',
+    'InstanceTaskCheckPackOrigin': 'tasks:_trn_instance_task_check_pack_origin',
+    'InstanceTaskCheckPackOriginVersions': 'tasks:_trn_instance_task_check_pack_origin_versions',
     'InstanceTaskLaunchRequestVersions': 'tasks:_trn_instance_task_launch_request_versions',
     'InstanceTaskLaunchRequestModpack': 'tasks:_trn_instance_task_launch_request_modpack',
     'InstanceTaskLaunchDownloadModpack': 'tasks:_trn_instance_task_launch_download_modpack',

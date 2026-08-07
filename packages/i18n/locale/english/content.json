@@ -123,6 +123,7 @@
   "_trn_disable_mod": "Disable Mod",
   "_trn_duplicated_mods_detected": "Duplicated Mods Detected",
   "_trn_duplicated_mods_message": "The following mods are duplicated",
+  "_trn_duplicated_mods_locked_message": "This modpack is locked — use Repair to review and remove duplicate files",
   "_trn_filter.all": "All",
   "_trn_filter.local": "Local",
   "_trn_multi_select_hint": "Hold Ctrl/Cmd to select multiple",

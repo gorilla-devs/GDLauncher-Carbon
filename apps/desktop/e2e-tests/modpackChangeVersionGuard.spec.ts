@@ -19,7 +19,6 @@ import {
   pickModpackVersionAndConfirm
 } from "./helpers/modpacks.js"
 import {
-  MODPACK_MR_PROJECT,
   MODPACK_MR_QUERY,
   MODPACK_MR_V_MID,
   MODPACK_MR_V_NEW,
@@ -28,44 +27,31 @@ import {
 
 /**
  * Covers `change_modpack`
- * (`crates/carbon_app/src/managers/instance/modpack/mod.rs:137-183`) started
+ * (`crates/carbon_app/src/managers/instance/modpack/mod.rs:139-207`) started
  * while the game is running — the one half of this feature's launch-state
  * story that `modpackReinstall.spec.ts` does not reach.
  *
- * **The finding this pins, stated correctly.** `reinstall_modpack` refuses
- * outright while the instance is launching, queued, running or being deleted
- * (`modpack/mod.rs:210-217`); `change_modpack` has no such guard. The
- * consequence is **not** a mid-game `mods/` rewrite, which is what an earlier
- * reading of this claimed: both functions end at `prepare_game`, and
- * `prepare_game` bails on `LaunchState::Running` of its own accord
- * (`run/mod.rs:194-196`), so no staging pass ever runs under a live JVM.
+ * **The guard, and what it protects.** `change_modpack` and
+ * `repair_modpack` carry the same `LaunchState` match
+ * (`modpack/mod.rs:156-163` and `234-241`): either call bails immediately,
+ * before touching `.setup/` at all, unless the instance is `Inactive`. For
+ * `change_modpack` that guard sits *before* the `setup_path.exists()` check,
+ * `create_dir_all`, and the `change-pack-version.json` write
+ * (`modpack/mod.rs:176-190`), so a call made while the instance is
+ * launching, queued, running, or being deleted leaves nothing on disk at
+ * all — not a leak, not a deferred apply, nothing for a later launch to
+ * find. `repair_modpack`'s guard was already closing this gap on its own
+ * path; this file is what proves `change_modpack` now matches it, since
+ * `modpackReinstall.spec.ts` never drives `change_modpack` itself.
  *
- * What actually happens is narrower and more interesting. `change_modpack`
- * creates `.setup/` and writes `change-pack-version.json` into it
- * (`modpack/mod.rs:161-176`) **before** it ever calls `prepare_game`, so the
- * refusal arrives too late to undo either. The version change is therefore
- * not cancelled — it is **deferred**. The next launch finds
- * `change-pack-version.json` sitting in `.setup/` and applies it, at a moment
- * the user never asked for and with no UI having reported that anything was
- * pending. Meanwhile every further `change_modpack` call bails with
- * "Instance has not completed the setup phase, attempting to change the
- * modpack may irreparably damage it", because `.setup/` now exists.
- *
- * That whole sequence is what this test walks, in order: the leak, the second
- * call's refusal, and finally the deferred application on the next launch —
- * which is the load-bearing assertion, since it is the part with real user
- * consequences.
- *
- * **A second finding, discovered by this test's own first run: a refused
- * version change tells the user nothing at all.** `handleUpdate`
- * (`ModPackVersionUpdate/index.tsx:126-151`) awaits the mutation and only
- * afterwards calls `closeModal()` and `navigate("/library")`. There is no
- * `catch` anywhere on that path, so when `change_modpack` rejects — which is
- * exactly what happens mid-game — both are skipped: the modal stays open,
- * unchanged, with no toast, no inline error, and no indication that anything
- * failed or that a change is now pending on disk. The user is left looking at
- * a dialog that simply did not respond to the button they pressed. Pinned
- * below by asserting the route never leaves the instance detail.
+ * **The refusal reaches the user.** `handleUpdate`
+ * (`ModPackVersionUpdate/index.tsx:170-201`) wraps the mutation in a
+ * `try/catch`: a rejection sets an inline-error signal instead of closing the
+ * modal and navigating to `/library`, and the modal renders it under
+ * `data-testid="modpack-version-update-error"`. Pinned below by asserting
+ * that testid becomes visible and the route never leaves the instance
+ * detail — proof the user is actually told something, not just that nothing
+ * navigated out from under them.
  *
  * That behaviour also dictates this file's shape. Because the page stays on
  * the Settings route behind a modal overlay, there is **no instance tile on
@@ -74,26 +60,18 @@ import {
  * draft asserted the tile and reported "the instance left the running state"
  * when the guard had in fact held perfectly, which is precisely the class of
  * misleading red this suite's sabotage checks exist to catch.
- * For the same reason the second attempt is driven *inside* the open modal
+ * For the same reason a second attempt is driven *inside* the open modal
  * rather than navigating back to it, and the modal is explicitly cancelled
- * before any tile is touched.
+ * only once both attempts have been observed.
  *
- * **The second call's refusal is observed on disk, not through the UI.**
- * `change_modpack` bails at its `if setup_path.exists()` check
- * (`modpack/mod.rs:163-167`), which sits *before* both the `create_dir_all`
- * and the `write_file_atomic` below it — so a bailed call provably cannot
- * have touched `change-pack-version.json`. Asserting the file is byte-for-byte
- * what the first call wrote is therefore a sound proxy for "the second call
- * bailed", and a far better one than the rspc error, which the renderer does
- * not surface anywhere this test can read.
- *
- * `change-pack-version.json`'s shape is read off `PackVersionFile`
- * (`modpack/mod.rs:253-264`), which is `#[serde(tag = "platform")]` with no
- * `rename_all`: fields stay snake_case and the tag carries the PascalCase
- * variant name, so the file is exactly
- * `{"platform":"Modrinth","project_id":"…","version_id":"…"}`. Asserted as a
- * whole object rather than by probing one key, so a change to either
- * convention fails loudly instead of silently comparing `undefined`.
+ * **A second attempt refuses identically to the first.** Unlike the old
+ * `setup_path.exists()` bail it replaced, the `LaunchState` guard reads
+ * instance state rather than a marker file on disk, so there is no "the
+ * first call poisons `.setup/` for the second" distinction left to prove —
+ * both calls take the exact same branch for the exact same reason. This file
+ * drives a second confirm with a different target version
+ * (`MODPACK_MR_V_OLD`) and asserts the same two things again: the inline
+ * error reappears, and `change-pack-version.json` still does not exist.
  *
  * **Own harness**, like `modpackLifecycle.spec.ts` and
  * `modpackReinstall.spec.ts`'s second test: this leaves a real JVM running
@@ -111,12 +89,24 @@ import {
  * `InfiniteScrollVersionsQueryWrapper` tearing the list down on an unchanged
  * scope, and that is fixed in the product now.
  *
- * **Sabotage result — inverted, and deliberately so.** This test pins a
- * *missing* guard, so the sabotage **adds** the `LaunchState` match
- * `reinstall_modpack` already has to `change_modpack`. `.setup/` is then never
- * created and the `change-pack-version.json` poll goes red. That is exactly
- * what should happen the day someone fixes this bug, and the assertion's own
- * message says so — a tripwire, not decoration. See `task-1b-2-report.md`.
+ * **Sabotage result.** `change_modpack`'s own `LaunchState` guard
+ * (`modpack/mod.rs:156-163`) and `prepare_game`'s independent
+ * `LaunchState::Running(_)` bail (`run/mod.rs:194-196`) are redundant layers
+ * for a *running* instance, and the `.setup/` cleanup that follows either one
+ * (`modpack/mod.rs:200-204`) fires unconditionally on any `Err`. So this file
+ * cannot discriminate deleting just `change_modpack`'s own guard: `.setup/`
+ * and `change-pack-version.json` still get written, `prepare_game` still
+ * bails — sub-second, well inside `SECOND_ATTEMPT_SETTLE` — cleanup still
+ * runs, and the mutation still rejects, just with a different message. The
+ * leak-absence poll stays green and the inline error still appears; a
+ * single-guard sabotage here is invisible to this test.
+ *
+ * What this file does trip: removing **both** guards (or otherwise letting
+ * `prepare_game` proceed while running) resurrects the deferred-apply bug —
+ * `.setup/` survives, and the remain-MID relaunch assertion goes red once a
+ * later launch picks it up. Removing the `try`/`catch` in `handleUpdate`
+ * (`ModPackVersionUpdate/index.tsx:170-201`) kills the inline-error
+ * assertion instead, independent of which backend guard is in play.
  */
 
 /** Mirrors `modpackReinstall.spec.ts`'s `LAUNCH_TIMEOUT`. */
@@ -125,26 +115,19 @@ const LAUNCH_TIMEOUT = 180_000
 /** Mirrors `modpackReinstall.spec.ts`'s `STOP_TIMEOUT`. */
 const STOP_TIMEOUT = 60_000
 
-/** How long the deferred change is given to apply on the next launch: a full
- *  28 MiB re-download plus the staging apply, on top of the launch that
- *  triggers it. Generous because a slow red here is far better than a false
- *  one — the assertion it guards is this file's whole point. */
-const CHANGE_APPLY_TIMEOUT = 300_000
-
-/** How long `change_modpack` is given to leak `.setup/` after the confirm
- *  click. It writes the file before ever calling `prepare_game`, so this is
- *  a fast path; the allowance covers the rspc round trip only. */
-const LEAK_TIMEOUT = 15_000
-
-/** How long `.setup/` is given to be swept after the deferred change lands.
- *  Separate from `CHANGE_APPLY_TIMEOUT` because it measures a different gap:
- *  the config is written inside `process_modpack`, while the directory is
- *  removed later, by the launch path that called it. */
+/** How long `.setup/` is given to stay swept — i.e. absent — once a launch
+ *  has had the chance to create it. The guard refuses before `create_dir_all`
+ *  ever runs, so in practice this bound is never approached; kept generous
+ *  rather than re-tuned tight, since a slow pass here is far cheaper than a
+ *  false red on the assertion that is this file's whole point. */
 const SETUP_SWEEP_TIMEOUT = 120_000
 
-/** Settle window after the second change attempt, before asserting the
- *  pending file is untouched. Long enough that a call which *did* write would
- *  have done so. */
+/** Settle window used wherever this test must prove a fixed-window absence
+ *  or no-change rather than wait for a positive signal — that
+ *  `change-pack-version.json` never appears after a refused change, and that
+ *  a later, unrelated launch never moves the pinned version off what the
+ *  guard left it at. Long enough that a call which *did* write, or a launch
+ *  which *did* re-pin, would have done so. */
 const SECOND_ATTEMPT_SETTLE = 3_000
 
 /** Navigates to the instance's Settings tab and opens the version modal. */
@@ -170,7 +153,7 @@ async function cancelVersionModal(page: Page): Promise<void> {
 
 test.describe("modpack change version guard", () => {
   // eslint-disable-next-line no-empty-pattern
-  test("a version change started mid-game is deferred, not cancelled", async ({}, testInfo) => {
+  test("a version change started mid-game is refused, not deferred", async ({}, testInfo) => {
     expect(isCoreModulePresent()).toBeTruthy()
 
     const harness = await startHarness()
@@ -247,70 +230,54 @@ test.describe("modpack change version guard", () => {
       await openVersionModal(page, name)
       await pickModpackVersionAndConfirm(page, MODPACK_MR_V_NEW)
 
-      // The leak, pinned as current behaviour.
-      await expect
-        .poll(() => fs.existsSync(pendingFile), {
-          timeout: LEAK_TIMEOUT,
-          message:
-            "change_modpack did not write change-pack-version.json while the " +
-            "instance was running. If a LaunchState guard was just added to " +
-            "change_modpack, that is a FIX and this test pins the old " +
-            "behaviour — update this assertion and the README's product " +
-            "findings rather than deleting either"
-        })
-        .toBe(true)
-
-      const pendingFirst = JSON.parse(
-        await fs.promises.readFile(pendingFile, "utf8")
-      )
-      expect(
-        pendingFirst,
-        "change-pack-version.json does not describe the version that was " +
-          "selected, in the shape PackVersionFile serialises"
-      ).toEqual({
-        platform: "Modrinth",
-        project_id: MODPACK_MR_PROJECT,
-        version_id: MODPACK_MR_V_NEW
-      })
-
-      // The game must still be running: `prepare_game` refused, even though
-      // `change_modpack` had already done its damage. Asserted from the core's
-      // own state stream rather than the instance tile, because a refused
-      // change leaves the page on the instance's Settings route with the modal
-      // still open — there is no tile on screen to read, and asserting one
-      // here would report "the instance left the running state" for a routing
-      // reason while the guard was in fact holding perfectly.
-      expect(
-        closedCount(),
-        "the game stopped after a mid-game version change — prepare_game's " +
-          "own LaunchState guard did not hold"
-      ).toBe(closedBeforeLaunch)
-
-      // A refused change tells the user nothing. `handleUpdate`
-      // (`ModPackVersionUpdate/index.tsx:126-151`) awaits the mutation and
-      // only then calls `closeModal()` and `navigate("/library")`, with no
-      // catch anywhere — so a rejection skips both and the modal just sits
-      // there, unchanged, no toast, no error text. Pinned as current
-      // behaviour; see the README's product findings.
-      expect(
-        page.url(),
-        "a refused version change navigated away from the instance — " +
-          "handleUpdate must have grown error handling, which is a fix; " +
-          "update this assertion and the README rather than deleting it"
-      ).toMatch(/#\/library\/\d+/)
-
-      // A SECOND attempt bails at `if setup_path.exists()`, which precedes
-      // both the create_dir_all and the write — so the pending file must be
-      // untouched, still naming the FIRST target. Driven inside the modal
-      // that is still open, since nothing can navigate past its overlay.
-      await pickModpackVersionAndConfirm(page, MODPACK_MR_V_OLD)
+      // The guard refuses before touching .setup — nothing may appear on disk.
       await page.waitForTimeout(SECOND_ATTEMPT_SETTLE)
       expect(
-        JSON.parse(await fs.promises.readFile(pendingFile, "utf8")),
-        "a second change_modpack call overwrote the pending version while " +
-          "`.setup/` already existed — it should have bailed on " +
-          '"Instance has not completed the setup phase"'
-      ).toEqual(pendingFirst)
+        fs.existsSync(pendingFile),
+        "change_modpack wrote change-pack-version.json while the instance was " +
+          "running — the LaunchState guard regressed"
+      ).toBe(false)
+
+      // The game must still be running: the guard bails before `prepare_game`
+      // is ever called, so this is not `prepare_game`'s own LaunchState check
+      // holding — it is `change_modpack` refusing outright, earlier. Asserted
+      // from the core's own state stream rather than the instance tile,
+      // because a refused change leaves the page on the instance's Settings
+      // route with the modal still open — there is no tile on screen to
+      // read, and asserting one here would report "the instance left the
+      // running state" for a routing reason while the guard was in fact
+      // holding perfectly.
+      expect(
+        closedCount(),
+        "the game stopped after a mid-game version change — change_modpack's " +
+          "LaunchState guard did not hold"
+      ).toBe(closedBeforeLaunch)
+
+      // The refusal must reach the user. `handleUpdate`
+      // (`ModPackVersionUpdate/index.tsx`) catches the rejected mutation and
+      // renders an inline error in the still-open modal instead of closing it
+      // and navigating away.
+      await expect(
+        page.locator(byTestId("modpack-version-update-error")),
+        "a refused version change surfaced no inline error in the modal"
+      ).toBeVisible({ timeout: 15_000 })
+      expect(page.url()).toMatch(/#\/library\/\d+/)
+
+      // A SECOND attempt refuses identically to the first — the guard reads
+      // `LaunchState`, not `.setup/`'s presence, so there is no "the first
+      // call poisons `.setup/` for the second" distinction left to observe.
+      // Driven inside the modal that is still open, since nothing can
+      // navigate past its overlay.
+      await pickModpackVersionAndConfirm(page, MODPACK_MR_V_OLD)
+      await expect(
+        page.locator(byTestId("modpack-version-update-error")),
+        "a second refused version change surfaced no inline error in the modal"
+      ).toBeVisible({ timeout: 15_000 })
+      expect(
+        fs.existsSync(pendingFile),
+        "the second change_modpack call wrote change-pack-version.json " +
+          "while the instance was running — the LaunchState guard regressed"
+      ).toBe(false)
 
       // Close the still-open modal and get back to the library grid before
       // touching any tile.
@@ -325,38 +292,38 @@ test.describe("modpack change version guard", () => {
         })
         .toBeGreaterThan(closedBeforeLaunch)
 
-      const beforeDeferred = await readInstanceConfig(root)
+      const beforeRelaunch = await readInstanceConfig(root)
       expect(
-        beforeDeferred.modpack?.modrinthVersionId,
-        "the instance was repinned before the deferred change ever ran"
+        beforeRelaunch.modpack?.modrinthVersionId,
+        "the instance was repinned even though every change_modpack call " +
+          "while it was running was refused"
       ).toBe(MODPACK_MR_V_MID)
 
-      // Launch again. THE load-bearing assertion: the change queued mid-game
-      // applies itself now, unprompted.
+      // Launch again. THE load-bearing assertion: a version change the guard
+      // refused must not resurrect itself on a later, perfectly normal
+      // launch — there was never anything queued for it to find.
       closedBeforeLaunch = closedCount()
+      const launchedBeforeRelaunch = launchedCount()
       await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
       await expect
-        .poll(
-          async () =>
-            (await readInstanceConfig(root)).modpack?.modrinthVersionId,
-          {
-            timeout: CHANGE_APPLY_TIMEOUT,
-            message:
-              "the version change queued mid-game never applied on the next " +
-              "launch — it was discarded rather than deferred, which would " +
-              "make this a smaller bug than the one documented"
-          }
-        )
-        .toBe(MODPACK_MR_V_NEW)
+        .poll(() => launchedCount(), {
+          timeout: LAUNCH_TIMEOUT,
+          message:
+            "the core never reported GAME_LAUNCHED after the second Play click"
+        })
+        .toBeGreaterThan(launchedBeforeRelaunch)
 
-      // ...and the pending file is consumed, so the change does not re-apply
-      // on every future launch. Polled, not checked instantly: nothing deletes
-      // `change-pack-version.json` on its own — it goes away only when
-      // `.setup/` as a whole is removed (`run/mod.rs:527-528`), which happens
-      // after `process_modpack` has already written the new version into
-      // `instance.json`. So the config flips first and the directory is swept
-      // a moment later, and an instant check here races that gap.
+      await page.waitForTimeout(SECOND_ATTEMPT_SETTLE)
+      expect(
+        (await readInstanceConfig(root)).modpack?.modrinthVersionId,
+        "the instance's pinned version moved off MID after a launch that had " +
+          "nothing pending — a refused change is re-applying itself from " +
+          "somewhere"
+      ).toBe(MODPACK_MR_V_MID)
+
+      // ...and `.setup/` was never created in the first place, so there is
+      // nothing left for a later launch to sweep.
       await expect
         .poll(() => fs.existsSync(pendingFile), {
           timeout: SETUP_SWEEP_TIMEOUT,

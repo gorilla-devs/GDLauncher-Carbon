@@ -280,7 +280,7 @@ const Settings = () => {
       </Show>
       <Row>
         <Title>
-          <Trans key="instances:_trn_instance_settings.reinstall" />
+          <Trans key="instances:_trn_instance_settings.repair" />
         </Title>
         <RightHandSide>
           <Button
@@ -289,7 +289,7 @@ const Settings = () => {
             onClick={() => {
               modalsContext?.openModal(
                 {
-                  name: "confirmReinstall"
+                  name: "repairModpack"
                 },
                 {
                   id: parseInt(params.id, 10),
@@ -300,7 +300,7 @@ const Settings = () => {
             }}
           >
             <i class="i-hugeicons:refresh h-5 w-5" />
-            <Trans key="instances:_trn_instance_settings.reinstall" />
+            <Trans key="instances:_trn_instance_settings.repair" />
           </Button>
         </RightHandSide>
       </Row>

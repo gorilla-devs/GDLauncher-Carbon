@@ -13,6 +13,10 @@ pub enum Translation {
     InstanceTaskPrepare {
         name: String,
     },
+    InstanceTaskCheckPackOrigin {
+        name: String,
+    },
+    InstanceTaskCheckPackOriginVersions,
     InstanceTaskLaunchRequestVersions,
     InstanceTaskLaunchRequestModpack,
     InstanceTaskLaunchDownloadModpack,

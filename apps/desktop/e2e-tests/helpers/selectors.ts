@@ -257,18 +257,18 @@ export const TEST_IDS = Object.freeze({
   instanceSettingsUnpair: "instance-settings-unpair",
   instanceSettingsChangeVersion: "instance-settings-change-version",
   /** Opens the instance page's overflow menu (`Library/Instance/index.tsx`'s
-   *  `menuItems()`) — the reinstall entry below only resolves once this has
+   *  `menuItems()`) — the repair entry below only resolves once this has
    *  been clicked. On the `@gd/ui` `Button` (`as="div"`) nested inside
    *  `DropdownMenuTrigger`, not the trigger itself — `Button` is already
    *  confirmed elsewhere in this file to spread unknown props onto whatever
    *  element `as` renders (hazard 1 does not apply to it). */
   instanceMenuTrigger: "instance-menu-trigger",
-  /** Reinstall lives in the instance page's overflow menu
+  /** Repair lives in the instance page's overflow menu
    *  (`Library/Instance/index.tsx`'s `menuItems()`), NOT in the Settings tab
    *  with the three above — hence the different prefix. The menu must be
    *  opened (`instanceMenuTrigger`) before this resolves. */
-  instanceMenuReinstall: "instance-menu-reinstall",
-  confirmReinstallConfirm: "confirm-reinstall-confirm",
+  instanceMenuRepair: "instance-menu-repair",
+  repairModpackConfirm: "repair-modpack-confirm",
   // The confirm control on `Confirmation`
   // (`ModalsManager/modals/Confirmation`), which `ModalsManager/index.tsx`
   // registers under both `unlock_confirmation` and `unpair_confirmation` for

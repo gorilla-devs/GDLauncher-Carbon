@@ -87,6 +87,12 @@ pub struct InstanceManager {
     modpack_info_semaphore: Mutex<()>,
     pub any_instance_running: Arc<watch::Sender<bool>>,
     instance_running_tracker: Arc<LivenessTracker>,
+    /// Results of the last completed (or failed-but-partial) run of
+    /// [`modpack::check_pack_origin`](ManagerRef::check_pack_origin) per
+    /// instance — read by `modpack::origin_verdict_for` when building a
+    /// repair preview. In-memory only: a restart clears it, same as every
+    /// other manager cache in this struct.
+    pub(crate) origin_checks: RwLock<HashMap<InstanceId, modpack::origin_check::OriginResults>>,
 }
 
 impl Default for InstanceManager {
@@ -114,6 +120,7 @@ impl InstanceManager {
             instance_running_tracker: LivenessTracker::new(move |count| {
                 drop(any_instance_running.send_replace(count != 0))
             }),
+            origin_checks: RwLock::new(HashMap::new()),
         }
     }
 }

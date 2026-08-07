@@ -20,7 +20,7 @@ import {
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
-import { readPackinfo } from "./helpers/packinfo.js"
+import { classifyPackinfo, readPackinfo } from "./helpers/packinfo.js"
 import { readInstallAudit } from "./helpers/installAudit.js"
 import { snapshotTree } from "./helpers/instanceTree.js"
 import {
@@ -29,7 +29,7 @@ import {
   installModpackVersion,
   openInstanceSettings,
   pickModpackVersionAndConfirm,
-  reinstallModpack
+  repairModpack
 } from "./helpers/modpacks.js"
 import {
   MODPACK_CF_FILE,
@@ -42,7 +42,7 @@ import {
 
 /**
  * The modpack pipeline interrupted part-way, in the two places it can be.
- * Nothing else in this suite kills the app mid-install; `reinstall_modpack`'s
+ * Nothing else in this suite kills the app mid-install; `repair_modpack`'s
  * own doc comment calls the resulting poisoned `.setup/` "the state it exists
  * to fix", so the recovery path is real, reachable, and until now untested.
  *
@@ -373,47 +373,76 @@ test.describe("modpack interrupted staging", () => {
       await changeModpackVersion(page, name, MODPACK_CF_FILE)
 
       // Restore it. `process_modpack` writes its scan to tmp-packinfo.json and
-      // renames it over packinfo.json only at run/modpack.rs:899, after the
+      // renames it over packinfo.json only at run/modpack.rs:803, after the
       // apply — so this is precisely the state a crash during the apply
       // leaves: new files on disk, old record of them.
       await fs.promises.writeFile(packinfoPath, oldPackinfoText)
 
       const stale = await readPackinfo(root)
+      // The paths whose current on-disk bytes no longer match the stale
+      // packinfo's recorded hash — the population the restore above exists
+      // to produce: bytes that are already the NEW version's, tracked under
+      // the OLD version's hash. `classifyPackinfo` reads `packinfo.json` at
+      // call time, which right now is the stale content just written above.
+      const staleTracked = (await classifyPackinfo(root)).modified
+      expect(
+        staleTracked.length,
+        "no pack file in the stale packinfo actually differs from its " +
+          "current on-disk bytes — the fixture no longer proves anything " +
+          "about repairing a stale record; re-measure boosted-fps' OLD -> " +
+          "target delta"
+      ).toBeGreaterThan(0)
       const beforeRepair = await snapshotTree(path.join(root, "instance"))
 
-      await reinstallModpack(page, name)
+      await repairModpack(page, name)
 
       const afterRepair = await snapshotTree(path.join(root, "instance"))
       const audit = await readInstallAudit(root)
       expect(audit, "the repair pass wrote no install audit").not.toBeNull()
 
-      // Every file the stale packinfo still tracks under its OLD hash, whose
-      // on-disk bytes are now the NEW version's, classifies modified-by-user
-      // and is skipped — permanently. This is the half-upgraded state an
-      // interrupted apply strands an instance in.
-      const misclassified = [...stale.keys()]
-        .filter((key) =>
-          audit!.skipped.some(
-            (s) => s.file === key && s.reason === "modified-by-user"
-          )
+      // None of them are misclassified `modified-by-user` any more. This is
+      // the half-upgraded state an interrupted apply strands an instance in
+      // — and the fix for it: the repair reconciles against the target
+      // version it is repairing onto, not blindly against packinfo's stale
+      // record, so a path whose on-disk bytes already match that target is
+      // recognised as already correct rather than as a user edit.
+      const misclassified = staleTracked.filter((key) =>
+        audit!.skipped.some(
+          (s) => s.file === key && s.reason === "modified-by-user"
         )
-        .sort()
-
+      )
       expect(
-        misclassified.length,
-        "no pack file was misclassified as user-modified against a stale " +
-          "packinfo. Either promotion is no longer the last step of the " +
-          "pipeline, or the repair now reconciles against the target version " +
-          "rather than the recorded one. Both would be fixes — update this " +
-          "assertion and the README rather than deleting it"
-      ).toBeGreaterThan(0)
+        misclassified,
+        "a pack file already reconciled by the earlier version change was " +
+          "still misclassified modified-by-user against the stale packinfo " +
+          "— the repair is reconciling against the recorded version instead " +
+          "of the target it is repairing onto"
+      ).toEqual([])
 
-      for (const key of misclassified) {
+      for (const key of staleTracked) {
+        // Bytes were already the target's before the repair ran, so "the
+        // repair left them untouched" and "the repair recognised them as
+        // already correct" are the same fact, checked two ways.
         expect(
           afterRepair.get(key.slice(1))?.sha256,
-          `${key} was reported skipped as modified-by-user, so the repair ` +
-            "must not have touched its bytes"
+          `${key}'s bytes changed across the repair, even though they were ` +
+            "already correct before it ran"
         ).toBe(beforeRepair.get(key.slice(1))?.sha256)
+        expect(
+          audit!.unchanged,
+          `audit did not record ${key} as unchanged`
+        ).toContain(key)
+      }
+
+      // packinfo was promoted: the repair's own fresh scan now records
+      // these paths' actual hashes, not the stale ones restored into
+      // packinfo.json above.
+      const packinfoAfterRepair = await readPackinfo(root)
+      for (const key of staleTracked) {
+        expect(
+          packinfoAfterRepair.get(key)?.md5,
+          `packinfo still records ${key} under its stale hash after the repair`
+        ).not.toBe(stale.get(key)?.md5)
       }
     } catch (error) {
       bodyFailed = true

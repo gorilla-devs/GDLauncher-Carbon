@@ -265,7 +265,7 @@ const Server = (props: { children?: any }) => {
                   disabled={!details()!.modpackInfo || !isStopped()}
                   onClick={() =>
                     modalsContext?.openModal(
-                      { name: "confirmReinstall" },
+                      { name: "repairModpack" },
                       {
                         id: serverId(),
                         name: details()!.name,
@@ -278,7 +278,7 @@ const Server = (props: { children?: any }) => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instances:_trn_instance_settings.reinstall" />
+                <Trans key="instances:_trn_instance_settings.repair" />
               </TooltipContent>
             </Tooltip>
           </Show>

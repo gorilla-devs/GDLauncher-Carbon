@@ -1,24 +1,29 @@
 /**
  * Parses `.install_audit/audit.txt`, the plain-text record
- * `process_modpack_staging` writes of every decision a modpack install or
- * version change made (`crates/carbon_app/src/managers/instance/run/modpack.rs:833-892`).
+ * `process_modpack_staging` writes of every decision a modpack install,
+ * version change or repair made — rendered by the pure `render_audit`
+ * (`crates/carbon_app/src/managers/instance/run/modpack.rs`), which builds it
+ * from the apply planner's `PlanEntry` list (`managers/instance/modpack/apply_plan.rs`).
  *
  * This is the single best oracle in the whole feature: it names, per file,
- * whether the pass replaced it, deleted it, created it, or refused to touch
- * it and why. Asserting against it means a test can prove *why* a file
- * survived, not just that it did.
+ * whether the pass replaced it, deleted it, created it, left it alone, or
+ * refused to touch it and why. Asserting against it means a test can prove
+ * *why* a file survived, not just that it did.
  *
  * The directory is deleted and recreated on every pass, so its content
  * always describes the most recent one only — never an accumulation.
  *
- * Two deliberate non-normalisations. First, `null` (no audit directory)
- * means "the pass never ran" and is kept distinct from an audit with four
- * empty sections, which means "the pass ran and decided nothing"; collapsing
- * them would make a skipped staging phase look like a no-op one. Second, the
- * three packinfo-derived sections carry keys with a leading `/` while
- * `Files created:` carries staging-relative paths with no leading slash and
- * an `instance/` prefix. That difference is real (`modpack.rs:812-819`), so
- * it is preserved here and normalised at the comparison site.
+ * One deliberate non-normalisation: `null` (no audit directory) means "the
+ * pass never ran" and is kept distinct from an audit with every section
+ * empty, which means "the pass ran and decided nothing"; collapsing them
+ * would make a skipped staging phase look like a no-op one.
+ *
+ * Every section carries packinfo-style keys with a leading `/`, including
+ * `Files created:` — `render_audit` writes the plan's own `path` field
+ * everywhere, so there is no more staging-relative/packinfo-style split to
+ * normalise away. A caller that still does
+ * `.replace(/^instance\//, "")` on a `created` entry is unaffected: the
+ * prefix it strips no longer appears, so the replace is a no-op.
  */
 
 import fs from "node:fs/promises"
@@ -28,6 +33,8 @@ export type SkipReason =
   | "deleted-by-user"
   | "modified-by-user"
   | "in-save-folder"
+  | "disabled-by-user"
+  | "already-present"
 
 export interface AuditSkip {
   file: string
@@ -43,19 +50,33 @@ export interface InstallAudit {
   deleted: string[]
   replaced: string[]
   created: string[]
+  /** Left untouched because it already matched the target — `Keep`/`Unchanged`
+   *  entries that don't fall into one of the `skipped` reasons above. */
+  unchanged: string[]
+  /** A disabled twin (`*.jar.disabled`) restored to its enabled path by a
+   *  repair. Repair-only — a plain version change never produces this. */
+  reEnabled: string[]
+  /** Explicitly removed at the user's request (a future prune/repair
+   *  feature) rather than by the pack's own reconciliation. */
+  userRemoved: string[]
 }
 
 const SECTIONS = {
   "Files that could not be replaced:": "skipped",
   "Files deleted:": "deleted",
   "Files replaced:": "replaced",
-  "Files created:": "created"
+  "Files created:": "created",
+  "Files unchanged:": "unchanged",
+  "Files re-enabled:": "reEnabled",
+  "Files removed at user request:": "userRemoved"
 } as const
 
 const REASONS: Record<string, SkipReason> = {
   "deleted by user": "deleted-by-user",
   "modified by user": "modified-by-user",
-  "files in /saves will never be modified": "in-save-folder"
+  "files in /saves will never be modified": "in-save-folder",
+  "disabled by user": "disabled-by-user",
+  "already present": "already-present"
 }
 
 export function parseInstallAudit(text: string): InstallAudit {
@@ -63,7 +84,10 @@ export function parseInstallAudit(text: string): InstallAudit {
     skipped: [],
     deleted: [],
     replaced: [],
-    created: []
+    created: [],
+    unchanged: [],
+    reEnabled: [],
+    userRemoved: []
   }
 
   let section: keyof typeof audit | undefined

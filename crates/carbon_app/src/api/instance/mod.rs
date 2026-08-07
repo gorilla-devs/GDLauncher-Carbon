@@ -119,9 +119,29 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .map(FETaskId::from)
         }
 
-        mutation REINSTALL_MODPACK[app, id: FEInstanceId] {
+        mutation REPAIR_MODPACK[app, args: RepairModpack] {
             app.instance_manager()
-                .reinstall_modpack(id.into())
+                .repair_modpack(
+                    args.instance.into(),
+                    manager::modpack::RepairMarkerFile {
+                        re_enable_disabled: args.re_enable_disabled,
+                        cleanup_paths: args.cleanup_paths,
+                    },
+                )
+                .await
+                .map(FETaskId::from)
+        }
+
+        query GET_REPAIR_PREVIEW[app, args: RepairPreviewArgs] {
+            app.instance_manager()
+                .repair_preview(args.instance.into(), args.re_enable_disabled)
+                .await
+                .map(FERepairPreview::from)
+        }
+
+        mutation CHECK_PACK_ORIGIN[app, id: FEInstanceId] {
+            app.instance_manager()
+                .check_pack_origin(id.into())
                 .await
                 .map(FETaskId::from)
         }
@@ -1164,6 +1184,264 @@ struct CreateInstance {
 struct ChangeModpack {
     instance: FEInstanceId,
     modpack: Modpack,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct RepairModpack {
+    instance: FEInstanceId,
+    /// Packinfo-style keys the user ticked for removal in the repair
+    /// preview. Always empty until a later task wires the preview UI.
+    cleanup_paths: Vec<String>,
+    re_enable_disabled: bool,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct RepairPreviewArgs {
+    instance: FEInstanceId,
+    re_enable_disabled: bool,
+}
+
+/// Result of [`GET_REPAIR_PREVIEW`](keys::instance::GET_REPAIR_PREVIEW): what
+/// [`manager::modpack::ManagerRef::repair_preview`] would do, computed
+/// read-only against the recorded `packinfo.json` — never the network. See
+/// that function's own docs for the preview/execution asymmetry this
+/// implies.
+#[derive(Type, Debug, Serialize)]
+pub struct FERepairPreview {
+    pub has_packinfo: bool,
+    /// Full expandable list, path-sorted.
+    pub entries: Vec<FERepairEntry>,
+    pub counts: FERepairCounts,
+    pub untracked: Vec<FEUntrackedFile>,
+    pub duplicates: Vec<FEDuplicateGroup>,
+}
+
+impl From<manager::modpack::RepairPreview> for FERepairPreview {
+    fn from(value: manager::modpack::RepairPreview) -> Self {
+        Self {
+            has_packinfo: value.has_packinfo,
+            entries: value.entries.into_iter().map(FERepairEntry::from).collect(),
+            counts: value.counts.into(),
+            untracked: value
+                .untracked
+                .into_iter()
+                .map(FEUntrackedFile::from)
+                .collect(),
+            duplicates: value
+                .duplicates
+                .into_iter()
+                .map(FEDuplicateGroup::from)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+pub struct FERepairEntry {
+    pub path: String,
+    pub action: FERepairAction,
+    pub reason: FERepairReason,
+}
+
+impl From<manager::modpack::apply_plan::PlanEntry> for FERepairEntry {
+    fn from(value: manager::modpack::apply_plan::PlanEntry) -> Self {
+        Self {
+            path: value.path,
+            action: value.action.into(),
+            reason: value.reason.into(),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+pub enum FERepairAction {
+    Replace,
+    Create,
+    Delete,
+    Keep,
+    ReplaceDisabled,
+    ReEnable,
+}
+
+impl From<manager::modpack::apply_plan::PlanAction> for FERepairAction {
+    fn from(value: manager::modpack::apply_plan::PlanAction) -> Self {
+        use manager::modpack::apply_plan::PlanAction;
+        match value {
+            PlanAction::Replace => Self::Replace,
+            PlanAction::Create => Self::Create,
+            PlanAction::Delete => Self::Delete,
+            PlanAction::Keep => Self::Keep,
+            PlanAction::ReplaceDisabled => Self::ReplaceDisabled,
+            PlanAction::ReEnable => Self::ReEnable,
+        }
+    }
+}
+
+/// Mirrors `apply_plan::PlanReason` but without its per-variant hash payload
+/// — the preview surfaces only which bucket a path fell into, not the raw
+/// md5 diff.
+#[derive(Type, Debug, Serialize)]
+pub enum FERepairReason {
+    PackUpdate,
+    Unchanged,
+    ModifiedByUser,
+    DeletedByUser,
+    DisabledByUser,
+    InSaveFolder,
+    PackDropped,
+    DroppedButModified,
+    PreservedExisting,
+    RepairOverwrote,
+    RepairRestored,
+    ReEnabled,
+}
+
+impl From<manager::modpack::apply_plan::PlanReason> for FERepairReason {
+    fn from(value: manager::modpack::apply_plan::PlanReason) -> Self {
+        use manager::modpack::apply_plan::PlanReason;
+        match value {
+            PlanReason::PackUpdate => Self::PackUpdate,
+            PlanReason::Unchanged => Self::Unchanged,
+            PlanReason::ModifiedByUser { .. } => Self::ModifiedByUser,
+            PlanReason::DeletedByUser => Self::DeletedByUser,
+            PlanReason::DisabledByUser => Self::DisabledByUser,
+            PlanReason::InSaveFolder => Self::InSaveFolder,
+            PlanReason::PackDropped => Self::PackDropped,
+            PlanReason::DroppedButModified { .. } => Self::DroppedButModified,
+            PlanReason::PreservedExisting => Self::PreservedExisting,
+            PlanReason::RepairOverwrote { .. } => Self::RepairOverwrote,
+            PlanReason::RepairRestored => Self::RepairRestored,
+            PlanReason::ReEnabled => Self::ReEnabled,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+pub struct FERepairCounts {
+    pub restore_modified: u32,
+    pub restore_deleted: u32,
+    pub unchanged: u32,
+    pub disabled_kept: u32,
+    pub re_enabled: u32,
+    pub stale_dropped: u32,
+    pub saves_skipped: u32,
+}
+
+impl From<manager::modpack::RepairCounts> for FERepairCounts {
+    fn from(value: manager::modpack::RepairCounts) -> Self {
+        Self {
+            restore_modified: value.restore_modified,
+            restore_deleted: value.restore_deleted,
+            unchanged: value.unchanged,
+            disabled_kept: value.disabled_kept,
+            re_enabled: value.re_enabled,
+            stale_dropped: value.stale_dropped,
+            saves_skipped: value.saves_skipped,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+pub struct FEUntrackedFile {
+    pub path: String,
+    /// `u64` doesn't map cleanly through specta — same `f64` pattern
+    /// `Mod::file_size` uses above.
+    pub size: f64,
+    pub label: FEUntrackedLabel,
+    /// Whether ticking this path for cleanup would actually remove it —
+    /// see `manager::modpack::UntrackedFile::deletable`. Always `true` for
+    /// `Unknown`; for `DisabledPackFile` this depends on whether the
+    /// tracked path's enabled copy still coexists on disk.
+    pub deletable: bool,
+    pub origin: Option<FEOriginVerdict>,
+}
+
+impl From<manager::modpack::UntrackedFile> for FEUntrackedFile {
+    fn from(value: manager::modpack::UntrackedFile) -> Self {
+        Self {
+            path: value.path,
+            size: value.size as f64,
+            label: value.label.into(),
+            deletable: value.deletable,
+            origin: value.origin.map(FEOriginVerdict::from),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+pub enum FEUntrackedLabel {
+    Unknown,
+    DisabledPackFile,
+}
+
+impl From<manager::modpack::UntrackedLabel> for FEUntrackedLabel {
+    fn from(value: manager::modpack::UntrackedLabel) -> Self {
+        match value {
+            manager::modpack::UntrackedLabel::Unknown => Self::Unknown,
+            manager::modpack::UntrackedLabel::DisabledPackFile => Self::DisabledPackFile,
+        }
+    }
+}
+
+/// Populated once `instance.checkPackOrigin` has completed a run for the
+/// instance — `None` on an untracked file until then, or if that run never
+/// assigned this exact path a verdict. See `manager::modpack::origin_verdict_for`.
+#[derive(Type, Debug, Serialize)]
+pub enum FEOriginVerdict {
+    ShippedIn {
+        version_name: String,
+        version_id: String,
+    },
+    CurrentVersion,
+    Unknown,
+}
+
+impl From<manager::modpack::OriginVerdict> for FEOriginVerdict {
+    fn from(value: manager::modpack::OriginVerdict) -> Self {
+        match value {
+            manager::modpack::OriginVerdict::ShippedIn {
+                version_name,
+                version_id,
+            } => Self::ShippedIn {
+                version_name,
+                version_id,
+            },
+            manager::modpack::OriginVerdict::CurrentVersion => Self::CurrentVersion,
+            manager::modpack::OriginVerdict::Unknown => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+pub struct FEDuplicateGroup {
+    pub modid: String,
+    pub files: Vec<FEDuplicateSide>,
+}
+
+impl From<manager::modpack::DuplicateGroup> for FEDuplicateGroup {
+    fn from(value: manager::modpack::DuplicateGroup) -> Self {
+        Self {
+            modid: value.modid,
+            files: value.files.into_iter().map(FEDuplicateSide::from).collect(),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+pub struct FEDuplicateSide {
+    pub path: String,
+    pub pack_owned: bool,
+    pub enabled: bool,
+}
+
+impl From<manager::modpack::DuplicateSide> for FEDuplicateSide {
+    fn from(value: manager::modpack::DuplicateSide) -> Self {
+        Self {
+            path: value.path,
+            pack_owned: value.pack_owned,
+            enabled: value.enabled,
+        }
+    }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]

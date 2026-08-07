@@ -11,7 +11,10 @@ use crate::managers::AppInner;
 use crate::managers::instance::log::{
     GameLog, LogEntry, LogEntrySourceKind, format_message_as_log4j_event,
 };
-use crate::managers::instance::modpack::{PackVersionFile, packinfo};
+use crate::managers::instance::modpack::{
+    PackVersionFile, RepairMarkerFile, apply_plan, disk_scan, normalize_cleanup_path, packinfo,
+    walk_untracked_files,
+};
 use crate::managers::instance::schema::make_instance_config;
 use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
@@ -39,8 +42,7 @@ use carbon_platforms::modrinth::search::VersionID;
 use carbon_rt_path::InstancePath;
 use chrono::{DateTime, Local, Utc};
 use futures::Future;
-use md5::{Digest, Md5};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -53,7 +55,7 @@ use tokio::sync::{Mutex, Semaphore, watch};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 
 pub type TSubtasks = Arc<TSubtasksInner>;
 
@@ -90,7 +92,7 @@ pub async fn process_modpack(
     instance_shortpath: String,
     task: &VisualTask,
     has_callback_task: bool,
-) -> anyhow::Result<(TSubtasks, Option<StandardVersion>)> {
+) -> anyhow::Result<(TSubtasks, Option<StandardVersion>, Option<RepairMarkerFile>)> {
     let mut version: Option<StandardVersion> = None;
 
     let runtime_path = app.settings_manager().runtime_path.clone();
@@ -108,9 +110,33 @@ pub async fn process_modpack(
 
     let packinfo_path = instance_root.join("packinfo.json");
     let tmp_packinfo_path = instance_root.join("tmp-packinfo.json");
-    let packinfo = match tokio::fs::read_to_string(packinfo_path).await {
-        Ok(text) => Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?),
-        Err(_) => None,
+
+    // Absent marker (including a `.setup` left behind by an older build that
+    // never wrote one) means an ordinary version change — unchanged from
+    // before this file read the marker at all.
+    let repair_marker_path = setup_path.join("repair");
+    let repair_options: Option<RepairMarkerFile> =
+        match tokio::fs::read_to_string(&repair_marker_path).await {
+            Ok(s) => Some(serde_json::from_str(&s).context("while parsing repair marker json")?),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(e.into()),
+        };
+
+    // Named for what it's used for below (skip-optimisation oracle for the
+    // platform prep fns), not merely what it holds. A repair judges "needs
+    // download" against what is actually on disk right now, not against the
+    // record — a corrupt or missing file must be re-fetched even when the
+    // record says it was fine.
+    let skip_oracle = match &repair_options {
+        Some(_) => {
+            Some(disk_scan::scan_instance_as_packinfo(&instance_path.get_data_path()).await?)
+        }
+        None => match tokio::fs::read_to_string(&packinfo_path).await {
+            Ok(text) => {
+                Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?)
+            }
+            Err(_) => None,
+        },
     };
 
     let t_modpack = match is_setup && !is_modpack_complete {
@@ -373,7 +399,7 @@ pub async fn process_modpack(
                     &cffile_path,
                     &instance_prep_path,
                     skip_overrides,
-                    packinfo.as_ref(),
+                    skip_oracle.as_ref(),
                     t_addon_metadata,
                     modpack_progress_tx,
                 )
@@ -441,7 +467,7 @@ pub async fn process_modpack(
                     &mrfile_path,
                     &instance_prep_path,
                     skip_overrides,
-                    packinfo.as_ref(),
+                    skip_oracle.as_ref(),
                     modpack_progress_tx,
                 )
                 .await?;
@@ -465,6 +491,23 @@ pub async fn process_modpack(
                 Some(gdl_version)
             }
             Some(Modplatform::GDLPack) => {
+                // gdlpack's own skip predicate (`gdlpack.rs`'s
+                // `existing_packinfo`/`skip_path` lookup) only checks
+                // whether a path is PRESENT in the oracle, never whether its
+                // hash matches — unlike the curseforge/modrinth prep fns.
+                // Under an ordinary version change that is merely a missed
+                // optimisation (the record is trusted anyway); under repair
+                // the oracle is a live disk scan, so a merely-*existing*
+                // damaged file would be skip-optimised as-is and its
+                // corrupt hash promoted into packinfo as canonical —
+                // laundering the corruption instead of fixing it. No
+                // `Modpack` variant can select GDLPack today (making this
+                // unreachable in practice), but refuse outright rather than
+                // leave a live trap for whenever one can.
+                if repair_options.is_some() {
+                    bail!("repair is not supported for GDLPack-installed instances");
+                }
+
                 let (modpack_progress_tx, mut modpack_progress_rx) =
                     tokio::sync::watch::channel(gdlpack::ProgressState::Idle);
 
@@ -495,7 +538,7 @@ pub async fn process_modpack(
                     &gdlpack_path,
                     &instance_prep_path,
                     skip_overrides,
-                    packinfo.as_ref(),
+                    skip_oracle.as_ref(),
                     modpack_progress_tx,
                 )
                 .await?;
@@ -613,7 +656,11 @@ pub async fn process_modpack(
         if file.is_some() {
             // normally there would be a problem here because we would be skipping any mods removed by users
             // but since we dont try to update those anyway its fine.
-            let mut files = skipped_mods;
+            //
+            // Cloned rather than moved: `skipped_mods` is walked again below
+            // to merge its hashes into the freshly scanned packinfo, since
+            // `scan_dir` never staged these paths and so cannot see them.
+            let mut files = skipped_mods.clone();
             // snapshot filetree before applying
             let mut walker = NormalizedWalkdir::new(&staging_dir.join("instance"))?;
             while let Some(entry) = walker.next()? {
@@ -631,8 +678,24 @@ pub async fn process_modpack(
             let files_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
             // At this point the modpack files are all in the staging directory, so that's the path we need to scan.
             // The packinfo on the other hand is in the instance folder itself.
-            let packinfo =
+            let mut packinfo =
                 packinfo::scan_dir(&instance_prep_path.get_data_path(), Some(&files_refs)).await?;
+
+            // Skip-optimised files were never staged, so the scan cannot see
+            // them. "Skipped" means the oracle's hash matched the manifest's,
+            // so the oracle entry IS the target hash — merge it, or every
+            // unchanged file falls out of the record (the stale-survivor bug).
+            for skipped in &skipped_mods {
+                if packinfo.files.contains_key(skipped) {
+                    continue;
+                }
+                let Some(hashes) = skip_oracle.as_ref().and_then(|o| o.files.get(skipped)) else {
+                    bail!(
+                        "skip-optimised path {skipped} has no oracle entry — refusing to write an incomplete packinfo"
+                    );
+                };
+                packinfo.files.insert(skipped.clone(), hashes.clone());
+            }
 
             let packinfo_str = packinfo::make_packinfo(packinfo)?;
             tokio::fs::write(tmp_packinfo_path, packinfo_str).await?;
@@ -677,7 +740,7 @@ pub async fn process_modpack(
         t_finalize_import,
     };
 
-    Ok((Arc::new(subtasks), version))
+    Ok((Arc::new(subtasks), version, repair_options))
 }
 
 // TODO: Modpack staging is not atomic and does not track applied changes, so if the process is interrupted,
@@ -687,6 +750,7 @@ pub async fn process_modpack_staging(
     instance_id: InstanceId,
     instance_shortpath: String,
     t_subtasks: &TSubtasks,
+    repair_options: Option<RepairMarkerFile>,
 ) -> anyhow::Result<()> {
     let runtime_path = app.settings_manager().runtime_path.clone();
     let instance_path = runtime_path
@@ -716,119 +780,82 @@ pub async fn process_modpack_staging(
 
         t_subtasks.t_apply_staging.start_opaque();
 
-        let change_version_path = setup_path.join("change-pack-version.json");
-        let overwrite_changed = !change_version_path.exists(); // TODO
+        let old_packinfo =
+            match tokio::fs::read_to_string(instance_root.join("packinfo.json")).await {
+                Ok(s) => Some(packinfo::parse_packinfo(&s)?),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => return Err(e.into()),
+            };
+        let target_packinfo = packinfo::parse_packinfo(
+            &tokio::fs::read_to_string(instance_root.join("tmp-packinfo.json")).await?,
+        )?;
 
-        let staged_text = tokio::fs::read_to_string(&staging_packinfo).await?;
-        let staging_snapshot = serde_json::from_str::<Vec<&str>>(&staged_text)
-            .context("could not parse staging snapshot")?;
-
-        #[derive(Debug)]
-        enum SkipReplaceReason {
-            DeletedByUser,
-            ModifiedByUser([u8; 16], [u8; 16]),
-            InSaveFolder,
+        // Staged set: files physically present under .setup/staging/instance,
+        // as packinfo-style keys.
+        let mut staged = HashSet::new();
+        let mut walker = NormalizedWalkdir::new(&staging_dir.join("instance"))?;
+        while let Some(entry) = walker.next()? {
+            if entry.is_dir {
+                continue;
+            }
+            // Mirrors packinfo::scan_dir's own `.disabled` stripping
+            // (packinfo/scan.rs:30-32): a pack that ships an override
+            // disabled by default stages it under the `.disabled` name, but
+            // tmp-packinfo.json (built by scan_dir) keys it under the
+            // enabled name. `staged` has to match that key shape, or a path
+            // whose only staged copy is `.disabled`-suffixed looks unstaged
+            // to the planner and a fresh install of that path errors
+            // permanently (MissingStagedSource).
+            let mut key = entry.relative_path.to_string();
+            if key.ends_with(".disabled") {
+                key.truncate(key.len() - ".disabled".len());
+            }
+            staged.insert(key);
         }
 
-        let mut new_files = Vec::<String>::new();
-        let mut deleted_files = Vec::<String>::new();
-        let mut replaced_files = Vec::<String>::new();
-        let mut skipped_replacements = Vec::<(String, SkipReplaceReason)>::new();
+        let universe: BTreeSet<String> = old_packinfo
+            .iter()
+            .flat_map(|p| p.files.keys().cloned())
+            .chain(target_packinfo.files.keys().cloned())
+            .collect();
+        let disk = disk_scan::scan_disk_state(&instance_root.join("instance"), &universe).await?;
 
-        let packinfo_path = instance_root.join("packinfo.json");
-        let packinfo = match tokio::fs::read_to_string(packinfo_path).await {
-            Ok(text) => {
-                Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?)
-            }
-            Err(_) => None,
+        // Absent marker -> ordinary version-change reconciliation, unchanged
+        // from before repair mode existed. Present -> re-reconcile every
+        // pack-tracked path against `target` alone (see
+        // `apply_plan::decide_repair`), regardless of what `old` says.
+        let mode = match &repair_options {
+            Some(options) => apply_plan::ApplyMode::Repair {
+                re_enable_disabled: options.re_enable_disabled,
+            },
+            None => apply_plan::ApplyMode::VersionChange,
         };
 
-        debug!("Applying staged instance files");
-        let r: anyhow::Result<_> = async {
-            if let Some(packinfo) = packinfo {
-                for (oldfile, oldfilehash) in &packinfo.files {
-                    let mut original_file = instance_root.join("instance").join(&oldfile[1..]);
+        let entries = apply_plan::plan(apply_plan::PlanInputs {
+            old: old_packinfo.as_ref(),
+            target: &target_packinfo,
+            staged: &staged,
+            disk: &disk,
+            mode,
+        })?;
 
-                    trace!("Checking for replacement for packinfo file: {original_file:?}");
+        execute_plan(&entries, &instance_root, &staging_dir).await?;
 
-                    if !original_file.exists() {
-                        let mut name = original_file.file_name().unwrap().to_owned();
-                        name.push(".disabled");
-                        original_file.set_file_name(name);
-
-                        if !original_file.exists() {
-                            // either the user deleted it or we already deleted it in the next check, skip
-                            skipped_replacements
-                                .push((oldfile.clone(), SkipReplaceReason::DeletedByUser));
-                            continue;
-                        }
-                    }
-
-                    let mut original_md5 = Md5::new();
-                    let mut file = tokio::fs::File::open(&original_file).await?;
-                    carbon_scheduler::buffered_digest(&mut file, |chunk| {
-                        original_md5.update(chunk);
-                    })
-                    .await?;
-                    drop(file);
-                    let original_md5: [u8; 16] = original_md5.finalize().into();
-
-                    if original_md5 != oldfilehash.md5 {
-                        // the user has modified this file so we shouldn't touch it
-                        skipped_replacements.push((
-                            oldfile.clone(),
-                            SkipReplaceReason::ModifiedByUser(oldfilehash.md5, original_md5),
-                        ));
-                        continue;
-                    }
-
-                    if !staging_snapshot.contains(&(&oldfile as &str)) {
-                        if oldfile.starts_with("/saves") {
-                            skipped_replacements
-                                .push((oldfile.clone(), SkipReplaceReason::InSaveFolder));
-                            continue;
-                        }
-
-                        // file is not present in new version and old version was not changed, delete
-                        tokio::fs::remove_file(original_file).await?;
-                        deleted_files.push(oldfile.clone());
-                        continue;
-                    }
-
-                    let staged_file = staging_dir.join("instance").join(&oldfile[1..]);
-
-                    if staged_file.is_file() {
-                        // old file matches the snapshotted version and new file is present, replace
-                        tokio::fs::rename(staged_file, original_file).await?;
-                        replaced_files.push(oldfile.clone());
-                    }
-                }
+        // Repair-only: paths the user explicitly ticked for removal in the
+        // preview, applied after the plan so a cleanup can never race the
+        // pack's own reconciliation of the same path.
+        let user_removed = match &repair_options {
+            Some(options) => {
+                apply_user_cleanup(
+                    &options.cleanup_paths,
+                    old_packinfo.as_ref(),
+                    &target_packinfo,
+                    &instance_root,
+                )
+                .await
             }
-
-            for entry in walkdir::WalkDir::new(&staging_dir) {
-                let entry = entry?;
-
-                let staged_file = entry.path().to_path_buf();
-                let relpath = staged_file.strip_prefix(&staging_dir).unwrap();
-                let original_file = instance_root.join(relpath);
-
-                if entry.metadata()?.is_file() && !original_file.exists() {
-                    // there was no record of this file in the packinfo or it would've been moved previously,
-                    // and the user has not created one in its place, add the file
-
-                    new_files.push(relpath.to_string_lossy().to_string());
-                    tokio::fs::create_dir_all(original_file.parent().unwrap()).await?;
-                    tokio::fs::rename(staged_file, original_file).await?;
-                }
-            }
-
-            Ok(())
-        }
-        .await;
-
-        if let Err(e) = r {
-            return Err(e.context("Failed to apply staged instance changes"));
-        }
+            None => Vec::new(),
+        };
 
         trace!("Creating update audit files");
         let audit_dir = instance_root.join(".install_audit");
@@ -841,54 +868,7 @@ pub async fn process_modpack_staging(
         tokio::fs::create_dir(&audit_dir).await?;
 
         let audit_file = audit_dir.join("audit.txt");
-        let mut audit_txt = "GDLauncher Modpack Install/Update Audit\n".to_string();
-
-        if (!skipped_replacements.is_empty()) {
-            audit_txt += "\nFiles that could not be replaced:\n";
-
-            for (file, reason) in skipped_replacements {
-                match reason {
-                    SkipReplaceReason::DeletedByUser => {
-                        audit_txt += &format!(" - {file}: deleted by user\n")
-                    }
-                    SkipReplaceReason::ModifiedByUser(original, current) => {
-                        audit_txt += &format!(
-                            " - {file}: modified by user\n     original md5: {}\n     current md5:  {}\n",
-                            hex::encode(original),
-                            hex::encode(current),
-                        )
-                    }
-                    SkipReplaceReason::InSaveFolder => {
-                        audit_txt += &format!(" - {file}: files in /saves will never be modified\n")
-                    }
-                }
-            }
-        }
-
-        if (!deleted_files.is_empty()) {
-            audit_txt += "\nFiles deleted:\n";
-
-            for file in deleted_files {
-                audit_txt += &format!(" - {file}\n");
-            }
-        }
-
-        if (!replaced_files.is_empty()) {
-            audit_txt += "\nFiles replaced:\n";
-
-            for file in replaced_files {
-                audit_txt += &format!(" - {file}\n");
-            }
-        }
-
-        if (!new_files.is_empty()) {
-            audit_txt += "\nFiles created:\n";
-
-            for file in new_files {
-                audit_txt += &format!(" - {file}\n");
-            }
-        }
-
+        let audit_txt = render_audit(&entries, &user_removed);
         tokio::fs::write(audit_file, audit_txt).await?;
 
         trace!("Cleaning up staging directory");
@@ -916,3 +896,313 @@ pub async fn process_modpack_staging(
 
     Ok(())
 }
+
+/// Carries out every [`apply_plan::PlanEntry`] against the real filesystem.
+/// Pure mechanics — every decision (including whether a path even needs
+/// touching) was already made by [`apply_plan::plan`]; this only performs
+/// the rename/remove that `entry.action` names.
+async fn execute_plan(
+    entries: &[apply_plan::PlanEntry],
+    instance_root: &Path,
+    staging_dir: &Path,
+) -> anyhow::Result<()> {
+    use apply_plan::PlanAction;
+    for entry in entries {
+        let rel = &entry.path[1..];
+        let live = instance_root.join("instance").join(rel);
+        let staged = staging_dir.join("instance").join(rel);
+        let twin = disabled_sibling(&live);
+        match entry.action {
+            PlanAction::Keep => {}
+            PlanAction::Delete => {
+                tokio::fs::remove_file(&live).await?;
+            }
+            PlanAction::Replace => {
+                let (source, is_disabled) =
+                    resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
+                if is_disabled {
+                    // The target now ships this path disabled by default:
+                    // land it under the twin spelling, then drop the
+                    // previously-enabled live copy so only one spelling of
+                    // the file survives on disk.
+                    tokio::fs::rename(&source, &twin).await?;
+                    tokio::fs::remove_file(&live).await?;
+                } else {
+                    tokio::fs::rename(&source, &live).await?;
+                }
+            }
+            PlanAction::Create => {
+                let (source, is_disabled) =
+                    resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
+                // A pack-shipped-disabled path must land disabled, not
+                // enabled — the pack's own default is preserved.
+                let dest = if is_disabled { &twin } else { &live };
+                tokio::fs::create_dir_all(dest.parent().unwrap()).await?;
+                tokio::fs::rename(&source, dest).await?;
+            }
+            PlanAction::ReplaceDisabled => {
+                let (source, _) =
+                    resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
+                tokio::fs::rename(&source, &twin).await?;
+            }
+            PlanAction::ReEnable => {
+                if let Some((source, _)) = resolve_staged(&staged) {
+                    tokio::fs::create_dir_all(live.parent().unwrap()).await?;
+                    tokio::fs::rename(&source, &live).await?;
+                    let _ = tokio::fs::remove_file(&twin).await;
+                } else {
+                    tokio::fs::rename(&twin, &live).await?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Deletes every path in a repair's `cleanup_paths` from the live instance
+/// data dir, on the user's own explicit request from the repair preview.
+/// Runs after [`execute_plan`] so a cleanup can never race the pack's own
+/// reconciliation of the same path.
+///
+/// **Never bails.** `repair_modpack` already rejected a syntactically
+/// invalid path before this pipeline ever started (see
+/// [`crate::managers::instance::modpack::normalize_cleanup_path`]'s doc), so
+/// by the time execution reaches here every remaining failure mode — a
+/// tracked path, a symlink-widened escape, a plain I/O error — is either an
+/// adversarial input or a benign race, never a normal user mistake worth
+/// aborting the whole apply for. A single bad entry after [`execute_plan`]
+/// has already run would otherwise skip the audit write and the
+/// `packinfo.json` promotion entirely and leave `.setup/repair` in place, so
+/// every future relaunch re-enters repair and re-fails at the identical
+/// path forever. Every rejection is `tracing::warn!`-logged and the path is
+/// skipped instead: it simply stays on disk, absent from the returned list
+/// (and so absent from the audit's "removed at user request" section too).
+///
+/// **Walk-membership design.** A byte-exact string comparison against
+/// `/saves`, a `.disabled` suffix, or a packinfo key is not enough on its
+/// own: Windows and default-configuration macOS resolve paths
+/// case-insensitively (`/Saves/...` reaches the same file as `/saves/...`,
+/// `/Mods/tracked.jar` the same as `/mods/tracked.jar`), and Windows also
+/// silently drops a trailing dot/space — any of these would pass every
+/// string check here yet still delete the real `/saves` or pack-tracked
+/// file once the OS's own path resolution runs inside `remove_file`. Rather
+/// than chase every OS-specific aliasing rule with case-folds, this closes
+/// the whole class structurally: [`walk_untracked_files`] walks the REAL
+/// instance data dir once and returns the ground-truth set of untracked
+/// files, each keyed by the raw spelling **the walk itself observed** (never
+/// a spelling derived from user input) and mapped to that file's own real
+/// [`PathBuf`]. A `cleanup_paths` entry (already syntax-validated by
+/// [`normalize_cleanup_path`]) is honored only if it is an *exact* member of
+/// that set — **the `remove_file` target is always the walked entry's own
+/// `PathBuf`, never rebuilt from the user's string.** That is what makes
+/// alias divergence structurally impossible: whatever spelling the user
+/// typed, it only ever earns the deletion of a directory entry the walk
+/// itself enumerated and classified untracked — there is no code path left
+/// where a user-supplied string is turned into a deletion target on its
+/// own, so no OS path-resolution quirk can make the two diverge.
+///
+/// The canonicalize-parent containment check below is kept as defense in
+/// depth against a *walked* entry reached through a symlink somewhere in
+/// the instance tree (`NormalizedWalkdir` follows a symlinked subdirectory
+/// during traversal, same as `fs::metadata`) — `remove_file` itself never
+/// follows a symlink in the final path component, so only the parent chain
+/// needs checking. A path already absent from disk, or whose parent
+/// directory no longer exists at all (a benign race between the walk and
+/// this loop), is not a failure: the user's intent — this path gone — is
+/// already satisfied, though still `tracing::warn!`-logged rather than
+/// silently passed over, since by this point the walk itself just proved
+/// the entry existed a moment ago. Returns exactly the paths actually
+/// removed, for [`render_audit`]'s `user_removed`.
+async fn apply_user_cleanup(
+    cleanup_paths: &[String],
+    old_packinfo: Option<&packinfo::PackInfo>,
+    target_packinfo: &packinfo::PackInfo,
+    instance_root: &Path,
+) -> Vec<String> {
+    if cleanup_paths.is_empty() {
+        // Avoid walking the whole instance tree for nothing — the common
+        // case today, since the repair preview UI that produces a non-empty
+        // list doesn't exist yet (`RepairModpack/index.tsx` always sends `[]`).
+        return Vec::new();
+    }
+
+    let instance_data = instance_root.join("instance");
+    let canonical_data = match tokio::fs::canonicalize(&instance_data).await {
+        Ok(p) => p,
+        Err(e) => {
+            // The staging apply that runs immediately before this already
+            // requires this directory to exist — this should never happen,
+            // but "never bail" means treating even this as skip-all rather
+            // than propagating an error that would ALSO lose the audit
+            // write and packinfo promotion, the exact failure mode this
+            // function exists to avoid.
+            tracing::warn!(
+                "skipping all repair cleanup: failed to canonicalize instance data dir {instance_data:?}: {e}"
+            );
+            return Vec::new();
+        }
+    };
+
+    let deletable = walk_untracked_files(&instance_data, old_packinfo, target_packinfo).await;
+
+    let mut user_removed = Vec::new();
+    for path in cleanup_paths {
+        let Some(key) = normalize_cleanup_path(path) else {
+            tracing::warn!("skipping repair cleanup of syntactically invalid path {path:?}");
+            continue;
+        };
+
+        let Some(real_path) = deletable.get(&key) else {
+            tracing::warn!(
+                "skipping repair cleanup of {key}: not an exact match for any untracked file \
+                 currently on disk (either it doesn't exist, or only a differently-spelled \
+                 alias of it does)"
+            );
+            continue;
+        };
+
+        let Some(parent) = real_path.parent() else {
+            tracing::warn!("skipping repair cleanup of {key}: path has no parent directory");
+            continue;
+        };
+        let canonical_parent = match tokio::fs::canonicalize(parent).await {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    "skipping repair cleanup of {key}: failed to canonicalize parent directory \
+                     (the walk found it moments ago, so this is likely a race): {e}"
+                );
+                continue;
+            }
+        };
+        if !canonical_parent.starts_with(&canonical_data) {
+            tracing::warn!(
+                "skipping repair cleanup of {key}: resolves outside the instance data dir \
+                 once its parent directory's symlinks are followed"
+            );
+            continue;
+        }
+
+        match tokio::fs::remove_file(real_path).await {
+            Ok(()) => user_removed.push(key),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                tracing::warn!(
+                    "repair cleanup of {key}: the walk found it moments ago but it is gone now \
+                     (likely a race) — treating as already satisfied"
+                );
+            }
+            Err(e) => {
+                tracing::warn!("skipping repair cleanup of {key}: failed to remove: {e}");
+            }
+        }
+    }
+    user_removed
+}
+
+/// Resolves the physical staged file backing a plan entry, which may sit
+/// under its bare name or — when the target ships this path disabled by
+/// default — under the `.disabled`-suffixed name. `packinfo::scan_dir`
+/// strips that suffix when keying `tmp-packinfo.json`
+/// (`packinfo/scan.rs:30-32`), so a [`apply_plan::PlanEntry::path`] never
+/// carries it even when the only staged copy does; this is where that gets
+/// reconciled against what is physically on disk. The bare spelling wins
+/// when (implausibly) both exist. `Some((path, true))` means the resolved
+/// copy is the disabled spelling.
+fn resolve_staged(staged_bare: &Path) -> Option<(PathBuf, bool)> {
+    if staged_bare.is_file() {
+        return Some((staged_bare.to_path_buf(), false));
+    }
+    let twin = disabled_sibling(staged_bare);
+    twin.is_file().then_some((twin, true))
+}
+
+/// The planner already required a staged source to exist (via the same
+/// path-normalised `staged` set) before choosing an action that needs one,
+/// so `resolve_staged` failing here means that invariant broke, not a
+/// normal runtime condition — still handled as a proper error rather than a
+/// panic, since a real filesystem is involved.
+fn missing_staged_error(path: &str) -> anyhow::Error {
+    anyhow!(
+        "planner chose an action requiring a staged source for {path}, but neither the bare nor \
+         .disabled-suffixed staged copy exists on disk"
+    )
+}
+
+/// `<name>` -> `<name>.disabled`, the on-disk convention for a disabled mod.
+fn disabled_sibling(path: &Path) -> PathBuf {
+    let mut name = path.file_name().unwrap().to_owned();
+    name.push(".disabled");
+    path.with_file_name(name)
+}
+
+/// Renders the plain-text install audit `apps/desktop/e2e-tests/helpers/installAudit.ts`
+/// parses. Pure and unit-tested (`staging_test::render_audit_golden`) — every
+/// byte of an existing section is a format contract with that parser, so a
+/// change here must stay in lockstep with it. `entries` are expected
+/// path-sorted (guaranteed by [`apply_plan::plan`]'s own output), which is
+/// what makes each section's line order deterministic.
+fn render_audit(entries: &[apply_plan::PlanEntry], user_removed: &[String]) -> String {
+    use apply_plan::{PlanAction, PlanReason};
+    let mut skipped = String::new();
+    let mut deleted = String::new();
+    let mut replaced = String::new();
+    let mut created = String::new();
+    let mut unchanged = String::new();
+    let mut re_enabled = String::new();
+
+    for e in entries {
+        let file = &e.path;
+        match (&e.action, &e.reason) {
+            (PlanAction::Keep, PlanReason::DeletedByUser) => {
+                skipped += &format!(" - {file}: deleted by user\n")
+            }
+            (PlanAction::Keep, PlanReason::ModifiedByUser { original, current })
+            | (PlanAction::Keep, PlanReason::DroppedButModified { original, current }) => {
+                skipped += &format!(
+                    " - {file}: modified by user\n     original md5: {}\n     current md5:  {}\n",
+                    hex::encode(original),
+                    hex::encode(current),
+                )
+            }
+            (PlanAction::Keep, PlanReason::InSaveFolder) => {
+                skipped += &format!(" - {file}: files in /saves will never be modified\n")
+            }
+            (PlanAction::Keep, PlanReason::DisabledByUser) => {
+                skipped += &format!(" - {file}: disabled by user\n")
+            }
+            (PlanAction::Keep, PlanReason::PreservedExisting) => {
+                skipped += &format!(" - {file}: already present\n")
+            }
+            (PlanAction::Keep, _) => unchanged += &format!(" - {file}\n"),
+            (PlanAction::Delete, _) => deleted += &format!(" - {file}\n"),
+            (PlanAction::Replace, _) | (PlanAction::ReplaceDisabled, _) => {
+                replaced += &format!(" - {file}\n")
+            }
+            (PlanAction::Create, _) => created += &format!(" - {file}\n"),
+            (PlanAction::ReEnable, _) => re_enabled += &format!(" - {file}\n"),
+        }
+    }
+
+    let mut audit = "GDLauncher Modpack Install/Update Audit\n".to_string();
+    audit += "\nFiles that could not be replaced:\n";
+    audit += &skipped;
+    audit += "\nFiles deleted:\n";
+    audit += &deleted;
+    audit += "\nFiles replaced:\n";
+    audit += &replaced;
+    audit += "\nFiles created:\n";
+    audit += &created;
+    audit += "\nFiles unchanged:\n";
+    audit += &unchanged;
+    audit += "\nFiles re-enabled:\n";
+    audit += &re_enabled;
+    audit += "\nFiles removed at user request:\n";
+    for file in user_removed {
+        audit += &format!(" - {file}\n");
+    }
+    audit
+}
+
+#[cfg(test)]
+#[path = "staging_test.rs"]
+mod staging_test;

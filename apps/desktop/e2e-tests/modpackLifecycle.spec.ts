@@ -106,20 +106,23 @@ import {
  * the edit target is picked from the pristine list at runtime rather than
  * assumed — a config the launch happened to touch is simply not eligible.
  *
- * **Two pack files are deleted, expecting two different outcomes**, because
- * the staging pass (walks `packinfo.json`) and the staging walk (walks
- * whatever is left in the staging directory afterwards) are independent:
+ * **Two pack files are deleted, and both stay deleted.** `process_modpack_staging`
+ * now reconciles every path exactly once (`apply_plan::plan`, consumed by
+ * `execute_plan`/`render_audit` in `run/modpack.rs`), so there is no second,
+ * independent pass that can recreate what the first decision already left
+ * alone:
  *   - `deleteReturning` — pristine, and the NEW version genuinely restages
- *     it (not merely "the same path exists in both" — see below). The
- *     staging *pass* records it `deleted by user` and moves on without
- *     touching the staging directory's own copy of it; the staging *walk*
- *     then finds nothing at that path on disk and recreates it, independent
- *     of the pass having already made a decision about it. It ends up in
- *     **both** the audit's skipped-as-deleted section and its created
- *     section.
- *   - `deleteGone` — a pristine jar only the OLD version ships. No staged
- *     copy exists for the walk to find (the new version never downloaded
- *     one), so it stays gone, and only the skip is recorded.
+ *     it (not merely "the same path exists in both" — see below). Disk has
+ *     nothing at that path, so the planner decides `Keep`/`DeletedByUser`
+ *     regardless of what the target version ships there — that is the only
+ *     decision made for it, recorded once, under "could not be replaced".
+ *   - `deleteGone` — a pristine jar only the OLD version ships. Dropped from
+ *     the target entirely, and disk has nothing there either, so the
+ *     planner reaches the identical `Keep`/`DeletedByUser` decision by the
+ *     other route (`decide_dropped`). Both converge on the same behaviour,
+ *     which is itself worth proving here: a regression that broke only one
+ *     of the two input shapes (dropped-by-target vs. still-shipped-by-target)
+ *     would still be caught.
  *
  * `deleteReturning` cannot be picked on path-presence alone, in a way only
  * caught by running it. A *mod* only
@@ -142,47 +145,37 @@ import {
  * one) and falls back to a pristine config override otherwise, which this
  * pack always has.
  *
- * **`packinfo.json` silently loses track of unchanged files on every version
- * change — a real, separate product gap found writing this test, unrelated
- * to anything its three sabotages target.** `packinfo::scan_dir`
- * (`crates/carbon_app/src/managers/instance/modpack/packinfo/scan.rs`)
- * rebuilds packinfo.json by hashing whatever physically landed in the
- * staging directory; combined with the skip-if-unchanged download
- * optimization above, a file whose bytes are identical between the old and
- * new version is never staged and so is silently absent from the rebuilt
- * packinfo — regardless of whether the user ever touched it, and regardless
- * of the file still being genuinely installed and correct on disk. Confirmed
- * live: all 20 of this pack's mods unchanged between MID and NEW
- * vanished from packinfo after the upgrade. The gap is cumulative across
- * further version changes too — a path already missing from packinfo going
- * into a *second* change has no recorded hash to skip-compare against, so it
- * always gets freshly staged there (and is *not* missing afterward), while
- * whatever packinfo does still record keeps being silently dropped whenever
- * that recorded hash happens to match. This test does not treat the gap as
- * this task's to fix — the assertions below characterize it precisely
- * (asserting exactly the predicted missing set, not a loosened "at least"
- * check) rather than papering over it, so a future fix would need to update
- * this test, and a further regression in *which* files go missing would
- * still be caught.
+ * **`packinfo.json` retains unchanged files across a version change.**
+ * `packinfo::scan_dir` (`crates/carbon_app/src/managers/instance/modpack/packinfo/scan.rs`)
+ * still rebuilds packinfo.json by hashing whatever physically landed in the
+ * staging directory, and the skip-if-unchanged download optimization above
+ * still means a file whose bytes are identical between the old and new
+ * version is never staged. `process_modpack`'s snapshot block now merges the
+ * skip-oracle's hash for every such path back into the freshly scanned
+ * packinfo before writing it (the loop over `skipped_mods` in
+ * `run/modpack.rs`, just after the `scan_dir` call): a "skipped" path is, by
+ * construction of the skip condition itself, one where the oracle's recorded
+ * hash already equals the target version's declared hash, so merging that
+ * hash back in is not a guess — it *is* the target's hash. The assertions
+ * below now expect packinfo to be complete rather than characterising a
+ * predicted gap.
  *
- * **The packinfo gap above is not merely a bookkeeping blind spot — it lets
- * a pack file the downgrade should delete survive forever, invisibly.**
- * `process_modpack_staging`'s deletion pass is driven *exclusively* by
- * iterating packinfo's own keys, so a path the upgrade already dropped from
- * packinfo is a path the downgrade's deletion pass can never visit, no
- * matter what the newly-installed version's own manifest says about it. Of
- * the 20 mods the upgrade drops from packinfo (above), 9 are paths OLD does
- * not ship at all — those physically survive the downgrade with zero audit
- * trace, which is a live defeat of "correctly deletes the pack's own files"
- * that every packinfo-derived assertion in this file, including
- * `beforeMutation2` and the packinfo-completeness checks above, is
- * structurally unable to see, because they all derive from the same
- * corrupted record. The downgrade leg's physical-completeness check (near
- * its end, right before the playtime assertions) checks the file system
- * instead of packinfo for exactly this reason, and pins the current 9-path
- * stale-survivor set by name — see its own comment for the full mechanism
- * and why the set is hardcoded rather than re-derived from the rule that
- * predicts it.
+ * **A pack file surviving a downgrade forever, invisibly, was the packinfo
+ * gap's most serious consequence — and is fixed by the same merge.**
+ * `process_modpack_staging`'s deletion now comes from `apply_plan::plan`'s
+ * `universe` (`old.keys() ∪ target.keys()`), not a walk over packinfo's own
+ * keys in isolation, but `old` is still exactly `packinfo.json`'s content —
+ * so a path the upgrade would have dropped from packinfo, pre-fix, was a
+ * path the downgrade's deletion could never have visited, no matter what the
+ * newly-installed version's own manifest said about it. With packinfo now
+ * complete after every version change (previous finding), that no longer
+ * happens: every path the downgrade needs to delete is still on record to
+ * delete. The downgrade leg's physical-completeness check (near its end,
+ * right before the playtime assertions) still checks the file system
+ * instead of packinfo, deliberately — it is the one check in this file that
+ * does not derive from packinfo at all, so it would catch a *different*
+ * mechanism producing the same kind of leak, not just a regression of this
+ * specific one.
  *
  * **The Replaced loops verify override content by hash, not just presence.**
  * `PackIndex.overrides` carries hashes, not paths alone: `nextByPath`/
@@ -208,12 +201,14 @@ import {
  * leg where this fix is actually exercised on every green run, not merely
  * in theory.
  *
- * **The audit's four sections do not share one path format.** The three
- * packinfo-derived sections (`skipped`/`deleted`/`replaced`) carry packinfo's
- * own leading-slash keys; `created` carries staging-relative paths with an
- * `instance/` prefix and no leading slash (`helpers/installAudit.ts`
- * preserves this rather than normalising it away). Comparisons below
- * normalise at the call site.
+ * **Every audit section now shares one path format.** `render_audit`
+ * (`run/modpack.rs`) writes each `PlanEntry`'s own packinfo-style,
+ * leading-slash `path` into every section, `created` included — there is no
+ * more staging-relative, `instance/`-prefixed form to normalise away.
+ * Comparisons below still call `.replace(/^instance\//, "")` at the point
+ * they read `created`; it is now a no-op (the prefix it strips never
+ * appears), kept rather than removed since it costs nothing to leave in
+ * place.
  *
  * **`seconds_played` accrues during the launch** and is asserted non-zero and
  * non-decreasing across both version changes — "unchanged" would be the
@@ -542,11 +537,18 @@ test.describe("modpack lifecycle", () => {
         editedBody
       )
 
-      // 2. Delete a pack file the NEW version genuinely restages. Expected
-      //    back after the upgrade: the staging walk recreates any path with
-      //    no file on disk, independently of the packinfo pass having
-      //    skipped it. A mod (`/mods/`) only qualifies if its bytes actually
-      //    differ between MID and NEW — `prepare_modpack_from_mrpack`
+      // 2. Delete a pack file the NEW version still ships. The planner
+      //    decides `Keep`/`DeletedByUser` for this path and that decision is
+      //    final — the deletion is respected, not silently reinstated (see
+      //    the module doc comment's "two pack files are deleted" paragraph).
+      //    The path is still staged (see the mod/override preference below)
+      //    and so still ends up recorded in the promoted packinfo.json, even
+      //    though nothing lands on disk at it — which is exactly why
+      //    `classifyPackinfo` reports it `missing` after the upgrade, and
+      //    `beforeMutation2.missing` below asserts that explicitly rather
+      //    than requiring the list empty. A mod (`/mods/`) only qualifies as
+      //    a genuinely fresh-staged example if its bytes actually differ
+      //    between MID and NEW — `prepare_modpack_from_mrpack`
       //    (`modrinth.rs:277-289`) skips re-downloading a file whose
       //    new-version sha512 already matches the *old* packinfo's recorded
       //    hash, so a same-content mod across the bump never gets a fresh
@@ -748,22 +750,21 @@ test.describe("modpack lifecycle", () => {
         "audit original md5 for the edited config"
       ).toBe(packinfoAtInstall.get(editTarget!)?.md5)
 
-      // The jar deleted that the new version ships: back, and in BOTH the
-      // skipped and created sections. This pins a real product oddity — the
-      // two passes are independent, so a user's deletion is silently
-      // reinstated.
+      // The jar deleted that the new version ships: stays deleted, recorded
+      // once, and nowhere else. The planner makes exactly one decision per
+      // path, so there is no independent second pass left to reinstate it.
       expect(
         afterUpgrade.has(deleteReturning.slice(1)),
-        "a user-deleted pack file was not reinstated by the new version"
-      ).toBe(true)
+        "a user-deleted pack file was reinstated by the new version"
+      ).toBe(false)
       expect(
         skipReason.get(deleteReturning)?.reason,
         `audit reason for ${deleteReturning}`
       ).toBe("deleted-by-user")
       expect(
         auditCreated.has(deleteReturning.slice(1)),
-        `audit did not also record creating ${deleteReturning}`
-      ).toBe(true)
+        `audit wrongly also recorded creating ${deleteReturning}`
+      ).toBe(false)
 
       // The jar deleted that the new version does not ship: still gone, and
       // NOT counted as a deletion the pass performed.
@@ -795,23 +796,14 @@ test.describe("modpack lifecycle", () => {
         )
       }
 
-      // packinfo now describes the new version — with one known,
-      // pre-existing gap, precisely characterized rather than ignored.
-      // `packinfo::scan_dir` (`crates/carbon_app/src/managers/instance/modpack/packinfo/scan.rs`)
-      // rebuilds packinfo.json purely by hashing whatever physically landed
-      // in the staging directory; it cannot see a path it has no file for.
-      // Combined with the skip-if-unchanged optimization documented above
-      // (`modrinth.rs:277-289` never stages a file whose hash is unchanged
-      // from the old packinfo), a pack file whose bytes are identical
-      // between MID and NEW is silently dropped from the rebuilt
-      // packinfo.json — regardless of whether the user ever touched it.
-      // Confirmed live: of this pack's 20 mods unchanged between
-      // MID and NEW, all 20 vanished from packinfo after the upgrade. This
-      // is a real, separate product gap unrelated to anything this test's
-      // three sabotages target (none of them touch packinfo regeneration),
-      // so it is asserted *precisely* — the only paths allowed to be
-      // missing are exactly the ones this mechanism predicts — rather than
-      // papered over by dropping or loosening the check.
+      // packinfo now describes the new version completely. The merge fix
+      // (`process_modpack`'s snapshot block, `run/modpack.rs`: the loop over
+      // `skipped_mods` right after the `scan_dir` call) folds the
+      // skip-oracle's hash back in for every skip-optimised path, so a pack
+      // file whose bytes are unchanged between MID and NEW is no longer
+      // silently dropped from the rebuilt packinfo.json just because
+      // `prepare_modpack_from_mrpack` (`modrinth.rs:277-289`) never
+      // re-staged it.
       const packinfoAfterUpgrade = await readPackinfo(root)
       const packinfoPathsAfterUpgrade = new Set(
         [...packinfoAfterUpgrade.keys()].map((k) => k.slice(1))
@@ -819,20 +811,24 @@ test.describe("modpack lifecycle", () => {
       const missingFromPackinfoAfterUpgrade = packPaths(next)
         .filter((p) => !packinfoPathsAfterUpgrade.has(p))
         .sort()
-      const expectedMissingFromSkipGapUpgrade = packPaths(next)
-        .filter((p) => {
-          const midSha = midShaByPath.get(p)
-          const nextSha = nextShaByPath.get(p)
-          return (
-            midSha !== undefined && nextSha !== undefined && midSha === nextSha
-          )
-        })
-        .sort()
       expect(
         missingFromPackinfoAfterUpgrade,
-        "packinfo.json is missing pack files after the upgrade beyond the " +
-          "known unchanged-file gap in packinfo::scan_dir"
-      ).toEqual(expectedMissingFromSkipGapUpgrade)
+        "packinfo.json is missing pack files after the upgrade"
+      ).toEqual([])
+      // The narrowest, most direct proof the merge fix is doing its job: a
+      // `files[]` (mod) entry is exactly the population that CAN be
+      // skip-optimised; an override cannot (`modrinth.rs:321-379`
+      // re-extracts every override unconditionally, regardless of content),
+      // so checking overrides here would prove nothing about this
+      // specific fix. Independent of the broader, packPaths-based check
+      // above.
+      expect(
+        next.files
+          .map((f) => f.path)
+          .every((p) => packinfoPathsAfterUpgrade.has(p)),
+        "packinfo.json is missing a files[] path after the upgrade — the " +
+          "skip-optimised merge fix regressed"
+      ).toBe(true)
       // Every path packinfo *does* record must still belong to the new pack
       // — no stale entries left over from a path the new version dropped.
       const nextPathSet = new Set(packPaths(next))
@@ -844,15 +840,21 @@ test.describe("modpack lifecycle", () => {
 
       // --- downgrade leg ---------------------------------------------------
       const beforeMutation2 = await classifyPackinfo(root)
+      // `deleteReturning`, and only it, is expected here: the upgrade's
+      // planner decided `Keep`/`DeletedByUser` for it (the deleted-stays-
+      // deleted flip — see point 2 above and the module doc comment), so
+      // nothing landed on disk at that path, but it is still staged and so
+      // still recorded in the promoted packinfo.json. `classifyPackinfo`
+      // has no third bucket for "packinfo tracks it, disk has nothing" other
+      // than `missing`, so that is exactly where it lands. Any other member
+      // here would mean a *different* pack file went missing.
       expect(
         beforeMutation2.missing,
-        "a pack file went missing between the upgrade and the downgrade"
-      ).toEqual([])
+        "a pack file went missing between the upgrade and the downgrade, " +
+          "beyond the already-accounted-for deleteReturning"
+      ).toEqual([deleteReturning])
 
       const oldPaths = new Set(packPaths(old))
-      // Path -> declared sha512, for the same known packinfo-completeness
-      // gap this leg's own final assertion accounts for (see its comment).
-      const oldShaByPath = new Map(old.files.map((f) => [f.path, f.sha512]))
       const beforeDowngrade = await snapshotTree(data)
 
       await changeModpackVersion(page, name, MODPACK_MR_V_OLD)
@@ -904,12 +906,15 @@ test.describe("modpack lifecycle", () => {
 
       // Replaced: pristine, in both, and the two versions disagree on the
       // bytes. Same declared-file-vs-override split as the upgrade leg's
-      // Replaced loop above, and not merely for symmetry: unlike that loop,
-      // nothing here excludes `deleteReturning` (`/options.txt` for this
-      // pack), so this is the leg where that path actually reaches the
-      // override-hash check below on every green run, rather than only in
-      // theory — see the module doc comment's override-verification
-      // paragraph.
+      // Replaced loop above. `deleteReturning` (`/options.txt` for this
+      // pack) needs no explicit exclusion here the way the upgrade leg
+      // excludes it: it no longer appears in `beforeMutation2.pristine` at
+      // all — it is `missing` there instead, per the deleted-stays-deleted
+      // fix (point 2 above and the module doc comment) — so this loop
+      // naturally skips it without being told to. The override-hash check
+      // below is still exercised on every green run regardless, by this
+      // pack's other pristine config overrides — see the module doc
+      // comment's override-verification paragraph.
       const oldByPath = new Map(old.files.map((f) => [f.path, f]))
       const oldOverrideSha256ByPath = new Map(
         old.overrideFiles.map((f) => [f.path, f.sha256])
@@ -975,15 +980,8 @@ test.describe("modpack lifecycle", () => {
         ).not.toContain(`/${p}`)
       }
 
-      // packinfo now describes the old version — with the same known,
-      // pre-existing `packinfo::scan_dir` gap as the upgrade leg, but
-      // computed against the *pre-downgrade* packinfo (`packinfoAfterUpgrade`,
-      // captured above): that gap is cumulative, not merely a MID/NEW
-      // artifact — a path already missing from it going into the downgrade
-      // has nothing to skip-compare against, so it always gets freshly
-      // staged (and thus is never missing here), while a path it *does*
-      // record is skipped, and therefore silently dropped again, exactly
-      // when that recorded hash matches OLD's declared one.
+      // packinfo now describes the old version completely — the same merge
+      // fix as the upgrade leg, applied again on the way back down.
       const packinfoAfterDowngrade = await readPackinfo(root)
       const packinfoPathsAfterDowngrade = new Set(
         [...packinfoAfterDowngrade.keys()].map((k) => k.slice(1))
@@ -991,22 +989,17 @@ test.describe("modpack lifecycle", () => {
       const missingFromPackinfoAfterDowngrade = packPaths(old)
         .filter((p) => !packinfoPathsAfterDowngrade.has(p))
         .sort()
-      const expectedMissingFromSkipGapDowngrade = packPaths(old)
-        .filter((p) => {
-          const preDowngradeSha = packinfoAfterUpgrade.get(`/${p}`)?.sha512
-          const oldSha = oldShaByPath.get(p)
-          return (
-            preDowngradeSha !== undefined &&
-            oldSha !== undefined &&
-            preDowngradeSha === oldSha
-          )
-        })
-        .sort()
       expect(
         missingFromPackinfoAfterDowngrade,
-        "packinfo.json is missing pack files after the downgrade beyond " +
-          "the known unchanged-file gap in packinfo::scan_dir"
-      ).toEqual(expectedMissingFromSkipGapDowngrade)
+        "packinfo.json is missing pack files after the downgrade"
+      ).toEqual([])
+      expect(
+        old.files
+          .map((f) => f.path)
+          .every((p) => packinfoPathsAfterDowngrade.has(p)),
+        "packinfo.json is missing a files[] path after the downgrade — the " +
+          "skip-optimised merge fix regressed"
+      ).toBe(true)
       const oldPathSet = new Set(packPaths(old))
       expect(
         [...packinfoPathsAfterDowngrade].filter((p) => !oldPathSet.has(p)),
@@ -1014,67 +1007,34 @@ test.describe("modpack lifecycle", () => {
           "does not declare"
       ).toEqual([])
 
-      // Every assertion above this point is derived from packinfo.json, so
-      // every one of them is blind to the gap the previous block documents —
-      // they can only ever compare a corrupted record against itself. This
-      // checks physical reality instead: what is actually still sitting on
-      // disk, regardless of what packinfo does or does not know about it.
+      // Every assertion above this point is derived from packinfo.json. This
+      // checks physical reality instead — what is actually still sitting on
+      // disk, regardless of what packinfo says — as independent
+      // corroboration that the fix made the record correct rather than just
+      // making it *look* correct while a different mechanism still leaked a
+      // stale file onto disk.
       //
-      // It matters because the deletion pass in `process_modpack_staging`
-      // (`modpack.rs`, the loop over `packinfo.files` a few hundred lines up
-      // from the audit-writing block cited throughout this file) is driven
-      // *exclusively* by packinfo's own keys — nothing else in the pipeline
-      // ever decides to delete a pack-owned file. A path `scan_dir` dropped
-      // from packinfo after the upgrade is therefore a path that loop can
-      // never visit on the downgrade, no matter what OLD's own manifest
-      // says about it. For the 11 of the 20 upgrade-gap mods (see
-      // `expectedMissingFromSkipGapUpgrade` above) that OLD still ships,
-      // that is silently harmless — the stale survivor and the file OLD
-      // wants at that path are, at worst, the same path with stale bytes.
-      // For the other 9, which OLD's manifest does not declare at all, it
-      // is a live defeat of "correctly deletes the pack's own files": they
-      // physically survive the downgrade forever, undeleted, with zero
-      // audit trace of ever being decided about — and every check above,
-      // being packinfo-derived, is structurally unable to see it.
+      // Before this task's fix, this mattered acutely: the deletion pass was
+      // driven *exclusively* by packinfo's own keys, so a path `scan_dir`
+      // silently dropped from packinfo after the upgrade (the previous
+      // finding) was a path the downgrade's deletion could never visit, no
+      // matter what OLD's own manifest said about it — nine of this pack's
+      // mods survived every downgrade forever, undeleted, with zero audit
+      // trace. `process_modpack_staging`'s deletion now comes from
+      // `apply_plan::plan`'s `universe` (`old.keys() ∪ target.keys()`),
+      // built fresh each time from a packinfo the merge fix keeps complete,
+      // so that leak path no longer exists.
       //
-      // So the expectation here comes from the file system, not from
-      // packinfo: every path physically present under a directory this pack
-      // has ever owned (the union of `packPaths` across MID, NEW and OLD —
-      // `mods/`, `config/`, or the pack root for this pack) must be
-      // explained by one of (a) a path the currently-installed OLD version
-      // actually declares, (b) one of this test's own explicit mutations
-      // (`userMod`, `userSave`, the hand-edited config), or (c) something
-      // the real game session wrote (`gameWritten` — logs, the seven
-      // launch-normalised configs, etc; the game never runs again after the
-      // single launch leg near the top of this test, so that set is still
-      // exhaustive here).
-      //
-      // Anything left over is pinned by exact name below rather than
-      // re-derived from the "unchanged between MID and NEW, and absent from
-      // OLD" rule that predicts it (the same rule
-      // `expectedMissingFromSkipGapUpgrade` already applies above): deriving
-      // it the same way would just re-run the very prediction that produces
-      // the leak, and could never notice the set growing for a *different*
-      // reason. Computed once (2026-08-01) by cross-referencing the three
-      // pinned indexes directly: of the 20 mods `scan_dir` drops from
-      // packinfo on the MID -> NEW upgrade, these 9 are the ones OLD's own
-      // manifest never declares at all. If this pack is ever re-pinned
-      // (`modpackFixtures.ts`), re-derive this list against the new
-      // versions rather than hand-editing it — fetch all three indexes,
-      // take the paths where MID's and NEW's declared sha512 agree, and
-      // keep only the ones `packPaths(old)` does not contain.
-      const KNOWN_STALE_SURVIVORS_AFTER_DOWNGRADE = [
-        "mods/ImmediatelyFast-Fabric-1.5.3+1.20.4.jar",
-        "mods/Resourcify (1.20.1-fabric)-1.7.5.jar",
-        "mods/entityculling-fabric-1.9.5-mc1.20.1.jar",
-        "mods/fabric-api-0.92.6+1.20.1.jar",
-        "mods/fabric-language-kotlin-1.13.8+kotlin.2.3.0.jar",
-        "mods/lithium-fabric-mc1.20.1-0.11.4.jar",
-        "mods/modernfix-fabric-5.25.2+mc1.20.1.jar",
-        "mods/sodium-extra-0.5.9+mc1.20.1.jar",
-        "mods/yet_another_config_lib_v3-3.6.6+1.20.1-fabric.jar"
-      ].sort()
-
+      // So the expectation here is that nothing is left unexplained: every
+      // path physically present under a directory this pack has ever owned
+      // (the union of `packPaths` across MID, NEW and OLD — `mods/`,
+      // `config/`, or the pack root for this pack) must be accounted for by
+      // one of (a) a path the currently-installed OLD version actually
+      // declares, (b) one of this test's own explicit mutations (`userMod`,
+      // `userSave`, the hand-edited config), or (c) something the real game
+      // session wrote (`gameWritten` — logs, the seven launch-normalised
+      // configs, etc; the game never runs again after the single launch leg
+      // near the top of this test, so that set is still exhaustive here).
       const packOwnedPrefixes = new Set(
         [...packPaths(mid), ...packPaths(next), ...packPaths(old)].map(
           (p) => p.split("/")[0]
@@ -1095,10 +1055,9 @@ test.describe("modpack lifecycle", () => {
       expect(
         unexplainedOnDisk,
         "physically present pack-owned files the downgrade cannot account " +
-          "for grew or shrank relative to the known scan_dir stale-survivor " +
-          "set pinned as KNOWN_STALE_SURVIVORS_AFTER_DOWNGRADE — see the " +
-          "comment above it"
-      ).toEqual(KNOWN_STALE_SURVIVORS_AFTER_DOWNGRADE)
+          "for — the stale-survivor leak (fixed by the packinfo merge and " +
+          "the planner-driven, universe-wide deletion pass) has returned"
+      ).toEqual([])
 
       // Playtime accrued during the launch and never went backwards across
       // either version change.

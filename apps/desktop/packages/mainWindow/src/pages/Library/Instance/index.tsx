@@ -427,12 +427,12 @@ const Instance = (props: { children?: any }) => {
     },
     {
       icon: "i-hugeicons:refresh",
-      label: t("instances:_trn_instance_settings.reinstall"),
+      label: t("instances:_trn_instance_settings.repair"),
       disabled: !hasModpack(),
-      testId: "instance-menu-reinstall",
+      testId: "instance-menu-repair",
       action: () => {
         modalsContext?.openModal(
-          { name: "confirmReinstall" },
+          { name: "repairModpack" },
           {
             id: instanceId(),
             name: routeData.instanceDetails.data?.name,
@@ -774,12 +774,7 @@ const Instance = (props: { children?: any }) => {
       noPaddingPaths={["/addons", "/logs"]}
       isFullScreen={isFullScreen}
     >
-      <Show
-        when={
-          duplicatedMods().length > 0 &&
-          !routeData.instanceDetails.data?.modpack?.locked
-        }
-      >
+      <Show when={duplicatedMods().length > 0}>
         <div
           class="mb-4 flex items-center justify-between rounded-xl border border-yellow-600/30 bg-yellow-900/20 p-4"
           classList={{
@@ -793,26 +788,60 @@ const Instance = (props: { children?: any }) => {
                 <Trans key="content:_trn_duplicated_mods_detected" />
               </h3>
               <p class="m-0 text-sm text-yellow-300/70">
-                <Trans key="content:_trn_duplicated_mods_message" />
+                <Trans
+                  key={
+                    (() => {
+                      const isLocked = !!routeData.instanceDetails.data?.modpack
+                        ?.locked
+                      return isLocked
+                        ? "content:_trn_duplicated_mods_locked_message"
+                        : "content:_trn_duplicated_mods_message"
+                    })()
+                  }
+                />
               </p>
             </div>
           </div>
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => {
-              modalsContext?.openModal(
-                { name: "duplicatedModsResolution" },
-                {
-                  duplicatedMods: duplicatedMods().map((g) => g.mods),
-                  instanceId: instanceId()
-                }
-              )
-            }}
+          <Show
+            when={!routeData.instanceDetails.data?.modpack?.locked}
+            fallback={
+              <Button
+                type="primary"
+                size="small"
+                data-testid="duplicated-mods-repair-cta"
+                onClick={() => {
+                  modalsContext?.openModal(
+                    { name: "repairModpack" },
+                    {
+                      id: instanceId(),
+                      name: routeData.instanceDetails.data?.name,
+                      isServer: false
+                    }
+                  )
+                }}
+              >
+                <div class="i-hugeicons:refresh" />
+                <Trans key="instances:_trn_instance_settings.repair" />
+              </Button>
+            }
           >
-            <div class="i-hugeicons:magic-wand-01" />
-            <Trans key="instances:_trn_fix_now" />
-          </Button>
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => {
+                modalsContext?.openModal(
+                  { name: "duplicatedModsResolution" },
+                  {
+                    duplicatedMods: duplicatedMods().map((g) => g.mods),
+                    instanceId: instanceId()
+                  }
+                )
+              }}
+            >
+              <div class="i-hugeicons:magic-wand-01" />
+              <Trans key="instances:_trn_fix_now" />
+            </Button>
+          </Show>
         </div>
       </Show>
       {props.children}
