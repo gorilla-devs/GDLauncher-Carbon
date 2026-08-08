@@ -70,6 +70,12 @@ module.exports = {
     buildResources: "build"
   },
   files: ["dist", "package.json"],
+  // The unmerged mac layout boots through an @electron/universal entry stub that
+  // is CommonJS but inherits this package.json, whose "type": "module" would have
+  // Node parse the stub's .js as ESM and fail before any app code runs. Every
+  // packaged entry is an explicit .cjs, so the declaration only matters to the
+  // stub. Scoped to mac to leave the bytes Overwolf signs elsewhere untouched.
+  extraMetadata: os === "mac" ? { type: "commonjs" } : undefined,
   extraResources: [
     {
       from: "binaries/${arch}",
@@ -116,7 +122,12 @@ module.exports = {
     minimumSystemVersion: "11.0",
     hardenedRuntime: true,
     gatekeeperAssess: false,
-    notarize: false
+    notarize: false,
+    // Overwolf signs the app once per architecture, so the x64 and arm64 asars
+    // hold different signatures in package.json. Merging them demands every
+    // non-Mach-O file be byte-identical, so ship both asars alongside the
+    // arch-dispatching entry stub instead of merging.
+    mergeASARs: false
   },
   dmg: {
     sign: false
