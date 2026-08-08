@@ -99,8 +99,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@overwolf/ow-electron':
-        specifier: 39.8.10
-        version: 39.8.10
+        specifier: 39.8.11
+        version: 39.8.11
       '@overwolf/ow-electron-builder':
         specifier: ^26.9.0
         version: 26.9.0(electron-builder-squirrel-windows@26.8.1)
@@ -2291,8 +2291,8 @@ packages:
   '@overwolf/ow-electron-packages-types@1.1.5-2':
     resolution: {integrity: sha512-Tp2tSDLfCoBuvXlw5Y339QgLRllbRFqP2XwGIe7kUoPxEikGX6DfZgyQE4jkSxV4jEveWoZi/bkdT6P5tf/+bg==}
 
-  '@overwolf/ow-electron@39.8.10':
-    resolution: {integrity: sha512-qDlXfUrliYAsB5ZblLZiYzZaih9yi6QJ51KCn8Jh/hJEfLK+BpTK1PSi7GwpLyGKvMP1Fxs+Td4xJh6to3W6iw==}
+  '@overwolf/ow-electron@39.8.11':
+    resolution: {integrity: sha512-VJUS3WbWjbnhxzZfyICn89625wjPAumEDv958ze2HOqkVhysAzlFSPtZFUpeut9U6vecsbfUxmAjrC5VWv1scw==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -10468,7 +10468,7 @@ snapshots:
     dependencies:
       glob: 13.0.6
 
-  '@overwolf/ow-electron@39.8.10':
+  '@overwolf/ow-electron@39.8.11':
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 22.18.6
