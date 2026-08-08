@@ -37,6 +37,7 @@ interface ModDownloadButtonProps {
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [t] = useTransContext()
   const [taskId, setTaskId] = createSignal<number | null>(null)
+  const [pendingInstall, setPendingInstall] = createSignal(false)
 
   const {
     instanceLoadingStates,
@@ -97,9 +98,16 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       if (task?.data?.progress.type === "Known") {
         setProgress(Math.round(task?.data?.progress.value * 100))
       } else if (task?.data === null) {
+        if (props.addon?.type === "world") {
+          toast.success(
+            `${props.addon?.title || "World"} installed successfully`,
+            { duration: 2000 }
+          )
+        }
         setLoading(false)
         setTaskId(null)
         setProgress(null)
+        setPendingInstall(false)
       }
     }
   })
@@ -210,20 +218,28 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       return
     }
 
-    if (!props.fileId) {
-      await installLatestModMutation.mutateAsync({
-        instance_id: instanceId,
-        mod_source: latestModInstallObj()
-      })
-    } else {
-      const replacesMod = installedMod()?.id || null
+    setPendingInstall(true)
+    try {
+      if (!props.fileId) {
+        await installLatestModMutation.mutateAsync({
+          instance_id: instanceId,
+          mod_source: latestModInstallObj()
+        })
+      } else {
+        const replacesMod = installedMod()?.id || null
 
-      await installModMutation.mutateAsync({
-        mod_source: modInstallObj(),
-        instance_id: instanceId,
-        install_deps: !replacesMod,
-        replaces_mod: replacesMod
-      })
+        await installModMutation.mutateAsync({
+          mod_source: modInstallObj(),
+          instance_id: instanceId,
+          install_deps: !replacesMod,
+          replaces_mod: replacesMod
+        })
+      }
+    } catch {
+      // Error surfaced via global MutationCache.onError
+      setPendingInstall(false)
+      setLoading(false)
+      setProgress(null)
     }
   }
 
@@ -236,13 +252,6 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     const installed = isInstalled()
     const isCurrentlyLoading = loading()
     const isWorld = props.addon?.type === "world"
-
-    // For worlds: show toast when loading finishes (since they never show as "installed")
-    if (isWorld && wasLoading() && !isCurrentlyLoading && taskId() === null) {
-      toast.success(`${props.addon?.title || "World"} installed successfully`, {
-        duration: 2000
-      })
-    }
 
     // For other addon types: show toast when transitioning from not installed to installed
     // Skip on initial mount to avoid showing toast for already-installed versions
@@ -260,21 +269,15 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     // Track loading state changes
     setWasLoading(isCurrentlyLoading)
 
-    // KNOWN BUG (worlds only): `isWorld && taskId() === null` conflates "the
-    // install has not started yet" with "the install finished". `taskId()`
-    // reads `null` both before `installLatestModMutation` resolves with a real
-    // one and after the vtask poll clears it on completion, and this effect
-    // cannot tell those apart. `handleDownload` flips `loading` true
-    // synchronously, which re-runs this effect while `taskId()` is still null
-    // from before the mutation resolved, so the branch below immediately flips
-    // it back to false — a world install shows no in-progress feedback at all.
-    // Confirmed live: the spinner never becomes visible even briefly while a
-    // world downloads and extracts correctly (`installModIntoInstance`'s doc
-    // comment, `apps/desktop/e2e-tests/helpers/mods.ts`, records the
-    // measurement and the completion signal the e2e suite uses instead).
-    // Fixing it needs a real "started" signal distinct from `taskId`, not a
-    // tweak to this condition.
-    if (installed || (isWorld && taskId() === null)) {
+    // For worlds, `taskId() === null` conflates "the install has not started
+    // yet" with "the install finished". `pendingInstall` marks the
+    // not-yet-tracked window between click (when `loading` flips true) and
+    // vtask completion, closing the gap. Only clear loading here if the
+    // install genuinely finished (`pendingInstall` false means either the
+    // vtask poll's null branch already ran, or the attempt failed and the
+    // catch cleared it). For toast delivery, see vtask-poll effect above
+    // (apps/desktop/e2e-tests/helpers/mods.ts:installModIntoInstance).
+    if (installed || (isWorld && !pendingInstall() && taskId() === null)) {
       setLoading(false)
       setTaskId(null)
       setProgress(null)

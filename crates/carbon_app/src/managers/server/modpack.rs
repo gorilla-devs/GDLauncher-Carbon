@@ -727,7 +727,7 @@ fn loader_version_from_jar_name(name: &str, prefix: &str) -> Option<String> {
 ///
 /// Errors if both a Forge and a NeoForge tree are present with a valid argfile:
 /// that is not a state any real install produces, and silently preferring one
-/// (NeoForge, previously) risks installing/launching the wrong loader entirely.
+/// risks installing/launching the wrong loader entirely.
 async fn detect_modloader_from_files(
     data_path: &Path,
 ) -> anyhow::Result<(Option<String>, Option<String>)> {

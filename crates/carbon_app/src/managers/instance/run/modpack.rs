@@ -112,8 +112,7 @@ pub async fn process_modpack(
     let tmp_packinfo_path = instance_root.join("tmp-packinfo.json");
 
     // Absent marker (including a `.setup` left behind by an older build that
-    // never wrote one) means an ordinary version change — unchanged from
-    // before this file read the marker at all.
+    // never wrote one) means an ordinary version change.
     let repair_marker_path = setup_path.join("repair");
     let repair_options: Option<RepairMarkerFile> =
         match tokio::fs::read_to_string(&repair_marker_path).await {
@@ -1020,9 +1019,11 @@ async fn apply_user_cleanup(
     instance_root: &Path,
 ) -> Vec<String> {
     if cleanup_paths.is_empty() {
-        // Avoid walking the whole instance tree for nothing — the common
-        // case today, since the repair preview UI that produces a non-empty
-        // list doesn't exist yet (`RepairModpack/index.tsx` always sends `[]`).
+        // Avoid walking the whole instance tree for nothing — `cleanup_paths`
+        // is whatever the user ticked in the repair preview's untracked-file
+        // list (`RepairModpack/index.tsx` sends `cleanup_paths: [...ticked()]`),
+        // so an empty list just means the user ticked nothing this time, not
+        // that the feature is unwired.
         return Vec::new();
     }
 

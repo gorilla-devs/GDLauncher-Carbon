@@ -665,13 +665,15 @@ export async function pickModpackVersionAndConfirm(
  * any work — so this waits for the instance to leave `inactive` and come
  * back, the same signal `waitForInstallComplete` uses for a first install.
  *
- * Note that `handleUpdate` only closes and navigates once the mutation
- * *resolves*: there is no `catch` on that path, so a **rejected** change
- * leaves the modal open on the instance's Settings route with nothing shown
- * to the user. Callers that expect a refusal must not use this helper — it
- * ends in `waitForInstallComplete`, which such a call never reaches. See
- * `modpackChangeVersionGuard.spec.ts`, which drives the modal itself for
- * exactly that reason.
+ * Note that a **rejected** change leaves the modal open on the instance's
+ * Settings route rather than proceeding to `waitForInstallComplete`:
+ * `handleUpdate` (`ModPackVersionUpdate/index.tsx:170-201`) catches the
+ * rejection and renders an inline error (`data-testid=
+ * "modpack-version-update-error"`) instead of closing the modal and
+ * navigating to `/library`. Callers that expect a refusal must not use this
+ * helper — it ends in `waitForInstallComplete`, which such a call never
+ * reaches. See `modpackChangeVersionGuard.spec.ts`, which drives the modal
+ * itself and asserts on that inline error directly.
  */
 export async function changeModpackVersion(
   page: Page,

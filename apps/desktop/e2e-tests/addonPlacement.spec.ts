@@ -53,6 +53,14 @@ const RECONCILIATION_WAIT = 30_000
  */
 const isPartFile = (name: string) => name.endsWith(".__gdl_part~")
 
+/** How long the `ShaderLoaderSetup` wizard's intro step is given to appear
+ *  after the install click, for the cancel leg below. Mirrors `helpers/mods.ts`'s
+ *  own private `SHADER_WIZARD_WAIT` (same mechanism — a real
+ *  `instance.checkShaderRequirements` round trip gates the modal — not
+ *  reused directly since that constant is not exported and this file needs
+ *  a hard wait here, not a race). */
+const SHADER_WIZARD_OPEN_TIMEOUT = 5_000
+
 /**
  * Proves each non-mod addon type installs into its **own** folder and is
  * typed correctly on the way back out — one test per `ADDON_FIXTURES` entry
@@ -143,6 +151,85 @@ test.describe("addon placement", () => {
       })
       await openAddonPage(page, fixture.projectId)
 
+      // Shader-cancel leg, run once (curseforge only — either shader
+      // fixture works equally well here, see the constant's own comment; the
+      // point is a loaderless instance, not a platform). `installedInstance`
+      // is a bare Fabric instance with neither Iris nor Oculus installed,
+      // and stays that way through both shader fixtures below: the ordinary
+      // path this loop otherwise takes for a shader install
+      // (`installModIntoInstance`'s "Continue anyway" branch) installs only
+      // the shaderpack file, deliberately never a loader mod — see that
+      // function's own doc comment. So this always finds the wizard, whether
+      // it runs before or after the other shader fixture's normal install.
+      //
+      // Drives the wizard directly rather than through `installModIntoInstance`
+      // (which only ever clicks "Continue anyway") to reach the *Cancel*
+      // button instead: the wizard's `Intro` step
+      // (`ShaderLoaderSetup/index.tsx`) calls `complete(null)` on cancel,
+      // which fires the `notifications:_trn_shader_install_cancelled` toast
+      // (via `onCleanup`'s guarded `complete`) and never calls either
+      // install mutation.
+      if (
+        fixture.platform === "curseforge" &&
+        fixture.addonType === "shaders"
+      ) {
+        const installButton = page.locator(
+          byTestId(TEST_IDS.addonInstallButton)
+        )
+        await installButton.click()
+
+        // Proves the wizard actually opened before looking for its Cancel
+        // control — `shaderLoaderContinueAnyway` is the one sibling button
+        // in the same `Intro` step that already carries a `data-testid`
+        // (installModIntoInstance's own wizard race uses it for the same
+        // "did this really open" signal).
+        await expect(
+          page.locator(byTestId(TEST_IDS.shaderLoaderContinueAnyway)),
+          {
+            message:
+              "shader-cancel leg: the ShaderLoaderSetup wizard never opened " +
+              `after clicking install for "${fixture.query}" on a loaderless ` +
+              "instance — checkShaderRequirements may have reported LoaderPresent"
+          }
+        ).toBeVisible({ timeout: SHADER_WIZARD_OPEN_TIMEOUT })
+
+        // Cancel carries no `data-testid` (`ShaderLoaderSetup/index.tsx`'s
+        // `Intro` step anchors only "Continue anyway" — this task's binding
+        // constraints leave `mainWindow/src` untouched, so a new anchor isn't
+        // an option here). Scoped to `#overlay`, the portal every modal in
+        // this app mounts into (`ModalsManager/index.tsx`) and the same
+        // element `ensureLibraryInteractive` already reads to prove no modal
+        // is open — the identical "role-selector, no testid" precedent
+        // `installModpackVersion` already uses for the Versions tab.
+        await page
+          .locator("#overlay")
+          .getByRole("button", { name: "Cancel" })
+          .click()
+
+        // Toast markup from `somoto` (`@gd/ui`'s `Sonner`): each toast is an
+        // `[data-somoto-toast]` `<li role="status">` holding the message in a
+        // nested `[data-title]`. Filtered by text rather than matched
+        // structurally so a second, unrelated toast still on screen can never
+        // make this pass for the wrong reason.
+        await expect(
+          page
+            .locator("[data-somoto-toast]")
+            .filter({ hasText: "Shader install cancelled" }),
+          {
+            message:
+              'shader-cancel leg: no toast containing "Shader install ' +
+              'cancelled" appeared after clicking Cancel on the wizard'
+          }
+        ).toBeVisible({ timeout: 5_000 })
+
+        await expect(installButton, {
+          message:
+            'shader-cancel leg: the install button reported "Downloaded" ' +
+            "after the wizard was cancelled — cancelling must never install " +
+            "anything"
+        }).not.toHaveText(/downloaded/i)
+      }
+
       // `installModIntoInstance`'s own text-based completion check cannot
       // see a world finishing (see its doc comment for the confirmed
       // `ModDownloadButton` bug behind that) — poll the real target
@@ -196,7 +283,12 @@ test.describe("addon placement", () => {
 
       await installModIntoInstance(page, {
         instanceName,
-        waitForCompletion
+        waitForCompletion,
+        // World only (see `installModIntoInstance`'s own doc comment): a
+        // world's completion signal above is a disk poll that says nothing
+        // about the button's own visible state, which is exactly the gap
+        // the `pendingInstall` fix closed — assert it actually shows.
+        assertLoadingVisible: fixture.addonType === "worlds"
       })
 
       const after = fs.existsSync(targetDir) ? fs.readdirSync(targetDir) : []

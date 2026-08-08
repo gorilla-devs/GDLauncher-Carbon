@@ -227,9 +227,9 @@ const RepairModpack = (props: ModalProps) => {
       noHeader={props.noHeader}
       title={props?.title}
       width="w-110"
-      // The server branch's content is short and static (unchanged from
-      // Task 8), so it keeps ModalLayout's own default sizing (`h-full` +
-      // `overflow-hidden`). The instance branch now grows with the preview
+      // The server branch's content is short and static, so it keeps
+      // ModalLayout's own default sizing (`h-full` +
+      // `overflow-hidden`). The instance branch grows with the preview
       // (counts, expandable file list, untracked files, duplicates), which
       // can easily exceed that default's clipping `overflow-hidden` — cap
       // the height and make it scroll instead of silently hiding content.

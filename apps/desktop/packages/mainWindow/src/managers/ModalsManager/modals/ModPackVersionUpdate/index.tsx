@@ -9,7 +9,7 @@ import {
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
-import { rspc } from "@/utils/rspcClient"
+import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
 import { Show, createEffect, createSignal, createMemo } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { Modpack } from "@gd/core_module/bindings"
@@ -51,8 +51,8 @@ const ModPackVersionUpdate = (props: ModalProps) => {
   // when someone is most likely to be changing versions.
   //
   // Comparing the three fields stops the cascade at its source: an
-  // invalidation that does not actually change the pinned pack no longer
-  // propagates. Same primitive `DragContext.tsx` uses for the same reason.
+  // invalidation that does not actually change the pinned pack does not
+  // propagate. Same primitive `DragContext.tsx` uses for the same reason.
   const modpackData = createMemo(
     () => {
       const modpack = instance.data?.modpack?.modpack
@@ -192,7 +192,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
         } as Modpack
       })
     } catch (e) {
-      setUpdateError(e instanceof Error ? e.message : String(e))
+      setUpdateError(extractErrorDisplay(e))
       return
     }
 
@@ -271,7 +271,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
               <div class="font-semibold">
                 <Trans key="instances:_trn_change_version_failed" />
               </div>
-              <div class="mt-1 break-words">{updateError()}</div>
+              <div class="mt-1 max-h-40 overflow-y-auto break-words">
+                {updateError()}
+              </div>
             </div>
           </Show>
 

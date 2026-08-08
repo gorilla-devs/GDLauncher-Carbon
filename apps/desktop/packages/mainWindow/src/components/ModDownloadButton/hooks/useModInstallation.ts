@@ -2,6 +2,8 @@ import { rspc } from "@/utils/rspcClient"
 import { createSignal } from "solid-js"
 import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 import { useModal } from "@/managers/ModalsManager"
+import { toast } from "@gd/ui"
+import { useTransContext } from "@gd/i18n"
 
 interface UseModInstallationProps {
   addon: FEUnifiedSearchResult | undefined
@@ -10,6 +12,7 @@ interface UseModInstallationProps {
 }
 
 export const useModInstallation = (props: UseModInstallationProps) => {
+  const [t] = useTransContext()
   const modalsContext = useModal()
   const ctx = rspc.useContext()
   const [instanceLoadingStates, setInstanceLoadingStates] = createSignal<
@@ -109,6 +112,7 @@ export const useModInstallation = (props: UseModInstallationProps) => {
       return true
     } catch (e) {
       console.error("Shader preflight failed", e)
+      toast.error(t("notifications:_trn_shader_preflight_failed"))
       return false
     }
   }

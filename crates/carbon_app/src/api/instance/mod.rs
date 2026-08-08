@@ -1189,8 +1189,9 @@ struct ChangeModpack {
 #[derive(Type, Debug, Deserialize)]
 struct RepairModpack {
     instance: FEInstanceId,
-    /// Packinfo-style keys the user ticked for removal in the repair
-    /// preview. Always empty until a later task wires the preview UI.
+    /// User-ticked untracked paths from the repair preview
+    /// (`RepairModpack/index.tsx`'s `ticked()` set) — packinfo-style keys,
+    /// empty when the user ticked nothing.
     cleanup_paths: Vec<String>,
     re_enable_disabled: bool,
 }

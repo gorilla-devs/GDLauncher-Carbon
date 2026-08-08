@@ -78,6 +78,10 @@ async function appearsWithin(
  * own wizard — two "Next" clicks into the final step's "Skip" control,
  * which is what actually calls `closeModal()` there (onboarding has no
  * header/X of its own, `noHeader: true`).
+ *
+ * `AuthFlow.tsx`'s `handleExit` now guards its own deferred post-login
+ * `navigate()` against the route having already moved on, so callers no
+ * longer need to wait out that window here.
  */
 export async function dismissStartupModals(page: Page): Promise<void> {
   // Changelogs stacks on top of onboarding (later entry in the modal stack

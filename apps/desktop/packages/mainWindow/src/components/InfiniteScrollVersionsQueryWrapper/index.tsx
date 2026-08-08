@@ -285,7 +285,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           applyScope({
             modLoaderType: supportsModloader(addonType)
               ? // `?.` on the element: a vanilla instance has no modloaders,
-                // and indexing an empty array here used to throw straight
+                // and bare indexing of the empty array would throw straight
                 // into the `catch` below, losing the game-version filter too.
                 details?.modloaders[0]?.type_
               : undefined,

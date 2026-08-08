@@ -21,8 +21,7 @@ import {
 import {
   MODPACK_MR_QUERY,
   MODPACK_MR_V_MID,
-  MODPACK_MR_V_NEW,
-  MODPACK_MR_V_OLD
+  MODPACK_MR_V_NEW
 } from "./helpers/modpackFixtures.js"
 
 /**
@@ -68,10 +67,18 @@ import {
  * `setup_path.exists()` bail it replaced, the `LaunchState` guard reads
  * instance state rather than a marker file on disk, so there is no "the
  * first call poisons `.setup/` for the second" distinction left to prove —
- * both calls take the exact same branch for the exact same reason. This file
- * drives a second confirm with a different target version
- * (`MODPACK_MR_V_OLD`) and asserts the same two things again: the inline
- * error reappears, and `change-pack-version.json` still does not exist.
+ * both calls take the exact same branch for the exact same reason, and the
+ * guard itself never inspects which version was requested. The modal is
+ * still open from the first refusal with a version still selected, so the
+ * second attempt clicks `modpackVersionUpdateConfirm` directly instead of
+ * reopening the version select: the ad SDK element `TopBannerAd`/`AdsBanner`
+ * render can tile duplicated ad content over the whole page during this
+ * file's longer real-launch run (a found, documented product bug — see the
+ * README), which pushes the select "outside of the viewport" and makes it
+ * unclickable. Resubmitting the still-selected version proves the same
+ * guard behaviour a second, different selection would. Asserts the same two
+ * things as the first attempt: the inline error reappears, and
+ * `change-pack-version.json` still does not exist.
  *
  * **Own harness**, like `modpackLifecycle.spec.ts` and
  * `modpackReinstall.spec.ts`'s second test: this leaves a real JVM running
@@ -257,18 +264,44 @@ test.describe("modpack change version guard", () => {
       // (`ModPackVersionUpdate/index.tsx`) catches the rejected mutation and
       // renders an inline error in the still-open modal instead of closing it
       // and navigating away.
+      const firstErrorLocator = page.locator(
+        byTestId("modpack-version-update-error")
+      )
       await expect(
-        page.locator(byTestId("modpack-version-update-error")),
+        firstErrorLocator,
         "a refused version change surfaced no inline error in the modal"
       ).toBeVisible({ timeout: 15_000 })
+
+      // The inline error must render the parsed backend message
+      // (`extractErrorDisplay` in `rspcClient.ts`), not the raw serialized
+      // rspc error — which carries the full axum/tokio backtrace (recognized
+      // here by its `::poll` async-state-machine frames) plus a trailing
+      // JSON fragment. Both assertions would have failed before that helper
+      // existed, when `handleUpdate` rendered `e.message` unparsed.
+      await expect(
+        firstErrorLocator,
+        "the inline error did not contain the backend's refusal message"
+      ).toContainText("Cannot change the modpack version")
+      await expect(
+        firstErrorLocator,
+        "the inline error rendered a raw backtrace frame instead of the " +
+          "parsed display message"
+      ).not.toContainText("::poll")
+
       expect(page.url()).toMatch(/#\/library\/\d+/)
 
       // A SECOND attempt refuses identically to the first — the guard reads
       // `LaunchState`, not `.setup/`'s presence, so there is no "the first
-      // call poisons `.setup/` for the second" distinction left to observe.
-      // Driven inside the modal that is still open, since nothing can
-      // navigate past its overlay.
-      await pickModpackVersionAndConfirm(page, MODPACK_MR_V_OLD)
+      // call poisons `.setup/` for the second" distinction left to observe,
+      // and it never inspects which version was requested. Driven inside the
+      // modal that is still open, with the version still selected from the
+      // first attempt: a direct click of Confirm, not
+      // `pickModpackVersionAndConfirm`'s open-select/pick-option/confirm
+      // sequence — reopening the version select races the ad banner's
+      // duplication bug (found, documented product bug; see the README),
+      // which can tile enough ad content over the page to push the select
+      // outside the viewport.
+      await page.click(byTestId(TEST_IDS.modpackVersionUpdateConfirm))
       await expect(
         page.locator(byTestId("modpack-version-update-error")),
         "a second refused version change surfaced no inline error in the modal"

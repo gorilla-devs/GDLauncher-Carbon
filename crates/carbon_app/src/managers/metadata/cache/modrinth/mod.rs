@@ -620,8 +620,8 @@ mod test {
         );
     }
 
-    /// Every project's versions used to be walked as one list, which collected
-    /// nothing as soon as another project's version came first.
+    /// Walking every project's versions as one list would collect nothing as
+    /// soon as another project's version came first.
     #[test]
     fn versions_of_other_projects_are_ignored_without_hiding_later_ones() {
         let installed = version("installed", "project", 10, VersionType::Release);

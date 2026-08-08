@@ -113,7 +113,27 @@ pub enum PlanError {
 /// Decide what to do with every path in `old ∪ target`, deterministically
 /// and without touching the filesystem. See the module docs for the
 /// invariants; per-path decisions are delegated to [`decide_version_change`]
-/// or [`decide_repair`] depending on [`ApplyMode`].
+/// or [`decide_repair`] depending on [`ApplyMode`], except for `/saves`
+/// paths, which this function decides itself before consulting either, to
+/// protect existing save bytes without ever resurrecting a deleted world:
+///
+/// - Disk `Present` or `Disabled` (bytes already exist, in any state):
+///   `Keep`/[`PlanReason::InSaveFolder`], always, in both modes — a save is
+///   never overwritten, replaced, re-enabled, or deleted, no matter what
+///   `old`/`target` say about it.
+/// - Disk `Missing` and `old` already recorded the path: `Keep`/
+///   [`PlanReason::InSaveFolder`], always, in both modes including
+///   [`ApplyMode::Repair`] — a world the user deleted is never resurrected,
+///   not even by repair (repair's "restore deleted" contract deliberately
+///   excludes saves).
+/// - Disk `Missing` and `old` never recorded the path (a from-scratch
+///   install, or a pack version that newly ships this world): falls through
+///   to the normal per-mode rows below, so a pack-staged world actually gets
+///   created when staged (`Create`/[`PlanReason::PackUpdate`] under
+///   [`ApplyMode::VersionChange`], `Create`/[`PlanReason::RepairRestored`]
+///   under [`ApplyMode::Repair`]) — a hard [`PlanError::MissingStagedSource`]
+///   when it isn't staged — instead of being silently promised in the target
+///   packinfo and never written to disk.
 pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
     let PlanInputs {
         old,
@@ -132,20 +152,29 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
     let mut entries = Vec::with_capacity(universe.len());
 
     for path in &universe {
-        // The saves folder is never touched, in either mode, regardless of
-        // which bucket below it would otherwise fall into.
-        if path.starts_with("/saves") {
-            entries.push(PlanEntry {
-                path: path.clone(),
-                action: PlanAction::Keep,
-                reason: PlanReason::InSaveFolder,
-            });
-            continue;
-        }
-
         let disk_state = disk.get(path).copied().unwrap_or(DiskState::Missing);
         let old_hashes = old.and_then(|o| o.files.get(path));
         let target_hashes = target.files.get(path);
+
+        // Existing save bytes (Present or Disabled) are protected
+        // unconditionally. A Missing save is only protected when `old`
+        // already knew about it — otherwise it falls through to the normal
+        // rows so a pack-staged world can actually be created.
+        if path.starts_with("/saves") {
+            let protect_missing_save = old_hashes.is_some();
+            let protected = match disk_state {
+                DiskState::Present { .. } | DiskState::Disabled { .. } => true,
+                DiskState::Missing => protect_missing_save,
+            };
+            if protected {
+                entries.push(PlanEntry {
+                    path: path.clone(),
+                    action: PlanAction::Keep,
+                    reason: PlanReason::InSaveFolder,
+                });
+                continue;
+            }
+        }
 
         let (action, reason) = match &mode {
             ApplyMode::VersionChange => {
@@ -185,6 +214,19 @@ fn decide_version_change(
         // Path exists in both the last-staged version and the target
         // version.
         (Some(old_hashes), Some(target_hashes)) => match disk_state {
+            // Disk already matches the target we're applying, even though it
+            // differs from `old`: a version change interrupted after the new
+            // bytes were written but before the new packinfo was promoted
+            // resumes into exactly this state. There is nothing left to do —
+            // checked before the modified-by-user arm below so a
+            // crash-resumed apply doesn't get classified as a user edit with
+            // a misleading original/current md5 pair in the audit (the
+            // md5==old==target case is still handled below, by the
+            // old_hashes.md5 == target_hashes.md5 arm — this one only
+            // catches md5==target but old differs).
+            DiskState::Present { md5 } if md5 == target_hashes.md5 && md5 != old_hashes.md5 => {
+                (PlanAction::Keep, PlanReason::Unchanged)
+            }
             DiskState::Present { md5 } if md5 != old_hashes.md5 => (
                 PlanAction::Keep,
                 PlanReason::ModifiedByUser {
@@ -297,9 +339,8 @@ fn decide_repair(
             (PlanAction::Keep, PlanReason::Unchanged)
         }
         // Damaged (or stale) bytes on disk relative to target, with the
-        // correct bytes staged: repair overwrites them. This is the fix for
-        // correct bytes staged: repair overwrites them, so a corrupted
-        // file no longer gets silently left alone.
+        // correct bytes staged: repair overwrites them rather than
+        // preserving the damage.
         DiskState::Present { md5 } if staged.contains(path) => (
             PlanAction::Replace,
             PlanReason::RepairOverwrote {
@@ -359,6 +400,12 @@ mod test {
     use crate::managers::instance::modpack::packinfo::{FileHashes, PackInfo};
 
     const PATH: &str = "/mods/a.jar";
+    // Used only by the "saves folder, disk missing" section further down;
+    // shadowed harmlessly by the pre-existing function-local `SAVE_PATH`
+    // constants in `saves_folder_is_always_kept` and
+    // `repair_saves_folder_kept_even_when_damaged`, which stay on their own
+    // literal and are otherwise untouched.
+    const SAVE_PATH: &str = "/saves/w/level.dat";
 
     fn hashes(seed: u8) -> FileHashes {
         FileHashes {
@@ -398,7 +445,15 @@ mod test {
         Error,
     }
 
+    // Looks up `PATH` in the produced entries — every table case in this
+    // module (bar the saves-specific ones, which check a `/saves` path
+    // instead and so go through `run_for_path` directly) exercises exactly
+    // one path.
     fn run(case: Case) {
+        run_for_path(case, PATH);
+    }
+
+    fn run_for_path(case: Case, path: &str) {
         let old = case.old.map(packinfo);
         let target = packinfo(case.target);
         let staged: HashSet<String> = case.staged.iter().map(|s| s.to_string()).collect();
@@ -447,8 +502,8 @@ mod test {
                     );
                 }
 
-                let entry = entries.iter().find(|e| e.path == PATH).unwrap_or_else(|| {
-                    panic!("case '{}': no entry for {PATH}, got {entries:?}", case.name)
+                let entry = entries.iter().find(|e| e.path == path).unwrap_or_else(|| {
+                    panic!("case '{}': no entry for {path}, got {entries:?}", case.name)
                 });
                 assert_eq!(
                     entry.action, action,
@@ -505,6 +560,24 @@ mod test {
             target: &[(PATH, 1)],
             staged: &[PATH],
             disk: &[(PATH, DiskCase::Present(1))],
+            mode: ApplyMode::VersionChange,
+            expect: Expect::Entry(PlanAction::Keep, PlanReason::Unchanged),
+        });
+    }
+
+    #[test]
+    fn both_disk_already_matches_target_keeps_unchanged() {
+        // Crash-resume case: a version change that wrote the new bytes but
+        // got interrupted before promoting packinfo leaves disk == target
+        // but old still on record as the pre-change hash. Staged too, to
+        // prove this arm is checked before the "pristine + staged ->
+        // Replace/PackUpdate" arm as well as the modified-by-user one.
+        run(Case {
+            name: "old=1, target=2, disk == target (staged) -> Keep/Unchanged, not ModifiedByUser",
+            old: Some(&[(PATH, 1)]),
+            target: &[(PATH, 2)],
+            staged: &[PATH],
+            disk: &[(PATH, DiskCase::Present(2))],
             mode: ApplyMode::VersionChange,
             expect: Expect::Entry(PlanAction::Keep, PlanReason::Unchanged),
         });
@@ -1043,6 +1116,200 @@ mod test {
                     .iter()
                     .find(|e| e.path == SAVE_PATH)
                     .expect("saves entry must be present");
+                assert_eq!(entry.action, PlanAction::Keep);
+                assert_eq!(entry.reason, PlanReason::InSaveFolder);
+            }
+        }
+    }
+
+    // --- saves folder, disk missing: create-vs-protect semantics ---------
+    //
+    // A `/saves` path only short-circuits to Keep/InSaveFolder when disk
+    // holds existing bytes (Present/Disabled) or `old` already recorded the
+    // path (a deleted world, never resurrected — see `plan`'s doc comment).
+    // A path `old` never heard of, missing from disk, falls through to the
+    // normal per-mode rows so a pack-staged world actually gets created
+    // instead of being promised in packinfo and left behind in the staging
+    // directory that gets deleted right after — the fresh-install
+    // regression this section guards against.
+
+    #[test]
+    fn old_none_saves_missing_staged_creates_pack_update() {
+        run_for_path(
+            Case {
+                name: "old=None, /saves path missing + staged -> Create/PackUpdate",
+                old: None,
+                target: &[(SAVE_PATH, 2)],
+                staged: &[SAVE_PATH],
+                disk: &[],
+                mode: ApplyMode::VersionChange,
+                expect: Expect::Entry(PlanAction::Create, PlanReason::PackUpdate),
+            },
+            SAVE_PATH,
+        );
+    }
+
+    #[test]
+    fn old_none_saves_missing_unstaged_errors() {
+        run_for_path(
+            Case {
+                name: "old=None, /saves path missing + unstaged -> Error",
+                old: None,
+                target: &[(SAVE_PATH, 2)],
+                staged: &[],
+                disk: &[],
+                mode: ApplyMode::VersionChange,
+                expect: Expect::Error,
+            },
+            SAVE_PATH,
+        );
+    }
+
+    #[test]
+    fn saves_new_in_target_only_missing_staged_creates_pack_update() {
+        run_for_path(
+            Case {
+                name: "/saves path new in target (old present but lacks path), missing + staged -> Create/PackUpdate",
+                old: Some(&[]),
+                target: &[(SAVE_PATH, 2)],
+                staged: &[SAVE_PATH],
+                disk: &[],
+                mode: ApplyMode::VersionChange,
+                expect: Expect::Entry(PlanAction::Create, PlanReason::PackUpdate),
+            },
+            SAVE_PATH,
+        );
+    }
+
+    #[test]
+    fn old_none_saves_missing_staged_repair_creates_restored() {
+        // The imported-instance repair case: an instance with no staging
+        // history at all (`old = None`) repaired against a pack version
+        // that ships a world this instance has never had on disk. Missing +
+        // `old` never recorded it falls through to the normal per-mode rows
+        // (see the section doc above), so under Repair this is
+        // Create/RepairRestored — the same fallthrough as the VersionChange
+        // case above, just decided by `decide_repair` instead of
+        // `decide_version_change`.
+        run_for_path(
+            Case {
+                name: "old=None, /saves path missing + staged, Repair -> Create/RepairRestored",
+                old: None,
+                target: &[(SAVE_PATH, 2)],
+                staged: &[SAVE_PATH],
+                disk: &[],
+                mode: ApplyMode::Repair {
+                    re_enable_disabled: false,
+                },
+                expect: Expect::Entry(PlanAction::Create, PlanReason::RepairRestored),
+            },
+            SAVE_PATH,
+        );
+    }
+
+    #[test]
+    fn saves_in_old_and_target_missing_staged_version_change_keeps_in_save_folder() {
+        run_for_path(
+            Case {
+                name: "/saves path in old ∩ target, missing + staged, VersionChange -> Keep/InSaveFolder (never resurrect)",
+                old: Some(&[(SAVE_PATH, 1)]),
+                target: &[(SAVE_PATH, 2)],
+                staged: &[SAVE_PATH],
+                disk: &[],
+                mode: ApplyMode::VersionChange,
+                expect: Expect::Entry(PlanAction::Keep, PlanReason::InSaveFolder),
+            },
+            SAVE_PATH,
+        );
+    }
+
+    #[test]
+    fn saves_in_old_and_target_missing_staged_repair_no_reenable_keeps_in_save_folder() {
+        run_for_path(
+            Case {
+                name: "/saves path in old ∩ target, missing + staged, Repair(no re-enable) -> Keep/InSaveFolder (never resurrect)",
+                old: Some(&[(SAVE_PATH, 1)]),
+                target: &[(SAVE_PATH, 2)],
+                staged: &[SAVE_PATH],
+                disk: &[],
+                mode: ApplyMode::Repair {
+                    re_enable_disabled: false,
+                },
+                expect: Expect::Entry(PlanAction::Keep, PlanReason::InSaveFolder),
+            },
+            SAVE_PATH,
+        );
+    }
+
+    #[test]
+    fn saves_in_old_and_target_missing_staged_repair_reenable_keeps_in_save_folder() {
+        run_for_path(
+            Case {
+                name: "/saves path in old ∩ target, missing + staged, Repair(re-enable) -> Keep/InSaveFolder (never resurrect)",
+                old: Some(&[(SAVE_PATH, 1)]),
+                target: &[(SAVE_PATH, 2)],
+                staged: &[SAVE_PATH],
+                disk: &[],
+                mode: ApplyMode::Repair {
+                    re_enable_disabled: true,
+                },
+                expect: Expect::Entry(PlanAction::Keep, PlanReason::InSaveFolder),
+            },
+            SAVE_PATH,
+        );
+    }
+
+    // --- saves folder, target-only membership, disk already has bytes -----
+    //
+    // Closes a gap the pre-existing saves coverage left open: both
+    // `saves_folder_is_always_kept` (in both old and target, or dropped —
+    // only in old) and `repair_saves_folder_kept_even_when_damaged` (in
+    // both old and target) only ever exercise paths `old` already knows
+    // about. A `/saves` path that exists *only* in `target` — no prior
+    // record at all, e.g. the first pack version to ship this world — must
+    // still protect whatever is already sitting on disk, in every mode,
+    // regardless of hash: Present-pristine (matches target's own hash),
+    // Present-modified (an arbitrary unrelated hash — there is no `old`
+    // hash for this path to be "pristine" against), and Disabled all keep.
+
+    #[test]
+    fn saves_target_only_present_or_disabled_always_protected() {
+        let staged: HashSet<String> = HashSet::new();
+        let target = packinfo(&[(SAVE_PATH, 2)]);
+
+        let disk_states = [
+            DiskState::Present { md5: hashes(2).md5 }, // pristine vs. target
+            DiskState::Present { md5: hashes(9).md5 }, // modified vs. target
+            DiskState::Disabled { md5: hashes(9).md5 },
+        ];
+
+        for disk_state in disk_states {
+            let mut disk = HashMap::new();
+            disk.insert(SAVE_PATH.to_string(), disk_state);
+
+            for mode in [
+                ApplyMode::VersionChange,
+                ApplyMode::Repair {
+                    re_enable_disabled: false,
+                },
+                ApplyMode::Repair {
+                    re_enable_disabled: true,
+                },
+            ] {
+                let entries = plan(PlanInputs {
+                    old: None,
+                    target: &target,
+                    staged: &staged,
+                    disk: &disk,
+                    mode,
+                })
+                .unwrap_or_else(|e| {
+                    panic!("target-only saves entries must never error, got {e}")
+                });
+                let entry = entries
+                    .iter()
+                    .find(|e| e.path == SAVE_PATH)
+                    .expect("saves entry must be present (target-only)");
                 assert_eq!(entry.action, PlanAction::Keep);
                 assert_eq!(entry.reason, PlanReason::InSaveFolder);
             }

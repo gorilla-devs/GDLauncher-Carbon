@@ -4,8 +4,8 @@ import type {
   ModSource,
   LatestModSource
 } from "@gd/core_module/bindings"
-import { Button } from "@gd/ui"
-import { Trans } from "@gd/i18n"
+import { Button, toast } from "@gd/ui"
+import { Trans, useTransContext } from "@gd/i18n"
 import Installing from "./Installing"
 import ModalLayout from "@/managers/ModalsManager/ModalLayout"
 import { ModalProps, useModal } from "@/managers/ModalsManager"
@@ -112,12 +112,20 @@ const Intro = (props: StepProps) => {
 }
 
 const ShaderLoaderSetup = (props: ModalProps) => {
+  const [t] = useTransContext()
   const [currentStep, setCurrentStep] = createSignal<WizardStep>("intro")
   const [installPlan, setInstallPlan] = createSignal<InstallPlan>({
     fileOnly: false
   })
+  const [installStarted, setInstallStarted] = createSignal(false)
 
   const data = (): ShaderLoaderSetupData => props?.data
+
+  // Wrapper that tracks when installation step is entered
+  const setStepTracked = (step: WizardStep) => {
+    if (step === "installing") setInstallStarted(true)
+    setCurrentStep(step)
+  }
 
   // Notify the owner exactly once, whatever closes the modal. A backdrop click
   // or Escape unmounts this component without running the Cancel/Install
@@ -126,6 +134,17 @@ const ShaderLoaderSetup = (props: ModalProps) => {
   const complete = (taskId: number | null) => {
     if (completed) return
     completed = true
+    if (taskId === null) {
+      const key = installStarted()
+        ? "notifications:_trn_shader_install_cancelled_mid_install"
+        : "notifications:_trn_shader_install_cancelled"
+      console.warn(
+        installStarted()
+          ? "[shader-wizard] cancelled after installation started"
+          : "[shader-wizard] cancelled before any install started"
+      )
+      toast(t(key), { duration: 4000 })
+    }
     data().onComplete?.(taskId)
   }
   onCleanup(() => complete(null))
@@ -141,7 +160,7 @@ const ShaderLoaderSetup = (props: ModalProps) => {
           <Intro
             data={data()}
             complete={complete}
-            setStep={setCurrentStep}
+            setStep={setStepTracked}
             setInstallPlan={setInstallPlan}
             installPlan={installPlan}
           />
@@ -150,7 +169,7 @@ const ShaderLoaderSetup = (props: ModalProps) => {
           <Installing
             data={data()}
             complete={complete}
-            setStep={setCurrentStep}
+            setStep={setStepTracked}
             setInstallPlan={setInstallPlan}
             installPlan={installPlan}
           />

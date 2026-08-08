@@ -24,34 +24,52 @@ import {
 /**
  * Proves `apply_plan::PlanReason::InSaveFolder`
  * (`crates/carbon_app/src/managers/instance/modpack/apply_plan.rs`) actually
- * stops both a version change AND a repair from touching a pack-tracked
+ * stops both a version change AND a repair from touching an already-tracked
  * file under `saves/` — one test each, sharing the same seeding mechanism.
  *
- * That branch fires for any path starting `/saves`, unconditionally, before
- * `apply_plan::plan` ever looks at either packinfo's hash or which
- * `ApplyMode` it is running under. No pack in this suite's fixture set ships
- * `overrides/saves/**`, so nothing about a real install ever puts a save
- * under packinfo's tracking — the branch is unreachable through any
- * realistic fixture. Both tests seed that state deliberately, the same class
- * of tampering `helpers/dbSeed.ts` already does for the DB-recovery suite,
- * and this stays its own file rather than folding into
- * `modpackLifecycle.spec.ts` or `modpackReinstall.spec.ts` so those files
- * stay a description of real user behaviour with nothing hand-planted in it.
+ * Existing save bytes on disk (`Present` or `Disabled`) are protected
+ * unconditionally, in every `ApplyMode` — never overwritten, replaced,
+ * re-enabled, or deleted, regardless of what `old`/`target` say about the
+ * path. A `Missing` save `old` already recorded is protected too, in both
+ * modes including repair (a deleted world is never resurrected); only a
+ * `Missing` save `old` never recorded falls through to the normal per-mode
+ * rows, so a pack-shipped world can still be created on install (see
+ * `apply_plan::plan`'s own doc comment for the full contract).
+ * `boosted-fps` (the CurseForge fixture) actually exercises that create
+ * fallthrough on a real install — see finding #7 in this suite's README, a
+ * fresh-install regression this branch introduced into its own
+ * single-planner rewrite and then fixed. What no fixture in this suite ships
+ * is a *second* pack version whose reconciliation could threaten a save
+ * `old` already tracks — the shape both tests below need — so this file
+ * still hand-seeds that half of the state deliberately, the same class of
+ * tampering `helpers/dbSeed.ts` already does for the DB-recovery suite, and
+ * stays its own file rather than folding into `modpackLifecycle.spec.ts` or
+ * `modpackReinstall.spec.ts` so those files stay a description of real user
+ * behaviour with nothing hand-planted in it.
  *
  * **Mechanism.** `apply_plan::plan` checks `path.starts_with("/saves")` as
  * its very first branch, for every path in `old ∪ target`, before it
- * consults either packinfo's hash or the disk state — so a pack-tracked save
- * decides `Keep`/`InSaveFolder` unconditionally, in both
- * `ApplyMode::VersionChange` (the first test) and `ApplyMode::Repair` (the
- * second, where `repair_modpack`'s `.setup/repair` marker selects the
- * mode — see `modpackReinstall.spec.ts`'s module doc for the full
- * mechanism). Since no fixture pack ships `overrides/saves/**`, the seeded
- * entry only ever enters the reconciliation universe via the `old` side of
- * `old ∪ target` (the hand-seeded `packinfo.json`) in either test — proving
- * the guard fires off the path string alone, not off anything resembling
- * normal pack content. `execute_plan` never issues a rename/remove for a
- * `Keep` entry, so the seeded file is left completely untouched on disk
- * either way — no delete-then-restage, no repair-then-revert.
+ * delegates to `decide_version_change`/`decide_repair` — but what happens
+ * next depends on disk state, never on a hash comparison: `Present`/
+ * `Disabled` protect unconditionally; `Missing` protects only when `old`
+ * already recorded the path, and otherwise falls through. Both tests below
+ * seed `Present` bytes already recorded in `old` — the strongest cell in
+ * that matrix, protected regardless of `ApplyMode` (`VersionChange` for the
+ * first test, `Repair` for the second, where `repair_modpack`'s
+ * `.setup/repair` marker selects the mode — see `modpackReinstall.spec.ts`'s
+ * module doc for the full mechanism) and regardless of what `target` does
+ * with the path. In both tests the seeded entry only ever enters `old ∪
+ * target` via `old` (the hand-seeded `packinfo.json`): the first test's
+ * target (`MODPACK_MR_V_NEW`) simply doesn't ship the path, and the
+ * second's target — repair reconciles against the *currently installed*
+ * version's own manifest, not the hand-seeded `old` json — doesn't either,
+ * since no Modrinth fixture in this suite ships `overrides/saves/**`. So
+ * both tests exercise the same old-only (`old \ target`) cell, proving the
+ * guard holds before either mode's own `decide_dropped` fallback — which
+ * would otherwise delete a pristine dropped file — ever runs. `execute_plan`
+ * never issues a rename/remove for a `Keep` entry, so the seeded file is
+ * left completely untouched on disk either way — no delete-then-restage, no
+ * repair-then-revert.
  *
  * **The packinfo round-trip.** The real `packinfo.json` is
  * `{"_version":"1","files":{...}}` — `PackInfoWrapper` is
@@ -185,18 +203,25 @@ test.describe("modpack save guard", () => {
       const data = path.join(root, "instance")
 
       // Same seeding mechanism as the version-change test above — reinstall
-      // targets the instance's own current version, which (like every
-      // fixture pack in this suite) ships no overrides/saves/**, so nothing
-      // about this seed depends on a version change ever happening.
+      // targets the instance's own current version, i.e. the real pack's
+      // own manifest for that version, not the hand-seeded `old` json. None
+      // of this suite's Modrinth fixtures (what this file uses) ship
+      // `overrides/saves/**`, so `target` never tracks this seeded path
+      // either — nothing about this seed depends on a version change ever
+      // happening. (The CurseForge fixture, `boosted-fps`, does ship saves
+      // and is what exercises the other half of the contract, the create
+      // fallthrough on a fresh install — see finding #7 in this suite's
+      // README.)
       //
       // Left PRISTINE (bytes matching the seeded hash exactly), not
       // damaged — deliberately, because pristine-and-old-only is the case
       // that actually discriminates a working /saves guard from a broken
-      // one. `apply_plan::plan` checks `path.starts_with("/saves")`
-      // unconditionally before ever looking at a hash; but this path is
-      // only in `old` (no fixture ships a saves override, so `target`
-      // never tracks it either), and if that check were ever bypassed the
-      // path would fall to `decide_dropped`, whose FIRST arm deletes a
+      // one. Present bytes under `/saves` protect unconditionally in
+      // `apply_plan::plan`, regardless of `old`/`target` or `ApplyMode` (see
+      // the module doc above); but this path is only in `old` (no Modrinth
+      // fixture ships a saves override, so `target` never tracks it
+      // either), and if that Present-bytes protection were ever bypassed
+      // the path would fall to `decide_dropped`, whose FIRST arm deletes a
       // path whose disk bytes still equal `old`'s recorded hash — exactly
       // this seed. A pre-damaged seed would not discriminate: even with
       // the guard removed, `decide_dropped`'s "modified" arm keeps a

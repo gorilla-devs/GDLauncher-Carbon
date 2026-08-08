@@ -10,7 +10,7 @@ import {
   createMemo,
   on
 } from "solid-js"
-import { useSearchParams } from "@solidjs/router"
+import { useLocation, useSearchParams } from "@solidjs/router"
 import { Spinner, Button } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
@@ -175,6 +175,7 @@ function AuthFlowContent() {
   const flow = useFlow()
   const animations = useAnimations()
   const navigator = useGDNavigate()
+  const location = useLocation()
 
   // Step-specific UI state
   const [termsAccepted, setTermsAccepted] = createSignal(false)
@@ -661,6 +662,22 @@ function AuthFlowContent() {
       await animations.text.fadeOut(["welcomeToText", "gdlauncherText"], {
         duration: 500
       })
+    }
+
+    // The animations above take several seconds, during which the app may
+    // have already left the login screen — either the "already set up"
+    // redirect in Login (index.tsx) firing while this was still animating,
+    // or a real navigation the user (or, in e2e, the test) performed since.
+    // Read the route fresh here rather than trusting anything captured
+    // earlier: only fire this navigate if the login route ("/") is still
+    // current, otherwise it would unconditionally overwrite wherever the
+    // app has since moved on to.
+    if (location.pathname !== "/") {
+      console.debug(
+        "[AuthFlow] Skipping deferred post-login navigate; already navigated away to",
+        location.pathname
+      )
+      return
     }
 
     // Navigate

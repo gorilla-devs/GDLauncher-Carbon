@@ -120,36 +120,20 @@ import { verifyModInstalled } from "./helpers/modVerify.js"
  * what a dropped guard at :815 would then overwrite. This is what that
  * mutation actually goes red on here; see the test's own comment.
  *
- * **Two bugs in the brief's own test 3 snippet, fixed here.** First,
- * `verifyModInstalled(dir, filename)` — the real signature is
- * `verifyModInstalled(dir, { filename, ... })`; the snippet passes a bare
- * string where an options object is required (a TypeScript error, not a
- * runtime one). Second, `expect(packinfo).not.toHaveProperty(key)` against
- * `readPackinfo`'s return — a `Map`, not a plain object — is vacuous:
- * `toHaveProperty` reads a plain-object property path, which a `Map`
- * exposes none of (entries live behind `.get`/`.has`, not own-enumerable
- * properties), so this always passes regardless of what the map actually
- * contains. Replaced with `expect(map.has(key)).toBe(false)`, which reads
- * the map correctly.
- *
- * **The packinfo-gap comparison in test 3** follows the exact accounting
- * `modpackLifecycle.spec.ts` already established and documents in depth:
- * `packinfo::scan_dir` rebuilds `packinfo.json` purely by hashing whatever
- * physically landed in `staging_dir`, and `prepare_modpack_from_mrpack`
- * skips re-downloading (and thus re-staging) a file whose new-version
- * sha512 already matches what the old packinfo recorded — so a pack file
- * unchanged between `MODPACK_MR_V_MID` and `MODPACK_MR_V_NEW` is silently
- * absent from the rebuilt `packinfo.json`, independent of anything a test
- * does. Asserting the brief's own literal
- * `packPaths(next) === [...packinfo.keys()]` here would be asserting
- * something false under correct operation, exactly as the task brief warns —
- * so this computes the same `expectedMissingFromSkipGap` predicate
- * `modpackLifecycle.spec.ts` does (paths where MID's and NEW's own declared
- * sha512 agree) and asserts equality against *that*, not against the naive
- * full set. Not derived from `classifyPackinfo`/a real launch's partition
- * the way that file's version is, because this file's instance is never
- * launched — every packinfo entry here starts pristine and stays that way
- * except for the one file this test edits by hand.
+ * **The packinfo-gap comparison in test 3** asserts `missingFromPackinfo`
+ * against an empty array directly, the same as `modpackLifecycle.spec.ts`'s
+ * own assertion. `packinfo::scan_dir` rebuilds `packinfo.json` purely by
+ * hashing whatever physically landed in `staging_dir`, and
+ * `prepare_modpack_from_mrpack` skips re-downloading (and thus re-staging) a
+ * file whose new-version sha512 already matches what the old packinfo
+ * recorded — so a pack file unchanged between `MODPACK_MR_V_MID` and
+ * `MODPACK_MR_V_NEW` would otherwise end up silently absent from the
+ * rebuilt `packinfo.json`, independent of anything a test does.
+ * `process_modpack`'s snapshot block merges the skip-oracle's hash back
+ * into packinfo for every such path (the same merge fix
+ * `modpackLifecycle.spec.ts`'s own doc comment documents in depth), so
+ * packinfo is complete after a version change and there is no gap to
+ * predict.
  *
  * **The unlock-button mutation needs no such workaround.**
  * `Settings/index.tsx`'s unlock
@@ -387,10 +371,13 @@ test.describe("modpack lock, unlock and unpair", () => {
     expect(audit!.replaced, `audit claims it replaced ${rel}`).not.toContain(
       `/${rel}`
     )
-    expect(
-      audit!.created.map((p) => p.replace(/^instance\//, "")),
-      `audit claims it created ${rel}`
-    ).not.toContain(rel)
+    // `created` carries the same leading-slash, packinfo-style spelling as
+    // `deleted`/`replaced` above (`render_audit` writes one path format into
+    // every section) — compared the same way, by prefixing `/` onto `rel`,
+    // not by normalising the array.
+    expect(audit!.created, `audit claims it created ${rel}`).not.toContain(
+      `/${rel}`
+    )
     expect(
       audit!.skipped.map((s) => s.file),
       `audit claims it skipped ${rel}`
@@ -409,12 +396,13 @@ test.describe("modpack lock, unlock and unpair", () => {
       `audit reason for the edited config ${editKey}`
     ).toBe("modified-by-user")
 
-    // And the pack itself still updated correctly around both of them —
-    // accounting for packinfo::scan_dir's own unchanged-file gap. See the
-    // module doc comment for why the naive `packPaths(next)` equality the
-    // brief's own snippet uses would be false under correct operation.
-    const midShaByPath = new Map(midIndex.files.map((f) => [f.path, f.sha512]))
-    const nextShaByPath = new Map(next.files.map((f) => [f.path, f.sha512]))
+    // And the pack itself still updated correctly around both of them.
+    // `process_modpack`'s snapshot block merges the skip-oracle's hash back
+    // into packinfo for every path unchanged since MID (the same merge fix
+    // `modpackLifecycle.spec.ts`'s doc comment documents in depth), so
+    // packinfo is complete after the version change — see this file's
+    // module doc comment's "packinfo-gap comparison" paragraph for why no
+    // gap is expected here.
     const packinfoAfter = await readPackinfo(root)
     const packinfoPathsAfter = new Set(
       [...packinfoAfter.keys()].map((k) => k.slice(1))
@@ -423,20 +411,10 @@ test.describe("modpack lock, unlock and unpair", () => {
     const missingFromPackinfo = packPaths(next)
       .filter((p) => !packinfoPathsAfter.has(p))
       .sort()
-    const expectedMissingFromSkipGap = packPaths(next)
-      .filter((p) => {
-        const midSha = midShaByPath.get(p)
-        const nextSha = nextShaByPath.get(p)
-        return (
-          midSha !== undefined && nextSha !== undefined && midSha === nextSha
-        )
-      })
-      .sort()
     expect(
       missingFromPackinfo,
-      "packinfo.json is missing pack files beyond the known unchanged-file " +
-        "gap in packinfo::scan_dir"
-    ).toEqual(expectedMissingFromSkipGap)
+      "packinfo.json is missing pack files after the version change"
+    ).toEqual([])
     expect(
       [...packinfoPathsAfter].filter((p) => !nextPathSet.has(p)),
       "packinfo.json records a path the new version does not declare"

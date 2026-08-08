@@ -2489,7 +2489,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Refuse the whole operation if any contained instance is preparing or running, before
         // deleting anything. Otherwise the per-instance delete below returns an error for the
-        // running instance (which the old code only logged) while the group row is removed
+        // running instance while the group row is removed
         // anyway, orphaning that instance: it keeps running with a dangling group id and vanishes
         // from list_groups (SQLite foreign keys are not enforced on this connection, so the group
         // row deletes regardless of the referencing row). Mirror the single-instance guard.

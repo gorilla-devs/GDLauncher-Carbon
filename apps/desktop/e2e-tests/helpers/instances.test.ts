@@ -77,9 +77,9 @@ describe("loaderVersionIdFromTestId", () => {
     // seeded pick landing on index 0 (clicks a testid that doesn't exist)
     // and an explicit `loaderVersion` equal to index 0's real id (fails the
     // `offeredVersions.includes(...)` check with a false "not offered"
-      // error). Confirmed live against the packaged app: a smoke
-    // test captured the raw contamination as
-    // `offered=Checked1.20.1-47.4.22|1.20.1-47.4.21|...` before this fix.
+    // error). Confirmed live against the packaged app: reading `textContent`
+    // captures the raw contamination as
+    // `offered=Checked1.20.1-47.4.22|1.20.1-47.4.21|...`.
     // The `data-testid` attribute this function reads is never touched by
     // that rendering — extracting from it directly (rather than from
     // `textContent`) makes the checkmark irrelevant regardless of which

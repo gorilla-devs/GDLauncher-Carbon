@@ -671,7 +671,7 @@ rather than let it silently corrupt an oracle.
 
 ## Modpack tests
 
-Eight spec files cover the modpack lifecycle end to end. All eight verify on
+Nine spec files cover the modpack lifecycle end to end. All nine verify on
 disk — against the pack's own `.mrpack` index, `packinfo.json`, the install
 audit, or a twin instance — never by trusting what the app renders about the
 same fact.
@@ -679,21 +679,27 @@ same fact.
 | File | Tests | What it proves | Wall-clock |
 |---|---|---|---|
 | `modpackInstall.spec.ts` | 2 | A first install from each platform lays every declared file and override on disk and writes a correct `packinfo.json`. | ~1.2 min |
-| `modpackLifecycle.spec.ts` | 1 | An upgrade *and* a downgrade against a **dirtied** instance preserve user and game data while correctly replacing, deleting and creating pack files. | ~2.2 min |
-| `modpackSaveGuard.spec.ts` | 1 | `SkipReplaceReason::InSaveFolder` actually stops a version change deleting a pack-tracked file under `saves/`. | ~51s |
+| `modpackLifecycle.spec.ts` | 1 | An upgrade *and* a downgrade against a **dirtied** instance preserve user and game data while correctly replacing, deleting and creating pack files. | ~1.5 min |
+| `modpackSaveGuard.spec.ts` | 2 | `PlanReason::InSaveFolder` actually stops a version change *and* a repair from touching a pack-tracked file under `saves/`. | ~1.1 min |
 | `modpackLock.spec.ts` | 4 | A fresh install starts locked; unlocking flips the flag and unblocks Addons; unpairing drops the association entirely. | ~4 min |
-| `modpackReinstall.spec.ts` | 2 | Reinstall restores a *deleted* pack file but preserves a *damaged* one, and is refused outright while the game is running. | ~1.8 min |
+| `modpackReinstall.spec.ts` | 2 | Repair restores a *deleted* pack file **and** repairs a *damaged* one — the same treatment for both — and is refused outright while the game is running. | ~1.6 min |
+| `modpackRepairPreview.spec.ts` | 2 | The repair preview's counts and per-file verdicts match what a real repair then does, for a deleted/truncated/edited file and a disabled pack mod, both left disabled and re-enabled. | ~1.1 min |
 | `modpackCurseforgeVersion.spec.ts` | 1 | A **CurseForge** version change lands the instance byte-identical to a fresh install of the same target file. | ~1.2 min |
-| `modpackChangeVersionGuard.spec.ts` | 1 | A version change started mid-game is **deferred, not cancelled** — it applies itself on the next launch. | ~1.1 min |
+| `modpackChangeVersionGuard.spec.ts` | 1 | A version change started mid-game is **refused outright, not deferred** — `change_modpack` now carries the same `LaunchState` guard `repair_modpack` always had. | ~1.1 min |
 | `modpackInterruptedStaging.spec.ts` | 2 | A download killed by a core crash resumes on the next launch; a lost packinfo promotion strands the new files as untouchable. | ~2.1 min |
 
-Two of the five own their harness instead of using the shared
-`authenticatedApp` fixture: `modpackLifecycle` and `modpackReinstall`'s second
-test both leave a real JVM running and must be free to kill it without
-disturbing an app other specs share. Both copy `gameLaunch.spec.ts`'s inline
-`startHarness`/`stopHarness` try/finally rather than importing it — importing
-any value from a `.spec.ts` re-registers that file's own `test()` calls, the
-same reason `helpers/resolutionFixtures.ts` exists.
+Four of the nine own their harness instead of using the shared
+`authenticatedApp` fixture, for two different reasons. Three —
+`modpackLifecycle`, `modpackReinstall`'s second test, and
+`modpackChangeVersionGuard` — leave a real JVM running and must be free to
+kill it without disturbing an app other specs share. The fourth,
+`modpackInterruptedStaging`'s first test, owns its harness for an unrelated
+reason: it `SIGKILL`s the core process itself mid-download, which is not
+something a fixture other specs still need alive afterward could survive.
+All four copy `gameLaunch.spec.ts`'s inline `startHarness`/`stopHarness`
+try/finally rather than importing it — importing any value from a `.spec.ts`
+re-registers that file's own `test()` calls, the same reason
+`helpers/resolutionFixtures.ts` exists.
 
 ### The fixture pack, and why this one
 
@@ -929,14 +935,18 @@ launches the game must partition with `classifyPackinfo` **after** the launch
 and **before** any mutation, and pick its edit target from the pristine list
 at runtime rather than assuming one survived.
 
-### Product findings this wave pinned, now all fixed
+### Product findings these tests pinned, now all fixed
 
-Six, all found by building these tests. None were fixed by that same
-test-writing wave — each was pinned by an assertion instead, deliberately: a
-test wave is the wrong place to change product behaviour, and each needed its
-own product decision first. Every one has since been fixed by a later task;
-each entry below still names the assertion that pins it, which now proves the
-fix holds rather than merely recording the bug.
+Eight, all found by building this suite. None were fixed as they were found —
+each was pinned by an assertion instead, deliberately: writing tests is the
+wrong place to change product behaviour, and each needed its own product
+decision first. Every one has since been fixed; each entry below still names
+the assertion that pins it, which now proves the fix holds rather than merely
+recording the bug. Two are different in kind: #7 is a regression these tests
+introduced into themselves, and #8 a pre-existing product bug outside the
+modpack surface entirely. Both surfaced in a full packaged-build run rather
+than while the tests were being written, and both are listed here for the
+same reason as the rest — pinned by an assertion, fixed, verified green.
 
 1. **`change_modpack` leaks a `.setup/` that defers the version change to the
    next launch.** `repair_modpack` refuses outright while the instance is
@@ -1056,6 +1066,73 @@ fix holds rather than merely recording the bug.
    any other reinstall, so the stale record itself is corrected too, not
    just papered over for one more launch. Pinned by
    `modpackInterruptedStaging.spec.ts`'s second test.
+7. **A CurseForge modpack's `packinfo.json` could record files that were not
+   on disk.** Not a pre-existing bug like #1-6 above — found in this same
+   branch's own first full packaged-build run, and *caused* by this branch:
+   a fresh-install regression introduced by the single-planner staging
+   rewrite (`apply_plan::plan`, finding #2's fix above), caught by
+   `modpackInstall.spec.ts`'s CurseForge test (`boosted-fps`, file
+   `4713831`), and fixed before merge. `apply_plan::plan`'s `/saves` rule
+   short-circuited every `/saves`-prefixed path to `Keep`/`InSaveFolder`
+   unconditionally, in every disk state, including `Missing`. On a fresh
+   install (`old = None`) a pack's own shipped world files are staged and
+   hashed into `tmp-packinfo.json` by `packinfo::scan_dir` — which has no
+   saves-specific branch at all, it unconditionally hashes whatever its
+   whitelist names — *before* the planner ever runs; the planner then
+   decided `Keep` for those `/saves` paths, so `execute_plan`'s no-op `Keep`
+   arm never moved them out of staging, and the staging directory is deleted
+   immediately after. packinfo promised three files
+   (`saves/FPS Stress Test.zip`, `saves/FPS Test.zip`,
+   `saves/FPS Winter Stress Test.zip`) that were never written to disk,
+   reproducible 3/3. The pre-planner two-pass code never had this failure
+   mode — its saves guard only ever covered the *delete* branch, not
+   creation.
+   **Fixed:** the `/saves` rule is now conditional instead of absolute.
+   Existing save bytes (disk `Present` or `Disabled`) are still protected
+   unconditionally, in both modes — never overwritten, replaced, re-enabled,
+   or deleted. A `Missing` save `old` already recorded is still protected in
+   both modes, including repair — a deleted world is never resurrected. A
+   `Missing` save `old` never recorded (a from-scratch install, or a pack
+   version newly shipping a world) now falls through to the normal rows, so
+   it gets created like any other pack-staged file instead of being promised
+   in packinfo and silently dropped. See `apply_plan::plan`'s doc comment
+   for the exact contract. Pinned by `apply_plan.rs`'s planner unit tests
+   (the "saves folder, disk missing" section) and by
+   `modpackInstall.spec.ts`'s CurseForge test, both green.
+8. **A fire-and-forget post-login navigate could clobber whatever the app had
+   since navigated to.** `AuthFlow.tsx`'s `handleExit`
+   (`pages/Login/AuthFlow.tsx:638-672`) runs once as a side effect of the
+   login flow's own state machine reaching its `exiting` phase, and ends with
+   `navigator.navigate("/library")` — but only *after* awaiting a sidebar
+   slide-out, an optional seasonal splash, and (on every fresh runtime path,
+   since `flow.data.isFirstLaunch` is always true here) a ~2.6s welcome-text
+   fade sequence. Nothing synchronized that final `navigate()` against
+   whatever the app was doing by the time it actually fired — measured live
+   (instrumenting `history.pushState`/`document.startViewTransition` and
+   resolving the minified production bundle's stack through the Vite-emitted
+   `.js.map`) at a consistent ~4.0-4.1s after `completeLogin` returns. A test
+   (or a real user) that navigated away and interacted with the app for a few
+   seconds right after login finished got silently yanked back to `/library`
+   mid-action: no error, no console warning, nothing. Reproduced two distinct
+   ways — `installModpackVersion`'s "the Versions tab click reached the route
+   and then left it" bounce, and `scrollVersionRowIntoView`'s rows-disappear
+   failure while scrolling the same page — against code neither the original
+   diagnosis nor any earlier commit on this branch touched
+   (`InfiniteScrollVersionsQueryWrapper`, `AddonViewPage`). This was blocking
+   enough of this suite's own modpack-version specs (anything that reaches a
+   pack's Versions tab shortly after login) that `fixtures/login.ts`'s
+   `dismissStartupModals` carried a `POST_LOGIN_SETTLE_MS` wait to work
+   around it.
+   **Fixed:** `handleExit` now reads `useLocation()`'s `pathname` fresh at
+   the moment it is about to navigate — after all the awaits, not captured
+   at closure creation — and skips the navigate (logging a `console.debug`)
+   whenever the login route (`"/"`) is no longer current. Both the ordinary
+   `/library` destination and the settings-return path
+   (`flow.data.returnPath`) go through the same guard, so a second login
+   after logout (which leaves the app back at `"/"`) still navigates
+   normally. `POST_LOGIN_SETTLE_MS` and the wait it drove are gone from
+   `fixtures/login.ts` — the suite no longer pads around this window, it
+   exercises it directly on every spec that navigates shortly after login.
 
 ### Search timeouts are measured, not guessed
 
@@ -1324,16 +1401,41 @@ skip is `login.spec.ts`'s "reached the real backend for the user profile",
 which needs `TEST_BASE_API` and `E2E_INTERNAL_AUTH_TOKEN` and therefore runs
 only in proxy mode — that is CI's mode, so CI executes 54.
 
-Per-file figures below are **isolated** runs. Do not add them up and expect
-the total above:
+**Re-measured end to end on 2026-08-07, Linux, standalone mode, against a
+real packaged `build:linux-x64-e2e` build — the first full run of everything
+this branch changed, `repair`/preview/disabled-mods/install-feedback included:
+73 tests collected, `67 passed, 4 failed, 1 skipped, 1 did not run` in
+`28.5m`.** Grew from 54 to 73 — more than the +3 added here
+(`modpackRepairPreview.spec.ts`'s 2, +1 in `modpackSaveGuard.spec.ts`'s
+repair leg) accounts for, since 54 was measured 2026-08-01 and other work
+has added coverage in the days since; not fully re-audited here. Of the 4
+failures: 2 (`modpackChangeVersionGuard.spec.ts`'s guard hazard,
+`modpackLifecycle.spec.ts`/`modpackLock.spec.ts`'s spec-side bugs) are fixed
+and verified green; 2 (`modLifecycle.spec.ts`, `persistence.spec.ts`) were
+transient live-Modrinth-CDN flakes that did not reproduce on individual
+re-run. One further failure (`modpackInstall.spec.ts`'s CurseForge test) was
+a genuine, reproducible (3/3) regression this branch introduced into itself
+via its own single-planner staging rewrite — see "Product findings these
+tests pinned, now all fixed" above (item #7) for the full diagnosis — since
+fixed
+and verified green. The "did not run" was a cascade of `modpackLock.spec.ts`'s
+failure in a serial test block, resolved by the same fix.
+
+Per-file figures below are **isolated** runs, several re-measured
+2026-08-07 alongside the new spec. Do not add them up and expect the total
+above:
 
 | File | Tests | Isolated |
 |---|---|---|
 | `modpackInstall.spec.ts` | 2 | ~1.2 min |
-| `modpackLifecycle.spec.ts` | 1 | ~2.2 min |
-| `modpackSaveGuard.spec.ts` | 1 | ~51s |
+| `modpackLifecycle.spec.ts` | 1 | ~1.5 min |
+| `modpackSaveGuard.spec.ts` | 2 | ~1.1 min |
 | `modpackLock.spec.ts` | 4 | ~4 min |
-| `modpackReinstall.spec.ts` | 2 | ~1.8 min |
+| `modpackReinstall.spec.ts` | 2 | ~1.6 min |
+| `modpackRepairPreview.spec.ts` | 2 | ~1.1 min |
+| `modpackCurseforgeVersion.spec.ts` | 1 | ~1.2 min |
+| `modpackChangeVersionGuard.spec.ts` | 1 | ~1.1 min |
+| `modpackInterruptedStaging.spec.ts` | 2 | ~2.1 min |
 | `persistence.spec.ts` | 1 | ~66s |
 | `dbRecovery.spec.ts` | 9 | ~46–48s |
 | `modResolution.spec.ts` | 4 | ~9 min |

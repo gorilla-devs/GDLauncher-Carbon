@@ -96,9 +96,9 @@ function ConfirmWorldDeletion(props: ModalProps) {
               //
               // The delete runs from `finally` because it is the action the
               // user actually confirmed, while the dismissal is a preference:
-              // a rejected upsert used to throw straight out of this handler,
-              // so neither the delete nor the modal close ever ran and the
-              // click was silently dropped.
+              // a rejected upsert must not abort the handler, or neither the
+              // delete nor the modal close would run and the click would be
+              // silently dropped.
               try {
                 if (dontAskAgain()) {
                   await dismissWarningMutation.mutateAsync(true)

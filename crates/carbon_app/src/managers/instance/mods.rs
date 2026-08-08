@@ -33,10 +33,10 @@ use thiserror::Error;
 /// `is_directory` is true only for `AddonType::Worlds`. A world is installed by
 /// extracting its zip into `saves/` and deleting the zip
 /// (`managers/instance/installer/mod.rs`'s `post_process`), so the thing on
-/// disk is a directory and `remove_file` cannot touch it. Before this existed,
-/// a world delete removed nothing while the caller dropped the cache row
-/// anyway, so the entry vanished from the UI and the next scan re-inserted it
-/// from the still-present directory.
+/// disk is a directory and `remove_file` cannot touch it. Treating a world
+/// like a file would remove nothing while the caller drops the cache row
+/// anyway: the entry would vanish from the UI and the next scan would
+/// re-insert it from the still-present directory.
 async fn remove_addon_from_disk(
     enabled_path: &std::path::Path,
     disabled_path: &std::path::Path,

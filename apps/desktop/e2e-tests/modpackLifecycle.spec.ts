@@ -201,14 +201,17 @@ import {
  * leg where this fix is actually exercised on every green run, not merely
  * in theory.
  *
- * **Every audit section now shares one path format.** `render_audit`
+ * **Every audit section shares one path format; `created` is normalised to
+ * this file's own spelling at the point it is read.** `render_audit`
  * (`run/modpack.rs`) writes each `PlanEntry`'s own packinfo-style,
- * leading-slash `path` into every section, `created` included — there is no
- * more staging-relative, `instance/`-prefixed form to normalise away.
- * Comparisons below still call `.replace(/^instance\//, "")` at the point
- * they read `created`; it is now a no-op (the prefix it strips never
- * appears), kept rather than removed since it costs nothing to leave in
- * place.
+ * leading-slash `path` into every section, `created` included. Every other
+ * comparison in this file — `afterUpgrade`/`afterDowngrade` (`snapshotTree`),
+ * `packinfoPathsAfterUpgrade`, `packPaths()`, `userMod`/`userSave`/
+ * `gameWritten` — works in the slash-less, instance-relative spelling, so
+ * `auditCreated`/`auditCreatedDown` strip the leading `/` (alongside the
+ * dead `instance/` prefix, kept as a no-op) when they are built. Every
+ * `auditCreated.has(...)`/`auditCreatedDown.has(...)` call below, positive
+ * or negative, depends on that normalisation to compare like-for-like.
  *
  * **`seconds_played` accrues during the launch** and is asserted non-zero and
  * non-decreasing across both version changes — "unchanged" would be the
@@ -634,8 +637,12 @@ test.describe("modpack lifecycle", () => {
       const audit = await readInstallAudit(root)
       expect(audit, "the version change wrote no install audit").not.toBeNull()
 
+      // Leading-slash stripped to match this file's slash-less comparisons —
+      // see the module doc comment's "created is normalised" paragraph.
       const auditCreated = new Set(
-        audit!.created.map((p) => p.replace(/^instance\//, ""))
+        audit!.created.map((p) =>
+          p.replace(/^instance\//, "").replace(/^\//, "")
+        )
       )
       const skipReason = new Map(audit!.skipped.map((s) => [s.file, s]))
 
@@ -866,8 +873,12 @@ test.describe("modpack lifecycle", () => {
         "the version change wrote no install audit"
       ).not.toBeNull()
 
+      // Same leading-slash strip as `auditCreated` above, same reason — see
+      // the module doc comment's "created is normalised" paragraph.
       const auditCreatedDown = new Set(
-        auditDown!.created.map((p) => p.replace(/^instance\//, ""))
+        auditDown!.created.map((p) =>
+          p.replace(/^instance\//, "").replace(/^\//, "")
+        )
       )
       const skipReasonDown = new Map(auditDown!.skipped.map((s) => [s.file, s]))
 
@@ -1020,10 +1031,10 @@ test.describe("modpack lifecycle", () => {
       // finding) was a path the downgrade's deletion could never visit, no
       // matter what OLD's own manifest said about it — nine of this pack's
       // mods survived every downgrade forever, undeleted, with zero audit
-      // trace. `process_modpack_staging`'s deletion now comes from
+      // trace. `process_modpack_staging`'s deletion comes from
       // `apply_plan::plan`'s `universe` (`old.keys() ∪ target.keys()`),
       // built fresh each time from a packinfo the merge fix keeps complete,
-      // so that leak path no longer exists.
+      // so no such leak path exists.
       //
       // So the expectation here is that nothing is left unexplained: every
       // path physically present under a directory this pack has ever owned

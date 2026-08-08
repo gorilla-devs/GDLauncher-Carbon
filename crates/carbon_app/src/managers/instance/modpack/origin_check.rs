@@ -356,7 +356,7 @@ async fn parse_mrpack(path: &Path) -> anyhow::Result<(ModpackIndex, HashMap<Stri
 /// using the wrong client made large packs time out and silently fall back
 /// to `Unknown` exactly where the checker mattered most.
 ///
-/// `carbon_net` also does what this function used to do by hand: it
+/// `carbon_net` also owns the integrity checking here: it
 /// verifies both `file.size` and `file.hashes.sha512` *during* the download
 /// (streaming, not after-the-fact) and only ever renames its `.part` file
 /// into place at `dest` once both check out — so by the time this returns

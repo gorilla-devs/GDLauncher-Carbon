@@ -573,38 +573,36 @@ const SHADER_WIZARD_WAIT = 5_000
  * on disk is an extracted folder with no on-disk trace of the file id that
  * was installed.
  *
- * The obvious next candidate — `InstallButton`'s own loading spinner, which
- * every addon type's install sets while its mutation is in flight, not just
- * worlds' — turns out **not** to be reliable for a world either, confirmed
- * live: `addonPlacement.spec.ts`'s curseforge-worlds case downloaded and
- * extracted its file correctly (verified independently on disk) while the
- * spinner never registered as visible at all, even briefly, within 15s of
- * the click. Root cause traced to `ModDownloadButton`'s own
- * "watch for installation completion" `createEffect`: for `isWorld`, its
- * `setLoading(false)` guard is `installed || (isWorld && taskId() === null)`
- * — `taskId()` reads `null` both *before* `installLatestModMutation`
- * resolves with a real one and *after* the vtask poll clears it back to
- * `null` on completion, and this effect cannot tell those two apart. The
- * mutation call synchronously flips `loading` to `true`, which immediately
- * re-runs this same effect while `taskId()` is still `null` from before the
- * mutation resolved, and `isWorld && taskId() === null` promptly flips it
- * back to `false` in the same reactive tick — a real, independent frontend
- * bug (missing in-progress feedback on a world install), not a test timing
- * issue, and out of scope for this suite to fix.
- *
- * So a world needs a completion signal from outside the button entirely:
- * `opts.waitForCompletion`, an optional caller-supplied check awaited
- * instead of the text-based wait below. `addonPlacement.spec.ts` passes one
- * that polls the real target directory it already resolved for its own
- * placement assertion — disk state even the frontend bug above cannot
- * misreport. Left undefined by every caller that predates the world case, so
+ * The spinner now shows; `ModDownloadButton` uses `pendingInstall` to mark
+ * the not-yet-tracked window between click and vtask completion. The e2e also
+ * keeps the filesystem completion signal because it is what proves the
+ * install finished — `opts.waitForCompletion`, an optional caller-supplied
+ * check awaited instead of the text-based wait below. `addonPlacement.spec.ts`
+ * passes one that polls the real target directory it already resolved for its
+ * own placement assertion — disk state independent of any UI
+ * signal. Left undefined by every caller that predates the world case, so
  * their behaviour (the text-based wait) is unchanged.
+ *
+ * `opts.assertLoadingVisible`, opt-in and off by default: asserts the
+ * button's own loading `Spinner` (`@gd/ui`, an `svg.animate-spin` with no
+ * `data-testid` of its own — `InstallButton.tsx`'s `<Show when={props.loading()}>`)
+ * becomes visible right after the click, before the completion wait below
+ * even starts. Only `addonPlacement.spec.ts`'s world fixture passes this: a
+ * world's own completion signal is a raw disk poll (`opts.waitForCompletion`
+ * above) that proves nothing about what the button itself showed in between,
+ * which is exactly the gap `pendingInstall` (`ModDownloadButton`) was added to
+ * close. Left off every other caller for the same "don't tax callers that
+ * don't need it" reason the wizard race below exists: the loading window for
+ * a small mod/resourcepack/shader file can be a handful of milliseconds, and
+ * asserting on it there would risk flaking a check unrelated to what those
+ * callers are actually testing.
  */
 export async function installModIntoInstance(
   page: Page,
   opts: {
     instanceName: string
     waitForCompletion?: () => Promise<void>
+    assertLoadingVisible?: boolean
   }
 ): Promise<void> {
   const installButton = page.locator(byTestId(TEST_IDS.addonInstallButton))
@@ -618,6 +616,16 @@ export async function installModIntoInstance(
   }).not.toHaveText(/downloaded/i)
 
   await installButton.click()
+
+  if (opts.assertLoadingVisible) {
+    await expect(installButton.locator("svg.animate-spin"), {
+      message:
+        `installModIntoInstance: the loading spinner never appeared on ` +
+        `"${opts.instanceName}"'s install button after the click — the ` +
+        "button's own visible-loading state (Spinner/@gd/ui, driven by " +
+        "ModDownloadButton's `loading` signal) never showed"
+    }).toBeVisible({ timeout: 10_000 })
+  }
 
   const continueAnyway = page.locator(
     byTestId(TEST_IDS.shaderLoaderContinueAnyway)

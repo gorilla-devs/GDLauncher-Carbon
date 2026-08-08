@@ -814,8 +814,8 @@ async fn walk_packinfo_scoped_files(
 /// `.disabled`-suffixed key whose *stripped* form IS a packinfo key
 /// (typically a stale twin left beside a since-restored enabled copy — the
 /// planner has no way to see a path's "other" spelling once
-/// [`disk_scan::scan_disk_state`] picks one, and unlike an older pipeline
-/// this one no longer deletes such twins outright) is still listed, labeled
+/// [`disk_scan::scan_disk_state`] picks one, and it never deletes such
+/// twins outright) is still listed, labeled
 /// [`UntrackedLabel::DisabledPackFile`] rather than [`UntrackedLabel::Unknown`]
 /// so the UI can tell the user it is a disabled copy of a real pack file
 /// rather than unrelated content. `deletable` mirrors exactly what

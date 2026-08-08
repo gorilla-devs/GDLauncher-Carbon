@@ -56,8 +56,9 @@ export interface InstallAudit {
   /** A disabled twin (`*.jar.disabled`) restored to its enabled path by a
    *  repair. Repair-only — a plain version change never produces this. */
   reEnabled: string[]
-  /** Explicitly removed at the user's request (a future prune/repair
-   *  feature) rather than by the pack's own reconciliation. */
+  /** Explicitly removed at the user's request — untracked paths ticked in
+   *  the repair preview's cleanup list — rather than by the pack's own
+   *  reconciliation. */
   userRemoved: string[]
 }
 

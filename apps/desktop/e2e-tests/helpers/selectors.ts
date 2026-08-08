@@ -269,6 +269,35 @@ export const TEST_IDS = Object.freeze({
    *  opened (`instanceMenuTrigger`) before this resolves. */
   instanceMenuRepair: "instance-menu-repair",
   repairModpackConfirm: "repair-modpack-confirm",
+  /** The repair preview's counts block (`RepairModpack/index.tsx`) — one
+   *  `<div>` per non-zero `RepairCounts` bucket (modified/deleted/unchanged/
+   *  disabled-kept/re-enabled), each holding the translated, `{{count}}`-
+   *  interpolated sentence for that bucket. No per-row id (`countRows` is a
+   *  plain array, not individually keyed) — read the whole block's text and
+   *  match by each bucket's own fixed phrase. On a plain `<div>`, so neither
+   *  hazard in this file's header applies. */
+  repairPreviewCounts: "repair-preview-counts",
+  /** Toggles the raw per-file list open/closed below the counts
+   *  (`RepairModpack/index.tsx`). On a `@gd/ui` `Button`, which spreads
+   *  unknown props onto the real `<button>` — no hazard-1 wrinkle. The list
+   *  itself (`repairPreviewEntry` rows) is not mounted at all until this has
+   *  been clicked once (`<Show when={expanded()}>`). */
+  repairPreviewExpand: "repair-preview-expand",
+  /** One row in the expanded raw file list — every packinfo-tracked path in
+   *  the preview, not just the ones a test mutated, so a query for this id
+   *  needs to be narrowed further (e.g. by the path span's own `title`
+   *  attribute, which holds the full, untruncated path even where the
+   *  sibling text node is CSS-clipped). On a plain `<div>`. */
+  repairPreviewEntry: "repair-preview-entry",
+  /** The re-enable-disabled-mods checkbox's own label span
+   *  (`RepairModpack/index.tsx`) — NOT the `@gd/ui` `Checkbox` itself, which
+   *  (hazard 1 in this file's header) does not forward unknown props at all.
+   *  The label span is plain JSX `children`, not a spread prop, so it mounts
+   *  regardless, and a click anywhere inside the `Checkbox`'s wrapping `<div>`
+   *  (this span included — the checkbox toggle handlers live on that
+   *  ancestor, not on any native input; there is no native input here) toggles
+   *  it via ordinary event bubbling. */
+  repairReenableCheckbox: "repair-reenable-checkbox",
   // The confirm control on `Confirmation`
   // (`ModalsManager/modals/Confirmation`), which `ModalsManager/index.tsx`
   // registers under both `unlock_confirmation` and `unpair_confirmation` for

@@ -149,57 +149,93 @@ function showDedupedErrorToast(display: string, source: "query" | "mutation") {
 }
 
 // ---------------------------------------------------------------------------
-// Global error handler (same logic as the old createClient onError)
+// rspc error parsing
+//
+// rspc wraps errors as {code, message} where message is a JSON string
+// containing {cause, backtrace}. `parseRspcErrorPayload` is the one place
+// that shape gets parsed; both the global toast handler below and any UI
+// that needs the same clean text (via `extractErrorDisplay`) route through
+// it so they can never drift out of sync with each other.
+// ---------------------------------------------------------------------------
+
+type RspcErrorCause = { display: string; code?: string; data?: unknown }
+
+type ParsedRspcError = {
+  code?: number
+  message?: string
+  cause?: RspcErrorCause[]
+}
+
+function parseRspcErrorPayload(raw: string): ParsedRspcError | undefined {
+  let parsed: ParsedRspcError
+  try {
+    parsed = JSON.parse(raw) as ParsedRspcError
+  } catch {
+    return undefined
+  }
+
+  // rspc wraps errors as {code, message} where message is a JSON string containing {cause, backtrace}
+  if (parsed.message && !parsed.cause) {
+    try {
+      const inner = JSON.parse(parsed.message) as { cause?: RspcErrorCause[] }
+      if (inner.cause) {
+        parsed = inner
+      }
+    } catch {
+      // message wasn't JSON, keep parsed as-is
+    }
+  }
+
+  return parsed
+}
+
+/** Extracts a short, human-readable message from an rspc error (or any
+ *  thrown value): the first cause's `display` when the rspc {cause,
+ *  backtrace} payload parses, else the parsed payload's own `message`, else
+ *  the error's `message`, else its stringified form. Callers that render an
+ *  error inline (rather than relying on the global toast below) should use
+ *  this instead of `error.message` — the raw rspc error message can carry a
+ *  full backend backtrace. */
+export function extractErrorDisplay(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const parsed = parseRspcErrorPayload(message)
+  return parsed?.cause?.[0]?.display ?? parsed?.message ?? message
+}
+
+// ---------------------------------------------------------------------------
+// Global error handler shared by every query and mutation cache entry
 // ---------------------------------------------------------------------------
 
 function handleGlobalError(error: Error, source: "query" | "mutation") {
   console.error("RSPC error:", error)
 
-  try {
-    let parsed = JSON.parse(error.message) as {
-      code?: number
-      message?: string
-      cause?: { display: string; code?: string; data?: unknown }[]
-    }
-
-    // rspc wraps errors as {code, message} where message is a JSON string containing {cause, backtrace}
-    if (parsed.message && !parsed.cause) {
-      try {
-        const inner = JSON.parse(parsed.message) as {
-          cause?: { display: string; code?: string; data?: unknown }[]
-        }
-        if (inner.cause) {
-          parsed = inner
-        }
-      } catch {
-        // message wasn't JSON, keep parsed as-is
-      }
-    }
-
-    const errorCause = parsed.cause?.find((c) => c.code)
-    const errorCode = errorCause?.code
-    const hasCustomCode = !!errorCode
-
-    if (errorCode === "ACCOUNT_BANNED") {
-      dispatchBannedEvent()
-      return
-    }
-
-    if (errorCode === "INSUFFICIENT_MEMORY" && errorCause?.data) {
-      dispatchMemoryWarningEvent(errorCause.data as InsufficientMemoryData)
-      return
-    }
-
-    if (errorCode === "EULA_NOT_ACCEPTED" && errorCause?.data) {
-      dispatchServerEulaEvent(errorCause.data as ServerEulaData)
-      return
-    }
-
-    if (!hasCustomCode && parsed.cause?.[0]?.display) {
-      showDedupedErrorToast(parsed.cause[0].display, source)
-    }
-  } catch {
+  const parsed = parseRspcErrorPayload(error.message)
+  if (!parsed) {
     showDedupedErrorToast(error.message, source)
+    return
+  }
+
+  const errorCause = parsed.cause?.find((c) => c.code)
+  const errorCode = errorCause?.code
+  const hasCustomCode = !!errorCode
+
+  if (errorCode === "ACCOUNT_BANNED") {
+    dispatchBannedEvent()
+    return
+  }
+
+  if (errorCode === "INSUFFICIENT_MEMORY" && errorCause?.data) {
+    dispatchMemoryWarningEvent(errorCause.data as InsufficientMemoryData)
+    return
+  }
+
+  if (errorCode === "EULA_NOT_ACCEPTED" && errorCause?.data) {
+    dispatchServerEulaEvent(errorCause.data as ServerEulaData)
+    return
+  }
+
+  if (!hasCustomCode && parsed.cause?.[0]?.display) {
+    showDedupedErrorToast(extractErrorDisplay(error), source)
   }
 }
 

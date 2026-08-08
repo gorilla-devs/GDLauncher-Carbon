@@ -343,8 +343,8 @@ impl ManagerRef<'_, InstanceManager> {
         let logs_file_path = if launch_account.is_some() {
             let gdl_logs_path = instance_path.get_gdl_logs_path();
 
-            // Same retention as the launcher's own __gdl_logs__; these files previously
-            // accumulated forever. Deleting can involve huge files, so keep the blocking
+            // Same retention as the launcher's own __gdl_logs__; without cleanup these
+            // files accumulate forever. Deleting can involve huge files, so keep the blocking
             // fs work off the async runtime.
             let cleanup_path = gdl_logs_path.clone();
             let _ = tokio::task::spawn_blocking(move || {
