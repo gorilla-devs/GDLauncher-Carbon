@@ -108,7 +108,7 @@ module.exports = {
     verifyUpdateCodeSignature: false
   },
   nsis: {
-    oneClick: false,
+    oneClick: true,
     perMachine: false,
     allowToChangeInstallationDirectory: false,
     deleteAppDataOnUninstall: false
