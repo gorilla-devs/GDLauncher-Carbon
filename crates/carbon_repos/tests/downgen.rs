@@ -1,4 +1,4 @@
-//! Schema-diff down-generation tests (spec §10.1, CI matrix T2/T3).
+//! Schema-diff down-generation tests.
 //!
 //! Synthetic fixtures exercise the generator against every diff shape it must
 //! invert — created/dropped table, added/dropped column, added/dropped index,
@@ -309,7 +309,7 @@ fn insert_migration_entry_is_idempotent_on_rerun_for_the_same_migration() {
 
 #[test]
 fn full_schema_dump_matches_the_committed_baseline() {
-    // `new_migration` writes exactly this (spec §11: baseline regenerated on
+    // `new_migration` writes exactly this (baseline regenerated on
     // every new migration) after the newest migration in the chain. Against
     // the real 25-migration chain this must equal the committed
     // `baseline/baseline.sql` byte-for-byte, or the two have drifted apart.

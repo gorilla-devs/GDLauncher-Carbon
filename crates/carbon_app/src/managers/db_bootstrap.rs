@@ -31,7 +31,7 @@ pub enum DatabaseError {
 
 impl DatabaseError {
     /// True for the fatal DB outcomes whose `_STATUS_:` line the runner already
-    /// emitted through the funnel (spec §13). The caller exits cleanly on these:
+    /// emitted through the funnel. The caller exits cleanly on these:
     /// the status line is the single signal Electron consumes, so panicking
     /// after a clean emission would double-signal and bury it under a backtrace.
     pub fn is_emitted_db_status(&self) -> bool {
@@ -46,7 +46,7 @@ impl DatabaseError {
     }
 }
 
-/// The terminal DB status funnel (spec §13). Every fatal outcome of the
+/// The terminal DB status funnel. Every fatal outcome of the
 /// migration runner converts to one of these, and [`emit_status`] writes exactly
 /// one `_STATUS_:` line — the single place that formats them, so the emittable
 /// set is enumerable and test-locked. `Downgraded` is a non-fatal info line;
@@ -97,7 +97,7 @@ impl DbStatus {
     }
 }
 
-/// The single stdout funnel point (spec §13): every DB status line passes
+/// The single stdout funnel point: every DB status line passes
 /// through here so no fatal path can bypass emission.
 fn emit_status(status: &DbStatus) {
     println!("{}", status.status_line());
@@ -106,7 +106,7 @@ fn emit_status(status: &DbStatus) {
 /// Maps the runner outcome to the funnel. `Ok(None)` proceeds silently;
 /// `Ok(Some(_))` is a non-fatal info line to emit; `Err(_)` is a fatal status to
 /// emit before aborting. Pure over its input, so the mapping is unit-tested per
-/// class — the "emission per class" assertion (spec §12 T10, §13 funnel).
+/// class — the "emission per class" assertion.
 fn classify_open(result: DbResult<OpenVerdict>) -> Result<Option<DbStatus>, DbStatus> {
     match result {
         Ok(OpenVerdict::Proceed) => Ok(None),
@@ -149,7 +149,7 @@ fn snapshot_path_for(db_path: &Path) -> PathBuf {
     db_path.with_file_name(format!("{stem}.pre-downgrade.db"))
 }
 
-/// Snapshot retention (spec §13): keep the single most recent pre-downgrade
+/// Snapshot retention: keep the single most recent pre-downgrade
 /// snapshot, delete it after the next fully-successful launch. Called once this
 /// build has opened the database cleanly; a snapshot older than `session_start`
 /// is from an earlier session and is now safe to drop, while one created during
@@ -200,10 +200,10 @@ pub(super) async fn load_and_migrate(
 
     debug!("Starting migration procedure");
 
-    // The runner (spec §9) applies pending migrations forward, overlays a newer
+    // The runner applies pending migrations forward, overlays a newer
     // additive schema, or steps a newer breaking schema back down under a
     // verified snapshot. Every outcome funnels through `classify_open` into a
-    // single `_STATUS_:` line (spec §13): a fatal outcome emits and aborts; a
+    // single `_STATUS_:` line: a fatal outcome emits and aborts; a
     // successful down-run emits the non-fatal `DB_DOWNGRADED` info line and
     // continues. `BACKWARDS_MIGRATION` keeps its exact meaning — a database
     // ahead of this build with no downgrade metadata (a pre-floor database).
@@ -220,8 +220,8 @@ pub(super) async fn load_and_migrate(
         }
     }
 
-    // Foreign keys have been OFF for the app's entire life (spec §2.3). Turn
-    // them ON behind a fail-safe sweep (spec §7): run it on a dedicated
+    // Foreign keys have been OFF for the app's entire life. Turn
+    // them ON behind a fail-safe sweep: run it on a dedicated
     // connection with FKs OFF (so repair deletes do not cascade), then open the
     // runtime pools with FKs ON only if the DB is — or was repaired — clean.
     // `GDL_DISABLE_FK_ENFORCEMENT=1` skips the sweep and forces FKs OFF.
@@ -234,7 +234,7 @@ pub(super) async fn load_and_migrate(
 
     seed_init_db(&db, latest_consent_sha).await?;
 
-    // Reached the successful-open point (spec §13 retention): drop a snapshot
+    // Reached the successful-open point: drop a snapshot
     // left by an earlier session now that this build has opened the database
     // cleanly. A snapshot from this session's own down-run is newer than
     // `session_start` and is kept.
@@ -309,7 +309,7 @@ fn migrate_db(db_path: &Path, migration_set: &MigrationSet) -> DbResult<OpenVerd
     Ok(verdict)
 }
 
-/// Runs the FK sweep (spec §7) and returns whether the runtime pools should
+/// Runs the FK sweep and returns whether the runtime pools should
 /// enable foreign-key enforcement. Never fails startup on integrity grounds: an
 /// unrepairable violation or a sweep error falls back to FKs OFF (today's
 /// behavior) and reports to Sentry, and the app continues.
@@ -493,7 +493,7 @@ async fn seed_init_db(
 mod test {
     use super::*;
 
-    // --- Status funnel (spec §13 / CI T10): every fatal DB class maps to
+    // --- Status funnel: every fatal DB class maps to
     // exactly one `_STATUS_:` line. `emit_status` is a single `println!` of
     // `status_line`, so locking the classification and the line text per class
     // is the "emission per class" assertion, verified in-process without

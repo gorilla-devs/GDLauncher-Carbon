@@ -11,7 +11,7 @@
    reconstructs a dependency-safe, directly executable DDL sequence from it
    (`schema_dump::executable_statements`) and runs it in one transaction
    instead of replaying every historical migration, when it opens a database
-   with an empty `sqlite_master` (spec §11).
+   with an empty `sqlite_master`.
 
 Both consumers read the exact same file, so there is nothing to keep in sync
 by hand: `tests/baseline.rs` is the CI-fatal equivalence test asserting the

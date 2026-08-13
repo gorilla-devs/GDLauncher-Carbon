@@ -37,7 +37,7 @@ function useLoading() {
       const _fontSize = isString ? "1.3rem" : "1rem"
       const dbPath = pathJoin(runtimePath, "gdl_conf.db")
 
-      // The "Restore snapshot" rung of the recovery ladder (spec §13) is only
+      // The "Restore snapshot" rung of the recovery ladder is only
       // offered when the core preserved a pre-downgrade snapshot: it rolls the
       // database back to just before the failed update, losing only changes
       // made after it.

@@ -1,4 +1,4 @@
-//! Bidirectional runner simulation tests (spec §9, CI matrix T10/T11).
+//! Bidirectional runner simulation tests.
 //!
 //! The runner takes the migration list as a parameter, so an "old binary" is
 //! simulated by passing the real 25-migration list and a "new binary" by
@@ -38,7 +38,7 @@ const ADD_WIDGET: MigrationDef = MigrationDef {
 
 /// Breaking migration 27: rebuilds `Widget` to drop the `label` column (the
 /// classic table-rebuild). Its down restores `Widget` from the exact prior DDL,
-/// as a generated down does (spec §10.1: recreate from the before-snapshot),
+/// as a generated down does (recreate from the before-snapshot),
 /// so the down-run result is byte-identical to replaying the ups to version 26.
 const DROP_WIDGET_LABEL: MigrationDef = MigrationDef {
     name: "27_drop_widget_label",

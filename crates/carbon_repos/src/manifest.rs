@@ -1,6 +1,6 @@
-//! Derived migration metadata: `kind` and lossiness (spec §10.2-10.3).
+//! Derived migration metadata: `kind` and lossiness.
 //!
-//! Task 2's [`crate::downgen`] generates the `down.sql` and flags the rename /
+//! [`crate::downgen`] generates the `down.sql` and flags the rename /
 //! DML touchpoints. This module derives — never trusts — the two remaining
 //! metadata fields a migration carries, so a declaration in `get_migrations()`
 //! that disagrees with what the engine actually attests is a CI failure:
@@ -164,7 +164,7 @@ fn quote(ident: &str) -> String {
 }
 
 // ------------------------------------------------------------------------
-// Kind derivation (spec §10.2)
+// Kind derivation
 // ------------------------------------------------------------------------
 
 /// The derived kind plus the concrete reasons a migration is `Breaking` (empty
@@ -424,7 +424,7 @@ fn render_col_def(col: &Col) -> String {
 }
 
 // ------------------------------------------------------------------------
-// Lossiness declaration + derivation (spec §10.3)
+// Lossiness declaration + derivation
 // ------------------------------------------------------------------------
 
 /// The parsed `data_down` declaration a migration carries. `Full` means the
@@ -598,7 +598,7 @@ pub fn verify_data_down(
 }
 
 // ------------------------------------------------------------------------
-// Seeded boundary-value round-trip (spec §10.3 item 4 / CI T5)
+// Seeded boundary-value round-trip
 // ------------------------------------------------------------------------
 
 /// Seeds every table of `S(n-1)` with deterministic boundary-value rows in

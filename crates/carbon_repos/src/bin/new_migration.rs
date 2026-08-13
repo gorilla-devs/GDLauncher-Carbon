@@ -1,5 +1,4 @@
-//! `new_migration` — the migration authoring tool (spec §10), replacing
-//! `prisma migrate dev`.
+//! `new_migration` — the migration authoring tool.
 //!
 //! Two phases, keyed on whether the migration directory's `migration.sql`
 //! already holds a written `up`:
@@ -8,7 +7,7 @@
 //!    `prisma/migrations/<utc-timestamp>_<name>/migration.sql` from an empty
 //!    template. The developer writes the forward SQL there.
 //! 2. **Generate** — rerun `new_migration <name>` once the `up` is written and
-//!    the tool derives `down.sql` by schema diff (spec §10.1), verifies it
+//!    the tool derives `down.sql` by schema diff, verifies it
 //!    round-trips the prior schema, and prints the `MigrationDef` entry to paste
 //!    into `get_migrations()`.
 //!
@@ -223,7 +222,7 @@ fn generate_or_verify(
     }
 }
 
-/// Regenerates the committed fresh-install baseline (spec §11) from `prev`
+/// Regenerates the committed fresh-install baseline from `prev`
 /// (every earlier migration's `up`) plus this migration's `up`. `new_migration`
 /// only ever operates on the newest migration in the chain, so `prev + up` is
 /// always the full chain's schema at this point — the exact content
@@ -243,7 +242,7 @@ fn regenerate_baseline(prev: &[&str], up: &str) -> std::io::Result<()> {
 }
 
 /// Builds the `MigrationDef` list-entry text for this migration, with `kind`
-/// and `data_down` **derived** from the up/down (spec §10.2-10.3), not left as
+/// and `data_down` **derived** from the up/down, not left as
 /// placeholders: the same values the CI gate enforces are what the tool
 /// inserts, so a correct edit passes by construction.
 fn build_list_entry(dir_name: &str, prev: &[&str], up: &str, down: &str) -> String {

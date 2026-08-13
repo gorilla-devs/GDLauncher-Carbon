@@ -1,4 +1,4 @@
-//! Foreign-key enablement sweep (spec §7).
+//! Foreign-key enablement sweep.
 //!
 //! Foreign keys have been OFF for the app's entire life: SQLite defaults FKs
 //! off per connection, no pragma ever turned them on, and referential integrity
@@ -16,7 +16,7 @@
 //! integrity grounds.
 //!
 //! The definitive edge list in [`EDGES`] is derived from the migrated schema's
-//! `pragma_foreign_key_list` (spec §7.2, §18.3), each edge tagged with the
+//! `pragma_foreign_key_list`, each edge tagged with the
 //! repair class its parent/child relationship permits. Destructive repair
 //! (DELETE) is allowed only on cache-class tables; user-data tables are only
 //! null-fixed or reassigned to a default group.
@@ -499,7 +499,7 @@ mod tests {
 
     #[test]
     fn edge_list_matches_schema() {
-        // Bidirectional completeness (spec §7.2, Plan-4 global constraint): the
+        // Bidirectional completeness: the
         // encoded `EDGES` list must be exactly the set of foreign keys the live
         // schema declares. Checking only one direction would let a schema FK
         // silently fall out of the sweep (a new migration adds a reference the

@@ -72,7 +72,7 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("CREATE TABLE t (d DATETIME)").unwrap();
 
-        // Real value observed in production DB (spec §2.1)
+        // Real value observed in production DB
         let dt = DbDateTime(from_millis(1_784_557_692_104).unwrap());
         conn.execute("INSERT INTO t (d) VALUES (?)", [&dt]).unwrap();
 

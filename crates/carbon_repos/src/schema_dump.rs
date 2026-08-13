@@ -4,7 +4,7 @@
 //! whitespace-normalized text form so the same logical schema produces
 //! byte-identical output across SQLite builds that reformat stored DDL text
 //! differently. This is the acceptance test for the rusqlite/bundled-SQLite
-//! version bump (Task 4): the schema snapshot test in `tests/` byte-compares
+//! version bump: the schema snapshot test in `tests/` byte-compares
 //! this dump against a committed baseline before and after the bump. Plan 4's
 //! runtime verification reuses this same function against the same baseline.
 
@@ -139,7 +139,7 @@ pub fn dump_schema(conn: &Connection) -> DbResult<String> {
 /// created automatically the first time an `AUTOINCREMENT` table is created —
 /// re-issuing its `CREATE TABLE` is a reserved-name error).
 ///
-/// This is the fresh-install baseline's execution order (spec §11): the exact
+/// This is the fresh-install baseline's execution order: the exact
 /// dump the schema snapshot test byte-compares as text is, here, replayed as
 /// DDL by [`crate::compat`] instead of the historical migration chain.
 pub fn executable_statements(dump: &str) -> Vec<String> {
@@ -342,7 +342,7 @@ mod tests {
         // The dump of the fully migrated chain, replayed through
         // `executable_statements`, must reproduce the exact same schema when
         // executed fresh — the property the fresh-install baseline path relies
-        // on (spec §11).
+        // on.
         let (_d, conn) = migrated();
         let dump = dump_schema(&conn).unwrap();
 

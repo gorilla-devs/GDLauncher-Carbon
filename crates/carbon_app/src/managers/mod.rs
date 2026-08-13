@@ -137,7 +137,7 @@ mod app {
                 Ok(loaded_db) => loaded_db,
                 Err(e) => {
                     // Fatal DB outcomes already emitted their `_STATUS_:` line
-                    // through the funnel (spec §13); Electron shows the recovery
+                    // through the funnel; Electron shows the recovery
                     // ladder from that line. Exit cleanly so the status line is
                     // the single signal rather than burying it under a panic
                     // backtrace.

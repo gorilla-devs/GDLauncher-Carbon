@@ -1,4 +1,4 @@
-//! Self-test census (spec §12 T11): the fence that fence-tests the fences.
+//! Self-test census: the fence that fence-tests the fences.
 //!
 //! Every mechanical enforcement rule in the data layer — the query checker's
 //! structural checks, its authorizer-driven lints, the bidirectional runner's
@@ -37,7 +37,7 @@ const SELFTEST_MARKER: &str = "CENSUS-SELFTEST:";
 /// Source files whose enforcement rules the census governs: the checker + its
 /// lints, the bidirectional runner's verifier/refusals, and the migration
 /// generator's derivations. (The foreign-key sweep in `fk.rs` is verified by its
-/// own behavioral + fallback tests under CI T10 and its bidirectional
+/// own behavioral + fallback tests and its bidirectional
 /// edge-list-completeness invariant; it is not part of this planted-failure
 /// census.)
 const RULE_SOURCE_FILES: &[&str] = &[

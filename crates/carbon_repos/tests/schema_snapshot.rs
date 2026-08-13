@@ -8,7 +8,7 @@
 //! produce the identical logical schema before and after.
 //!
 //! The committed snapshot lives at `baseline/baseline.sql` — the one file with
-//! two consumers spec §11 calls for: this test byte-compares it as a dump,
+//! two consumers: this test byte-compares it as a dump,
 //! and the fresh-install runner (`src/compat.rs`) replays it as executable
 //! DDL. `tests/baseline.rs` is the CI-fatal equivalence test covering that
 //! second consumer.

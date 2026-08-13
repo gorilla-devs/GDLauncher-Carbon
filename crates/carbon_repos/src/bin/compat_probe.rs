@@ -1,5 +1,5 @@
 //! `compat_probe` — the cross-version harness's entrypoint into *this* binary's
-//! compatibility machinery (spec §12 T7/T8).
+//! compatibility machinery.
 //!
 //! The cross-version tests (`tests/cross_version.rs`) drive an *old* checkout's
 //! binary against a database written by a *new* checkout. Because this release

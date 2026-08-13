@@ -1,4 +1,4 @@
-//! Down-script generation by schema diff (spec §10.1), the library half of the
+//! Down-script generation by schema diff, the library half of the
 //! `new_migration` tool.
 //!
 //! A migration's two surrounding schemas are both mechanically constructible:
@@ -132,7 +132,7 @@ struct Schema {
 }
 
 /// Applies `ups` in order to a fresh in-memory connection with foreign keys
-/// OFF (matching the migration connection's semantics, spec §7.1), so the
+/// OFF (matching the migration connection's semantics), so the
 /// resulting schema is exactly what the runner would produce.
 ///
 /// Shared with [`crate::manifest`], which builds the same surrounding schemas
@@ -427,7 +427,7 @@ pub fn verify_round_trip(prev_ups: &[&str], up: &str, down: &str) -> Result<(), 
 /// through the shared normalizer. When `up` is the newest migration in the
 /// chain, this is the full chain's schema — what `new_migration` writes to
 /// `baseline/baseline.sql` after generating or verifying each migration's down
-/// (spec §11: the baseline is regenerated on every new migration).
+/// (the baseline is regenerated on every new migration).
 pub fn full_schema_dump(prev_ups: &[&str], up: &str) -> DbResult<String> {
     let mut ups: Vec<&str> = prev_ups.to_vec();
     ups.push(up);

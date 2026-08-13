@@ -1,4 +1,4 @@
-//! Cross-version harness with real old binaries (spec §12 T7/T8).
+//! Cross-version harness with real old binaries.
 //!
 //! T7 and T8 verify compatibility against an *actual previous release binary*,
 //! not a simulation:
@@ -123,7 +123,7 @@ fn run_old_probe(root: &Path, subcmd: &str, db: &Path) -> (bool, String) {
         !combined.contains("no bin target named `compat_probe`")
             && !combined.contains("error: no bin target"),
         "the old checkout at {} has no `compat_probe` bin — it predates the compatibility \
-         floor, so T7/T8 cannot run against it yet:\n{combined}",
+         floor, so cross-version testing cannot run against it yet:\n{combined}",
         root.display()
     );
     (output.status.success(), combined)

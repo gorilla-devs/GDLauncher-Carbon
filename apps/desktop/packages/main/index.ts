@@ -563,7 +563,7 @@ const loadCoreModule: CoreModule = () =>
             event === "DB_CORRUPT" ||
             event === "DB_DOWNGRADE_FAILED"
           ) {
-            // Fatal database outcomes (spec §13). The core emits exactly one of
+            // Fatal database outcomes. The core emits exactly one of
             // these then exits; surface the failure screen with the recovery
             // ladder. `DB_DOWNGRADE_FAILED` carries a pre-downgrade snapshot
             // path, which unlocks the "Restore snapshot" step.

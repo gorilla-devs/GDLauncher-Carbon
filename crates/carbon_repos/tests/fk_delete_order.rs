@@ -1,4 +1,4 @@
-//! Delete-order audit under FK enforcement (spec §7.3, plan T1 item 4).
+//! Delete-order audit under FK enforcement.
 //!
 //! With FKs ON the two Restrict edges (`ModFileCache`/`ServerModFileCache` →
 //! `ModMetadata`) turn wrong-order deletes into errors. These tests run the

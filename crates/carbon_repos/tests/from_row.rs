@@ -44,7 +44,7 @@ fn derives_name_based_from_row_with_columns_metadata() {
     );
     assert_eq!(got.blob, vec![1u8, 2]);
 
-    // COLUMNS metadata drives the checker (Task 6)
+    // COLUMNS metadata drives the checker
     let names: Vec<&str> = Sample::COLUMNS.iter().map(|c| c.name).collect();
     assert_eq!(
         names,

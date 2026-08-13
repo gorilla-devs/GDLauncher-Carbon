@@ -1,4 +1,4 @@
-//! Fresh-install baseline equivalence test (spec §11, CI matrix T4).
+//! Fresh-install baseline equivalence test.
 //!
 //! A truly fresh database — empty `sqlite_master`, never touched by any
 //! binary — executes `baseline/baseline.sql` in one transaction instead of
@@ -51,7 +51,7 @@ fn migration_rows(conn: &Connection) -> Vec<MigrationRow> {
 /// Every user table's full row data, keyed by table name: each row rendered
 /// as `column=value` pairs in column order via rusqlite's dynamic `ValueRef`
 /// (so any column type is captured without a per-table schema), ordered by
-/// `rowid`. This is the "full data dump" spec §11/T4 calls for, specialized
+/// `rowid`. This is a full data dump, specialized
 /// to the fresh-install case where every table is either empty or holds the
 /// one documented historical seed. A future migration that smuggles seed data
 /// into only one of the two paths would show up here as a mismatch.
@@ -204,7 +204,7 @@ fn reopening_a_baselined_db_is_a_pure_no_op() {
 
 #[test]
 fn a_stale_baseline_dump_is_caught_by_the_equivalence_check() {
-    // Planted-failure self-test (spec §12 T11): the equivalence assertion
+    // Planted-failure self-test: the equivalence assertion
     // above must actually be sensitive to drift, not vacuously true. Drop one
     // table's line from a hand-built dump (simulating a `baseline.sql` that
     // fell behind the chain after a new migration) and confirm replaying it

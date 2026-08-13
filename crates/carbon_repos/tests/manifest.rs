@@ -1,4 +1,4 @@
-//! Derived kind + lossiness tests (spec §10.2-10.3, CI matrix T5/T6/T11).
+//! Derived kind + lossiness tests.
 //!
 //! Kind derivation is exercised across every diff shape (additive column/table/
 //! non-unique index vs breaking drop/rebuild/unique-index/trigger/DML), both
@@ -25,7 +25,7 @@ fn fields(items: &[&str]) -> BTreeSet<String> {
 }
 
 // ------------------------------------------------------------------------
-// Kind derivation (spec §10.2)
+// Kind derivation
 // ------------------------------------------------------------------------
 
 #[test]
@@ -202,7 +202,7 @@ fn dropped_index_is_breaking() {
 }
 
 // ------------------------------------------------------------------------
-// declared == derived, both directions (spec §10.2, CI T6)
+// declared == derived, both directions
 // ------------------------------------------------------------------------
 
 #[test]
@@ -256,7 +256,7 @@ fn data_down_parses_full_and_partial() {
 }
 
 // ------------------------------------------------------------------------
-// Seeded boundary-value round-trip (spec §10.3, CI T5)
+// Seeded boundary-value round-trip
 // ------------------------------------------------------------------------
 
 #[test]
@@ -345,7 +345,7 @@ fn dropped_integer_and_blob_columns_are_both_detected_lost() {
 }
 
 // ------------------------------------------------------------------------
-// Planted-failure self-tests (spec §10.2-10.3 item 5, CI T11)
+// Planted-failure self-tests
 // ------------------------------------------------------------------------
 
 #[test]
@@ -400,7 +400,7 @@ fn planted_stale_partial_declaration_fails() {
 }
 
 // ------------------------------------------------------------------------
-// Real committed schema (spec §10.3 item 4 against the shipped DDL)
+// Real committed schema, against the shipped DDL
 // ------------------------------------------------------------------------
 
 #[test]
@@ -431,7 +431,7 @@ fn derives_additive_for_a_nullable_add_on_the_real_schema() {
 }
 
 // ------------------------------------------------------------------------
-// Whole-list enforcement over get_migrations() (spec §10.2-10.3, CI T6)
+// Whole-list enforcement over get_migrations()
 // ------------------------------------------------------------------------
 
 #[test]

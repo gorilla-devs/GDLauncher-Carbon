@@ -271,7 +271,7 @@ pub struct Db {
 }
 
 /// Applies the connection-level PRAGMAs the app runs against every pool
-/// connection (spec §2.6).
+/// connection.
 ///
 /// `read_only` gates `journal_mode`: it is a database-header setting, so
 /// *setting* it needs write access to the file. The writer always opens
