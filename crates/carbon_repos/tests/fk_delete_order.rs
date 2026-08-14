@@ -379,7 +379,5 @@ fn non_fk_db_errors_are_not_classified_as_foreign_key_violations() {
 
     assert!(!DbError::Closed.is_foreign_key_violation());
     assert!(!DbError::Conversion("bad row".into()).is_foreign_key_violation());
-    assert!(
-        !DbError::Sqlite(rusqlite::Error::QueryReturnedNoRows).is_foreign_key_violation()
-    );
+    assert!(!DbError::Sqlite(rusqlite::Error::QueryReturnedNoRows).is_foreign_key_violation());
 }

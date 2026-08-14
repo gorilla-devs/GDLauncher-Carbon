@@ -673,8 +673,7 @@ mod tests {
                 // an empty base leaves `RequiredFile::path` exactly the
                 // relative path, so nothing here needs to strip a prefix
                 // back off before comparing.
-                let required =
-                    required_files(&case.processors, Some(&case.data), Path::new(""));
+                let required = required_files(&case.processors, Some(&case.data), Path::new(""));
                 GoldenOutputCase {
                     name: case.name.clone(),
                     required: to_golden(&required),
@@ -696,12 +695,10 @@ mod tests {
         let input_path = dir.join("input.json");
         let output_path = dir.join("output.json");
 
-        let input_json = std::fs::read_to_string(&input_path).unwrap_or_else(|e| {
-            panic!("failed to read golden input {input_path:?}: {e}")
-        });
-        let cases: Vec<GoldenCase> = serde_json::from_str(&input_json).unwrap_or_else(|e| {
-            panic!("failed to parse golden input {input_path:?}: {e}")
-        });
+        let input_json = std::fs::read_to_string(&input_path)
+            .unwrap_or_else(|e| panic!("failed to read golden input {input_path:?}: {e}"));
+        let cases: Vec<GoldenCase> = serde_json::from_str(&input_json)
+            .unwrap_or_else(|e| panic!("failed to parse golden input {input_path:?}: {e}"));
         assert!(
             !cases.is_empty(),
             "golden input fixture {input_path:?} has no cases"
@@ -711,9 +708,8 @@ mod tests {
         let computed_json = serde_json::to_string_pretty(&computed).unwrap() + "\n";
 
         if std::env::var_os("UPDATE_GOLDEN_PROCESSOR_OUTPUTS").is_some() {
-            std::fs::write(&output_path, &computed_json).unwrap_or_else(|e| {
-                panic!("failed to write golden output {output_path:?}: {e}")
-            });
+            std::fs::write(&output_path, &computed_json)
+                .unwrap_or_else(|e| panic!("failed to write golden output {output_path:?}: {e}"));
             eprintln!("Regenerated golden output at {output_path:?}");
             return;
         }

@@ -1303,9 +1303,7 @@ mod test {
                     disk: &disk,
                     mode,
                 })
-                .unwrap_or_else(|e| {
-                    panic!("target-only saves entries must never error, got {e}")
-                });
+                .unwrap_or_else(|e| panic!("target-only saves entries must never error, got {e}"));
                 let entry = entries
                     .iter()
                     .find(|e| e.path == SAVE_PATH)
