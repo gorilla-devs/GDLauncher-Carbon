@@ -906,10 +906,39 @@ async fn execute_plan(
     staging_dir: &Path,
 ) -> anyhow::Result<()> {
     use apply_plan::PlanAction;
+    let data_path = instance_root.join("instance");
     for entry in entries {
-        let rel = &entry.path[1..];
+        // `strip_prefix` rather than `[1..]`: char-boundary-safe (an empty
+        // key or one starting with a multibyte character would panic on a
+        // byte-index slice), and it gives `None` instead of a garbage
+        // substring for a key that doesn't actually start with '/'.
+        let rel = entry
+            .path
+            .strip_prefix('/')
+            .ok_or_else(|| anyhow!("packinfo key '{}' must start with '/'", entry.path))?;
+        // Re-checked here rather than trusted from `parse_packinfo`: a `..`
+        // segment survives `Path::join` as a literal component, and
+        // `Path::starts_with` below compares components lexically without
+        // ever resolving `..` — so "mods/../../evil" joined onto the data
+        // dir would otherwise pass the containment check below even though
+        // the real, OS-resolved path escapes the data dir entirely.
+        if packinfo::has_dotdot_segment(&entry.path) {
+            bail!("packinfo key '{}' contains a '..' path segment", entry.path);
+        }
         let live = instance_root.join("instance").join(rel);
         let staged = staging_dir.join("instance").join(rel);
+        // Belt-and-braces even though `parse_packinfo` already rejects a
+        // doubled leading '/': `Path::join` with an absolute argument
+        // REPLACES the base entirely, so a key like "//tmp/esc" (whose tail
+        // after stripping one '/' is itself still absolute) would otherwise
+        // point `remove_file`/`rename` below at a path outside the instance
+        // — never trust a join alone before a destructive op.
+        if !live.starts_with(&data_path) {
+            bail!(
+                "packinfo key '{}' escapes the instance data dir",
+                entry.path
+            );
+        }
         let twin = disabled_sibling(&live);
         match entry.action {
             PlanAction::Keep => {}

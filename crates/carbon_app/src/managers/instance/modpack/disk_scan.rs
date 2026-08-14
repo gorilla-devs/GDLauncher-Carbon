@@ -26,7 +26,31 @@ pub async fn scan_disk_state(
     let mut futures = Vec::with_capacity(universe.len());
 
     for path in universe {
-        let disk_path = data_path.join(&path[1..]);
+        // `strip_prefix` rather than `[1..]`: char-boundary-safe (an empty
+        // key or one starting with a multibyte character would panic on a
+        // byte-index slice), and it gives `None` instead of a garbage
+        // substring for a key that doesn't actually start with '/'.
+        let rel = path
+            .strip_prefix('/')
+            .ok_or_else(|| anyhow::anyhow!("packinfo key '{path}' must start with '/'"))?;
+        // Re-checked here rather than trusted from `parse_packinfo`: a `..`
+        // segment survives `Path::join` as a literal component, and
+        // `Path::starts_with` below compares components lexically without
+        // ever resolving `..` — so `data_path.join("mods/../../evil")`
+        // would otherwise pass the containment check below even though the
+        // real, OS-resolved path escapes `data_path` entirely.
+        if super::packinfo::has_dotdot_segment(path) {
+            anyhow::bail!("packinfo key '{path}' contains a '..' path segment");
+        }
+        let disk_path = data_path.join(rel);
+        // Belt-and-braces even though `parse_packinfo` already rejects a
+        // doubled leading '/': `Path::join` with an absolute argument
+        // REPLACES the base entirely, so a key like "//tmp/esc" (whose tail
+        // after stripping one '/' is itself still absolute) would otherwise
+        // resolve to a path outside `data_path` — never trust a join alone.
+        if !disk_path.starts_with(data_path) {
+            anyhow::bail!("packinfo key '{path}' escapes the instance data dir");
+        }
         let key = path.clone();
 
         futures.push(async move {
@@ -266,6 +290,44 @@ mod tests {
         assert_eq!(
             result.get("/nonexistent/a.jar"),
             Some(&apply_plan::DiskState::Missing)
+        );
+    }
+
+    #[tokio::test]
+    async fn scan_disk_state_never_escapes_data_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_path = dir.path().join("instance");
+        std::fs::create_dir_all(&data_path).unwrap();
+
+        let result = scan_disk_state(&data_path, &universe(&["//tmp/esc"])).await;
+
+        assert!(
+            result.is_err(),
+            "a key that leaves an absolute tail after stripping the leading '/' must error, \
+             not silently probe outside the data dir"
+        );
+    }
+
+    #[tokio::test]
+    async fn scan_disk_state_rejects_a_dotdot_segment() {
+        // `Path::starts_with` compares path components lexically and never
+        // resolves `..`, so the plain containment check alone does not
+        // catch this: `data_path.join("mods/../../escaped.jar")` still
+        // lexically "starts with" data_path even though the real,
+        // OS-resolved path is data_path's own parent. `mods` must
+        // physically exist for the filesystem to walk through it while
+        // resolving the `..`s below. This key never goes through
+        // `parse_packinfo` at all, proving the guard holds on its own.
+        let dir = tempfile::tempdir().unwrap();
+        let data_path = dir.path().join("instance");
+        std::fs::create_dir_all(data_path.join("mods")).unwrap();
+        std::fs::write(dir.path().join("escaped.jar"), b"outside-bytes").unwrap();
+
+        let result = scan_disk_state(&data_path, &universe(&["/mods/../../escaped.jar"])).await;
+
+        assert!(
+            result.is_err(),
+            "a '..' segment must be rejected before ever probing outside data_path"
         );
     }
 

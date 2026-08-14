@@ -996,6 +996,80 @@ async fn apply_user_cleanup_refuses_to_follow_a_symlinked_parent_out_of_the_inst
     );
 }
 
+// --- execute_plan containment guard -----------------------------------------
+
+#[tokio::test]
+async fn execute_plan_never_escapes_the_instance_root() {
+    // Bypasses apply_plan::plan (and so parse_packinfo's own key validation)
+    // to hand execute_plan a PlanEntry it never validated itself — proving
+    // the belt-and-braces containment check right before `remove_file` is
+    // what actually stops the escape, not just upstream validation.
+    let (_tmp, instance_root, staging_dir) = scaffold();
+
+    let outside = tempfile::tempdir().unwrap();
+    let victim = outside.path().join("victim.txt");
+    tokio::fs::write(&victim, b"must-survive").await.unwrap();
+
+    let entries = vec![PlanEntry {
+        // A doubled leading slash: stripping one leaves the absolute tail
+        // that would otherwise redirect `data_path.join(rel)` at `victim`
+        // once combined with the outside path below.
+        path: format!("/{}", victim.display()),
+        action: PlanAction::Delete,
+        reason: PlanReason::PackDropped,
+    }];
+
+    let result = execute_plan(&entries, &instance_root, &staging_dir).await;
+
+    assert!(
+        result.is_err(),
+        "a plan entry escaping the instance root must error, not proceed"
+    );
+    assert_eq!(
+        tokio::fs::read(&victim).await.unwrap(),
+        b"must-survive",
+        "the file outside the instance root must be completely untouched"
+    );
+}
+
+#[tokio::test]
+async fn execute_plan_rejects_a_dotdot_segment_even_though_starts_with_alone_would_miss_it() {
+    // `Path::starts_with` compares path components lexically and never
+    // resolves `..`, so the plain `live.starts_with(&data_path)` check
+    // alone does not catch this: "mods/../../evil.jar" joined onto the data
+    // dir still lexically "starts with" it even though the real,
+    // OS-resolved path is the data dir's own parent. Bypasses
+    // apply_plan::plan (and so parse_packinfo's own '..'-segment
+    // rejection) entirely, proving execute_plan's own re-check — not
+    // upstream validation — is what stops this escape.
+    let (_tmp, instance_root, staging_dir) = scaffold();
+    // `mods` must physically exist under the data dir for the filesystem to
+    // walk through it while resolving the `..`s below.
+    tokio::fs::create_dir_all(instance_root.join("instance").join("mods"))
+        .await
+        .unwrap();
+    let victim = instance_root.join("evil.jar");
+    tokio::fs::write(&victim, b"must-survive").await.unwrap();
+
+    let entries = vec![PlanEntry {
+        path: "/mods/../../evil.jar".to_string(),
+        action: PlanAction::Delete,
+        reason: PlanReason::PackDropped,
+    }];
+
+    let result = execute_plan(&entries, &instance_root, &staging_dir).await;
+
+    assert!(
+        result.is_err(),
+        "a '..' segment must be rejected before ever reaching remove_file"
+    );
+    assert_eq!(
+        tokio::fs::read(&victim).await.unwrap(),
+        b"must-survive",
+        "a '..'-segment escape must never actually delete anything outside the data dir"
+    );
+}
+
 // --- (e) audit format golden -------------------------------------------------
 
 /// The format contract `installAudit.ts` parses. Every `PlanAction` and every
