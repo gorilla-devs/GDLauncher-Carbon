@@ -1,3 +1,26 @@
+/// Builds the shared client's transport config. Split out so tests can
+/// inject sub-second `connect`/`read` durations against a local server
+/// instead of waiting on the real multi-second production budgets.
+fn shared_client_builder(
+    connect: std::time::Duration,
+    read: std::time::Duration,
+) -> reqwest::ClientBuilder {
+    reqwest::Client::builder()
+        .user_agent(format!(
+            "{} {}",
+            env!("USER_AGENT_PREFIX"),
+            env!("APP_VERSION")
+        ))
+        .connect_timeout(connect)
+        // Bounds the gap between reads, not the whole transfer: a stalled
+        // connection dies fast while a slow, still-moving large body
+        // survives. Server-side downloads (server packs, mrpacks, modloader
+        // installer jars, vanilla server.jar) stream multi-hundred-MB bodies
+        // straight through this client, so the budget must tolerate
+        // transfers that take minutes as long as bytes keep arriving.
+        .read_timeout(read)
+}
+
 pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
     use reqwest::{Request, Response};
     use reqwest_middleware::{Middleware, Next};
@@ -159,21 +182,12 @@ pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
         }
     }
 
-    let client = reqwest::Client::builder()
-        .user_agent(format!(
-            "{} {}",
-            env!("USER_AGENT_PREFIX"),
-            env!("APP_VERSION")
-        ))
-        // This client serves small JSON API calls (GDL/CurseForge/Modrinth), several
-        // of which run on the startup critical path before any recovery UI exists, so
-        // a stalled connection must fail instead of hanging. Large file downloads run
-        // through a separate client in carbon_net that intentionally has no overall
-        // timeout; this bound never touches those.
-        .connect_timeout(std::time::Duration::from_secs(30))
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .expect("Failed to build HTTP client");
+    let client = shared_client_builder(
+        std::time::Duration::from_secs(30),
+        std::time::Duration::from_secs(60),
+    )
+    .build()
+    .expect("Failed to build HTTP client");
 
     let retryable_post_hosts = [
         url::Url::parse(MODRINTH_API_BASE).ok(),
@@ -257,6 +271,100 @@ mod test {
 
         assert_eq!(response.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
         mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn stalled_response_times_out() {
+        use tokio::io::AsyncWriteExt;
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("failed to bind test server");
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept failed");
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n")
+                .await
+                .expect("failed to write headers");
+            // Never write the body: the connection just sits open.
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        });
+
+        let client = super::shared_client_builder(
+            std::time::Duration::from_secs(5),
+            std::time::Duration::from_millis(500),
+        )
+        .build()
+        .expect("failed to build client");
+
+        let result = client
+            .get(format!("http://{addr}/"))
+            .send()
+            .await
+            .expect("headers should arrive")
+            .bytes()
+            .await;
+
+        let err = result.expect_err("a stalled body must time out");
+        assert!(err.is_timeout(), "expected a timeout error, got {err:?}");
+    }
+
+    #[tokio::test]
+    async fn slow_stream_is_not_capped() {
+        use tokio::io::AsyncWriteExt;
+        use tokio::net::TcpListener;
+
+        const CHUNK: &[u8] = b"0123456789";
+        const CHUNK_COUNT: usize = 30;
+
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("failed to bind test server");
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept failed");
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
+                        CHUNK.len() * CHUNK_COUNT
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .expect("failed to write headers");
+            // A chunk every 100ms for 3s: no single gap trips a 500ms read
+            // budget, even though the transfer as a whole vastly exceeds it.
+            for _ in 0..CHUNK_COUNT {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                socket
+                    .write_all(CHUNK)
+                    .await
+                    .expect("failed to write chunk");
+            }
+        });
+
+        let client = super::shared_client_builder(
+            std::time::Duration::from_secs(5),
+            std::time::Duration::from_millis(500),
+        )
+        .build()
+        .expect("failed to build client");
+
+        let body = client
+            .get(format!("http://{addr}/"))
+            .send()
+            .await
+            .expect("headers should arrive")
+            .bytes()
+            .await
+            .expect("a slow but steady stream must not be capped by the read gap");
+
+        assert_eq!(body.len(), CHUNK.len() * CHUNK_COUNT);
     }
 }
 
