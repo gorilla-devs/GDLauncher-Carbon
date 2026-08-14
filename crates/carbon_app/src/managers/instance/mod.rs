@@ -294,6 +294,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     if matches!(data.state, LaunchState::Inactive { .. }) {
                         data.state = LaunchState::Running(RunningInstance::adopted(
                             game.pid,
+                            game.verified_start_time,
                             game.start_time,
                             Utc::now(),
                         ));
@@ -3048,6 +3049,13 @@ struct AdoptedGame {
     /// enough to keep playtime accounting roughly right across a restart
     /// instead of resetting it.
     start_time: DateTime<Utc>,
+    /// The sysinfo start time (seconds since epoch) `reconcile_pid` already
+    /// verified `pid` against, carried forward rather than re-derived. Every
+    /// later re-check of this pid (the adopted-instance poller,
+    /// `kill_instance`) verifies against this exact value — not a bare pid
+    /// lookup — since the game can exit and have its pid recycled by an
+    /// unrelated process at any point after this reconcile pass.
+    verified_start_time: u64,
 }
 
 /// Reconcile every instance directory directly under `instances_root`
@@ -3084,7 +3092,7 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
     // read each) and collect the recorded pids up front, so the process
     // table only needs a single targeted refresh for this whole pass
     // instead of a full system scan per instance.
-    let mut recorded: Vec<(String, PathBuf, Option<u32>)> = Vec::new();
+    let mut recorded: Vec<(String, PathBuf, Option<(u32, Option<u64>)>)> = Vec::new();
     loop {
         let entry = match entries.next_entry().await {
             Ok(Some(entry)) => entry,
@@ -3122,7 +3130,7 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
 
     let pids: Vec<Pid> = recorded
         .iter()
-        .filter_map(|(_, _, pid)| pid.map(Pid::from_u32))
+        .filter_map(|(_, _, pid)| pid.map(|(p, _)| Pid::from_u32(p)))
         .collect();
 
     let mut system = System::new();
@@ -3130,22 +3138,36 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
         system.refresh_processes(ProcessesToUpdate::Some(&pids));
     }
 
-    // Pass 2: reconcile. A pid that is dead, or alive but no longer java,
-    // leaves nothing behind but a stale file to remove; one that is still a
-    // live JVM is a game to adopt, and its pidfile stays exactly where it is.
+    // Pass 2: reconcile. A pid that is dead, alive but no longer java, or
+    // alive and java-looking but whose identity can't be proven (a legacy
+    // pidfile, or a start time that doesn't match what was recorded when
+    // this launcher spawned it) leaves nothing behind but a stale file to
+    // remove; only a live JVM whose start time matches is a game to adopt,
+    // and its pidfile stays exactly where it is.
     for (shortpath, root, pid) in recorded {
-        let is_live_java = pid
-            .map(|p| orphan_pid::is_live_java_process(&system, p))
-            .unwrap_or(false);
+        let live = pid.and_then(|(p, _)| orphan_pid::live_proc(&system, p));
 
-        match orphan_pid::reconcile_pid(pid, is_live_java) {
+        match orphan_pid::reconcile_pid(pid, live) {
             orphan_pid::PidReconcileAction::NoPidFile => {}
             orphan_pid::PidReconcileAction::RemoveStale => {
                 orphan_pid::remove_pid_file(&root, PID_FILE_NAME).await;
             }
+            orphan_pid::PidReconcileAction::NotOurs => {
+                // Safe: NotOurs is only ever produced from `Some(pid)`.
+                let (pid, _) = pid.expect("NotOurs implies a recorded pid");
+                warn!(
+                    "Instance {} has a recorded pid ({}) that cannot be proven to still be its own game (legacy pidfile or start-time mismatch) — refusing to adopt it",
+                    shortpath, pid
+                );
+                orphan_pid::remove_pid_file(&root, PID_FILE_NAME).await;
+            }
             orphan_pid::PidReconcileAction::StillRunning => {
-                // Safe: StillRunning is only ever produced from `Some(pid)`.
-                let pid = pid.expect("StillRunning implies a recorded pid");
+                // Safe: StillRunning is only ever produced from `Some(pid)`,
+                // and only when `live` matched it — see `reconcile_pid`.
+                let (pid, _) = pid.expect("StillRunning implies a recorded pid");
+                let verified_start_time = live
+                    .expect("StillRunning implies a live java process")
+                    .start_time;
 
                 // Falling back to "now" only understates how long the game has
                 // been up; it never invents playtime that was not played.
@@ -3161,7 +3183,14 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
                     "Instance {} still has a game running (pid {}) from a previous launcher session — adopting it",
                     shortpath, pid
                 );
-                adopted.insert(shortpath, AdoptedGame { pid, start_time });
+                adopted.insert(
+                    shortpath,
+                    AdoptedGame {
+                        pid,
+                        start_time,
+                        verified_start_time,
+                    },
+                );
             }
         }
     }
@@ -3968,6 +3997,19 @@ mod test {
     // directory laid out like the real instances root, using the actual
     // `.gdl_instance.pid` file name.
 
+    /// The start time sysinfo currently reports for `pid`, via a targeted
+    /// refresh — the same lookup the real writer sites do right after
+    /// spawning a process, so tests can write a pidfile that reconciliation
+    /// will actually verify as matching.
+    fn live_start_time(pid: u32) -> u64 {
+        let mut system = sysinfo::System::new();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(
+            pid,
+        )]));
+        super::orphan_pid::process_start_time(&system, pid)
+            .expect("pid must be alive to look up its start time")
+    }
+
     #[tokio::test]
     async fn reconcile_running_instances_removes_pidfile_for_a_dead_recorded_pid() {
         let dir = tempfile::tempdir().unwrap();
@@ -3975,7 +4017,13 @@ mod test {
         tokio::fs::create_dir_all(&instance_root).await.unwrap();
 
         let dead_pid = u32::MAX - 100;
-        super::orphan_pid::write_pid_file(&instance_root, super::PID_FILE_NAME, dead_pid).await;
+        super::orphan_pid::write_pid_file(
+            &instance_root,
+            super::PID_FILE_NAME,
+            dead_pid,
+            1_700_000_000,
+        )
+        .await;
 
         let adopted = super::reconcile_running_instances_under(dir.path()).await;
 
@@ -3997,7 +4045,13 @@ mod test {
 
         // Our own pid: alive for the duration of the test, but not java.
         let own_pid = std::process::id();
-        super::orphan_pid::write_pid_file(&instance_root, super::PID_FILE_NAME, own_pid).await;
+        super::orphan_pid::write_pid_file(
+            &instance_root,
+            super::PID_FILE_NAME,
+            own_pid,
+            live_start_time(own_pid),
+        )
+        .await;
 
         let adopted = super::reconcile_running_instances_under(dir.path()).await;
 
@@ -4053,15 +4107,22 @@ mod test {
         let bin_dir = tempfile::tempdir().unwrap();
         let mut fake_jvm = spawn_fake_jvm(bin_dir.path()).await;
         let pid = fake_jvm.id().expect("fake jvm must have a pid");
+        let start_time = live_start_time(pid);
 
-        super::orphan_pid::write_pid_file(&instance_root, super::PID_FILE_NAME, pid).await;
+        super::orphan_pid::write_pid_file(&instance_root, super::PID_FILE_NAME, pid, start_time)
+            .await;
 
         let adopted = super::reconcile_running_instances_under(dir.path()).await;
 
-        let game = adopted
-            .get("some-instance")
-            .expect("a live game JVM must be reported for adoption, not killed");
+        let game = adopted.get("some-instance").expect(
+            "a live game JVM whose recorded start time matches must be adopted, not killed",
+        );
         assert_eq!(game.pid, pid);
+        // The verified start time is carried into `AdoptedGame` rather than
+        // dropped: it is what `RunningInstance::adopted` threads onward so
+        // later re-checks (the poller, `kill_instance`) can tell this same
+        // process apart from whatever the OS hands the pid to next.
+        assert_eq!(game.verified_start_time, start_time);
 
         // The process is the user's session and must survive being found.
         assert!(
@@ -4076,8 +4137,87 @@ mod test {
             super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
                 .await
                 .unwrap(),
-            Some(pid),
+            Some((pid, Some(start_time))),
             "an adopted game's pidfile must be left in place"
+        );
+
+        fake_jvm.kill().await.unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn reconcile_running_instances_drops_a_legacy_pidfile_for_a_live_game_without_adopting_it()
+     {
+        let dir = tempfile::tempdir().unwrap();
+        let instance_root = dir.path().join("some-instance");
+        tokio::fs::create_dir_all(&instance_root).await.unwrap();
+
+        let bin_dir = tempfile::tempdir().unwrap();
+        let mut fake_jvm = spawn_fake_jvm(bin_dir.path()).await;
+        let pid = fake_jvm.id().expect("fake jvm must have a pid");
+
+        // A pre-fix single-line pidfile: pid only, no start time to verify.
+        tokio::fs::write(
+            super::orphan_pid::pid_file_path(&instance_root, super::PID_FILE_NAME),
+            pid.to_string(),
+        )
+        .await
+        .unwrap();
+
+        let adopted = super::reconcile_running_instances_under(dir.path()).await;
+
+        assert!(
+            adopted.is_empty(),
+            "a legacy pidfile can never prove identity, so it must never be adopted even though the pid is alive and java-looking"
+        );
+        assert_eq!(
+            super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
+                .await
+                .unwrap(),
+            None,
+            "an unverifiable legacy pidfile must still be removed"
+        );
+
+        fake_jvm.kill().await.unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn reconcile_running_instances_drops_a_pidfile_with_mismatched_start_time_without_adopting_it()
+     {
+        let dir = tempfile::tempdir().unwrap();
+        let instance_root = dir.path().join("some-instance");
+        tokio::fs::create_dir_all(&instance_root).await.unwrap();
+
+        let bin_dir = tempfile::tempdir().unwrap();
+        let mut fake_jvm = spawn_fake_jvm(bin_dir.path()).await;
+        let pid = fake_jvm.id().expect("fake jvm must have a pid");
+        let real_start_time = live_start_time(pid);
+
+        // A pidfile recording a start time far from the process's actual one
+        // — as if this pid had been reused by an unrelated process after the
+        // launcher's own JVM (which really did start at `real_start_time`
+        // minus a day) had already exited.
+        super::orphan_pid::write_pid_file(
+            &instance_root,
+            super::PID_FILE_NAME,
+            pid,
+            real_start_time.saturating_sub(86_400),
+        )
+        .await;
+
+        let adopted = super::reconcile_running_instances_under(dir.path()).await;
+
+        assert!(
+            adopted.is_empty(),
+            "a start-time mismatch means the pid was reused; it must never be adopted"
+        );
+        assert_eq!(
+            super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
+                .await
+                .unwrap(),
+            None,
+            "an unverifiable pidfile must still be removed"
         );
 
         fake_jvm.kill().await.unwrap();

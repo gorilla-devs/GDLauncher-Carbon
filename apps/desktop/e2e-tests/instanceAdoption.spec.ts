@@ -124,7 +124,10 @@ async function leaveAGameRunning(
     })
     .toBe(true)
 
-  const gamePid = Number(fs.readFileSync(pidFile, "utf8").trim())
+  // The pidfile is two lines, `"{pid}\n{start_time}"` — only the first is
+  // the pid; `.trim()` alone leaves the embedded newline and start time in
+  // the string and `Number(...)` on that is `NaN`.
+  const gamePid = Number(fs.readFileSync(pidFile, "utf8").split("\n")[0].trim())
   expect(
     Number.isInteger(gamePid) && gamePid > 0,
     `pid file did not contain a usable pid (read ${JSON.stringify(gamePid)})`

@@ -367,7 +367,7 @@ impl ManagerRef<'_, ServerManager> {
         // read each) and collect the recorded pids up front, so the process
         // table only needs a single targeted refresh for this whole pass
         // instead of a full system scan per server.
-        let mut recorded: Vec<(i32, std::path::PathBuf, Option<u32>)> =
+        let mut recorded: Vec<(i32, std::path::PathBuf, Option<(u32, Option<u64>)>)> =
             Vec::with_capacity(db_servers.len());
         for db_server in db_servers {
             let root = servers_path
@@ -390,7 +390,7 @@ impl ManagerRef<'_, ServerManager> {
 
         let pids: Vec<Pid> = recorded
             .iter()
-            .filter_map(|(_, _, pid)| pid.map(Pid::from_u32))
+            .filter_map(|(_, _, pid)| pid.map(|(p, _)| Pid::from_u32(p)))
             .collect();
 
         let mut system = System::new();
@@ -399,16 +399,26 @@ impl ManagerRef<'_, ServerManager> {
         }
 
         // Pass 2: reconcile. Every server with a recorded pid gets its
-        // pidfile removed one way or another; only a pid sysinfo confirms
-        // is still alive AND still java is killed first.
+        // pidfile removed one way or another; only a pid sysinfo confirms is
+        // still alive, still java, AND whose start time matches what was
+        // recorded when this launcher spawned it is killed first — a legacy
+        // pidfile or a start-time mismatch means its identity can't be
+        // proven, and is refused exactly like a dead or reused pid.
         for (server_id, root, pid) in recorded {
-            let is_live_java = pid
-                .map(|p| orphan_pid::is_live_java_process(&system, p))
-                .unwrap_or(false);
+            let live = pid.and_then(|(p, _)| orphan_pid::live_proc(&system, p));
 
-            match orphan_pid::reconcile_pid(pid, is_live_java) {
+            match orphan_pid::reconcile_pid(pid, live) {
                 orphan_pid::PidReconcileAction::NoPidFile => {}
                 orphan_pid::PidReconcileAction::RemoveStale => {
+                    provider::remove_pid_file(&root).await;
+                }
+                orphan_pid::PidReconcileAction::NotOurs => {
+                    // Safe: NotOurs is only ever produced from `Some(pid)`.
+                    let (pid, _) = pid.expect("NotOurs implies a recorded pid");
+                    warn!(
+                        "Server {} has a recorded pid ({}) that cannot be proven to still be its own JVM (legacy pidfile or start-time mismatch) — refusing to kill it",
+                        server_id, pid
+                    );
                     provider::remove_pid_file(&root).await;
                 }
                 orphan_pid::PidReconcileAction::StillRunning => {
@@ -418,7 +428,7 @@ impl ManagerRef<'_, ServerManager> {
                     // adopts the game it finds.
                     //
                     // Safe: StillRunning is only ever produced from `Some(pid)`.
-                    let pid = pid.expect("StillRunning implies a recorded pid");
+                    let (pid, _) = pid.expect("StillRunning implies a recorded pid");
                     warn!(
                         "Server {} has an orphaned java process (pid {}) still running from a previous session — killing it",
                         server_id, pid

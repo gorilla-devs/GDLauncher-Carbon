@@ -1,13 +1,15 @@
 use super::provider::{ServerHandle, ServerProvider, exit_signal, remove_pid_file, write_pid_file};
 use crate::domain::server::LaunchConfig;
+use crate::managers::orphan_pid;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use carbon_rt_path::ServerPath;
 use std::path::Path;
 use std::process::Stdio;
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub struct LocalServerProvider;
 
@@ -145,12 +147,25 @@ impl ServerProvider for LocalServerProvider {
 
         info!("Server process started with PID {}", pid);
 
-        // Best-effort: record the pid so a future `load_servers` pass can
-        // detect and kill this JVM if the core exits without going through
-        // `stop`/`kill` first (crash, force-quit, Windows TerminateProcess —
-        // none of which run the kill/wait task below). Never blocks or fails
-        // the launch on write failure.
-        write_pid_file(&server_root, pid).await;
+        // Best-effort: record the pid and its start time so a future
+        // `load_servers` pass can prove this is still the same JVM and kill
+        // it, if the core exits without going through `stop`/`kill` first
+        // (crash, force-quit, Windows TerminateProcess — none of which run
+        // the kill/wait task below). Never blocks or fails the launch on
+        // write failure. If the process has already exited by the time its
+        // start time is looked up, the pidfile is skipped entirely rather
+        // than written without one — an unverifiable pidfile could later be
+        // matched against an unrelated process that reused the pid, which is
+        // worse than leaving no pidfile at all.
+        let mut system = System::new();
+        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(pid)]));
+        match orphan_pid::process_start_time(&system, pid) {
+            Some(start_time) => write_pid_file(&server_root, pid, start_time).await,
+            None => warn!(
+                "Could not determine start time for server process (pid {}); not writing a pidfile for it",
+                pid
+            ),
+        }
 
         // Set up stdin channel
         let (stdin_tx, mut stdin_rx) = mpsc::channel::<String>(64);

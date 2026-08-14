@@ -670,18 +670,39 @@ impl ManagerRef<'_, InstanceManager> {
                         return;
                     };
 
-                    // Record the pid so a future `InstanceManager::scan_instances`
-                    // pass can find this game JVM again and adopt it, if the
-                    // core exits without going through the kill_rx/child.wait()
-                    // path below — the user closing the launcher, a crash, a
+                    // Record the pid and its start time so a future
+                    // `InstanceManager::scan_instances` pass can prove this is
+                    // still the same game JVM and adopt it, if the core exits
+                    // without going through the kill_rx/child.wait() path
+                    // below — the user closing the launcher, a crash, a
                     // force-quit, Windows TerminateProcess. Best-effort: never
-                    // blocks or fails the launch on write failure.
-                    orphan_pid::write_pid_file(
-                        &instance_path.get_root(),
-                        super::PID_FILE_NAME,
-                        process_id,
-                    )
-                    .await;
+                    // blocks or fails the launch on write failure. If the
+                    // process has already exited by the time its start time is
+                    // looked up, the pidfile is skipped entirely rather than
+                    // written without one — an unverifiable pidfile could
+                    // later be matched against an unrelated process that
+                    // reused the pid, which is worse than leaving no pidfile
+                    // at all.
+                    let mut system = System::new();
+                    system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(process_id)]));
+                    match orphan_pid::process_start_time(&system, process_id) {
+                        Some(process_start_time) => {
+                            orphan_pid::write_pid_file(
+                                &instance_path.get_root(),
+                                super::PID_FILE_NAME,
+                                process_id,
+                                process_start_time,
+                            )
+                            .await;
+                        }
+                        None => {
+                            tracing::warn!(
+                                "Could not determine start time for instance {} process (pid {}); not writing a pidfile for it",
+                                *instance_id,
+                                process_id
+                            );
+                        }
+                    }
 
                     let Some(running_log_id) = log_id else {
                         tracing::error!("log_id missing when launching instance {}", *instance_id);
@@ -704,6 +725,12 @@ impl ManagerRef<'_, InstanceManager> {
                             LaunchState::Running(RunningInstance {
                                 process_id,
                                 kill_tx: Some(kill_tx),
+                                // This core owns the process and stops it
+                                // through the real child handle (`kill_tx`
+                                // above), never by re-resolving the pid — so
+                                // there is nothing here that ever needs to
+                                // re-verify it against a start time.
+                                process_start_time: None,
                                 start_time,
                                 log: Some(running_log_id),
                                 // This core owns the process, so the loop
@@ -1045,12 +1072,15 @@ impl ManagerRef<'_, InstanceManager> {
             }
             // Adopted: there is no run task and no handle, so the pid is
             // signalled directly and everything that task would have done has
-            // to happen here instead. Narrowed to "still a live java process"
-            // first — the same guard the server manager's kill relies on, and
-            // the only thing standing between this and a pid that has been
-            // reused by something unrelated.
+            // to happen here instead. Narrowed to "still verifiably the same
+            // live java process it was adopted as" first — the pid alone is
+            // not enough: the game can have exited and had its number
+            // recycled by an unrelated process in the time since adoption
+            // (or since the last poll), so the start time recorded at
+            // adoption is checked again here, not just trusted.
             None => {
                 let process_id = running.process_id;
+                let expected_start_time = running.process_start_time;
                 let shortpath = instance.shortpath.clone();
                 drop(instances);
 
@@ -1058,7 +1088,11 @@ impl ManagerRef<'_, InstanceManager> {
                 let mut system = System::new();
                 system.refresh_processes(ProcessesToUpdate::Some(&[pid]));
 
-                if orphan_pid::is_live_java_process(&system, process_id) {
+                if orphan_pid::is_verified_live_java_process(
+                    &system,
+                    process_id,
+                    expected_start_time,
+                ) {
                     if let Some(process) = system.process(pid) {
                         if !process.kill() {
                             bail!("failed to signal adopted game process {process_id}");
@@ -1072,13 +1106,15 @@ impl ManagerRef<'_, InstanceManager> {
                     self.bank_adopted_playtime(instance_id).await;
                 } else {
                     // Already gone, or the number now belongs to something
-                    // else. Either way there is nothing to stop and nothing to
-                    // bank — it stopped playing at an unknown earlier moment —
-                    // and the instance still has to come back to Inactive: the
-                    // poller would eventually do it, but not before the user
-                    // has been told their click did nothing.
+                    // else (a start-time mismatch is treated exactly the same
+                    // as the pid being gone — either way this is not the game
+                    // that was adopted). There is nothing to stop and nothing
+                    // to bank — it stopped playing at an unknown earlier
+                    // moment — and the instance still has to come back to
+                    // Inactive: the poller would eventually do it, but not
+                    // before the user has been told their click did nothing.
                     warn!(
-                        "adopted game process {process_id} for instance {instance_id} was already gone"
+                        "adopted game process {process_id} for instance {instance_id} is gone, or no longer verifiably the same process"
                     );
                 }
 
@@ -1225,7 +1261,7 @@ impl ManagerRef<'_, InstanceManager> {
                 // the user may have stopped one through `kill_instance` in
                 // the meantime, and it is no longer adopted (or no longer
                 // running) if so.
-                let still_adopted: Vec<(InstanceId, u32, String)> = {
+                let still_adopted: Vec<(InstanceId, u32, Option<u64>, String)> = {
                     let manager = app.instance_manager();
                     let instances = manager.instances.read().await;
                     remaining
@@ -1238,9 +1274,14 @@ impl ManagerRef<'_, InstanceManager> {
                             let LaunchState::Running(running) = &data.state else {
                                 return None;
                             };
-                            running
-                                .is_adopted()
-                                .then(|| (*id, running.process_id, instance.shortpath.clone()))
+                            running.is_adopted().then(|| {
+                                (
+                                    *id,
+                                    running.process_id,
+                                    running.process_start_time,
+                                    instance.shortpath.clone(),
+                                )
+                            })
                         })
                         .collect()
                 };
@@ -1251,7 +1292,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let pids: Vec<Pid> = still_adopted
                     .iter()
-                    .map(|(_, pid, _)| Pid::from_u32(*pid))
+                    .map(|(_, pid, _, _)| Pid::from_u32(*pid))
                     .collect();
                 let mut system = System::new();
                 system.refresh_processes(ProcessesToUpdate::Some(&pids));
@@ -1259,10 +1300,14 @@ impl ManagerRef<'_, InstanceManager> {
                 let observed_at = Utc::now();
 
                 remaining.clear();
-                for (instance_id, pid, shortpath) in still_adopted {
-                    if should_release_adopted(orphan_pid::is_live_java_process(&system, pid)) {
+                for (instance_id, pid, expected_start_time, shortpath) in still_adopted {
+                    if should_release_adopted(orphan_pid::is_verified_live_java_process(
+                        &system,
+                        pid,
+                        expected_start_time,
+                    )) {
                         info!(
-                            "adopted game process {pid} for instance {instance_id} has exited; instance is inactive again"
+                            "adopted game process {pid} for instance {instance_id} has exited, or is no longer verifiably the same process; instance is inactive again"
                         );
                         // Banked up to the last tick that saw it alive, not to
                         // now: it died at some unknowable point in between.
@@ -1323,13 +1368,20 @@ fn adopted_playtime_mut(
 }
 
 /// Whether an adopted instance should go back to Inactive, given whether its
-/// recorded pid is still a live java process.
+/// recorded pid is still verifiably the same live java process it was
+/// adopted as (`orphan_pid::is_verified_live_java_process` — alive,
+/// java-looking, AND its start time still matching the one recorded at
+/// adoption). A bare liveness check is not enough here: the game can have
+/// exited and had its pid recycled by an unrelated process between two
+/// polls, and passing that unverified would keep the instance Running
+/// (accruing playtime, offering a Stop that would kill the stranger's JVM)
+/// for a game that is actually long gone.
 ///
 /// Split out from the polling loop for the same reason `reconcile_pid` is
 /// split out from the sysinfo lookup: the decision is then testable without a
 /// real process table behind it.
-pub fn should_release_adopted(is_live_java: bool) -> bool {
-    !is_live_java
+pub fn should_release_adopted(is_verified_live_java: bool) -> bool {
+    !is_verified_live_java
 }
 
 /// Whole seconds of playtime to bank for an adopted instance last banked at
@@ -1428,6 +1480,15 @@ pub struct RunningInstance {
     /// `None` when the game was adopted: there is no spawning task to signal,
     /// so stopping goes through the pid instead (`kill_instance`).
     kill_tx: Option<mpsc::Sender<()>>,
+    /// The start time (seconds since epoch) `process_id` was verified against
+    /// at adoption time — `None` when this core owns the process, which
+    /// never re-verifies a pid this way (see `is_adopted`). Every later check
+    /// of an adopted `process_id` (the liveness poller, `kill_instance`) must
+    /// go back through this rather than trusting the pid alone: the game
+    /// this instance was adopted as can exit and have its pid recycled by an
+    /// unrelated process in the time between two polls, and a bare pid
+    /// lookup at that point can no longer tell the two apart.
+    process_start_time: Option<u64>,
     start_time: DateTime<Utc>,
     /// `None` when the game was adopted: the stdout pipe belonged to the core
     /// that spawned it, and died with that process. Nothing can re-attach to
@@ -1475,10 +1536,23 @@ impl RunningInstance {
     /// launch would count all of that a second time. Everything between that
     /// tick and this moment is lost instead — the launcher was not running to
     /// observe it, and undercounting is the side to err on.
-    pub fn adopted(process_id: u32, start_time: DateTime<Utc>, now: DateTime<Utc>) -> Self {
+    ///
+    /// `process_start_time` is the sysinfo start time (seconds since epoch)
+    /// `reconcile_running_instances_under` already verified this pid against
+    /// — carried forward rather than re-derived, so every later re-check of
+    /// this process (the poller, `kill_instance`) verifies against the exact
+    /// value reconciliation matched, not a fresh and potentially different
+    /// read.
+    pub fn adopted(
+        process_id: u32,
+        process_start_time: u64,
+        start_time: DateTime<Utc>,
+        now: DateTime<Utc>,
+    ) -> Self {
         Self {
             process_id,
             kill_tx: None,
+            process_start_time: Some(process_start_time),
             start_time,
             log: None,
             playtime: Some(AdoptedPlaytime {
@@ -1658,6 +1732,7 @@ mod tests {
                     RunningInstance {
                         process_id: 4242,
                         kill_tx: Some(kill_tx),
+                        process_start_time: None,
                         start_time: Utc::now(),
                         log: Some(GameLogId(1)),
                         playtime: None,
@@ -1722,7 +1797,7 @@ mod tests {
             Instance {
                 shortpath: "adopted-instance".to_string(),
                 type_: InstanceType::Valid(instance_data_with_state(LaunchState::Running(
-                    RunningInstance::adopted(4242, Utc::now(), Utc::now()),
+                    RunningInstance::adopted(4242, 1_700_000_000, Utc::now(), Utc::now()),
                 ))),
             },
         );
@@ -1807,6 +1882,7 @@ mod tests {
         let owned = RunningInstance {
             process_id: 4242,
             kill_tx: Some(kill_tx),
+            process_start_time: None,
             start_time: Utc::now(),
             log: Some(GameLogId(1)),
             playtime: None,
@@ -1817,7 +1893,7 @@ mod tests {
         // previous core already recorded up to its own last tick.
         let launched_at = Utc::now() - chrono::Duration::hours(2);
         let adopted_at = Utc::now();
-        let adopted = RunningInstance::adopted(4242, launched_at, adopted_at);
+        let adopted = RunningInstance::adopted(4242, 1_700_000_000, launched_at, adopted_at);
         assert_eq!(
             adopted.playtime,
             Some(AdoptedPlaytime {
@@ -1826,6 +1902,10 @@ mod tests {
             })
         );
         assert_eq!(adopted.start_time, launched_at);
+        // The verified sysinfo start time recorded at reconcile time is
+        // carried forward too — this is what the poller and `kill_instance`
+        // re-check on every later lookup, not just once at adoption.
+        assert_eq!(adopted.process_start_time, Some(1_700_000_000));
     }
 
     #[test]

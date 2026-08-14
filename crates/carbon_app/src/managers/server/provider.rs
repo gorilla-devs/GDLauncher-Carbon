@@ -82,12 +82,13 @@ pub fn pid_file_path(server_root: &Path) -> PathBuf {
     orphan_pid::pid_file_path(server_root, PID_FILE_NAME)
 }
 
-/// Record `pid` as this server's current JVM. Best-effort: a write failure
-/// is only logged. Losing the pidfile just means an unclean exit during this
-/// run won't be auto-cleaned up on the next launch — it must never block or
-/// fail the launch itself.
-pub async fn write_pid_file(server_root: &Path, pid: u32) {
-    orphan_pid::write_pid_file(server_root, PID_FILE_NAME, pid).await;
+/// Record `pid` and its `start_time` (seconds since epoch, from sysinfo
+/// right after spawning it) as this server's current JVM. Best-effort: a
+/// write failure is only logged. Losing the pidfile just means an unclean
+/// exit during this run won't be auto-cleaned up on the next launch — it
+/// must never block or fail the launch itself.
+pub async fn write_pid_file(server_root: &Path, pid: u32, start_time: u64) {
+    orphan_pid::write_pid_file(server_root, PID_FILE_NAME, pid, start_time).await;
 }
 
 /// Remove a server's pidfile. Best-effort: a missing file is not an error,
@@ -99,8 +100,10 @@ pub async fn remove_pid_file(server_root: &Path) {
 /// Read and parse a server's pidfile. `Ok(None)` means no pidfile exists —
 /// there is nothing to reconcile for this server. Any other I/O or parse
 /// failure comes back as `Err` so the caller can log it and fall back to
-/// treating it exactly like "no pidfile"; this must never fail startup.
-pub async fn read_pid_file(server_root: &Path) -> Result<Option<u32>> {
+/// treating it exactly like "no pidfile"; this must never fail startup. The
+/// inner `Option<u64>` is the recorded start time, `None` for a legacy
+/// pid-only pidfile — see `orphan_pid::read_pid_file`.
+pub async fn read_pid_file(server_root: &Path) -> Result<Option<(u32, Option<u64>)>> {
     orphan_pid::read_pid_file(server_root, PID_FILE_NAME).await
 }
 
@@ -160,8 +163,11 @@ mod tests {
         // Nothing written yet.
         assert_eq!(read_pid_file(root).await.unwrap(), None);
 
-        write_pid_file(root, 4242).await;
-        assert_eq!(read_pid_file(root).await.unwrap(), Some(4242));
+        write_pid_file(root, 4242, 1_700_000_000).await;
+        assert_eq!(
+            read_pid_file(root).await.unwrap(),
+            Some((4242, Some(1_700_000_000)))
+        );
         assert!(pid_file_path(root).exists());
 
         remove_pid_file(root).await;
@@ -177,10 +183,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
 
-        write_pid_file(root, 111).await;
-        write_pid_file(root, 222).await;
+        write_pid_file(root, 111, 1000).await;
+        write_pid_file(root, 222, 2000).await;
 
-        assert_eq!(read_pid_file(root).await.unwrap(), Some(222));
+        assert_eq!(read_pid_file(root).await.unwrap(), Some((222, Some(2000))));
     }
 
     #[tokio::test]
@@ -200,6 +206,6 @@ mod tests {
         // this must be swallowed (logged) rather than panicking, since
         // `write_pid_file` is best-effort and must never block a launch.
         let bogus_root = std::path::Path::new("/nonexistent/gdl-test-pidfile-root");
-        write_pid_file(bogus_root, 123).await;
+        write_pid_file(bogus_root, 123, 1000).await;
     }
 }
