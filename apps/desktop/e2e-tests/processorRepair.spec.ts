@@ -26,9 +26,9 @@
  * `importer/curseforge.rs`, whose path is instance creation and therefore
  * takes the `is_setup` branch anyway. Every other route, `prepareInstance`
  * included, passes `true`. So a version of this test that drove
- * `prepareInstance` would pass with the entire fix deleted, which is the
- * defect class `HANDOFF-e2e.md` §4 catalogues eighteen instances of. Play is
- * the only route on which the clause is load-bearing.
+ * `prepareInstance` would pass with the entire fix deleted — a test that
+ * exercises the code path without depending on the fix it claims to guard.
+ * Play is the only route on which the clause is load-bearing.
  *
  * Launching is safe here, and does not depend on Minecraft actually starting:
  * `run/mod.rs` reaches `match launch_account { Some(account) => ... }` only
@@ -46,8 +46,8 @@
  *
  * **File name.** `processorRepair` sorts after `dbRecovery`, whose position
  * first is load-bearing (its process cleanup must not run while another
- * spec's app is alive — `HANDOFF-e2e.md` §3). A name sorting ahead of it,
- * `cacheCleanup.spec.ts` being the obvious one, would break that.
+ * spec's app is alive). A name sorting ahead of it, `cacheCleanup.spec.ts`
+ * being the obvious one, would break that.
  */
 
 import { expect, test } from "@playwright/test"

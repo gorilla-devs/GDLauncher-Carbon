@@ -316,12 +316,10 @@ async function fetchUnfilteredDirect(
 
 /**
  * `captureModrinthVersions`'s CurseForge counterpart — written fresh, not
- * adapted from it by analogy. `HANDOFF-e2e.md` records that an earlier,
- * symmetric-looking CurseForge branch was written from source, never
- * executed, and deleted rather than kept as unvalidated coverage, precisely
- * because CurseForge's `getModFiles` is paginated (`index`/`pageSize`) while
- * Modrinth's `getProjectVersions` is a single response — the two platforms'
- * timing/caching behaviour is not symmetric merely by having a similar shape.
+ * adapted from it by analogy: CurseForge's `getModFiles` is paginated
+ * (`index`/`pageSize`) while Modrinth's `getProjectVersions` is a single
+ * response, so the two platforms' timing/caching behaviour is not symmetric
+ * merely by having a similar shape.
  *
  * **`unfiltered` here is NOT a full, all-versions-ever-published catalogue
  * the way Modrinth's is.** `api.curseforge.com` requires an API key this

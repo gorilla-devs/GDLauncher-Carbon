@@ -24,7 +24,8 @@
  * one.
  *
  * **File name.** Sorts after `dbRecovery`, whose first position is
- * load-bearing (`HANDOFF-e2e.md` §3).
+ * load-bearing: its process cleanup must not run while another spec's app is
+ * alive.
  */
 
 import fs from "node:fs"
@@ -102,8 +103,7 @@ async function leaveAGameRunning(
   )
 
   // Counted, not searched for: the install itself ends with a transition to
-  // Inactive, so the string is already present before anything has launched
-  // (`HANDOFF-2026-07-31.md` §5).
+  // Inactive, so the string is already present before anything has launched.
   const launchedCount = () =>
     current.stdout.join("").split("GAME_LAUNCHED").length
 

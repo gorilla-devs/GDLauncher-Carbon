@@ -34,7 +34,8 @@
  * would tear the core out from under any spec sharing a worker-scoped one.
  *
  * **File name.** Sorts after `dbRecovery`, whose first position is
- * load-bearing (`HANDOFF-e2e.md` §3).
+ * load-bearing: its process cleanup must not run while another spec's app is
+ * alive.
  */
 
 import fs from "node:fs"

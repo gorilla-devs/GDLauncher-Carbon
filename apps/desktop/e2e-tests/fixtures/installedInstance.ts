@@ -60,10 +60,11 @@ const LOADER = "fabric"
  *  `modResolution.spec.ts` (the only consumer of `forgeInstance`) sorts
  *  after `loaderInstall` alphabetically, so today it cannot pre-satisfy them
  *  either — but that makes this a *third* load-bearing ordering dependency,
- *  joining this one and the `dbRecovery`-sorts-first dependency documented
- *  in `HANDOFF-e2e.md` §3 (that third one guards process cleanup, not
- *  installed artifacts, so it is not restated here — see that file for it).
- *  Renaming or adding a spec file requires re-checking all three. */
+ *  joining this one and `dbRecovery`'s own: `dbRecovery` must sort first
+ *  because its process cleanup must not run while another spec's app is
+ *  alive — a different hazard from the first two, which guard installed
+ *  artifacts rather than process cleanup. Renaming or adding a spec file
+ *  requires re-checking all three. */
 export const INSTALLED_INSTANCE_NAME = "gdl-e2e-mods-fabric"
 
 /**

@@ -2,7 +2,7 @@
  * Proves the launcher can actually start Minecraft and get it to a stable
  * main menu — not merely that it spawned a process.
  *
- * `HANDOFF-e2e.md` §2 recorded that the game "is never launched" because
+ * A plausible-looking assumption is that the game "is never launched" because
  * mock-IdP accounts "hold a mock entitlement real Minecraft rejects". That
  * reasoning does not hold, and this spec exists because it was checked
  * rather than believed: the Minecraft client does not validate its access
@@ -42,8 +42,9 @@
  * without touching an app other specs are sharing.
  *
  * **File name.** `gameLaunch` sorts after `dbRecovery`, whose position first
- * is load-bearing (`HANDOFF-e2e.md` §3). It owns its runtime path outright,
- * so it cannot pre-satisfy any artifact assertion in another spec.
+ * is load-bearing: its process cleanup must not run while another spec's app
+ * is alive. It owns its runtime path outright, so it cannot pre-satisfy any
+ * artifact assertion in another spec.
  *
  * **Cost and portability.** A full startup under software GL took roughly 90
  * seconds when this was written. It is also the only spec that needs working
