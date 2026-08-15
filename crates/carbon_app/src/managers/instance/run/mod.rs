@@ -1081,7 +1081,6 @@ impl ManagerRef<'_, InstanceManager> {
             None => {
                 let process_id = running.process_id;
                 let expected_start_time = running.process_start_time;
-                let shortpath = instance.shortpath.clone();
                 drop(instances);
 
                 let pid = Pid::from_u32(process_id);
@@ -1118,7 +1117,7 @@ impl ManagerRef<'_, InstanceManager> {
                     );
                 }
 
-                self.release_adopted_instance(instance_id, &shortpath).await;
+                self.release_adopted_instance(instance_id, process_id).await;
             }
         }
 
@@ -1128,6 +1127,15 @@ impl ManagerRef<'_, InstanceManager> {
     /// Return an adopted instance to Inactive: remove the pidfile that was the
     /// only record of its process, and tell the frontend.
     ///
+    /// A no-op unless the instance is still adopted-Running with exactly
+    /// `expected_pid` — the pid the caller (`kill_instance`, or the liveness
+    /// poller in `watch_adopted_instances`) just verified before deciding to
+    /// release it. Without this guard a caller acting on a decision made a
+    /// moment earlier could tear down state that has since moved on: the
+    /// instance stopped and relaunched, deleted, or already released by a
+    /// concurrent caller — none of which this call has any business
+    /// touching, however stale the pid it was handed still looks.
+    ///
     /// Deliberately not through `change_launch_state`, which prints
     /// `_INSTANCE_STATE_:GAME_CLOSED` for Electron to act on. An adopted
     /// session never printed the matching `GAME_LAUNCHED` — doing so at
@@ -1135,23 +1143,34 @@ impl ManagerRef<'_, InstanceManager> {
     /// or closing the window they just opened) for a game they launched
     /// earlier — so it must not print the close either, or the two go out of
     /// step.
-    pub async fn release_adopted_instance(self, instance_id: InstanceId, shortpath: &str) {
+    pub async fn release_adopted_instance(self, instance_id: InstanceId, expected_pid: u32) {
+        let shortpath = {
+            let mut instances = self.instances.write().await;
+            let Some(instance) = instances.get_mut(&instance_id) else {
+                return;
+            };
+            let Ok(data) = instance.data_mut() else {
+                return;
+            };
+            let LaunchState::Running(running) = &data.state else {
+                return;
+            };
+            if !running.is_adopted() || running.process_id != expected_pid {
+                return;
+            }
+
+            data.state = LaunchState::Inactive { failed_task: None };
+            instance.shortpath.clone()
+        };
+
         let root = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
-            .get_instance_path(shortpath)
+            .get_instance_path(&shortpath)
             .get_root();
         orphan_pid::remove_pid_file(&root, super::PID_FILE_NAME).await;
-
-        let mut instances = self.instances.write().await;
-        if let Some(instance) = instances.get_mut(&instance_id) {
-            if let Ok(data) = instance.data_mut() {
-                data.state = LaunchState::Inactive { failed_task: None };
-            }
-        }
-        drop(instances);
 
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
@@ -1261,7 +1280,7 @@ impl ManagerRef<'_, InstanceManager> {
                 // the user may have stopped one through `kill_instance` in
                 // the meantime, and it is no longer adopted (or no longer
                 // running) if so.
-                let still_adopted: Vec<(InstanceId, u32, Option<u64>, String)> = {
+                let still_adopted: Vec<(InstanceId, u32, Option<u64>)> = {
                     let manager = app.instance_manager();
                     let instances = manager.instances.read().await;
                     remaining
@@ -1274,14 +1293,9 @@ impl ManagerRef<'_, InstanceManager> {
                             let LaunchState::Running(running) = &data.state else {
                                 return None;
                             };
-                            running.is_adopted().then(|| {
-                                (
-                                    *id,
-                                    running.process_id,
-                                    running.process_start_time,
-                                    instance.shortpath.clone(),
-                                )
-                            })
+                            running
+                                .is_adopted()
+                                .then(|| (*id, running.process_id, running.process_start_time))
                         })
                         .collect()
                 };
@@ -1292,7 +1306,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let pids: Vec<Pid> = still_adopted
                     .iter()
-                    .map(|(_, pid, _, _)| Pid::from_u32(*pid))
+                    .map(|(_, pid, _)| Pid::from_u32(*pid))
                     .collect();
                 let mut system = System::new();
                 system.refresh_processes(ProcessesToUpdate::Some(&pids));
@@ -1300,7 +1314,7 @@ impl ManagerRef<'_, InstanceManager> {
                 let observed_at = Utc::now();
 
                 remaining.clear();
-                for (instance_id, pid, expected_start_time, shortpath) in still_adopted {
+                for (instance_id, pid, expected_start_time) in still_adopted {
                     if should_release_adopted(orphan_pid::is_verified_live_java_process(
                         &system,
                         pid,
@@ -1317,7 +1331,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .bank_adopted_playtime(instance_id)
                             .await;
                         app.instance_manager()
-                            .release_adopted_instance(instance_id, &shortpath)
+                            .release_adopted_instance(instance_id, pid)
                             .await;
                     } else {
                         app.instance_manager()
@@ -1834,6 +1848,59 @@ mod tests {
         assert!(
             !should_release_adopted(true),
             "a pid that is still a live JVM must keep the instance Running"
+        );
+    }
+
+    #[tokio::test]
+    async fn release_adopted_instance_is_a_no_op_when_the_state_has_moved_on() {
+        let app = crate::setup_managers_for_test().await;
+
+        let instance_id = InstanceId(1);
+        let shortpath = "test-instance".to_string();
+
+        let root = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath)
+            .get_root();
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        orphan_pid::write_pid_file(&root, super::super::PID_FILE_NAME, 4242, 1_700_000_000).await;
+
+        app.instance_manager().instances.write().await.insert(
+            instance_id,
+            Instance {
+                shortpath: shortpath.clone(),
+                type_: InstanceType::Valid(instance_data_with_state(LaunchState::Queued(
+                    VisualTaskId(0),
+                ))),
+            },
+        );
+
+        // The pid the caller decided on is stale by the time it calls in —
+        // the instance moved to Queued in the meantime (a relaunch, a
+        // concurrent release). Nothing here belongs to this call anymore.
+        app.instance_manager()
+            .release_adopted_instance(instance_id, 4242)
+            .await;
+
+        let instance_manager = app.instance_manager();
+        let instances = instance_manager.instances.read().await;
+        let InstanceType::Valid(data) = &instances[&instance_id].type_ else {
+            panic!("instance became invalid");
+        };
+        assert!(
+            matches!(data.state, LaunchState::Queued(_)),
+            "state must be untouched when it is no longer adopted-Running with the expected pid"
+        );
+        drop(instances);
+
+        assert_eq!(
+            orphan_pid::read_pid_file(&root, super::super::PID_FILE_NAME)
+                .await
+                .unwrap(),
+            Some((4242, Some(1_700_000_000))),
+            "the pidfile must be left in place when the release is a no-op"
         );
     }
 
