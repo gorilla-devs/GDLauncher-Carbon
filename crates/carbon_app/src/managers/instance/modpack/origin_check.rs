@@ -489,12 +489,11 @@ async fn download_and_match(
 /// whatever was there — each run's result is a fresh snapshot, never merged
 /// with the previous one) and nudges the frontend to re-read the repair
 /// preview, which is where these verdicts actually surface (see
-/// `super::origin_verdict_for`). `args` is a *partial* object (only the
-/// `instance` key) rather than the full `RepairPreviewArgs` shape so the
-/// frontend's partial query-key matching invalidates the cached preview for
-/// this instance regardless of which `re_enable_disabled` value it was
-/// queried with — see `GET_REPAIR_PREVIEW`'s route doc for why a full-object
-/// filter would miss the other variant.
+/// `super::origin_verdict_for`). `args` here is the complete
+/// `RepairPreviewArgs` shape (its only field is `instance`), since a repair
+/// preview query carries both `re_enable_disabled` outcomes in one response
+/// — see `RepairPreview`'s own doc — so there is no other variant this could
+/// miss by filtering on this object.
 async fn store_and_invalidate(
     app: &Arc<AppInner>,
     instance_id: InstanceId,

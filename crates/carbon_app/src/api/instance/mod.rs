@@ -134,7 +134,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         query GET_REPAIR_PREVIEW[app, args: RepairPreviewArgs] {
             app.instance_manager()
-                .repair_preview(args.instance.into(), args.re_enable_disabled)
+                .repair_preview(args.instance.into())
                 .await
                 .map(FERepairPreview::from)
         }
@@ -1199,20 +1199,22 @@ struct RepairModpack {
 #[derive(Type, Debug, Deserialize)]
 struct RepairPreviewArgs {
     instance: FEInstanceId,
-    re_enable_disabled: bool,
 }
 
 /// Result of [`GET_REPAIR_PREVIEW`](keys::instance::GET_REPAIR_PREVIEW): what
 /// [`manager::modpack::ManagerRef::repair_preview`] would do, computed
 /// read-only against the recorded `packinfo.json` — never the network. See
 /// that function's own docs for the preview/execution asymmetry this
-/// implies.
+/// implies. `with_re_enable`/`without_re_enable` carry both
+/// `re_enable_disabled` outcomes over the one disk scan the query performs —
+/// `RepairModpack/index.tsx` picks between them client-side as its checkbox
+/// is toggled, so a query keyed only on `instance` never needs to re-fetch
+/// for that.
 #[derive(Type, Debug, Serialize)]
 pub struct FERepairPreview {
     pub has_packinfo: bool,
-    /// Full expandable list, path-sorted.
-    pub entries: Vec<FERepairEntry>,
-    pub counts: FERepairCounts,
+    pub with_re_enable: FERepairPlanVariant,
+    pub without_re_enable: FERepairPlanVariant,
     pub untracked: Vec<FEUntrackedFile>,
     pub duplicates: Vec<FEDuplicateGroup>,
 }
@@ -1221,8 +1223,8 @@ impl From<manager::modpack::RepairPreview> for FERepairPreview {
     fn from(value: manager::modpack::RepairPreview) -> Self {
         Self {
             has_packinfo: value.has_packinfo,
-            entries: value.entries.into_iter().map(FERepairEntry::from).collect(),
-            counts: value.counts.into(),
+            with_re_enable: value.with_re_enable.into(),
+            without_re_enable: value.without_re_enable.into(),
             untracked: value
                 .untracked
                 .into_iter()
@@ -1233,6 +1235,24 @@ impl From<manager::modpack::RepairPreview> for FERepairPreview {
                 .into_iter()
                 .map(FEDuplicateGroup::from)
                 .collect(),
+        }
+    }
+}
+
+/// One `re_enable_disabled` setting's worth of [`FERepairPreview`] — see
+/// [`manager::modpack::RepairPlanVariant`].
+#[derive(Type, Debug, Serialize)]
+pub struct FERepairPlanVariant {
+    /// Full expandable list, path-sorted.
+    pub entries: Vec<FERepairEntry>,
+    pub counts: FERepairCounts,
+}
+
+impl From<manager::modpack::RepairPlanVariant> for FERepairPlanVariant {
+    fn from(value: manager::modpack::RepairPlanVariant) -> Self {
+        Self {
+            entries: value.entries.into_iter().map(FERepairEntry::from).collect(),
+            counts: value.counts.into(),
         }
     }
 }

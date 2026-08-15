@@ -117,25 +117,29 @@ const RepairModpack = (props: ModalProps) => {
     }
   }
 
+  // Keyed on the instance alone: the backend returns both
+  // `re_enable_disabled` outcomes (`with_re_enable`/`without_re_enable`) in
+  // one response, computed over a single disk scan — see `RepairPreview`'s
+  // own doc (`managers/instance/modpack/mod.rs`). Toggling the checkbox
+  // below is therefore a pure client-side selection between the two
+  // already-fetched variants (`selectedVariant` below), never a refetch.
   const preview = rspc.createQuery(() => ({
-    queryKey: [
-      "instance.getRepairPreview",
-      { instance: instanceId(), re_enable_disabled: reEnable() }
-    ],
+    queryKey: ["instance.getRepairPreview", { instance: instanceId() }],
     enabled: !isServer(),
-    // `re_enable_disabled` is part of the query key, so toggling the
-    // re-enable checkbox below switches to a distinct cache entry with no
-    // data yet — without this, `isLoading` would go true again on that
-    // switch and unmount this whole gated block (see the `Show` below),
-    // taking the just-clicked checkbox out from under the user's pointer.
-    // `keepPreviousData` keeps rendering the outgoing key's data (as
-    // `isPlaceholderData`) until the new key resolves, which is also why
-    // `isPending`/`isLoading` stay false across the switch — only the very
-    // first fetch (nothing cached for *any* key yet) leaves `data`
-    // undefined and `isLoading` true, so the initial-open spinner is
-    // unaffected.
+    // Keeps the previous response visible (as `isPlaceholderData`) during a
+    // background refetch — e.g. right after a `checkPackOrigin` run
+    // completes and invalidates this query to surface fresh untracked-file
+    // verdicts — instead of clearing `data` and re-showing the loading
+    // fallback below for a query that already has something to show.
     placeholderData: keepPreviousData
   }))
+
+  // The counts/entries half of `preview.data` the re-enable checkbox
+  // currently selects; `has_packinfo`/`untracked`/`duplicates` don't depend
+  // on `re_enable_disabled` and are read directly off `preview.data`.
+  const selectedVariant = createMemo(() =>
+    reEnable() ? preview.data?.with_re_enable : preview.data?.without_re_enable
+  )
 
   // Only Modrinth packs can be origin-checked (see
   // `InstanceManager::check_pack_origin`'s own doc comment) — the button
@@ -176,7 +180,7 @@ const RepairModpack = (props: ModalProps) => {
   })
 
   const countRows = createMemo(() => {
-    const c = preview.data?.counts
+    const c = selectedVariant()?.counts
     return (
       [
         ["instances:_trn_repair_counts_modified", c?.restore_modified ?? 0],
@@ -320,7 +324,7 @@ const RepairModpack = (props: ModalProps) => {
                 </span>
               </Checkbox>
 
-              <Show when={(preview.data?.entries.length ?? 0) > 0}>
+              <Show when={(selectedVariant()?.entries.length ?? 0) > 0}>
                 <div class="flex flex-col gap-2">
                   <Button
                     type="text"
@@ -333,7 +337,7 @@ const RepairModpack = (props: ModalProps) => {
                   </Button>
                   <Show when={expanded()}>
                     <div class="bg-darkSlate-800 flex max-h-60 flex-col gap-1 overflow-y-auto rounded-md p-2">
-                      <For each={preview.data?.entries}>
+                      <For each={selectedVariant()?.entries}>
                         {(entry) => (
                           <div
                             class="text-lightSlate-300 flex items-center justify-between gap-2 text-xs"

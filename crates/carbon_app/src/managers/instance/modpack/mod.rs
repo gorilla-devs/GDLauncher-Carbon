@@ -339,11 +339,23 @@ impl ManagerRef<'_, InstanceManager> {
 
     /// Computes what [`repair_modpack`](Self::repair_modpack) would do,
     /// read-only: it only reads the recorded `packinfo.json`, hashes what is
-    /// already on disk (via [`disk_scan::scan_disk_state`]), and runs
+    /// already on disk (via [`disk_scan::scan_disk_state`]) once, and runs
     /// [`apply_plan::plan`] — the exact same pure planner the real repair
-    /// uses — over that, followed by the DB-only duplicate-mod scan. Nothing
-    /// is ever written to disk, no staged bytes are produced or consumed,
-    /// the network is never touched, and no plan entry is ever executed.
+    /// uses — twice over that one disk scan, once per
+    /// `re_enable_disabled` setting, followed by the DB-only duplicate-mod
+    /// scan. Nothing is ever written to disk, no staged bytes are produced
+    /// or consumed, the network is never touched, and no plan entry is ever
+    /// executed.
+    ///
+    /// Returns both `re_enable_disabled` variants in one
+    /// [`RepairPreview`] — [`RepairPreview::with_re_enable`] and
+    /// [`RepairPreview::without_re_enable`] — rather than taking the flag as
+    /// a parameter: `plan` is pure and cheap relative to the disk scan
+    /// (`entries`/`counts` alone versus a real filesystem walk+hash), so the
+    /// caller (`RepairModpack/index.tsx`, via `GET_REPAIR_PREVIEW`) can
+    /// switch which variant it displays entirely client-side, on a query
+    /// keyed only by instance — no re-scan, and no second network
+    /// round-trip, just to reflect the re-enable checkbox toggling.
     ///
     /// Preview/execution asymmetry (documented, intentional): a real repair
     /// re-downloads and re-verifies the pack's true current manifest, so a
@@ -354,11 +366,7 @@ impl ManagerRef<'_, InstanceManager> {
     /// packinfo-declared paths ("everything the pack declares is
     /// obtainable"), so the plan is never blocked on a real staging
     /// directory that (for a preview) was never populated.
-    pub async fn repair_preview(
-        self,
-        instance_id: InstanceId,
-        re_enable_disabled: bool,
-    ) -> anyhow::Result<RepairPreview> {
+    pub async fn repair_preview(self, instance_id: InstanceId) -> anyhow::Result<RepairPreview> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -405,8 +413,8 @@ impl ManagerRef<'_, InstanceManager> {
         let Some(recorded) = recorded else {
             return Ok(RepairPreview {
                 has_packinfo: false,
-                entries: Vec::new(),
-                counts: RepairCounts::default(),
+                with_re_enable: RepairPlanVariant::default(),
+                without_re_enable: RepairPlanVariant::default(),
                 untracked: Vec::new(),
                 duplicates,
             });
@@ -427,17 +435,27 @@ impl ManagerRef<'_, InstanceManager> {
         // it (`run/modpack.rs`).
         let fs_case_insensitive = disk_scan::probe_case_insensitive(&data_path).await;
 
-        let entries = apply_plan::plan(apply_plan::PlanInputs {
-            old: Some(&recorded),
-            target: &recorded,
-            staged: &staged,
-            disk: &disk,
-            coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
-            mode: apply_plan::ApplyMode::Repair { re_enable_disabled },
-            fs_case_insensitive,
-        })?;
+        // `plan` itself never touches the filesystem, so running it twice —
+        // once per `re_enable_disabled` setting — over the single disk scan
+        // above is negligible next to the scan itself; see this method's own
+        // doc for why both variants are computed unconditionally rather than
+        // one selected by a parameter.
+        let plan_variant = |re_enable_disabled: bool| -> anyhow::Result<RepairPlanVariant> {
+            let entries = apply_plan::plan(apply_plan::PlanInputs {
+                old: Some(&recorded),
+                target: &recorded,
+                staged: &staged,
+                disk: &disk,
+                coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
+                mode: apply_plan::ApplyMode::Repair { re_enable_disabled },
+                fs_case_insensitive,
+            })?;
+            let counts = tally_counts(&entries);
+            Ok(RepairPlanVariant { entries, counts })
+        };
+        let with_re_enable = plan_variant(true)?;
+        let without_re_enable = plan_variant(false)?;
 
-        let counts = tally_counts(&entries);
         let untracked = untracked_files_for_preview(
             &data_path,
             &recorded,
@@ -448,8 +466,8 @@ impl ManagerRef<'_, InstanceManager> {
 
         Ok(RepairPreview {
             has_packinfo: true,
-            entries,
-            counts,
+            with_re_enable,
+            without_re_enable,
             untracked,
             duplicates,
         })
@@ -577,14 +595,27 @@ impl From<PackVersionFile> for Modpack {
 
 /// Manager-side result of [`ManagerRef::repair_preview`]; the FE-facing
 /// `FERepairPreview` (`api/instance/mod.rs`) is built from this via `From`.
+/// `with_re_enable`/`without_re_enable` are the two `plan` outcomes over the
+/// SAME disk scan — see [`ManagerRef::repair_preview`]'s own doc for why both
+/// are always computed rather than one selected by a parameter; every other
+/// field (`untracked`, `duplicates`, `has_packinfo`) doesn't depend on
+/// `re_enable_disabled` at all, so it isn't duplicated per variant.
 #[derive(Debug)]
 pub struct RepairPreview {
     pub has_packinfo: bool,
+    pub with_re_enable: RepairPlanVariant,
+    pub without_re_enable: RepairPlanVariant,
+    pub untracked: Vec<UntrackedFile>,
+    pub duplicates: Vec<DuplicateGroup>,
+}
+
+/// One `re_enable_disabled` setting's worth of [`apply_plan::plan`] output —
+/// see [`RepairPreview::with_re_enable`]/[`RepairPreview::without_re_enable`].
+#[derive(Debug, Default)]
+pub struct RepairPlanVariant {
     /// Path-sorted (guaranteed by [`apply_plan::plan`]'s own output).
     pub entries: Vec<apply_plan::PlanEntry>,
     pub counts: RepairCounts,
-    pub untracked: Vec<UntrackedFile>,
-    pub duplicates: Vec<DuplicateGroup>,
 }
 
 /// Per-bucket tallies over [`RepairPreview::entries`] — see [`tally_counts`].
@@ -1673,18 +1704,27 @@ mod tests {
 
         let preview = app
             .instance_manager()
-            .repair_preview(instance_id, false)
+            .repair_preview(instance_id)
             .await
             .unwrap();
 
         assert!(preview.has_packinfo);
-        assert_eq!(preview.counts.restore_modified, 1);
+        assert_eq!(preview.without_re_enable.counts.restore_modified, 1);
         let entry = preview
+            .without_re_enable
             .entries
             .iter()
             .find(|e| e.path == "/mods/a.jar")
             .expect("packinfo-tracked path must have a plan entry");
         assert_eq!(entry.action, PlanAction::Replace);
+
+        // A present-but-modified file's plan entry never depends on
+        // `re_enable_disabled` (that flag only governs the `Disabled` arm) —
+        // both variants must agree over the same disk scan.
+        assert_eq!(
+            preview.with_re_enable.counts, preview.without_re_enable.counts,
+            "a modified-but-present file's outcome must not depend on re_enable_disabled"
+        );
 
         // Read-only: the corrupted file on disk must be untouched by the
         // preview — repair_preview must never execute any plan entry.
@@ -1719,13 +1759,15 @@ mod tests {
 
         let preview = app
             .instance_manager()
-            .repair_preview(instance_id, false)
+            .repair_preview(instance_id)
             .await
             .unwrap();
 
         assert!(!preview.has_packinfo);
-        assert!(preview.entries.is_empty());
-        assert_eq!(preview.counts, RepairCounts::default());
+        assert!(preview.with_re_enable.entries.is_empty());
+        assert_eq!(preview.with_re_enable.counts, RepairCounts::default());
+        assert!(preview.without_re_enable.entries.is_empty());
+        assert_eq!(preview.without_re_enable.counts, RepairCounts::default());
         assert!(preview.untracked.is_empty());
         assert!(preview.duplicates.is_empty());
     }
