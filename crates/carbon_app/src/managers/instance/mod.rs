@@ -3157,11 +3157,18 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
             Ok(pid) => pid,
             Err(e) => {
                 warn!(
-                    "Failed to read pidfile for instance {} at {}: {}",
+                    "Failed to read pidfile for instance {} at {}: {} — removing it",
                     shortpath,
                     root.display(),
                     e
                 );
+                // A pidfile that fails to parse can never be reconciled —
+                // there is no recorded pid to check against the process
+                // table — so it will only fail the same way again on every
+                // future startup unless it is cleaned up here, exactly like
+                // a stale-but-parseable one is by `RemoveStale`/`NotOurs`
+                // below.
+                orphan_pid::remove_pid_file(&root, PID_FILE_NAME).await;
                 None
             }
         };
@@ -4048,6 +4055,36 @@ mod test {
         )]));
         super::orphan_pid::process_start_time(&system, pid)
             .expect("pid must be alive to look up its start time")
+    }
+
+    #[tokio::test]
+    async fn reconcile_running_instances_removes_a_corrupt_pidfile() {
+        // A pidfile that fails to parse (garbage content, a bad upgrade, disk
+        // corruption) can never be reconciled — there is no recorded pid to
+        // check against the process table — so unlike a dead-but-parseable
+        // pid it must self-heal by being removed outright, or it would keep
+        // warning on every future startup forever.
+        let dir = tempfile::tempdir().unwrap();
+        let instance_root = dir.path().join("some-instance");
+        tokio::fs::create_dir_all(&instance_root).await.unwrap();
+
+        tokio::fs::write(
+            super::orphan_pid::pid_file_path(&instance_root, super::PID_FILE_NAME),
+            b"not-a-pid",
+        )
+        .await
+        .unwrap();
+
+        let adopted = super::reconcile_running_instances_under(dir.path()).await;
+
+        assert!(adopted.is_empty(), "a corrupt pidfile must not be adopted");
+        assert_eq!(
+            super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
+                .await
+                .unwrap(),
+            None,
+            "a corrupt pidfile must be removed, not left behind to fail the same way again"
+        );
     }
 
     #[tokio::test]
