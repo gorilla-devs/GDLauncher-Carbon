@@ -2365,7 +2365,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // leaving the duplicate with the source's instance.json (its old name and metadata).
         tokio::fs::write(&tmppath.join("instance.json"), json).await?;
 
-        tokio::fs::rename(&tmppath, new_path).await?;
+        tokio::fs::rename(&tmppath, &new_path).await?;
+
+        // `fs_extra::dir::copy` above copied the whole source root, pidfile
+        // included if the source instance happened to be running — a game's
+        // pid (and its verified start time) belongs to that one process,
+        // never to a duplicate that has not launched anything. Left in
+        // place, a future startup reconcile pass could adopt the duplicate
+        // as if it were running the source's game, or Stop on the duplicate
+        // could signal the source's real, unrelated game process.
+        orphan_pid::remove_pid_file(&new_path, PID_FILE_NAME).await;
+
         let id = self
             .add_instance(
                 new_info.name.clone(),
@@ -4254,5 +4264,77 @@ mod test {
         .expect("reconcile_running_instances_under must not hang on a missing directory");
 
         assert!(adopted.is_empty());
+    }
+
+    // --- duplicate_instance ------------------------------------------------
+
+    #[tokio::test]
+    async fn duplicate_instance_does_not_carry_the_source_pidfile() -> anyhow::Result<()> {
+        let app = crate::setup_managers_for_test().await;
+
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                "source".to_string(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        let source_root = {
+            let instance_manager = app.instance_manager();
+            let instances = instance_manager.instances.read().await;
+            let shortpath = instances[&instance_id].shortpath.clone();
+            app.settings_manager()
+                .runtime_path
+                .get_instances()
+                .get_instance_path(&shortpath)
+                .get_root()
+        };
+
+        // As if the source instance were running: the pidfile lives directly
+        // under the instance root, a sibling of the `instance/` data dir that
+        // `fs_extra::dir::copy` copies wholesale.
+        super::orphan_pid::write_pid_file(&source_root, super::PID_FILE_NAME, 4242, 1_700_000_000)
+            .await;
+
+        let duplicate_id = app
+            .instance_manager()
+            .duplicate_instance(instance_id, "duplicate".to_string())
+            .await?;
+
+        let duplicate_root = {
+            let instance_manager = app.instance_manager();
+            let instances = instance_manager.instances.read().await;
+            let shortpath = instances[&duplicate_id].shortpath.clone();
+            app.settings_manager()
+                .runtime_path
+                .get_instances()
+                .get_instance_path(&shortpath)
+                .get_root()
+        };
+
+        assert_eq!(
+            super::orphan_pid::read_pid_file(&duplicate_root, super::PID_FILE_NAME).await?,
+            None,
+            "a duplicate must never carry the source's pidfile — it would let a future \
+             reconcile pass adopt the duplicate as if it were running the source's game, \
+             or let Stop on the duplicate signal the source's real process"
+        );
+        assert_eq!(
+            super::orphan_pid::read_pid_file(&source_root, super::PID_FILE_NAME).await?,
+            Some((4242, Some(1_700_000_000))),
+            "duplicating an instance must not disturb the source's own pidfile"
+        );
+
+        Ok(())
     }
 }
