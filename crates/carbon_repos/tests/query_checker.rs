@@ -171,6 +171,27 @@ fn checker_does_not_flag_question_mark_in_string_literal() {
 }
 
 #[test]
+fn checker_does_not_flag_question_mark_in_a_line_comment() {
+    // A stale "-- why?" comment must not be read as a positional placeholder
+    // either — comments are stripped before the positional-'?' scan runs.
+    let (_d, conn) = migrated_db();
+    let sql = "SELECT id FROM Java WHERE major = :major -- why?\n";
+    let ok = [QueryCheck {
+        name: "question_mark_in_comment",
+        sql,
+        params: &[":major"],
+        columns: None,
+        class: carbon_repos::registry::class_of(sql),
+        routes_write: false,
+    }];
+    let v = check_module(&conn, &ok);
+    assert!(
+        !v.iter().any(|m| m.contains("positional")),
+        "'?' inside a line comment must not be read as a positional placeholder, got: {v:?}"
+    );
+}
+
+#[test]
 fn checker_flags_a_positional_param_in_a_single_param_query() {
     // CENSUS-SELFTEST: checker.positional-param
     // The generated wrappers bind by name only, so a positional placeholder is
@@ -534,6 +555,49 @@ fn nullability_lint_does_not_flag_inner_joins_or_self_joins() {
         check_nullability(&conn, &self_join).is_empty(),
         "a self-join must be skipped: column_metadata can't disambiguate which side a column is from, got: {:?}",
         check_nullability(&conn, &self_join)
+    );
+}
+
+#[test]
+fn nullability_lint_treats_a_comma_and_left_joined_table_as_ambiguous() {
+    // CENSUS-SELFTEST: checker.nullability-outer-join-widening
+    // `OjComma` is introduced twice: once by the old-style comma join in the
+    // FROM list, once by the LEFT JOIN — genuinely ambiguous the same way a
+    // self-join is, since `column_metadata` cannot tell which occurrence a
+    // result column resolves to. Only the LEFT JOIN's occurrence was ever
+    // counted before comma-introduced tables were tracked, so this table
+    // looked (wrongly) unambiguous and got flagged.
+    let (_d, conn) = migrated_db();
+    conn.execute_batch(
+        "CREATE TABLE OjSide (id INTEGER PRIMARY KEY);
+         CREATE TABLE OjComma (id INTEGER PRIMARY KEY, parent_id INTEGER, label TEXT NOT NULL);
+         INSERT INTO OjSide (id) VALUES (1);
+         INSERT INTO OjComma (id, parent_id, label) VALUES (1, NULL, 'root'), (2, 1, 'child');",
+    )
+    .unwrap();
+
+    use carbon_repos::from_row::{ColumnSpec, TypeClass};
+    const NON_OPTION: &[ColumnSpec] = &[ColumnSpec {
+        name: "label",
+        ty: TypeClass::Text,
+        nullable: false,
+        explicit_nullable: false,
+    }];
+    let sql = "SELECT t2.label FROM OjSide, OjComma t1 \
+               LEFT JOIN OjComma t2 ON t2.parent_id = t1.id";
+    let planted = [QueryCheck {
+        name: "comma_and_left_join_ambiguous",
+        sql,
+        params: &[],
+        columns: Some(NON_OPTION),
+        class: carbon_repos::registry::class_of(sql),
+        routes_write: false,
+    }];
+    assert!(
+        check_nullability(&conn, &planted).is_empty(),
+        "a table introduced both via a comma join and a LEFT JOIN must be treated as \
+         ambiguous and skipped, not incorrectly widened: {:?}",
+        check_nullability(&conn, &planted)
     );
 }
 

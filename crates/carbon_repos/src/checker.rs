@@ -140,10 +140,79 @@ pub fn check_module(conn: &Connection, queries: &[QueryCheck]) -> Vec<String> {
     violations
 }
 
+/// Strips SQL `-- ...` line comments and `/* ... */` block comments from
+/// `sql`, replacing each with a single space (never nothing — `foo--bar`
+/// stripped to `foobar` would wrongly merge two tokens into one) so callers
+/// that tokenize or scan the result never mistake commented-out SQL for live
+/// SQL. Quote-aware: a `--` or `/*` inside a `'...'` string literal or a
+/// `"..."` / `` `...` `` / `[...]` quoted identifier is left untouched — a
+/// literal like `'a--b'` survives intact — matching the same span rules
+/// [`sql_tokens`] itself understands (`''` doubles an embedded quote inside a
+/// `'...'` string; the other quote kinds have no doubling here, same as
+/// `sql_tokens`'s own reader). Used by both [`sql_tokens`] and
+/// [`sql_has_positional_param`] so a comment can neither feed a phantom
+/// LEFT JOIN/table reference into the former nor trip a false positional-`?`
+/// hit in the latter.
+fn strip_sql_comments(sql: &str) -> String {
+    let mut out = String::with_capacity(sql.len());
+    let mut chars = sql.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\'' => {
+                out.push(c);
+                while let Some(n) = chars.next() {
+                    out.push(n);
+                    if n == '\'' {
+                        if chars.peek() == Some(&'\'') {
+                            out.push(chars.next().unwrap());
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            '"' | '`' | '[' => {
+                let close = if c == '[' { ']' } else { c };
+                out.push(c);
+                for n in chars.by_ref() {
+                    out.push(n);
+                    if n == close {
+                        break;
+                    }
+                }
+            }
+            '-' if chars.peek() == Some(&'-') => {
+                chars.next(); // consume the second '-'
+                for n in chars.by_ref() {
+                    if n == '\n' {
+                        break;
+                    }
+                }
+                out.push(' ');
+            }
+            '/' if chars.peek() == Some(&'*') => {
+                chars.next(); // consume the '*'
+                let mut prev = '\0';
+                for n in chars.by_ref() {
+                    if prev == '*' && n == '/' {
+                        break;
+                    }
+                    prev = n;
+                }
+                out.push(' ');
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 /// True when `sql` contains a positional `?` placeholder outside any string
-/// literal or quoted identifier. A tiny state machine skips `'...'` and `"..."`
-/// spans (SQLite doubles the quote to escape it) so a literal `?` inside a text
-/// value never reads as a placeholder.
+/// literal, quoted identifier, or SQL comment. Comments are stripped first
+/// (see [`strip_sql_comments`]) so a literal `?` inside a `-- ...` or
+/// `/* ... */` comment never reads as a placeholder. A tiny state machine then
+/// skips `'...'` and `"..."` spans (SQLite doubles the quote to escape it) so
+/// a literal `?` inside a text value doesn't either.
 fn sql_has_positional_param(sql: &str) -> bool {
     #[derive(PartialEq)]
     enum State {
@@ -151,6 +220,7 @@ fn sql_has_positional_param(sql: &str) -> bool {
         Single,
         Double,
     }
+    let sql = strip_sql_comments(sql);
     let mut state = State::Normal;
     let mut chars = sql.chars().peekable();
     while let Some(c) = chars.next() {
@@ -494,21 +564,69 @@ pub fn check_nullability(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
 ///   `LEFT JOIN (SELECT …) AS sub` has no bare identifier after `JOIN` (a `(`
 ///   token instead), so it never matches a real schema table name — the
 ///   heuristic silently does not apply rather than misfiring.
+/// - **Old-style comma joins count too.** `FROM a, b` introduces `b` exactly
+///   as an explicit `JOIN b` would; a comma seen while still inside a `FROM`
+///   clause's table list is treated as another occurrence, so a table also
+///   reached this way still correctly counts toward the ambiguity check
+///   below.
 ///
 /// None of these gaps can produce a false positive; they can only make the
 /// rule miss a case, which is exactly the existing status quo this rule
 /// improves on rather than regresses.
 fn unambiguous_left_join_tables(sql: &str) -> std::collections::HashSet<String> {
+    // Keywords/punctuation that close a `FROM` clause's comma-separated table
+    // list once seen. `JOIN` itself is handled separately below (it starts its
+    // own explicit join rather than continuing a comma list); plain
+    // identifiers — bare table names, aliases, `AS` — never appear here, so
+    // they never terminate the list before its next comma.
+    const FROM_LIST_TERMINATORS: &[&str] = &[
+        "WHERE",
+        "INNER",
+        "LEFT",
+        "RIGHT",
+        "FULL",
+        "CROSS",
+        "NATURAL",
+        "GROUP",
+        "ORDER",
+        "LIMIT",
+        "HAVING",
+        "UNION",
+        "EXCEPT",
+        "INTERSECT",
+        "WINDOW",
+        "SET",
+        "VALUES",
+        "RETURNING",
+        ")",
+        ";",
+    ];
+
     let tokens = sql_tokens(sql);
     let mut occurrences: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
     let mut seen_via_left_join: std::collections::HashSet<String> =
         std::collections::HashSet::new();
+    let mut in_from_list = false;
 
     for (i, tok) in tokens.iter().enumerate() {
         let is_from = tok.eq_ignore_ascii_case("FROM");
         let is_join = tok.eq_ignore_ascii_case("JOIN");
-        if !is_from && !is_join {
+        let is_from_list_comma = in_from_list && tok == ",";
+
+        if is_join {
+            in_from_list = false;
+        } else if is_from {
+            in_from_list = true;
+        } else if in_from_list
+            && FROM_LIST_TERMINATORS
+                .iter()
+                .any(|k| tok.eq_ignore_ascii_case(k))
+        {
+            in_from_list = false;
+        }
+
+        if !is_from && !is_join && !is_from_list_comma {
             continue;
         }
         // A bare identifier must follow; a `(` (derived table) or anything
@@ -643,11 +761,14 @@ pub fn check_query_plans(conn: &Connection, queries: &[QueryCheck]) -> Vec<Strin
 }
 
 /// Splits `sql` into identifier and single-character punctuation tokens,
-/// unwrapping quoted identifiers and dropping string literals. Enough structure
-/// to tell an alias from the keyword or punctuation that would otherwise follow
-/// a table name; not a SQL parser.
+/// unwrapping quoted identifiers and dropping string literals. Comments are
+/// stripped first (see [`strip_sql_comments`]), so `-- ...` / `/* ... */` text
+/// — including a commented-out `LEFT JOIN` or table reference — is never
+/// tokenized as live SQL. Enough structure to tell an alias from the keyword
+/// or punctuation that would otherwise follow a table name; not a SQL parser.
 fn sql_tokens(sql: &str) -> Vec<String> {
     let mut out = Vec::new();
+    let sql = strip_sql_comments(sql);
     let mut chars = sql.chars().peekable();
 
     while let Some(c) = chars.next() {
@@ -996,4 +1117,101 @@ pub fn check_handwritten_sql(files: &[(String, String)]) -> Vec<String> {
         }
     }
     violations
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_sql_comments_strips_line_and_block_comments() {
+        let sql = "SELECT id -- old: LEFT JOIN X\n  FROM Foo /* inline note */ WHERE id = 1";
+        let stripped = strip_sql_comments(sql);
+        assert!(
+            !stripped.contains("LEFT JOIN X"),
+            "line comment text must be gone: {stripped:?}"
+        );
+        assert!(
+            !stripped.contains("inline note"),
+            "block comment text must be gone: {stripped:?}"
+        );
+        assert!(
+            stripped.contains("FROM Foo"),
+            "live SQL must survive: {stripped:?}"
+        );
+        assert!(
+            stripped.contains("WHERE id = 1"),
+            "live SQL after a mid-statement block comment must survive: {stripped:?}"
+        );
+    }
+
+    #[test]
+    fn strip_sql_comments_preserves_string_literals_containing_comment_markers() {
+        // A literal like 'a--b' or '/* not a comment */' must survive intact —
+        // the scan must not mistake a marker inside a string for a real
+        // comment start.
+        let sql = "SELECT 'a--b', '/* not a comment */' FROM Foo";
+        let stripped = strip_sql_comments(sql);
+        assert!(
+            stripped.contains("'a--b'"),
+            "a string literal containing '--' must be untouched: {stripped:?}"
+        );
+        assert!(
+            stripped.contains("'/* not a comment */'"),
+            "a string literal containing '/*' must be untouched: {stripped:?}"
+        );
+    }
+
+    #[test]
+    fn sql_tokens_drops_a_commented_out_left_join() {
+        let sql = "-- old: LEFT JOIN Bar b ON b.id = Foo.id\nSELECT Foo.id FROM Foo";
+        let tokens = sql_tokens(sql);
+        assert!(
+            !tokens.iter().any(|t| t.eq_ignore_ascii_case("Bar")),
+            "a commented-out table reference must not be tokenized: {tokens:?}"
+        );
+        assert!(
+            !tokens.iter().any(|t| t.eq_ignore_ascii_case("LEFT")),
+            "a commented-out LEFT keyword must not be tokenized: {tokens:?}"
+        );
+    }
+
+    #[test]
+    fn unambiguous_left_join_tables_ignores_a_phantom_left_join_in_a_comment() {
+        // Before comment-stripping, this comment's "LEFT JOIN Bar" text alone
+        // tokenized as a real, unambiguous (occurring exactly once) LEFT JOIN
+        // of a table that never actually appears anywhere in the live SQL.
+        let sql = "-- old shape: LEFT JOIN Bar b ON b.foo_id = Foo.id\nSELECT Foo.id FROM Foo";
+        let widened = unambiguous_left_join_tables(sql);
+        assert!(
+            !widened.contains("BAR"),
+            "a LEFT JOIN mentioned only in a comment must not count: {widened:?}"
+        );
+    }
+
+    #[test]
+    fn unambiguous_left_join_tables_counts_comma_introduced_tables() {
+        // `Foo` is introduced twice: once by the old-style comma join in the
+        // FROM list, once by the explicit LEFT JOIN — genuinely ambiguous,
+        // like a self-join, and must be excluded from widening.
+        let sql = "SELECT Foo.label FROM Bar, Foo LEFT JOIN Foo f2 ON f2.id = Foo.parent_id";
+        let widened = unambiguous_left_join_tables(sql);
+        assert!(
+            !widened.contains("FOO"),
+            "a table introduced both by a comma join and a LEFT JOIN must be treated as \
+             ambiguous, not unambiguously widened: {widened:?}"
+        );
+    }
+
+    #[test]
+    fn sql_has_positional_param_ignores_a_question_mark_in_a_comment() {
+        assert!(
+            !sql_has_positional_param("SELECT id FROM Foo -- why?\nWHERE id = :id"),
+            "a '?' inside a line comment must not read as a positional placeholder"
+        );
+        assert!(
+            sql_has_positional_param("SELECT id FROM Foo WHERE id = ?"),
+            "a genuine bare '?' outside any comment or literal must still be caught"
+        );
+    }
 }
