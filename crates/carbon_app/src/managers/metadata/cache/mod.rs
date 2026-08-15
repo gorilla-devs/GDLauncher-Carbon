@@ -154,6 +154,10 @@ pub struct MetaCacheManager {
     /// Serializes `ensure_mod_metadata` per content hash. Without it two
     /// concurrent scans of the same jar both miss the lookup and each insert a
     /// `ModMetadata` row, since there is no unique constraint on the hash pair.
+    /// `ensure_mod_metadata` evicts its own entry once settled (see its own
+    /// doc, right before it returns), so this only ever holds one entry per
+    /// (sha512, murmur2) pair with an in-flight or racing-to-start lookup,
+    /// never one per pair ever scanned over the process's lifetime.
     metadata_hash_locks: dashmap::DashMap<(Vec<u8>, i32), std::sync::Arc<tokio::sync::Mutex<()>>>,
 }
 
@@ -1232,9 +1236,10 @@ impl ManagerRef<'_, MetaCacheManager> {
         // and each insert a duplicate `ModMetadata` row. Clone the Arc and drop
         // the map guard before awaiting the lock so the DashMap shard isn't held
         // across the await.
+        let lock_key = (sha512.clone(), murmur2);
         let hash_lock = self
             .metadata_hash_locks
-            .entry((sha512.clone(), murmur2))
+            .entry(lock_key.clone())
             .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
             .clone();
         let _hash_guard = hash_lock.lock().await;
@@ -1329,6 +1334,42 @@ impl ManagerRef<'_, MetaCacheManager> {
                 meta_id
             }
         };
+
+        // Evicts this hash's lock entry once nothing else needs it, so
+        // `metadata_hash_locks` doesn't grow forever across a long-running
+        // process's full mod library — an entry that's never removed would
+        // otherwise accumulate one permanent `Arc<Mutex<()>>` per distinct
+        // (sha512, murmur2) ever scanned. Both the guard and this function's
+        // own `hash_lock` clone are dropped first: `remove_if`'s closure
+        // only observes the copy stored IN the map, so as long as either is
+        // still alive here the true strong count is higher than what the
+        // closure sees, and `Arc::strong_count(v) == 1` would never fire —
+        // silently defeating the eviction, not merely delaying it. Dropping
+        // both before calling `remove_if` also keeps this clear of DashMap's
+        // own single-shard self-deadlock rule: neither drop leaves an
+        // outstanding `Ref`/`RefMut` borrowed from `metadata_hash_locks`
+        // itself (the `.entry(..).or_insert_with(..).clone()` above already
+        // released its shard guard the moment that statement finished), so
+        // `remove_if`'s own shard lock is never re-entered while already
+        // held.
+        //
+        // Safe against a race with a concurrent caller: another in-flight
+        // `ensure_mod_metadata` call for the SAME hash holds its own `Arc`
+        // clone (from the same `.entry()` lookup, before this one's
+        // `remove_if` runs), which keeps `strong_count` above 1 and the
+        // entry survives untouched. A caller that acquires the lock for the
+        // first time strictly *between* this drop and `remove_if` actually
+        // running would have its own fresh `Arc` clone racing this removal —
+        // either it wins (its clone keeps `strong_count` > 1, `remove_if` is
+        // a no-op) or `remove_if` wins and removes the entry it no longer
+        // needs, since `DashMap::entry` on its next lookup just re-inserts a
+        // fresh lock for the same key. Either outcome is correct: no
+        // duplicate `ModMetadata` row can result, only — in the second,
+        // narrower case — one wasted removal-then-reinsert.
+        drop(_hash_guard);
+        drop(hash_lock);
+        self.metadata_hash_locks
+            .remove_if(&lock_key, |_, v| std::sync::Arc::strong_count(v) == 1);
 
         Ok(meta_id)
     }
@@ -1965,5 +2006,51 @@ mod tests {
         assert!(!addon_has_extension("Pack.zip", "jar"));
         assert!(!addon_has_extension("readme.txt", "zip"));
         assert!(!addon_has_extension("no-extension", "jar"));
+    }
+
+    // Pins the exact drop-then-`remove_if` eviction pattern
+    // `ensure_mod_metadata` runs on `metadata_hash_locks` right before it
+    // returns, against a standalone map of the same shape — no DB-backed
+    // `App` needed, since the pattern itself (acquire, settle, drop the
+    // guard and this call's own `Arc` clone, then `remove_if` on
+    // `Arc::strong_count == 1`) is what's under test, not the metadata
+    // lookup/insert `ensure_mod_metadata` wraps it around.
+    #[tokio::test]
+    async fn hash_lock_evicts_once_unreferenced_but_survives_a_concurrent_holder() {
+        let locks: dashmap::DashMap<(Vec<u8>, i32), Arc<Mutex<()>>> = dashmap::DashMap::new();
+        let key = (vec![1, 2, 3], 42);
+
+        // No concurrent holder: the settled entry must be evicted.
+        let lock = locks
+            .entry(key.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone();
+        let guard = lock.lock().await;
+        drop(guard);
+        drop(lock);
+        locks.remove_if(&key, |_, v| Arc::strong_count(v) == 1);
+        assert!(
+            !locks.contains_key(&key),
+            "an unreferenced hash lock must be evicted once its holder settles"
+        );
+
+        // A concurrent holder — its own `Arc` clone, standing in for a
+        // second in-flight `ensure_mod_metadata` call racing the same hash —
+        // must keep the entry alive through the first caller's eviction
+        // attempt.
+        let lock = locks
+            .entry(key.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone();
+        let concurrent_holder = lock.clone();
+        let guard = lock.lock().await;
+        drop(guard);
+        drop(lock);
+        locks.remove_if(&key, |_, v| Arc::strong_count(v) == 1);
+        assert!(
+            locks.contains_key(&key),
+            "a lock a concurrent caller still holds must never be evicted out from under it"
+        );
+        drop(concurrent_holder);
     }
 }
