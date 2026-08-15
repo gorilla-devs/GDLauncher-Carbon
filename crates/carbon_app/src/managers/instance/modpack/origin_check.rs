@@ -23,6 +23,7 @@ use carbon_platforms::modrinth::{
     search::ProjectID,
     version::{ModpackIndex, Version, VersionFile},
 };
+use futures::stream::{self, StreamExt};
 use sha2::{Digest, Sha512};
 use tokio::task::spawn_blocking;
 
@@ -592,9 +593,27 @@ async fn run_check_pack_origin(
         .filter(|(key, _)| !packinfo.files.contains_key(key.as_str()))
         .collect();
 
-    let mut untracked: HashMap<String, [u8; 64]> = HashMap::new();
+    // Hashed concurrently (bounded to 8 in flight at once, the same idiom
+    // `disk_scan.rs` uses for its own per-file probes) rather than one file
+    // at a time — an instance can have hundreds of untracked files, each a
+    // full sha512 over its own bytes, and this loop was previously the sum
+    // of every one of those I/O-bound hashes done in strict sequence. Order
+    // doesn't matter here: `untracked` is a `HashMap`, and every downstream
+    // consumer (`fill_unmatched_as_unknown`, `record_matches`,
+    // `match_against_index`) only ever reads it by key or iterates it
+    // unordered, never relies on hashing/insertion order. Futures are built
+    // via an explicit loop into a `Vec` first, not `raw_untracked.iter().map(..)`
+    // — a closure returning `async move` there fails to type-check under
+    // the higher-ranked lifetime `stream::iter`'s `Iterator` bound requires.
+    let mut hash_futures = Vec::with_capacity(raw_untracked.len());
     for (key, path) in &raw_untracked {
-        match hash_file_sha512(path).await {
+        hash_futures.push(async move { (key, hash_file_sha512(path).await) });
+    }
+
+    let mut untracked: HashMap<String, [u8; 64]> = HashMap::new();
+    let mut hash_results = stream::iter(hash_futures).buffer_unordered(8);
+    while let Some((key, result)) = hash_results.next().await {
+        match result {
             Ok(hash) => {
                 untracked.insert(key.clone(), hash);
             }
