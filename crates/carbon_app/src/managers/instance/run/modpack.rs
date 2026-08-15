@@ -77,6 +77,76 @@ pub struct TSubtasksInner {
     pub t_finalize_import: Option<Subtask>,
 }
 
+/// Whether `tmp-packinfo.json` (the full post-apply record) must be
+/// (re)derived by walking `.setup/staging`, or is already the authoritative
+/// target record left by an earlier, possibly-interrupted pass over this
+/// exact change-pack-version session and must be preserved untouched.
+///
+/// `apply_started` (`.setup/apply-started`, written by
+/// [`process_modpack_staging`] right before it calls [`execute_plan`], the
+/// only thing that ever destructively consumes `.setup/staging`) is the
+/// discriminator — deliberately *not* `skip_overrides`, which flips true as
+/// soon as override extraction finishes, well before the mod-download phase
+/// and the `tmp-packinfo.json` write even run. A crash in that gap leaves
+/// `skip_overrides` true while `.setup/staging` is still completely
+/// untouched; keying regeneration on it alone would suppress regeneration
+/// for a record that was never even written, silently discarding the
+/// staged download and completing the launch with nothing applied. Whether
+/// `execute_plan` has actually *started* is the only thing that tells us
+/// re-walking staging might no longer be safe:
+///
+/// - `apply_started` false: staging is guaranteed unconsumed (execute_plan
+///   cannot run without a `tmp-packinfo.json` to plan against, and nothing
+///   else touches staging), so re-deriving `tmp-packinfo.json` from it is
+///   always safe — this covers a first pass, a crash before extraction
+///   finished, and a crash anywhere between extraction finishing and
+///   `execute_plan` actually starting (including a crash mid-write of
+///   `tmp-packinfo.json` itself).
+/// - `apply_started` true: `.setup/staging` may be partially or fully
+///   consumed by whatever `execute_plan` already applied before a crash.
+///   Re-deriving `tmp-packinfo.json` from it now would silently drop every
+///   already-applied path from the very record meant to describe the target
+///   state (the resumed run then treats those paths as dropped by the pack
+///   and can delete them). Leaving `tmp-packinfo.json` untouched is correct
+///   whether it currently exists (the apply is still in flight; this
+///   preserves the complete pre-apply record for
+///   [`process_modpack_staging`] to resume against) or not (the apply
+///   already finished and promoted it to `packinfo.json`;
+///   `process_modpack_staging` recognises that on its own, via the same
+///   `apply_started` marker, and skips straight to finishing cleanup — see
+///   its doc comment for the other half of this invariant).
+fn tmp_packinfo_must_be_regenerated(file_provided: bool, apply_started: bool) -> bool {
+    file_provided && !apply_started
+}
+
+/// Whether [`process_modpack_staging`] finding `tmp-packinfo.json` missing
+/// proves the apply already fully completed and got promoted to
+/// `packinfo.json`, rather than simply never having started.
+///
+/// `packinfo_exists` alone is not enough: a *version change* on an
+/// already-installed modpack has an old `packinfo.json` on disk from before
+/// the change even began, so its mere presence proves nothing about whether
+/// *this* apply ran. `apply_started` (`.setup/apply-started`) is what
+/// proves it — written only right before [`execute_plan`] is first called
+/// for the record currently being applied, so its presence is proof
+/// `execute_plan` actually ran for that record; combined with `tmp` being
+/// gone (checked by the caller before this is consulted), the only way
+/// `execute_plan` can have run *and* `tmp` be gone is a successful promote.
+/// Requiring both `apply_started` and `packinfo_exists` — rather than
+/// either alone — is deliberate: `apply_started` alone can't rule out a
+/// crash between promoting (which needs `packinfo_exists`) and finishing
+/// (this function isn't reached once `packinfo_exists` when `apply_started`
+/// is false, since `tmp_packinfo_must_be_regenerated` would have already
+/// regenerated `tmp` in that case, before this function ever runs). Only
+/// `apply_started && packinfo_exists` is unambiguous proof of a completed,
+/// promoted apply; any other combination (most importantly `apply_started`
+/// false, whether or not an old `packinfo_exists`) must never be read as
+/// "already applied" — that would silently mark a change complete having
+/// applied nothing at all.
+fn staging_apply_already_promoted(apply_started: bool, packinfo_exists: bool) -> bool {
+    apply_started && packinfo_exists
+}
+
 /// This function prepares the modpack in a staging directory in the instance folder.
 /// The original instane data is not modified.
 ///
@@ -226,6 +296,23 @@ pub async fn process_modpack(
         // TODO: look into this
         let skip_overrides_path = setup_path.join("modpack-skip-overrides");
         let skip_overrides = skip_overrides_path.is_dir();
+
+        // Whether `process_modpack_staging` has ever started consuming
+        // `.setup/staging` for the record currently on disk — written right
+        // before it calls `execute_plan` (see there) and never removed
+        // except by `.setup` itself being wiped (full completion, or a fresh
+        // `change_modpack`/`repair_modpack`). This is deliberately a
+        // *different* signal from `skip_overrides`: `skip_overrides` flips
+        // true as soon as extraction finishes, well before the mod-download
+        // phase and the `tmp-packinfo.json` write below even run, so a crash
+        // in that gap would leave `skip_overrides` true while staging is
+        // still completely untouched — keying the regeneration decision on
+        // it alone would suppress regeneration for a record that was never
+        // even written, losing the staged download outright. Whether
+        // `execute_plan` has actually started is the only thing that tells
+        // us staging might no longer be safe to re-walk.
+        let apply_started_path = setup_path.join("apply-started");
+        let apply_started = apply_started_path.exists();
 
         let modpack = match tokio::fs::read_to_string(&change_version_path).await {
             Ok(text) => Some(Modpack::from(serde_json::from_str::<PackVersionFile>(
@@ -652,7 +739,7 @@ pub async fn process_modpack(
         // Only generate staging-packinfo if we actually processed a modpack
         // (i.e., file was Some). Otherwise this is just a version/modloader change
         // and we should not touch the existing mods.
-        if file.is_some() {
+        if tmp_packinfo_must_be_regenerated(file.is_some(), apply_started) {
             // normally there would be a problem here because we would be skipping any mods removed by users
             // but since we dont try to update those anyway its fine.
             //
@@ -742,8 +829,25 @@ pub async fn process_modpack(
     Ok((Arc::new(subtasks), version, repair_options))
 }
 
-// TODO: Modpack staging is not atomic and does not track applied changes, so if the process is interrupted,
-// the instance will be in an inconsistent state.
+/// Applies the staged files for a modpack version change or repair,
+/// reconciling them against the instance's live data.
+///
+/// Not atomic at the filesystem level — planning, [`execute_plan`], the
+/// audit write, promoting `tmp-packinfo.json` to `packinfo.json`, and
+/// removing `staging_dir` are all separate operations, any of which can be
+/// cut off by a crash — but every step here, together with the
+/// `apply_started`-gated guard in [`process_modpack`]
+/// (`tmp_packinfo_must_be_regenerated`) that stops a resumed pass from
+/// re-deriving `tmp-packinfo.json` by re-walking a partially-consumed
+/// `staging_dir`, is ordered to maintain one invariant: **at every
+/// interruption point, either the pre-existing `packinfo.json`, the
+/// untouched `tmp-packinfo.json` written before this function's
+/// [`execute_plan`] call ever runs, or the newly-promoted `packinfo.json`
+/// fully describes the target state.** A resumed run only ever has to pick
+/// which of those it landed on (the `tmp_packinfo_path.exists()` branch
+/// below, itself only trusted once `.setup/apply-started` confirms
+/// `execute_plan` really did run before) — never reconstruct one from a
+/// filesystem walk that may itself be mid-consumption.
 pub async fn process_modpack_staging(
     app: Arc<AppInner>,
     instance_id: InstanceId,
@@ -779,15 +883,48 @@ pub async fn process_modpack_staging(
 
         t_subtasks.t_apply_staging.start_opaque();
 
-        let old_packinfo =
-            match tokio::fs::read_to_string(instance_root.join("packinfo.json")).await {
-                Ok(s) => Some(packinfo::parse_packinfo(&s)?),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-                Err(e) => return Err(e.into()),
-            };
-        let target_packinfo = packinfo::parse_packinfo(
-            &tokio::fs::read_to_string(instance_root.join("tmp-packinfo.json")).await?,
-        )?;
+        let packinfo_path = instance_root.join("packinfo.json");
+        let tmp_packinfo_path = instance_root.join("tmp-packinfo.json");
+        let apply_started_path = setup_path.join("apply-started");
+
+        // `tmp_packinfo_path` missing is ambiguous on its own: it means
+        // either "never written yet this session" (staging is unconsumed —
+        // see `tmp_packinfo_must_be_regenerated`'s doc, that state is handled
+        // by `process_modpack` regenerating it before this function is even
+        // reached, so this branch is never entered for it) or "already
+        // promoted" (renamed to `packinfo_path`, below). `staging_apply_already_promoted`
+        // is what disambiguates them — see its own doc.
+        if !tmp_packinfo_path.exists() {
+            if !staging_apply_already_promoted(apply_started_path.exists(), packinfo_path.exists())
+            {
+                bail!(
+                    "instance {instance_id} has a staged modpack apply (staging-packinfo.json \
+                     present) with no tmp-packinfo.json, but the apply-started/packinfo.json \
+                     state doesn't prove a completed, promoted apply — cannot determine the \
+                     target record"
+                );
+            }
+
+            finish_promoted_staging(&staging_dir, &setup_path).await?;
+            t_subtasks.t_apply_staging.complete_opaque();
+
+            // Trigger caching now that modpack installation is complete
+            app.meta_cache_manager()
+                .watch_and_prioritize(Some(
+                    crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+                ))
+                .await;
+
+            return Ok(());
+        }
+
+        let old_packinfo = match tokio::fs::read_to_string(&packinfo_path).await {
+            Ok(s) => Some(packinfo::parse_packinfo(&s)?),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(e.into()),
+        };
+        let target_packinfo =
+            packinfo::parse_packinfo(&tokio::fs::read_to_string(&tmp_packinfo_path).await?)?;
 
         // Staged set: files physically present under .setup/staging/instance,
         // as packinfo-style keys.
@@ -849,6 +986,34 @@ pub async fn process_modpack_staging(
             fs_case_insensitive,
         })?;
 
+        // Written before `execute_plan` — the only thing that destructively
+        // consumes `staging_dir` — ever runs: from this point on, staging is
+        // no longer provably unconsumed, so `process_modpack` must not
+        // re-derive `tmp_packinfo_path` from it on any later resume (see
+        // `tmp_packinfo_must_be_regenerated`'s doc). Left in place until
+        // `.setup` itself is wiped (full completion, or a fresh
+        // `change_modpack`/`repair_modpack`) — no explicit removal needed.
+        //
+        // Explicitly fsynced — both the file's own bytes and the directory
+        // entry that makes it visible — before `execute_plan` is allowed to
+        // run. A plain `write` only guarantees the OS's page/dentry cache
+        // sees it, not that it has actually reached disk; on a filesystem
+        // without ordered metadata journaling (FAT32/exFAT — a real
+        // placement for an instance directory on an external or portable
+        // drive) the kernel is free to persist `execute_plan`'s later
+        // renames to `staging_dir` before it gets around to persisting this
+        // marker's creation. A power loss in that window would then resume
+        // with the marker gone but staging already partially consumed —
+        // the exact round-1 corruption this marker exists to rule out. The
+        // ordering (marker durable strictly before any rename below) is
+        // what's load-bearing here, not merely that the write eventually
+        // lands.
+        {
+            let marker_file = File::create(&apply_started_path).await?;
+            marker_file.sync_all().await?;
+        }
+        fsync_dir(&setup_path).await?;
+
         execute_plan(&entries, &instance_root, &staging_dir).await?;
 
         // Repair-only: paths the user explicitly ticked for removal in the
@@ -882,20 +1047,24 @@ pub async fn process_modpack_staging(
         let audit_txt = render_audit(&entries, &user_removed);
         tokio::fs::write(audit_file, audit_txt).await?;
 
+        // Promote before removing staging, not after: once this rename
+        // lands, `packinfo_path` fully describes the target state on its
+        // own, so a crash between the two leaves the "tmp-packinfo.json
+        // missing, `.setup/apply-started` present, packinfo.json present"
+        // branch above (`staging_apply_already_promoted`) to finish the
+        // leftover `staging_dir` cleanup on the next resume. The reverse
+        // order would leave a window where a crash between the two calls
+        // loses `staging_dir`'s remaining contents while `tmp_packinfo_path`
+        // is still unpromoted — at that point neither file fully describes
+        // the target state, and a resumed `process_modpack` would rebuild
+        // `tmp-packinfo.json` by walking a `staging_dir` that no longer has
+        // anything left to walk.
+        tokio::fs::rename(&tmp_packinfo_path, &packinfo_path).await?;
+
         trace!("Cleaning up staging directory");
-        tokio::fs::remove_dir_all(staging_dir).await?;
+        finish_promoted_staging(&staging_dir, &setup_path).await?;
         trace!("Staging complete");
         t_subtasks.t_apply_staging.complete_opaque();
-
-        if instance_root.join("tmp-packinfo.json").exists() {
-            tokio::fs::rename(
-                instance_root.join("tmp-packinfo.json"),
-                instance_root.join("packinfo.json"),
-            )
-            .await?;
-        }
-
-        tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
 
         // Trigger caching now that modpack installation is complete
         app.meta_cache_manager()
@@ -905,6 +1074,53 @@ pub async fn process_modpack_staging(
             .await;
     }
 
+    Ok(())
+}
+
+/// Finishes the leftover cleanup of a staging pass whose apply already fully
+/// landed — `packinfo_path` (checked by the caller before this is invoked)
+/// already fully describes the target state, so all that is left is
+/// removing the now-superfluous `staging_dir` and recording
+/// `modpack-complete`. Used both for a pass that just promoted
+/// `tmp-packinfo.json` itself and for a resumed pass that finds the promote
+/// already happened (`tmp-packinfo.json` gone, `.setup/apply-started`
+/// present, `packinfo.json` present — see `staging_apply_already_promoted`,
+/// which the caller uses to tell this apart from an apply that simply never
+/// started) — see [`process_modpack_staging`]'s doc comment for the
+/// invariant this is the tail of. Never touches `packinfo_path` or
+/// `tmp_packinfo_path` itself.
+async fn finish_promoted_staging(staging_dir: &Path, setup_path: &Path) -> anyhow::Result<()> {
+    tokio::fs::remove_dir_all(staging_dir).await?;
+    tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
+    Ok(())
+}
+
+/// Fsyncs `dir`'s own directory entry (not its contents) — the other half
+/// of durably creating a file: a file's own `sync_all` only guarantees its
+/// bytes reached disk, not that the directory entry pointing at it did too.
+/// Without this, a crash can leave a freshly-created file's bytes durable on
+/// disk yet the directory listing that would make it discoverable again
+/// still unflushed, so the file appears to have never been created at all
+/// after an unclean restart — undermining `sync_all`'s own guarantee for
+/// exactly the callers (like the `apply-started` marker write) that depend
+/// on "this file exists" surviving a crash in a specific order relative to
+/// other writes.
+///
+/// No-op on Windows: opening a bare directory as a `File` is rejected there
+/// (`ERROR_ACCESS_DENIED`), and it isn't needed — NTFS's own ordered
+/// metadata journaling already guarantees a completed file create is
+/// durable before any later write that depends on it, unlike a filesystem
+/// without ordered metadata journaling (FAT32/exFAT — a real placement for
+/// an instance directory on an external or portable drive), where this call
+/// is what closes that gap.
+#[cfg(windows)]
+async fn fsync_dir(_dir: &Path) -> anyhow::Result<()> {
+    Ok(())
+}
+
+#[cfg(not(windows))]
+async fn fsync_dir(dir: &Path) -> anyhow::Result<()> {
+    File::open(dir).await?.sync_all().await?;
     Ok(())
 }
 

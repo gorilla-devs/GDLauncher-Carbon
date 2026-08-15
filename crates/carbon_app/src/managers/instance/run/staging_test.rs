@@ -21,7 +21,7 @@ use super::apply_plan::{
 };
 use super::disk_scan;
 use super::packinfo::{FileHashes, PackInfo};
-use super::{apply_user_cleanup, execute_plan, render_audit};
+use super::{apply_user_cleanup, execute_plan, finish_promoted_staging, render_audit};
 
 fn hashes(seed: u8) -> FileHashes {
     FileHashes {
@@ -1239,4 +1239,411 @@ fn render_audit_golden() {
     expected.push_str(" - /mods/removed-by-request.jar\n");
 
     assert_eq!(audit, expected);
+}
+
+// --- resume after a crash mid-`execute_plan` --------------------------
+//
+// `process_modpack` only rebuilds `tmp-packinfo.json` by walking
+// `.setup/staging` when `.setup/apply-started` is absent (see
+// `tmp_packinfo_must_be_regenerated`'s own doc) — once `execute_plan` has
+// been called at least once for the current record, that marker stays
+// present across every later pass over the same change-pack-version
+// session, so `tmp-packinfo.json` is left untouched instead of being
+// re-derived. This test proves both halves of why that guard exists: first
+// the corruption mechanism it prevents (re-deriving the record from a
+// staging dir `execute_plan` has already partially consumed silently drops
+// the paths it already moved out), then the fix's actual guarantee (a
+// resumed pass reconciling against the untouched, complete pre-crash
+// record finishes applying the pending override and never touches the one
+// already on disk).
+
+#[tokio::test]
+async fn resume_after_partial_apply_preserves_unconsumed_overrides() {
+    let (_tmp, instance_root, staging_dir) = scaffold();
+    const APPLIED: &str = "/mods/applied.jar";
+    const PENDING: &str = "/mods/pending.jar";
+
+    // A fresh modpack install stages two overrides.
+    write_staged(&staging_dir, APPLIED, b"applied-bytes").await;
+    write_staged(&staging_dir, PENDING, b"pending-bytes").await;
+
+    // The full post-apply record `process_modpack` writes to
+    // `tmp-packinfo.json` BEFORE `execute_plan` ever runs, derived (via
+    // `packinfo::scan_dir`, the same function `process_modpack` calls) from
+    // the fully-populated staging directory.
+    let complete_target = super::packinfo::scan_dir(&staging_dir.join("instance"), None)
+        .await
+        .expect("scanning the fully-populated staging dir must not error");
+    assert_eq!(
+        complete_target.files.len(),
+        2,
+        "the pre-apply record must cover both overrides"
+    );
+    let applied_md5 = complete_target.files.get(APPLIED).unwrap().md5;
+
+    // Round-tripped through `tmp-packinfo.json` on disk exactly like
+    // `process_modpack` does, proving the JSON encoding preserves both
+    // entries too, not just the in-memory `PackInfo`.
+    let tmp_packinfo_path = instance_root.join("tmp-packinfo.json");
+    tokio::fs::write(
+        &tmp_packinfo_path,
+        super::packinfo::make_packinfo(complete_target).unwrap(),
+    )
+    .await
+    .unwrap();
+
+    // Simulate a crash mid-`execute_plan`: APPLIED already got renamed out
+    // of staging into the live instance dir (mirroring what the real
+    // `PlanAction::Create` arm of `execute_plan` does, `create_dir_all`
+    // included); PENDING is still sitting in staging, exactly where
+    // extraction left it.
+    let applied_live = live_path(&instance_root, APPLIED);
+    tokio::fs::create_dir_all(applied_live.parent().unwrap())
+        .await
+        .unwrap();
+    tokio::fs::rename(staged_path(&staging_dir, APPLIED), &applied_live)
+        .await
+        .unwrap();
+
+    // The actual decision `process_modpack` consults on this exact resumed
+    // pass: a modpack file is still on disk (`file.is_some()` would be
+    // `true`) and `execute_plan` already started consuming staging before
+    // the crash (`apply_started` is `true` — it was written right before
+    // the interrupted pass called it, and only `.setup` being wiped removes
+    // it). A guard that ignored whether the apply had actually started
+    // would regenerate here.
+    let target_packinfo = if super::tmp_packinfo_must_be_regenerated(true, true) {
+        // What that regeneration would produce if it walked staging again
+        // right now: this is the corruption mechanism the guard exists to
+        // prevent, exercised here via the very function `process_modpack`
+        // itself calls to derive it.
+        super::packinfo::scan_dir(&staging_dir.join("instance"), None)
+            .await
+            .expect("scanning the partially-consumed staging dir must not error")
+    } else {
+        // The fix: `tmp-packinfo.json` was left untouched across the
+        // resume, so this is what `process_modpack_staging` actually loads
+        // as the target.
+        super::packinfo::parse_packinfo(
+            &tokio::fs::read_to_string(&tmp_packinfo_path).await.unwrap(),
+        )
+        .unwrap()
+    };
+
+    assert!(
+        target_packinfo.files.contains_key(APPLIED),
+        "the surviving packinfo record must still cover the already-applied path — a guard \
+         that regenerates on a resumed pass loses it by walking a staging dir that no longer \
+         has it"
+    );
+    assert_eq!(
+        target_packinfo.files.len(),
+        2,
+        "the surviving packinfo record must still cover both paths"
+    );
+
+    let mut disk = HashMap::new();
+    disk.insert(APPLIED.to_string(), DiskState::Present { md5: applied_md5 });
+    // PENDING was never applied, so disk has nothing for it (defaults to
+    // Missing in `apply_plan::plan`).
+
+    let staged: HashSet<String> = [PENDING.to_string()].into_iter().collect();
+
+    let entries = apply_plan::plan(PlanInputs {
+        old: None,
+        target: &target_packinfo,
+        staged: &staged,
+        disk: &disk,
+        mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
+    })
+    .expect("a resumed pass against the preserved record must not error");
+
+    execute_plan(&entries, &instance_root, &staging_dir)
+        .await
+        .expect("execute_plan must finish applying the unconsumed override");
+
+    assert_eq!(
+        tokio::fs::read(live_path(&instance_root, APPLIED))
+            .await
+            .unwrap(),
+        b"applied-bytes",
+        "the already-applied override must survive the resumed pass untouched"
+    );
+    assert_eq!(
+        tokio::fs::read(live_path(&instance_root, PENDING))
+            .await
+            .unwrap(),
+        b"pending-bytes",
+        "the not-yet-applied override must still get created from its staged bytes"
+    );
+}
+
+// --- crash between promote and staging-removal: idempotent completion -----
+//
+// `process_modpack_staging` promotes `tmp-packinfo.json` to `packinfo.json`
+// BEFORE removing `staging_dir`, not after: once that rename lands,
+// `packinfo.json` alone fully describes the target state, so a crash
+// landing between the two calls is recoverable by finishing the leftover
+// cleanup rather than re-deriving anything. `finish_promoted_staging` is
+// exactly that leftover cleanup — this test lands in that exact gap
+// (`packinfo.json` already the promoted record, `tmp-packinfo.json` gone,
+// `staging_dir` still around) and checks the resumed cleanup completes
+// cleanly without ever touching `packinfo.json`.
+
+#[tokio::test]
+async fn resume_after_promote_before_staging_removal_completes_cleanly() {
+    let (_tmp, instance_root, staging_dir) = scaffold();
+    let setup_path = staging_dir.parent().unwrap().to_path_buf();
+
+    // The promote already landed: packinfo.json is the fully-promoted new
+    // record; tmp-packinfo.json no longer exists.
+    let target = packinfo(&[("/mods/a.jar", 1), ("/mods/b.jar", 2)]);
+    let target_json = super::packinfo::make_packinfo(target).unwrap();
+    tokio::fs::write(instance_root.join("packinfo.json"), &target_json)
+        .await
+        .unwrap();
+    assert!(!instance_root.join("tmp-packinfo.json").exists());
+
+    // Leftover staged bytes the crash never got to clean up.
+    write_staged(&staging_dir, "/mods/a.jar", b"leftover").await;
+
+    finish_promoted_staging(&staging_dir, &setup_path)
+        .await
+        .expect("resuming into an already-promoted staging pass must complete cleanly");
+
+    assert!(!staging_dir.exists(), "staging must be fully cleaned up");
+    assert!(
+        setup_path.join("modpack-complete").exists(),
+        "the modpack must be recorded complete"
+    );
+    assert_eq!(
+        tokio::fs::read_to_string(instance_root.join("packinfo.json"))
+            .await
+            .unwrap(),
+        target_json,
+        "the promoted packinfo.json must be left exactly as it was — it is already the new record"
+    );
+}
+
+// --- the widest window: overrides extracted, apply not yet started --------
+//
+// Override extraction finishing (what used to be the sole `skip_overrides`
+// signal) happens well before `tmp-packinfo.json` is ever written — the mod
+// download phase and the packinfo-generation walk both sit in between. A
+// crash anywhere in that gap leaves an extraction-is-done marker set while
+// `.setup/staging` is still completely UNCONSUMED (nothing has renamed
+// anything out of it yet) and neither `staging-packinfo.json` nor
+// `tmp-packinfo.json` exists. Keying the regeneration decision on
+// "overrides extracted" alone (rather than "has execute_plan actually
+// started") gets this window wrong in two different ways, covered by the
+// two tests below.
+
+#[tokio::test]
+async fn resume_with_overrides_extracted_but_apply_not_started_regenerates_and_applies_everything()
+{
+    let (_tmp, instance_root, staging_dir) = scaffold();
+    const A: &str = "/mods/a.jar";
+    const B: &str = "/config/b.cfg";
+
+    // Extraction already finished for this session — both target files are
+    // staged and fully unconsumed, since `execute_plan` has never run yet
+    // for this record.
+    write_staged(&staging_dir, A, b"a-bytes").await;
+    write_staged(&staging_dir, B, b"b-bytes").await;
+
+    let setup_path = staging_dir.parent().unwrap().to_path_buf();
+    let staging_packinfo_path = setup_path.join("staging-packinfo.json");
+    let tmp_packinfo_path = instance_root.join("tmp-packinfo.json");
+
+    // The exact window: neither record has been written yet.
+    assert!(!staging_packinfo_path.exists());
+    assert!(!tmp_packinfo_path.exists());
+
+    // Real markers on a real `.setup`, exactly as `process_modpack` would
+    // leave them mid-window: extraction already created its own
+    // "overrides done" marker (a directory, matching
+    // `skip_overrides_path.is_dir()`), but `execute_plan` genuinely never
+    // ran, so `.setup/apply-started` was never written.
+    let skip_overrides_style_marker = setup_path.join("modpack-skip-overrides");
+    tokio::fs::create_dir_all(&skip_overrides_style_marker)
+        .await
+        .unwrap();
+    let apply_started_marker = setup_path.join("apply-started");
+    assert!(!apply_started_marker.exists());
+
+    // Two candidate discriminators for the exact same window, read from the
+    // exact real files a resumed `process_modpack` would check. Both feed
+    // the same `tmp_packinfo_must_be_regenerated` arithmetic (which never
+    // changed) — the divergence is entirely in which marker gets read, i.e.
+    // in `process_modpack`'s own (App-dependent, not directly unit-testable
+    // here) call site. Spelled out explicitly so this test documents,
+    // rather than merely asserts, exactly what regressing that call site
+    // back to the pre-fix marker would do.
+    assert!(
+        !super::tmp_packinfo_must_be_regenerated(true, skip_overrides_style_marker.is_dir()),
+        "sanity: keying regeneration on \"overrides extracted\" alone (the pre-fix design) \
+         would wrongly suppress it here — extraction finished long before the apply itself, or \
+         even tmp-packinfo.json, ever existed"
+    );
+    assert!(
+        super::tmp_packinfo_must_be_regenerated(true, apply_started_marker.exists()),
+        "the real discriminator (has execute_plan started, read from .setup/apply-started) \
+         must regenerate here — staging is fully unconsumed, so re-deriving both records is \
+         always safe, and skipping it leaves staging-packinfo.json unwritten, which \
+         process_modpack_staging reads as \"nothing staged\" and deletes the whole \
+         freshly-downloaded pack without applying anything"
+    );
+
+    // Perform the regeneration exactly as `process_modpack` does: scan the
+    // fully-populated staging dir and write both records.
+    let target = super::packinfo::scan_dir(&staging_dir.join("instance"), None)
+        .await
+        .expect("scanning the fully-populated staging dir must not error");
+    assert_eq!(
+        target.files.len(),
+        2,
+        "regeneration must see every unconsumed override"
+    );
+    // staging-packinfo.json's content is never read again, only its
+    // existence is checked (see process_modpack_staging's early return) —
+    // write a placeholder, exactly enough to prove the write itself happens.
+    tokio::fs::write(&staging_packinfo_path, "[]")
+        .await
+        .unwrap();
+    tokio::fs::write(
+        &tmp_packinfo_path,
+        super::packinfo::make_packinfo(target).unwrap(),
+    )
+    .await
+    .unwrap();
+
+    // process_modpack_staging must now see a real record to apply against
+    // instead of taking its "nothing staged" early return.
+    assert!(staging_packinfo_path.exists());
+
+    let target_packinfo = super::packinfo::parse_packinfo(
+        &tokio::fs::read_to_string(&tmp_packinfo_path).await.unwrap(),
+    )
+    .unwrap();
+
+    let staged: HashSet<String> = [A.to_string(), B.to_string()].into_iter().collect();
+    let disk: HashMap<String, DiskState> = HashMap::new(); // both missing on disk so far
+
+    let entries = apply_plan::plan(PlanInputs {
+        old: None,
+        target: &target_packinfo,
+        staged: &staged,
+        disk: &disk,
+        mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
+    })
+    .expect("a fully-staged, unconsumed apply must not error");
+
+    execute_plan(&entries, &instance_root, &staging_dir)
+        .await
+        .expect("execute_plan must apply both files");
+
+    assert_eq!(
+        tokio::fs::read(live_path(&instance_root, A)).await.unwrap(),
+        b"a-bytes",
+        "both overrides must actually land on disk — nothing was silently dropped"
+    );
+    assert_eq!(
+        tokio::fs::read(live_path(&instance_root, B)).await.unwrap(),
+        b"b-bytes"
+    );
+}
+
+#[test]
+fn already_promoted_inference_requires_apply_started_not_just_an_old_packinfo() {
+    // Genuinely promoted: `execute_plan` ran (marker present) and its
+    // record was renamed into place. The only combination that may take
+    // the "already applied, just finish cleanup" fast path.
+    assert!(super::staging_apply_already_promoted(true, true));
+
+    // Fresh install landing in the overrides-extracted-but-not-yet-applied
+    // window: no packinfo has ever existed (nothing installed before), and
+    // the apply hasn't started. Must NOT be read as "already promoted" — a
+    // guard that did would mark the change complete having applied nothing,
+    // permanently (every future launch lands in the same state).
+    assert!(!super::staging_apply_already_promoted(false, false));
+
+    // Version change on an already-installed modpack landing in the same
+    // window: an OLD packinfo.json genuinely exists (from before this
+    // change began), but the apply for *this* change hasn't started. The
+    // old packinfo's mere existence must not be mistaken for proof this
+    // apply finished — same failure mode as above, just with a
+    // pre-existing file this time instead of no file at all. The pre-fix
+    // inline condition (`!tmp_packinfo_path.exists()` alone deciding
+    // "already promoted" whenever `packinfo_path.exists()`, with no
+    // apply-started check at all) reduces to exactly `packinfo_exists` on
+    // its own — computed here from the same input this case feeds the real
+    // function, so the two are asserted to actually disagree rather than
+    // just independently asserted.
+    let apply_started = false;
+    let packinfo_exists = true;
+    let pre_fix_would_treat_as_promoted = packinfo_exists; // the bare, pre-fix condition
+    let fixed = super::staging_apply_already_promoted(apply_started, packinfo_exists);
+    assert_ne!(
+        pre_fix_would_treat_as_promoted, fixed,
+        "the fixed discriminator must disagree with the pre-fix bare-packinfo_exists one for \
+         exactly this input (old packinfo present, apply not started) — that divergence is the \
+         whole point of the fix; the pre-fix condition would have wrongly taken the fast path \
+         and marked the change complete having applied nothing"
+    );
+    assert!(!fixed);
+
+    // Marker present but no packinfo at all: `apply_started` alone isn't
+    // sufficient either — a genuine invariant violation, must not be
+    // silently treated as promoted.
+    assert!(!super::staging_apply_already_promoted(true, false));
+}
+
+// --- apply-started marker durability -------------------------------------
+
+#[tokio::test]
+async fn fsync_dir_succeeds_on_a_real_directory() {
+    // `fsync_dir` is the other half of durably creating
+    // `.setup/apply-started` (see the write site in
+    // `process_modpack_staging`): a file's own `sync_all` only flushes its
+    // bytes, this flushes the directory entry that makes it discoverable.
+    // Exercised here against a real directory rather than only compiled —
+    // `File::open` on a bare directory (legal on Unix for this purpose,
+    // rejected on Windows, where the function is a no-op instead) is easy
+    // to get subtly wrong.
+    let tmp = tempfile::tempdir().unwrap();
+    super::fsync_dir(tmp.path())
+        .await
+        .expect("fsyncing a real, existing directory must not error");
+}
+
+#[tokio::test]
+async fn apply_started_marker_is_durably_creatable_and_discoverable() {
+    // The exact sequence `process_modpack_staging` runs right before
+    // `execute_plan`: create the marker file, fsync it, fsync its parent
+    // directory. Proves the sequence itself completes and leaves the marker
+    // present and readable — not a substitute for a real power-loss test
+    // (not feasible here), but does prove `fsync_dir` and `File::create` +
+    // `sync_all` compose without erroring against a real `.setup`-shaped
+    // directory, and that the marker is exactly what `apply_started_path.exists()`
+    // (the read side, in both `process_modpack` and `process_modpack_staging`)
+    // expects to find.
+    let tmp = tempfile::tempdir().unwrap();
+    let setup_path = tmp.path().join(".setup");
+    tokio::fs::create_dir_all(&setup_path).await.unwrap();
+    let marker_path = setup_path.join("apply-started");
+
+    assert!(!marker_path.exists());
+
+    {
+        let marker_file = tokio::fs::File::create(&marker_path).await.unwrap();
+        marker_file.sync_all().await.unwrap();
+    }
+    super::fsync_dir(&setup_path).await.unwrap();
+
+    assert!(
+        marker_path.exists(),
+        "the marker must be discoverable immediately after the sync sequence completes"
+    );
 }

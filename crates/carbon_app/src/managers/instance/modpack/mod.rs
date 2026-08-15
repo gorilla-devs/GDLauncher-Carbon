@@ -184,6 +184,17 @@ impl ManagerRef<'_, InstanceManager> {
             );
         }
 
+        // A crashed previous session (before this one's `.setup` bail-out
+        // above could even apply — see `repair_modpack`, which wipes
+        // `.setup` unconditionally) can leave a `tmp-packinfo.json` behind:
+        // it lives at the instance root, outside `.setup`, so wiping/never
+        // having `.setup` doesn't clean it. This session is starting fully
+        // fresh (no `.setup` at all right now), so any leftover
+        // `tmp-packinfo.json` is necessarily stale relative to what's about
+        // to be staged — remove it rather than leaving it to be relied on to
+        // get silently overwritten later.
+        let _ = tokio::fs::remove_file(instance_path.get_root().join("tmp-packinfo.json")).await;
+
         tokio::fs::create_dir_all(&setup_path).await?;
 
         let update_file_path = setup_path.join("change-pack-version.json");
@@ -280,6 +291,15 @@ impl ManagerRef<'_, InstanceManager> {
         if setup_path.exists() {
             tokio::fs::remove_dir_all(&setup_path).await?;
         }
+
+        // `tmp-packinfo.json` lives at the instance root, outside `.setup`,
+        // so wiping `.setup` above doesn't touch it — a previous session
+        // that crashed after writing it but before promoting it would
+        // otherwise leave it behind. This repair is about to regenerate its
+        // own record from scratch regardless, but a stale file here should
+        // never be left for later code to have to reason about (or rely on
+        // being overwritten) — remove it outright.
+        let _ = tokio::fs::remove_file(instance_path.get_root().join("tmp-packinfo.json")).await;
 
         tokio::fs::create_dir_all(&setup_path).await?;
 
