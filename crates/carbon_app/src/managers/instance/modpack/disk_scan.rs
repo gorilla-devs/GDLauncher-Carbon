@@ -263,12 +263,38 @@ async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
     Ok(Some(md5.finalize().into()))
 }
 
-/// Repair skip-oracle: full scan of the instance data dir as a PackInfo
-/// (md5+sha512), keyed under enabled names (`.disabled` stripped), skipping
-/// `/saves` and `.install_audit`. When both `X` and `X.disabled` exist the
-/// ENABLED file's hashes win (deterministic, unlike scan_dir's racy insert).
-pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<PackInfo> {
+/// Repair skip-oracle: full scan of the instance data dir, producing both a
+/// [`PackInfo`] (md5+sha512, keyed under enabled names with `.disabled`
+/// stripped, skipping `/saves` and `.install_audit` — same as
+/// [`scan_dir`](super::packinfo::scan_dir)) for the skip-optimising prep
+/// functions, and a [`DiskScan`] with Present/Disabled/twin semantics
+/// identical to [`scan_disk_state`] over that same directory. Both are
+/// derived from one walk so a repair's
+/// [`super::super::run::modpack::process_modpack_staging`] can reuse the
+/// `DiskScan` half instead of paying for a second full-tree hash of the
+/// instance data dir. When both `X` and `X.disabled` exist the ENABLED
+/// file's hashes win in both outputs (deterministic, unlike scan_dir's racy
+/// insert).
+///
+/// `/saves` and `.install_audit` are never hashed and never appear in the
+/// returned `PackInfo`, exactly as before — but a file under either that the
+/// walk finds still needs to land in `DiskScan`: a modpack override can
+/// legitimately ship a file under `/saves` (see [`apply_plan::plan`]'s own
+/// doc), so its planner needs to know whether such a path exists on disk at
+/// all. That branch of the planner only ever inspects the `DiskState`
+/// variant for a `/saves` path (`Present`/`Disabled`/`Missing`), never the
+/// md5 carried by the first two, so a placeholder stands in for the real
+/// hash here — recording existence, which the walk already observed for
+/// free, without opening and hashing a save that can be many gigabytes,
+/// which would defeat the entire point of this function producing a
+/// `DiskScan` a repair can reuse in the first place.
+pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<(PackInfo, DiskScan)> {
     let mut futures = Vec::new();
+    // `(key, from_disabled)` for every `/saves`/`.install_audit` file the
+    // walk finds — real, on-disk paths whose existence is free to record
+    // (the walk already visited them) but that must never be opened, hashed,
+    // or included in the returned `PackInfo` — see this function's own doc.
+    let mut unhashed_presence: Vec<(String, bool)> = Vec::new();
 
     let mut walker = NormalizedWalkdir::new(data_path)?;
     while let Some(entry) = walker.next()? {
@@ -279,6 +305,12 @@ pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<PackI
         let relative_path = entry.relative_path;
         if apply_plan::is_saves_path(relative_path) || relative_path.starts_with("/.install_audit")
         {
+            let mut key = relative_path.to_string();
+            let from_disabled = key.ends_with(".disabled");
+            if from_disabled {
+                key.truncate(key.len() - ".disabled".len());
+            }
+            unhashed_presence.push((key, from_disabled));
             continue;
         }
 
@@ -322,19 +354,76 @@ pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<PackI
     let mut files: HashMap<String, FileHashes> = HashMap::new();
     let mut disabled_backed: HashSet<String> = HashSet::new();
 
-    for (key, hashes, from_disabled) in results {
-        if from_disabled {
-            if !files.contains_key(&key) || disabled_backed.contains(&key) {
-                files.insert(key.clone(), hashes);
-                disabled_backed.insert(key);
+    for (key, hashes, from_disabled) in &results {
+        if *from_disabled {
+            if !files.contains_key(key) || disabled_backed.contains(key) {
+                files.insert(key.clone(), hashes.clone());
+                disabled_backed.insert(key.clone());
             }
         } else {
-            files.insert(key.clone(), hashes);
-            disabled_backed.remove(&key);
+            files.insert(key.clone(), hashes.clone());
+            disabled_backed.remove(key);
         }
     }
 
-    Ok(PackInfo { files })
+    // `DiskScan` companion to `files` above, built from the same walk.
+    // Tracked via separate enabled/disabled md5 maps rather than reusing
+    // `files`/`disabled_backed`: a coexisting `.disabled` twin's md5 is
+    // exactly what `disabled_backed`'s bookkeeping discards once an enabled
+    // copy wins the key above, but `DiskScan::coexisting_disabled_twin_md5`
+    // needs that value regardless. Placeholder md5s from `unhashed_presence`
+    // (see this function's own doc) are folded in via `or_insert` only,
+    // never able to clobber a real hashed value — a path is either under
+    // `/saves`/`.install_audit` or hashed, never both, so this can't happen
+    // in practice, but `or_insert` keeps that an explicit ordering rather
+    // than an assumed invariant.
+    const UNHASHED_PRESENCE_PLACEHOLDER: [u8; 16] = [0xEE; 16];
+
+    let mut enabled_md5: HashMap<String, [u8; 16]> = HashMap::new();
+    let mut disabled_md5: HashMap<String, [u8; 16]> = HashMap::new();
+    for (key, hashes, from_disabled) in &results {
+        if *from_disabled {
+            disabled_md5.entry(key.clone()).or_insert(hashes.md5);
+        } else {
+            enabled_md5.entry(key.clone()).or_insert(hashes.md5);
+        }
+    }
+    for (key, from_disabled) in &unhashed_presence {
+        if *from_disabled {
+            disabled_md5
+                .entry(key.clone())
+                .or_insert(UNHASHED_PRESENCE_PLACEHOLDER);
+        } else {
+            enabled_md5
+                .entry(key.clone())
+                .or_insert(UNHASHED_PRESENCE_PLACEHOLDER);
+        }
+    }
+
+    let mut states = HashMap::with_capacity(enabled_md5.len() + disabled_md5.len());
+    let mut coexisting_disabled_twin_md5 = HashMap::new();
+    for (key, &md5) in &enabled_md5 {
+        states.insert(key.clone(), apply_plan::DiskState::Present { md5 });
+        if let Some(&twin_md5) = disabled_md5.get(key) {
+            coexisting_disabled_twin_md5.insert(key.clone(), twin_md5);
+        }
+    }
+    for (key, &md5) in &disabled_md5 {
+        if enabled_md5.contains_key(key) {
+            // Already recorded as `Present` above; its own md5 is in
+            // `coexisting_disabled_twin_md5`, not a second `states` entry.
+            continue;
+        }
+        states.insert(key.clone(), apply_plan::DiskState::Disabled { md5 });
+    }
+
+    Ok((
+        PackInfo { files },
+        DiskScan {
+            states,
+            coexisting_disabled_twin_md5,
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -526,7 +615,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("a.jar"), b"hi").unwrap();
 
-        let packinfo = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
 
         assert!(
             packinfo.files.contains_key("/a.jar"),
@@ -540,7 +629,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("a.jar.disabled"), b"hi").unwrap();
 
-        let packinfo = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
 
         assert!(packinfo.files.contains_key("/a.jar"));
         assert!(!packinfo.files.contains_key("/a.jar.disabled"));
@@ -552,7 +641,7 @@ mod tests {
         std::fs::write(dir.path().join("a.jar"), b"enabled-bytes").unwrap();
         std::fs::write(dir.path().join("a.jar.disabled"), b"disabled-bytes").unwrap();
 
-        let packinfo = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
 
         let hashes = packinfo
             .files
@@ -568,7 +657,7 @@ mod tests {
         std::fs::write(dir.path().join("saves/world/level.dat"), b"save").unwrap();
         std::fs::write(dir.path().join("a.jar"), b"kept").unwrap();
 
-        let packinfo = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
 
         assert!(packinfo.files.contains_key("/a.jar"));
         assert!(
@@ -585,7 +674,7 @@ mod tests {
         std::fs::write(dir.path().join(".install_audit/log.json"), b"audit").unwrap();
         std::fs::write(dir.path().join("a.jar"), b"kept").unwrap();
 
-        let packinfo = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
 
         assert!(packinfo.files.contains_key("/a.jar"));
         assert!(
@@ -604,13 +693,84 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("mods/sub")).unwrap();
         std::fs::write(dir.path().join("mods/sub/nested.jar"), b"nested-bytes").unwrap();
 
-        let packinfo = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
 
         let hashes = packinfo
             .files
             .get("/mods/sub/nested.jar")
             .expect("nested file must be found by the walk");
         assert_eq!(hashes.md5, md5_of(b"nested-bytes"));
+    }
+
+    // --- scan_instance_as_packinfo's paired DiskScan -----------------------
+
+    #[tokio::test]
+    async fn oracle_disk_scan_matches_a_direct_scan_disk_state_over_the_same_universe() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("mods")).unwrap();
+        // Plain enabled-only file.
+        std::fs::write(dir.path().join("mods/enabled.jar"), b"enabled-bytes").unwrap();
+        // Plain disabled-only file (sole on-disk representation).
+        std::fs::write(
+            dir.path().join("mods/disabled.jar.disabled"),
+            b"disabled-only-bytes",
+        )
+        .unwrap();
+        // Coexisting enabled file + disabled twin.
+        std::fs::write(dir.path().join("mods/twin.jar"), b"twin-enabled-bytes").unwrap();
+        std::fs::write(
+            dir.path().join("mods/twin.jar.disabled"),
+            b"twin-disabled-bytes",
+        )
+        .unwrap();
+
+        let (packinfo, oracle_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
+
+        let file_universe: BTreeSet<String> = packinfo.files.keys().cloned().collect();
+        assert_eq!(
+            file_universe,
+            universe(&["/mods/enabled.jar", "/mods/disabled.jar", "/mods/twin.jar"])
+        );
+
+        let direct_scan = scan_disk_state(dir.path(), &file_universe).await.unwrap();
+
+        assert_eq!(
+            oracle_scan.states, direct_scan.states,
+            "the oracle-derived DiskScan states must exactly match a direct scan_disk_state \
+             over the same universe"
+        );
+        assert_eq!(
+            oracle_scan.coexisting_disabled_twin_md5, direct_scan.coexisting_disabled_twin_md5,
+            "the oracle-derived coexisting-twin md5s must exactly match a direct scan_disk_state"
+        );
+    }
+
+    #[tokio::test]
+    async fn oracle_disk_scan_reports_a_saves_file_present_without_hashing_it() {
+        // `/saves` is excluded from the returned `PackInfo` (never hashed —
+        // see this function's own doc), but its DiskScan companion still
+        // needs to know a save exists at all, since `apply_plan::plan`'s
+        // `/saves` branch can fall through to normal reconciliation for a
+        // path `old` never tracked (see that function's own doc).
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("saves/world")).unwrap();
+        std::fs::write(dir.path().join("saves/world/level.dat"), b"save-bytes").unwrap();
+
+        let (packinfo, oracle_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
+
+        assert!(
+            !packinfo.files.contains_key("/saves/world/level.dat"),
+            "a /saves file must never be hashed into the returned PackInfo"
+        );
+        assert!(
+            matches!(
+                oracle_scan.states.get("/saves/world/level.dat"),
+                Some(apply_plan::DiskState::Present { .. })
+            ),
+            "a /saves file's mere existence must still surface as Present in the paired \
+             DiskScan, got {:?}",
+            oracle_scan.states.get("/saves/world/level.dat")
+        );
     }
 
     // --- probe_case_insensitive ---------------------------------------

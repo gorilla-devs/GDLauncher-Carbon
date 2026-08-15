@@ -162,7 +162,12 @@ pub async fn process_modpack(
     instance_shortpath: String,
     task: &VisualTask,
     has_callback_task: bool,
-) -> anyhow::Result<(TSubtasks, Option<StandardVersion>, Option<RepairMarkerFile>)> {
+) -> anyhow::Result<(
+    TSubtasks,
+    Option<StandardVersion>,
+    Option<RepairMarkerFile>,
+    Option<disk_scan::DiskScan>,
+)> {
     let mut version: Option<StandardVersion> = None;
 
     let runtime_path = app.settings_manager().runtime_path.clone();
@@ -196,16 +201,31 @@ pub async fn process_modpack(
     // download" against what is actually on disk right now, not against the
     // record — a corrupt or missing file must be re-fetched even when the
     // record says it was fine.
-    let skip_oracle = match &repair_options {
+    //
+    // Repair mode's full-tree walk (`scan_instance_as_packinfo`) also yields
+    // a `DiskScan` with Present/Disabled/twin semantics identical to
+    // `process_modpack_staging`'s own `scan_disk_state` over the same
+    // directory (see that function's own doc) — carried alongside as
+    // `oracle_disk_scan` so `process_modpack_staging` can reuse this single
+    // walk instead of hashing every tracked file a second time. `None`
+    // outside repair mode: an ordinary version change never runs the oracle
+    // walk at all, so `process_modpack_staging` always scans for itself in
+    // that case.
+    let (skip_oracle, oracle_disk_scan) = match &repair_options {
         Some(_) => {
-            Some(disk_scan::scan_instance_as_packinfo(&instance_path.get_data_path()).await?)
+            let (packinfo, disk_scan) =
+                disk_scan::scan_instance_as_packinfo(&instance_path.get_data_path()).await?;
+            (Some(packinfo), Some(disk_scan))
         }
-        None => match tokio::fs::read_to_string(&packinfo_path).await {
-            Ok(text) => {
-                Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?)
-            }
-            Err(_) => None,
-        },
+        None => (
+            match tokio::fs::read_to_string(&packinfo_path).await {
+                Ok(text) => {
+                    Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?)
+                }
+                Err(_) => None,
+            },
+            None,
+        ),
     };
 
     let t_modpack = match is_setup && !is_modpack_complete {
@@ -826,7 +846,12 @@ pub async fn process_modpack(
         t_finalize_import,
     };
 
-    Ok((Arc::new(subtasks), version, repair_options))
+    Ok((
+        Arc::new(subtasks),
+        version,
+        repair_options,
+        oracle_disk_scan,
+    ))
 }
 
 /// Applies the staged files for a modpack version change or repair,
@@ -854,6 +879,7 @@ pub async fn process_modpack_staging(
     instance_shortpath: String,
     t_subtasks: &TSubtasks,
     repair_options: Option<RepairMarkerFile>,
+    oracle_disk_scan: Option<disk_scan::DiskScan>,
 ) -> anyhow::Result<()> {
     let runtime_path = app.settings_manager().runtime_path.clone();
     let instance_path = runtime_path
@@ -954,10 +980,23 @@ pub async fn process_modpack_staging(
             .flat_map(|p| p.files.keys().cloned())
             .chain(target_packinfo.files.keys().cloned())
             .collect();
+        // `oracle_disk_scan`, when given, is repair's own skip-optimisation
+        // oracle walk (`scan_instance_as_packinfo`, called by `process_modpack`
+        // before this function ever runs) reused instead of hashing every
+        // tracked file a second time: nothing under `instance/` changes
+        // between that walk and this point — every write in between lands
+        // under `.setup/staging`, a separate tree, and `execute_plan` below
+        // is what first touches `instance/` at all — so the snapshot is
+        // still exactly accurate here. Falls back to a fresh scan whenever
+        // it's absent (an ordinary version change, which never runs the
+        // oracle walk at all).
         let disk_scan::DiskScan {
             states: disk,
             coexisting_disabled_twin_md5,
-        } = disk_scan::scan_disk_state(&instance_root.join("instance"), &universe).await?;
+        } = match oracle_disk_scan {
+            Some(scan) => scan,
+            None => disk_scan::scan_disk_state(&instance_root.join("instance"), &universe).await?,
+        };
 
         // Whether this instance's data dir lives on a filesystem that folds
         // path case together (Windows, default-configuration macOS) — see

@@ -457,22 +457,24 @@ impl ManagerRef<'_, InstanceManager> {
             let try_result: anyhow::Result<_> = async {
                 let mut downloads = Vec::new();
 
-                let (t_subtasks, modpack_version, repair_options) = modpack::process_modpack(
-                    Arc::clone(&app),
-                    instance_id.clone(),
-                    deep_check,
-                    config,
-                    instance_shortpath.clone(),
-                    &task,
-                    callback_task.is_some(),
-                )
-                .await?;
+                let (t_subtasks, modpack_version, repair_options, oracle_disk_scan) =
+                    modpack::process_modpack(
+                        Arc::clone(&app),
+                        instance_id.clone(),
+                        deep_check,
+                        config,
+                        instance_shortpath.clone(),
+                        &task,
+                        callback_task.is_some(),
+                    )
+                    .await?;
                 modpack::process_modpack_staging(
                     Arc::clone(&app),
                     instance_id,
                     instance_shortpath.clone(),
                     &t_subtasks,
                     repair_options,
+                    oracle_disk_scan,
                 )
                 .await?;
 
