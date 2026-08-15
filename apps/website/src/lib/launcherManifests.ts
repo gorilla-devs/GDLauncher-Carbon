@@ -38,6 +38,12 @@ async function getManifest(os: DownloadOs): Promise<Manifest | null> {
     const res = await fetch(MANIFEST_URL[os])
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const manifest = yaml.load(await res.text()) as Manifest
+    if (
+      typeof manifest?.path !== "string" ||
+      typeof manifest?.version !== "string"
+    ) {
+      throw new Error(`Malformed ${os} launcher manifest`)
+    }
     manifests.set(os, manifest)
     return manifest
   } catch (e) {
