@@ -820,8 +820,7 @@ pub async fn walk_untracked_files(
     target_packinfo: &packinfo::PackInfo,
     fs_case_insensitive: bool,
 ) -> HashMap<String, PathBuf> {
-    let allowed = top_level_segments(target_packinfo, old_packinfo);
-    let all_files = walk_data_files(instance_data, &allowed).await;
+    let all_files = walk_packinfo_scoped_files(instance_data, target_packinfo, old_packinfo).await;
 
     // Built once for the whole walk, not per lookup, and only when the
     // filesystem itself can't tell two differently-cased spellings apart.
@@ -891,11 +890,8 @@ fn fold_tracked_keys<'a>(
 /// want the untracked subset (e.g. `origin_check`) filter
 /// `packinfo.files.contains_key(key)` out themselves.
 ///
-/// Shared by [`untracked_files_for_preview`] and
-/// [`origin_check::run_check_pack_origin`](origin_check); [`walk_untracked_files`]
-/// inlines the same two-line combo separately rather than sharing this, since
-/// it also folds in `old`'s segments and isn't part of this task's scope to
-/// touch.
+/// Shared by [`untracked_files_for_preview`], [`walk_untracked_files`], and
+/// [`origin_check::run_check_pack_origin`](origin_check).
 async fn walk_packinfo_scoped_files(
     instance_data: &Path,
     packinfo: &packinfo::PackInfo,
