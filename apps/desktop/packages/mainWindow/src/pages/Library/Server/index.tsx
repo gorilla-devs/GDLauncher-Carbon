@@ -20,6 +20,11 @@ interface ServerTab {
   segment: string
 }
 
+// Mirrors CRASH_RESTART_MAX_ATTEMPTS in
+// crates/carbon_app/src/managers/server/mod.rs, which the backend does not
+// expose — only the resulting `autoRestartAbandoned` flag is sent over rspc.
+const AUTO_RESTART_MAX_ATTEMPTS = 6
+
 const ALL_TABS: ServerTab[] = [
   {
     id: "console",
@@ -89,6 +94,7 @@ const Server = (props: { children?: any }) => {
   const isStopping = () => details()?.state?.status === "stopping"
   const isStopped = () => details()?.state?.status === "stopped"
   const isBusy = () => isStarting() || isStopping()
+  const isAutoRestartAbandoned = () => details()?.autoRestartAbandoned ?? false
 
   const handleStartStop = () => {
     if (isRunning()) {
@@ -216,6 +222,16 @@ const Server = (props: { children?: any }) => {
                   </Match>
                 </Switch>
               </div>
+              {/* Auto-restart gave up — surfaces until the next manual start */}
+              <Show when={isAutoRestartAbandoned()}>
+                <div class="flex items-center gap-1.5 text-xs font-medium text-yellow-500">
+                  <div class="i-hugeicons:alert-02 h-4 w-4 shrink-0" />
+                  <Trans
+                    key="instances:_trn_server_auto_restart_abandoned"
+                    options={{ count: AUTO_RESTART_MAX_ATTEMPTS }}
+                  />
+                </div>
+              </Show>
             </div>
           </div>
         </>

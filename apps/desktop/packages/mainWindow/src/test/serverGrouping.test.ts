@@ -28,6 +28,7 @@ function makeServer(overrides: Partial<ListServer> = {}): ListServer {
     modloaderType: null,
     modloaderVersion: null,
     modpackInfo: null,
+    autoRestartAbandoned: false,
     ...overrides
   }
 }

@@ -88,6 +88,7 @@ pub struct ListServer {
     modloader_type: Option<String>,
     modloader_version: Option<String>,
     modpack_info: Option<FEServerModpackInfo>,
+    auto_restart_abandoned: bool,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -151,6 +152,7 @@ pub struct FEServerDetails {
     modloader_type: Option<String>,
     modloader_version: Option<String>,
     modpack_info: Option<FEServerModpackInfo>,
+    auto_restart_abandoned: bool,
 }
 
 impl From<domain::ServerDetails> for FEServerDetails {
@@ -176,6 +178,7 @@ impl From<domain::ServerDetails> for FEServerDetails {
             modloader_type: d.modloader_type,
             modloader_version: d.modloader_version,
             modpack_info: d.modpack_info.map(FEServerModpackInfo::from),
+            auto_restart_abandoned: d.auto_restart_abandoned,
         }
     }
 }
@@ -477,6 +480,8 @@ pub(super) fn mount() -> RouterBuilder<App> {
                             .get(&s.id)
                             .map(|sd| convert_state(&sd.state))
                             .unwrap_or(FEServerState::Stopped { failed_task: None });
+                        let auto_restart_abandoned =
+                            app.server_manager.is_auto_restart_abandoned(s.id);
 
                         ListServer {
                             id: FEServerId(s.id.0),
@@ -495,6 +500,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                             modloader_type: s.modloader_type,
                             modloader_version: s.modloader_version,
                             modpack_info: s.modpack_info.map(FEServerModpackInfo::from),
+                            auto_restart_abandoned,
                         }
                     })
                 })

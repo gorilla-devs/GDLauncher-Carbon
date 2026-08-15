@@ -211,6 +211,10 @@ pub struct ServerManager {
     /// Consecutive fast-crash count per server, used to back off and cap
     /// automatic restarts. See `crash_restart_delay`.
     crash_restart_state: DashMap<ServerId, u32>,
+    /// Servers whose auto-restart has hit `CRASH_RESTART_MAX_ATTEMPTS` and
+    /// given up. Surfaced to the frontend as `auto_restart_abandoned`;
+    /// cleared the moment the server is started manually.
+    crash_restart_abandoned: DashMap<ServerId, ()>,
 }
 
 impl std::fmt::Debug for ServerManager {
@@ -234,7 +238,37 @@ impl ServerManager {
             log_counter: Mutex::new(0),
             index_lock: Mutex::new(()),
             crash_restart_state: DashMap::new(),
+            crash_restart_abandoned: DashMap::new(),
         }
+    }
+
+    /// Whether `id`'s auto-restart has given up after repeated fast crashes
+    /// without a healthy run. Cleared the moment the server is next started
+    /// manually — see `ManagerRef<ServerManager>::start_server`.
+    pub fn is_auto_restart_abandoned(&self, id: ServerId) -> bool {
+        self.crash_restart_abandoned.contains_key(&id)
+    }
+
+    /// Records a crash for `id` and returns the updated consecutive
+    /// fast-crash count plus whether auto-restart has now given up. A prior
+    /// run lasting at least `CRASH_RESTART_HEALTHY_UPTIME_SECS` (`healthy`)
+    /// resets the streak instead of continuing it. Hitting
+    /// `CRASH_RESTART_MAX_ATTEMPTS` marks the server abandoned.
+    fn record_crash_restart_attempt(&self, id: ServerId, healthy: bool) -> (u32, bool) {
+        let attempts = {
+            let mut entry = self.crash_restart_state.entry(id).or_insert(0);
+            if healthy {
+                *entry = 0;
+            }
+            *entry += 1;
+            *entry
+        };
+
+        let abandoned = attempts > CRASH_RESTART_MAX_ATTEMPTS;
+        if abandoned {
+            self.crash_restart_abandoned.insert(id, ());
+        }
+        (attempts, abandoned)
     }
 
     fn get_provider(&self) -> Box<dyn ServerProvider> {
@@ -1381,6 +1415,7 @@ impl ManagerRef<'_, ServerManager> {
         }
         self.server_op_locks.remove(&id);
         self.crash_restart_state.remove(&id);
+        self.crash_restart_abandoned.remove(&id);
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_GROUPS, None);
@@ -1388,7 +1423,19 @@ impl ManagerRef<'_, ServerManager> {
         Ok(())
     }
 
+    /// Starts `id` manually. Always gets a fresh auto-restart cycle: past
+    /// crash history — including a prior "gave up" state — no longer applies
+    /// once the user has taken over, fulfilling the give-up log's "until it
+    /// is started manually" promise. The auto-restart watcher's own retries
+    /// call `start_server_impl` directly so a retry doesn't erase the streak
+    /// it's the one accumulating.
     pub async fn start_server(self, id: ServerId) -> anyhow::Result<()> {
+        self.crash_restart_state.remove(&id);
+        self.crash_restart_abandoned.remove(&id);
+        self.start_server_impl(id).await
+    }
+
+    async fn start_server_impl(self, id: ServerId) -> anyhow::Result<()> {
         let lock = self.get_op_lock(id);
         let _guard = lock.lock().await;
 
@@ -1604,26 +1651,20 @@ impl ManagerRef<'_, ServerManager> {
             // attempt count — this crash starts a fresh sequence rather than
             // continuing a tight loop.
             let healthy = uptime >= chrono::Duration::seconds(CRASH_RESTART_HEALTHY_UPTIME_SECS);
-            let attempts = {
-                let mut entry = app
-                    .server_manager
-                    .crash_restart_state
-                    .entry(id)
-                    .or_insert(0);
-                if healthy {
-                    *entry = 0;
-                }
-                *entry += 1;
-                *entry
-            };
+            let (attempts, abandoned) =
+                app.server_manager.record_crash_restart_attempt(id, healthy);
 
-            if attempts > CRASH_RESTART_MAX_ATTEMPTS {
+            if abandoned {
                 error!(
                     "Server {} crashed {} times in a row without staying up {}s; giving up on auto-restart until it is started manually",
                     id.0,
                     attempts - 1,
                     CRASH_RESTART_HEALTHY_UPTIME_SECS
                 );
+                // Surfaces `auto_restart_abandoned` to the frontend now,
+                // rather than waiting for the next unrelated invalidation.
+                app.invalidate(GET_ALL_SERVERS, None);
+                app.invalidate(GET_SERVER_DETAILS, None);
                 return;
             }
 
@@ -1634,16 +1675,20 @@ impl ManagerRef<'_, ServerManager> {
             );
             tokio::time::sleep(delay).await;
             // ManagerRef's future is not Send, so we use a oneshot to
-            // bridge into a context where we can call start_server.
+            // bridge into a context where we can call start_server_impl.
             let (tx, rx) = tokio::sync::oneshot::channel::<anyhow::Result<()>>();
             let app2 = app.clone();
             // Captured here, on a runtime thread: the handle lives in a
             // thread-local that a freshly spawned OS thread does not inherit,
             // so resolving it inside the closure below would panic instead.
             let rt = tokio::runtime::Handle::current();
-            // This inner task owns the Arc and can create a ManagerRef locally
+            // This inner task owns the Arc and can create a ManagerRef locally.
+            // Calls `start_server_impl` directly (bypassing the public
+            // `start_server`'s crash-state reset) — this retry is the one
+            // accumulating the streak `record_crash_restart_attempt` tracks,
+            // so it must not erase it on every attempt.
             std::thread::spawn(move || {
-                let result = rt.block_on(app2.server_manager().start_server(id));
+                let result = rt.block_on(app2.server_manager().start_server_impl(id));
                 let _ = tx.send(result);
             });
             match rx.await {
@@ -1843,6 +1888,7 @@ impl ManagerRef<'_, ServerManager> {
             xms: db_server.xms,
             extra_java_args: db_server.extra_java_args,
             auto_restart: db_server.auto_restart,
+            auto_restart_abandoned: self.is_auto_restart_abandoned(id),
             date_created: db_server.date_created.into(),
             last_started: db_server.last_started.map(|d| d.into()),
             state,
@@ -3555,6 +3601,38 @@ mod tests {
         // attempts is always >= 1 in practice (incremented before use), but
         // guard the boundary explicitly: no delay would defeat the backoff.
         assert!(crash_restart_delay(1) > std::time::Duration::ZERO);
+    }
+
+    #[test]
+    fn crash_restart_abandons_after_max_attempts_and_clears_on_manual_start() {
+        let manager = ServerManager::new();
+        let id = ServerId(1);
+
+        // CRASH_RESTART_MAX_ATTEMPTS consecutive fast (unhealthy) crashes are
+        // still within budget — auto-restart keeps retrying.
+        for _ in 0..CRASH_RESTART_MAX_ATTEMPTS {
+            let (_, abandoned) = manager.record_crash_restart_attempt(id, false);
+            assert!(!abandoned);
+        }
+        assert!(!manager.is_auto_restart_abandoned(id));
+
+        // One more fast crash past the cap — the seventh in a row — gives up
+        // and marks the server abandoned.
+        let (attempts, abandoned) = manager.record_crash_restart_attempt(id, false);
+        assert_eq!(attempts, CRASH_RESTART_MAX_ATTEMPTS + 1);
+        assert!(abandoned);
+        assert!(manager.is_auto_restart_abandoned(id));
+
+        // A manual start (the public `start_server`'s reset step) clears both
+        // the streak and the abandoned flag, handing the server one fresh
+        // retry cycle instead of staying permanently given up.
+        manager.crash_restart_state.remove(&id);
+        manager.crash_restart_abandoned.remove(&id);
+
+        assert!(!manager.is_auto_restart_abandoned(id));
+        let (attempts, abandoned) = manager.record_crash_restart_attempt(id, false);
+        assert_eq!(attempts, 1);
+        assert!(!abandoned);
     }
 
     // Pure decision logic (`reconcile_pid`, `is_live_java_process`,

@@ -50,6 +50,7 @@
   "_trn_server_settings_name": "Server Name",
   "_trn_server_settings_name_description": "The name shown for this server in your library.",
   "_trn_server_settings_auto_restart": "Auto Restart",
+  "_trn_server_auto_restart_abandoned": "Auto-restart gave up after {{count}} failed attempts. Start the server manually to try again.",
   "_trn_server_settings_xmx": "Max Memory (Xmx)",
   "_trn_server_settings_xms": "Min Memory (Xms)",
   "_trn_server_settings_extra_args": "Extra Java Args",

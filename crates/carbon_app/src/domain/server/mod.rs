@@ -106,6 +106,9 @@ pub struct ServerDetails {
     pub xms: i32,
     pub extra_java_args: String,
     pub auto_restart: bool,
+    /// Whether auto-restart has given up on this server after repeated fast
+    /// crashes without a healthy run. Cleared on the next manual start.
+    pub auto_restart_abandoned: bool,
     pub date_created: DateTime<Utc>,
     pub last_started: Option<DateTime<Utc>>,
     pub state: ServerState,
