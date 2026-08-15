@@ -1779,6 +1779,22 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok((icon_name, data))
     }
 
+    /// [`download_icon`](Self::download_icon), but for callers to whom an
+    /// icon is decorative rather than essential — a modpack archive import
+    /// that shouldn't fail just because the platform-supplied icon URL has
+    /// rotted. Any failure is `tracing::warn!`-logged and yields `None`
+    /// rather than propagating, leaving the caller free to fall back to
+    /// another icon source or import without one.
+    pub async fn try_download_icon(self, url: &str) -> Option<(String, Vec<u8>)> {
+        match self.download_icon(url.to_string()).await {
+            Ok(icon) => Some(icon),
+            Err(e) => {
+                tracing::warn!("Failed to download icon, continuing without it: {e}");
+                None
+            }
+        }
+    }
+
     pub async fn set_loaded_icon(self, icon: (String, Vec<u8>)) {
         *self.loaded_icon.lock().await = Some(icon);
     }
