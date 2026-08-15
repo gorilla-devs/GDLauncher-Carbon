@@ -260,22 +260,19 @@ fn success_page() -> String {
     include_str!("oauth_success.html").to_string()
 }
 
-/// Minimal HTML-escaping for untrusted text interpolated into a page body.
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
-}
-
 /// HTML page shown on authentication error
 fn error_page(error: &str, description: &str) -> String {
     // `error`/`error_description` come from the identity provider; escape them
-    // before substitution so they can't inject markup into the page.
+    // before substitution so they can't inject markup into the page. Escapes
+    // the same five characters (`& < > " '`) a quoted-attribute context
+    // needs, a strict superset of what the plain-text placeholders here
+    // require.
     include_str!("oauth_error.html")
-        .replace("{ERROR_TYPE}", &html_escape(error))
-        .replace("{ERROR_DESCRIPTION}", &html_escape(description))
+        .replace("{ERROR_TYPE}", &html_escape::encode_quoted_attribute(error))
+        .replace(
+            "{ERROR_DESCRIPTION}",
+            &html_escape::encode_quoted_attribute(description),
+        )
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
@@ -313,5 +310,17 @@ mod tests {
         assert!(result.is_err());
 
         handle.shutdown().await;
+    }
+
+    // `error`/`error_description` come straight from the identity provider,
+    // so error_page's escaping is the only thing standing between that and
+    // markup injection into a page GDLauncher itself serves.
+    #[test]
+    fn error_page_escapes_html_special_characters_in_provider_supplied_text() {
+        let page = error_page("<script>alert(1)</script>", "5 & 6 \"quoted\" 'single'");
+
+        assert!(!page.contains("<script>alert(1)</script>"));
+        assert!(page.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+        assert!(page.contains("5 &amp; 6 &quot;quoted&quot; &#x27;single&#x27;"));
     }
 }

@@ -443,6 +443,7 @@ dependencies = [
  "fs_extra",
  "futures",
  "hex",
+ "html-escape",
  "httpdate",
  "hyper",
  "image",

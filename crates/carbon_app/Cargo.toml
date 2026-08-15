@@ -80,6 +80,7 @@ serde-enum-str = "0.4.0"
 markdown = { workspace = true }
 serde_plain = { workspace = true }
 ring = { workspace = true }
+html-escape = { workspace = true }
 num_cpus = { workspace = true }
 display-info = { git = "https://github.com/blarfoon/display-info", rev = "e17abca4592b520b9027dbd8dc71bf756f913292" }
 strip-ansi-escapes = { workspace = true }
