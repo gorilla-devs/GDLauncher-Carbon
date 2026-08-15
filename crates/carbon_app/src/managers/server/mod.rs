@@ -78,7 +78,10 @@ fn sanitize_console_command(command: &str) -> String {
 /// instead would only be safe if the scanner inspected file contents too, which
 /// it doesn't.
 fn server_addon_dir(server_path: &ServerPath, filename: &str) -> std::path::PathBuf {
-    if filename.ends_with(".zip") {
+    let is_zip = std::path::Path::new(filename)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("zip"));
+    if is_zip {
         server_path.get_datapacks_path()
     } else {
         server_path.get_mods_path()
@@ -3475,6 +3478,18 @@ mod tests {
         // enter into it — only what the scan will see does.
         assert_eq!(
             server_addon_dir(&server_path, "cool-datapack-fabric.jar"),
+            server_path.get_mods_path()
+        );
+
+        // A CurseForge/Modrinth-supplied filename's extension case is not
+        // guaranteed — an uppercase `.ZIP` must still route to `datapacks/`,
+        // matching the scan's now case-insensitive extension check.
+        assert_eq!(
+            server_addon_dir(&server_path, "Pack.ZIP"),
+            server_path.get_datapacks_path()
+        );
+        assert_eq!(
+            server_addon_dir(&server_path, "Cool-Mod.JAR"),
             server_path.get_mods_path()
         );
     }

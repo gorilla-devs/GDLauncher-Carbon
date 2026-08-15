@@ -1433,7 +1433,7 @@ impl ManagerRef<'_, MetaCacheManager> {
             let mut entries = tokio::fs::read_dir(&mods_path).await?;
             while let Some(entry) = entries.next_entry().await? {
                 let filename = entry.file_name().to_string_lossy().to_string();
-                if filename.ends_with(".jar") || filename.ends_with(".jar.disabled") {
+                if addon_has_extension(&filename, "jar") {
                     let enabled = !filename.ends_with(".disabled");
                     let base_filename = filename.trim_end_matches(".disabled").to_string();
                     disk_files.push((base_filename, "mods".to_string(), enabled));
@@ -1446,7 +1446,7 @@ impl ManagerRef<'_, MetaCacheManager> {
             let mut entries = tokio::fs::read_dir(&datapacks_path).await?;
             while let Some(entry) = entries.next_entry().await? {
                 let filename = entry.file_name().to_string_lossy().to_string();
-                if filename.ends_with(".zip") || filename.ends_with(".zip.disabled") {
+                if addon_has_extension(&filename, "zip") {
                     let enabled = !filename.ends_with(".disabled");
                     let base_filename = filename.trim_end_matches(".disabled").to_string();
                     disk_files.push((base_filename, "datapacks".to_string(), enabled));
@@ -1522,6 +1522,18 @@ impl ManagerRef<'_, MetaCacheManager> {
         let currently_caching = self.get_currently_caching_entities().await;
         currently_caching.contains(&entity_id)
     }
+}
+
+/// Whether `filename`'s extension matches `ext`, ignoring case (a
+/// CurseForge/Modrinth-supplied file can arrive as `Pack.ZIP`), and
+/// tolerating a trailing `.disabled` suffix — appended by this app to mark an
+/// installed addon disabled without deleting it, so it must not itself count
+/// as the extension.
+fn addon_has_extension(filename: &str, ext: &str) -> bool {
+    let stripped = filename.strip_suffix(".disabled").unwrap_or(filename);
+    Path::new(stripped)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case(ext))
 }
 
 fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
@@ -1928,4 +1940,30 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             }
         ).await;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn addon_has_extension_ignores_case_and_the_disabled_suffix() {
+        // A CurseForge/Modrinth-supplied filename's extension case is not
+        // guaranteed — `cache_server_local`'s scan must still recognize it,
+        // or an installed `Pack.ZIP` datapack is invisible to it (unlistable,
+        // unremovable).
+        assert!(addon_has_extension("Pack.ZIP", "zip"));
+        assert!(addon_has_extension("cool-mod.JAR", "jar"));
+        assert!(addon_has_extension("cool-mod.jar", "jar"));
+
+        // The disabled marker this app appends must not itself count as the
+        // extension, and case-insensitivity still applies underneath it.
+        assert!(addon_has_extension("Pack.ZIP.disabled", "zip"));
+        assert!(addon_has_extension("cool-mod.jar.disabled", "jar"));
+
+        // A mismatched or absent extension is rejected either way.
+        assert!(!addon_has_extension("Pack.zip", "jar"));
+        assert!(!addon_has_extension("readme.txt", "zip"));
+        assert!(!addon_has_extension("no-extension", "jar"));
+    }
 }
