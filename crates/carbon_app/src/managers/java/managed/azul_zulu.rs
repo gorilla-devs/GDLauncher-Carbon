@@ -48,7 +48,16 @@ impl Managed for AzulZulu {
 
         let download_url = &version.download_url;
 
-        let content_length = reqwest::get(download_url).await?.content_length();
+        // Bounded the same way as every other Azul request in this module
+        // (see `azul_client`): calling the bare default client directly here
+        // had no timeout at all, so a server that accepts the connection and
+        // stalls would hang the whole managed-JRE install indefinitely on a
+        // probe whose result is merely a progress-bar size hint.
+        let content_length = azul_client(AZUL_REQUEST_TIMEOUT, AZUL_MAX_RETRIES)?
+            .get(download_url)
+            .send()
+            .await?
+            .content_length();
 
         // Best-effort: the list endpoint behind `fetch_all_versions` doesn't carry a
         // checksum at all, but Azul's per-package detail endpoint does. A failure here
@@ -663,6 +672,35 @@ mod test {
         assert!(
             result.is_err(),
             "a server that never responds must surface as an error"
+        );
+    }
+
+    /// Regression: `setup`'s Content-Length probe used to call the bare,
+    /// unbounded `reqwest::get` directly -- unlike every other network call
+    /// in this module, it had neither a timeout nor a retry policy, so a
+    /// server that accepted the connection and stalled would hang the whole
+    /// managed-JRE install indefinitely. `fetch_package_sha256` keeps its
+    /// own bespoke `tokio::time::timeout` wrapper around a bare
+    /// `reqwest::get` (unrelated, untouched here, and already bounded by
+    /// that wrapper); this only asserts the probe inside `setup` itself no
+    /// longer bypasses the module's bounded `azul_client`.
+    #[test]
+    fn setup_probes_content_length_through_the_bounded_azul_client() {
+        let source = include_str!("azul_zulu.rs");
+        let setup_start = source.find("async fn setup<G").expect("setup fn not found");
+        let setup_end = setup_start
+            + source[setup_start..]
+                .find("\n    async fn fetch_all_versions")
+                .expect("end of setup fn not found");
+        let setup_body = &source[setup_start..setup_end];
+
+        assert!(
+            !setup_body.contains("reqwest::get"),
+            "setup() must not call the bare, unbounded reqwest::get directly"
+        );
+        assert!(
+            setup_body.contains("azul_client("),
+            "setup() must bound its Content-Length probe through azul_client"
         );
     }
 
