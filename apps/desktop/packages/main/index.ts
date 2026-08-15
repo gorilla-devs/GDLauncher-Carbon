@@ -35,6 +35,10 @@ import log from "electron-log/main"
 import { hashEmailForOverwolf } from "./utils/emailHash"
 import { buildCoreModuleArgs } from "./utils/coreArgs.js"
 import { assertSafeRuntimeTarget } from "./utils/runtimePathGuard.js"
+import {
+  handleBeforeSendHeaders,
+  handleHeadersReceived
+} from "./utils/headerRewrite.js"
 import * as Sentry from "@sentry/electron/main"
 import "./preloadListeners"
 import getAdSize from "./adSize"
@@ -1465,17 +1469,6 @@ ipcMain.handle("getCurrentProgress", () => {
   return lastCoreModuleProgress
 })
 
-// Case-insensitive insert-only header write: existing values always win.
-function upsertKeyValue(obj: any, keyToChange: string, value: any) {
-  const keyToChangeLower = keyToChange.toLowerCase()
-  for (const key of Object.keys(obj)) {
-    if (key.toLowerCase() === keyToChangeLower) {
-      return
-    }
-  }
-  obj[keyToChange] = value
-}
-
 app.whenReady().then(async () => {
   console.log("App is ready")
   const accessibility = validateArgument("--enable-accessibility")
@@ -1495,42 +1488,13 @@ app.whenReady().then(async () => {
 
   // Electron allows exactly one listener per webRequest event per session —
   // a later registration silently replaces an earlier one — so all header
-  // rewriting for the renderer session lives in this single pair.
-  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
-    const { requestHeaders } = details
-
-    // YouTube's embedded player requires an HTTP Referer identifying the
-    // embedding site; packaged builds load from file://, which sends none,
-    // so the player refuses to play with error 153. Insert-only: when a
-    // real Referer exists (dev server pages, the player's own sub-requests)
-    // it is kept.
-    let hostname = ""
-    try {
-      hostname = new URL(details.url).hostname
-    } catch {
-      // ignore unparseable URLs
-    }
-    if (
-      hostname === "youtube.com" ||
-      hostname.endsWith(".youtube.com") ||
-      hostname === "youtube-nocookie.com" ||
-      hostname.endsWith(".youtube-nocookie.com")
-    ) {
-      upsertKeyValue(requestHeaders, "Referer", "https://app.gdlauncher.com/")
-    }
-
-    callback({ requestHeaders })
-  })
-
-  // The renderer runs from file:// in packaged builds, so cross-origin
-  // responses need permissive CORS headers for fetches to succeed. Insert-only:
-  // servers that set their own values keep them.
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    const { responseHeaders } = details
-    upsertKeyValue(responseHeaders, "Access-Control-Allow-Origin", ["*"])
-    upsertKeyValue(responseHeaders, "Access-Control-Allow-Headers", ["*"])
-    callback({ responseHeaders })
-  })
+  // rewriting for the renderer session lives in this single pair. See
+  // ./utils/headerRewrite.ts for what each listener does and why both guard
+  // against missing headers and always invoke `callback` exactly once.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    handleBeforeSendHeaders
+  )
+  session.defaultSession.webRequest.onHeadersReceived(handleHeadersReceived)
 
   app.on("second-instance", (_e, argv) => {
     // Handle protocol URLs on Windows (passed as command line arguments)
