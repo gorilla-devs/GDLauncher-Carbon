@@ -190,6 +190,82 @@ fn path_length(path: &Path) -> usize {
     path.as_os_str().len()
 }
 
+/// Characters illegal in a Windows filename — and unsafe or meaningless in a
+/// path component on any other OS — that `sanitize_icon_filename` strips from
+/// a URL-derived icon name before it touches disk.
+const ILLEGAL_FILENAME_CHARS: &[char] = &['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+
+/// Longest filename `download_icon` will write to disk, regardless of how
+/// long the URL's own last path segment is.
+const MAX_ICON_FILENAME_LEN: usize = 64;
+
+/// Turn a URL path segment into a filename safe to write directly to disk:
+/// every character illegal in a Windows filename becomes `_`, the result is
+/// capped to `MAX_ICON_FILENAME_LEN` characters, and a result that is empty
+/// or only dots (`.`, `..` — a bare `.`/`..` segment carries no name at all,
+/// and a leading `..` on a case that ever reached this far would otherwise
+/// walk out of the icon directory) falls back to a fixed safe name rather
+/// than passing through unchanged. The URL a `download_icon` filename is
+/// derived from is caller-supplied, so none of this is optional.
+fn sanitize_icon_filename(name: &str) -> String {
+    let sanitized: String = name
+        .chars()
+        .map(|c| {
+            if ILLEGAL_FILENAME_CHARS.contains(&c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .take(MAX_ICON_FILENAME_LEN)
+        .collect();
+
+    match sanitized.as_str() {
+        "" | "." | ".." => "icon".to_string(),
+        _ => sanitized,
+    }
+}
+
+/// The filename `download_icon` should use, derived from `url`'s own last
+/// path segment — `path_segments()` excludes `?query` and `#fragment` by
+/// construction, so `.../icon.png?width=64` yields `icon.png`, never
+/// `icon.png?width=64`. `None` when the URL has no non-empty path segment to
+/// use (e.g. it ends in `/`), so the caller can fall back to the response's
+/// `Content-Type` instead.
+fn icon_filename_from_url(url: &reqwest::Url) -> Option<String> {
+    url.path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .filter(|segment| !segment.is_empty())
+        .map(sanitize_icon_filename)
+}
+
+/// The file extension implied by a response's `Content-Type` header value
+/// (`image/png` -> `png`), lowercased. `png` if the header is absent,
+/// unparseable, or has no `/subtype` to read one from.
+fn extension_from_content_type(content_type: Option<&str>) -> String {
+    content_type
+        .and_then(|value| value.split(';').next())
+        .and_then(|mime| mime.trim().rsplit_once('/'))
+        .map(|(_, subtype)| subtype.trim().to_ascii_lowercase())
+        .filter(|ext| !ext.is_empty())
+        .unwrap_or_else(|| "png".to_string())
+}
+
+/// The filename `download_icon` actually writes to disk: `url_segment` (from
+/// `icon_filename_from_url`) verbatim when it already carries an extension
+/// (contains a `.`), otherwise with one appended from `content_type` — and
+/// the same content-type-derived extension, on a plain `icon` stem, when
+/// there was no usable URL segment at all. A URL segment with no extension
+/// (`.../noext`) must not silently lose the response's real content type the
+/// way falling back only on "no segment at all" would.
+fn icon_filename(url_segment: Option<String>, content_type: Option<&str>) -> String {
+    match url_segment {
+        Some(name) if name.contains('.') => name,
+        Some(name) => format!("{name}.{}", extension_from_content_type(content_type)),
+        None => format!("icon.{}", extension_from_content_type(content_type)),
+    }
+}
+
 impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn launch_background_tasks(self) {
         if let Err(e) = self.scan_instances().await {
@@ -1663,13 +1739,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             anyhow::bail!("icon url must be http or https");
         }
 
-        let extension = url
-            .rsplit_once('/')
-            .map(|(_, name)| name.rsplit_once('.'))
-            .flatten()
-            .map(|(_, ext)| ext)
-            .unwrap_or("png");
-
         const MAX_ICON_BYTES: usize = 10 * 1024 * 1024;
 
         let response = self
@@ -1679,6 +1748,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .send()
             .await?
             .error_for_status()?;
+
+        // The parsed URL's own last path segment, never the raw query
+        // string: a URL like `.../icon.png?width=64` must yield `icon.png`,
+        // not `icon.png?width=64` — `path_segments()` already excludes
+        // `?query` and `#fragment` by construction. `icon_filename` falls
+        // back to the response's declared content type both when the URL
+        // has no usable segment at all (e.g. it ends in `/`) and when its
+        // segment has no extension of its own (e.g. `.../noext`).
+        let icon_name = icon_filename(
+            icon_filename_from_url(&parsed),
+            response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+        );
 
         // Read with a hard cap instead of `.bytes()` so a large (or endless)
         // body can't exhaust memory.
@@ -1692,7 +1776,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             data.extend_from_slice(&chunk);
         }
 
-        Ok((format!("icon.{extension}"), data))
+        Ok((icon_name, data))
     }
 
     pub async fn set_loaded_icon(self, icon: (String, Vec<u8>)) {
@@ -4449,6 +4533,13 @@ mod test {
 
         let app = crate::setup_managers_for_test().await;
 
+        // App startup fires its own scan_instances pass in the background
+        // (unawaited — see managers/mod.rs). Nothing exists on disk for it
+        // to find yet, so it is a no-op, but without waiting for it here it
+        // can land at an arbitrary point during this test's own setup and
+        // race the scans below over the same instances directory.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
         let instances_dir = app
             .settings_manager()
             .runtime_path
@@ -4516,5 +4607,106 @@ mod test {
 
         fake_jvm.kill().await.unwrap();
         Ok(())
+    }
+
+    // --- download_icon filename derivation ------------------------------
+
+    #[test]
+    fn icon_filename_from_url_strips_the_query_string() {
+        use super::icon_filename_from_url;
+
+        let url = reqwest::Url::parse("https://cdn/x/icon.png?width=64").unwrap();
+        assert_eq!(icon_filename_from_url(&url).as_deref(), Some("icon.png"));
+    }
+
+    #[test]
+    fn icon_filename_from_url_is_none_when_the_path_has_no_final_segment() {
+        use super::icon_filename_from_url;
+
+        let url = reqwest::Url::parse("https://cdn/").unwrap();
+        assert_eq!(icon_filename_from_url(&url), None);
+    }
+
+    #[test]
+    fn sanitize_icon_filename_replaces_illegal_characters_and_never_produces_a_path() {
+        use super::sanitize_icon_filename;
+
+        let sanitized = sanitize_icon_filename("a\\b?.png");
+        assert_eq!(sanitized, "a_b_.png");
+        assert!(
+            !sanitized.contains(['/', '\\']),
+            "a sanitized icon filename must never contain a path separator: {sanitized:?}"
+        );
+    }
+
+    #[test]
+    fn sanitize_icon_filename_caps_length() {
+        use super::sanitize_icon_filename;
+
+        let long = "a".repeat(200);
+        assert_eq!(sanitize_icon_filename(&long).chars().count(), 64);
+    }
+
+    #[test]
+    fn sanitize_icon_filename_never_passes_through_a_bare_dot_segment() {
+        use super::sanitize_icon_filename;
+
+        // A `.`/`..` segment carries no name of its own, and `..` doctored
+        // through unchanged would claim (falsely) to be a safe filename
+        // while actually walking out of whatever directory it's joined to.
+        assert_eq!(sanitize_icon_filename("."), "icon");
+        assert_eq!(sanitize_icon_filename(".."), "icon");
+        assert_eq!(sanitize_icon_filename(""), "icon");
+    }
+
+    #[test]
+    fn extension_from_content_type_reads_the_subtype() {
+        use super::extension_from_content_type;
+
+        assert_eq!(extension_from_content_type(Some("image/png")), "png");
+        assert_eq!(
+            extension_from_content_type(Some("image/png; charset=utf-8")),
+            "png"
+        );
+        assert_eq!(extension_from_content_type(None), "png");
+        assert_eq!(extension_from_content_type(Some("garbage")), "png");
+    }
+
+    #[test]
+    fn icon_filename_keeps_a_url_segment_that_already_has_an_extension() {
+        use super::icon_filename;
+
+        assert_eq!(
+            icon_filename(Some("icon.png".to_string()), Some("image/jpeg")),
+            "icon.png",
+            "an extension already present in the URL must win over Content-Type"
+        );
+    }
+
+    #[test]
+    fn icon_filename_appends_a_content_type_extension_to_an_extensionless_segment() {
+        use super::icon_filename;
+
+        // The regression this closes: a URL segment with no extension of its
+        // own (`.../noext`) must not silently drop the response's real
+        // Content-Type just because *some* segment was found — only "no
+        // segment at all" is supposed to reach for a bare `icon.<ext>`.
+        assert_eq!(
+            icon_filename(Some("noext".to_string()), Some("image/png")),
+            "noext.png"
+        );
+        assert_eq!(
+            icon_filename(Some("noext".to_string()), None),
+            "noext.png",
+            "an extensionless segment with no Content-Type either must still fall back to png"
+        );
+    }
+
+    #[test]
+    fn icon_filename_falls_back_to_a_bare_icon_stem_with_no_url_segment_at_all() {
+        use super::icon_filename;
+
+        assert_eq!(icon_filename(None, Some("image/png")), "icon.png");
+        assert_eq!(icon_filename(None, None), "icon.png");
     }
 }
