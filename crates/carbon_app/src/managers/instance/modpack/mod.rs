@@ -184,42 +184,13 @@ impl ManagerRef<'_, InstanceManager> {
             );
         }
 
-        // A crashed previous session (before this one's `.setup` bail-out
-        // above could even apply — see `repair_modpack`, which wipes
-        // `.setup` unconditionally) can leave a `tmp-packinfo.json` behind:
-        // it lives at the instance root, outside `.setup`, so wiping/never
-        // having `.setup` doesn't clean it. This session is starting fully
-        // fresh (no `.setup` at all right now), so any leftover
-        // `tmp-packinfo.json` is necessarily stale relative to what's about
-        // to be staged — remove it rather than leaving it to be relied on to
-        // get silently overwritten later.
-        let _ = tokio::fs::remove_file(instance_path.get_root().join("tmp-packinfo.json")).await;
-
-        tokio::fs::create_dir_all(&setup_path).await?;
-
-        let update_file_path = setup_path.join("change-pack-version.json");
-
-        let result = async {
-            runtime_path
-                .get_temp()
-                .write_file_atomic(update_file_path, pack_version_text)
-                .await?;
-
-            self.app
-                .instance_manager()
-                .prepare_game(instance_id, None, None, true)
-                .await
-                .map(|r| r.1)
-        }
-        .await;
-
-        if result.is_err() {
-            // A refused change must leave nothing pending on disk — a leftover
-            // .setup/change-pack-version.json applies itself on the next launch.
-            let _ = tokio::fs::remove_dir_all(&setup_path).await;
-        }
-
-        result
+        self.run_prepare_with_setup_cleanup(
+            instance_id,
+            &instance_path,
+            &setup_path,
+            &[("change-pack-version.json", pack_version_text.into_bytes())],
+        )
+        .await
     }
 
     /// Repair the instance's current modpack. Equivalent to wiping the
@@ -292,32 +263,59 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::remove_dir_all(&setup_path).await?;
         }
 
-        // `tmp-packinfo.json` lives at the instance root, outside `.setup`,
-        // so wiping `.setup` above doesn't touch it — a previous session
-        // that crashed after writing it but before promoting it would
-        // otherwise leave it behind. This repair is about to regenerate its
-        // own record from scratch regardless, but a stale file here should
-        // never be left for later code to have to reason about (or rely on
-        // being overwritten) — remove it outright.
+        let repair_marker_text = serde_json::to_string(&options)?;
+        let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
+
+        self.run_prepare_with_setup_cleanup(
+            instance_id,
+            &instance_path,
+            &setup_path,
+            &[
+                ("repair", repair_marker_text.into_bytes()),
+                ("change-pack-version.json", pack_version_text.into_bytes()),
+            ],
+        )
+        .await
+    }
+
+    /// Writes `files` (each a `.setup`-relative filename paired with its
+    /// content) under `setup_path`, then attempts to apply them by calling
+    /// [`prepare_game`](super::InstanceManager::prepare_game). Shared by
+    /// [`change_modpack`](Self::change_modpack) and
+    /// [`repair_modpack`](Self::repair_modpack) — both start a fresh modpack
+    /// install this way, once their own precondition on `.setup` (bail if
+    /// present, or wipe it) has already been handled by the caller.
+    ///
+    /// Also clears any leftover `tmp-packinfo.json` at the instance root
+    /// before writing: it lives outside `.setup`, so a caller wiping (or
+    /// never having) `.setup` never touches it, and a crashed previous
+    /// session can leave one behind that is now stale relative to what is
+    /// about to be staged.
+    ///
+    /// On refusal from `prepare_game`, removes `setup_path` entirely rather
+    /// than leaving the files just written behind — a leftover
+    /// `.setup/change-pack-version.json` (or `.setup/repair`) would
+    /// otherwise apply itself on the next launch.
+    async fn run_prepare_with_setup_cleanup(
+        self,
+        instance_id: InstanceId,
+        instance_path: &InstancePath,
+        setup_path: &Path,
+        files: &[(&str, Vec<u8>)],
+    ) -> anyhow::Result<VisualTaskId> {
         let _ = tokio::fs::remove_file(instance_path.get_root().join("tmp-packinfo.json")).await;
 
-        tokio::fs::create_dir_all(&setup_path).await?;
+        tokio::fs::create_dir_all(setup_path).await?;
+
+        let runtime_path = self.app.settings_manager().runtime_path.clone();
 
         let result = async {
-            let repair_marker_text = serde_json::to_string(&options)?;
-
-            runtime_path
-                .get_temp()
-                .write_file_atomic(setup_path.join("repair"), repair_marker_text)
-                .await?;
-
-            let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
-            let update_file_path = setup_path.join("change-pack-version.json");
-
-            runtime_path
-                .get_temp()
-                .write_file_atomic(update_file_path, pack_version_text)
-                .await?;
+            for (name, content) in files {
+                runtime_path
+                    .get_temp()
+                    .write_file_atomic(setup_path.join(name), content)
+                    .await?;
+            }
 
             self.app
                 .instance_manager()
@@ -328,10 +326,7 @@ impl ManagerRef<'_, InstanceManager> {
         .await;
 
         if result.is_err() {
-            // A refused change must leave nothing pending on disk — a leftover
-            // .setup/change-pack-version.json (or .setup/repair) applies
-            // itself on the next launch.
-            let _ = tokio::fs::remove_dir_all(&setup_path).await;
+            let _ = tokio::fs::remove_dir_all(setup_path).await;
         }
 
         result
