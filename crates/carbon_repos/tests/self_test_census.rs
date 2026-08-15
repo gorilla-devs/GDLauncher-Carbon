@@ -76,6 +76,7 @@ const EXPECTED_RULES: &[&str] = &[
     "compat.downgrade-corrupt-down",
     "compat.downgrade-schema-mismatch",
     "compat.downgrade-breaking-no-down",
+    "compat.downgrade-checkpoint-busy",
     // Migration generator down derivation (downgen.rs).
     "downgen.round-trip",
     "downgen.rename-flag",

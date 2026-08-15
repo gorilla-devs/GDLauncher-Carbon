@@ -470,6 +470,66 @@ fn breaking_ahead_without_a_stored_down_is_refused_and_snapshot_kept() {
 }
 
 #[test]
+fn down_run_refuses_a_snapshot_when_the_wal_checkpoint_stays_busy() {
+    // CENSUS-SELFTEST: compat.downgrade-checkpoint-busy
+    // `wal_checkpoint(TRUNCATE)` only reports busy when a live reader's
+    // pinned snapshot sits BEHIND newly committed frames — a reader already
+    // caught up to the latest commit does not block it. So the write that
+    // produces the frames to protect must happen strictly after the reader's
+    // snapshot is pinned, not before. down_run must fail loud instead of
+    // copying a main file that may not yet hold those committed frames.
+    let (_d, path) = temp_db();
+    let l25 = base();
+    let l26 = extend(&base(), &[BREAKING_AT_26]);
+
+    let mut conn = open_db(&path);
+    // The production open path always runs in WAL mode (db_bootstrap.rs sets
+    // it before calling `open`); a checkpoint only has anything to contend
+    // over once the database actually is in WAL mode.
+    conn.pragma_update(None, "journal_mode", "WAL").unwrap();
+    l25.to_latest(&mut conn).unwrap();
+    assert_eq!(user_version(&conn), 25);
+
+    // Pin the reader's snapshot at version 25, before version 26 is written.
+    let reader = open_db(&path);
+    reader
+        .execute_batch("BEGIN; SELECT COUNT(*) FROM _migrations;")
+        .unwrap();
+
+    // Committed after the reader's snapshot was pinned: these frames are
+    // exactly what a checkpoint now cannot safely fold in and truncate past.
+    l26.to_latest(&mut conn).unwrap();
+    assert_eq!(user_version(&conn), 26);
+
+    // A fresh connection, as `down_run` itself uses to snapshot.
+    let mut down_conn = open_db(&path);
+    let result = l25.open(&mut down_conn, &path);
+    assert!(
+        result.is_err(),
+        "a busy checkpoint must refuse the down-run rather than snapshot silently, got {result:?}"
+    );
+
+    // The failure happens before the file copy step, so no snapshot — complete
+    // or partial — is left behind for this attempt.
+    let snapshot = path.with_file_name("gdl_conf.pre-downgrade.db");
+    assert!(
+        !snapshot.exists(),
+        "a refused checkpoint must not leave a snapshot behind"
+    );
+
+    reader.execute_batch("COMMIT;").unwrap();
+
+    // Once the reader releases its snapshot, the checkpoint can complete and
+    // the down-run proceeds normally.
+    let mut retry_conn = open_db(&path);
+    assert_eq!(
+        l25.open(&mut retry_conn, &path).unwrap(),
+        OpenVerdict::Downgraded
+    );
+    assert_eq!(user_version(&retry_conn), 25);
+}
+
+#[test]
 fn breaking_only_range_down_runs_from_intermediate_version() {
     // Opening with L26 against an L27 database steps back only the single
     // breaking migration 27, restoring the schema to 26 (Widget with its label).
