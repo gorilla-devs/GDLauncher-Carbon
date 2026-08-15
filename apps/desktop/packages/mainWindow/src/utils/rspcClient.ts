@@ -164,6 +164,11 @@ type ParsedRspcError = {
   code?: number
   message?: string
   cause?: RspcErrorCause[]
+  /** Set only when the payload parsed to valid JSON that isn't the expected
+   *  `{cause}`/`{message}` shape (e.g. the bare literal `"null"`, a number,
+   *  a string). Carries the untouched raw text so callers still have
+   *  something to show instead of crashing on the missing fields. */
+  display?: string
 }
 
 function parseRspcErrorPayload(raw: string): ParsedRspcError | undefined {
@@ -172,6 +177,10 @@ function parseRspcErrorPayload(raw: string): ParsedRspcError | undefined {
     parsed = JSON.parse(raw) as ParsedRspcError
   } catch {
     return undefined
+  }
+
+  if (parsed == null || typeof parsed !== "object") {
+    return { display: raw }
   }
 
   // rspc wraps errors as {code, message} where message is a JSON string containing {cause, backtrace}
@@ -192,21 +201,25 @@ function parseRspcErrorPayload(raw: string): ParsedRspcError | undefined {
 /** Extracts a short, human-readable message from an rspc error (or any
  *  thrown value): the first cause's `display` when the rspc {cause,
  *  backtrace} payload parses, else the parsed payload's own `message`, else
- *  the error's `message`, else its stringified form. Callers that render an
- *  error inline (rather than relying on the global toast below) should use
- *  this instead of `error.message` — the raw rspc error message can carry a
- *  full backend backtrace. */
+ *  its raw fallback `display` text, else the error's `message`, else its
+ *  stringified form. Callers that render an error inline (rather than
+ *  relying on the global toast below) should use this instead of
+ *  `error.message` — the raw rspc error message can carry a full backend
+ *  backtrace. */
 export function extractErrorDisplay(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   const parsed = parseRspcErrorPayload(message)
-  return parsed?.cause?.[0]?.display ?? parsed?.message ?? message
+  return parsed?.cause?.[0]?.display ?? parsed?.message ?? parsed?.display ?? message
 }
 
 // ---------------------------------------------------------------------------
 // Global error handler shared by every query and mutation cache entry
 // ---------------------------------------------------------------------------
 
-function handleGlobalError(error: Error, source: "query" | "mutation") {
+// Exported for unit testing (see rspcClient.test.ts) — not meant to be
+// called from application code, which reaches this only through the
+// QueryCache/MutationCache `onError` wiring below.
+export function handleGlobalError(error: Error, source: "query" | "mutation") {
   console.error("RSPC error:", error)
 
   const parsed = parseRspcErrorPayload(error.message)
@@ -234,8 +247,16 @@ function handleGlobalError(error: Error, source: "query" | "mutation") {
     return
   }
 
-  if (!hasCustomCode && parsed.cause?.[0]?.display) {
-    showDedupedErrorToast(extractErrorDisplay(error), source)
+  if (hasCustomCode) {
+    return
+  }
+
+  // Already confirmed by the checks below — read the value straight off
+  // `parsed` instead of re-running `extractErrorDisplay` (which would just
+  // re-parse `error.message` a second time for the same result).
+  const display = parsed.cause?.[0]?.display ?? parsed.display
+  if (display) {
+    showDedupedErrorToast(display, source)
   }
 }
 
@@ -449,17 +470,30 @@ export const rspc = {
 // Initialisation (called once when the backend port is known)
 // ---------------------------------------------------------------------------
 
+interface InvalidateOperation {
+  key: string
+  args: never
+}
+
+/** Parses one invalidations WS frame, returning `undefined` (and warning)
+ *  instead of throwing on a malformed frame — a bad frame should drop
+ *  silently rather than take down the socket's message handler. Exported
+ *  for unit testing. */
+export function parseInvalidateFrame(raw: unknown): InvalidateOperation | undefined {
+  try {
+    return JSON.parse(raw as string) as InvalidateOperation
+  } catch (error) {
+    console.warn("Invalidations channel: dropping unparsable frame", error)
+    return undefined
+  }
+}
+
 export default function initRspc(_port: number, _apiToken: string) {
   port = _port
   apiToken = _apiToken
 
   const createInvalidateQuery = () => {
     let socket: WebSocket
-
-    interface InvalidateOperation {
-      key: string
-      args: never
-    }
 
     function connect() {
       const base = `ws://127.0.0.1:${_port}/invalidations`
@@ -471,7 +505,10 @@ export default function initRspc(_port: number, _apiToken: string) {
       })
 
       socket.addEventListener("message", (event) => {
-        const data = JSON.parse(event.data as never) as InvalidateOperation
+        const data = parseInvalidateFrame(event.data)
+        if (!data) {
+          return
+        }
 
         // Not a real query invalidation: the backend deletes instances in a
         // detached task, so a deletion failure can't surface through the rspc
