@@ -763,12 +763,11 @@ impl ManagerRef<'_, InstanceManager> {
                     let update_playtime = async {
                         loop {
                             tokio::time::sleep(Duration::from_secs(60)).await;
-                            let now = Utc::now();
-                            let diff = now - last_stored_time;
-                            last_stored_time = now;
+                            let elapsed = elapsed_secs_clamped(last_stored_time);
+                            last_stored_time = Utc::now();
                             let r = app
                                 .instance_manager()
-                                .update_playtime(instance_id, diff.num_seconds() as u32)
+                                .update_playtime(instance_id, elapsed)
                                 .await;
                             if let Err(e) = r {
                                 tracing::error!({ error = ?e }, "error updating instance playtime");
@@ -804,10 +803,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let r = app
                         .instance_manager()
-                        .update_playtime(
-                            instance_id,
-                            (Utc::now() - last_stored_time).num_seconds() as u32,
-                        )
+                        .update_playtime(instance_id, elapsed_secs_clamped(last_stored_time))
                         .await;
 
                     if let Err(e) = r {
@@ -1411,6 +1407,17 @@ pub fn adopted_playtime_secs(banked_at: DateTime<Utc>, now: DateTime<Utc>) -> u3
     (now - banked_at).num_seconds().clamp(0, u32::MAX as i64) as u32
 }
 
+/// Whole seconds elapsed between `since` and now, for a session this core
+/// owns and tracks against its own `last_stored_time` bookmark rather than
+/// the adopted path's `banked_at`/`last_alive_at` pair. Shares the exact
+/// clamp `adopted_playtime_secs` applies — the same clock-stepping-backwards
+/// hazard (NTP correction, manual date change, RTC resume) applies here too,
+/// and `as u32` on a negative difference would invent billions of seconds of
+/// playtime nobody played.
+pub fn elapsed_secs_clamped(since: DateTime<Utc>) -> u32 {
+    adopted_playtime_secs(since, Utc::now())
+}
+
 impl InstanceManager {
     /// Best-effort kill of every currently running game process, meant for
     /// the core process itself being terminated (SIGTERM/SIGINT/Ctrl+C) so
@@ -1938,6 +1945,15 @@ mod tests {
             adopted_playtime_secs(banked_at, banked_at - chrono::Duration::days(365)),
             0
         );
+    }
+
+    #[test]
+    fn elapsed_secs_clamped_is_zero_for_a_since_in_the_future() {
+        // Mirrors the adopted path's clock-stepping-backwards guard for the
+        // owned-instance playtime sites: `since` ahead of `now` must read as
+        // zero elapsed seconds, never wrap into billions via a bare `as u32`.
+        let since = Utc::now() + chrono::Duration::seconds(10);
+        assert_eq!(elapsed_secs_clamped(since), 0);
     }
 
     #[test]
