@@ -99,7 +99,11 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms))
  */
 function stripHtml(value) {
   if (typeof value !== "string") return value
-  return value.replace(/<[^>]*>/g, "").trim()
+  // Requires a tag-start character (`<` immediately followed by `/` or a
+  // letter, or an HTML comment opener) so a bare `<` used as a comparison
+  // operator ("I <3 mods", "Java <17") isn't swallowed along with whatever
+  // follows it up to the next unrelated `>`.
+  return value.replace(/<\/?[a-zA-Z][^>]*>|<!--[\s\S]*?-->/g, "").trim()
 }
 
 // ---------------------------------------------------------------------------
