@@ -6,6 +6,14 @@ use reqwest_middleware::ClientWithMiddleware;
 use std::path::Path;
 use tracing::info;
 
+/// Clamps a byte count down to `u32`, the width `Subtask::update_download`
+/// takes. A raw `as u32` cast wraps a value past 4 GiB instead of saturating,
+/// corrupting the progress bar with an apparently-tiny total/current size for
+/// a large server jar or modpack download.
+fn clamp_progress_to_u32(bytes: u64) -> u32 {
+    bytes.min(u32::MAX as u64) as u32
+}
+
 /// Build the `Downloadable` for a server jar from the version manifest's
 /// `downloads.server` object, carrying over its checksum/size so carbon_net's
 /// downloader can skip an already-valid file and verify a freshly downloaded
@@ -100,7 +108,7 @@ pub async fn download_vanilla_server_jar(
 
     if let Some(p) = progress {
         match expected_size {
-            Some(size) => p.update_download(0, size.min(u32::MAX as u64) as u32, false),
+            Some(size) => p.update_download(0, clamp_progress_to_u32(size), false),
             None => p.start_opaque(),
         }
     }
@@ -115,8 +123,8 @@ pub async fn download_vanilla_server_jar(
             if let Some(p) = progress {
                 let snapshot = progress_rx.borrow();
                 p.update_download(
-                    snapshot.current_size as u32,
-                    snapshot.total_size as u32,
+                    clamp_progress_to_u32(snapshot.current_size),
+                    clamp_progress_to_u32(snapshot.total_size),
                     false,
                 );
             }
@@ -151,6 +159,18 @@ pub async fn download_vanilla_server_jar(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clamp_progress_to_u32_saturates_instead_of_wrapping() {
+        // A raw `as u32` cast would wrap a 5 GiB snapshot back down to a
+        // small number instead of saturating at the max representable value,
+        // corrupting the progress bar for a large download.
+        let five_gib: u64 = 5 * 1024 * 1024 * 1024;
+        assert_eq!(clamp_progress_to_u32(five_gib), u32::MAX);
+
+        // A normal, in-range value passes through unchanged.
+        assert_eq!(clamp_progress_to_u32(12345), 12345);
+    }
 
     #[test]
     fn server_jar_downloadable_carries_checksum_and_size_from_manifest() {
