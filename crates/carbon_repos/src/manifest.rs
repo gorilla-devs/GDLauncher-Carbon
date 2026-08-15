@@ -290,12 +290,23 @@ pub fn derive_kind_explained(prev_ups: &[&str], up: &str) -> DbResult<KindDeriva
     // engine reject the old binary's delete or key update on that parent. The
     // loop above only walks `old_tables`, so this is the one constraint class a
     // wholly-new object can impose on the old schema.
+    //
+    // `PRAGMA foreign_key_list` reports the parent exactly as written in the
+    // `REFERENCES` clause, which need not match the referenced table's own
+    // declared case (`REFERENCES instance(id)` against a table declared
+    // `Instance`). SQLite identifiers are ASCII-case-insensitive — and SQLite
+    // itself refuses two tables whose names differ only by case — so folding
+    // both sides here cannot conflate genuinely distinct tables; it only stops
+    // a same-table reference from being missed. Also reused by the trigger
+    // check below, which has the identical hazard against `tbl_name`.
+    let old_table_names_ci: BTreeSet<String> =
+        old_tables.keys().map(|n| n.to_ascii_lowercase()).collect();
     for name in new_tables.keys() {
         if old_tables.contains_key(name) {
             continue;
         }
         for fk in read_restricting_fks(&new_conn, name)? {
-            if old_tables.contains_key(&fk.parent) {
+            if old_table_names_ci.contains(&fk.parent.to_ascii_lowercase()) {
                 reasons.push(format!(
                     "new table `{name}` declares ON DELETE {} against pre-existing table `{}`",
                     fk.action, fk.parent
@@ -328,7 +339,11 @@ pub fn derive_kind_explained(prev_ups: &[&str], up: &str) -> DbResult<KindDeriva
         }
     }
     for (name, (tbl, _)) in &new_trg {
-        if !old_trg.contains_key(name) && old_tables.contains_key(tbl) {
+        // `sqlite_master.tbl_name` for a trigger is its `ON` clause's
+        // spelling verbatim, not resolved to the table's declared case —
+        // the same hazard as the FK-parent check above, so it folds through
+        // the same `old_table_names_ci` lookup.
+        if !old_trg.contains_key(name) && old_table_names_ci.contains(&tbl.to_ascii_lowercase()) {
             reasons.push(format!(
                 "new trigger `{name}` on pre-existing table `{tbl}`"
             ));
@@ -745,6 +760,19 @@ fn read_table_rows(
     Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
+/// Finds `key` among `map`'s keys case-insensitively (SQLite identifiers are
+/// ASCII-case-insensitive) and returns the matching canonical-cased
+/// `(key, value)` pair, or `None`. `PRAGMA foreign_key_list` reports a
+/// foreign key's parent exactly as written in the `REFERENCES` clause, which
+/// need not match the parent table's own declared case, so every
+/// pragma-derived parent name the seeder resolves against a canonically-keyed
+/// map must go through this instead of a plain `.get`/`.contains_key` — or a
+/// case-variant reference silently misses the very table its own database
+/// treats it as referencing.
+fn ci_lookup<'a, V>(map: &'a BTreeMap<String, V>, key: &str) -> Option<(&'a String, &'a V)> {
+    map.iter().find(|(k, _)| k.eq_ignore_ascii_case(key))
+}
+
 /// Orders `tables` so every table sorts after all tables it references by a
 /// foreign key (parents before children). Self-references are ignored; a
 /// reference cycle falls back to name order for the tables it entangles (the
@@ -762,8 +790,10 @@ fn fk_topological_order(
             .collect::<Result<Vec<_>, _>>()?;
         let set = parents.entry(name.clone()).or_default();
         for parent in refs {
-            if &parent != name && tables.contains_key(&parent) {
-                set.insert(parent);
+            if let Some((canonical, _)) = ci_lookup(tables, &parent) {
+                if canonical != name {
+                    set.insert(canonical.clone());
+                }
             }
         }
     }
@@ -821,7 +851,12 @@ fn seed_table(
 
         // Foreign-key columns first: reference a distinct parent row per row_i.
         for fk in &fks {
-            let parent_rows = inserted.get(&fk.parent);
+            // `fk.parent` is `PRAGMA foreign_key_list`'s literal spelling of
+            // the `REFERENCES` clause, which may differ in case from the
+            // canonical key `inserted` is keyed by — resolve case-
+            // insensitively so a case-variant reference still finds the
+            // parent rows already seeded for it.
+            let parent_rows = ci_lookup(inserted, &fk.parent).map(|(_, rows)| rows);
             match parent_rows.filter(|r| !r.is_empty()) {
                 Some(parent_rows) => {
                     let parent = &parent_rows[row_i % parent_rows.len()];

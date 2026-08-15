@@ -87,6 +87,35 @@ fn new_table_with_default_no_action_fk_to_existing_table_is_breaking() {
 }
 
 #[test]
+fn restricting_fk_with_case_variant_parent_is_breaking() {
+    // SQLite identifiers are ASCII-case-insensitive: `PRAGMA foreign_key_list`
+    // reports the parent exactly as written in the REFERENCES clause, which
+    // need not match the referenced table's own declared case. `instance`
+    // here is the same table as `Instance` in `prev`, so a RESTRICT FK
+    // against it must still classify breaking.
+    let prev = "CREATE TABLE \"Instance\" (id INTEGER PRIMARY KEY);";
+    let kind = derive_kind(
+        &[prev],
+        "CREATE TABLE \"C\" (i INTEGER REFERENCES instance(id) ON DELETE RESTRICT);",
+    )
+    .unwrap();
+    assert_eq!(kind, MigrationKind::Breaking);
+}
+
+#[test]
+fn trigger_with_case_variant_table_is_breaking() {
+    // `sqlite_master.tbl_name` for a trigger is the `ON` clause's spelling
+    // verbatim, not resolved to the table's declared case (empirically
+    // confirmed: `ON instance` against `CREATE TABLE "Instance"` stores
+    // tbl_name = "instance"). A new trigger firing on a pre-existing table
+    // must still classify breaking regardless of which case its `ON` clause
+    // used.
+    let prev = "CREATE TABLE \"Instance\" (id INTEGER PRIMARY KEY);";
+    let up = "CREATE TRIGGER \"trg_probe\" AFTER INSERT ON instance BEGIN SELECT 1; END;";
+    assert_eq!(derive_kind(&[prev], up).unwrap(), MigrationKind::Breaking);
+}
+
+#[test]
 fn restricting_on_update_alone_does_not_make_a_new_table_breaking() {
     // Only ON DELETE is consulted. ON UPDATE restricts rewrites of the
     // referenced key, which is always a synthetic primary key nothing updates,
@@ -485,6 +514,26 @@ fn a_down_that_only_preserves_integer_datetimes_is_reported_lossy_for_text_ones(
         lost.contains("D.v"),
         "a transform that only preserves integer-shaped datetimes must be reported lossy \
          once a TEXT-shaped datetime is also seeded: {lost:?}"
+    );
+}
+
+#[test]
+fn seeder_orders_and_links_a_case_variant_parent_reference() {
+    // The FK-topological seeder and its parent-row lookup both key off a
+    // table's canonical (declared) case, but `PRAGMA foreign_key_list`
+    // reports a foreign key's parent exactly as written in the `REFERENCES`
+    // clause. `instance` here is the same table as `Instance`: the seeder
+    // must both order `Instance` before `Child` and thread the real seeded
+    // parent row into `Child.iid` — if either lookup missed on case,
+    // `Child.iid` (NOT NULL) would seed NULL and the insert would fail
+    // outright, surfacing as an `Err` here instead of a lossless round trip.
+    let prev = "CREATE TABLE \"Instance\" (id INTEGER PRIMARY KEY);\
+                CREATE TABLE \"Child\" (id INTEGER PRIMARY KEY, \
+                iid INTEGER NOT NULL REFERENCES instance(id));";
+    let lost = seeded_lost_fields(&[prev], "", "").unwrap();
+    assert!(
+        lost.is_empty(),
+        "a no-op round trip over a case-variant FK reference must lose nothing: {lost:?}"
     );
 }
 
