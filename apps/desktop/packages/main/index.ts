@@ -1269,17 +1269,12 @@ ipcMain.handle(
       }
     }
 
-    try {
-      const cm = await coreModule
-      if (cm.type === "success") {
-        console.log(`[RTP] Killing core module`)
-        cm.result.kill()
-        // Give the OS a moment to release file handles (SQLite WAL, logs)
-        await new Promise((r) => setTimeout(r, 1500))
-      }
-    } catch {
-      // No op
-    }
+    // Kill the core FIRST so the database file (SQLite WAL, logs) is not held
+    // open while its directory is copied to the new location — same Windows
+    // open-file constraint as the reset/restore paths above. This also covers
+    // a startup that hung before READY.
+    console.log(`[RTP] Killing core module`)
+    await killCoreProcess()
 
     // Switch-only path: the target dir already contains the user's data and
     // they want to use it as-is. Don't touch any files in either dir; just
