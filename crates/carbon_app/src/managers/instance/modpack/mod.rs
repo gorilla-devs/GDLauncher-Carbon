@@ -509,7 +509,7 @@ pub fn normalize_cleanup_path(path: &str) -> Option<String> {
     }
 
     let normalized = format!("/{}", parts.join("/"));
-    if normalized.starts_with("/saves") {
+    if apply_plan::is_saves_path(&normalized) {
         return None;
     }
 
@@ -750,7 +750,7 @@ pub async fn walk_data_files(
         }
 
         let key = entry.relative_path.to_string();
-        if key.starts_with("/saves") || key.starts_with("/.install_audit") {
+        if apply_plan::is_saves_path(&key) || key.starts_with("/.install_audit") {
             continue;
         }
         if !allowed_top_level.contains(top_level_segment(&key)) {

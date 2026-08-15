@@ -19,6 +19,17 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use super::packinfo::{FileHashes, PackInfo};
 
+/// True for `/saves` itself or any path under it (`/saves/...`) — never for
+/// a path that merely shares the `/saves` byte prefix without a `/`
+/// boundary after it (`/savesbackup/x`, `/saves.zip`). Every saves-folder
+/// protection in this module (and the sibling call sites in `disk_scan.rs`
+/// and `mod.rs`) must go through this helper rather than a raw
+/// `starts_with("/saves")`, which would also catch those siblings and make
+/// them unrepairable, undeletable-on-version-change, and uncleanable.
+pub(crate) fn is_saves_path(path: &str) -> bool {
+    path == "/saves" || path.starts_with("/saves/")
+}
+
 /// Which kind of apply this plan is for. `VersionChange` reconciles the
 /// instance against a *new* pack version; `Repair` re-reconciles it against
 /// the version already installed, to fix corruption without changing
@@ -211,7 +222,7 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
         // unconditionally. A Missing save is only protected when `old`
         // already knew about it — otherwise it falls through to the normal
         // rows so a pack-staged world can actually be created.
-        if path.starts_with("/saves") {
+        if is_saves_path(path) {
             let protect_missing_save = old_hashes.is_some();
             let protected = match disk_state {
                 DiskState::Present { .. } | DiskState::Disabled { .. } => true,
@@ -1390,6 +1401,63 @@ mod test {
                 assert_eq!(entry.reason, PlanReason::InSaveFolder);
             }
         }
+    }
+
+    // --- saves guard is a path-segment match, not a raw prefix ------------
+
+    #[test]
+    fn saves_folder_itself_is_protected() {
+        run_for_path(
+            Case {
+                name: "/saves/world/level.dat is protected -> Keep/InSaveFolder",
+                old: Some(&[("/saves/world/level.dat", 1)]),
+                target: &[("/saves/world/level.dat", 2)],
+                staged: &[],
+                disk: &[("/saves/world/level.dat", DiskCase::Present(1))],
+                mode: ApplyMode::VersionChange,
+                expect: Expect::Entry(PlanAction::Keep, PlanReason::InSaveFolder),
+            },
+            "/saves/world/level.dat",
+        );
+    }
+
+    #[test]
+    fn saves_sibling_prefix_is_not_protected() {
+        // `/savesbackup/x` and `/saves.zip` both share the "/saves" byte
+        // prefix but have no '/' boundary after it, so they are ordinary
+        // pack paths outside the saves folder — the planner must decide
+        // them normally, never via the InSaveFolder short-circuit.
+        run_for_path(
+            Case {
+                name: "/savesbackup/x: disk modified vs. old and target -> ModifiedByUser, not InSaveFolder",
+                old: Some(&[("/savesbackup/x", 1)]),
+                target: &[("/savesbackup/x", 2)],
+                staged: &[],
+                disk: &[("/savesbackup/x", DiskCase::Present(3))],
+                mode: ApplyMode::VersionChange,
+                expect: Expect::Entry(
+                    PlanAction::Keep,
+                    PlanReason::ModifiedByUser {
+                        original: hashes(1).md5,
+                        current: hashes(3).md5,
+                    },
+                ),
+            },
+            "/savesbackup/x",
+        );
+
+        run_for_path(
+            Case {
+                name: "/saves.zip: disabled on disk -> DisabledByUser, not InSaveFolder",
+                old: Some(&[("/saves.zip", 1)]),
+                target: &[("/saves.zip", 2)],
+                staged: &[],
+                disk: &[("/saves.zip", DiskCase::Disabled(9))],
+                mode: ApplyMode::VersionChange,
+                expect: Expect::Entry(PlanAction::Keep, PlanReason::DisabledByUser),
+            },
+            "/saves.zip",
+        );
     }
 
     // --- Repair, re_enable_disabled: true ---------------------------------

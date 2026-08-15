@@ -237,7 +237,8 @@ pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<PackI
         }
 
         let relative_path = entry.relative_path;
-        if relative_path.starts_with("/saves") || relative_path.starts_with("/.install_audit") {
+        if apply_plan::is_saves_path(relative_path) || relative_path.starts_with("/.install_audit")
+        {
             continue;
         }
 
