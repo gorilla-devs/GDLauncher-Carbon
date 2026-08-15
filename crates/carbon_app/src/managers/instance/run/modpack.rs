@@ -819,6 +819,16 @@ pub async fn process_modpack_staging(
             .collect();
         let disk = disk_scan::scan_disk_state(&instance_root.join("instance"), &universe).await?;
 
+        // Whether this instance's data dir lives on a filesystem that folds
+        // path case together (Windows, default-configuration macOS) — see
+        // `disk_scan::probe_case_insensitive`'s own doc for the fallback
+        // semantics. Threaded into both the planner and the untracked-file
+        // walk below so a case-only rename can't lose the file it renames
+        // and a case-variant spelling of a tracked path is never treated as
+        // untracked/deletable.
+        let fs_case_insensitive =
+            disk_scan::probe_case_insensitive(&instance_root.join("instance")).await;
+
         // Absent marker -> ordinary version-change reconciliation, unchanged
         // from before repair mode existed. Present -> re-reconcile every
         // pack-tracked path against `target` alone (see
@@ -836,6 +846,7 @@ pub async fn process_modpack_staging(
             staged: &staged,
             disk: &disk,
             mode,
+            fs_case_insensitive,
         })?;
 
         execute_plan(&entries, &instance_root, &staging_dir).await?;
@@ -850,6 +861,7 @@ pub async fn process_modpack_staging(
                     old_packinfo.as_ref(),
                     &target_packinfo,
                     &instance_root,
+                    fs_case_insensitive,
                 )
                 .await
             }
@@ -1046,6 +1058,7 @@ async fn apply_user_cleanup(
     old_packinfo: Option<&packinfo::PackInfo>,
     target_packinfo: &packinfo::PackInfo,
     instance_root: &Path,
+    fs_case_insensitive: bool,
 ) -> Vec<String> {
     if cleanup_paths.is_empty() {
         // Avoid walking the whole instance tree for nothing — `cleanup_paths`
@@ -1073,7 +1086,13 @@ async fn apply_user_cleanup(
         }
     };
 
-    let deletable = walk_untracked_files(&instance_data, old_packinfo, target_packinfo).await;
+    let deletable = walk_untracked_files(
+        &instance_data,
+        old_packinfo,
+        target_packinfo,
+        fs_case_insensitive,
+    )
+    .await;
 
     let mut user_removed = Vec::new();
     for path in cleanup_paths {
@@ -1202,6 +1221,19 @@ fn render_audit(entries: &[apply_plan::PlanEntry], user_removed: &[String]) -> S
             }
             (PlanAction::Keep, PlanReason::PreservedExisting) => {
                 skipped += &format!(" - {file}: already present\n")
+            }
+            // `surviving_path` is deliberately not interpolated into this
+            // line: `installAudit.ts`'s `skipped` section parses the text
+            // after the last ": " as an exact match against a closed
+            // `REASONS` map, so the reason string has to be fixed, the same
+            // way `ModifiedByUser`'s variable md5s live on separate
+            // continuation lines rather than in the reason text itself.
+            // Belongs in `skipped`, not `unchanged`: `installAudit.ts`
+            // documents `unchanged` as "already matched the target", which a
+            // suppressed Delete did not — the file was never touched, but
+            // its old spelling and the target's spelling genuinely differ.
+            (PlanAction::Keep, PlanReason::CaseAliasedByTarget { .. }) => {
+                skipped += &format!(" - {file}: case-aliased with a tracked path\n")
             }
             (PlanAction::Keep, _) => unchanged += &format!(" - {file}\n"),
             (PlanAction::Delete, _) => deleted += &format!(" - {file}\n"),

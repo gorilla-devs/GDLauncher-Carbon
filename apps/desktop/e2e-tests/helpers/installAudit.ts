@@ -35,6 +35,7 @@ export type SkipReason =
   | "in-save-folder"
   | "disabled-by-user"
   | "already-present"
+  | "case-aliased-with-tracked-path"
 
 export interface AuditSkip {
   file: string
@@ -77,7 +78,8 @@ const REASONS: Record<string, SkipReason> = {
   "modified by user": "modified-by-user",
   "files in /saves will never be modified": "in-save-folder",
   "disabled by user": "disabled-by-user",
-  "already present": "already-present"
+  "already present": "already-present",
+  "case-aliased with a tracked path": "case-aliased-with-tracked-path"
 }
 
 export function parseInstallAudit(text: string): InstallAudit {

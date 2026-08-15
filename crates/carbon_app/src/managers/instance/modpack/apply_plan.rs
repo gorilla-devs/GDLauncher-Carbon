@@ -74,6 +74,16 @@ pub enum PlanReason {
     },
     RepairRestored,
     ReEnabled,
+    /// The Delete that would otherwise fire for this path was skipped: on a
+    /// case-insensitive filesystem this path's spelling and
+    /// `surviving_path` — a key `target` still ships — fold to the same
+    /// spelling, so they alias one physical file. Deleting this path would
+    /// erase the very bytes the surviving target entry's own
+    /// Keep/Replace/Create depends on; this Keep leaves that file exactly
+    /// where the surviving entry expects to find it.
+    CaseAliasedByTarget {
+        surviving_path: String,
+    },
 }
 
 /// One path's worth of decision.
@@ -100,6 +110,13 @@ pub struct PlanInputs<'a> {
     /// What's actually on disk right now, keyed by path.
     pub disk: &'a HashMap<String, DiskState>,
     pub mode: ApplyMode,
+    /// Whether the instance's filesystem folds path case together (true on
+    /// Windows and default-configuration macOS, false on ext4 and most
+    /// other Linux setups). Used only to keep [`plan`] from emitting a
+    /// [`PlanAction::Delete`] for a path that merely case-aliases a
+    /// surviving `target` path on such a filesystem — see the Delete-guard
+    /// in [`plan`]'s own body.
+    pub fs_case_insensitive: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -141,6 +158,7 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
         staged,
         disk,
         mode,
+        fs_case_insensitive,
     } = inputs;
 
     let mut universe: BTreeSet<String> = BTreeSet::new();
@@ -148,6 +166,39 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
         universe.extend(old.files.keys().cloned());
     }
     universe.extend(target.files.keys().cloned());
+
+    // ASCII-only case fold of every path `target` still ships, built once
+    // for the whole call rather than per path — consulted only by the
+    // Delete-guard below. ASCII fold only: NTFS/APFS case-folding tables
+    // differ from Unicode simple folding (e.g. Turkish İ), and ASCII covers
+    // the practical modpack namespace without chasing filesystem-specific
+    // folding rules.
+    //
+    // When two distinct `target` keys fold to the same spelling (a pack
+    // shipping both `/mods/Foo.jar` and `/mods/foo.jar` — broken, but not
+    // this planner's job to reject), the winner is resolved deterministically
+    // by lexicographically-smallest spelling rather than by whichever
+    // `target.files` (a `HashMap`) happens to iterate last: `PlanEntry`s are
+    // meant to be a deterministic function of their inputs, and an
+    // iteration-order-dependent `surviving_path` in the audit would silently
+    // vary run to run for no reason a user could see.
+    let target_folded: HashMap<String, &str> = if fs_case_insensitive {
+        let mut folded: HashMap<String, &str> = HashMap::new();
+        for key in target.files.keys() {
+            let folded_key = key.to_ascii_lowercase();
+            folded
+                .entry(folded_key)
+                .and_modify(|existing| {
+                    if key.as_str() < *existing {
+                        *existing = key.as_str();
+                    }
+                })
+                .or_insert(key.as_str());
+        }
+        folded
+    } else {
+        HashMap::new()
+    };
 
     let mut entries = Vec::with_capacity(universe.len());
 
@@ -176,7 +227,7 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
             }
         }
 
-        let (action, reason) = match &mode {
+        let (mut action, mut reason) = match &mode {
             ApplyMode::VersionChange => {
                 decide_version_change(old_hashes, target_hashes, disk_state, staged, path)?
             }
@@ -189,6 +240,22 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
                 *re_enable_disabled,
             )?,
         };
+
+        // `path` is absent from `target` under its own exact spelling
+        // (that's the only way either decision procedure above chooses
+        // Delete, via `decide_dropped`) — but on a case-insensitive
+        // filesystem it may still alias a target path that only differs by
+        // case, physically the very same file a surviving
+        // Keep/Replace/Create entry depends on. Deleting it here would
+        // erase that file out from under the surviving entry.
+        if fs_case_insensitive && action == PlanAction::Delete {
+            if let Some(&surviving) = target_folded.get(&path.to_ascii_lowercase()) {
+                action = PlanAction::Keep;
+                reason = PlanReason::CaseAliasedByTarget {
+                    surviving_path: surviving.to_string(),
+                };
+            }
+        }
 
         entries.push(PlanEntry {
             path: path.clone(),
@@ -480,6 +547,11 @@ mod test {
             staged: &staged,
             disk: &disk,
             mode: case.mode,
+            // None of the table cases below exercise the case-alias
+            // Delete-guard — that's covered by its own dedicated tests
+            // further down, which build `PlanInputs` directly rather than
+            // through this table.
+            fs_case_insensitive: false,
         });
 
         match case.expect {
@@ -795,6 +867,7 @@ mod test {
                 staged: &staged,
                 disk: &disk,
                 mode: ApplyMode::VersionChange,
+                fs_case_insensitive: false,
             })
             .unwrap_or_else(|e| panic!("saves folder entries must never error, got {e}"));
             let entry = entries
@@ -813,6 +886,7 @@ mod test {
                 staged: &staged,
                 disk: &disk,
                 mode: ApplyMode::VersionChange,
+                fs_case_insensitive: false,
             })
             .unwrap_or_else(|e| panic!("saves folder entries must never error, got {e}"));
             let entry = entries
@@ -839,6 +913,7 @@ mod test {
             staged: &staged,
             disk: &disk,
             mode: ApplyMode::VersionChange,
+            fs_case_insensitive: false,
         })
         .expect("all staged, must not error");
 
@@ -863,6 +938,7 @@ mod test {
             staged: &staged,
             disk: &disk,
             mode: ApplyMode::VersionChange,
+            fs_case_insensitive: false,
         })
         .expect("staged present, must not error");
 
@@ -1108,6 +1184,7 @@ mod test {
                     staged: &staged,
                     disk: &disk,
                     mode: ApplyMode::Repair { re_enable_disabled },
+                    fs_case_insensitive: false,
                 })
                 .unwrap_or_else(|e| {
                     panic!("saves folder entries must never error in repair mode, got {e}")
@@ -1302,6 +1379,7 @@ mod test {
                     staged: &staged,
                     disk: &disk,
                     mode,
+                    fs_case_insensitive: false,
                 })
                 .unwrap_or_else(|e| panic!("target-only saves entries must never error, got {e}"));
                 let entry = entries
@@ -1511,6 +1589,7 @@ mod test {
             mode: ApplyMode::Repair {
                 re_enable_disabled: true,
             },
+            fs_case_insensitive: false,
         })
         .expect("all required staged sources present, must not error");
 
@@ -1533,5 +1612,160 @@ mod test {
             );
         }
         assert_eq!(seen, expected_paths);
+    }
+
+    // --- case-alias Delete-guard ------------------------------------------
+    //
+    // On a case-insensitive filesystem (Windows, default-configuration
+    // macOS) a pack version that renames a path by case only — old
+    // `/Config/x.toml`, target `/config/x.toml` — has both spellings alias
+    // the very same physical file. Before the guard in `plan()`, `plan`
+    // produced a Delete for the old spelling (from `decide_dropped`, since
+    // the old spelling is genuinely absent from `target`) alongside a
+    // Create for the new spelling: the Delete would erase the one physical
+    // file the Create's own staged bytes are about to land on top of.
+
+    #[test]
+    fn case_only_rename_does_not_delete_on_insensitive_fs() {
+        const OLD_PATH: &str = "/Config/x.toml";
+        const NEW_PATH: &str = "/config/x.toml";
+
+        let old = packinfo(&[(OLD_PATH, 1)]);
+        let target = packinfo(&[(NEW_PATH, 2)]);
+        let staged: HashSet<String> = [NEW_PATH].into_iter().map(String::from).collect();
+        // Disk has one physical file — pristine relative to `old`, at the
+        // old spelling, exactly as a real case-insensitive filesystem scan
+        // would report it before the rename is applied.
+        let mut disk = HashMap::new();
+        disk.insert(
+            OLD_PATH.to_string(),
+            DiskState::Present { md5: hashes(1).md5 },
+        );
+
+        let entries = plan(PlanInputs {
+            old: Some(&old),
+            target: &target,
+            staged: &staged,
+            disk: &disk,
+            mode: ApplyMode::VersionChange,
+            fs_case_insensitive: true,
+        })
+        .expect("a case-only rename must plan without error");
+
+        assert!(
+            entries.iter().all(|e| e.action != PlanAction::Delete),
+            "no entry may be a Delete on an insensitive filesystem, got {entries:?}"
+        );
+
+        let old_entry = entries
+            .iter()
+            .find(|e| e.path == OLD_PATH)
+            .expect("old spelling must still have an entry");
+        assert_eq!(old_entry.action, PlanAction::Keep);
+        assert_eq!(
+            old_entry.reason,
+            PlanReason::CaseAliasedByTarget {
+                surviving_path: NEW_PATH.to_string(),
+            }
+        );
+
+        let new_entry = entries
+            .iter()
+            .find(|e| e.path == NEW_PATH)
+            .expect("new spelling must still have an entry");
+        assert_eq!(new_entry.action, PlanAction::Create);
+        assert_eq!(new_entry.reason, PlanReason::PackUpdate);
+    }
+
+    #[test]
+    fn case_only_rename_deletes_old_spelling_on_sensitive_fs() {
+        // Identical inputs to `case_only_rename_does_not_delete_on_insensitive_fs`
+        // except `fs_case_insensitive: false` — correct behaviour on ext4
+        // and most other Linux filesystems, where the two spellings are two
+        // genuinely distinct files and both actions must fire.
+        const OLD_PATH: &str = "/Config/x.toml";
+        const NEW_PATH: &str = "/config/x.toml";
+
+        let old = packinfo(&[(OLD_PATH, 1)]);
+        let target = packinfo(&[(NEW_PATH, 2)]);
+        let staged: HashSet<String> = [NEW_PATH].into_iter().map(String::from).collect();
+        let mut disk = HashMap::new();
+        disk.insert(
+            OLD_PATH.to_string(),
+            DiskState::Present { md5: hashes(1).md5 },
+        );
+
+        let entries = plan(PlanInputs {
+            old: Some(&old),
+            target: &target,
+            staged: &staged,
+            disk: &disk,
+            mode: ApplyMode::VersionChange,
+            fs_case_insensitive: false,
+        })
+        .expect("a case-only rename must plan without error");
+
+        let old_entry = entries
+            .iter()
+            .find(|e| e.path == OLD_PATH)
+            .expect("old spelling must still have an entry");
+        assert_eq!(old_entry.action, PlanAction::Delete);
+        assert_eq!(old_entry.reason, PlanReason::PackDropped);
+
+        let new_entry = entries
+            .iter()
+            .find(|e| e.path == NEW_PATH)
+            .expect("new spelling must still have an entry");
+        assert_eq!(new_entry.action, PlanAction::Create);
+        assert_eq!(new_entry.reason, PlanReason::PackUpdate);
+    }
+
+    #[test]
+    fn case_only_rename_prefers_lexicographically_smallest_surviving_spelling_on_fold_collision() {
+        // A broken pack shipping two spellings of the same folded path in
+        // `target` at once — not this planner's job to reject, but
+        // `surviving_path` still has to be a deterministic function of the
+        // inputs, not whichever order a `HashMap` iterator happens to visit
+        // `target.files` in.
+        const OLD_PATH: &str = "/Config/x.toml";
+        // Uppercase sorts before lowercase in ASCII ('C' = 0x43 < 'c' =
+        // 0x63), so this is the lexicographically smaller of the two.
+        const TARGET_SMALLER: &str = "/CONFIG/X.TOML";
+        const TARGET_LARGER: &str = "/config/x.toml";
+
+        let old = packinfo(&[(OLD_PATH, 1)]);
+        let target = packinfo(&[(TARGET_SMALLER, 2), (TARGET_LARGER, 3)]);
+        let staged: HashSet<String> = [TARGET_SMALLER, TARGET_LARGER]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let mut disk = HashMap::new();
+        disk.insert(
+            OLD_PATH.to_string(),
+            DiskState::Present { md5: hashes(1).md5 },
+        );
+
+        let entries = plan(PlanInputs {
+            old: Some(&old),
+            target: &target,
+            staged: &staged,
+            disk: &disk,
+            mode: ApplyMode::VersionChange,
+            fs_case_insensitive: true,
+        })
+        .expect("a case-only rename must plan without error");
+
+        let old_entry = entries
+            .iter()
+            .find(|e| e.path == OLD_PATH)
+            .expect("old spelling must still have an entry");
+        assert_eq!(
+            old_entry.reason,
+            PlanReason::CaseAliasedByTarget {
+                surviving_path: TARGET_SMALLER.to_string(),
+            },
+            "must deterministically prefer the lexicographically smallest \
+             colliding target spelling, got {old_entry:?}"
+        );
     }
 }

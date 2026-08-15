@@ -114,6 +114,7 @@ async fn deleted_by_user_stays_deleted() {
         staged: &staged,
         disk: &disk,
         mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
     })
     .expect("a deleted-by-user path must plan without error");
     assert_eq!(entries.len(), 1);
@@ -158,6 +159,7 @@ async fn modified_by_user_is_kept_with_both_md5s_in_the_audit() {
         staged: &staged,
         disk: &disk,
         mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
     })
     .expect("a modified-by-user path must plan without error");
     assert_eq!(entries.len(), 1);
@@ -214,6 +216,7 @@ async fn reenable_pristine_disabled_twin_uses_the_twins_own_bytes() {
         mode: ApplyMode::Repair {
             re_enable_disabled: true,
         },
+        fs_case_insensitive: false,
     })
     .expect("a pristine disabled twin re-enables without needing staged bytes");
     assert_eq!(entries.len(), 1);
@@ -256,6 +259,7 @@ async fn reenable_damaged_disabled_twin_uses_staged_bytes_and_drops_the_twin() {
         mode: ApplyMode::Repair {
             re_enable_disabled: true,
         },
+        fs_case_insensitive: false,
     })
     .expect("a damaged disabled twin with staged bytes re-enables without error");
     assert_eq!(entries.len(), 1);
@@ -309,6 +313,7 @@ async fn repair_replaces_a_damaged_disabled_twin_in_place() {
         mode: ApplyMode::Repair {
             re_enable_disabled: false,
         },
+        fs_case_insensitive: false,
     })
     .expect("a damaged disabled twin with staged bytes repairs without error");
     assert_eq!(entries.len(), 1);
@@ -369,6 +374,7 @@ async fn version_change_replaces_creates_and_deletes_real_files() {
         staged: &staged,
         disk: &disk,
         mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
     })
     .expect("a fully-staged version change must not error");
     assert_eq!(entries.len(), 3);
@@ -439,6 +445,7 @@ async fn pack_shipped_disabled_file_creates_disabled_and_is_seen_as_disabled_aft
         staged: &staged,
         disk: &disk,
         mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
     })
     .expect("a pack-shipped-disabled path must plan without error, not MissingStagedSource");
     assert_eq!(entries.len(), 1);
@@ -481,6 +488,7 @@ async fn pack_shipped_disabled_file_creates_disabled_and_is_seen_as_disabled_aft
         staged: &HashSet::new(),
         disk: &disk_after,
         mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
     })
     .expect("a later pass over the same disabled twin must not error");
     assert_eq!(entries2.len(), 1);
@@ -516,6 +524,7 @@ async fn replace_with_pack_shipped_disabled_target_drops_the_old_enabled_copy() 
         staged: &staged,
         disk: &disk,
         mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
     })
     .expect("a pristine path becoming pack-shipped-disabled must plan without error");
     assert_eq!(entries.len(), 1);
@@ -567,6 +576,7 @@ async fn repair_damaged_enabled_file_is_replaced_from_staged_bytes() {
         mode: ApplyMode::Repair {
             re_enable_disabled: false,
         },
+        fs_case_insensitive: false,
     })
     .expect("a damaged enabled file with staged bytes repairs without error");
     assert_eq!(entries.len(), 1);
@@ -620,6 +630,7 @@ async fn repair_missing_enabled_file_is_recreated_from_staged_bytes() {
         mode: ApplyMode::Repair {
             re_enable_disabled: false,
         },
+        fs_case_insensitive: false,
     })
     .expect("a missing enabled file with staged bytes repairs without error");
     assert_eq!(entries.len(), 1);
@@ -664,6 +675,7 @@ async fn repair_edited_override_is_reset_to_pack_bytes() {
         mode: ApplyMode::Repair {
             re_enable_disabled: false,
         },
+        fs_case_insensitive: false,
     })
     .expect("a hand-edited config with staged bytes repairs without error");
     assert_eq!(entries.len(), 1);
@@ -706,6 +718,7 @@ async fn repair_saves_folder_execute_plan_leaves_damaged_file_untouched() {
         mode: ApplyMode::Repair {
             re_enable_disabled: false,
         },
+        fs_case_insensitive: false,
     })
     .expect("a save file must never error, even damaged relative to target");
     assert_eq!(entries.len(), 1);
@@ -744,7 +757,8 @@ async fn apply_user_cleanup_removes_untracked_path_and_reports_it() {
     // an empty walk, by design (the walk is restricted to directories the
     // pack actually references).
     let target = packinfo(&[("/mods/tracked-sibling.jar", 1)]);
-    let removed = apply_user_cleanup(&[PATH.to_string()], None, &target, &instance_root).await;
+    let removed =
+        apply_user_cleanup(&[PATH.to_string()], None, &target, &instance_root, false).await;
 
     assert_eq!(removed, vec![PATH.to_string()]);
     assert!(
@@ -766,7 +780,8 @@ async fn apply_user_cleanup_accepts_a_path_whose_filename_merely_contains_a_dotd
     // a tracked /mods sibling is needed: an empty packinfo now means an
     // empty walk-restriction allow-list.
     let target = packinfo(&[("/mods/tracked-sibling.jar", 1)]);
-    let removed = apply_user_cleanup(&[PATH.to_string()], None, &target, &instance_root).await;
+    let removed =
+        apply_user_cleanup(&[PATH.to_string()], None, &target, &instance_root, false).await;
 
     assert_eq!(removed, vec![PATH.to_string()]);
     assert!(!live_path(&instance_root, PATH).exists());
@@ -789,7 +804,14 @@ async fn apply_user_cleanup_skips_a_spelling_that_is_not_an_exact_walked_member(
     write_live(&instance_root, REAL, b"real-file-bytes").await;
 
     let target = packinfo(&[]);
-    let removed = apply_user_cleanup(&[REQUESTED.to_string()], None, &target, &instance_root).await;
+    let removed = apply_user_cleanup(
+        &[REQUESTED.to_string()],
+        None,
+        &target,
+        &instance_root,
+        false,
+    )
+    .await;
 
     assert!(
         removed.is_empty(),
@@ -808,7 +830,8 @@ async fn apply_user_cleanup_is_noop_for_already_missing_path() {
     // Deliberately never written to disk.
 
     let target = packinfo(&[]);
-    let removed = apply_user_cleanup(&[PATH.to_string()], None, &target, &instance_root).await;
+    let removed =
+        apply_user_cleanup(&[PATH.to_string()], None, &target, &instance_root, false).await;
 
     assert!(
         removed.is_empty(),
@@ -823,7 +846,8 @@ async fn apply_user_cleanup_skips_path_tracked_in_target() {
     write_live(&instance_root, PATH, b"pack-owned-bytes").await;
 
     let target = packinfo(&[(PATH, 1)]);
-    let removed = apply_user_cleanup(&[PATH.to_string()], None, &target, &instance_root).await;
+    let removed =
+        apply_user_cleanup(&[PATH.to_string()], None, &target, &instance_root, false).await;
 
     assert!(
         removed.is_empty(),
@@ -845,8 +869,14 @@ async fn apply_user_cleanup_skips_path_tracked_in_old_only() {
     // pack-tracked history, not the user's own file to clean up.
     let old = packinfo(&[(PATH, 1)]);
     let target = packinfo(&[]);
-    let removed =
-        apply_user_cleanup(&[PATH.to_string()], Some(&old), &target, &instance_root).await;
+    let removed = apply_user_cleanup(
+        &[PATH.to_string()],
+        Some(&old),
+        &target,
+        &instance_root,
+        false,
+    )
+    .await;
 
     assert!(
         removed.is_empty(),
@@ -872,6 +902,7 @@ async fn apply_user_cleanup_skips_a_tracked_paths_disabled_twin_spelling() {
         None,
         &target,
         &instance_root,
+        false,
     )
     .await;
 
@@ -905,6 +936,7 @@ async fn apply_user_cleanup_removes_a_stale_disabled_twin_coexisting_with_its_en
         None,
         &target,
         &instance_root,
+        false,
     )
     .await;
 
@@ -943,7 +975,7 @@ async fn apply_user_cleanup_skips_every_syntactically_invalid_path_without_baili
     .map(String::from)
     .collect::<Vec<_>>();
 
-    let removed = apply_user_cleanup(&bad_paths, None, &target, &instance_root).await;
+    let removed = apply_user_cleanup(&bad_paths, None, &target, &instance_root, false).await;
 
     assert!(
         removed.is_empty(),
@@ -982,6 +1014,7 @@ async fn apply_user_cleanup_refuses_to_follow_a_symlinked_parent_out_of_the_inst
         None,
         &target,
         &instance_root,
+        false,
     )
     .await;
 
@@ -1134,6 +1167,13 @@ fn render_audit_golden() {
             reason: PlanReason::PreservedExisting,
         },
         PlanEntry {
+            path: "/config/case-aliased.json".to_string(),
+            action: PlanAction::Keep,
+            reason: PlanReason::CaseAliasedByTarget {
+                surviving_path: "/config/Case-Aliased.json".to_string(),
+            },
+        },
+        PlanEntry {
             path: "/mods/disabled-repair-overwrote.jar".to_string(),
             action: PlanAction::ReplaceDisabled,
             reason: PlanReason::RepairOverwrote {
@@ -1183,6 +1223,7 @@ fn render_audit_golden() {
         hex::encode(hashes(4).md5)
     ));
     expected.push_str(" - /config/preserved-existing.json: already present\n");
+    expected.push_str(" - /config/case-aliased.json: case-aliased with a tracked path\n");
     expected.push_str("\nFiles deleted:\n");
     expected.push_str(" - /mods/pack-dropped.jar\n");
     expected.push_str("\nFiles replaced:\n");

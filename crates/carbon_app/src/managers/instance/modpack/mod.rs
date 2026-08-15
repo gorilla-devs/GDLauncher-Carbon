@@ -398,6 +398,11 @@ impl ManagerRef<'_, InstanceManager> {
         // target path is simply assumed obtainable — see the doc comment
         // above for why this is the documented preview/execution asymmetry.
         let staged: HashSet<String> = universe.iter().cloned().collect();
+        // See `disk_scan::probe_case_insensitive`'s own doc for the fallback
+        // semantics; threaded into both the planner and the untracked-file
+        // walk below for the same reason `process_modpack_staging` threads
+        // it (`run/modpack.rs`).
+        let fs_case_insensitive = disk_scan::probe_case_insensitive(&data_path).await;
 
         let entries = apply_plan::plan(apply_plan::PlanInputs {
             old: Some(&recorded),
@@ -405,11 +410,17 @@ impl ManagerRef<'_, InstanceManager> {
             staged: &staged,
             disk: &disk,
             mode: apply_plan::ApplyMode::Repair { re_enable_disabled },
+            fs_case_insensitive,
         })?;
 
         let counts = tally_counts(&entries);
-        let untracked =
-            untracked_files_for_preview(&data_path, &recorded, origin_results.as_ref()).await?;
+        let untracked = untracked_files_for_preview(
+            &data_path,
+            &recorded,
+            origin_results.as_ref(),
+            fs_case_insensitive,
+        )
+        .await?;
 
         Ok(RepairPreview {
             has_packinfo: true,
@@ -740,8 +751,14 @@ pub async fn walk_data_files(
 ///
 /// A file whose raw key IS present in `old` or `target` is never included —
 /// that is the pack's own live copy, and deleting it would fight the
-/// planner, which already owns that path. A file whose raw key is absent
-/// but whose `.disabled`-stripped key IS tracked is included only when
+/// planner, which already owns that path. When `fs_case_insensitive` is set,
+/// a raw key that merely case-aliases a tracked key (e.g. disk spells it
+/// `/mods/foo.jar`, packinfo tracks `/mods/Foo.jar`) is treated identically —
+/// on such a filesystem the two spellings resolve to the same physical file,
+/// so it is exactly as pack-owned as an exact match and must never be
+/// classified untracked or deletable either. A file whose raw key is absent
+/// but whose `.disabled`-stripped key IS tracked (exactly or, when
+/// case-insensitive, by fold) is included only when
 /// [`is_coexisting_disabled_twin`] finds its enabled sibling ALSO on disk
 /// right now — a genuinely stale leftover twin — and excluded when it's the
 /// tracked path's *sole* on-disk representation, disabled or not, which is
@@ -752,9 +769,18 @@ pub async fn walk_untracked_files(
     instance_data: &Path,
     old_packinfo: Option<&packinfo::PackInfo>,
     target_packinfo: &packinfo::PackInfo,
+    fs_case_insensitive: bool,
 ) -> HashMap<String, PathBuf> {
     let allowed = top_level_segments(target_packinfo, old_packinfo);
     let all_files = walk_data_files(instance_data, &allowed).await;
+
+    // Built once for the whole walk, not per lookup, and only when the
+    // filesystem itself can't tell two differently-cased spellings apart.
+    let folded = if fs_case_insensitive {
+        fold_tracked_keys(target_packinfo, old_packinfo)
+    } else {
+        HashMap::new()
+    };
 
     all_files
         .iter()
@@ -764,10 +790,14 @@ pub async fn walk_untracked_files(
             if raw_tracked {
                 return false;
             }
+            if fs_case_insensitive && folded.contains_key(&key.to_ascii_lowercase()) {
+                return false;
+            }
 
             let bare_tracked = key.strip_suffix(".disabled").is_some_and(|k| {
                 target_packinfo.files.contains_key(k)
                     || old_packinfo.is_some_and(|p| p.files.contains_key(k))
+                    || (fs_case_insensitive && folded.contains_key(&k.to_ascii_lowercase()))
             });
             if bare_tracked {
                 return is_coexisting_disabled_twin(key, &all_files);
@@ -776,6 +806,25 @@ pub async fn walk_untracked_files(
             true
         })
         .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()
+}
+
+/// ASCII-only case fold of every key `target` tracks, unioned with `old`'s if
+/// given, mapping the folded spelling to the original. Built once per walk by
+/// both [`walk_untracked_files`] and [`untracked_files_for_preview`], and
+/// consulted only when their own `fs_case_insensitive` flag is set. ASCII
+/// fold only, deliberately: NTFS/APFS case-folding tables differ from
+/// Unicode simple folding (e.g. Turkish İ), and ASCII covers the practical
+/// modpack namespace without chasing filesystem-specific folding rules.
+fn fold_tracked_keys<'a>(
+    target: &'a packinfo::PackInfo,
+    old: Option<&'a packinfo::PackInfo>,
+) -> HashMap<String, &'a str> {
+    target
+        .files
+        .keys()
+        .chain(old.into_iter().flat_map(|p| p.files.keys()))
+        .map(|k| (k.to_ascii_lowercase(), k.as_str()))
         .collect()
 }
 
@@ -822,15 +871,27 @@ async fn walk_packinfo_scoped_files(
 /// [`walk_untracked_files`] would actually remove for that same path — see
 /// [`UntrackedFile::deletable`]. `origin_results` is the instance's last
 /// completed [`origin_check::check_pack_origin`](InstanceManager) run, if
-/// any — see [`origin_verdict_for`].
+/// any — see [`origin_verdict_for`]. When `fs_case_insensitive` is set, a raw
+/// key that merely case-aliases a `packinfo` key (or its `.disabled`-stripped
+/// form) is treated as tracked too, the same fold [`walk_untracked_files`]
+/// applies — see [`fold_tracked_keys`].
 async fn untracked_files_for_preview(
     instance_data: &Path,
     packinfo: &packinfo::PackInfo,
     origin_results: Option<&origin_check::OriginResults>,
+    fs_case_insensitive: bool,
 ) -> anyhow::Result<Vec<UntrackedFile>> {
     // old == target == packinfo for a preview (see `repair_preview`'s own
     // docs), so packinfo's own keys already cover the union this needs.
     let all_files = walk_packinfo_scoped_files(instance_data, packinfo, None).await;
+
+    // Built once for the whole preview, not per lookup, and only when the
+    // filesystem itself can't tell two differently-cased spellings apart.
+    let folded = if fs_case_insensitive {
+        fold_tracked_keys(packinfo, None)
+    } else {
+        HashMap::new()
+    };
 
     let mut untracked = Vec::new();
 
@@ -838,12 +899,20 @@ async fn untracked_files_for_preview(
         if packinfo.files.contains_key(key) {
             continue;
         }
+        if fs_case_insensitive && folded.contains_key(&key.to_ascii_lowercase()) {
+            continue;
+        }
 
         let (label, deletable) = match key.strip_suffix(".disabled") {
-            Some(bare) if packinfo.files.contains_key(bare) => (
-                UntrackedLabel::DisabledPackFile,
-                is_coexisting_disabled_twin(key, &all_files),
-            ),
+            Some(bare)
+                if packinfo.files.contains_key(bare)
+                    || (fs_case_insensitive && folded.contains_key(&bare.to_ascii_lowercase())) =>
+            {
+                (
+                    UntrackedLabel::DisabledPackFile,
+                    is_coexisting_disabled_twin(key, &all_files),
+                )
+            }
             _ => (UntrackedLabel::Unknown, true),
         };
 
@@ -986,6 +1055,7 @@ mod tests {
     use super::{
         AddonType, DuplicateCandidate, RepairCounts, RepairMarkerFile, UntrackedLabel,
         group_duplicates, normalize_cleanup_path, tally_counts, untracked_files_for_preview,
+        walk_untracked_files,
     };
     use carbon_rt_path::InstancePath;
     use std::collections::HashMap;
@@ -1116,7 +1186,7 @@ mod tests {
         );
         let packinfo = PackInfo { files };
 
-        let result = untracked_files_for_preview(data, &packinfo, None)
+        let result = untracked_files_for_preview(data, &packinfo, None, false)
             .await
             .expect("walking a real temp dir must not fail");
 
@@ -1166,7 +1236,7 @@ mod tests {
         );
         let packinfo = PackInfo { files };
 
-        let result = untracked_files_for_preview(data, &packinfo, None)
+        let result = untracked_files_for_preview(data, &packinfo, None, false)
             .await
             .expect("walking a real temp dir must not fail");
 
@@ -1207,7 +1277,7 @@ mod tests {
         );
         let packinfo = PackInfo { files };
 
-        let result = untracked_files_for_preview(data, &packinfo, None)
+        let result = untracked_files_for_preview(data, &packinfo, None, false)
             .await
             .expect("walking a real temp dir must not fail");
 
@@ -1217,6 +1287,126 @@ mod tests {
             "only the untracked file under an ALLOWED (packinfo-referenced) \
              directory may appear; logs/crash-reports/screenshots must never \
              surface, got {result:?}"
+        );
+    }
+
+    // --- case-alias fold: walk_untracked_files / untracked_files_for_preview
+    //
+    // A packinfo tracks `/mods/Foo.jar`; the file actually on disk is
+    // spelled `/mods/foo.jar` — the shape a case-only pack rename or a
+    // user's own OS produces on a case-insensitive filesystem, where the
+    // two spellings are one physical file. Byte-exact `contains_key`
+    // against the tracked key alone would misclassify that disk spelling as
+    // untracked and, in `walk_untracked_files`'s case, deletable — the
+    // "mirror hazard" alongside the planner's own Delete-guard.
+
+    #[tokio::test]
+    async fn walk_untracked_files_case_variant_of_tracked_path_is_not_listed_when_insensitive() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path();
+        std::fs::create_dir_all(data.join("mods")).unwrap();
+        std::fs::write(data.join("mods/foo.jar"), b"tracked-bytes").unwrap();
+
+        let target = PackInfo {
+            files: HashMap::from([(
+                "/mods/Foo.jar".to_string(),
+                FileHashes {
+                    sha512: [1; 64],
+                    md5: [1; 16],
+                },
+            )]),
+        };
+
+        let result = walk_untracked_files(data, None, &target, true).await;
+
+        assert!(
+            !result.contains_key("/mods/foo.jar"),
+            "a case-variant spelling of a tracked path must never be classified \
+             untracked/deletable on a case-insensitive filesystem, got {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn walk_untracked_files_case_variant_of_tracked_path_is_listed_when_sensitive() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path();
+        std::fs::create_dir_all(data.join("mods")).unwrap();
+        std::fs::write(data.join("mods/foo.jar"), b"tracked-bytes").unwrap();
+
+        let target = PackInfo {
+            files: HashMap::from([(
+                "/mods/Foo.jar".to_string(),
+                FileHashes {
+                    sha512: [1; 64],
+                    md5: [1; 16],
+                },
+            )]),
+        };
+
+        let result = walk_untracked_files(data, None, &target, false).await;
+
+        assert!(
+            result.contains_key("/mods/foo.jar"),
+            "on a case-sensitive filesystem the two spellings are genuinely \
+             distinct files, so the disk spelling must be listed untracked, \
+             got {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn untracked_files_for_preview_case_variant_of_tracked_path_is_excluded_when_insensitive()
+    {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path();
+        std::fs::create_dir_all(data.join("mods")).unwrap();
+        std::fs::write(data.join("mods/foo.jar"), b"tracked-bytes").unwrap();
+
+        let packinfo = PackInfo {
+            files: HashMap::from([(
+                "/mods/Foo.jar".to_string(),
+                FileHashes {
+                    sha512: [1; 64],
+                    md5: [1; 16],
+                },
+            )]),
+        };
+
+        let result = untracked_files_for_preview(data, &packinfo, None, true)
+            .await
+            .expect("walking a real temp dir must not fail");
+
+        assert!(
+            !result.iter().any(|f| f.path == "/mods/foo.jar"),
+            "a case-variant spelling of a tracked path must not be surfaced as \
+             untracked on a case-insensitive filesystem, got {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn untracked_files_for_preview_case_variant_of_tracked_path_is_listed_when_sensitive() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path();
+        std::fs::create_dir_all(data.join("mods")).unwrap();
+        std::fs::write(data.join("mods/foo.jar"), b"tracked-bytes").unwrap();
+
+        let packinfo = PackInfo {
+            files: HashMap::from([(
+                "/mods/Foo.jar".to_string(),
+                FileHashes {
+                    sha512: [1; 64],
+                    md5: [1; 16],
+                },
+            )]),
+        };
+
+        let result = untracked_files_for_preview(data, &packinfo, None, false)
+            .await
+            .expect("walking a real temp dir must not fail");
+
+        assert!(
+            result.iter().any(|f| f.path == "/mods/foo.jar"),
+            "on a case-sensitive filesystem the disk spelling is a genuinely \
+             distinct, untracked file, got {result:?}"
         );
     }
 

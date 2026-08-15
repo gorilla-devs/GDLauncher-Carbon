@@ -221,6 +221,7 @@
   "_trn_repair_reason_overwrote": "restored (was modified)",
   "_trn_repair_reason_restored": "restored (was missing)",
   "_trn_repair_reason_reenabled": "re-enabled",
+  "_trn_repair_reason_case_aliased": "aliases a tracked file on this filesystem — kept",
   "_trn_change_version_failed": "The version change was not applied",
   "_trn_no_instance_found": "No Instances found on this path",
   "_trn_export_path": "Export path",

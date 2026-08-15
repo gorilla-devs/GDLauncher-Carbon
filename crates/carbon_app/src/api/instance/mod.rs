@@ -1295,6 +1295,7 @@ pub enum FERepairReason {
     RepairOverwrote,
     RepairRestored,
     ReEnabled,
+    CaseAliasedByTarget,
 }
 
 impl From<manager::modpack::apply_plan::PlanReason> for FERepairReason {
@@ -1313,6 +1314,7 @@ impl From<manager::modpack::apply_plan::PlanReason> for FERepairReason {
             PlanReason::RepairOverwrote { .. } => Self::RepairOverwrote,
             PlanReason::RepairRestored => Self::RepairRestored,
             PlanReason::ReEnabled => Self::ReEnabled,
+            PlanReason::CaseAliasedByTarget { .. } => Self::CaseAliasedByTarget,
         }
     }
 }

@@ -42,6 +42,8 @@ function repairReasonLabel(t: TypedTFunction, reason: FERepairReason): string {
       return t("instances:_trn_repair_reason_restored")
     case "ReEnabled":
       return t("instances:_trn_repair_reason_reenabled")
+    case "CaseAliasedByTarget":
+      return t("instances:_trn_repair_reason_case_aliased")
     default:
       return reason
   }
@@ -173,10 +175,7 @@ const RepairModpack = (props: ModalProps) => {
         ["instances:_trn_repair_counts_modified", c?.restore_modified ?? 0],
         ["instances:_trn_repair_counts_deleted", c?.restore_deleted ?? 0],
         ["instances:_trn_repair_counts_unchanged", c?.unchanged ?? 0],
-        [
-          "instances:_trn_repair_counts_disabled_kept",
-          c?.disabled_kept ?? 0
-        ],
+        ["instances:_trn_repair_counts_disabled_kept", c?.disabled_kept ?? 0],
         ["instances:_trn_repair_counts_re_enabled", c?.re_enabled ?? 0]
       ] as const
     ).filter(([, count]) => count > 0)
@@ -402,9 +401,7 @@ const RepairModpack = (props: ModalProps) => {
                           originTaskId() !== null
                         }
                         percentage={originPercentage()}
-                        onClick={() =>
-                          checkOriginMutation.mutate(instanceId())
-                        }
+                        onClick={() => checkOriginMutation.mutate(instanceId())}
                       >
                         <div class="i-hugeicons:search-01" />
                         {t("instances:_trn_repair_check_origin")}
@@ -461,9 +458,7 @@ const RepairModpack = (props: ModalProps) => {
                                   )}
                                 </span>
                               </Show>
-                              <Show
-                                when={originVerdictText(t, file.origin)}
-                              >
+                              <Show when={originVerdictText(t, file.origin)}>
                                 {(text) => <span>{text()}</span>}
                               </Show>
                             </span>
