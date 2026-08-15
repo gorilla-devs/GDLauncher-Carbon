@@ -47,7 +47,7 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use thiserror::Error;
 use tokio::sync::{Mutex, MutexGuard, RwLock, watch};
-use tracing::{info, trace, warn};
+use tracing::{error, info, trace, warn};
 use unicode_segmentation::UnicodeSegmentation;
 
 pub mod explore;
@@ -192,7 +192,9 @@ fn path_length(path: &Path) -> usize {
 
 impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn launch_background_tasks(self) {
-        let _ = self.scan_instances().await;
+        if let Err(e) = self.scan_instances().await {
+            error!("failed to scan instances: {e:?}");
+        }
         self.import_manager().launch_background_tasks();
     }
 
@@ -243,76 +245,104 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .expect("current GDL versions only support UTF8 paths")
                 .to_string();
 
-            let cached = instance_cache
-                .iter()
-                .find(|instance| instance.shortpath == shortpath);
+            // One directory's failure (an add_instance/get_default_group
+            // error — scan_instance itself never fails, converting a bad
+            // config into an Invalid instance instead) must not abort the
+            // whole scan: instances already adopted from earlier entries
+            // would then never reach the watcher spawn below, and every
+            // directory after this one would silently go unscanned too.
+            // Isolated and logged instead so the rest of the scan keeps
+            // going.
+            let entry_result: anyhow::Result<Option<InstanceId>> = async {
+                let cached = instance_cache
+                    .iter()
+                    .find(|instance| instance.shortpath == shortpath);
 
-            let Some(mut instance) = self.scan_instance(shortpath, path, cached).await? else {
-                continue;
-            };
-            let InstanceType::Valid(data) = &instance.type_ else {
-                continue;
-            };
-
-            let instance_id = match cached {
-                Some(cached) => InstanceId(cached.id),
-                None => {
-                    self.add_instance(
-                        data.config.name.clone(),
-                        instance.shortpath.clone(),
-                        self.get_default_group().await?,
-                    )
+                let Some(mut instance) = self
+                    .scan_instance(shortpath.clone(), path.clone(), cached)
                     .await?
+                else {
+                    return Ok(None);
+                };
+                let InstanceType::Valid(data) = &instance.type_ else {
+                    return Ok(None);
+                };
+
+                let instance_id = match cached {
+                    Some(cached) => InstanceId(cached.id),
+                    None => {
+                        self.add_instance(
+                            data.config.name.clone(),
+                            instance.shortpath.clone(),
+                            self.get_default_group().await?,
+                        )
+                        .await?
+                    }
+                };
+
+                let mut instances = self.instances.write().await;
+
+                if let (
+                    Instance {
+                        type_: InstanceType::Valid(data),
+                        ..
+                    },
+                    Some(Instance {
+                        type_: InstanceType::Valid(old_data),
+                        ..
+                    }),
+                ) = (&mut instance, instances.remove(&instance_id))
+                {
+                    data.state = old_data.state;
                 }
-            };
 
-            let mut instances = self.instances.write().await;
-
-            if let (
-                Instance {
-                    type_: InstanceType::Valid(data),
-                    ..
-                },
-                Some(Instance {
-                    type_: InstanceType::Valid(old_data),
-                    ..
-                }),
-            ) = (&mut instance, instances.remove(&instance_id))
-            {
-                data.state = old_data.state;
-            }
-
-            // A game this core did not spawn, still running: present the
-            // instance as Running with no channel to signal and no log to
-            // read (see `RunningInstance::adopted`). Guarded on the state
-            // rather than applied unconditionally so a rescan can never
-            // replace a state this core does own — the line above carries an
-            // already-Running instance forward, and overwriting it here would
-            // throw away its `kill_tx` and strand the process.
-            if let Some(game) = adopted.get(&instance.shortpath).copied() {
-                if let InstanceType::Valid(data) = &mut instance.type_ {
-                    if matches!(data.state, LaunchState::Inactive { .. }) {
-                        data.state = LaunchState::Running(RunningInstance::adopted(
-                            game.pid,
-                            game.verified_start_time,
-                            game.start_time,
-                            Utc::now(),
-                        ));
-                        adopted_ids.push(instance_id);
+                // A game this core did not spawn, still running: present the
+                // instance as Running with no channel to signal and no log to
+                // read (see `RunningInstance::adopted`). Guarded on the state
+                // rather than applied unconditionally so a rescan can never
+                // replace a state this core does own — the line above carries an
+                // already-Running instance forward, and overwriting it here would
+                // throw away its `kill_tx` and strand the process.
+                if let Some(game) = adopted.get(&instance.shortpath).copied() {
+                    if let InstanceType::Valid(data) = &mut instance.type_ {
+                        if matches!(data.state, LaunchState::Inactive { .. }) {
+                            data.state = LaunchState::Running(RunningInstance::adopted(
+                                game.pid,
+                                game.verified_start_time,
+                                game.start_time,
+                                Utc::now(),
+                            ));
+                            adopted_ids.push(instance_id);
+                        }
                     }
                 }
+
+                instances.insert(instance_id, instance);
+                drop(instances);
+
+                self.app
+                    .meta_cache_manager()
+                    .queue_caching(
+                        crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+                        false,
+                    )
+                    .await;
+
+                Ok(Some(instance_id))
             }
+            .await;
 
-            instances.insert(instance_id, instance);
-            drop(instances);
-
-            self.app
-                .meta_cache_manager()
-                .queue_caching(
-                    crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
-                    false,
-                )
-                .await;
+            let instance_id = match entry_result {
+                Ok(Some(instance_id)) => instance_id,
+                Ok(None) => continue,
+                Err(e) => {
+                    warn!(
+                        "failed to scan instance directory {}: {e:?}",
+                        path.display()
+                    );
+                    continue;
+                }
+            };
 
             scanned_count += 1;
 
@@ -4335,6 +4365,119 @@ mod test {
             "duplicating an instance must not disturb the source's own pidfile"
         );
 
+        Ok(())
+    }
+
+    // --- scan_instances ------------------------------------------------
+
+    /// Write a minimal, valid `instance.json` directly to `dir` — the same
+    /// on-disk shape `scan_instances` reads, without going through
+    /// `create_instance` (which needs a resolvable game version) or the DB.
+    async fn write_test_instance_json(dir: &std::path::Path, name: &str) {
+        tokio::fs::create_dir_all(dir).await.unwrap();
+        let config = info::Instance {
+            name: name.to_string(),
+            icon: info::InstanceIcon::Default,
+            date_created: chrono::Utc::now(),
+            date_updated: chrono::Utc::now(),
+            last_played: None,
+            seconds_played: 0,
+            modpack: None,
+            game_configuration: info::GameConfig {
+                version: None,
+                global_java_args: true,
+                extra_java_args: None,
+                memory: None,
+                java_override: None,
+                game_resolution: None,
+            },
+            pre_launch_hook: None,
+            post_exit_hook: None,
+            wrapper_command: None,
+            mod_sources: None,
+            notes: String::new(),
+        };
+        let json = super::schema::make_instance_config(config).unwrap();
+        tokio::fs::write(dir.join("instance.json"), json)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn scan_instances_isolates_one_bad_entry_from_the_rest_of_the_scan() -> anyhow::Result<()>
+    {
+        use super::{InstanceType, LaunchState};
+        use carbon_repos::repos::app_configuration::AppConfigurationPatch;
+
+        let app = crate::setup_managers_for_test().await;
+
+        let instances_dir = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path();
+
+        let good_root = instances_dir.join("instance-a");
+        write_test_instance_json(&good_root, "instance-a").await;
+
+        // Registers "instance-a" in the DB (cached) and creates the default
+        // group before anything is broken.
+        app.instance_manager().scan_instances().await?;
+
+        // Break group resolution for any directory the DB does not already
+        // know about: exactly what `add_instance` needs to register a *new*
+        // directory. Deterministic and order-independent — unlike a
+        // filesystem permission trick, it fails the same way on every call
+        // regardless of directory iteration order or already-open handles,
+        // and it leaves "instance-a" (already cached, so it never calls
+        // `get_default_group`) completely unaffected.
+        app.settings_manager()
+            .set(AppConfigurationPatch {
+                default_instance_group: Some(Some(999_999)),
+                ..Default::default()
+            })
+            .await?;
+
+        // As if a game were still running from a previous session: gives the
+        // already-cached "instance-a" something to adopt on the next scan.
+        let bin_dir = tempfile::tempdir().unwrap();
+        let mut fake_jvm = spawn_fake_jvm(bin_dir.path()).await;
+        let pid = fake_jvm.id().expect("fake jvm must have a pid");
+        let start_time = live_start_time(pid);
+        super::orphan_pid::write_pid_file(&good_root, super::PID_FILE_NAME, pid, start_time).await;
+
+        // A brand new, never-before-seen directory: uncached, so it is the
+        // one that actually reaches (and fails on) the broken group
+        // resolution above.
+        let bad_root = instances_dir.join("instance-b");
+        write_test_instance_json(&bad_root, "instance-b").await;
+
+        app.instance_manager().scan_instances().await?;
+
+        let instance_manager = app.instance_manager();
+        let instances = instance_manager.instances.read().await;
+        let a = instances
+            .values()
+            .find(|i| i.shortpath == "instance-a")
+            .expect("instance-a must still be tracked");
+        let InstanceType::Valid(data) = &a.type_ else {
+            panic!("instance-a became invalid");
+        };
+        assert!(
+            matches!(&data.state, LaunchState::Running(r) if r.is_adopted()),
+            "instance-a must still be adopted even though a later directory in the \
+             same scan failed to register"
+        );
+        drop(instances);
+
+        assert!(
+            *instance_manager.any_instance_running.borrow(),
+            "the liveness poller for the adopted instance must have been spawned \
+             even though a later directory in the same scan failed"
+        );
+
+        fake_jvm.kill().await.unwrap();
         Ok(())
     }
 }
