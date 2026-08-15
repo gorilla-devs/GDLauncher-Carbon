@@ -617,7 +617,36 @@ impl<'a> LogProcessor<'a> {
 
         self.parser.feed(data);
 
-        while let Some(item) = self.parser.parse_next()? {
+        loop {
+            let buffered_before = self.parser.buffered_len();
+
+            let item = match self.parser.parse_next() {
+                Ok(item) => item,
+                Err(e) => {
+                    tracing::warn!({ error = ?e }, "Skipping malformed log event");
+
+                    // Most error paths (e.g. a complete-but-unparseable
+                    // `<log4j:Event>`) already advanced the buffer past the
+                    // bad bytes before returning, so it's safe -- and
+                    // necessary, to reach any good events buffered right
+                    // behind it -- to keep parsing the same chunk. A few
+                    // paths leave the buffer untouched, in which case
+                    // retrying immediately would just reproduce the same
+                    // error on the same bytes forever; stop for this call
+                    // and wait for more data next time, exactly like a
+                    // `Partial` result. Either way `buffered_len` strictly
+                    // decreases or the loop exits, so this can't spin.
+                    if self.parser.buffered_len() < buffered_before {
+                        continue;
+                    }
+                    break;
+                }
+            };
+
+            let Some(item) = item else {
+                break;
+            };
+
             match item {
                 ParsedItem::LogEntry(entry) => {
                     self.log
@@ -645,6 +674,39 @@ pub struct InvalidGameLogIdError;
 #[cfg(test)]
 mod test {
     use super::*;
+
+    /// Regression: a malformed event used to `?`-abort the whole chunk out
+    /// of `process_data`, stranding any good events buffered right behind
+    /// it until more bytes happened to arrive later. The bad event here is
+    /// complete but unparseable (non-numeric timestamp), which
+    /// `carbon_parsing`'s parser already advances the buffer past before
+    /// returning `Err` -- so the good event that follows in the very same
+    /// chunk must surface out of this same `process_data` call.
+    #[tokio::test]
+    async fn process_data_surfaces_a_good_event_behind_a_malformed_one_in_one_call() {
+        let (tx, rx) = watch::channel(GameLog::new());
+        let mut processor = LogProcessor::new(LogEntrySourceKind::StdOut, &tx).await;
+
+        let bad_event = r#"<log4j:Event logger="Logger1" timestamp="not-a-number" level="INFO" thread="main">
+            <log4j:Message><![CDATA[bad timestamp]]></log4j:Message>
+        </log4j:Event>"#;
+        let good_event = r#"<log4j:Event logger="Logger1" timestamp="1234567890" level="INFO" thread="main">
+            <log4j:Message><![CDATA[good message]]></log4j:Message>
+        </log4j:Event>"#;
+
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(bad_event.as_bytes());
+        chunk.extend_from_slice(good_event.as_bytes());
+
+        processor
+            .process_data(&chunk, None)
+            .await
+            .expect("a malformed event must be skipped, not returned as an error");
+
+        let log = rx.borrow();
+        assert_eq!(log.len(), 1, "expected only the good event to be recorded");
+        assert_eq!(log.get_entry(0).unwrap().message.trim(), "good message");
+    }
 
     #[test]
     fn span() {

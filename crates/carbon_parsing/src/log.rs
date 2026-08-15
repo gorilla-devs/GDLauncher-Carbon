@@ -75,6 +75,22 @@ impl LogParser {
         }
     }
 
+    /// Bytes currently buffered and not yet resolved into a [`ParsedItem`].
+    ///
+    /// Not needed to interpret `Ok` results -- those already say what
+    /// happened. It exists for callers that want to tell apart the two
+    /// shapes `Err` can take from [`Self::parse_next`]: most error paths
+    /// (e.g. a complete-but-unparseable `<log4j:Event>`) still advance the
+    /// buffer past the bad bytes before returning, so `buffered_len` drops;
+    /// a few (invalid UTF-8 or an unparseable XML entity in plain text
+    /// preceding any recognised tag) leave the buffer untouched, so
+    /// `buffered_len` stays the same and the identical error would recur on
+    /// an immediate retry -- a caller comparing this before and after can
+    /// tell the difference and only retry the former.
+    pub fn buffered_len(&self) -> usize {
+        self.buffer.len()
+    }
+
     /// Feeds new data into the parser.
     pub fn feed(&mut self, data: &[u8]) {
         if !self.partial_data.is_empty() {
@@ -222,6 +238,12 @@ impl LogParser {
     }
 
     /// Attempts to parse the next item from the buffer.
+    ///
+    /// `Err` does not always mean the same thing about buffer progress: see
+    /// [`Self::buffered_len`] for how to tell a consumed-bad-event error
+    /// (safe to call again right away) from one that left the buffer
+    /// untouched (would just recur -- wait for more data instead, exactly
+    /// like `Ok(Some(ParsedItem::Partial(_)))`).
     pub fn parse_next(&mut self) -> Result<Option<ParsedItem>, ParserError> {
         if self.buffer.is_empty() {
             return Ok(None);
