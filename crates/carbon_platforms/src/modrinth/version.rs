@@ -113,11 +113,33 @@ pub struct VersionFile {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Hashes {
+    #[serde(deserialize_with = "deserialize_lowercase_hex")]
     pub sha512: String,
+    #[serde(deserialize_with = "deserialize_lowercase_hex")]
     pub sha1: String,
     /// A map of other hashes that may have been provided
     #[serde(flatten)]
     pub others: HashMap<String, String>,
+}
+
+/// Folds a hex digest to lowercase as it is read.
+///
+/// Modrinth's API is not guaranteed to return these in any particular case,
+/// but callers both compare them against locally-computed digests (always
+/// lowercase — `hex::encode`) and key maps by them, so a digest that arrives
+/// differently-cased than a local one would fail an `==` comparison, or miss
+/// a map entry keyed by the other casing, despite being the same hash.
+/// Folding once here leaves every downstream use working on one casing —
+/// the same fold `gdlpack`'s `FileHashes` applies for the same reason.
+///
+/// ASCII-only on purpose: a hex digest is ASCII, and full Unicode folding
+/// would let a locale-specific rule alter a character it should leave alone.
+fn deserialize_lowercase_hex<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let hex = String::deserialize(deserializer)?;
+    Ok(hex.to_ascii_lowercase())
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -226,5 +248,37 @@ impl From<ModChannel> for VersionType {
             ModChannel::Beta => VersionType::Beta,
             ModChannel::Stable => VersionType::Release,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Modrinth's own API is not guaranteed to echo hex digests in any
+    /// particular case; callers compare `sha512`/`sha1` against
+    /// locally-computed (always-lowercase, `hex::encode`) digests, so both
+    /// must land lowercase regardless of how the API spelled them.
+    #[test]
+    fn mixed_case_hashes_are_read_as_lowercase() {
+        let json = r#"{
+            "hashes": { "sha512": "AB12cd34", "sha1": "EF34ab", "crc32": "DEADBEEF" },
+            "url": "https://cdn.modrinth.com/data/AAAA/versions/1/mod.jar",
+            "filename": "mod.jar",
+            "primary": true,
+            "size": 1024,
+            "file_type": null
+        }"#;
+
+        let file: VersionFile = serde_json::from_str(json).unwrap();
+
+        assert_eq!(file.hashes.sha512, "ab12cd34");
+        assert_eq!(file.hashes.sha1, "ef34ab");
+        // The flattened catch-all is untouched: only the two named,
+        // compared-against fields are folded.
+        assert_eq!(
+            file.hashes.others.get("crc32").map(String::as_str),
+            Some("DEADBEEF")
+        );
     }
 }

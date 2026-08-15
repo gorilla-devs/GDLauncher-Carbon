@@ -335,10 +335,15 @@ impl ModplatformCacher for ModrinthModCacher {
                 // no file whose own hash matches. Skip just this mod rather than
                 // panicking the shared query/save/icon task group, which would
                 // silently stop all Modrinth caching for the rest of the session.
+                //
+                // `sha512` is `hex::encode`'s (always lowercase) output; `file.hashes.sha512`
+                // is folded lowercase the same way at deserialize
+                // (`carbon_platforms::modrinth::version::Hashes`) — both sides are
+                // guaranteed lowercase, so a plain comparison suffices.
                 let Some(file) = version
                     .files
                     .iter()
-                    .find(|file| file.hashes.sha512.eq_ignore_ascii_case(&sha512))
+                    .find(|file| file.hashes.sha512 == sha512)
                 else {
                     let project_id = &project.id;
                     let version_id = &version.id;
@@ -732,16 +737,34 @@ mod test {
 
     /// Modrinth's stored file hash is external data, while the queried hash is
     /// this app's own lowercase `hex::encode` output. A response serving the hash
-    /// in a different case still describes the same file, so it must cache rather
-    /// than be skipped as unmatched -- being skipped would also park the hash in
-    /// `ignored_remote_mr_hashes` and stop it being retried for the session.
+    /// in a different case still describes the same file, so it must cache
+    /// rather than be skipped as unmatched -- being skipped would also park the
+    /// hash in `ignored_remote_mr_hashes` and stop it being retried for the
+    /// session. The file below is built through real JSON deserialization
+    /// (rather than the `file()` literal-construction helper) so the fixture
+    /// actually exercises `Hashes`' `deserialize_lowercase_hex` fold, the
+    /// mechanism now responsible for this -- not an in-memory struct the fold
+    /// never runs on.
     #[tokio::test]
     async fn a_differently_cased_response_hash_still_matches_the_queried_hash() {
         let app = crate::setup_managers_for_test().await;
 
         let queried_sha512 = "a".repeat(128);
         let mut version = version("version", "project", 1, VersionType::Release);
-        version.files = vec![file(&queried_sha512.to_uppercase())];
+        let uppercase_sha512 = queried_sha512.to_uppercase();
+        version.files = vec![
+            serde_json::from_str(&format!(
+                r#"{{
+                    "hashes": {{ "sha512": "{uppercase_sha512}", "sha1": "irrelevant" }},
+                    "url": "https://example.invalid/{uppercase_sha512}.jar",
+                    "filename": "{uppercase_sha512}.jar",
+                    "primary": true,
+                    "size": 1,
+                    "file_type": null
+                }}"#
+            ))
+            .unwrap(),
+        ];
 
         let mut versions = HashMap::new();
         versions.insert(queried_sha512.clone(), version);
