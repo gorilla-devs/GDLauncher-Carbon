@@ -89,6 +89,11 @@ fn run(migrations_root: &Path, name: &str, dml_reviewed: bool) -> std::io::Resul
         return scaffold(migrations_root, name);
     };
 
+    if let Err(msg) = require_newest(&dirs, &dir) {
+        eprintln!("{msg}");
+        return Ok(ExitCode::FAILURE);
+    }
+
     let up_path = dir.join("migration.sql");
     let up = std::fs::read_to_string(&up_path).unwrap_or_default();
     if is_effectively_empty(&up) {
@@ -355,6 +360,13 @@ fn default_checksums_test_path() -> PathBuf {
 /// `FROZEN` already fails `migration_checksums_frozen.rs`'s own count check
 /// loudly, in CI, before it ships, so skipping this step is caught elsewhere
 /// even when it isn't caught here.
+///
+/// Three outcomes, told apart before [`insert_before_anchor`] runs so each
+/// gets its own message: no tuple named `dir_name` existed (fresh insert); one
+/// existed and is byte-identical (true no-op); one existed but the checksum
+/// differs — the up SQL changed since it was written — and is replaced in
+/// place (see `run()`'s newest-in-chain guard for why that can only ever be
+/// this migration's own, still-unshipped tuple).
 fn append_checksum_entry(
     checksums_path: &Path,
     dir_name: &str,
@@ -363,6 +375,7 @@ fn append_checksum_entry(
     let checksum = sha256_hex(up.as_bytes());
     let entry = format!("    (\n        \"{dir_name}\",\n        \"{checksum}\",\n    ),");
     let src = std::fs::read_to_string(checksums_path)?;
+    let had_entry = src.contains(&tuple_needle(dir_name));
     match insert_before_anchor(&src, CHECKSUM_LIST_ANCHOR, &entry, dir_name) {
         Ok(updated) => {
             if updated == src {
@@ -370,6 +383,9 @@ fn append_checksum_entry(
                     "{} already has a frozen checksum entry for {dir_name}; nothing to insert.",
                     checksums_path.display()
                 );
+            } else if had_entry {
+                std::fs::write(checksums_path, &updated)?;
+                println!("updated frozen checksum for {dir_name}");
             } else {
                 std::fs::write(checksums_path, &updated)?;
                 println!(
@@ -390,12 +406,40 @@ fn append_checksum_entry(
     }
 }
 
+/// The exact quoted-name substring identifying a migration's tuple in the
+/// `FROZEN` list — shared by [`append_checksum_entry`]'s own presence check
+/// and [`insert_before_anchor`]'s, so both agree on what "already has an
+/// entry for this migration" means.
+fn tuple_needle(dir_name: &str) -> String {
+    format!("\"{dir_name}\"")
+}
+
 /// Inserts `entry` directly above the line containing `anchor` in `src`,
-/// returning the updated source. Idempotent: identifies the tuple by its
-/// quoted `dir_name`, so if a tuple naming it is already present, `src` is
-/// returned unchanged — rerunning the tool for the same migration never
-/// duplicates the entry. Fails if `anchor` is missing or appears more than
-/// once, since there would then be no single unambiguous insertion point.
+/// returning the updated source.
+///
+/// Idempotent by content, not merely by name: if a tuple naming `dir_name` is
+/// already present and byte-identical to `entry`, `src` is returned
+/// unchanged — rerunning the tool for an unedited migration never duplicates
+/// anything. If a tuple naming `dir_name` is present but differs (the up SQL
+/// changed since that tuple was written, so its checksum no longer matches),
+/// the stale tuple is replaced in place instead of left behind: leaving it
+/// would pin `FROZEN` to a hash the migration no longer produces, and the
+/// resulting `migration_checksums_frozen` failure would point the developer
+/// at re-deriving a hash the tool could have just fixed. Only ever inserts
+/// fresh, above `anchor`, when no tuple names `dir_name` at all.
+///
+/// INVARIANT: `run()` calls [`require_newest`] before any of this ever runs,
+/// refusing every name except the chain's newest, locally-authored migration.
+/// The replace branch here can therefore only ever rewrite *that* migration's
+/// own tuple — it can never be reached for, and so can never silently
+/// rewrite, a shipped mid-chain migration's frozen checksum.
+///
+/// Fails if `anchor` is missing or appears more than once (no single
+/// unambiguous insertion point), or if a tuple names `dir_name` but is not in
+/// the fixed 4-line shape this tool itself always writes (a hand-edited
+/// `FROZEN` entry) — replacing an unrecognised shape would risk corrupting
+/// unrelated text instead of just the stale tuple.
+///
 /// A smaller, file-agnostic sibling of [`insert_migration_entry`], which is
 /// hard-wired to `lib.rs`'s own anchor constant.
 fn insert_before_anchor(
@@ -414,9 +458,23 @@ fn insert_before_anchor(
         ));
     }
 
-    let needle = format!("\"{dir_name}\"");
-    if src.contains(&needle) {
-        return Ok(src.to_string());
+    let needle = tuple_needle(dir_name);
+    if let Some(needle_pos) = src.find(&needle) {
+        if src.contains(entry) {
+            return Ok(src.to_string());
+        }
+        let (start, end) = tuple_span(src, needle_pos).ok_or_else(|| {
+            format!(
+                "found `{needle}` but its tuple is not in the expected `(\"name\", \"checksum\"),` \
+                 shape; fix it by hand"
+            )
+        })?;
+        let mut out = String::with_capacity(src.len() + entry.len());
+        out.push_str(&src[..start]);
+        out.push_str(entry);
+        out.push('\n');
+        out.push_str(&src[end..]);
+        return Ok(out);
     }
 
     let anchor_pos = src.find(anchor).expect("anchor_count == 1 checked above");
@@ -428,6 +486,23 @@ fn insert_before_anchor(
     out.push('\n');
     out.push_str(&src[line_start..]);
     Ok(out)
+}
+
+/// The byte span `[start, end)` of the tuple line-block containing byte offset
+/// `needle_pos` — from the start of its opening `    (` line through the start
+/// of the line following its closing `    ),` line (mirroring
+/// [`insert_before_anchor`]'s own `line_start` semantics for the fresh-insert
+/// path, so both branches build the replacement the same way). Assumes the
+/// fixed 4-line shape [`append_checksum_entry`] always writes; returns `None`
+/// if that exact shape is not found around `needle_pos`.
+fn tuple_span(src: &str, needle_pos: usize) -> Option<(usize, usize)> {
+    let open_nl = src[..needle_pos].rfind("\n    (\n")?;
+    let start = open_nl + 1;
+
+    let close_rel = src[needle_pos..].find("    ),\n")?;
+    let end = needle_pos + close_rel + "    ),\n".len();
+
+    Some((start, end))
 }
 
 /// `SUCCESS` only when both steps succeeded — the combined exit code for the
@@ -481,6 +556,33 @@ fn find_migration_dir(dirs: &[PathBuf], name: &str) -> Option<PathBuf> {
         })
         .next_back()
         .cloned()
+}
+
+/// Refuses `dir` unless it is `dirs`' newest entry (`dirs` is already sorted
+/// chronologically by [`ordered_migration_dirs`]). `find_migration_dir` can
+/// match an older directory whenever a *different*, newer migration has since
+/// been added to the chain — the reused-name case it handles is only about
+/// picking the newest among same-named directories, not about the directory
+/// found being the chain's newest overall. Every caller downstream
+/// (`regenerate_baseline`, `apply_list_entry`, `append_checksum_entry`)
+/// assumes it is operating on the newest migration in the chain; running
+/// against an older one would regenerate the committed baseline, the
+/// `get_migrations()` list, and the frozen checksum from a truncated chain,
+/// silently dropping every later migration's objects while reporting success.
+fn require_newest(dirs: &[PathBuf], dir: &Path) -> Result<(), String> {
+    match dirs.last() {
+        Some(newest) if newest.as_path() == dir => Ok(()),
+        newest => Err(format!(
+            "{} is not the newest migration in the chain (newest: {}).\n\
+             This tool only ever regenerates the newest migration — rerun it naming that one \
+             instead. A shipped, mid-chain migration's down.sql, the baseline, and its frozen \
+             checksum must never be regenerated from a truncated chain.",
+            dir_name(dir).unwrap_or("<unknown>"),
+            newest
+                .and_then(|d| dir_name(d))
+                .unwrap_or("<no migrations found>")
+        )),
+    }
 }
 
 /// True when `sql` holds no statement — only whitespace and `--` comment lines
@@ -544,6 +646,62 @@ mod tests {
             find_migration_dir(&all, "init"),
             Some(PathBuf::from("20260701000000_init"))
         );
+    }
+
+    #[test]
+    fn require_newest_refuses_a_mid_chain_migration_naming_the_newest() {
+        let all = dirs(&[
+            "20260223000000_add_servers",
+            "20260328000000_add_server_modloader_and_addons",
+        ]);
+        let err = require_newest(&all, &all[0]).unwrap_err();
+        assert!(
+            err.contains("add_server_modloader_and_addons"),
+            "the refusal must name the actual newest migration, got: {err}"
+        );
+        assert!(
+            require_newest(&all, &all[1]).is_ok(),
+            "the chain's newest entry must be accepted"
+        );
+    }
+
+    #[test]
+    fn run_refuses_a_mid_chain_migration_name_end_to_end() {
+        // A shipped, mid-chain migration name reaching `run()` must be refused
+        // before any generation step — regenerating the baseline or frozen
+        // checksum from a truncated chain would report success while silently
+        // dropping every later migration's objects.
+        //
+        // Only the refusal path is exercised here, deliberately: the success
+        // path of `generate_or_verify` writes through `default_lib_path()` /
+        // `default_checksums_test_path()` / `CARGO_MANIFEST_DIR`-rooted
+        // baseline path straight into this checkout's real source files (the
+        // same reason every other test in this module drives
+        // `apply_list_entry` / `append_checksum_entry` against scratch paths
+        // instead of calling `run()` on a real up). The refusal below returns
+        // out of `run()` before any of that is reached, so it is safe to
+        // exercise `run()` itself here.
+        let root = tempfile::tempdir().unwrap();
+        let old = root.path().join("20240101000000_add_widget");
+        let newest = root.path().join("20260101000000_add_gadget");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::create_dir_all(&newest).unwrap();
+        std::fs::write(old.join("migration.sql"), UP).unwrap();
+        std::fs::write(
+            newest.join("migration.sql"),
+            "CREATE TABLE \"Gadget\" (id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+
+        let code = run(root.path(), "add_widget", false).unwrap();
+        assert_eq!(
+            code,
+            ExitCode::FAILURE,
+            "naming a mid-chain migration must refuse, not regenerate from a truncated chain"
+        );
+        // Nothing from the generate flow ran: no down.sql was produced.
+        assert!(!old.join("down.sql").exists());
+        assert!(!newest.join("down.sql").exists());
     }
 
     #[test]
@@ -658,6 +816,55 @@ mod tests {
         assert_eq!(
             once, twice,
             "rerunning for the same migration must not duplicate its checksum entry"
+        );
+    }
+
+    #[test]
+    fn append_checksum_entry_updates_a_stale_checksum_for_the_same_name() {
+        // The still-unshipped migration's up SQL is edited between two runs of
+        // the tool (`run()`'s newest-in-chain guard is what makes this safe to
+        // do only for the newest, locally-authored migration — see
+        // `insert_before_anchor`'s doc). Rerunning must replace the stale
+        // tuple, not leave FROZEN pinned to a checksum the migration no longer
+        // produces.
+        let (_dir, path) = scratch_checksums_test();
+        append_checksum_entry(&path, "20260501000000_add_widget", UP).unwrap();
+        let stale_checksum = sha256_hex(UP.as_bytes());
+        let first = std::fs::read_to_string(&path).unwrap();
+        assert!(first.contains(&stale_checksum));
+
+        const EDITED_UP: &str = "CREATE TABLE \"Widget\" (id INTEGER PRIMARY KEY, extra TEXT);";
+        let new_checksum = sha256_hex(EDITED_UP.as_bytes());
+        assert_ne!(
+            stale_checksum, new_checksum,
+            "sanity: the edit must actually change the checksum"
+        );
+
+        let code = append_checksum_entry(&path, "20260501000000_add_widget", EDITED_UP).unwrap();
+        assert_eq!(code, ExitCode::SUCCESS);
+
+        let updated = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            updated.contains(&new_checksum),
+            "the tuple must carry the new checksum:\n{updated}"
+        );
+        assert!(
+            !updated.contains(&stale_checksum),
+            "the stale checksum must be gone, not left duplicated alongside the new one:\n{updated}"
+        );
+        assert_eq!(
+            updated.matches("20260501000000_add_widget").count(),
+            1,
+            "the tuple must be replaced in place, not duplicated:\n{updated}"
+        );
+        assert!(
+            updated.contains("\"20240120134904_init\""),
+            "the pre-existing, unrelated entry must be preserved:\n{updated}"
+        );
+        assert_eq!(
+            updated.matches("new-migration:anchor").count(),
+            1,
+            "the anchor must survive the edit exactly once:\n{updated}"
         );
     }
 
