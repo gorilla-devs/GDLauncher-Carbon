@@ -1296,6 +1296,10 @@ pub enum FERepairReason {
     RepairRestored,
     ReEnabled,
     CaseAliasedByTarget,
+    /// VersionChange-only — repair (the only mode this FE type is ever
+    /// actually populated from) never produces it, but `PlanReason` is one
+    /// enum shared by both modes, so this arm still has to exist.
+    DisabledReplaceResumed,
 }
 
 impl From<manager::modpack::apply_plan::PlanReason> for FERepairReason {
@@ -1315,6 +1319,7 @@ impl From<manager::modpack::apply_plan::PlanReason> for FERepairReason {
             PlanReason::RepairRestored => Self::RepairRestored,
             PlanReason::ReEnabled => Self::ReEnabled,
             PlanReason::CaseAliasedByTarget { .. } => Self::CaseAliasedByTarget,
+            PlanReason::DisabledReplaceResumed => Self::DisabledReplaceResumed,
         }
     }
 }

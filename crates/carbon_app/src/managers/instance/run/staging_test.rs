@@ -16,6 +16,8 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
+use sha2::Digest as _;
+
 use super::apply_plan::{
     self, ApplyMode, DiskState, PlanAction, PlanEntry, PlanInputs, PlanReason,
 };
@@ -115,6 +117,7 @@ async fn deleted_by_user_stays_deleted() {
         disk: &disk,
         mode: ApplyMode::VersionChange,
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a deleted-by-user path must plan without error");
     assert_eq!(entries.len(), 1);
@@ -160,6 +163,7 @@ async fn modified_by_user_is_kept_with_both_md5s_in_the_audit() {
         disk: &disk,
         mode: ApplyMode::VersionChange,
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a modified-by-user path must plan without error");
     assert_eq!(entries.len(), 1);
@@ -217,6 +221,7 @@ async fn reenable_pristine_disabled_twin_uses_the_twins_own_bytes() {
             re_enable_disabled: true,
         },
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a pristine disabled twin re-enables without needing staged bytes");
     assert_eq!(entries.len(), 1);
@@ -260,6 +265,7 @@ async fn reenable_damaged_disabled_twin_uses_staged_bytes_and_drops_the_twin() {
             re_enable_disabled: true,
         },
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a damaged disabled twin with staged bytes re-enables without error");
     assert_eq!(entries.len(), 1);
@@ -285,6 +291,57 @@ async fn reenable_damaged_disabled_twin_uses_staged_bytes_and_drops_the_twin() {
         !staged_path(&staging_dir, PATH).exists(),
         "the staged copy must be moved, not merely copied"
     );
+}
+
+#[tokio::test]
+async fn reenable_errors_when_the_stale_twin_cannot_be_removed() {
+    let (_tmp, instance_root, staging_dir) = scaffold();
+    const PATH: &str = "/mods/locked.jar";
+
+    let old = packinfo(&[(PATH, 5)]);
+    let target = packinfo(&[(PATH, 2)]);
+    let staged: HashSet<String> = [PATH.to_string()].into_iter().collect();
+    write_staged(&staging_dir, PATH, b"fresh-pack-bytes").await;
+
+    // The "disabled twin" spelling is a non-empty directory rather than a
+    // regular file — `remove_file` on it fails (on Unix with EISDIR/ENOTEMPTY
+    // depending on platform), standing in for "twin can't be removed" (a
+    // locked file in the real world) without needing real file locking in a
+    // test.
+    let twin = disabled_path(&instance_root, PATH);
+    tokio::fs::create_dir_all(&twin).await.unwrap();
+    tokio::fs::write(twin.join("keep.txt"), b"not empty")
+        .await
+        .unwrap();
+
+    let mut disk = HashMap::new();
+    disk.insert(PATH.to_string(), DiskState::Disabled { md5: hashes(9).md5 });
+
+    let entries = apply_plan::plan(PlanInputs {
+        old: Some(&old),
+        target: &target,
+        staged: &staged,
+        disk: &disk,
+        mode: ApplyMode::Repair {
+            re_enable_disabled: true,
+        },
+        fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
+    })
+    .expect("a damaged disabled twin with staged bytes plans without error");
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].action, PlanAction::ReEnable);
+
+    let result = execute_plan(&entries, &instance_root, &staging_dir).await;
+    assert!(
+        result.is_err(),
+        "execute_plan must surface a twin it cannot remove instead of swallowing the error"
+    );
+
+    // No audit is ever rendered for this attempt — `process_modpack_staging`
+    // propagates `execute_plan`'s error with `?` before it reaches the
+    // audit-writing code, so the caller can never promote or report an apply
+    // that left a stale twin behind unremoved.
 }
 
 // --- extra: ReplaceDisabled (repair, no re-enable) — outside the (a)-(e)
@@ -314,6 +371,7 @@ async fn repair_replaces_a_damaged_disabled_twin_in_place() {
             re_enable_disabled: false,
         },
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a damaged disabled twin with staged bytes repairs without error");
     assert_eq!(entries.len(), 1);
@@ -375,6 +433,7 @@ async fn version_change_replaces_creates_and_deletes_real_files() {
         disk: &disk,
         mode: ApplyMode::VersionChange,
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a fully-staged version change must not error");
     assert_eq!(entries.len(), 3);
@@ -446,6 +505,7 @@ async fn pack_shipped_disabled_file_creates_disabled_and_is_seen_as_disabled_aft
         disk: &disk,
         mode: ApplyMode::VersionChange,
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a pack-shipped-disabled path must plan without error, not MissingStagedSource");
     assert_eq!(entries.len(), 1);
@@ -474,9 +534,12 @@ async fn pack_shipped_disabled_file_creates_disabled_and_is_seen_as_disabled_aft
         .await
         .unwrap();
     assert!(
-        matches!(disk_after.get(PATH), Some(DiskState::Disabled { .. })),
+        matches!(
+            disk_after.states.get(PATH),
+            Some(DiskState::Disabled { .. })
+        ),
         "expected the path to scan as Disabled after landing at the twin spelling, got {:?}",
-        disk_after.get(PATH)
+        disk_after.states.get(PATH)
     );
 
     // Re-planning as a later version change would (same target, nothing
@@ -486,9 +549,10 @@ async fn pack_shipped_disabled_file_creates_disabled_and_is_seen_as_disabled_aft
         old: Some(&target),
         target: &target,
         staged: &HashSet::new(),
-        disk: &disk_after,
+        disk: &disk_after.states,
         mode: ApplyMode::VersionChange,
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a later pass over the same disabled twin must not error");
     assert_eq!(entries2.len(), 1);
@@ -525,6 +589,7 @@ async fn replace_with_pack_shipped_disabled_target_drops_the_old_enabled_copy() 
         disk: &disk,
         mode: ApplyMode::VersionChange,
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a pristine path becoming pack-shipped-disabled must plan without error");
     assert_eq!(entries.len(), 1);
@@ -543,6 +608,101 @@ async fn replace_with_pack_shipped_disabled_target_drops_the_old_enabled_copy() 
         .await
         .unwrap();
     assert_eq!(bytes, b"new-disabled-bytes");
+}
+
+#[tokio::test]
+async fn resumed_apply_finishes_an_interrupted_disabled_replace_via_real_disk_scan() {
+    // Simulates the exact disk state a crash (or a locked-file `remove_file`
+    // failure) leaves between execute_plan's disabled-Replace rename
+    // (staged -> live/PATH.disabled, already landing target's own bytes)
+    // and its follow-up removal of the stale live/PATH: both spellings on
+    // disk, the bare one still pristine (old bytes), staging already
+    // consumed by the interrupted attempt (nothing re-staged here). Uses a
+    // real `disk_scan::scan_disk_state` scan — not hand-built `DiskState` —
+    // so this proves the whole pipeline (scanner surfaces the coexisting
+    // twin -> planner recognizes and finishes the interrupted state ->
+    // execute_plan performs exactly the Delete) works end to end, not just
+    // the pure planner in isolation.
+    let (_tmp, instance_root, staging_dir) = scaffold();
+    const PATH: &str = "/mods/becomes-disabled.jar";
+
+    // Real md5s of the actual bytes on disk below, not the synthetic
+    // `hashes(seed)` helper — `disk_scan::scan_disk_state` hashes real file
+    // content, so `old`/`target` have to agree with it for this to exercise
+    // the same comparisons a real resumed apply would make.
+    let old_md5: [u8; 16] = md5::Md5::digest(b"old-enabled-bytes").into();
+    let target_md5: [u8; 16] = md5::Md5::digest(b"new-disabled-bytes").into();
+    let old = PackInfo {
+        files: [(
+            PATH.to_string(),
+            FileHashes {
+                sha512: [0; 64],
+                md5: old_md5,
+            },
+        )]
+        .into_iter()
+        .collect(),
+    };
+    let target = PackInfo {
+        files: [(
+            PATH.to_string(),
+            FileHashes {
+                sha512: [0; 64],
+                md5: target_md5,
+            },
+        )]
+        .into_iter()
+        .collect(),
+    };
+    write_live(&instance_root, PATH, b"old-enabled-bytes").await;
+    write_disabled(&instance_root, PATH, b"new-disabled-bytes").await;
+    // Nothing staged — the interrupted attempt's own rename already
+    // consumed it, and overrides are never re-extracted on resume.
+    let staged: HashSet<String> = HashSet::new();
+
+    let universe: BTreeSet<String> = [PATH.to_string()].into_iter().collect();
+    let disk_scan::DiskScan {
+        states: disk,
+        coexisting_disabled_twin_md5,
+    } = disk_scan::scan_disk_state(&instance_root.join("instance"), &universe)
+        .await
+        .unwrap();
+
+    let entries = apply_plan::plan(PlanInputs {
+        old: Some(&old),
+        target: &target,
+        staged: &staged,
+        disk: &disk,
+        mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
+    })
+    .expect("a coexisting twin already matching target must finish the interrupted replace");
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].action, PlanAction::Delete);
+    assert_eq!(entries[0].reason, PlanReason::DisabledReplaceResumed);
+
+    execute_plan(&entries, &instance_root, &staging_dir)
+        .await
+        .expect("execute_plan must finish the interrupted replace without error");
+
+    assert!(
+        !live_path(&instance_root, PATH).exists(),
+        "the stale bare copy must be deleted, finishing the interrupted replace"
+    );
+    let bytes = tokio::fs::read(disabled_path(&instance_root, PATH))
+        .await
+        .unwrap();
+    assert_eq!(
+        bytes, b"new-disabled-bytes",
+        "the twin, which already had target's own bytes, must be left untouched"
+    );
+
+    let audit = render_audit(&entries, &[]);
+    assert!(
+        audit.contains(&format!("\nFiles deleted:\n - {PATH}\n")),
+        "an interrupted-replace resume must render as an honest Delete, audit was:\n{audit}"
+    );
 }
 
 // --- Repair-mode execute_plan integration (plain enabled files) ---
@@ -577,6 +737,7 @@ async fn repair_damaged_enabled_file_is_replaced_from_staged_bytes() {
             re_enable_disabled: false,
         },
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a damaged enabled file with staged bytes repairs without error");
     assert_eq!(entries.len(), 1);
@@ -631,6 +792,7 @@ async fn repair_missing_enabled_file_is_recreated_from_staged_bytes() {
             re_enable_disabled: false,
         },
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a missing enabled file with staged bytes repairs without error");
     assert_eq!(entries.len(), 1);
@@ -676,6 +838,7 @@ async fn repair_edited_override_is_reset_to_pack_bytes() {
             re_enable_disabled: false,
         },
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a hand-edited config with staged bytes repairs without error");
     assert_eq!(entries.len(), 1);
@@ -719,6 +882,7 @@ async fn repair_saves_folder_execute_plan_leaves_damaged_file_untouched() {
             re_enable_disabled: false,
         },
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a save file must never error, even damaged relative to target");
     assert_eq!(entries.len(), 1);
@@ -803,7 +967,12 @@ async fn apply_user_cleanup_skips_a_spelling_that_is_not_an_exact_walked_member(
     const REQUESTED: &str = "/mods/Extra.jar";
     write_live(&instance_root, REAL, b"real-file-bytes").await;
 
-    let target = packinfo(&[]);
+    // A tracked /mods sibling — see
+    // apply_user_cleanup_removes_untracked_path_and_reports_it for why: an
+    // empty packinfo means an empty top-level allow-list, so the walk would
+    // never even reach /mods and the exact-spelling guard below would never
+    // actually run.
+    let target = packinfo(&[("/mods/real.jar", 1)]);
     let removed = apply_user_cleanup(
         &[REQUESTED.to_string()],
         None,
@@ -1008,7 +1177,12 @@ async fn apply_user_cleanup_refuses_to_follow_a_symlinked_parent_out_of_the_inst
     tokio::fs::create_dir_all(&mods_dir).await.unwrap();
     std::os::unix::fs::symlink(outside.path(), mods_dir.join("escape")).unwrap();
 
-    let target = packinfo(&[]);
+    // A tracked /mods sibling — see
+    // apply_user_cleanup_removes_untracked_path_and_reports_it for why: an
+    // empty packinfo means an empty top-level allow-list, so the walk would
+    // never even descend into /mods and the containment check below would
+    // never actually run.
+    let target = packinfo(&[("/mods/real.jar", 1)]);
     let removed = apply_user_cleanup(
         &["/mods/escape/victim.txt".to_string()],
         None,
@@ -1154,6 +1328,11 @@ fn render_audit_golden() {
             reason: PlanReason::PackDropped,
         },
         PlanEntry {
+            path: "/mods/disabled-replace-resumed.jar".to_string(),
+            action: PlanAction::Delete,
+            reason: PlanReason::DisabledReplaceResumed,
+        },
+        PlanEntry {
             path: "/mods/dropped-but-modified.jar".to_string(),
             action: PlanAction::Keep,
             reason: PlanReason::DroppedButModified {
@@ -1226,6 +1405,7 @@ fn render_audit_golden() {
     expected.push_str(" - /config/case-aliased.json: case-aliased with a tracked path\n");
     expected.push_str("\nFiles deleted:\n");
     expected.push_str(" - /mods/pack-dropped.jar\n");
+    expected.push_str(" - /mods/disabled-replace-resumed.jar\n");
     expected.push_str("\nFiles replaced:\n");
     expected.push_str(" - /mods/pack-update.jar\n");
     expected.push_str(" - /mods/disabled-repair-overwrote.jar\n");
@@ -1356,6 +1536,7 @@ async fn resume_after_partial_apply_preserves_unconsumed_overrides() {
         disk: &disk,
         mode: ApplyMode::VersionChange,
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a resumed pass against the preserved record must not error");
 
@@ -1537,6 +1718,7 @@ async fn resume_with_overrides_extracted_but_apply_not_started_regenerates_and_a
         disk: &disk,
         mode: ApplyMode::VersionChange,
         fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &HashMap::new(),
     })
     .expect("a fully-staged, unconsumed apply must not error");
 

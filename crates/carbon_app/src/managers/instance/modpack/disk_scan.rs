@@ -19,12 +19,35 @@ use crate::util::NormalizedWalkdir;
 use super::apply_plan;
 use super::packinfo::{FileHashes, PackInfo};
 
+/// [`scan_disk_state`]'s result: every path's ordinary
+/// [`apply_plan::DiskState`], plus — only for a path currently `Present`
+/// under its bare spelling — the md5 of a `.disabled` twin that coexists
+/// with it right now, when one does. `DiskState::Disabled` already carries
+/// a twin's md5 for the twin-only case (bare spelling absent); this covers
+/// the shape `DiskState` alone can't express, both spellings present at
+/// once. That shape only ever arises mid-way through an interrupted
+/// disabled [`apply_plan::PlanAction::Replace`] — `run/modpack.rs::execute_plan`
+/// renames the staged bytes into the twin spelling *before* removing the
+/// stale bare copy, so a crash or a locked-file removal failure between the
+/// two leaves exactly this. [`apply_plan::decide_version_change`]'s
+/// pristine-unstaged-differs arm is the sole consumer, using it to
+/// recognize and finish that interrupted state on resume instead of
+/// erroring on it forever (staging is consumed either way and is never
+/// re-populated on resume).
+pub struct DiskScan {
+    pub states: HashMap<String, apply_plan::DiskState>,
+    pub coexisting_disabled_twin_md5: HashMap<String, [u8; 16]>,
+}
+
 /// Disk state for every path in `universe` (packinfo-style keys with leading '/').
-/// Probes `<data>/<path>` then `<data>/<path>.disabled`; hashes md5.
+/// Probes `<data>/<path>` then `<data>/<path>.disabled`; hashes md5. When the
+/// bare spelling is present, also probes the `.disabled` twin (see
+/// [`DiskScan`]'s own doc for why) — this costs one extra probe only in that
+/// branch; the twin-only and neither-present branches already probed it.
 pub async fn scan_disk_state(
     data_path: &Path,
     universe: &BTreeSet<String>,
-) -> anyhow::Result<HashMap<String, apply_plan::DiskState>> {
+) -> anyhow::Result<DiskScan> {
     let mut futures = Vec::with_capacity(universe.len());
 
     for path in universe {
@@ -56,22 +79,39 @@ pub async fn scan_disk_state(
         let key = path.clone();
 
         futures.push(async move {
-            let state = match probe_md5(&disk_path).await? {
-                Some(md5) => apply_plan::DiskState::Present { md5 },
+            let (state, coexisting_twin_md5) = match probe_md5(&disk_path).await? {
+                Some(md5) => {
+                    let twin_md5 = probe_md5(&disabled_sibling(&disk_path)).await?;
+                    (apply_plan::DiskState::Present { md5 }, twin_md5)
+                }
                 None => match probe_md5(&disabled_sibling(&disk_path)).await? {
-                    Some(md5) => apply_plan::DiskState::Disabled { md5 },
-                    None => apply_plan::DiskState::Missing,
+                    Some(md5) => (apply_plan::DiskState::Disabled { md5 }, None),
+                    None => (apply_plan::DiskState::Missing, None),
                 },
             };
 
-            Ok::<_, anyhow::Error>((key, state))
+            Ok::<_, anyhow::Error>((key, state, coexisting_twin_md5))
         });
     }
 
-    futures::future::join_all(futures)
+    let results = futures::future::join_all(futures)
         .await
         .into_iter()
-        .collect::<Result<HashMap<_, _>, anyhow::Error>>()
+        .collect::<Result<Vec<_>, anyhow::Error>>()?;
+
+    let mut states = HashMap::with_capacity(results.len());
+    let mut coexisting_disabled_twin_md5 = HashMap::new();
+    for (key, state, twin_md5) in results {
+        if let Some(twin_md5) = twin_md5 {
+            coexisting_disabled_twin_md5.insert(key.clone(), twin_md5);
+        }
+        states.insert(key, state);
+    }
+
+    Ok(DiskScan {
+        states,
+        coexisting_disabled_twin_md5,
+    })
 }
 
 /// Process-wide, so two concurrent [`probe_case_insensitive`] calls in the
@@ -322,7 +362,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result.get("/mods/a.jar"),
+            result.states.get("/mods/a.jar"),
             Some(&apply_plan::DiskState::Present {
                 md5: md5_of(b"hello")
             })
@@ -338,7 +378,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result.get("/mods/a.jar"),
+            result.states.get("/mods/a.jar"),
             Some(&apply_plan::DiskState::Missing)
         );
     }
@@ -354,7 +394,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result.get("/mods/a.jar"),
+            result.states.get("/mods/a.jar"),
             Some(&apply_plan::DiskState::Disabled {
                 md5: md5_of(b"twin-bytes")
             })
@@ -373,10 +413,37 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result.get("/mods/a.jar"),
+            result.states.get("/mods/a.jar"),
             Some(&apply_plan::DiskState::Present {
                 md5: md5_of(b"enabled-bytes")
             })
+        );
+        // The coexisting `.disabled` twin's own md5 is also surfaced
+        // alongside `Present` — the shape `DiskState` alone can't express,
+        // and what an interrupted disabled `PlanAction::Replace` leaves
+        // behind (see `DiskScan`'s own doc).
+        assert_eq!(
+            result.coexisting_disabled_twin_md5.get("/mods/a.jar"),
+            Some(&md5_of(b"disabled-bytes"))
+        );
+    }
+
+    #[tokio::test]
+    async fn bare_only_reports_no_coexisting_twin() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("mods")).unwrap();
+        std::fs::write(dir.path().join("mods/a.jar"), b"enabled-bytes").unwrap();
+
+        let result = scan_disk_state(dir.path(), &universe(&["/mods/a.jar"]))
+            .await
+            .unwrap();
+
+        assert!(
+            result
+                .coexisting_disabled_twin_md5
+                .get("/mods/a.jar")
+                .is_none(),
+            "no twin on disk must never synthesize a coexisting-twin entry"
         );
     }
 
@@ -391,7 +458,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result.get("/saves/world/level.dat"),
+            result.states.get("/saves/world/level.dat"),
             Some(&apply_plan::DiskState::Present {
                 md5: md5_of(b"save-bytes")
             }),
@@ -409,7 +476,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result.get("/nonexistent/a.jar"),
+            result.states.get("/nonexistent/a.jar"),
             Some(&apply_plan::DiskState::Missing)
         );
     }

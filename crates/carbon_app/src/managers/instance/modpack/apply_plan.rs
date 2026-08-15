@@ -95,6 +95,21 @@ pub enum PlanReason {
     CaseAliasedByTarget {
         surviving_path: String,
     },
+    /// [`PlanAction::Delete`] of the bare spelling that finishes an
+    /// interrupted disabled-default [`PlanAction::Replace`]:
+    /// `run/modpack.rs::execute_plan`'s Replace arm renames the staged bytes
+    /// into the `.disabled` twin spelling *before* removing the stale bare
+    /// copy, so a crash or a locked-file removal failure between those two
+    /// steps leaves the twin already holding exactly what `target` wants
+    /// while the bare spelling still has the pre-update bytes. Staging is
+    /// consumed either way (the rename already happened) and is never
+    /// re-populated on resume, so the planner recognizes this state by the
+    /// twin's own md5 — see [`decide_version_change`]'s pristine-unstaged-
+    /// differs arm — and finishes the interrupted removal instead of
+    /// erroring on it forever. Renders in the audit's plain "Files deleted:"
+    /// section like any other Delete; no dedicated skip-reason string is
+    /// needed since Delete is the only action here, not a Keep.
+    DisabledReplaceResumed,
 }
 
 /// One path's worth of decision.
@@ -120,6 +135,15 @@ pub struct PlanInputs<'a> {
     pub staged: &'a HashSet<String>,
     /// What's actually on disk right now, keyed by path.
     pub disk: &'a HashMap<String, DiskState>,
+    /// For a path currently `Present` (bare spelling) on disk, the md5 of a
+    /// `.disabled` twin that coexists with it right now, if one does — see
+    /// [`super::disk_scan::DiskScan`]'s own doc for what state this
+    /// represents and why. Empty is always a safe/correct default for a
+    /// caller that never produces or cares about this (every mode but
+    /// [`ApplyMode::VersionChange`]'s pristine-unstaged-differs arm ignores
+    /// it entirely); only a real, populated map lets that one arm recognize
+    /// and finish an interrupted disabled Replace instead of erroring on it.
+    pub coexisting_disabled_twin_md5: &'a HashMap<String, [u8; 16]>,
     pub mode: ApplyMode,
     /// Whether the instance's filesystem folds path case together (true on
     /// Windows and default-configuration macOS, false on ext4 and most
@@ -168,6 +192,7 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
         target,
         staged,
         disk,
+        coexisting_disabled_twin_md5,
         mode,
         fs_case_insensitive,
     } = inputs;
@@ -239,9 +264,14 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
         }
 
         let (mut action, mut reason) = match &mode {
-            ApplyMode::VersionChange => {
-                decide_version_change(old_hashes, target_hashes, disk_state, staged, path)?
-            }
+            ApplyMode::VersionChange => decide_version_change(
+                old_hashes,
+                target_hashes,
+                disk_state,
+                staged,
+                path,
+                coexisting_disabled_twin_md5.get(path).copied(),
+            )?,
             ApplyMode::Repair { re_enable_disabled } => decide_repair(
                 old_hashes,
                 target_hashes,
@@ -252,14 +282,27 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
             )?,
         };
 
-        // `path` is absent from `target` under its own exact spelling
-        // (that's the only way either decision procedure above chooses
-        // Delete, via `decide_dropped`) — but on a case-insensitive
-        // filesystem it may still alias a target path that only differs by
-        // case, physically the very same file a surviving
-        // Keep/Replace/Create entry depends on. Deleting it here would
-        // erase that file out from under the surviving entry.
-        if fs_case_insensitive && action == PlanAction::Delete {
+        // Two distinct reasons the decision procedures above choose Delete:
+        // `decide_dropped` (path absent from `target` under its own exact
+        // spelling — `target` genuinely no longer wants this path at all),
+        // or `decide_version_change`'s interrupted-disabled-Replace finisher
+        // (path very much present in `target`, under this exact spelling —
+        // the twin already has target's bytes, this Delete only clears the
+        // stale bare copy sitting alongside it). Only the first is ever a
+        // case-alias casualty: on a case-insensitive filesystem a path
+        // `target` doesn't track under its own spelling may still alias a
+        // target path that only differs by case, physically the very same
+        // file a surviving Keep/Replace/Create entry depends on, and
+        // deleting it here would erase that file out from under the
+        // surviving entry. The second can never be one — `path` folded
+        // against itself is trivially "case-aliased" with its own surviving
+        // entry, which isn't a real hazard (there is no *other* physical
+        // file at risk) and would otherwise silently turn the finishing
+        // Delete into a Keep that leaves the stale bare copy in place
+        // forever, on exactly the two platforms (Windows, default-config
+        // macOS) this whole mechanism exists to protect. Gating on `target`
+        // not tracking `path` under its own exact spelling excludes it.
+        if fs_case_insensitive && action == PlanAction::Delete && target.files.get(path).is_none() {
             if let Some(&surviving) = target_folded.get(&path.to_ascii_lowercase()) {
                 action = PlanAction::Keep;
                 reason = PlanReason::CaseAliasedByTarget {
@@ -287,6 +330,7 @@ fn decide_version_change(
     disk_state: DiskState,
     staged: &HashSet<String>,
     path: &str,
+    coexisting_disabled_twin_md5: Option<[u8; 16]>,
 ) -> Result<(PlanAction, PlanReason), PlanError> {
     Ok(match (old_hashes, target_hashes) {
         // Path exists in both the last-staged version and the target
@@ -324,9 +368,51 @@ fn decide_version_change(
             DiskState::Present { .. } if staged.contains(path) => {
                 (PlanAction::Replace, PlanReason::PackUpdate)
             }
-            // Pristine, target differs, but nothing is staged for it —
-            // leave the existing file alone rather than guess.
-            DiskState::Present { .. } => (PlanAction::Keep, PlanReason::Unchanged),
+            // Pristine, target genuinely differs, but nothing is staged for
+            // it: mirrors the new-file arm below — never silently skip a
+            // path we have no staged source to update. A resumed apply
+            // cannot land here for a path the previous attempt fully
+            // *applied*: an applied path's disk bytes equal `target`, which
+            // the disk==target arm above claims first (Keep/Unchanged) since
+            // it's checked before this one.
+            //
+            // But a path the previous attempt was only *part-way through*
+            // applying can still land here, for exactly one shape: an
+            // interrupted disabled `PlanAction::Replace`.
+            // `run/modpack.rs::execute_plan`'s Replace arm, when the target
+            // ships this path disabled by default, renames the staged bytes
+            // into the `.disabled` twin spelling *before* removing the
+            // stale bare copy — a crash, or a locked-file `remove_file`
+            // failure (exactly as plausible as the twin-removal failure
+            // `execute_plan`'s ReEnable arm guards against), between those
+            // two steps leaves the bare spelling still holding `old`'s bytes
+            // (pristine, hence this arm) while the twin already holds
+            // `target`'s own bytes and the staged source is already
+            // consumed (hence unstaged) — and stays that way forever, since
+            // overrides are never re-extracted on resume. Recognize that
+            // shape by the twin's own md5 — carried by
+            // `coexisting_disabled_twin_md5`, sourced from a live disk probe
+            // the same crash/resume cycle can't desync (see
+            // `super::disk_scan::DiskScan`'s own doc) — and finish the
+            // interrupted removal instead of erroring on it forever:
+            // `PlanAction::Delete` here only removes the stale bare copy
+            // (`execute_plan`'s Delete arm), leaving the twin — which
+            // already has what `target` wants — untouched.
+            //
+            // Any other disk shape reaching here (no twin, or a twin whose
+            // bytes don't actually match `target`) is a genuine staging gap
+            // with no interrupted-apply explanation, not a resume artifact,
+            // and still hard-errors.
+            DiskState::Present { .. } => match coexisting_disabled_twin_md5 {
+                Some(twin_md5) if twin_md5 == target_hashes.md5 => {
+                    (PlanAction::Delete, PlanReason::DisabledReplaceResumed)
+                }
+                _ => {
+                    return Err(PlanError::MissingStagedSource {
+                        path: path.to_string(),
+                    });
+                }
+            },
             DiskState::Missing => (PlanAction::Keep, PlanReason::DeletedByUser),
             DiskState::Disabled { .. } => (PlanAction::Keep, PlanReason::DisabledByUser),
         },
@@ -563,6 +649,7 @@ mod test {
             // further down, which build `PlanInputs` directly rather than
             // through this table.
             fs_case_insensitive: false,
+            coexisting_disabled_twin_md5: &HashMap::new(),
         });
 
         match case.expect {
@@ -620,6 +707,160 @@ mod test {
             mode: ApplyMode::VersionChange,
             expect: Expect::Entry(PlanAction::Replace, PlanReason::PackUpdate),
         });
+    }
+
+    // Pristine (disk == old), target genuinely differs, and nothing is
+    // staged for it: this is the arm 2.24 hardened from a silent
+    // Keep/Unchanged into a hard error, mirroring `new_missing_unstaged_errors`
+    // below. Reachability check (not just a test, the actual invariant this
+    // case protects): a resumed apply cannot land here for a path the
+    // *previous* attempt already applied. `execute_plan` (`run/modpack.rs`)
+    // renames a path's bytes out of `staging_dir` into place for every
+    // Create/Replace it performs, so on resume `process_modpack_staging`'s
+    // fresh walk of `staging_dir` no longer finds that path — it is
+    // legitimately absent from `staged` — but the disk bytes it left behind
+    // equal `target`'s hash, not `old`'s. That state is claimed by the
+    // earlier `disk == target, disk != old -> Keep/Unchanged` arm (see
+    // `both_disk_already_matches_target_keeps_unchanged` above), which is
+    // checked first specifically to catch the resume case before this one.
+    // Reaching *this* arm requires disk == old's hash (never touched by any
+    // attempt) with target differing and no staged source — i.e. a path the
+    // staging step itself failed to produce, not a resume artifact.
+    #[test]
+    fn both_pristine_differs_unstaged_errors() {
+        run(Case {
+            name: "both pristine (disk == old), target differs, unstaged -> Error",
+            old: Some(&[(PATH, 1)]),
+            target: &[(PATH, 2)],
+            staged: &[],
+            disk: &[(PATH, DiskCase::Present(1))],
+            mode: ApplyMode::VersionChange,
+            expect: Expect::Error,
+        });
+    }
+
+    // A path the pack update ships disabled-by-default lands via
+    // `execute_plan`'s disabled Replace arm: rename the staged bytes into
+    // the `.disabled` twin spelling, THEN remove the stale bare copy. A
+    // crash, or a locked-file `remove_file` failure, between those two steps
+    // leaves the bare spelling still holding `old`'s bytes (pristine — this
+    // is the exact disk shape `both_pristine_differs_unstaged_errors` above
+    // covers) while the twin already holds `target`'s own bytes and staging
+    // is already consumed (unstaged, permanently — overrides are never
+    // re-extracted on resume). These two tests bypass the `Case` table
+    // (which always threads an empty `coexisting_disabled_twin_md5`, like
+    // `both_pristine_differs_unstaged_errors` does) to build `PlanInputs`
+    // directly with a real one, the same way the case-alias tests below do.
+
+    #[test]
+    fn interrupted_disabled_replace_resumes_by_deleting_the_stale_bare_copy() {
+        let old = packinfo(&[(PATH, 1)]);
+        let target = packinfo(&[(PATH, 2)]);
+        // Staging already consumed by the interrupted attempt's rename.
+        let staged: HashSet<String> = HashSet::new();
+        let mut disk = HashMap::new();
+        disk.insert(PATH.to_string(), DiskState::Present { md5: hashes(1).md5 });
+        let mut coexisting_disabled_twin_md5 = HashMap::new();
+        // The twin already holds exactly what `target` wants.
+        coexisting_disabled_twin_md5.insert(PATH.to_string(), hashes(2).md5);
+
+        let entries = plan(PlanInputs {
+            old: Some(&old),
+            target: &target,
+            staged: &staged,
+            disk: &disk,
+            mode: ApplyMode::VersionChange,
+            fs_case_insensitive: false,
+            coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
+        })
+        .expect("a twin already matching target must finish the interrupted replace, not error");
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].path, PATH);
+        assert_eq!(
+            entries[0].action,
+            PlanAction::Delete,
+            "must only remove the stale bare copy — execute_plan's Delete arm leaves the twin \
+             (which already has target's bytes) untouched"
+        );
+        assert_eq!(entries[0].reason, PlanReason::DisabledReplaceResumed);
+    }
+
+    #[test]
+    fn interrupted_disabled_replace_finisher_survives_the_case_alias_guard_on_insensitive_fs() {
+        // Same scenario as `interrupted_disabled_replace_resumes_by_deleting_the_stale_bare_copy`,
+        // except `fs_case_insensitive: true` — on Windows/default-config
+        // macOS the case-alias Delete-guard right after this arm runs over
+        // every Delete this function produces, including this one. `path`
+        // is present in `target` under its own exact spelling (target still
+        // tracks it — it just ships disabled by default now), so a guard
+        // that didn't exclude an exact-spelling match would fold `path`
+        // onto itself and rewrite this Delete into
+        // Keep/CaseAliasedByTarget{surviving_path: path} — leaving the
+        // stale bare copy's OLD bytes enabled forever on exactly the two
+        // platforms this whole mechanism exists to protect, with a
+        // nonsensical "case-aliased with itself" audit line. Pins that the
+        // finisher's Delete survives instead.
+        let old = packinfo(&[(PATH, 1)]);
+        let target = packinfo(&[(PATH, 2)]);
+        let staged: HashSet<String> = HashSet::new();
+        let mut disk = HashMap::new();
+        disk.insert(PATH.to_string(), DiskState::Present { md5: hashes(1).md5 });
+        let mut coexisting_disabled_twin_md5 = HashMap::new();
+        coexisting_disabled_twin_md5.insert(PATH.to_string(), hashes(2).md5);
+
+        let entries = plan(PlanInputs {
+            old: Some(&old),
+            target: &target,
+            staged: &staged,
+            disk: &disk,
+            mode: ApplyMode::VersionChange,
+            fs_case_insensitive: true,
+            coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
+        })
+        .expect("a twin already matching target must finish the interrupted replace, not error");
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].path, PATH);
+        assert_eq!(
+            entries[0].action,
+            PlanAction::Delete,
+            "the case-alias guard must not reinterpret a same-spelling finishing Delete as \
+             Keep/CaseAliasedByTarget, got {:?}",
+            entries[0]
+        );
+        assert_eq!(entries[0].reason, PlanReason::DisabledReplaceResumed);
+    }
+
+    #[test]
+    fn coexisting_twin_with_mismatched_md5_still_errors() {
+        // Same disk shape as the interrupted-replace case above, except the
+        // twin's bytes don't actually match `target` — no interrupted-apply
+        // explanation covers this, so it must still be treated as a genuine
+        // staging gap rather than silently resolved.
+        let old = packinfo(&[(PATH, 1)]);
+        let target = packinfo(&[(PATH, 2)]);
+        let staged: HashSet<String> = HashSet::new();
+        let mut disk = HashMap::new();
+        disk.insert(PATH.to_string(), DiskState::Present { md5: hashes(1).md5 });
+        let mut coexisting_disabled_twin_md5 = HashMap::new();
+        coexisting_disabled_twin_md5.insert(PATH.to_string(), hashes(9).md5);
+
+        let result = plan(PlanInputs {
+            old: Some(&old),
+            target: &target,
+            staged: &staged,
+            disk: &disk,
+            mode: ApplyMode::VersionChange,
+            fs_case_insensitive: false,
+            coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
+        });
+
+        assert!(
+            result.is_err(),
+            "a twin whose bytes don't match target must not be treated as an interrupted \
+             replace, got {result:?}"
+        );
     }
 
     #[test]
@@ -879,6 +1120,7 @@ mod test {
                 disk: &disk,
                 mode: ApplyMode::VersionChange,
                 fs_case_insensitive: false,
+                coexisting_disabled_twin_md5: &HashMap::new(),
             })
             .unwrap_or_else(|e| panic!("saves folder entries must never error, got {e}"));
             let entry = entries
@@ -898,6 +1140,7 @@ mod test {
                 disk: &disk,
                 mode: ApplyMode::VersionChange,
                 fs_case_insensitive: false,
+                coexisting_disabled_twin_md5: &HashMap::new(),
             })
             .unwrap_or_else(|e| panic!("saves folder entries must never error, got {e}"));
             let entry = entries
@@ -925,6 +1168,7 @@ mod test {
             disk: &disk,
             mode: ApplyMode::VersionChange,
             fs_case_insensitive: false,
+            coexisting_disabled_twin_md5: &HashMap::new(),
         })
         .expect("all staged, must not error");
 
@@ -950,6 +1194,7 @@ mod test {
             disk: &disk,
             mode: ApplyMode::VersionChange,
             fs_case_insensitive: false,
+            coexisting_disabled_twin_md5: &HashMap::new(),
         })
         .expect("staged present, must not error");
 
@@ -1196,6 +1441,7 @@ mod test {
                     disk: &disk,
                     mode: ApplyMode::Repair { re_enable_disabled },
                     fs_case_insensitive: false,
+                    coexisting_disabled_twin_md5: &HashMap::new(),
                 })
                 .unwrap_or_else(|e| {
                     panic!("saves folder entries must never error in repair mode, got {e}")
@@ -1391,6 +1637,7 @@ mod test {
                     disk: &disk,
                     mode,
                     fs_case_insensitive: false,
+                    coexisting_disabled_twin_md5: &HashMap::new(),
                 })
                 .unwrap_or_else(|e| panic!("target-only saves entries must never error, got {e}"));
                 let entry = entries
@@ -1658,6 +1905,7 @@ mod test {
                 re_enable_disabled: true,
             },
             fs_case_insensitive: false,
+            coexisting_disabled_twin_md5: &HashMap::new(),
         })
         .expect("all required staged sources present, must not error");
 
@@ -1717,6 +1965,7 @@ mod test {
             disk: &disk,
             mode: ApplyMode::VersionChange,
             fs_case_insensitive: true,
+            coexisting_disabled_twin_md5: &HashMap::new(),
         })
         .expect("a case-only rename must plan without error");
 
@@ -1770,6 +2019,7 @@ mod test {
             disk: &disk,
             mode: ApplyMode::VersionChange,
             fs_case_insensitive: false,
+            coexisting_disabled_twin_md5: &HashMap::new(),
         })
         .expect("a case-only rename must plan without error");
 
@@ -1820,6 +2070,7 @@ mod test {
             disk: &disk,
             mode: ApplyMode::VersionChange,
             fs_case_insensitive: true,
+            coexisting_disabled_twin_md5: &HashMap::new(),
         })
         .expect("a case-only rename must plan without error");
 

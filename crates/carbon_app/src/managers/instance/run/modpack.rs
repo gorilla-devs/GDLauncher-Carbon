@@ -954,7 +954,10 @@ pub async fn process_modpack_staging(
             .flat_map(|p| p.files.keys().cloned())
             .chain(target_packinfo.files.keys().cloned())
             .collect();
-        let disk = disk_scan::scan_disk_state(&instance_root.join("instance"), &universe).await?;
+        let disk_scan::DiskScan {
+            states: disk,
+            coexisting_disabled_twin_md5,
+        } = disk_scan::scan_disk_state(&instance_root.join("instance"), &universe).await?;
 
         // Whether this instance's data dir lives on a filesystem that folds
         // path case together (Windows, default-configuration macOS) — see
@@ -982,6 +985,7 @@ pub async fn process_modpack_staging(
             target: &target_packinfo,
             staged: &staged,
             disk: &disk,
+            coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
             mode,
             fs_case_insensitive,
         })?;
@@ -1205,7 +1209,16 @@ async fn execute_plan(
                 if let Some((source, _)) = resolve_staged(&staged) {
                     tokio::fs::create_dir_all(live.parent().unwrap()).await?;
                     tokio::fs::rename(&source, &live).await?;
-                    let _ = tokio::fs::remove_file(&twin).await;
+                    // Propagated rather than swallowed: repair is retryable,
+                    // so a twin that can't be removed (locked by another
+                    // process, or — in the pathological case — not even a
+                    // regular file) must fail the operation loudly. Silently
+                    // ignoring the error would leave both spellings on disk
+                    // (the newly re-enabled live file and the stale disabled
+                    // twin) with nothing to report it, and the caller would
+                    // go on to promote the apply and write an audit that
+                    // never mentions the leftover twin.
+                    tokio::fs::remove_file(&twin).await?;
                 } else {
                     tokio::fs::rename(&twin, &live).await?;
                 }

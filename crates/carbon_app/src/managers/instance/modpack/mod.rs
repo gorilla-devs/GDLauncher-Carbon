@@ -413,7 +413,10 @@ impl ManagerRef<'_, InstanceManager> {
         };
 
         let universe: BTreeSet<String> = recorded.files.keys().cloned().collect();
-        let disk = disk_scan::scan_disk_state(&data_path, &universe).await?;
+        let disk_scan::DiskScan {
+            states: disk,
+            coexisting_disabled_twin_md5,
+        } = disk_scan::scan_disk_state(&data_path, &universe).await?;
         // Synthetic: the preview never actually stages anything, so every
         // target path is simply assumed obtainable — see the doc comment
         // above for why this is the documented preview/execution asymmetry.
@@ -429,6 +432,7 @@ impl ManagerRef<'_, InstanceManager> {
             target: &recorded,
             staged: &staged,
             disk: &disk,
+            coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
             mode: apply_plan::ApplyMode::Repair { re_enable_disabled },
             fs_case_insensitive,
         })?;

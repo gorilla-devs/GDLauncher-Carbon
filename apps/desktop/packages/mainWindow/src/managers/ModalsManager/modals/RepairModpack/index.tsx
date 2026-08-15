@@ -15,7 +15,12 @@ import { FEOriginVerdict, FERepairReason } from "@gd/core_module/bindings"
  *  PlanReason)` pairing `apply_plan::decide_repair` / `decide_dropped`
  *  actually produce (see `apply_plan.rs`) — e.g. `DroppedButModified` and
  *  `ModifiedByUser` both resolve to `Keep`, not a destructive action, so
- *  their labels say "kept", not "removed"/"reset". */
+ *  their labels say "kept", not "removed"/"reset". `DisabledReplaceResumed`
+ *  is the one exception: it's `decide_version_change`-only (an interrupted
+ *  disabled Replace's finishing Delete), so this repair preview — which
+ *  only ever runs `decide_repair` — can never actually produce it; still
+ *  given a real label rather than falling through, since `FERepairReason`
+ *  is one enum shared with the rest of `PlanReason`. */
 function repairReasonLabel(t: TypedTFunction, reason: FERepairReason): string {
   switch (reason) {
     case "PackUpdate":
@@ -44,6 +49,8 @@ function repairReasonLabel(t: TypedTFunction, reason: FERepairReason): string {
       return t("instances:_trn_repair_reason_reenabled")
     case "CaseAliasedByTarget":
       return t("instances:_trn_repair_reason_case_aliased")
+    case "DisabledReplaceResumed":
+      return t("instances:_trn_repair_reason_disabled_replace_resumed")
     default:
       return reason
   }

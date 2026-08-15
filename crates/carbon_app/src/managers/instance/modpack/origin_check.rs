@@ -41,6 +41,21 @@ use crate::managers::vtask::{TaskState, VisualTask};
 
 use super::OriginVerdict;
 
+/// Ceiling on the total decompressed bytes [`parse_mrpack`] will hash across
+/// *all* of one archive's override entries combined. [`MAX_HASHED_ENTRY_BYTES`]
+/// bounds each entry independently (a decompression-bomb guard — no single
+/// entry can blow up unboundedly); this bounds the sum, which per-entry
+/// budgeting alone doesn't: an archive with many entries each individually
+/// within the per-entry limit could otherwise still cost entries × 64 MiB of
+/// hashing work. This is deliberately generous (1 GiB) and is a stall guard
+/// against a pathological archive with an enormous number of override
+/// entries, not a correctness bound — a real modpack's overrides are nowhere
+/// near this large in aggregate, so hitting it in practice would itself be
+/// a sign of an abusive or corrupt archive, and the entries beyond the cap
+/// are skipped (warned, not hashed) exactly like an individually-oversized
+/// entry already is, rather than blocking the whole origin-check pass.
+const MAX_TOTAL_HASHED_BYTES: u64 = 1024 * 1024 * 1024;
+
 /// Manager-side cache entry for one instance — see
 /// [`crate::managers::instance::InstanceManager::origin_checks`]. Replaced
 /// wholesale by each completed (or failed-but-partial) run of
@@ -226,9 +241,11 @@ fn packinfo_key_from_relative(path: &Path) -> Option<String> {
 /// bytes. The override-hashing analogue of
 /// [`crate::managers::minecraft::modrinth::copy_bounded`], which guards a
 /// decompression bomb the same way but copies into a [`std::io::Write`] sink
-/// instead of a digest. Returns the number of bytes actually read so callers
-/// can thread a shrinking budget across multiple entries, exactly like
-/// `copy_bounded`.
+/// instead of a digest. Returns the number of bytes actually read; unlike
+/// `copy_bounded`'s callers, [`parse_mrpack`] gives every entry the same
+/// fresh `limit` rather than threading a shrinking budget across entries —
+/// this only ever streams through a fixed-size buffer, so nothing is held in
+/// memory proportional to `limit` in the first place.
 fn hash_bounded<R: std::io::Read>(reader: &mut R, limit: u64) -> anyhow::Result<(u64, [u8; 64])> {
     let mut hasher = Sha512::new();
     let mut buf = [0u8; 64 * 1024];
@@ -274,7 +291,35 @@ async fn hash_file_sha512(path: &Path) -> anyhow::Result<[u8; 64]> {
 /// zip-slip defense (the crate-provided `enclosed_name` guard plus
 /// [`secure_path_join`]) even though nothing here is ever written to disk —
 /// a zip-slip path must never even be *hashed* under an attacker-chosen key.
+///
+/// Thin wrapper over [`parse_mrpack_with_budgets`] fixing the per-entry
+/// budget at [`MAX_HASHED_ENTRY_BYTES`] and the archive-wide one at
+/// [`MAX_TOTAL_HASHED_BYTES`] — the split exists only so tests can exercise
+/// both budgets with small injected limits instead of needing real
+/// multi-ten/hundred-megabyte archives to prove them.
 async fn parse_mrpack(path: &Path) -> anyhow::Result<(ModpackIndex, HashMap<String, [u8; 64]>)> {
+    parse_mrpack_with_budgets(path, MAX_HASHED_ENTRY_BYTES, MAX_TOTAL_HASHED_BYTES).await
+}
+
+/// See [`parse_mrpack`]. `entry_budget` is the fresh [`hash_bounded`] limit
+/// given to *every* override entry independently — not a running total
+/// shared across the archive. `hash_bounded` streams each entry through a
+/// fixed 64 KiB buffer and never holds more than that in memory regardless
+/// of the entry's size, so nothing is gained by shrinking later entries'
+/// allowances to make room for earlier ones; doing so only made a
+/// legitimately large pack (many override files individually well under the
+/// limit, summing past it) silently lose hash coverage for whichever
+/// entries happened to be enumerated last.
+///
+/// `total_budget` is the separate, archive-wide cap on bytes actually
+/// hashed across every entry combined (see [`MAX_TOTAL_HASHED_BYTES`]):
+/// once reached, remaining entries are skipped (warned, not hashed) rather
+/// than continuing to spend unbounded total work on one archive.
+async fn parse_mrpack_with_budgets(
+    path: &Path,
+    entry_budget: u64,
+    total_budget: u64,
+) -> anyhow::Result<(ModpackIndex, HashMap<String, [u8; 64]>)> {
     let path = path.to_path_buf();
 
     spawn_blocking(move || {
@@ -290,7 +335,7 @@ async fn parse_mrpack(path: &Path) -> anyhow::Result<(ModpackIndex, HashMap<Stri
         };
 
         let mut override_hashes = HashMap::new();
-        let mut hashed_bytes: u64 = 0;
+        let mut total_hashed_bytes: u64 = 0;
 
         for i in 0..archive.len() {
             let mut entry = archive.by_index(i)?;
@@ -324,10 +369,23 @@ async fn parse_mrpack(path: &Path) -> anyhow::Result<(ModpackIndex, HashMap<Stri
                 continue;
             };
 
-            let remaining_budget = MAX_HASHED_ENTRY_BYTES.saturating_sub(hashed_bytes);
-            match hash_bounded(&mut entry, remaining_budget) {
+            // Stall guard, checked before spending any work on this entry:
+            // once the archive-wide total is already at/over budget, every
+            // remaining entry is skipped rather than hashed — see
+            // `MAX_TOTAL_HASHED_BYTES`'s own doc for why this is a separate
+            // concern from the per-entry `entry_budget` above.
+            if total_hashed_bytes >= total_budget {
+                tracing::warn!(
+                    "origin check: skipping override entry {} — archive-wide hashed byte cap \
+                     ({total_budget} bytes) already reached",
+                    enclosed.display()
+                );
+                continue;
+            }
+
+            match hash_bounded(&mut entry, entry_budget) {
                 Ok((copied, hash)) => {
-                    hashed_bytes += copied;
+                    total_hashed_bytes += copied;
                     override_hashes.insert(key, hash);
                 }
                 Err(e) => {
@@ -1320,5 +1378,155 @@ mod tests {
         std::fs::write(&path, b"not a zip archive").unwrap();
 
         assert!(parse_mrpack(&path).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn parse_mrpack_gives_every_override_entry_its_own_full_budget() {
+        // Real-world shape this pins: three override entries each under
+        // MAX_HASHED_ENTRY_BYTES (64 MiB) individually, but summing to
+        // nearly double it (e.g. three 40 MiB entries in a pack bundling
+        // large resource/shader packs). A budget shared across entries
+        // (subtracting each entry's size from what's left for the next)
+        // would hash the first and reject the second and third as
+        // "oversized" purely because the *running total* crossed the limit —
+        // even though no single entry does. Scaled down to a small
+        // test-only `entry_budget` via `parse_mrpack_with_budgets` rather
+        // than real 40 MiB entries so this stays fast: the archive and
+        // hashing work here are the same code path regardless of the
+        // budget's magnitude. `total_budget` is passed generously large —
+        // the archive-wide aggregate cap is a separate concern, its own
+        // dedicated test below.
+        use std::io::Write as _;
+
+        const ENTRY_BUDGET: u64 = 1000;
+        // Each entry is under ENTRY_BUDGET on its own; three of them sum to
+        // well past it.
+        let entry_data = vec![0xABu8; 700];
+
+        let dir = tempfile::tempdir().unwrap();
+        let archive_path = dir.path().join("multi-overrides.mrpack");
+
+        {
+            let file = std::fs::File::create(&archive_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+
+            zip.start_file(
+                "modrinth.index.json",
+                zip::write::FileOptions::<()>::default(),
+            )
+            .unwrap();
+            zip.write_all(
+                br#"{"formatVersion":1,"game":"minecraft","versionId":"v1","name":"Test","files":[],"dependencies":{}}"#,
+            )
+            .unwrap();
+
+            for name in ["a.bin", "b.bin", "c.bin"] {
+                zip.start_file(
+                    format!("overrides/{name}"),
+                    zip::write::FileOptions::<()>::default(),
+                )
+                .unwrap();
+                zip.write_all(&entry_data).unwrap();
+            }
+
+            zip.finish().unwrap();
+        }
+
+        let (_index, override_hashes) =
+            parse_mrpack_with_budgets(&archive_path, ENTRY_BUDGET, u64::MAX)
+                .await
+                .unwrap();
+
+        let expected_hash = Sha512::digest(&entry_data);
+        for name in ["a.bin", "b.bin", "c.bin"] {
+            let key = format!("/{name}");
+            assert_eq!(
+                override_hashes.get(&key).map(|h| h.as_slice()),
+                Some(expected_hash.as_slice()),
+                "entry {key} must be hashed on its own {ENTRY_BUDGET}-byte budget, got {:?}",
+                override_hashes.keys().collect::<Vec<_>>()
+            );
+        }
+        assert_eq!(
+            override_hashes.len(),
+            3,
+            "all three entries must be hashed, none skipped as oversized due to a shared budget"
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_mrpack_stops_hashing_once_the_aggregate_cap_is_reached() {
+        // The per-entry test above proves each entry gets its own full
+        // budget; this proves the archive-wide total is still bounded
+        // *somewhere* — an unbounded number of individually-small entries
+        // could otherwise cost unbounded total hashing work. Three entries,
+        // each within `ENTRY_BUDGET` on their own, with `TOTAL_BUDGET` set
+        // to allow exactly the first two combined: the first two must be
+        // hashed, the third skipped (warned, not hashed) rather than
+        // rejected as "oversized" — it never reaches `hash_bounded` at all.
+        use std::io::Write as _;
+
+        const ENTRY_BUDGET: u64 = 1000;
+        const TOTAL_BUDGET: u64 = 800; // room for exactly two 400-byte entries
+        let entry_data = vec![0xCDu8; 400];
+
+        let dir = tempfile::tempdir().unwrap();
+        let archive_path = dir.path().join("aggregate-cap.mrpack");
+
+        {
+            let file = std::fs::File::create(&archive_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+
+            zip.start_file(
+                "modrinth.index.json",
+                zip::write::FileOptions::<()>::default(),
+            )
+            .unwrap();
+            zip.write_all(
+                br#"{"formatVersion":1,"game":"minecraft","versionId":"v1","name":"Test","files":[],"dependencies":{}}"#,
+            )
+            .unwrap();
+
+            // Zip entries are enumerated in the order they were written, and
+            // `parse_mrpack_with_budgets` walks the archive by index, so
+            // "a.bin"/"b.bin" land within budget and "c.bin" is the one that
+            // overflows it.
+            for name in ["a.bin", "b.bin", "c.bin"] {
+                zip.start_file(
+                    format!("overrides/{name}"),
+                    zip::write::FileOptions::<()>::default(),
+                )
+                .unwrap();
+                zip.write_all(&entry_data).unwrap();
+            }
+
+            zip.finish().unwrap();
+        }
+
+        let (_index, override_hashes) =
+            parse_mrpack_with_budgets(&archive_path, ENTRY_BUDGET, TOTAL_BUDGET)
+                .await
+                .unwrap();
+
+        let expected_hash = Sha512::digest(&entry_data);
+        for name in ["a.bin", "b.bin"] {
+            let key = format!("/{name}");
+            assert_eq!(
+                override_hashes.get(&key).map(|h| h.as_slice()),
+                Some(expected_hash.as_slice()),
+                "entries within the aggregate cap must still be hashed, got {:?}",
+                override_hashes.keys().collect::<Vec<_>>()
+            );
+        }
+        assert!(
+            !override_hashes.contains_key("/c.bin"),
+            "an entry beyond the aggregate cap must be skipped, not hashed, got {:?}",
+            override_hashes.keys().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            override_hashes.len(),
+            2,
+            "exactly the two entries within the aggregate cap must be hashed"
+        );
     }
 }
