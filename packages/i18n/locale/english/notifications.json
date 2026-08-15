@@ -11,6 +11,7 @@
   "_trn_custom_java_added": "Custom Java Path added successfully",
   "_trn_addon_downloading_to_server": "{{title}} downloading to server",
   "_trn_addon_fallback_name": "Addon",
+  "_trn_addon_install_failed": "{{title}} installation failed",
   "_trn_shader_install_cancelled": "Shader install cancelled — no compatible shader loader is installed",
   "_trn_shader_install_cancelled_mid_install": "Shader install cancelled — steps that already finished were kept",
   "_trn_shader_preflight_failed": "Could not check shader loader requirements"

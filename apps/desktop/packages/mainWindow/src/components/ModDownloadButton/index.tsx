@@ -3,11 +3,13 @@ import { Switch, Match, createSignal, createEffect, createMemo } from "solid-js"
 import {
   FEUnifiedSearchResult,
   Mod,
+  Progress,
   ServerAddon
 } from "@gd/core_module/bindings"
 import { useModInstallation } from "./hooks/useModInstallation"
 import { useInstanceSearch } from "./hooks/useInstanceSearch"
 import { useTaskProgress } from "./hooks/useTaskProgress"
+import { resolveTaskPoll } from "./hooks/resolveTaskPoll"
 import { InstanceDropdown } from "./components/InstanceDropdown"
 import { InstallButton } from "./components/InstallButton"
 import { toast } from "@gd/ui"
@@ -93,22 +95,55 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     enabled: taskId() !== null
   }))
 
+  const dismissTaskMutation = rspc.createMutation(() => ({
+    mutationKey: ["vtask.dismissTask"]
+  }))
+
+  // Last non-`Indeterminate`/`null` progress seen for the tracked task. Used
+  // to tell a genuine completion (progress goes `Known` then the task is
+  // forgotten, `data` becomes `null`) apart from a task that failed and was
+  // then dismissed (`data` also becomes `null` once forgotten) — only the
+  // former should trigger the success toast below.
+  const [lastProgress, setLastProgress] = createSignal<Progress | null>(null)
+
   createEffect(() => {
-    if (taskId() !== null) {
-      if (task?.data?.progress.type === "Known") {
-        setProgress(Math.round(task?.data?.progress.value * 100))
-      } else if (task?.data === null) {
-        if (props.addon?.type === "world") {
-          toast.success(
-            `${props.addon?.title || "World"} installed successfully`,
-            { duration: 2000 }
-          )
-        }
-        setLoading(false)
-        setTaskId(null)
-        setProgress(null)
-        setPendingInstall(false)
+    if (taskId() === null) return
+
+    const { action, nextLastProgress } = resolveTaskPoll(
+      task?.data,
+      lastProgress(),
+      props.addon?.type === "world"
+    )
+    setLastProgress(nextLastProgress)
+
+    if (action.kind === "progress") {
+      setProgress(action.percent)
+    } else if (action.kind === "failed") {
+      toast.error(
+        t("notifications:_trn_addon_install_failed", {
+          title: props.addon?.title || t("notifications:_trn_addon_fallback_name")
+        }),
+        action.message ? { description: action.message } : undefined
+      )
+      setLoading(false)
+      setPendingInstall(false)
+      const failedTaskId = taskId()
+      setTaskId(null)
+      setProgress(null)
+      if (failedTaskId !== null) {
+        dismissTaskMutation.mutate(failedTaskId)
       }
+    } else if (action.kind === "completed") {
+      if (action.showSuccessToast) {
+        toast.success(
+          `${props.addon?.title || "World"} installed successfully`,
+          { duration: 2000 }
+        )
+      }
+      setLoading(false)
+      setTaskId(null)
+      setProgress(null)
+      setPendingInstall(false)
     }
   })
 
