@@ -13,16 +13,19 @@ use tracing::{error, info, warn};
 
 pub struct LocalServerProvider;
 
-/// Clamp the server's configured heap settings (MB) into values safe to hand
-/// the JVM. Saturating instead of a raw `as u16` cast avoids e.g. 66000 MB
-/// silently wrapping into a tiny heap; flooring both at 1 MB and capping xms
-/// to xmx keeps a zero/negative/inverted setting from making the JVM refuse
-/// to start outright, which would otherwise crash the server on every boot
-/// (and feed the auto-restart loop).
-fn clamp_heap_mb(xms: i32, xmx: i32) -> (u16, u16) {
-    let xmx = xmx.clamp(1, u16::MAX as i32) as u16;
-    let xms = xms.clamp(1, xmx as i32) as u16;
-    (xms, xmx)
+/// Converts a server's configured heap setting (MB) into a value safe to hand
+/// the JVM. A zero/negative setting is a corrupt config — failing loudly here
+/// beats silently booting the JVM with a nonsensical heap, which would
+/// otherwise crash the server on every boot (and feed the auto-restart loop).
+/// There is no upper clamp: the JVM validates its own `-Xmx`/`-Xms` bounds
+/// and rejects an unreasonable value with a clear error, so a deliberately
+/// large heap (e.g. 100 GB on a big host) reaches it unclamped instead of
+/// being silently rewritten down to ~464 MB by a raw `as u16` cast.
+fn heap_mb(v: i32) -> Result<u32> {
+    if v <= 0 {
+        anyhow::bail!("Server heap size must be positive, got {v} MB");
+    }
+    Ok(v as u32)
 }
 
 #[async_trait]
@@ -41,7 +44,8 @@ impl ServerProvider for LocalServerProvider {
         let data_path = server_path.get_data_path();
         let server_root = server_path.get_root();
 
-        let (xms, xmx) = clamp_heap_mb(xms, xmx);
+        let xms = heap_mb(xms)?;
+        let xmx = heap_mb(xmx)?;
 
         let mut cmd = tokio::process::Command::new(java_path);
         // Without this, a process still running when the app exits without an
@@ -290,18 +294,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn heap_clamp_saturates_and_orders() {
-        // Absurdly large values saturate instead of wrapping (a raw `as u16`
-        // cast would turn 66000 into 464).
-        assert_eq!(clamp_heap_mb(1024, 66000), (1024, u16::MAX));
-        // xms is capped to xmx rather than left inverted.
-        assert_eq!(clamp_heap_mb(8192, 1024), (1024, 1024));
-        // Zero/negative settings are floored at 1 MB so the JVM never refuses
-        // to start on a nonsensical heap.
-        assert_eq!(clamp_heap_mb(0, 0), (1, 1));
-        assert_eq!(clamp_heap_mb(-100, -50), (1, 1));
-        // A normal, already-sane pair passes through unchanged.
-        assert_eq!(clamp_heap_mb(1024, 4096), (1024, 4096));
+    fn heap_mb_honors_large_heaps_and_rejects_non_positive() {
+        // A deliberately large heap must reach the JVM unclamped — the old
+        // u16::MAX cap silently rewrote a 100 GB `-Xmx100000m` down to ~464 MB.
+        assert_eq!(heap_mb(100_000).unwrap(), 100_000);
+        assert_eq!(format!("-Xmx{}m", heap_mb(100_000).unwrap()), "-Xmx100000m");
+
+        // A normal, already-sane value passes through unchanged.
+        assert_eq!(heap_mb(1024).unwrap(), 1024);
+
+        // Zero/negative is a corrupt config; fail loud rather than silently
+        // booting the JVM with a nonsensical heap.
+        assert!(heap_mb(0).is_err());
+        assert!(heap_mb(-100).is_err());
     }
 
     #[tokio::test]
