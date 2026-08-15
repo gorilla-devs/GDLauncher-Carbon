@@ -1459,7 +1459,6 @@ impl From<manager::modpack::DuplicateGroup> for FEDuplicateGroup {
 pub struct FEDuplicateSide {
     pub path: String,
     pub pack_owned: bool,
-    pub enabled: bool,
 }
 
 impl From<manager::modpack::DuplicateSide> for FEDuplicateSide {
@@ -1467,7 +1466,6 @@ impl From<manager::modpack::DuplicateSide> for FEDuplicateSide {
         Self {
             path: value.path,
             pack_owned: value.pack_owned,
-            enabled: value.enabled,
         }
     }
 }

@@ -1313,11 +1313,16 @@ impl ManagerRef<'_, InstanceManager> {
 
                 remaining.clear();
                 for (instance_id, pid, expected_start_time) in still_adopted {
-                    if should_release_adopted(orphan_pid::is_verified_live_java_process(
-                        &system,
-                        pid,
-                        expected_start_time,
-                    )) {
+                    // Released back to Inactive unless the pid is still
+                    // verifiably the same live java process it was adopted
+                    // as. A bare liveness check is not enough here: the game
+                    // can have exited and had its pid recycled by an
+                    // unrelated process between two polls, and passing that
+                    // unverified would keep the instance Running (accruing
+                    // playtime, offering a Stop that would kill the
+                    // stranger's JVM) for a game that is actually long gone.
+                    if !orphan_pid::is_verified_live_java_process(&system, pid, expected_start_time)
+                    {
                         info!(
                             "adopted game process {pid} for instance {instance_id} has exited, or is no longer verifiably the same process; instance is inactive again"
                         );
@@ -1377,23 +1382,6 @@ fn adopted_playtime_mut(
         return None;
     };
     running.playtime.as_mut()
-}
-
-/// Whether an adopted instance should go back to Inactive, given whether its
-/// recorded pid is still verifiably the same live java process it was
-/// adopted as (`orphan_pid::is_verified_live_java_process` — alive,
-/// java-looking, AND its start time still matching the one recorded at
-/// adoption). A bare liveness check is not enough here: the game can have
-/// exited and had its pid recycled by an unrelated process between two
-/// polls, and passing that unverified would keep the instance Running
-/// (accruing playtime, offering a Stop that would kill the stranger's JVM)
-/// for a game that is actually long gone.
-///
-/// Split out from the polling loop for the same reason `reconcile_pid` is
-/// split out from the sysinfo lookup: the decision is then testable without a
-/// real process table behind it.
-pub fn should_release_adopted(is_verified_live_java: bool) -> bool {
-    !is_verified_live_java
 }
 
 /// Whole seconds of playtime to bank for an adopted instance last banked at
@@ -1589,10 +1577,6 @@ impl RunningInstance {
     /// it was adopted from a previous session.
     pub fn is_adopted(&self) -> bool {
         self.kill_tx.is_none()
-    }
-
-    pub fn process_id(&self) -> u32 {
-        self.process_id
     }
 }
 
@@ -1843,20 +1827,6 @@ mod tests {
         assert!(
             matches!(&data.state, LaunchState::Running(r) if r.is_adopted()),
             "an adopted instance must still be running after shutdown_running"
-        );
-    }
-
-    // --- adopted liveness ------------------------------------------------
-
-    #[test]
-    fn adopted_instance_is_released_once_its_pid_stops_being_a_live_jvm() {
-        assert!(
-            should_release_adopted(false),
-            "a pid that is gone (or no longer java) must release the instance back to Inactive"
-        );
-        assert!(
-            !should_release_adopted(true),
-            "a pid that is still a live JVM must keep the instance Running"
         );
     }
 

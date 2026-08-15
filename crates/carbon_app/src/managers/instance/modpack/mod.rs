@@ -679,7 +679,6 @@ pub struct DuplicateGroup {
 pub struct DuplicateSide {
     pub path: String,
     pub pack_owned: bool,
-    pub enabled: bool,
 }
 
 /// A packinfo-style key's top-level directory segment, for restricting a
@@ -1083,11 +1082,7 @@ fn group_duplicates(
                     let path = format!("/{folder_name}/{}", candidate.filename);
                     let pack_owned = packinfo.is_some_and(|p| p.files.contains_key(&path));
 
-                    DuplicateSide {
-                        path,
-                        pack_owned,
-                        enabled: candidate.enabled,
-                    }
+                    DuplicateSide { path, pack_owned }
                 })
                 .collect();
             files.sort_by(|a, b| a.path.cmp(&b.path));
