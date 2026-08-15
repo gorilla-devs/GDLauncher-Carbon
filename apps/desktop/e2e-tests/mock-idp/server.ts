@@ -79,14 +79,15 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /**
- * electron-updater's generic provider asks for `<channel>-<platform>.yml`,
- * with the arch appended on anything but x64 — `latest-linux.yml`,
+ * electron-updater's generic provider asks for `<channel>.yml` on Windows
+ * (`getChannelFilePrefix()` returns "" for win32) and `<channel>-<platform>
+ * [-<arch>].yml` everywhere else — `latest.yml`, `latest-linux.yml`,
  * `latest-linux-arm64.yml`, and the `beta-`/`alpha-` variants the release
  * channel picks between (`autoUpdater.ts` sets `autoUpdater.channel`). All of
  * them get the same answer here; which one a run asks for depends on the host
  * and the settings row, and none of that changes what this feed is for.
  */
-const UPDATE_CHANNEL_FILE = /^\/updates\/[a-z]+-[a-z0-9-]+\.yml$/
+const UPDATE_CHANNEL_FILE = /^\/updates\/[a-z0-9]+(?:-[a-z0-9]+)*\.yml$/
 
 /**
  * A channel file reporting the lowest version semver has.

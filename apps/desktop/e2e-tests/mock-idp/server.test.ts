@@ -535,4 +535,21 @@ describe("update feed", () => {
     expect(res.status).toBe(200)
     expect(await res.text()).toMatch(/^version:\s*0\.0\.0$/m)
   })
+
+  it("serves the suffix-less channel file electron-updater asks for on Windows", async () => {
+    // getChannelFilePrefix() returns "" for win32, so the generic provider
+    // requests the bare channel name with no -<platform> segment. Missing
+    // this route means every Windows run hits the unmatched-route 501,
+    // which is the failed check that raises the login-blocking error toast.
+    const res = await fetch(`${mock.url}/updates/latest.yml`)
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toMatch(/^version:\s*0\.0\.0$/m)
+  })
+
+  it("does not treat an arbitrary .yml-adjacent path as a channel file", async () => {
+    const res = await fetch(`${mock.url}/updates/evil.exe`)
+
+    expect(res.status).toBe(501)
+  })
 })
