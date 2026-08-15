@@ -14,10 +14,15 @@ fn shared_client_builder(
         .connect_timeout(connect)
         // Bounds the gap between reads, not the whole transfer: a stalled
         // connection dies fast while a slow, still-moving large body
-        // survives. Server-side downloads (server packs, mrpacks, modloader
-        // installer jars, vanilla server.jar) stream multi-hundred-MB bodies
+        // survives. Server-side downloads (server packs and mrpacks in
+        // server/modpack.rs, modloader installer jars in
+        // server/modloader_install.rs) stream multi-hundred-MB bodies
         // straight through this client, so the budget must tolerate
         // transfers that take minutes as long as bytes keep arriving.
+        // Vanilla server.jar bytes do not go through this client -- they
+        // stream through carbon_net's own downloader instead, and
+        // server/jars.rs only uses this client for two small JSON metadata
+        // GETs (the version manifest and version details).
         .read_timeout(read)
 }
 
