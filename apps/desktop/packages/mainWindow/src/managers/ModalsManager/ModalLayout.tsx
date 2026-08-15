@@ -1,6 +1,6 @@
-import { Show, children } from "solid-js"
+import { Show, children, onCleanup, onMount } from "solid-js"
 import { JSX } from "solid-js/jsx-runtime"
-import { ModalProps, useModal } from "."
+import { ModalProps, useModal, useModalStackEntry } from "."
 import adSize from "@/utils/adhelper"
 
 interface Props extends ModalProps {
@@ -18,6 +18,19 @@ interface Props extends ModalProps {
 const ModalLayout = (props: Props) => {
   const c = children(() => props.children)
   const modalsContext = useModal()
+  const stackEntry = useModalStackEntry()
+
+  // Publishes this instance's live `preventClose` prop onto its stack entry
+  // so the manager's Escape handler and backdrop click can see it too — both
+  // previously only consulted the static registry, which JavaSetup (a
+  // prop-only `preventClose`, no registry entry) never appeared in.
+  onMount(() => {
+    stackEntry?.registerPreventClose(() => props.preventClose === true)
+  })
+
+  onCleanup(() => {
+    stackEntry?.unregisterPreventClose()
+  })
 
   return (
     <div
