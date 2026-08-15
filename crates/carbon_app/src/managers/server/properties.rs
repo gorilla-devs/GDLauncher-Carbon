@@ -216,6 +216,32 @@ mod tests {
     }
 
     #[test]
+    fn update_properties_from_empty_content_sanitizes_new_file_writes() {
+        // `update_server_properties`'s create-new-file branch calls
+        // `update_properties("", pairs)` so a from-scratch write goes through
+        // the same control-char filter as an update to an existing file.
+        let mut updates = BTreeMap::new();
+        updates.insert("motd".to_string(), "x\nonline-mode=false".to_string());
+
+        let updated = update_properties("", &updates);
+
+        // The malicious value is dropped outright rather than partially
+        // applied — the fresh file ends up empty, not holding the sanitized
+        // `motd` plus a second, injected `online-mode` line.
+        assert_eq!(updated, "\n");
+        assert!(!updated.contains("online-mode"));
+
+        // A clean value alongside a malicious one still lands as exactly one
+        // sanitized line — the filter drops only the offending pair.
+        let mut mixed = BTreeMap::new();
+        mixed.insert("motd".to_string(), "x\nonline-mode=false".to_string());
+        mixed.insert("max-players".to_string(), "10".to_string());
+
+        let updated = update_properties("", &mixed);
+        assert_eq!(updated.lines().collect::<Vec<_>>(), vec!["max-players=10"]);
+    }
+
+    #[test]
     fn update_properties_still_applies_clean_values() {
         let existing = "#Minecraft server properties\nmotd=Hello\n";
         let mut updates = BTreeMap::new();

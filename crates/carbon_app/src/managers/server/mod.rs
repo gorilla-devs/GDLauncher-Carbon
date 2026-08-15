@@ -137,6 +137,20 @@ fn resolve_server_port(port: Option<i32>) -> anyhow::Result<i32> {
     Ok(port)
 }
 
+/// Validates a `server-port` value from a `server.properties` patch against
+/// the same range `resolve_server_port` enforces, so a bad value is rejected
+/// before any DB/file write instead of surfacing later as an opaque JVM bind
+/// error.
+fn validate_server_port_patch(value: &str) -> anyhow::Result<i32> {
+    let parsed: i32 = value
+        .parse()
+        .map_err(|_| anyhow!("Server port must be a number, got `{value}`"))?;
+    if !(1..=65535).contains(&parsed) {
+        bail!("Server port must be between 1 and 65535, got {parsed}");
+    }
+    Ok(parsed)
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("Minecraft server EULA has not been accepted for server {server_id}")]
 pub struct EulaNotAcceptedError {
@@ -1919,16 +1933,23 @@ impl ManagerRef<'_, ServerManager> {
         let btree_updates: std::collections::BTreeMap<String, String> =
             updates.into_iter().collect();
 
+        // Reject an out-of-range `server-port` before touching the DB or the
+        // file — the same range `resolve_server_port` enforces at launch, so
+        // a bad value is rejected here rather than surfacing later as an
+        // opaque JVM bind error.
+        if let Some(port) = btree_updates.get("server-port") {
+            validate_server_port_patch(port)?;
+        }
+
         if props_path.exists() {
             let existing = tokio::fs::read_to_string(&props_path).await?;
             let updated = properties::update_properties(&existing, &btree_updates);
             tokio::fs::write(&props_path, &updated).await?;
         } else {
-            // Create new file
-            let mut content = String::from("#Minecraft server properties\n");
-            for (key, value) in &btree_updates {
-                content.push_str(&format!("{}={}\n", key, value));
-            }
+            // Create new file, routed through the same sanitizer as the
+            // update-existing-file path so a raw newline in a value can't
+            // inject an extra property line.
+            let content = properties::update_properties("", &btree_updates);
             tokio::fs::write(&props_path, &content).await?;
         }
 
@@ -3399,6 +3420,21 @@ mod tests {
         assert!(resolve_server_port(Some(0)).is_err());
         assert!(resolve_server_port(Some(-1)).is_err());
         assert!(resolve_server_port(Some(65536)).is_err());
+    }
+
+    #[test]
+    fn validate_server_port_patch_rejects_out_of_range_and_non_numeric() {
+        // A `server-port` patch outside the TCP range must be rejected before
+        // `update_server_properties` ever reaches the DB/file write — not
+        // surfaced later as an opaque JVM bind error.
+        assert!(validate_server_port_patch("70000").is_err());
+        assert!(validate_server_port_patch("0").is_err());
+        assert!(validate_server_port_patch("-1").is_err());
+        assert!(validate_server_port_patch("not-a-number").is_err());
+
+        assert_eq!(validate_server_port_patch("25565").unwrap(), 25565);
+        assert_eq!(validate_server_port_patch("1").unwrap(), 1);
+        assert_eq!(validate_server_port_patch("65535").unwrap(), 65535);
     }
 
     #[test]
