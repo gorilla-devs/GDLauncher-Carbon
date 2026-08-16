@@ -1,16 +1,56 @@
-import { splitProps, type ParentProps, type ValidComponent } from "solid-js"
+import {
+  createMemo,
+  splitProps,
+  type ParentProps,
+  type ValidComponent
+} from "solid-js"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 import {
   Select as SelectPrimitive,
   type SelectContentProps,
   type SelectItemProps,
+  type SelectRootProps,
   type SelectTriggerProps
 } from "@kobalte/core/select"
 
 import { cn } from "../util"
 import { PRESS_CLASSES } from "../Clickable"
+import { optionsEqual } from "./optionsEqual"
 
-export const Select = SelectPrimitive
+type selectRootProps<Option, OptGroup = never> = SelectRootProps<
+  Option,
+  OptGroup
+> & {
+  /** Derives the id an option is compared by when deciding whether a fresh
+   *  `options` array actually changed identity. See `optionsEqual` for the
+   *  default when this isn't provided. */
+  optionKey?: (option: Option | OptGroup) => string
+}
+
+export const Select = <
+  Option,
+  OptGroup = never,
+  T extends ValidComponent = "div"
+>(
+  props: PolymorphicProps<T, selectRootProps<Option, OptGroup>>
+) => {
+  const [local, rest] = splitProps(
+    props as selectRootProps<Option, OptGroup>,
+    ["options", "optionKey"]
+  )
+
+  // `Select`'s listbox is keyed off `options`' identity, so a fresh-but-
+  // equivalent array (a memo invalidated by an unrelated field, a refetch
+  // returning byte-for-byte the same rows) tears the open dropdown down and
+  // rebuilds it under the user's cursor. Comparing structurally instead of
+  // by reference stops that — see `optionsEqual`.
+  const stableOptions = createMemo(() => local.options, undefined, {
+    equals: (prev, next) => optionsEqual(prev, next, local.optionKey)
+  })
+
+  return <SelectPrimitive {...rest} options={stableOptions()} />
+}
+
 export const SelectValue = SelectPrimitive.Value
 export const SelectDescription = SelectPrimitive.Description
 export const SelectErrorMessage = SelectPrimitive.ErrorMessage

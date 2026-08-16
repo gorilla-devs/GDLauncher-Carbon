@@ -16,7 +16,8 @@
     "showcase:build": "vite build --config showcase/vite.config.mjs",
     "showcase:preview": "vite preview --config showcase/vite.config.mjs",
     "lint": "tsc && pnpm --dir ../.. exec eslint packages/ui --quiet && pnpm --dir ../.. exec prettier --check packages/ui",
-    "lint-fix": "tsc && pnpm --dir ../.. exec eslint packages/ui --quiet --fix && pnpm --dir ../.. exec prettier --write packages/ui"
+    "lint-fix": "tsc && pnpm --dir ../.. exec eslint packages/ui --quiet --fix && pnpm --dir ../.. exec prettier --write packages/ui",
+    "test:unit": "vitest run"
   },
   "pnpm": {
     "overrides": {
