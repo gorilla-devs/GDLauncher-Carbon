@@ -27,9 +27,17 @@ export const useTaskProgress = (
   // task, mirroring the single-button flow's `lastProgress` (see
   // `resolveTaskPoll`) — kept per instance since this hook tracks every
   // instance in the dropdown install path at once.
-  const [lastProgressByInstance, setLastProgressByInstance] = createSignal<
-    Map<number, Progress | null>
-  >(new Map())
+  //
+  // A plain Map, and it has to stay one: the poll effect below reads this
+  // back on the pass after it writes it, so making it reactive would make
+  // the effect a dependency of its own writes. A tracked task sitting at one
+  // `Known` progress resolves to the same `"progress"` action on every pass,
+  // so the effect would re-queue itself without end — and Solid nests a
+  // `completeUpdates` -> `runUpdates` -> `runEffects` frame per re-queue, so
+  // the renderer dies with `RangeError: Maximum call stack size exceeded`
+  // rather than merely spinning. The effect's reactive inputs are
+  // `instanceTaskIds()` and `allTasksQuery.data`, nothing else.
+  const lastProgressByInstance = new Map<number, Progress | null>()
 
   createEffect(() => {
     const taskIds = instanceTaskIds()
@@ -44,7 +52,7 @@ export const useTaskProgress = (
           ? undefined
           : (allTasks.find((task) => task.id === taskId) ?? null)
 
-      const previousProgress = lastProgressByInstance().get(instanceId) ?? null
+      const previousProgress = lastProgressByInstance.get(instanceId) ?? null
       const { action, nextLastProgress } = resolveTaskPoll(
         taskData,
         previousProgress,
@@ -54,21 +62,13 @@ export const useTaskProgress = (
       if (action.kind === "noop") return
 
       if (action.kind === "progress") {
-        setLastProgressByInstance((prev) => {
-          const next = new Map(prev)
-          next.set(instanceId, nextLastProgress)
-          return next
-        })
+        lastProgressByInstance.set(instanceId, nextLastProgress)
         return
       }
 
       // Failed or completed: the tracked task is done either way, so this
       // instance's entry is retired from both maps together.
-      setLastProgressByInstance((prev) => {
-        const next = new Map(prev)
-        next.delete(instanceId)
-        return next
-      })
+      lastProgressByInstance.delete(instanceId)
 
       if (action.kind === "failed") {
         clearInstanceLoadingState(instanceId)
