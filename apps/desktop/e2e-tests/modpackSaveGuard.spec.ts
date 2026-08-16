@@ -20,6 +20,7 @@ import {
   MODPACK_MR_V_MID,
   MODPACK_MR_V_NEW
 } from "./helpers/modpackFixtures.js"
+import { withCleanup } from "./helpers/cleanup.js"
 
 /**
  * Proves `apply_plan::PlanReason::InSaveFolder`
@@ -104,84 +105,79 @@ test.describe("modpack save guard", () => {
   }) => {
     const { page, harness } = authenticatedApp
 
-    let bodyFailed = false
     let name: string | undefined
-    try {
-      name = await installModpackVersion(
-        page,
-        MODPACK_MR_QUERY,
-        "modrinth",
-        MODPACK_MR_V_MID
-      )
-      const { shortpath } = readInstanceByName(harness.runtimePath, name)
-      const root = path.join(harness.runtimePath, "instances", shortpath)
-      const data = path.join(root, "instance")
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        name = await installModpackVersion(
+          page,
+          MODPACK_MR_QUERY,
+          "modrinth",
+          MODPACK_MR_V_MID
+        )
+        const { shortpath } = readInstanceByName(harness.runtimePath, name)
+        const root = path.join(harness.runtimePath, "instances", shortpath)
+        const data = path.join(root, "instance")
 
-      // Seed a world file and claim it for the pack, so the next version
-      // change reaches the /saves branch. MODPACK_MR_V_NEW does not ship
-      // this path, so without the guard it would fall through to the
-      // ordinary "gone from the new version, old version untouched" delete.
-      const rel = "saves/e2e-seeded-world/level.dat"
-      const body = "seeded-by-modpackSaveGuard"
-      await fs.promises.mkdir(path.dirname(path.join(data, rel)), {
-        recursive: true
-      })
-      await fs.promises.writeFile(path.join(data, rel), body)
+        // Seed a world file and claim it for the pack, so the next version
+        // change reaches the /saves branch. MODPACK_MR_V_NEW does not ship
+        // this path, so without the guard it would fall through to the
+        // ordinary "gone from the new version, old version untouched" delete.
+        const rel = "saves/e2e-seeded-world/level.dat"
+        const body = "seeded-by-modpackSaveGuard"
+        await fs.promises.mkdir(path.dirname(path.join(data, rel)), {
+          recursive: true
+        })
+        await fs.promises.writeFile(path.join(data, rel), body)
 
-      // Round-trip the whole parsed object (see module doc comment) — the
-      // `files` type annotation below describes only the field this test
-      // touches, not the file's full shape; `raw` itself still carries
-      // whatever else was parsed, `_version` included.
-      const raw = JSON.parse(
-        await fs.promises.readFile(path.join(root, "packinfo.json"), "utf8")
-      ) as { files: Record<string, { sha512: string; md5: string }> }
-      raw.files[`/${rel}`] = {
-        sha512: createHash("sha512").update(body).digest("hex"),
-        md5: createHash("md5").update(body).digest("hex")
-      }
-      await fs.promises.writeFile(
-        path.join(root, "packinfo.json"),
-        JSON.stringify(raw)
-      )
-
-      await changeModpackVersion(page, name, MODPACK_MR_V_NEW)
-
-      expect(
-        await fs.promises.readFile(path.join(data, rel), "utf8"),
-        "a pack-tracked file under saves/ was modified or deleted by the upgrade"
-      ).toBe(body)
-
-      const audit = await readInstallAudit(root)
-      expect(audit, "the version change wrote no install audit").not.toBeNull()
-      expect(
-        audit!.skipped.find((s) => s.file === `/${rel}`)?.reason,
-        "the audit did not record the /saves skip"
-      ).toBe("in-save-folder")
-      expect(
-        audit!.deleted,
-        "the audit counted a pack-tracked file under saves/ among the " +
-          "files this pass deleted — the /saves guard must keep it out of " +
-          "this list entirely, independent of whatever survives on disk"
-      ).not.toContain(`/${rel}`)
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (name) {
-        try {
-          await deleteInstanceViaUi(page, name)
-        } catch (cleanupError) {
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error(
-            'cleanup for "never deletes a pack-tracked file under saves/" also failed:',
-            cleanupError
-          )
+        // Round-trip the whole parsed object (see module doc comment) — the
+        // `files` type annotation below describes only the field this test
+        // touches, not the file's full shape; `raw` itself still carries
+        // whatever else was parsed, `_version` included.
+        const raw = JSON.parse(
+          await fs.promises.readFile(path.join(root, "packinfo.json"), "utf8")
+        ) as { files: Record<string, { sha512: string; md5: string }> }
+        raw.files[`/${rel}`] = {
+          sha512: createHash("sha512").update(body).digest("hex"),
+          md5: createHash("md5").update(body).digest("hex")
         }
-      }
-    }
+        await fs.promises.writeFile(
+          path.join(root, "packinfo.json"),
+          JSON.stringify(raw)
+        )
+
+        await changeModpackVersion(page, name, MODPACK_MR_V_NEW)
+
+        expect(
+          await fs.promises.readFile(path.join(data, rel), "utf8"),
+          "a pack-tracked file under saves/ was modified or deleted by the upgrade"
+        ).toBe(body)
+
+        const audit = await readInstallAudit(root)
+        expect(
+          audit,
+          "the version change wrote no install audit"
+        ).not.toBeNull()
+        expect(
+          audit!.skipped.find((s) => s.file === `/${rel}`)?.reason,
+          "the audit did not record the /saves skip"
+        ).toBe("in-save-folder")
+        expect(
+          audit!.deleted,
+          "the audit counted a pack-tracked file under saves/ among the " +
+            "files this pass deleted — the /saves guard must keep it out of " +
+            "this list entirely, independent of whatever survives on disk"
+        ).not.toContain(`/${rel}`)
+      },
+      async () => {
+        if (name) {
+          await deleteInstanceViaUi(page, name)
+        }
+      },
+      'cleanup for "never deletes a pack-tracked file under saves/" also failed:'
+    )
   })
 
   test("never touches a pack-tracked file under saves/ during a repair either", async ({
@@ -189,111 +185,103 @@ test.describe("modpack save guard", () => {
   }) => {
     const { page, harness } = authenticatedApp
 
-    let bodyFailed = false
     let name: string | undefined
-    try {
-      name = await installModpackVersion(
-        page,
-        MODPACK_MR_QUERY,
-        "modrinth",
-        MODPACK_MR_V_MID
-      )
-      const { shortpath } = readInstanceByName(harness.runtimePath, name)
-      const root = path.join(harness.runtimePath, "instances", shortpath)
-      const data = path.join(root, "instance")
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        name = await installModpackVersion(
+          page,
+          MODPACK_MR_QUERY,
+          "modrinth",
+          MODPACK_MR_V_MID
+        )
+        const { shortpath } = readInstanceByName(harness.runtimePath, name)
+        const root = path.join(harness.runtimePath, "instances", shortpath)
+        const data = path.join(root, "instance")
 
-      // Same seeding mechanism as the version-change test above — reinstall
-      // targets the instance's own current version, i.e. the real pack's
-      // own manifest for that version, not the hand-seeded `old` json. None
-      // of this suite's Modrinth fixtures (what this file uses) ship
-      // `overrides/saves/**`, so `target` never tracks this seeded path
-      // either — nothing about this seed depends on a version change ever
-      // happening. (The CurseForge fixture, `boosted-fps`, does ship saves
-      // and is what exercises the other half of the contract, the create
-      // fallthrough on a fresh install — see finding #7 in this suite's
-      // README.)
-      //
-      // Left PRISTINE (bytes matching the seeded hash exactly), not
-      // damaged — deliberately, because pristine-and-old-only is the case
-      // that actually discriminates a working /saves guard from a broken
-      // one. Present bytes under `/saves` protect unconditionally in
-      // `apply_plan::plan`, regardless of `old`/`target` or `ApplyMode` (see
-      // the module doc above); but this path is only in `old` (no Modrinth
-      // fixture ships a saves override, so `target` never tracks it
-      // either), and if that Present-bytes protection were ever bypassed
-      // the path would fall to `decide_dropped`, whose FIRST arm deletes a
-      // path whose disk bytes still equal `old`'s recorded hash — exactly
-      // this seed. A pre-damaged seed would not discriminate: even with
-      // the guard removed, `decide_dropped`'s "modified" arm keeps a
-      // damaged file too (for an unrelated reason — a dropped path that
-      // was hand-edited), so the bytes-preserved assertion would stay
-      // green either way and only the audit-reason assertion would still
-      // catch a regression. A damaged /saves file under repair specifically
-      // is already covered at the Rust level, independent of this
-      // discrimination concern: `apply_plan.rs`'s
-      // `repair_saves_folder_kept_even_when_damaged` (the planner decision
-      // alone) and `run/staging_test.rs`'s
-      // `repair_saves_folder_execute_plan_leaves_damaged_file_untouched`
-      // (against a real filesystem).
-      const rel = "saves/e2e-seeded-world/level.dat"
-      const original = "seeded-by-modpackSaveGuard-repair"
-      await fs.promises.mkdir(path.dirname(path.join(data, rel)), {
-        recursive: true
-      })
-      await fs.promises.writeFile(path.join(data, rel), original)
+        // Same seeding mechanism as the version-change test above — reinstall
+        // targets the instance's own current version, i.e. the real pack's
+        // own manifest for that version, not the hand-seeded `old` json. None
+        // of this suite's Modrinth fixtures (what this file uses) ship
+        // `overrides/saves/**`, so `target` never tracks this seeded path
+        // either — nothing about this seed depends on a version change ever
+        // happening. (The CurseForge fixture, `boosted-fps`, does ship saves
+        // and is what exercises the other half of the contract, the create
+        // fallthrough on a fresh install — see finding #7 in this suite's
+        // README.)
+        //
+        // Left PRISTINE (bytes matching the seeded hash exactly), not
+        // damaged — deliberately, because pristine-and-old-only is the case
+        // that actually discriminates a working /saves guard from a broken
+        // one. Present bytes under `/saves` protect unconditionally in
+        // `apply_plan::plan`, regardless of `old`/`target` or `ApplyMode` (see
+        // the module doc above); but this path is only in `old` (no Modrinth
+        // fixture ships a saves override, so `target` never tracks it
+        // either), and if that Present-bytes protection were ever bypassed
+        // the path would fall to `decide_dropped`, whose FIRST arm deletes a
+        // path whose disk bytes still equal `old`'s recorded hash — exactly
+        // this seed. A pre-damaged seed would not discriminate: even with
+        // the guard removed, `decide_dropped`'s "modified" arm keeps a
+        // damaged file too (for an unrelated reason — a dropped path that
+        // was hand-edited), so the bytes-preserved assertion would stay
+        // green either way and only the audit-reason assertion would still
+        // catch a regression. A damaged /saves file under repair specifically
+        // is already covered at the Rust level, independent of this
+        // discrimination concern: `apply_plan.rs`'s
+        // `repair_saves_folder_kept_even_when_damaged` (the planner decision
+        // alone) and `run/staging_test.rs`'s
+        // `repair_saves_folder_execute_plan_leaves_damaged_file_untouched`
+        // (against a real filesystem).
+        const rel = "saves/e2e-seeded-world/level.dat"
+        const original = "seeded-by-modpackSaveGuard-repair"
+        await fs.promises.mkdir(path.dirname(path.join(data, rel)), {
+          recursive: true
+        })
+        await fs.promises.writeFile(path.join(data, rel), original)
 
-      const raw = JSON.parse(
-        await fs.promises.readFile(path.join(root, "packinfo.json"), "utf8")
-      ) as { files: Record<string, { sha512: string; md5: string }> }
-      raw.files[`/${rel}`] = {
-        sha512: createHash("sha512").update(original).digest("hex"),
-        md5: createHash("md5").update(original).digest("hex")
-      }
-      await fs.promises.writeFile(
-        path.join(root, "packinfo.json"),
-        JSON.stringify(raw)
-      )
-
-      await repairModpack(page, name)
-
-      expect(
-        await fs.promises.readFile(path.join(data, rel), "utf8"),
-        "a repair touched a pack-tracked file under saves/ — with the " +
-          "guard working this must stay byte-identical; a broken guard " +
-          "would let decide_dropped's pristine-matches-old arm delete it"
-      ).toBe(original)
-
-      const audit = await readInstallAudit(root)
-      expect(audit, "the repair wrote no install audit").not.toBeNull()
-      expect(
-        audit!.skipped.find((s) => s.file === `/${rel}`)?.reason,
-        "the audit did not record the /saves skip during a repair"
-      ).toBe("in-save-folder")
-      expect(
-        audit!.deleted,
-        "the audit counted a pack-tracked file under saves/ among the " +
-          "files this repair deleted — the /saves guard must keep it out " +
-          "of this list entirely, independent of whatever survives on disk"
-      ).not.toContain(`/${rel}`)
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (name) {
-        try {
-          await deleteInstanceViaUi(page, name)
-        } catch (cleanupError) {
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error(
-            'cleanup for "never touches a pack-tracked file under saves/ ' +
-              'during a repair either" also failed:',
-            cleanupError
-          )
+        const raw = JSON.parse(
+          await fs.promises.readFile(path.join(root, "packinfo.json"), "utf8")
+        ) as { files: Record<string, { sha512: string; md5: string }> }
+        raw.files[`/${rel}`] = {
+          sha512: createHash("sha512").update(original).digest("hex"),
+          md5: createHash("md5").update(original).digest("hex")
         }
-      }
-    }
+        await fs.promises.writeFile(
+          path.join(root, "packinfo.json"),
+          JSON.stringify(raw)
+        )
+
+        await repairModpack(page, name)
+
+        expect(
+          await fs.promises.readFile(path.join(data, rel), "utf8"),
+          "a repair touched a pack-tracked file under saves/ — with the " +
+            "guard working this must stay byte-identical; a broken guard " +
+            "would let decide_dropped's pristine-matches-old arm delete it"
+        ).toBe(original)
+
+        const audit = await readInstallAudit(root)
+        expect(audit, "the repair wrote no install audit").not.toBeNull()
+        expect(
+          audit!.skipped.find((s) => s.file === `/${rel}`)?.reason,
+          "the audit did not record the /saves skip during a repair"
+        ).toBe("in-save-folder")
+        expect(
+          audit!.deleted,
+          "the audit counted a pack-tracked file under saves/ among the " +
+            "files this repair deleted — the /saves guard must keep it out " +
+            "of this list entirely, independent of whatever survives on disk"
+        ).not.toContain(`/${rel}`)
+      },
+      async () => {
+        if (name) {
+          await deleteInstanceViaUi(page, name)
+        }
+      },
+      'cleanup for "never touches a pack-tracked file under saves/ ' +
+        'during a repair either" also failed:'
+    )
   })
 })

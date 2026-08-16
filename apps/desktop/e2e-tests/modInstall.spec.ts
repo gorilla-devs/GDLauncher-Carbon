@@ -12,6 +12,7 @@ import {
   type ModPlatform
 } from "./helpers/mods.js"
 import { verifyModEnabled, verifyModInstalled } from "./helpers/modVerify.js"
+import { withCleanup } from "./helpers/cleanup.js"
 
 /**
  * This is the CurseForge CDN regression guard: the
@@ -86,79 +87,76 @@ test.describe("mod install", () => {
     test(testCase.title, async ({ installedInstance }) => {
       const { page, instanceName, modsDir } = installedInstance
 
-      // See instanceInstall.spec.ts's identical `bodyFailed` doc comment: a
-      // `throw` inside `finally` discards whatever the try-block was
-      // throwing, so cleanup failure must only re-throw over a passing body.
-      let bodyFailed = false
-      let installed: InstalledMod | undefined
-      try {
-        await openInstanceAddons(page, instanceName)
-        await searchForMod(page, {
-          platform: testCase.platform,
-          query: testCase.query
-        })
-        await openAddonPage(page, testCase.projectId)
-        await installModIntoInstance(page, { instanceName })
+      // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why
+      // cleanup must never re-throw over an already-failing body, only over
+      // a passing one.
+      await withCleanup(
+        async () => {
+          let installed: InstalledMod | undefined
+          await openInstanceAddons(page, instanceName)
+          await searchForMod(page, {
+            platform: testCase.platform,
+            query: testCase.query
+          })
+          await openAddonPage(page, testCase.projectId)
+          await installModIntoInstance(page, { instanceName })
 
-        // Read the just-installed mod's `filename`/`file_size`/sha1 back off
-        // the app's own mod list (a fresh `instance.getInstanceMods`
-        // response — see `openInstanceAddons`'s doc comment for why this is
-        // race-free) rather than constructing the filename ourselves — the
-        // entire point of this test: a CDN
-        // regression that changes what gets served would change what this
-        // list reports too, not just break a hand-built URL.
-        const mods = await openInstanceAddons(page, instanceName)
-        installed = mods.find(testCase.matches)
-        if (!installed) {
-          throw new Error(
-            `"${testCase.title}": instance.getInstanceMods for ` +
-              `"${instanceName}" has no entry matching project ` +
-              `${testCase.projectId} on ${testCase.platform} after install ` +
-              `(got ${JSON.stringify(mods)})`
-          )
-        }
+          // Read the just-installed mod's `filename`/`file_size`/sha1 back off
+          // the app's own mod list (a fresh `instance.getInstanceMods`
+          // response — see `openInstanceAddons`'s doc comment for why this is
+          // race-free) rather than constructing the filename ourselves — the
+          // entire point of this test: a CDN
+          // regression that changes what gets served would change what this
+          // list reports too, not just break a hand-built URL.
+          const mods = await openInstanceAddons(page, instanceName)
+          installed = mods.find(testCase.matches)
+          if (!installed) {
+            throw new Error(
+              `"${testCase.title}": instance.getInstanceMods for ` +
+                `"${instanceName}" has no entry matching project ` +
+                `${testCase.projectId} on ${testCase.platform} after install ` +
+                `(got ${JSON.stringify(mods)})`
+            )
+          }
 
-        // The app believes it installed. Verify the jar is genuinely on disk
-        // — independent of anything reported through the UI — which is the
-        // entire reason this test exists (see the module doc comment).
-        const diskResult = await verifyModInstalled(modsDir, {
-          filename: installed.filename,
-          expectedSize: installed.fileSize,
-          expectedSha1: installed.sha1 ?? undefined
-        })
-        if (!diskResult.ok) {
-          throw new Error(
-            `"${testCase.title}": disk verification failed:\n` +
-              diskResult.problems.map((p) => `  - ${p}`).join("\n")
-          )
-        }
+          // The app believes it installed. Verify the jar is genuinely on disk
+          // — independent of anything reported through the UI — which is the
+          // entire reason this test exists (see the module doc comment).
+          const diskResult = await verifyModInstalled(modsDir, {
+            filename: installed.filename,
+            expectedSize: installed.fileSize,
+            expectedSha1: installed.sha1 ?? undefined
+          })
+          if (!diskResult.ok) {
+            throw new Error(
+              `"${testCase.title}": disk verification failed:\n` +
+                diskResult.problems.map((p) => `  - ${p}`).join("\n")
+            )
+          }
 
-        // A freshly installed mod is enabled by default — cheap to also
-        // confirm via `verifyModEnabled` rather than only checking
-        // presence.
-        const enabledResult = await verifyModEnabled(
-          modsDir,
-          installed.filename,
-          true
-        )
-        if (!enabledResult.ok) {
-          throw new Error(
-            `"${testCase.title}": enabled-state verification failed:\n` +
-              enabledResult.problems.map((p) => `  - ${p}`).join("\n")
+          // A freshly installed mod is enabled by default — cheap to also
+          // confirm via `verifyModEnabled` rather than only checking
+          // presence.
+          const enabledResult = await verifyModEnabled(
+            modsDir,
+            installed.filename,
+            true
           )
-        }
-      } catch (error) {
-        bodyFailed = true
-        throw error
-      } finally {
+          if (!enabledResult.ok) {
+            throw new Error(
+              `"${testCase.title}": enabled-state verification failed:\n` +
+                enabledResult.problems.map((p) => `  - ${p}`).join("\n")
+            )
+          }
+        },
         // `cleanupInstalledMod` (`helpers/mods.ts`, shared with
         // `modLifecycle.spec.ts`) re-derives what's actually installed
-        // rather than trusting `installed` from the try-block: a failure
-        // partway through (e.g. the disk check throwing after a genuine
-        // install) must still be cleaned up, and re-reading is what makes
-        // this correct regardless of where the body failed, order-independent
-        // of the other test case in this file.
-        try {
+        // rather than trusting `installed` from the body: a failure partway
+        // through (e.g. the disk check throwing after a genuine install)
+        // must still be cleaned up, and re-reading is what makes this
+        // correct regardless of where the body failed, order-independent of
+        // the other test case in this file.
+        async () => {
           await cleanupInstalledMod(
             page,
             instanceName,
@@ -166,20 +164,9 @@ test.describe("mod install", () => {
             testCase.matches,
             `"${testCase.title}"`
           )
-        } catch (cleanupError) {
-          // See instanceInstall.spec.ts's identical branch: only re-throw
-          // over a body that itself succeeded, so cleanup failure never
-          // buries the real failure.
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error(
-            `cleanup for "${testCase.title}" also failed:`,
-            cleanupError
-          )
-        }
-      }
+        },
+        `cleanup for "${testCase.title}" also failed:`
+      )
     })
   }
 })

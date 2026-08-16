@@ -31,6 +31,7 @@ import {
   readVersionInfo,
   type CachedLoaderLibrary
 } from "./helpers/versionCache.js"
+import { withCleanup } from "./helpers/cleanup.js"
 
 // `globalSetup.ts` always resolves and prints a seed before any spec module
 // is imported (see playwright.config.ts's `globalSetup`), the same way
@@ -319,224 +320,217 @@ test.describe("loader install matrix", () => {
       const { page } = authenticatedApp
       const baseSeed = resolveLoaderVersionSeed()
 
-      // See instanceInstall.spec.ts's own `bodyFailed` doc comment: a
-      // `throw` inside `finally` discards whatever the try-block was
-      // throwing, so cleanup failure must only re-throw over a passing body.
-      let bodyFailed = false
-      try {
-        const manifest = await fetchLoaderManifest(page, entry.loader)
-        const mcVersion = resolveMcVersion(entry, manifest)
-        const offered = offeredLoaderVersions(manifest, entry.loader, mcVersion)
-        if (offered.length === 0) {
-          throw new Error(
-            `${entry.loader} offers no loader-version builds for Minecraft ` +
-              `${mcVersion} per its own manifest — cannot seed a pick`
-          )
-        }
-        const loaderVersion = pickSeededOption(
-          offered,
-          deriveLoaderVersionSeed(baseSeed, entry.loader, mcVersion)
-        )
-
-        // Printed rather than embedded in the (statically-registered, so
-        // necessarily seed-only) test title above: the loader version is
-        // only knowable once the app's own manifest has been read, which
-        // requires a running page — the same reason `mcVersion` itself
-        // can't be static for the NeoForge entry. `E2E_VERSION_SEED` plus
-        // this line together are what makes a failure reproducible, exactly
-        // like the vanilla matrix's seed banner.
-        console.log(
-          `[loaderInstall] ${entry.loader} / Minecraft ${mcVersion}: ` +
-            `chosen loader version = ${loaderVersion} (seed ${baseSeed})`
-        )
-
-        await createInstanceViaUi(page, {
-          name,
-          version: mcVersion,
-          loader: entry.loader,
-          loaderVersion
-        })
-        await waitForInstallComplete(page, name)
-
-        // Ready to play. Deliberately not clicked — see
-        // instanceInstall.spec.ts's identical comment: mocked accounts
-        // carry a mock entitlement real Minecraft rejects.
-        const tile = page.locator(byInstanceName(name))
-        await expect(tile).toHaveAttribute("data-instance-state", "inactive")
-        await expect(tile).not.toHaveAttribute("data-instance-failed", "true")
-        await expect(
-          tile.locator(byTestId(TEST_IDS.instancePlay))
-        ).toBeVisible()
-
-        // The app believes it installed. Verify the vanilla substrate every
-        // loader install sits on top of — client jar and assets — is
-        // genuinely present and correct, independent of anything reported
-        // through the UI (see `readVersionInfo`'s doc comment for why this
-        // is keyed by `mcVersion`, not by loader or loader version). This
-        // check alone does not prove *this* install produced those files:
-        // in CI's `workers: 1`, `instanceInstall.spec.ts`'s vanilla matrix
-        // runs first and already pins 1.20.1/1.12.2, so for every entry
-        // above except NeoForge (whose Minecraft version is live-resolved,
-        // not pinned) the files it finds here could equally be leftovers
-        // from that earlier run. The loader-specific check further below —
-        // the processor-generated libraries for Forge/NeoForge, the loader
-        // jar itself for Fabric/Quilt — is what is actually unique to this
-        // combination's own install, regardless of run order.
-        const cachedVersion = readVersionInfo(
-          authenticatedApp.harness.runtimePath,
-          mcVersion
-        )
-        const assetIndexId = cachedVersion.assetIndex?.id
-        const expectedClientSha1 = cachedVersion.downloads?.client?.sha1
-        if (!assetIndexId || !expectedClientSha1) {
-          throw new Error(
-            `cached version JSON for "${mcVersion}" is missing ` +
-              "assetIndex.id or downloads.client.sha1 — cannot verify the " +
-              "install on disk"
-          )
-        }
-        const [clientJarResult, assetIndexResult] = await Promise.all([
-          verifyClientJar(
-            authenticatedApp.harness.runtimePath,
-            mcVersion,
-            expectedClientSha1
-          ),
-          verifyAssetIndex(authenticatedApp.harness.runtimePath, assetIndexId)
-        ])
-        const diskProblems = [
-          ...clientJarResult.problems,
-          ...assetIndexResult.problems
-        ]
-        if (diskProblems.length > 0) {
-          throw new Error(
-            `disk verification failed for ${entry.loader} on Minecraft ` +
-              `${mcVersion}:\n` +
-              diskProblems.map((problem) => `  - ${problem}`).join("\n")
-          )
-        }
-
-        // The highest-value assertion in this suite: Forge and NeoForge run
-        // install processors that generate patched/SRG client jars into
-        // libraries/ at maven paths derived from the loader build's own
-        // JSON — exactly what a cache-clear wipes without regenerating (see
-        // processor_outputs.rs's own doc comment).
-        // Fabric/Quilt never populate `PartialVersionInfoCache.processors`,
-        // so this block doesn't run for them at all (no `expectedSha1`-style
-        // "assert exactly zero" here either — there is no cache row to read
-        // in the first place, a structurally different case from 1.12.2
-        // genuinely declaring zero); the `else` branch below is their
-        // equivalent, unique-to-this-install check.
-        if (entry.loader === "forge" || entry.loader === "neoforge") {
-          const cacheId = `${entry.loader}-${loaderVersion}`
-          const cached = readPartialVersionInfo(
-            authenticatedApp.harness.runtimePath,
-            cacheId
-          )
-          const required = requiredLibraryPaths(
-            cached.processors ?? [],
-            cached.data
-          )
-
-          console.log(
-            `[loaderInstall] ${cacheId}: ${required.length} required ` +
-              "processor artifact(s) derived from its cached loader JSON"
-          )
-
-          // Explicit, not a bare `if (required.length > 0)` guard around the
-          // verification call below: that shape made "derived zero" and
-          // "derived zero because a port bug or install-profile regression
-          // broke derivation" indistinguishable — the highest-value
-          // assertion in this suite would silently degrade to a log line
-          // for Forge 1.20.1/NeoForge if it ever unexpectedly derived
-          // nothing. Asserting the expected count explicitly makes both
-          // "unexpectedly zero" and "unexpectedly non-zero" (1.12.2 suddenly
-          // gaining processors) fail loudly instead of passing quietly.
-          if (entry.expectsProcessorArtifacts) {
-            expect(
-              required.length,
-              `expected ${cacheId} to declare at least one client ` +
-                "processor artifact (Forge 1.20.1 and NeoForge both run " +
-                "processors) — derived zero. Either the install profile " +
-                "genuinely stopped declaring any (a real finding, worth " +
-                "reporting), or requiredLibraryPaths mis-derived the set " +
-                "from a JSON shape it doesn't handle (check " +
-                "processorOutputsGolden.test.ts against a fresh live fetch " +
-                "of this build)."
-            ).toBeGreaterThan(0)
-          } else {
-            expect(
-              required.length,
-              `expected ${cacheId} to declare zero client processor ` +
-                "artifacts (pre-flattening Forge ships " +
-                '"processors":[],"data":{} — confirmed live), but derived ' +
-                `${required.length}. This build gaining processors is a ` +
-                "real finding, not a harness bug — do not relax this back " +
-                "to > 0 without confirming what changed."
-            ).toBe(0)
-          }
-
-          const result = await verifyLibrariesPresent(
-            authenticatedApp.harness.runtimePath,
-            required.map((r) => r.relativePath)
-          )
-          if (!result.ok) {
-            throw new Error(
-              `processor-generated libraries missing after installing ` +
-                `${cacheId}:\n` +
-                result.problems.map((problem) => `  - ${problem}`).join("\n")
-            )
-          }
-        } else {
-          // Fabric/Quilt's equivalent of the processor-artifact assertion
-          // above: neither loader runs install processors, but both declare
-          // their own loader jar as a library in their cached loader-version
-          // JSON, at a maven path keyed on the exact `loaderVersion` just
-          // seeded-picked and installed (see `findLoaderLibraryPath`'s doc
-          // comment). Nothing else this suite installs ever writes under
-          // `net/fabricmc/fabric-loader/` or `org/quiltmc/quilt-loader/`, so
-          // — unlike the client jar/asset index check above — finding this
-          // file present and correct is evidence of *this* install, not a
-          // leftover from whatever ran earlier in the same worker.
-          const cacheId = `${entry.loader}-${loaderVersion}`
-          const cached = readPartialVersionInfo(
-            authenticatedApp.harness.runtimePath,
-            cacheId
-          )
-          const loaderLibraryPath = findLoaderLibraryPath(
-            cached.libraries,
+      // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why
+      // cleanup must never re-throw over an already-failing body, only over
+      // a passing one.
+      await withCleanup(
+        async () => {
+          const manifest = await fetchLoaderManifest(page, entry.loader)
+          const mcVersion = resolveMcVersion(entry, manifest)
+          const offered = offeredLoaderVersions(
+            manifest,
             entry.loader,
-            loaderVersion
+            mcVersion
           )
-
-          const result = await verifyLibrariesPresent(
-            authenticatedApp.harness.runtimePath,
-            [loaderLibraryPath]
-          )
-          if (!result.ok) {
+          if (offered.length === 0) {
             throw new Error(
-              `${entry.loader} loader library missing after installing ` +
-                `${cacheId}:\n` +
-                result.problems.map((problem) => `  - ${problem}`).join("\n")
+              `${entry.loader} offers no loader-version builds for Minecraft ` +
+                `${mcVersion} per its own manifest — cannot seed a pick`
             )
           }
-        }
-      } catch (error) {
-        bodyFailed = true
-        throw error
-      } finally {
-        try {
-          await deleteInstanceViaUi(page, name)
-        } catch (cleanupError) {
-          // See instanceInstall.spec.ts's identical branch: only re-throw
-          // over a body that itself succeeded, so cleanup failure never
-          // buries the real failure.
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
+          const loaderVersion = pickSeededOption(
+            offered,
+            deriveLoaderVersionSeed(baseSeed, entry.loader, mcVersion)
+          )
+
+          // Printed rather than embedded in the (statically-registered, so
+          // necessarily seed-only) test title above: the loader version is
+          // only knowable once the app's own manifest has been read, which
+          // requires a running page — the same reason `mcVersion` itself
+          // can't be static for the NeoForge entry. `E2E_VERSION_SEED` plus
+          // this line together are what makes a failure reproducible, exactly
+          // like the vanilla matrix's seed banner.
+          console.log(
+            `[loaderInstall] ${entry.loader} / Minecraft ${mcVersion}: ` +
+              `chosen loader version = ${loaderVersion} (seed ${baseSeed})`
+          )
+
+          await createInstanceViaUi(page, {
+            name,
+            version: mcVersion,
+            loader: entry.loader,
+            loaderVersion
+          })
+          await waitForInstallComplete(page, name)
+
+          // Ready to play. Deliberately not clicked — see
+          // instanceInstall.spec.ts's identical comment: mocked accounts
+          // carry a mock entitlement real Minecraft rejects.
+          const tile = page.locator(byInstanceName(name))
+          await expect(tile).toHaveAttribute("data-instance-state", "inactive")
+          await expect(tile).not.toHaveAttribute("data-instance-failed", "true")
+          await expect(
+            tile.locator(byTestId(TEST_IDS.instancePlay))
+          ).toBeVisible()
+
+          // The app believes it installed. Verify the vanilla substrate every
+          // loader install sits on top of — client jar and assets — is
+          // genuinely present and correct, independent of anything reported
+          // through the UI (see `readVersionInfo`'s doc comment for why this
+          // is keyed by `mcVersion`, not by loader or loader version). This
+          // check alone does not prove *this* install produced those files:
+          // in CI's `workers: 1`, `instanceInstall.spec.ts`'s vanilla matrix
+          // runs first and already pins 1.20.1/1.12.2, so for every entry
+          // above except NeoForge (whose Minecraft version is live-resolved,
+          // not pinned) the files it finds here could equally be leftovers
+          // from that earlier run. The loader-specific check further below —
+          // the processor-generated libraries for Forge/NeoForge, the loader
+          // jar itself for Fabric/Quilt — is what is actually unique to this
+          // combination's own install, regardless of run order.
+          const cachedVersion = readVersionInfo(
+            authenticatedApp.harness.runtimePath,
+            mcVersion
+          )
+          const assetIndexId = cachedVersion.assetIndex?.id
+          const expectedClientSha1 = cachedVersion.downloads?.client?.sha1
+          if (!assetIndexId || !expectedClientSha1) {
+            throw new Error(
+              `cached version JSON for "${mcVersion}" is missing ` +
+                "assetIndex.id or downloads.client.sha1 — cannot verify the " +
+                "install on disk"
+            )
           }
-          console.error(`cleanup for "${name}" also failed:`, cleanupError)
-        }
-      }
+          const [clientJarResult, assetIndexResult] = await Promise.all([
+            verifyClientJar(
+              authenticatedApp.harness.runtimePath,
+              mcVersion,
+              expectedClientSha1
+            ),
+            verifyAssetIndex(authenticatedApp.harness.runtimePath, assetIndexId)
+          ])
+          const diskProblems = [
+            ...clientJarResult.problems,
+            ...assetIndexResult.problems
+          ]
+          if (diskProblems.length > 0) {
+            throw new Error(
+              `disk verification failed for ${entry.loader} on Minecraft ` +
+                `${mcVersion}:\n` +
+                diskProblems.map((problem) => `  - ${problem}`).join("\n")
+            )
+          }
+
+          // The highest-value assertion in this suite: Forge and NeoForge run
+          // install processors that generate patched/SRG client jars into
+          // libraries/ at maven paths derived from the loader build's own
+          // JSON — exactly what a cache-clear wipes without regenerating (see
+          // processor_outputs.rs's own doc comment).
+          // Fabric/Quilt never populate `PartialVersionInfoCache.processors`,
+          // so this block doesn't run for them at all (no `expectedSha1`-style
+          // "assert exactly zero" here either — there is no cache row to read
+          // in the first place, a structurally different case from 1.12.2
+          // genuinely declaring zero); the `else` branch below is their
+          // equivalent, unique-to-this-install check.
+          if (entry.loader === "forge" || entry.loader === "neoforge") {
+            const cacheId = `${entry.loader}-${loaderVersion}`
+            const cached = readPartialVersionInfo(
+              authenticatedApp.harness.runtimePath,
+              cacheId
+            )
+            const required = requiredLibraryPaths(
+              cached.processors ?? [],
+              cached.data
+            )
+
+            console.log(
+              `[loaderInstall] ${cacheId}: ${required.length} required ` +
+                "processor artifact(s) derived from its cached loader JSON"
+            )
+
+            // Explicit, not a bare `if (required.length > 0)` guard around the
+            // verification call below: that shape made "derived zero" and
+            // "derived zero because a port bug or install-profile regression
+            // broke derivation" indistinguishable — the highest-value
+            // assertion in this suite would silently degrade to a log line
+            // for Forge 1.20.1/NeoForge if it ever unexpectedly derived
+            // nothing. Asserting the expected count explicitly makes both
+            // "unexpectedly zero" and "unexpectedly non-zero" (1.12.2 suddenly
+            // gaining processors) fail loudly instead of passing quietly.
+            if (entry.expectsProcessorArtifacts) {
+              expect(
+                required.length,
+                `expected ${cacheId} to declare at least one client ` +
+                  "processor artifact (Forge 1.20.1 and NeoForge both run " +
+                  "processors) — derived zero. Either the install profile " +
+                  "genuinely stopped declaring any (a real finding, worth " +
+                  "reporting), or requiredLibraryPaths mis-derived the set " +
+                  "from a JSON shape it doesn't handle (check " +
+                  "processorOutputsGolden.test.ts against a fresh live fetch " +
+                  "of this build)."
+              ).toBeGreaterThan(0)
+            } else {
+              expect(
+                required.length,
+                `expected ${cacheId} to declare zero client processor ` +
+                  "artifacts (pre-flattening Forge ships " +
+                  '"processors":[],"data":{} — confirmed live), but derived ' +
+                  `${required.length}. This build gaining processors is a ` +
+                  "real finding, not a harness bug — do not relax this back " +
+                  "to > 0 without confirming what changed."
+              ).toBe(0)
+            }
+
+            const result = await verifyLibrariesPresent(
+              authenticatedApp.harness.runtimePath,
+              required.map((r) => r.relativePath)
+            )
+            if (!result.ok) {
+              throw new Error(
+                `processor-generated libraries missing after installing ` +
+                  `${cacheId}:\n` +
+                  result.problems.map((problem) => `  - ${problem}`).join("\n")
+              )
+            }
+          } else {
+            // Fabric/Quilt's equivalent of the processor-artifact assertion
+            // above: neither loader runs install processors, but both declare
+            // their own loader jar as a library in their cached loader-version
+            // JSON, at a maven path keyed on the exact `loaderVersion` just
+            // seeded-picked and installed (see `findLoaderLibraryPath`'s doc
+            // comment). Nothing else this suite installs ever writes under
+            // `net/fabricmc/fabric-loader/` or `org/quiltmc/quilt-loader/`, so
+            // — unlike the client jar/asset index check above — finding this
+            // file present and correct is evidence of *this* install, not a
+            // leftover from whatever ran earlier in the same worker.
+            const cacheId = `${entry.loader}-${loaderVersion}`
+            const cached = readPartialVersionInfo(
+              authenticatedApp.harness.runtimePath,
+              cacheId
+            )
+            const loaderLibraryPath = findLoaderLibraryPath(
+              cached.libraries,
+              entry.loader,
+              loaderVersion
+            )
+
+            const result = await verifyLibrariesPresent(
+              authenticatedApp.harness.runtimePath,
+              [loaderLibraryPath]
+            )
+            if (!result.ok) {
+              throw new Error(
+                `${entry.loader} loader library missing after installing ` +
+                  `${cacheId}:\n` +
+                  result.problems.map((problem) => `  - ${problem}`).join("\n")
+              )
+            }
+          }
+        },
+        async () => {
+          await deleteInstanceViaUi(page, name)
+        },
+        `cleanup for "${name}" also failed:`
+      )
     })
   }
 })

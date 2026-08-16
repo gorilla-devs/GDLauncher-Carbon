@@ -23,6 +23,7 @@ import {
   verifyModEnabled,
   verifyModInstalled
 } from "./helpers/modVerify.js"
+import { withCleanup } from "./helpers/cleanup.js"
 
 /**
  * The installed-mod lifecycle: disable, enable, delete, update — each
@@ -120,141 +121,118 @@ test.describe("mod lifecycle", () => {
   test("disables an installed mod", async ({ installedInstance }) => {
     const { page, instanceName, modsDir } = installedInstance
 
-    // See modInstall.spec.ts's identical `bodyFailed` doc comment: a `throw`
-    // inside `finally` discards whatever the try-block was throwing, so
-    // cleanup failure must only re-throw over a passing body.
-    let bodyFailed = false
-    try {
-      const installed = await installFabricApi(page, instanceName)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        const installed = await installFabricApi(page, instanceName)
 
-      await toggleModEnabled(page, installed.filename, false)
+        await toggleModEnabled(page, installed.filename, false)
 
-      // The real disk representation, not the switch's own state —
-      // see the module doc comment on why the DB's `enabled` column is
-      // deliberately not trusted here.
-      const result = await verifyModEnabled(modsDir, installed.filename, false)
-      if (!result.ok) {
-        throw new Error(
-          `"disables an installed mod": disk verification failed:\n` +
-            result.problems.map((p) => `  - ${p}`).join("\n")
+        // The real disk representation, not the switch's own state —
+        // see the module doc comment on why the DB's `enabled` column is
+        // deliberately not trusted here.
+        const result = await verifyModEnabled(
+          modsDir,
+          installed.filename,
+          false
         )
-      }
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      try {
-        await cleanupFabricApi(page, instanceName, modsDir)
-      } catch (cleanupError) {
-        if (!bodyFailed) {
-          // eslint-disable-next-line no-unsafe-finally
-          throw cleanupError
+        if (!result.ok) {
+          throw new Error(
+            `"disables an installed mod": disk verification failed:\n` +
+              result.problems.map((p) => `  - ${p}`).join("\n")
+          )
         }
-        console.error(
-          'cleanup for "disables an installed mod" also failed:',
-          cleanupError
-        )
-      }
-    }
+      },
+      async () => {
+        await cleanupFabricApi(page, instanceName, modsDir)
+      },
+      'cleanup for "disables an installed mod" also failed:'
+    )
   })
 
   test("enables a disabled mod", async ({ installedInstance }) => {
     const { page, instanceName, modsDir } = installedInstance
 
-    let bodyFailed = false
-    try {
-      const installed = await installFabricApi(page, instanceName)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        const installed = await installFabricApi(page, instanceName)
 
-      // Setup, not the assertion under test: a mod has to already be
-      // disabled before "enable" is a meaningful action. Verified on disk
-      // before proceeding so a broken disable wouldn't silently make the
-      // enable assertion below vacuously true.
-      await toggleModEnabled(page, installed.filename, false)
-      const setupResult = await verifyModEnabled(
-        modsDir,
-        installed.filename,
-        false
-      )
-      if (!setupResult.ok) {
-        throw new Error(
-          `"enables a disabled mod": setup (disabling) failed verification:\n` +
-            setupResult.problems.map((p) => `  - ${p}`).join("\n")
+        // Setup, not the assertion under test: a mod has to already be
+        // disabled before "enable" is a meaningful action. Verified on disk
+        // before proceeding so a broken disable wouldn't silently make the
+        // enable assertion below vacuously true.
+        await toggleModEnabled(page, installed.filename, false)
+        const setupResult = await verifyModEnabled(
+          modsDir,
+          installed.filename,
+          false
         )
-      }
-
-      await toggleModEnabled(page, installed.filename, true)
-
-      const result = await verifyModEnabled(modsDir, installed.filename, true)
-      if (!result.ok) {
-        throw new Error(
-          `"enables a disabled mod": disk verification failed:\n` +
-            result.problems.map((p) => `  - ${p}`).join("\n")
-        )
-      }
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      try {
-        await cleanupFabricApi(page, instanceName, modsDir)
-      } catch (cleanupError) {
-        if (!bodyFailed) {
-          // eslint-disable-next-line no-unsafe-finally
-          throw cleanupError
+        if (!setupResult.ok) {
+          throw new Error(
+            `"enables a disabled mod": setup (disabling) failed verification:\n` +
+              setupResult.problems.map((p) => `  - ${p}`).join("\n")
+          )
         }
-        console.error(
-          'cleanup for "enables a disabled mod" also failed:',
-          cleanupError
-        )
-      }
-    }
+
+        await toggleModEnabled(page, installed.filename, true)
+
+        const result = await verifyModEnabled(modsDir, installed.filename, true)
+        if (!result.ok) {
+          throw new Error(
+            `"enables a disabled mod": disk verification failed:\n` +
+              result.problems.map((p) => `  - ${p}`).join("\n")
+          )
+        }
+      },
+      async () => {
+        await cleanupFabricApi(page, instanceName, modsDir)
+      },
+      'cleanup for "enables a disabled mod" also failed:'
+    )
   })
 
   test("deletes an installed mod", async ({ installedInstance }) => {
     const { page, instanceName, modsDir } = installedInstance
 
-    let bodyFailed = false
-    try {
-      const installed = await installFabricApi(page, instanceName)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        const installed = await installFabricApi(page, instanceName)
 
-      await deleteModViaUi(page, installed.filename)
+        await deleteModViaUi(page, installed.filename)
 
-      // `verifyModInstalled` is deliberately not reused here inverted: its
-      // "ok" only ever means present-and-correct, so a caller checking
-      // `!result.ok` for "deleted" cannot tell a genuine absence apart from
-      // some other unrelated verification failure (wrong size on a
-      // different file at the same name, a stray directory, ...). Listing
-      // the directory and asserting the exact filename is gone is the
-      // direct, unambiguous check — the same one `modInstall.spec.ts`'s own
-      // cleanup already uses for the identical reason.
-      const remaining = await listModFiles(modsDir)
-      if (remaining.includes(installed.filename)) {
-        throw new Error(
-          `"deletes an installed mod": "${installed.filename}" is still ` +
-            `present in ${modsDir} after deleteModViaUi (found: ` +
-            `${JSON.stringify(remaining)})`
-        )
-      }
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
+        // `verifyModInstalled` is deliberately not reused here inverted: its
+        // "ok" only ever means present-and-correct, so a caller checking
+        // `!result.ok` for "deleted" cannot tell a genuine absence apart from
+        // some other unrelated verification failure (wrong size on a
+        // different file at the same name, a stray directory, ...). Listing
+        // the directory and asserting the exact filename is gone is the
+        // direct, unambiguous check — the same one `modInstall.spec.ts`'s own
+        // cleanup already uses for the identical reason.
+        const remaining = await listModFiles(modsDir)
+        if (remaining.includes(installed.filename)) {
+          throw new Error(
+            `"deletes an installed mod": "${installed.filename}" is still ` +
+              `present in ${modsDir} after deleteModViaUi (found: ` +
+              `${JSON.stringify(remaining)})`
+          )
+        }
+      },
       // The delete under test already returns the instance to a clean
       // state on its own success — this only catches a body that failed
       // before or during the delete, leaving something to remove.
-      try {
+      async () => {
         await cleanupFabricApi(page, instanceName, modsDir)
-      } catch (cleanupError) {
-        if (!bodyFailed) {
-          // eslint-disable-next-line no-unsafe-finally
-          throw cleanupError
-        }
-        console.error(
-          'cleanup for "deletes an installed mod" also failed:',
-          cleanupError
-        )
-      }
-    }
+      },
+      'cleanup for "deletes an installed mod" also failed:'
+    )
   })
 
   /**
@@ -275,109 +253,101 @@ test.describe("mod lifecycle", () => {
   }) => {
     const { page, instanceName, modsDir } = installedInstance
 
-    let bodyFailed = false
-    try {
-      await openInstanceAddons(page, instanceName)
-      await searchForMod(page, { platform: "modrinth", query: "fabric api" })
-      await openAddonPage(page, FABRIC_API_PROJECT_ID)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        await openInstanceAddons(page, instanceName)
+        await searchForMod(page, { platform: "modrinth", query: "fabric api" })
+        await openAddonPage(page, FABRIC_API_PROJECT_ID)
 
-      const versions = await openAddonVersions(page)
-      const older = pickOlderVersion(versions)
-      await installAddonVersion(page, older)
+        const versions = await openAddonVersions(page)
+        const older = pickOlderVersion(versions)
+        await installAddonVersion(page, older)
 
-      const mods = await openInstanceAddons(page, instanceName)
-      const installed = mods.find(matchesFabricApi)
-      if (!installed) {
-        throw new Error(
-          '"updates an installed mod to a newer version": ' +
-            "instance.getInstanceMods has no entry matching project " +
-            `${FABRIC_API_PROJECT_ID} on modrinth after installing the ` +
-            `deliberately-older build (fileId ${older.fileId})`
-        )
-      }
-
-      // The older build is genuinely on disk before ever touching update —
-      // otherwise a later "filename changed" observation could not be
-      // trusted to mean what it claims.
-      const installedResult = await verifyModInstalled(modsDir, {
-        filename: installed.filename,
-        expectedSize: installed.fileSize,
-        expectedSha1: installed.sha1 ?? undefined
-      })
-      if (!installedResult.ok) {
-        throw new Error(
-          '"updates an installed mod to a newer version": older-build disk ' +
-            "verification failed:\n" +
-            installedResult.problems.map((p) => `  - ${p}`).join("\n")
-        )
-      }
-
-      // Waits for the update to become available, not asserts it: this
-      // helper cannot return without `hasUpdate: true` on the matched mod —
-      // it either finds that or throws its own named timeout — so an
-      // `expect` on its result here would check a condition the call above
-      // it already guarantees, proving nothing. The genuinely-failable
-      // assertions are the
-      // disk checks below, after the update has actually run.
-      await waitForModUpdateAvailable(page, instanceName, matchesFabricApi)
-
-      const row = page.locator(byModRow(installed.filename))
-      await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
-
-      // Same reasoning as the wait above: `waitForModFilenameChange` cannot
-      // return without the filename having changed, so there is nothing to
-      // usefully assert about `updated.filename` itself here — the real
-      // observation this whole test exists for is that the *disk* — not
-      // just the app's own record — reflects a genuinely different,
-      // verifiable file, which the two checks below establish.
-      const updated = await waitForModFilenameChange(page, instanceName, {
-        oldFilename: installed.filename,
-        matches: matchesFabricApi
-      })
-
-      const updatedResult = await verifyModInstalled(modsDir, {
-        filename: updated.filename,
-        expectedSize: updated.fileSize,
-        expectedSha1: updated.sha1 ?? undefined
-      })
-      if (!updatedResult.ok) {
-        throw new Error(
-          '"updates an installed mod to a newer version": updated-build ' +
-            "disk verification failed:\n" +
-            updatedResult.problems.map((p) => `  - ${p}`).join("\n")
-        )
-      }
-
-      // The old build's file is genuinely gone, not left behind alongside
-      // the new one — `update_mod`'s installer deletes the replaced mod
-      // after the new file lands (`replaces_mod_id`,
-      // `managers/instance/installer/mod.rs`), so two jars coexisting here
-      // would itself be a real regression, not a harmless leftover.
-      const remaining = await listModFiles(modsDir)
-      if (remaining.includes(installed.filename)) {
-        throw new Error(
-          '"updates an installed mod to a newer version": the pre-update ' +
-            `file "${installed.filename}" is still present in ${modsDir} ` +
-            `after updating to "${updated.filename}" (found: ` +
-            `${JSON.stringify(remaining)})`
-        )
-      }
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      try {
-        await cleanupFabricApi(page, instanceName, modsDir)
-      } catch (cleanupError) {
-        if (!bodyFailed) {
-          // eslint-disable-next-line no-unsafe-finally
-          throw cleanupError
+        const mods = await openInstanceAddons(page, instanceName)
+        const installed = mods.find(matchesFabricApi)
+        if (!installed) {
+          throw new Error(
+            '"updates an installed mod to a newer version": ' +
+              "instance.getInstanceMods has no entry matching project " +
+              `${FABRIC_API_PROJECT_ID} on modrinth after installing the ` +
+              `deliberately-older build (fileId ${older.fileId})`
+          )
         }
-        console.error(
-          'cleanup for "updates an installed mod to a newer version" also failed:',
-          cleanupError
-        )
-      }
-    }
+
+        // The older build is genuinely on disk before ever touching update —
+        // otherwise a later "filename changed" observation could not be
+        // trusted to mean what it claims.
+        const installedResult = await verifyModInstalled(modsDir, {
+          filename: installed.filename,
+          expectedSize: installed.fileSize,
+          expectedSha1: installed.sha1 ?? undefined
+        })
+        if (!installedResult.ok) {
+          throw new Error(
+            '"updates an installed mod to a newer version": older-build disk ' +
+              "verification failed:\n" +
+              installedResult.problems.map((p) => `  - ${p}`).join("\n")
+          )
+        }
+
+        // Waits for the update to become available, not asserts it: this
+        // helper cannot return without `hasUpdate: true` on the matched mod —
+        // it either finds that or throws its own named timeout — so an
+        // `expect` on its result here would check a condition the call above
+        // it already guarantees, proving nothing. The genuinely-failable
+        // assertions are the
+        // disk checks below, after the update has actually run.
+        await waitForModUpdateAvailable(page, instanceName, matchesFabricApi)
+
+        const row = page.locator(byModRow(installed.filename))
+        await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
+
+        // Same reasoning as the wait above: `waitForModFilenameChange` cannot
+        // return without the filename having changed, so there is nothing to
+        // usefully assert about `updated.filename` itself here — the real
+        // observation this whole test exists for is that the *disk* — not
+        // just the app's own record — reflects a genuinely different,
+        // verifiable file, which the two checks below establish.
+        const updated = await waitForModFilenameChange(page, instanceName, {
+          oldFilename: installed.filename,
+          matches: matchesFabricApi
+        })
+
+        const updatedResult = await verifyModInstalled(modsDir, {
+          filename: updated.filename,
+          expectedSize: updated.fileSize,
+          expectedSha1: updated.sha1 ?? undefined
+        })
+        if (!updatedResult.ok) {
+          throw new Error(
+            '"updates an installed mod to a newer version": updated-build ' +
+              "disk verification failed:\n" +
+              updatedResult.problems.map((p) => `  - ${p}`).join("\n")
+          )
+        }
+
+        // The old build's file is genuinely gone, not left behind alongside
+        // the new one — `update_mod`'s installer deletes the replaced mod
+        // after the new file lands (`replaces_mod_id`,
+        // `managers/instance/installer/mod.rs`), so two jars coexisting here
+        // would itself be a real regression, not a harmless leftover.
+        const remaining = await listModFiles(modsDir)
+        if (remaining.includes(installed.filename)) {
+          throw new Error(
+            '"updates an installed mod to a newer version": the pre-update ' +
+              `file "${installed.filename}" is still present in ${modsDir} ` +
+              `after updating to "${updated.filename}" (found: ` +
+              `${JSON.stringify(remaining)})`
+          )
+        }
+      },
+      async () => {
+        await cleanupFabricApi(page, instanceName, modsDir)
+      },
+      'cleanup for "updates an installed mod to a newer version" also failed:'
+    )
   })
 })

@@ -75,6 +75,7 @@ import {
   verifyLibrariesPresent
 } from "./helpers/installVerify.js"
 import { runCacheCleanup } from "./helpers/cacheCleanup.js"
+import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 
 const INSTANCE_NAME = "gdl-e2e-processor-repair"
 
@@ -122,178 +123,181 @@ test.describe("processor output repair", () => {
       pageErrors: Error[]
       stdout: string[]
     } | null = null
-    let bodyFailed = false
     /** The core's stdout, captured so cleanup can wait on the process-level
      *  GAME_CLOSED event rather than on a UI state that races it. */
     let stdout: string[] = []
 
-    try {
-      current = await launchApp(launchOpts)
-      const page = current.page
-      stdout = current.stdout
-      await completeLogin(page, harness)
-      await dismissStartupModals(page)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        current = await launchApp(launchOpts)
+        const page = current.page
+        stdout = current.stdout
+        await completeLogin(page, harness)
+        await dismissStartupModals(page)
 
-      let paths: string[] = []
+        let paths: string[] = []
 
-      await test.step("install a Forge instance", async () => {
-        // The app's own default build is used rather than a pinned or seeded
-        // one: this spec asserts a repair path, not version coverage, and
-        // `loaderInstall.spec.ts` already carries the seeded-matrix coverage.
-        // Pinning a Forge build here would only add a string that Forge's
-        // release cadence eventually invalidates.
-        await createInstanceViaUi(page, {
-          name: INSTANCE_NAME,
-          version: MC_VERSION,
-          loader: LOADER
+        await test.step("install a Forge instance", async () => {
+          // The app's own default build is used rather than a pinned or seeded
+          // one: this spec asserts a repair path, not version coverage, and
+          // `loaderInstall.spec.ts` already carries the seeded-matrix coverage.
+          // Pinning a Forge build here would only add a string that Forge's
+          // release cadence eventually invalidates.
+          await createInstanceViaUi(page, {
+            name: INSTANCE_NAME,
+            version: MC_VERSION,
+            loader: LOADER
+          })
+          await waitForInstallComplete(page, INSTANCE_NAME)
+
+          // Which build the app picked is discovered rather than assumed. This
+          // runtime path is this test's alone and has had exactly one Forge
+          // instance installed into it, so exactly one `forge-` cache row must
+          // exist — asserted, because two would mean the id below was a guess
+          // between them and zero would mean the install never cached anything.
+          const forgeIds = listPartialVersionInfoIds(
+            harness.runtimePath,
+            `${LOADER}-`
+          )
+          expect(
+            forgeIds,
+            "expected exactly one cached Forge build on a runtime path with " +
+              "exactly one Forge instance"
+          ).toHaveLength(1)
+          const loaderVersion = forgeIds[0].slice(`${LOADER}-`.length)
+
+          const cached = readPartialVersionInfo(
+            harness.runtimePath,
+            forgeIds[0]
+          )
+          const required = requiredLibraryPaths(
+            cached.processors ?? [],
+            cached.data
+          )
+          // Explicit rather than a bare `if (required.length)` guard: deriving
+          // zero would otherwise silently turn every assertion below into a
+          // no-op over an empty list, and the whole test would pass having
+          // checked nothing at all.
+          expect(
+            required.length,
+            `expected forge-${loaderVersion} to declare at least one client ` +
+              "processor artifact — derived zero. Either this build genuinely " +
+              "stopped declaring any (a real finding), or requiredLibraryPaths " +
+              "mis-derived the set (check processorOutputsGolden.test.ts)."
+          ).toBeGreaterThan(0)
+          paths = required.map((r) => r.relativePath)
+
+          const present = await verifyLibrariesPresent(
+            harness.runtimePath,
+            paths
+          )
+          if (!present.ok) {
+            throw new Error(
+              `processor-generated libraries missing straight after installing ` +
+                `forge-${loaderVersion}, before this test wiped anything:\n` +
+                present.problems.map((p) => `  - ${p}`).join("\n")
+            )
+          }
         })
-        await waitForInstallComplete(page, INSTANCE_NAME)
 
-        // Which build the app picked is discovered rather than assumed. This
-        // runtime path is this test's alone and has had exactly one Forge
-        // instance installed into it, so exactly one `forge-` cache row must
-        // exist — asserted, because two would mean the id below was a guess
-        // between them and zero would mean the install never cached anything.
-        const forgeIds = listPartialVersionInfoIds(
-          harness.runtimePath,
-          `${LOADER}-`
-        )
-        expect(
-          forgeIds,
-          "expected exactly one cached Forge build on a runtime path with " +
-            "exactly one Forge instance"
-        ).toHaveLength(1)
-        const loaderVersion = forgeIds[0].slice(`${LOADER}-`.length)
+        await test.step("wipe the Minecraft cache", async () => {
+          // `gdlauncher: false` is load-bearing, not tidiness: that scope wipes
+          // DB tables, including this instance's own row.
+          await runCacheCleanup(page, { gdlauncher: false, minecraft: true })
 
-        const cached = readPartialVersionInfo(harness.runtimePath, forgeIds[0])
-        const required = requiredLibraryPaths(
-          cached.processors ?? [],
-          cached.data
-        )
-        // Explicit rather than a bare `if (required.length)` guard: deriving
-        // zero would otherwise silently turn every assertion below into a
-        // no-op over an empty list, and the whole test would pass having
-        // checked nothing at all.
-        expect(
-          required.length,
-          `expected forge-${loaderVersion} to declare at least one client ` +
-            "processor artifact — derived zero. Either this build genuinely " +
-            "stopped declaring any (a real finding), or requiredLibraryPaths " +
-            "mis-derived the set (check processorOutputsGolden.test.ts)."
-        ).toBeGreaterThan(0)
-        paths = required.map((r) => r.relativePath)
+          // Without this the final assertion is satisfied by files the cleanup
+          // never touched, and the test would pass just as happily against a
+          // cleanup that deleted nothing.
+          const absent = await verifyLibrariesAbsent(harness.runtimePath, paths)
+          if (!absent.ok) {
+            throw new Error(
+              "the minecraft cache cleanup did not delete the processor-" +
+                "generated libraries, so the regeneration assertion that " +
+                "follows would prove nothing:\n" +
+                absent.problems.map((p) => `  - ${p}`).join("\n")
+            )
+          }
+        })
 
-        const present = await verifyLibrariesPresent(harness.runtimePath, paths)
-        if (!present.ok) {
-          throw new Error(
-            `processor-generated libraries missing straight after installing ` +
-              `forge-${loaderVersion}, before this test wiped anything:\n` +
-              present.problems.map((p) => `  - ${p}`).join("\n")
-          )
-        }
-      })
-
-      await test.step("wipe the Minecraft cache", async () => {
-        // `gdlauncher: false` is load-bearing, not tidiness: that scope wipes
-        // DB tables, including this instance's own row.
-        await runCacheCleanup(page, { gdlauncher: false, minecraft: true })
-
-        // Without this the final assertion is satisfied by files the cleanup
-        // never touched, and the test would pass just as happily against a
-        // cleanup that deleted nothing.
-        const absent = await verifyLibrariesAbsent(harness.runtimePath, paths)
-        if (!absent.ok) {
-          throw new Error(
-            "the minecraft cache cleanup did not delete the processor-" +
-              "generated libraries, so the regeneration assertion that " +
-              "follows would prove nothing:\n" +
-              absent.problems.map((p) => `  - ${p}`).join("\n")
-          )
-        }
-      })
-
-      await test.step("launch, and assert the libraries are rebuilt", async () => {
-        await goToLibrary(page)
-        const tile = page.locator(byInstanceName(INSTANCE_NAME))
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-        await expect
-          .poll(
-            async () =>
-              (await verifyLibrariesPresent(harness.runtimePath, paths)).ok,
-            {
-              timeout: REGEN_TIMEOUT,
-              message:
-                "processor-generated libraries were not rebuilt after " +
-                "launching an instance whose cache had been wiped. This is " +
-                "the regression this spec exists to catch: run/minecraft.rs " +
-                "must re-run the processors when missing_files() is " +
-                "non-empty, even though deep_check is false on the launch " +
-                "path."
-            }
-          )
-          .toBe(true)
-      })
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (current) {
-        try {
-          // The launch really does start Minecraft — `_INSTANCE_STATE_:
-          // GAME_LAUNCHED` is observable in the core's stdout — so a real JVM
-          // is left running and has to be stopped, or it outlives the test.
-          // The tile's play control doubles as the stop control while the
-          // instance runs: `Tile.tsx`'s `handlePlay` calls `killInstance`
-          // when `props.isRunning`, and the `instance-play` anchor stays
-          // mounted, swapping only its icon and label.
-          const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
-          const play = tile.locator(byTestId(TEST_IDS.instancePlay))
-
-          // Counted, not merely searched for. `change_launch_state`
-          // (`run/mod.rs`) prints GAME_CLOSED on every transition to
-          // Inactive, and the *install* ends with one of those — so this
-          // string is already in stdout long before anything launches, and a
-          // plain `includes("GAME_CLOSED")` is satisfied instantly, waits for
-          // nothing, and lets teardown race the kill it was supposed to be
-          // waiting on. Only a new occurrence means this stop happened.
-          const closedCount = () => stdout.join("").split("GAME_CLOSED").length
-          const before = closedCount()
-
-          await play.click()
+        await test.step("launch, and assert the libraries are rebuilt", async () => {
+          await goToLibrary(page)
+          const tile = page.locator(byInstanceName(INSTANCE_NAME))
+          await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
           await expect
-            .poll(() => closedCount(), {
-              timeout: GAME_STOP_TIMEOUT,
-              message:
-                "the launched instance never reported a new GAME_CLOSED " +
-                "after its stop control was clicked — a Minecraft process " +
-                "may have been left running"
-            })
-            .toBeGreaterThan(before)
+            .poll(
+              async () =>
+                (await verifyLibrariesPresent(harness.runtimePath, paths)).ok,
+              {
+                timeout: REGEN_TIMEOUT,
+                message:
+                  "processor-generated libraries were not rebuilt after " +
+                  "launching an instance whose cache had been wiped. This is " +
+                  "the regression this spec exists to catch: run/minecraft.rs " +
+                  "must re-run the processors when missing_files() is " +
+                  "non-empty, even though deep_check is false on the launch " +
+                  "path."
+              }
+            )
+            .toBe(true)
+        })
+      },
+      async (alreadyFailed) => {
+        if (current) {
+          try {
+            // The launch really does start Minecraft — `_INSTANCE_STATE_:
+            // GAME_LAUNCHED` is observable in the core's stdout — so a real JVM
+            // is left running and has to be stopped, or it outlives the test.
+            // The tile's play control doubles as the stop control while the
+            // instance runs: `Tile.tsx`'s `handlePlay` calls `killInstance`
+            // when `props.isRunning`, and the `instance-play` anchor stays
+            // mounted, swapping only its icon and label.
+            const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
+            const play = tile.locator(byTestId(TEST_IDS.instancePlay))
 
-          // The instance is deliberately not deleted. This spec owns its
-          // runtime path outright and `stopHarness` removes the whole
-          // temporary tree, so a delete would buy nothing while adding a
-          // second UI interaction — one that has to race the same
-          // running-to-stopped transition — to teardown.
-        } catch (cleanupError) {
-          // See instanceInstall.spec.ts's identical branch: only re-throw
-          // over a body that itself succeeded, so cleanup failure never
-          // buries the real failure.
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
+            // Counted, not merely searched for. `change_launch_state`
+            // (`run/mod.rs`) prints GAME_CLOSED on every transition to
+            // Inactive, and the *install* ends with one of those — so this
+            // string is already in stdout long before anything launches, and a
+            // plain `includes("GAME_CLOSED")` is satisfied instantly, waits for
+            // nothing, and lets teardown race the kill it was supposed to be
+            // waiting on. Only a new occurrence means this stop happened.
+            const closedCount = () =>
+              stdout.join("").split("GAME_CLOSED").length
+            const before = closedCount()
+
+            await play.click()
+
+            await expect
+              .poll(() => closedCount(), {
+                timeout: GAME_STOP_TIMEOUT,
+                message:
+                  "the launched instance never reported a new GAME_CLOSED " +
+                  "after its stop control was clicked — a Minecraft process " +
+                  "may have been left running"
+              })
+              .toBeGreaterThan(before)
+
+            // The instance is deliberately not deleted. This spec owns its
+            // runtime path outright and `stopHarness` removes the whole
+            // temporary tree, so a delete would buy nothing while adding a
+            // second UI interaction — one that has to race the same
+            // running-to-stopped transition — to teardown.
+          } catch (cleanupError) {
+            reportCleanupFailure(
+              cleanupError,
+              alreadyFailed,
+              `cleanup for "${INSTANCE_NAME}" also failed:`
+            )
           }
-          console.error(
-            `cleanup for "${INSTANCE_NAME}" also failed:`,
-            cleanupError
-          )
+          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await current.app.close()
         }
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-        await current.app.close()
+        await stopHarness(harness)
       }
-      await stopHarness(harness)
-    }
+    )
   })
 })

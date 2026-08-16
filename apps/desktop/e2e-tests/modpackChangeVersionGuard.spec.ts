@@ -23,6 +23,7 @@ import {
   MODPACK_MR_V_MID,
   MODPACK_MR_V_NEW
 } from "./helpers/modpackFixtures.js"
+import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 
 /**
  * Covers `change_modpack`
@@ -178,7 +179,6 @@ test.describe("modpack change version guard", () => {
       pageErrors: Error[]
       stdout: string[]
     } | null = null
-    let bodyFailed = false
     let stdout: string[] = []
     let name: string | undefined
     /** `GAME_CLOSED` count immediately before Play is clicked, so `finally`
@@ -192,227 +192,230 @@ test.describe("modpack change version guard", () => {
     const closedCount = () => stdout.join("").split("GAME_CLOSED").length
     const launchedCount = () => stdout.join("").split("GAME_LAUNCHED").length
 
-    try {
-      current = await launchApp(launchOpts)
-      const page = current.page
-      stdout = current.stdout
-      await completeLogin(page, harness)
-      await dismissStartupModals(page)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        current = await launchApp(launchOpts)
+        const page = current.page
+        stdout = current.stdout
+        await completeLogin(page, harness)
+        await dismissStartupModals(page)
 
-      name = await installModpackVersion(
-        page,
-        MODPACK_MR_QUERY,
-        "modrinth",
-        MODPACK_MR_V_MID
-      )
-      const { shortpath } = readInstanceByName(harness.runtimePath, name)
-      const root = path.join(harness.runtimePath, "instances", shortpath)
-      const setupDir = path.join(root, ".setup")
-      const pendingFile = path.join(setupDir, "change-pack-version.json")
+        name = await installModpackVersion(
+          page,
+          MODPACK_MR_QUERY,
+          "modrinth",
+          MODPACK_MR_V_MID
+        )
+        const { shortpath } = readInstanceByName(harness.runtimePath, name)
+        const root = path.join(harness.runtimePath, "instances", shortpath)
+        const setupDir = path.join(root, ".setup")
+        const pendingFile = path.join(setupDir, "change-pack-version.json")
 
-      expect(
-        fs.existsSync(setupDir),
-        "the install left `.setup/` behind, so this test cannot tell a leak " +
-          "from leftover install state"
-      ).toBe(false)
+        expect(
+          fs.existsSync(setupDir),
+          "the install left `.setup/` behind, so this test cannot tell a leak " +
+            "from leftover install state"
+        ).toBe(false)
 
-      const tile = page.locator(byInstanceName(name))
-      closedBeforeLaunch = closedCount()
-      await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+        const tile = page.locator(byInstanceName(name))
+        closedBeforeLaunch = closedCount()
+        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
-      await expect
-        .poll(() => launchedCount(), {
-          timeout: LAUNCH_TIMEOUT,
-          message:
-            "the core never reported GAME_LAUNCHED after Play was clicked"
-        })
-        .toBeGreaterThan(1)
-      await expect(
-        tile,
-        "the instance never reached the running state after GAME_LAUNCHED"
-      ).toHaveAttribute("data-instance-state", "running")
+        await expect
+          .poll(() => launchedCount(), {
+            timeout: LAUNCH_TIMEOUT,
+            message:
+              "the core never reported GAME_LAUNCHED after Play was clicked"
+          })
+          .toBeGreaterThan(1)
+        await expect(
+          tile,
+          "the instance never reached the running state after GAME_LAUNCHED"
+        ).toHaveAttribute("data-instance-state", "running")
 
-      // Drive the modal directly — NOT changeModpackVersion, whose last step
-      // is waitForInstallComplete, exactly what must not be reached here.
-      await openVersionModal(page, name)
-      await pickModpackVersionAndConfirm(page, MODPACK_MR_V_NEW)
+        // Drive the modal directly — NOT changeModpackVersion, whose last step
+        // is waitForInstallComplete, exactly what must not be reached here.
+        await openVersionModal(page, name)
+        await pickModpackVersionAndConfirm(page, MODPACK_MR_V_NEW)
 
-      // The guard refuses before touching .setup — nothing may appear on disk.
-      await page.waitForTimeout(SECOND_ATTEMPT_SETTLE)
-      expect(
-        fs.existsSync(pendingFile),
-        "change_modpack wrote change-pack-version.json while the instance was " +
-          "running — the LaunchState guard regressed"
-      ).toBe(false)
+        // The guard refuses before touching .setup — nothing may appear on disk.
+        await page.waitForTimeout(SECOND_ATTEMPT_SETTLE)
+        expect(
+          fs.existsSync(pendingFile),
+          "change_modpack wrote change-pack-version.json while the instance was " +
+            "running — the LaunchState guard regressed"
+        ).toBe(false)
 
-      // The game must still be running: the guard bails before `prepare_game`
-      // is ever called, so this is not `prepare_game`'s own LaunchState check
-      // holding — it is `change_modpack` refusing outright, earlier. Asserted
-      // from the core's own state stream rather than the instance tile,
-      // because a refused change leaves the page on the instance's Settings
-      // route with the modal still open — there is no tile on screen to
-      // read, and asserting one here would report "the instance left the
-      // running state" for a routing reason while the guard was in fact
-      // holding perfectly.
-      expect(
-        closedCount(),
-        "the game stopped after a mid-game version change — change_modpack's " +
-          "LaunchState guard did not hold"
-      ).toBe(closedBeforeLaunch)
+        // The game must still be running: the guard bails before `prepare_game`
+        // is ever called, so this is not `prepare_game`'s own LaunchState check
+        // holding — it is `change_modpack` refusing outright, earlier. Asserted
+        // from the core's own state stream rather than the instance tile,
+        // because a refused change leaves the page on the instance's Settings
+        // route with the modal still open — there is no tile on screen to
+        // read, and asserting one here would report "the instance left the
+        // running state" for a routing reason while the guard was in fact
+        // holding perfectly.
+        expect(
+          closedCount(),
+          "the game stopped after a mid-game version change — change_modpack's " +
+            "LaunchState guard did not hold"
+        ).toBe(closedBeforeLaunch)
 
-      // The refusal must reach the user. `handleUpdate`
-      // (`ModPackVersionUpdate/index.tsx`) catches the rejected mutation and
-      // renders an inline error in the still-open modal instead of closing it
-      // and navigating away.
-      const firstErrorLocator = page.locator(
-        byTestId("modpack-version-update-error")
-      )
-      await expect(
-        firstErrorLocator,
-        "a refused version change surfaced no inline error in the modal"
-      ).toBeVisible({ timeout: 15_000 })
+        // The refusal must reach the user. `handleUpdate`
+        // (`ModPackVersionUpdate/index.tsx`) catches the rejected mutation and
+        // renders an inline error in the still-open modal instead of closing it
+        // and navigating away.
+        const firstErrorLocator = page.locator(
+          byTestId("modpack-version-update-error")
+        )
+        await expect(
+          firstErrorLocator,
+          "a refused version change surfaced no inline error in the modal"
+        ).toBeVisible({ timeout: 15_000 })
 
-      // The inline error must render the parsed backend message
-      // (`extractErrorDisplay` in `rspcClient.ts`), not the raw serialized
-      // rspc error — which carries the full axum/tokio backtrace (recognized
-      // here by its `::poll` async-state-machine frames) plus a trailing
-      // JSON fragment. Both assertions would have failed before that helper
-      // existed, when `handleUpdate` rendered `e.message` unparsed.
-      await expect(
-        firstErrorLocator,
-        "the inline error did not contain the backend's refusal message"
-      ).toContainText("Cannot change the modpack version")
-      await expect(
-        firstErrorLocator,
-        "the inline error rendered a raw backtrace frame instead of the " +
-          "parsed display message"
-      ).not.toContainText("::poll")
+        // The inline error must render the parsed backend message
+        // (`extractErrorDisplay` in `rspcClient.ts`), not the raw serialized
+        // rspc error — which carries the full axum/tokio backtrace (recognized
+        // here by its `::poll` async-state-machine frames) plus a trailing
+        // JSON fragment. Both assertions would have failed before that helper
+        // existed, when `handleUpdate` rendered `e.message` unparsed.
+        await expect(
+          firstErrorLocator,
+          "the inline error did not contain the backend's refusal message"
+        ).toContainText("Cannot change the modpack version")
+        await expect(
+          firstErrorLocator,
+          "the inline error rendered a raw backtrace frame instead of the " +
+            "parsed display message"
+        ).not.toContainText("::poll")
 
-      expect(page.url()).toMatch(/#\/library\/\d+/)
+        expect(page.url()).toMatch(/#\/library\/\d+/)
 
-      // A SECOND attempt refuses identically to the first — the guard reads
-      // `LaunchState`, not `.setup/`'s presence, so there is no "the first
-      // call poisons `.setup/` for the second" distinction left to observe,
-      // and it never inspects which version was requested. Driven inside the
-      // modal that is still open, with the version still selected from the
-      // first attempt: a direct click of Confirm, not
-      // `pickModpackVersionAndConfirm`'s open-select/pick-option/confirm
-      // sequence — reopening the version select races the ad banner's
-      // duplication bug (found, documented product bug; see the README),
-      // which can tile enough ad content over the page to push the select
-      // outside the viewport.
-      await page.click(byTestId(TEST_IDS.modpackVersionUpdateConfirm))
-      await expect(
-        page.locator(byTestId("modpack-version-update-error")),
-        "a second refused version change surfaced no inline error in the modal"
-      ).toBeVisible({ timeout: 15_000 })
-      expect(
-        fs.existsSync(pendingFile),
-        "the second change_modpack call wrote change-pack-version.json " +
-          "while the instance was running — the LaunchState guard regressed"
-      ).toBe(false)
+        // A SECOND attempt refuses identically to the first — the guard reads
+        // `LaunchState`, not `.setup/`'s presence, so there is no "the first
+        // call poisons `.setup/` for the second" distinction left to observe,
+        // and it never inspects which version was requested. Driven inside the
+        // modal that is still open, with the version still selected from the
+        // first attempt: a direct click of Confirm, not
+        // `pickModpackVersionAndConfirm`'s open-select/pick-option/confirm
+        // sequence — reopening the version select races the ad banner's
+        // duplication bug (found, documented product bug; see the README),
+        // which can tile enough ad content over the page to push the select
+        // outside the viewport.
+        await page.click(byTestId(TEST_IDS.modpackVersionUpdateConfirm))
+        await expect(
+          page.locator(byTestId("modpack-version-update-error")),
+          "a second refused version change surfaced no inline error in the modal"
+        ).toBeVisible({ timeout: 15_000 })
+        expect(
+          fs.existsSync(pendingFile),
+          "the second change_modpack call wrote change-pack-version.json " +
+            "while the instance was running — the LaunchState guard regressed"
+        ).toBe(false)
 
-      // Close the still-open modal and get back to the library grid before
-      // touching any tile.
-      await cancelVersionModal(page)
+        // Close the still-open modal and get back to the library grid before
+        // touching any tile.
+        await cancelVersionModal(page)
 
-      // Stop the game.
-      await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-      await expect
-        .poll(() => closedCount(), {
-          timeout: STOP_TIMEOUT,
-          message: "the game never stopped after the play/stop toggle"
-        })
-        .toBeGreaterThan(closedBeforeLaunch)
+        // Stop the game.
+        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+        await expect
+          .poll(() => closedCount(), {
+            timeout: STOP_TIMEOUT,
+            message: "the game never stopped after the play/stop toggle"
+          })
+          .toBeGreaterThan(closedBeforeLaunch)
 
-      const beforeRelaunch = await readInstanceConfig(root)
-      expect(
-        beforeRelaunch.modpack?.modrinthVersionId,
-        "the instance was repinned even though every change_modpack call " +
-          "while it was running was refused"
-      ).toBe(MODPACK_MR_V_MID)
+        const beforeRelaunch = await readInstanceConfig(root)
+        expect(
+          beforeRelaunch.modpack?.modrinthVersionId,
+          "the instance was repinned even though every change_modpack call " +
+            "while it was running was refused"
+        ).toBe(MODPACK_MR_V_MID)
 
-      // Launch again. THE load-bearing assertion: a version change the guard
-      // refused must not resurrect itself on a later, perfectly normal
-      // launch — there was never anything queued for it to find.
-      closedBeforeLaunch = closedCount()
-      const launchedBeforeRelaunch = launchedCount()
-      await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+        // Launch again. THE load-bearing assertion: a version change the guard
+        // refused must not resurrect itself on a later, perfectly normal
+        // launch — there was never anything queued for it to find.
+        closedBeforeLaunch = closedCount()
+        const launchedBeforeRelaunch = launchedCount()
+        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
-      await expect
-        .poll(() => launchedCount(), {
-          timeout: LAUNCH_TIMEOUT,
-          message:
-            "the core never reported GAME_LAUNCHED after the second Play click"
-        })
-        .toBeGreaterThan(launchedBeforeRelaunch)
+        await expect
+          .poll(() => launchedCount(), {
+            timeout: LAUNCH_TIMEOUT,
+            message:
+              "the core never reported GAME_LAUNCHED after the second Play click"
+          })
+          .toBeGreaterThan(launchedBeforeRelaunch)
 
-      await page.waitForTimeout(SECOND_ATTEMPT_SETTLE)
-      expect(
-        (await readInstanceConfig(root)).modpack?.modrinthVersionId,
-        "the instance's pinned version moved off MID after a launch that had " +
-          "nothing pending — a refused change is re-applying itself from " +
-          "somewhere"
-      ).toBe(MODPACK_MR_V_MID)
+        await page.waitForTimeout(SECOND_ATTEMPT_SETTLE)
+        expect(
+          (await readInstanceConfig(root)).modpack?.modrinthVersionId,
+          "the instance's pinned version moved off MID after a launch that had " +
+            "nothing pending — a refused change is re-applying itself from " +
+            "somewhere"
+        ).toBe(MODPACK_MR_V_MID)
 
-      // ...and `.setup/` was never created in the first place, so there is
-      // nothing left for a later launch to sweep.
-      await expect
-        .poll(() => fs.existsSync(pendingFile), {
-          timeout: SETUP_SWEEP_TIMEOUT,
-          message:
-            "change-pack-version.json survived the launch that consumed it — " +
-            "`.setup/` is never swept, so this change would re-apply on every " +
-            "subsequent launch"
-        })
-        .toBe(false)
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (current) {
-        try {
-          // Only stop what is still running — clicking Play again would
-          // launch a fresh game if the body failed after the client died.
-          if (name && closedCount() <= closedBeforeLaunch) {
-            // Get back to the library grid first. A body that failed anywhere
-            // between opening the version modal and cancelling it leaves the
-            // page on the instance's Settings route behind a modal overlay,
-            // where no tile exists — so the stop click below would time out,
-            // the game would outlive the test, and `app.close()` would then
-            // sit waiting on a live JVM. That is exactly how the first run of
-            // this file hung for thirteen minutes after failing in one second.
-            await current.page
-              .getByRole("button", { name: "Cancel", exact: true })
-              .last()
-              .click({ timeout: 5_000 })
-              .catch(() => {})
-            await current.page
-              .locator(byTestId(TEST_IDS.navbarLogo))
-              .click({ timeout: 5_000 })
-              .catch(() => {})
+        // ...and `.setup/` was never created in the first place, so there is
+        // nothing left for a later launch to sweep.
+        await expect
+          .poll(() => fs.existsSync(pendingFile), {
+            timeout: SETUP_SWEEP_TIMEOUT,
+            message:
+              "change-pack-version.json survived the launch that consumed it — " +
+              "`.setup/` is never swept, so this change would re-apply on every " +
+              "subsequent launch"
+          })
+          .toBe(false)
+      },
+      async (alreadyFailed) => {
+        if (current) {
+          try {
+            // Only stop what is still running — clicking Play again would
+            // launch a fresh game if the body failed after the client died.
+            if (name && closedCount() <= closedBeforeLaunch) {
+              // Get back to the library grid first. A body that failed anywhere
+              // between opening the version modal and cancelling it leaves the
+              // page on the instance's Settings route behind a modal overlay,
+              // where no tile exists — so the stop click below would time out,
+              // the game would outlive the test, and `app.close()` would then
+              // sit waiting on a live JVM. That is exactly how the first run of
+              // this file hung for thirteen minutes after failing in one second.
+              await current.page
+                .getByRole("button", { name: "Cancel", exact: true })
+                .last()
+                .click({ timeout: 5_000 })
+                .catch(() => {})
+              await current.page
+                .locator(byTestId(TEST_IDS.navbarLogo))
+                .click({ timeout: 5_000 })
+                .catch(() => {})
 
-            const tile = current.page.locator(byInstanceName(name))
-            await tile
-              .locator(byTestId(TEST_IDS.instancePlay))
-              .click({ timeout: 10_000 })
-            await expect
-              .poll(() => closedCount(), { timeout: STOP_TIMEOUT })
-              .toBeGreaterThan(closedBeforeLaunch)
+              const tile = current.page.locator(byInstanceName(name))
+              await tile
+                .locator(byTestId(TEST_IDS.instancePlay))
+                .click({ timeout: 10_000 })
+              await expect
+                .poll(() => closedCount(), { timeout: STOP_TIMEOUT })
+                .toBeGreaterThan(closedBeforeLaunch)
+            }
+          } catch (cleanupError) {
+            reportCleanupFailure(
+              cleanupError,
+              alreadyFailed,
+              "cleanup: stopping the game also failed:"
+            )
           }
-        } catch (cleanupError) {
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error("cleanup: stopping the game also failed:", cleanupError)
+          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await current.app.close()
         }
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-        await current.app.close()
+        // Best-effort: also sweeps any leftover game process via
+        // killGameProcesses(harness.runtimePath).
+        await stopHarness(harness)
       }
-      // Best-effort: also sweeps any leftover game process via
-      // killGameProcesses(harness.runtimePath).
-      await stopHarness(harness)
-    }
+    )
   })
 })

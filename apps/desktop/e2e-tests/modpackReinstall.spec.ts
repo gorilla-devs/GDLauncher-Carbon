@@ -30,6 +30,7 @@ import {
   MODPACK_MR_SLUG,
   MODPACK_MR_V_MID
 } from "./helpers/modpackFixtures.js"
+import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 
 /**
  * Covers "Repair" — the instance overflow menu's repair action
@@ -146,152 +147,151 @@ test.describe("modpack reinstall", () => {
     authenticatedApp
   }, testInfo) => {
     const { page, harness } = authenticatedApp
-    let bodyFailed = false
     let name: string | undefined
-    try {
-      const index = await fetchMrpackIndex(MODPACK_MR_V_MID)
-      name = await installModpackVersion(
-        page,
-        MODPACK_MR_QUERY,
-        "modrinth",
-        MODPACK_MR_V_MID
-      )
-      const { shortpath } = readInstanceByName(harness.runtimePath, name)
-      const root = path.join(harness.runtimePath, "instances", shortpath)
-      const data = path.join(root, "instance")
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        const index = await fetchMrpackIndex(MODPACK_MR_V_MID)
+        name = await installModpackVersion(
+          page,
+          MODPACK_MR_QUERY,
+          "modrinth",
+          MODPACK_MR_V_MID
+        )
+        const { shortpath } = readInstanceByName(harness.runtimePath, name)
+        const root = path.join(harness.runtimePath, "instances", shortpath)
+        const data = path.join(root, "instance")
 
-      // All three keys are pristine OVERRIDES — see the module doc comment
-      // for why (simplest to seed; no remaining behavioural difference from
-      // a `.files`-declared mod under repair).
-      const status = await classifyPackinfo(root)
-      const overridePaths = new Set(index.overrides)
-      const overrideCandidates = status.pristine.filter((k) =>
-        overridePaths.has(k.slice(1))
-      )
-      const deletedKey = overrideCandidates[0]
-      const corruptKey = overrideCandidates[1]
-      const editKey = overrideCandidates[2]
-      for (const [label, key] of [
-        ["a first pristine override to delete", deletedKey],
-        ["a second pristine override to truncate", corruptKey],
-        ["a third pristine override to edit", editKey]
-      ] as const) {
-        expect(
-          key,
-          `no pristine pack override was available as ${label} in ` +
-            `"${MODPACK_MR_SLUG}" — the remarkably fixture's shape must ` +
-            "have changed; re-measure it"
-        ).toBeDefined()
-      }
-
-      const deletedDeclared = index.overrideFiles.find(
-        (f) => f.path === deletedKey.slice(1)
-      )
-      expect(
-        deletedDeclared,
-        `"${deletedKey}" is in classifyPackinfo's pristine list and in ` +
-          `${MODPACK_MR_V_MID}'s own declared overrides, but ` +
-          "parseMrpackIndex's overrideFiles has no entry for it"
-      ).toBeDefined()
-
-      const before = await snapshotTree(data)
-
-      // Delete one pristine override, truncate a second, and edit a third.
-      await fs.promises.rm(packinfoDataPath(root, deletedKey))
-      await fs.promises.writeFile(packinfoDataPath(root, corruptKey), "")
-      const editedBody = "e2e-reinstall-edit\n"
-      await fs.promises.writeFile(packinfoDataPath(root, editKey), editedBody)
-
-      await repairModpack(page, name)
-
-      const after = await snapshotTree(data)
-      const audit = await readInstallAudit(root)
-      expect(audit, "reinstall wrote no install audit").not.toBeNull()
-
-      // Deleted -> restored: byte-identical to both the pristine copy that
-      // existed before the deletion and the pack's own declared content, and
-      // recorded as created. `render_audit` writes the plan's own path
-      // (packinfo-style, leading slash) into every section now — no more
-      // staging-relative format to normalise away — so `deletedKey` is
-      // compared as-is, never `.slice(1)`'d, against `created`/`replaced`.
-      expect(
-        after.get(deletedKey.slice(1))?.sha256,
-        "reinstall did not restore a pack file the user had deleted"
-      ).toBe(before.get(deletedKey.slice(1))?.sha256)
-      expect(
-        after.get(deletedKey.slice(1))?.sha256,
-        "the restored file's bytes do not match the pack's own declared content"
-      ).toBe(deletedDeclared!.sha256)
-      expect(
-        audit!.created,
-        `audit did not record creating ${deletedKey}`
-      ).toContain(deletedKey)
-      expect(
-        audit!.skipped.some((s) => s.file === deletedKey),
-        `${deletedKey} was restored by the plan, so it must not also appear ` +
-          "in the skipped section — repair decides each path exactly once, " +
-          "unlike the old two-independent-passes pipeline"
-      ).toBe(false)
-
-      // Truncated -> repaired: non-empty again, byte-identical to its own
-      // pristine original (captured into `before` before the truncation),
-      // and recorded as replaced, not skipped.
-      expect(
-        after.get(corruptKey.slice(1))?.size,
-        "reinstall did not repair a truncated pack file"
-      ).toBeGreaterThan(0)
-      expect(
-        after.get(corruptKey.slice(1))?.sha256,
-        "the repaired file's bytes do not match its own pristine original"
-      ).toBe(before.get(corruptKey.slice(1))?.sha256)
-      expect(
-        audit!.replaced,
-        `audit did not record repairing ${corruptKey}`
-      ).toContain(corruptKey)
-
-      // Edited config -> reset to the pack's own bytes, not preserved.
-      const editedFileNow = await fs.promises.readFile(
-        packinfoDataPath(root, editKey),
-        "utf8"
-      )
-      expect(
-        editedFileNow,
-        "reinstall left the user's edit in place instead of repairing it"
-      ).not.toBe(editedBody)
-      expect(
-        after.get(editKey.slice(1))?.sha256,
-        "the reset file's bytes do not match its own pristine original"
-      ).toBe(before.get(editKey.slice(1))?.sha256)
-      expect(
-        audit!.replaced,
-        `audit did not record repairing ${editKey}`
-      ).toContain(editKey)
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-      if (name) {
-        try {
-          await page
-            .locator(byTestId(TEST_IDS.navbarLogo))
-            .click({ timeout: 5_000 })
-            .catch(() => {})
-          await deleteInstanceViaUi(page, name)
-        } catch (cleanupError) {
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error(
-            'cleanup for "reinstalling restores a deleted pack file and ' +
-              'repairs a damaged one" also failed:',
-            cleanupError
-          )
+        // All three keys are pristine OVERRIDES — see the module doc comment
+        // for why (simplest to seed; no remaining behavioural difference from
+        // a `.files`-declared mod under repair).
+        const status = await classifyPackinfo(root)
+        const overridePaths = new Set(index.overrides)
+        const overrideCandidates = status.pristine.filter((k) =>
+          overridePaths.has(k.slice(1))
+        )
+        const deletedKey = overrideCandidates[0]
+        const corruptKey = overrideCandidates[1]
+        const editKey = overrideCandidates[2]
+        for (const [label, key] of [
+          ["a first pristine override to delete", deletedKey],
+          ["a second pristine override to truncate", corruptKey],
+          ["a third pristine override to edit", editKey]
+        ] as const) {
+          expect(
+            key,
+            `no pristine pack override was available as ${label} in ` +
+              `"${MODPACK_MR_SLUG}" — the remarkably fixture's shape must ` +
+              "have changed; re-measure it"
+          ).toBeDefined()
         }
+
+        const deletedDeclared = index.overrideFiles.find(
+          (f) => f.path === deletedKey.slice(1)
+        )
+        expect(
+          deletedDeclared,
+          `"${deletedKey}" is in classifyPackinfo's pristine list and in ` +
+            `${MODPACK_MR_V_MID}'s own declared overrides, but ` +
+            "parseMrpackIndex's overrideFiles has no entry for it"
+        ).toBeDefined()
+
+        const before = await snapshotTree(data)
+
+        // Delete one pristine override, truncate a second, and edit a third.
+        await fs.promises.rm(packinfoDataPath(root, deletedKey))
+        await fs.promises.writeFile(packinfoDataPath(root, corruptKey), "")
+        const editedBody = "e2e-reinstall-edit\n"
+        await fs.promises.writeFile(packinfoDataPath(root, editKey), editedBody)
+
+        await repairModpack(page, name)
+
+        const after = await snapshotTree(data)
+        const audit = await readInstallAudit(root)
+        expect(audit, "reinstall wrote no install audit").not.toBeNull()
+
+        // Deleted -> restored: byte-identical to both the pristine copy that
+        // existed before the deletion and the pack's own declared content, and
+        // recorded as created. `render_audit` writes the plan's own path
+        // (packinfo-style, leading slash) into every section now — no more
+        // staging-relative format to normalise away — so `deletedKey` is
+        // compared as-is, never `.slice(1)`'d, against `created`/`replaced`.
+        expect(
+          after.get(deletedKey.slice(1))?.sha256,
+          "reinstall did not restore a pack file the user had deleted"
+        ).toBe(before.get(deletedKey.slice(1))?.sha256)
+        expect(
+          after.get(deletedKey.slice(1))?.sha256,
+          "the restored file's bytes do not match the pack's own declared content"
+        ).toBe(deletedDeclared!.sha256)
+        expect(
+          audit!.created,
+          `audit did not record creating ${deletedKey}`
+        ).toContain(deletedKey)
+        expect(
+          audit!.skipped.some((s) => s.file === deletedKey),
+          `${deletedKey} was restored by the plan, so it must not also appear ` +
+            "in the skipped section — repair decides each path exactly once, " +
+            "unlike the old two-independent-passes pipeline"
+        ).toBe(false)
+
+        // Truncated -> repaired: non-empty again, byte-identical to its own
+        // pristine original (captured into `before` before the truncation),
+        // and recorded as replaced, not skipped.
+        expect(
+          after.get(corruptKey.slice(1))?.size,
+          "reinstall did not repair a truncated pack file"
+        ).toBeGreaterThan(0)
+        expect(
+          after.get(corruptKey.slice(1))?.sha256,
+          "the repaired file's bytes do not match its own pristine original"
+        ).toBe(before.get(corruptKey.slice(1))?.sha256)
+        expect(
+          audit!.replaced,
+          `audit did not record repairing ${corruptKey}`
+        ).toContain(corruptKey)
+
+        // Edited config -> reset to the pack's own bytes, not preserved.
+        const editedFileNow = await fs.promises.readFile(
+          packinfoDataPath(root, editKey),
+          "utf8"
+        )
+        expect(
+          editedFileNow,
+          "reinstall left the user's edit in place instead of repairing it"
+        ).not.toBe(editedBody)
+        expect(
+          after.get(editKey.slice(1))?.sha256,
+          "the reset file's bytes do not match its own pristine original"
+        ).toBe(before.get(editKey.slice(1))?.sha256)
+        expect(
+          audit!.replaced,
+          `audit did not record repairing ${editKey}`
+        ).toContain(editKey)
+      },
+      async (alreadyFailed) => {
+        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+        if (name) {
+          try {
+            await page
+              .locator(byTestId(TEST_IDS.navbarLogo))
+              .click({ timeout: 5_000 })
+              .catch(() => {})
+            await deleteInstanceViaUi(page, name)
+          } catch (cleanupError) {
+            reportCleanupFailure(
+              cleanupError,
+              alreadyFailed,
+              'cleanup for "reinstalling restores a deleted pack file and ' +
+                'repairs a damaged one" also failed:'
+            )
+          }
+        }
+        await ensureLibraryInteractive(page)
       }
-      await ensureLibraryInteractive(page)
-    }
+    )
   })
 
   // eslint-disable-next-line no-empty-pattern
@@ -313,7 +313,6 @@ test.describe("modpack reinstall", () => {
       pageErrors: Error[]
       stdout: string[]
     } | null = null
-    let bodyFailed = false
     let stdout: string[] = []
     let name: string | undefined
     let root: string | undefined
@@ -329,102 +328,105 @@ test.describe("modpack reinstall", () => {
     const closedCount = () => stdout.join("").split("GAME_CLOSED").length
     const launchedCount = () => stdout.join("").split("GAME_LAUNCHED").length
 
-    try {
-      current = await launchApp(launchOpts)
-      const page = current.page
-      stdout = current.stdout
-      await completeLogin(page, harness)
-      await dismissStartupModals(page)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        current = await launchApp(launchOpts)
+        const page = current.page
+        stdout = current.stdout
+        await completeLogin(page, harness)
+        await dismissStartupModals(page)
 
-      name = await installModpackVersion(
-        page,
-        MODPACK_MR_QUERY,
-        "modrinth",
-        MODPACK_MR_V_MID
-      )
-      const { shortpath } = readInstanceByName(harness.runtimePath, name)
-      root = path.join(harness.runtimePath, "instances", shortpath)
+        name = await installModpackVersion(
+          page,
+          MODPACK_MR_QUERY,
+          "modrinth",
+          MODPACK_MR_V_MID
+        )
+        const { shortpath } = readInstanceByName(harness.runtimePath, name)
+        root = path.join(harness.runtimePath, "instances", shortpath)
 
-      const tile = page.locator(byInstanceName(name))
-      closedBeforeLaunch = closedCount()
-      await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+        const tile = page.locator(byInstanceName(name))
+        closedBeforeLaunch = closedCount()
+        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
-      await expect
-        .poll(() => launchedCount(), {
-          timeout: LAUNCH_TIMEOUT,
-          message:
-            "the core never reported GAME_LAUNCHED after Play was clicked"
-        })
-        .toBeGreaterThan(1)
+        await expect
+          .poll(() => launchedCount(), {
+            timeout: LAUNCH_TIMEOUT,
+            message:
+              "the core never reported GAME_LAUNCHED after Play was clicked"
+          })
+          .toBeGreaterThan(1)
 
-      await expect(
-        tile,
-        "the instance never reached the running state after GAME_LAUNCHED"
-      ).toHaveAttribute("data-instance-state", "running")
+        await expect(
+          tile,
+          "the instance never reached the running state after GAME_LAUNCHED"
+        ).toHaveAttribute("data-instance-state", "running")
 
-      // Drive the overflow menu directly — NOT repairModpack, which
-      // awaits waitForInstallComplete, exactly what must NOT happen when the
-      // mutation is refused. openInstance is the same navigation
-      // repairModpack itself uses internally; only the wait afterward is
-      // skipped.
-      await openInstance(page, name)
-      await page.click(byTestId(TEST_IDS.instanceMenuTrigger))
-      const entry = page.locator(byTestId(TEST_IDS.instanceMenuRepair))
-      await expect(
-        entry,
-        `the repair menu entry was disabled for "${name}" — the instance ` +
-          "has no modpack association"
-      ).toBeEnabled()
-      await entry.click()
-      await page.click(byTestId(TEST_IDS.repairModpackConfirm))
+        // Drive the overflow menu directly — NOT repairModpack, which
+        // awaits waitForInstallComplete, exactly what must NOT happen when the
+        // mutation is refused. openInstance is the same navigation
+        // repairModpack itself uses internally; only the wait afterward is
+        // skipped.
+        await openInstance(page, name)
+        await page.click(byTestId(TEST_IDS.instanceMenuTrigger))
+        const entry = page.locator(byTestId(TEST_IDS.instanceMenuRepair))
+        await expect(
+          entry,
+          `the repair menu entry was disabled for "${name}" — the instance ` +
+            "has no modpack association"
+        ).toBeEnabled()
+        await entry.click()
+        await page.click(byTestId(TEST_IDS.repairModpackConfirm))
 
-      // The mutation rejects; the instance must still be running and its
-      // files untouched. `repairModpackConfirm`'s click synchronously
-      // navigates back to /library (see the module doc comment), which is
-      // what makes the tile locator resolve here.
-      await expect(
-        page.locator(byInstanceName(name)),
-        "reinstall was not refused while the instance was running — it " +
-          "left the running state"
-      ).toHaveAttribute("data-instance-state", "running")
-      expect(
-        fs.existsSync(path.join(root, ".setup")),
-        "reinstall created .setup/ even though the instance was running — " +
-          "the running-state guard did not fire"
-      ).toBe(false)
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (current) {
-        try {
-          // Only stop what is still running — same guard
-          // `modpackLifecycle.spec.ts`/`gameLaunch.spec.ts` use: clicking
-          // Play again would launch a fresh game in the case where the body
-          // failed because the client had already died.
-          if (name && closedCount() <= closedBeforeLaunch) {
-            const tile = current.page.locator(byInstanceName(name))
-            await tile
-              .locator(byTestId(TEST_IDS.instancePlay))
-              .click({ timeout: 5_000 })
-            await expect
-              .poll(() => closedCount(), { timeout: STOP_TIMEOUT })
-              .toBeGreaterThan(closedBeforeLaunch)
+        // The mutation rejects; the instance must still be running and its
+        // files untouched. `repairModpackConfirm`'s click synchronously
+        // navigates back to /library (see the module doc comment), which is
+        // what makes the tile locator resolve here.
+        await expect(
+          page.locator(byInstanceName(name)),
+          "reinstall was not refused while the instance was running — it " +
+            "left the running state"
+        ).toHaveAttribute("data-instance-state", "running")
+        expect(
+          fs.existsSync(path.join(root, ".setup")),
+          "reinstall created .setup/ even though the instance was running — " +
+            "the running-state guard did not fire"
+        ).toBe(false)
+      },
+      async (alreadyFailed) => {
+        if (current) {
+          try {
+            // Only stop what is still running — same guard
+            // `modpackLifecycle.spec.ts`/`gameLaunch.spec.ts` use: clicking
+            // Play again would launch a fresh game in the case where the body
+            // failed because the client had already died.
+            if (name && closedCount() <= closedBeforeLaunch) {
+              const tile = current.page.locator(byInstanceName(name))
+              await tile
+                .locator(byTestId(TEST_IDS.instancePlay))
+                .click({ timeout: 5_000 })
+              await expect
+                .poll(() => closedCount(), { timeout: STOP_TIMEOUT })
+                .toBeGreaterThan(closedBeforeLaunch)
+            }
+          } catch (cleanupError) {
+            reportCleanupFailure(
+              cleanupError,
+              alreadyFailed,
+              "cleanup: stopping the game also failed:"
+            )
           }
-        } catch (cleanupError) {
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error("cleanup: stopping the game also failed:", cleanupError)
+          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await current.app.close()
         }
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-        await current.app.close()
+        // Best-effort: also sweeps any leftover game process via
+        // killGameProcesses(harness.runtimePath), the final safety net if the
+        // graceful stop above never ran at all.
+        await stopHarness(harness)
       }
-      // Best-effort: also sweeps any leftover game process via
-      // killGameProcesses(harness.runtimePath), the final safety net if the
-      // graceful stop above never ran at all.
-      await stopHarness(harness)
-    }
+    )
   })
 })

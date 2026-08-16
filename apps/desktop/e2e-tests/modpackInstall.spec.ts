@@ -25,6 +25,7 @@ import {
   MODPACK_MR_PROJECT,
   MODPACK_MR_QUERY
 } from "./helpers/modpackFixtures.js"
+import { withCleanup } from "./helpers/cleanup.js"
 
 /**
  * The first end-to-end modpack coverage this suite has: one install per
@@ -173,119 +174,114 @@ test.describe("modpack install", () => {
   }) => {
     const { page, harness } = authenticatedApp
 
-    let bodyFailed = false
     let name: string | undefined
-    try {
-      name = await installModpackLatest(page, MODPACK_MR_QUERY, "modrinth")
-      const { shortpath } = readInstanceByName(harness.runtimePath, name)
-      const root = path.join(harness.runtimePath, "instances", shortpath)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        name = await installModpackLatest(page, MODPACK_MR_QUERY, "modrinth")
+        const { shortpath } = readInstanceByName(harness.runtimePath, name)
+        const root = path.join(harness.runtimePath, "instances", shortpath)
 
-      // Which version did the app actually resolve? Read it back rather than
-      // predicting it — "latest" is a moving target and this is the one test
-      // that deliberately does not pin.
-      const config = await readInstanceConfig(root)
-      const versionId = config.modpack?.modrinthVersionId
-      expect(
-        versionId,
-        "the installed instance recorded no Modrinth modpack version"
-      ).toBeTruthy()
-
-      const index = await fetchMrpackIndex(versionId!)
-      const tree = await snapshotTree(path.join(root, "instance"))
-
-      // Every declared file is present at its declared size AND hashes to
-      // exactly what the pack's own index says — sha512, computed here
-      // straight off the on-disk bytes, never through packinfo. packinfo
-      // cannot stand in for this: its own hash is computed from the staging
-      // copy before the final rename (see the module doc comment), so it can
-      // never tell a wrong-but-same-sized file from a right one. This sha512
-      // check is the one place in either test that verifies content against
-      // a source the app itself did not compute.
-      for (const file of index.files) {
-        const entry = tree.get(file.path)
-        expect(entry, `pack file missing from disk: ${file.path}`).toBeDefined()
-        expect(entry!.size, `wrong size for ${file.path}`).toBe(file.size)
-        const bytes = await fs.promises.readFile(
-          path.join(root, "instance", file.path)
-        )
-        const sha512 = createHash("sha512").update(bytes).digest("hex")
-        expect(sha512, `wrong sha512 for ${file.path}`).toBe(file.sha512)
-      }
-
-      // Every override landed at its stripped path.
-      for (const override of index.overrides) {
+        // Which version did the app actually resolve? Read it back rather than
+        // predicting it — "latest" is a moving target and this is the one test
+        // that deliberately does not pin.
+        const config = await readInstanceConfig(root)
+        const versionId = config.modpack?.modrinthVersionId
         expect(
-          tree.has(override),
-          `override missing from disk: ${override}`
-        ).toBe(true)
-      }
+          versionId,
+          "the installed instance recorded no Modrinth modpack version"
+        ).toBeTruthy()
 
-      // instance.json records which pack this is and took its Minecraft and
-      // loader versions.
-      expect(
-        config.modpack?.modrinthProjectId,
-        "wrong Modrinth project id recorded on instance.json"
-      ).toBe(MODPACK_MR_PROJECT)
-      expect(
-        config.modpack?.locked,
-        "a freshly installed modpack instance must be locked"
-      ).toBe(true)
-      expect(
-        config.mcVersion,
-        "installed Minecraft version does not match the pack's own index"
-      ).toBe(index.minecraft)
-      const loader = config.modloaders[0]
-      expect(
-        loader?.type.toLowerCase(),
-        "installed loader type does not match the pack's own index"
-      ).toBe(index.loader.type)
-      expect(
-        loader?.version,
-        "installed loader version does not match the pack's own index"
-      ).toBe(index.loader.version)
+        const index = await fetchMrpackIndex(versionId!)
+        const tree = await snapshotTree(path.join(root, "instance"))
 
-      // Setup is finished.
-      expect(
-        fs.existsSync(path.join(root, ".setup")),
-        ".setup/ should be gone after a completed install"
-      ).toBe(false)
-
-      // packinfo covers exactly the union, and every recorded hash still
-      // matches what actually landed on disk. Last, deliberately — see the
-      // module doc comment's sabotage section for why.
-      const info = await readPackinfo(root)
-      expect(
-        [...info.keys()].map((k) => k.slice(1)).sort(),
-        "packinfo.json's key set does not match the pack's own declared files+overrides"
-      ).toEqual(packPaths(index))
-      const status = await classifyPackinfo(root)
-      expect(
-        status.modified,
-        "a freshly installed pack file already differs from its recorded hash"
-      ).toEqual([])
-      expect(
-        status.missing,
-        "a freshly installed pack file is absent from disk"
-      ).toEqual([])
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (name) {
-        try {
-          await deleteInstanceViaUi(page, name)
-        } catch (cleanupError) {
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error(
-            'cleanup for "installs the latest Modrinth modpack and lays every pack file on disk" also failed:',
-            cleanupError
+        // Every declared file is present at its declared size AND hashes to
+        // exactly what the pack's own index says — sha512, computed here
+        // straight off the on-disk bytes, never through packinfo. packinfo
+        // cannot stand in for this: its own hash is computed from the staging
+        // copy before the final rename (see the module doc comment), so it can
+        // never tell a wrong-but-same-sized file from a right one. This sha512
+        // check is the one place in either test that verifies content against
+        // a source the app itself did not compute.
+        for (const file of index.files) {
+          const entry = tree.get(file.path)
+          expect(
+            entry,
+            `pack file missing from disk: ${file.path}`
+          ).toBeDefined()
+          expect(entry!.size, `wrong size for ${file.path}`).toBe(file.size)
+          const bytes = await fs.promises.readFile(
+            path.join(root, "instance", file.path)
           )
+          const sha512 = createHash("sha512").update(bytes).digest("hex")
+          expect(sha512, `wrong sha512 for ${file.path}`).toBe(file.sha512)
         }
-      }
-    }
+
+        // Every override landed at its stripped path.
+        for (const override of index.overrides) {
+          expect(
+            tree.has(override),
+            `override missing from disk: ${override}`
+          ).toBe(true)
+        }
+
+        // instance.json records which pack this is and took its Minecraft and
+        // loader versions.
+        expect(
+          config.modpack?.modrinthProjectId,
+          "wrong Modrinth project id recorded on instance.json"
+        ).toBe(MODPACK_MR_PROJECT)
+        expect(
+          config.modpack?.locked,
+          "a freshly installed modpack instance must be locked"
+        ).toBe(true)
+        expect(
+          config.mcVersion,
+          "installed Minecraft version does not match the pack's own index"
+        ).toBe(index.minecraft)
+        const loader = config.modloaders[0]
+        expect(
+          loader?.type.toLowerCase(),
+          "installed loader type does not match the pack's own index"
+        ).toBe(index.loader.type)
+        expect(
+          loader?.version,
+          "installed loader version does not match the pack's own index"
+        ).toBe(index.loader.version)
+
+        // Setup is finished.
+        expect(
+          fs.existsSync(path.join(root, ".setup")),
+          ".setup/ should be gone after a completed install"
+        ).toBe(false)
+
+        // packinfo covers exactly the union, and every recorded hash still
+        // matches what actually landed on disk. Last, deliberately — see the
+        // module doc comment's sabotage section for why.
+        const info = await readPackinfo(root)
+        expect(
+          [...info.keys()].map((k) => k.slice(1)).sort(),
+          "packinfo.json's key set does not match the pack's own declared files+overrides"
+        ).toEqual(packPaths(index))
+        const status = await classifyPackinfo(root)
+        expect(
+          status.modified,
+          "a freshly installed pack file already differs from its recorded hash"
+        ).toEqual([])
+        expect(
+          status.missing,
+          "a freshly installed pack file is absent from disk"
+        ).toEqual([])
+      },
+      async () => {
+        if (name) {
+          await deleteInstanceViaUi(page, name)
+        }
+      },
+      'cleanup for "installs the latest Modrinth modpack and lays every pack file on disk" also failed:'
+    )
   })
 
   test("installs a pinned CurseForge modpack version and every file it wrote is accounted for in packinfo", async ({
@@ -293,82 +289,74 @@ test.describe("modpack install", () => {
   }) => {
     const { page, harness } = authenticatedApp
 
-    let bodyFailed = false
     let name: string | undefined
-    try {
-      name = await installModpackVersion(
-        page,
-        MODPACK_CF_QUERY,
-        "curseforge",
-        MODPACK_CF_FILE
-      )
-      const { shortpath } = readInstanceByName(harness.runtimePath, name)
-      const root = path.join(harness.runtimePath, "instances", shortpath)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        name = await installModpackVersion(
+          page,
+          MODPACK_CF_QUERY,
+          "curseforge",
+          MODPACK_CF_FILE
+        )
+        const { shortpath } = readInstanceByName(harness.runtimePath, name)
+        const root = path.join(harness.runtimePath, "instances", shortpath)
 
-      const config = await readInstanceConfig(root)
+        const config = await readInstanceConfig(root)
 
-      expect(
-        config.modpack?.curseforgeProjectId,
-        "wrong CurseForge project id recorded on instance.json"
-      ).toBe(Number(MODPACK_CF_PROJECT))
-      expect(
-        config.modpack?.curseforgeFileId,
-        "instance.json's file_id does not match the pinned fileId"
-      ).toBe(Number(MODPACK_CF_FILE))
-      expect(
-        config.modpack?.locked,
-        "a freshly installed modpack instance must be locked"
-      ).toBe(true)
-      expect(
-        config.mcVersion,
-        "installed instance recorded no Minecraft version"
-      ).toBeTruthy()
-      const loader = config.modloaders[0]
-      expect(loader?.type.toLowerCase(), "boosted-fps is a Fabric pack").toBe(
-        "fabric"
-      )
+        expect(
+          config.modpack?.curseforgeProjectId,
+          "wrong CurseForge project id recorded on instance.json"
+        ).toBe(Number(MODPACK_CF_PROJECT))
+        expect(
+          config.modpack?.curseforgeFileId,
+          "instance.json's file_id does not match the pinned fileId"
+        ).toBe(Number(MODPACK_CF_FILE))
+        expect(
+          config.modpack?.locked,
+          "a freshly installed modpack instance must be locked"
+        ).toBe(true)
+        expect(
+          config.mcVersion,
+          "installed instance recorded no Minecraft version"
+        ).toBeTruthy()
+        const loader = config.modloaders[0]
+        expect(loader?.type.toLowerCase(), "boosted-fps is a Fabric pack").toBe(
+          "fabric"
+        )
 
-      expect(
-        fs.existsSync(path.join(root, ".setup")),
-        ".setup/ should be gone after a completed install"
-      ).toBe(false)
+        expect(
+          fs.existsSync(path.join(root, ".setup")),
+          ".setup/ should be gone after a completed install"
+        ).toBe(false)
 
-      // No .mrpack-equivalent index exists for CurseForge without an API key
-      // this suite does not carry (see module doc comment) — invariants only,
-      // last, deliberately.
-      const tree = await snapshotTree(path.join(root, "instance"))
-      const info = await readPackinfo(root)
-      expect(
-        [...info.keys()].map((k) => k.slice(1)).sort(),
-        "packinfo.json's key set does not match the on-disk instance/ tree"
-      ).toEqual([...tree.keys()].sort())
-      const status = await classifyPackinfo(root)
-      expect(
-        status.modified,
-        "a freshly installed pack file already differs from its recorded hash"
-      ).toEqual([])
-      expect(
-        status.missing,
-        "a freshly installed pack file is absent from disk"
-      ).toEqual([])
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (name) {
-        try {
+        // No .mrpack-equivalent index exists for CurseForge without an API key
+        // this suite does not carry (see module doc comment) — invariants only,
+        // last, deliberately.
+        const tree = await snapshotTree(path.join(root, "instance"))
+        const info = await readPackinfo(root)
+        expect(
+          [...info.keys()].map((k) => k.slice(1)).sort(),
+          "packinfo.json's key set does not match the on-disk instance/ tree"
+        ).toEqual([...tree.keys()].sort())
+        const status = await classifyPackinfo(root)
+        expect(
+          status.modified,
+          "a freshly installed pack file already differs from its recorded hash"
+        ).toEqual([])
+        expect(
+          status.missing,
+          "a freshly installed pack file is absent from disk"
+        ).toEqual([])
+      },
+      async () => {
+        if (name) {
           await deleteInstanceViaUi(page, name)
-        } catch (cleanupError) {
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error(
-            'cleanup for "installs a pinned CurseForge modpack version and every file it wrote is accounted for in packinfo" also failed:',
-            cleanupError
-          )
         }
-      }
-    }
+      },
+      'cleanup for "installs a pinned CurseForge modpack version and every file it wrote is accounted for in packinfo" also failed:'
+    )
   })
 })

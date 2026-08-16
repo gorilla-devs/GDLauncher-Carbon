@@ -31,6 +31,7 @@ import {
   RESOLUTION_PROJECT_MODRINTH_ID,
   RESOLUTION_PROJECT_QUERY
 } from "./helpers/resolutionFixtures.js"
+import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 
 /**
  * Proves that installing an addon *without picking a version* resolves the
@@ -674,211 +675,206 @@ test.describe("mod resolution", () => {
     "resolves the newest compatible Modrinth build for each instance's loader"
 
   test(TEST_TITLE, async ({ installedInstance, forgeInstance }) => {
-    // See modInstall.spec.ts's identical `bodyFailed` doc comment: a `throw`
-    // inside `finally` discards whatever the try-block was throwing, so
-    // cleanup failure must only re-throw over a passing body.
-    let bodyFailed = false
     const resolvedIds: Partial<Record<ResolutionLoader, string>> = {}
 
-    try {
-      // The fixture-concurrency finding applies to the
-      // test-body call sites too, not just fixture resolution: Playwright
-      // already resolved both fixtures sequentially before this body ever
-      // runs, and both share one `page`, so driving them one after another
-      // here — never concurrently — is the only valid order regardless.
-      const targets: { loader: ResolutionLoader; inst: ResolutionInstance }[] =
-        [
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        // The fixture-concurrency finding applies to the
+        // test-body call sites too, not just fixture resolution: Playwright
+        // already resolved both fixtures sequentially before this body ever
+        // runs, and both share one `page`, so driving them one after another
+        // here — never concurrently — is the only valid order regardless.
+        const targets: {
+          loader: ResolutionLoader
+          inst: ResolutionInstance
+        }[] = [
           { loader: "fabric", inst: installedInstance },
           { loader: "forge", inst: forgeInstance }
         ]
 
-      for (const { loader, inst } of targets) {
-        const { modrinthVersionId } = await resolveForInstance(inst, loader)
-        resolvedIds[loader] = modrinthVersionId
-      }
-
-      // The whole point of driving two loaders through one project: if
-      // install_latest_modrinth_mod's loader filter
-      // (managers/instance/mods.rs:572-585) were ever silently dropped, both
-      // instances would resolve to whichever build sorts newest overall
-      // instead of their own loader's newest — and the request-scoping check
-      // in `resolveForInstance` cannot catch that, since it only observes
-      // the frontend's own rspc call, never the core's outbound HTTP to
-      // Modrinth (see this file's module doc comment). This assertion, plus
-      // the jar-parsed `modloaders` check already run for each instance, are
-      // what's actually left standing between a dropped filter and a green
-      // suite.
-      if (resolvedIds.fabric === resolvedIds.forge) {
-        throw new Error(
-          `"${TEST_TITLE}": both the Fabric and Forge instances resolved to ` +
-            `the same Modrinth version id ("${resolvedIds.fabric}"). Cloth ` +
-            "Config API publishes 4 distinct Forge version " +
-            "ids and 4 distinct Fabric version ids at Minecraft 1.20.1, " +
-            "fully disjoint, so this is not expected " +
-            "from the fixture project itself. Likely causes, in order: (1) " +
-            "a real regression in install_latest_modrinth_mod's loader " +
-            "filter, or (2) — only if this project is ever swapped out — " +
-            "the replacement shipping one universal jar for both loaders " +
-            "instead of separate per-loader builds, which would make this " +
-            "a fixture-choice problem rather than a product one."
-        )
-      }
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      // Both instances get a cleanup attempt regardless of how far the body
-      // got — `cleanupInstalledMod` re-derives what's actually installed per
-      // instance rather than trusting `resolvedIds`, so a body that failed
-      // after only the Fabric instance's install still gets the Forge side
-      // checked (a no-op there, since nothing was installed) and vice versa.
-      const cleanupErrors: unknown[] = []
-      try {
-        await cleanupInstalledMod(
-          installedInstance.page,
-          installedInstance.instanceName,
-          installedInstance.modsDir,
-          matchesClothConfig,
-          `"${TEST_TITLE}" (Fabric instance)`
-        )
-      } catch (cleanupError) {
-        cleanupErrors.push(cleanupError)
-      }
-      try {
-        await cleanupInstalledMod(
-          forgeInstance.page,
-          forgeInstance.instanceName,
-          forgeInstance.modsDir,
-          matchesClothConfig,
-          `"${TEST_TITLE}" (Forge instance)`
-        )
-      } catch (cleanupError) {
-        cleanupErrors.push(cleanupError)
-      }
-
-      if (cleanupErrors.length > 0) {
-        // Only re-throw over a passing body, same reasoning as
-        // modInstall.spec.ts's identical branch — otherwise cleanup failure
-        // would bury a real body failure instead of just being logged
-        // alongside it.
-        if (!bodyFailed) {
-          // eslint-disable-next-line no-unsafe-finally
-          throw cleanupErrors[0]
+        for (const { loader, inst } of targets) {
+          const { modrinthVersionId } = await resolveForInstance(inst, loader)
+          resolvedIds[loader] = modrinthVersionId
         }
+
+        // The whole point of driving two loaders through one project: if
+        // install_latest_modrinth_mod's loader filter
+        // (managers/instance/mods.rs:572-585) were ever silently dropped, both
+        // instances would resolve to whichever build sorts newest overall
+        // instead of their own loader's newest — and the request-scoping check
+        // in `resolveForInstance` cannot catch that, since it only observes
+        // the frontend's own rspc call, never the core's outbound HTTP to
+        // Modrinth (see this file's module doc comment). This assertion, plus
+        // the jar-parsed `modloaders` check already run for each instance, are
+        // what's actually left standing between a dropped filter and a green
+        // suite.
+        if (resolvedIds.fabric === resolvedIds.forge) {
+          throw new Error(
+            `"${TEST_TITLE}": both the Fabric and Forge instances resolved to ` +
+              `the same Modrinth version id ("${resolvedIds.fabric}"). Cloth ` +
+              "Config API publishes 4 distinct Forge version " +
+              "ids and 4 distinct Fabric version ids at Minecraft 1.20.1, " +
+              "fully disjoint, so this is not expected " +
+              "from the fixture project itself. Likely causes, in order: (1) " +
+              "a real regression in install_latest_modrinth_mod's loader " +
+              "filter, or (2) — only if this project is ever swapped out — " +
+              "the replacement shipping one universal jar for both loaders " +
+              "instead of separate per-loader builds, which would make this " +
+              "a fixture-choice problem rather than a product one."
+          )
+        }
+      },
+      async (alreadyFailed) => {
+        // Both instances get a cleanup attempt regardless of how far the body
+        // got — `cleanupInstalledMod` re-derives what's actually installed per
+        // instance rather than trusting `resolvedIds`, so a body that failed
+        // after only the Fabric instance's install still gets the Forge side
+        // checked (a no-op there, since nothing was installed) and vice versa.
+        const cleanupErrors: unknown[] = []
+        try {
+          await cleanupInstalledMod(
+            installedInstance.page,
+            installedInstance.instanceName,
+            installedInstance.modsDir,
+            matchesClothConfig,
+            `"${TEST_TITLE}" (Fabric instance)`
+          )
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError)
+        }
+        try {
+          await cleanupInstalledMod(
+            forgeInstance.page,
+            forgeInstance.instanceName,
+            forgeInstance.modsDir,
+            matchesClothConfig,
+            `"${TEST_TITLE}" (Forge instance)`
+          )
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError)
+        }
+
+        // Only re-throw over a passing body, same reasoning as
+        // `withCleanup`'s doc comment — otherwise cleanup failure would bury a
+        // real body failure instead of just being logged alongside it. Looping
+        // `reportCleanupFailure` over every collected error reproduces that
+        // exactly: a passing body throws on the first one (discarding nothing,
+        // since there was no body error to lose), a failing body logs each in
+        // turn.
         for (const cleanupError of cleanupErrors) {
-          console.error(
-            `cleanup for "${TEST_TITLE}" also failed:`,
-            cleanupError
+          reportCleanupFailure(
+            cleanupError,
+            alreadyFailed,
+            `cleanup for "${TEST_TITLE}" also failed:`
           )
         }
       }
-    }
+    )
   })
 
   const TEST_TITLE_CURSEFORGE =
     "resolves the newest compatible CurseForge build for each instance's loader"
 
   test(TEST_TITLE_CURSEFORGE, async ({ installedInstance, forgeInstance }) => {
-    // See modInstall.spec.ts's identical `bodyFailed` doc comment: a `throw`
-    // inside `finally` discards whatever the try-block was throwing, so
-    // cleanup failure must only re-throw over a passing body.
-    let bodyFailed = false
     const resolvedIds: Partial<Record<ResolutionLoader, string>> = {}
 
-    try {
-      // Same sequential-by-construction reasoning as the Modrinth test above
-      // — both fixtures already resolved before this body runs, and both
-      // share one `page`, so driving them one after another is the only
-      // valid order regardless of what the fixture-concurrency finding
-      // says about fixture resolution itself.
-      const targets: { loader: ResolutionLoader; inst: ResolutionInstance }[] =
-        [
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        // Same sequential-by-construction reasoning as the Modrinth test above
+        // — both fixtures already resolved before this body runs, and both
+        // share one `page`, so driving them one after another is the only
+        // valid order regardless of what the fixture-concurrency finding
+        // says about fixture resolution itself.
+        const targets: {
+          loader: ResolutionLoader
+          inst: ResolutionInstance
+        }[] = [
           { loader: "fabric", inst: installedInstance },
           { loader: "forge", inst: forgeInstance }
         ]
 
-      for (const { loader, inst } of targets) {
-        const { curseforgeFileId } = await resolveForInstanceCurseforge(
-          inst,
-          loader
-        )
-        resolvedIds[loader] = curseforgeFileId
-      }
+        for (const { loader, inst } of targets) {
+          const { curseforgeFileId } = await resolveForInstanceCurseforge(
+            inst,
+            loader
+          )
+          resolvedIds[loader] = curseforgeFileId
+        }
 
-      // This is the path that never re-checks the modloader client-side —
-      // install_latest_curseforge_mod (managers/instance/mods.rs) re-checks
-      // only game_versions, never the loader, trusting CurseForge's own
-      // `mod_loader_type` query parameter to have filtered correctly. If
-      // that upstream filter were ever silently dropped, both instances
-      // would resolve to whichever file sorts newest overall instead of
-      // their own loader's newest, and resolveForInstanceCurseforge's own
-      // request-scoping check cannot catch that either (it only observes
-      // the frontend's own rspc call, never the core's outbound HTTP to
-      // CurseForge). This assertion, plus the jar-parsed `modloaders` check
-      // already run for each instance, are the only things left standing
-      // between a dropped/broken CurseForge-side loader filter and a green
-      // suite.
-      if (resolvedIds.fabric === resolvedIds.forge) {
-        throw new Error(
-          `"${TEST_TITLE_CURSEFORGE}": both the Fabric and Forge instances ` +
-            `resolved to the same CurseForge file id ("${resolvedIds.fabric}"). ` +
-            "Cloth Config API publishes 4 distinct Forge " +
-            "file ids and 4 distinct Fabric file ids at Minecraft 1.20.1, " +
-            "fully disjoint, so this is not expected " +
-            "from the fixture project itself. Likely causes, in order: (1) " +
-            "a real regression in install_latest_curseforge_mod's use of " +
-            "CurseForge's own modLoaderType filter, or (2) — only if this " +
-            "project is ever swapped out — the replacement shipping one " +
-            "universal file for both loaders instead of separate per-loader " +
-            "builds, which would make this a fixture-choice problem rather " +
-            "than a product one."
-        )
-      }
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      // Both instances get a cleanup attempt regardless of how far the body
-      // got — same reasoning as the Modrinth test's identical finally block.
-      const cleanupErrors: unknown[] = []
-      try {
-        await cleanupInstalledMod(
-          installedInstance.page,
-          installedInstance.instanceName,
-          installedInstance.modsDir,
-          matchesClothConfigCurseforge,
-          `"${TEST_TITLE_CURSEFORGE}" (Fabric instance)`
-        )
-      } catch (cleanupError) {
-        cleanupErrors.push(cleanupError)
-      }
-      try {
-        await cleanupInstalledMod(
-          forgeInstance.page,
-          forgeInstance.instanceName,
-          forgeInstance.modsDir,
-          matchesClothConfigCurseforge,
-          `"${TEST_TITLE_CURSEFORGE}" (Forge instance)`
-        )
-      } catch (cleanupError) {
-        cleanupErrors.push(cleanupError)
-      }
+        // This is the path that never re-checks the modloader client-side —
+        // install_latest_curseforge_mod (managers/instance/mods.rs) re-checks
+        // only game_versions, never the loader, trusting CurseForge's own
+        // `mod_loader_type` query parameter to have filtered correctly. If
+        // that upstream filter were ever silently dropped, both instances
+        // would resolve to whichever file sorts newest overall instead of
+        // their own loader's newest, and resolveForInstanceCurseforge's own
+        // request-scoping check cannot catch that either (it only observes
+        // the frontend's own rspc call, never the core's outbound HTTP to
+        // CurseForge). This assertion, plus the jar-parsed `modloaders` check
+        // already run for each instance, are the only things left standing
+        // between a dropped/broken CurseForge-side loader filter and a green
+        // suite.
+        if (resolvedIds.fabric === resolvedIds.forge) {
+          throw new Error(
+            `"${TEST_TITLE_CURSEFORGE}": both the Fabric and Forge instances ` +
+              `resolved to the same CurseForge file id ("${resolvedIds.fabric}"). ` +
+              "Cloth Config API publishes 4 distinct Forge " +
+              "file ids and 4 distinct Fabric file ids at Minecraft 1.20.1, " +
+              "fully disjoint, so this is not expected " +
+              "from the fixture project itself. Likely causes, in order: (1) " +
+              "a real regression in install_latest_curseforge_mod's use of " +
+              "CurseForge's own modLoaderType filter, or (2) — only if this " +
+              "project is ever swapped out — the replacement shipping one " +
+              "universal file for both loaders instead of separate per-loader " +
+              "builds, which would make this a fixture-choice problem rather " +
+              "than a product one."
+          )
+        }
+      },
+      async (alreadyFailed) => {
+        // Both instances get a cleanup attempt regardless of how far the body
+        // got — same reasoning as the Modrinth test's identical finally block.
+        const cleanupErrors: unknown[] = []
+        try {
+          await cleanupInstalledMod(
+            installedInstance.page,
+            installedInstance.instanceName,
+            installedInstance.modsDir,
+            matchesClothConfigCurseforge,
+            `"${TEST_TITLE_CURSEFORGE}" (Fabric instance)`
+          )
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError)
+        }
+        try {
+          await cleanupInstalledMod(
+            forgeInstance.page,
+            forgeInstance.instanceName,
+            forgeInstance.modsDir,
+            matchesClothConfigCurseforge,
+            `"${TEST_TITLE_CURSEFORGE}" (Forge instance)`
+          )
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError)
+        }
 
-      if (cleanupErrors.length > 0) {
         // Only re-throw over a passing body, same reasoning as the Modrinth
         // test's identical branch.
-        if (!bodyFailed) {
-          // eslint-disable-next-line no-unsafe-finally
-          throw cleanupErrors[0]
-        }
         for (const cleanupError of cleanupErrors) {
-          console.error(
-            `cleanup for "${TEST_TITLE_CURSEFORGE}" also failed:`,
-            cleanupError
+          reportCleanupFailure(
+            cleanupError,
+            alreadyFailed,
+            `cleanup for "${TEST_TITLE_CURSEFORGE}" also failed:`
           )
         }
       }
-    }
+    )
   })
 
   const TEST_TITLE_UPDATE =
@@ -897,169 +893,165 @@ test.describe("mod resolution", () => {
   test(TEST_TITLE_UPDATE, async ({ installedInstance }) => {
     const { page, instanceName, modsDir } = installedInstance
 
-    // See modInstall.spec.ts's identical `bodyFailed` doc comment: a `throw`
-    // inside `finally` discards whatever the try-block was throwing, so
-    // cleanup failure must only re-throw over a passing body.
-    let bodyFailed = false
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        await openInstanceAddons(page, instanceName)
+        await searchForMod(page, {
+          platform: "modrinth",
+          query: RESOLUTION_PROJECT_QUERY
+        })
 
-    try {
-      await openInstanceAddons(page, instanceName)
-      await searchForMod(page, {
-        platform: "modrinth",
-        query: RESOLUTION_PROJECT_QUERY
-      })
+        // One capture, feeding both the pick-an-older-build step below and
+        // this test's later ordering assertion — not a second call to
+        // `openAddonVersions` for the former: `versions.scoped` already
+        // carries a strict superset of what `openAddonVersions` returns
+        // (`id`/`datePublished`, here also `channel`), and re-driving the
+        // Versions tab a second time in the same visit has no guarantee of
+        // firing a second scoped request at all (the scoping effect fires
+        // once per (instance id, Minecraft version, loader) — a plain
+        // re-click of an already-active tab is not one of the things it
+        // reacts to). One settled capture, mapped into the shape
+        // `pickOlderVersion`/`installAddonVersion` expect, is both simpler and
+        // safer than relying on that.
+        const versions = await captureModrinthVersions(
+          page,
+          RESOLUTION_PROJECT_MODRINTH_ID,
+          async () => {
+            await openAddonPage(page, RESOLUTION_PROJECT_MODRINTH_ID)
+            await page.getByRole("tab", { name: "Versions" }).click()
+          }
+        )
 
-      // One capture, feeding both the pick-an-older-build step below and
-      // this test's later ordering assertion — not a second call to
-      // `openAddonVersions` for the former: `versions.scoped` already
-      // carries a strict superset of what `openAddonVersions` returns
-      // (`id`/`datePublished`, here also `channel`), and re-driving the
-      // Versions tab a second time in the same visit has no guarantee of
-      // firing a second scoped request at all (the scoping effect fires
-      // once per (instance id, Minecraft version, loader) — a plain
-      // re-click of an already-active tab is not one of the things it
-      // reacts to). One settled capture, mapped into the shape
-      // `pickOlderVersion`/`installAddonVersion` expect, is both simpler and
-      // safer than relying on that.
-      const versions = await captureModrinthVersions(
-        page,
-        RESOLUTION_PROJECT_MODRINTH_ID,
-        async () => {
-          await openAddonPage(page, RESOLUTION_PROJECT_MODRINTH_ID)
-          await page.getByRole("tab", { name: "Versions" }).click()
+        const older = pickOlderVersion(
+          versions.scoped.map((v) => ({
+            fileId: v.id,
+            datePublished: v.datePublished
+          }))
+        )
+        await installAddonVersion(page, older)
+
+        const mods = await openInstanceAddons(page, instanceName)
+        const installed = mods.find(matchesClothConfig)
+        if (!installed) {
+          throw new Error(
+            `"${TEST_TITLE_UPDATE}": instance.getInstanceMods has no entry ` +
+              `matching project ${RESOLUTION_PROJECT_MODRINTH_ID} after ` +
+              `installing the deliberately-older build (version id ` +
+              `${older.fileId})`
+          )
         }
-      )
 
-      const older = pickOlderVersion(
-        versions.scoped.map((v) => ({
-          fileId: v.id,
-          datePublished: v.datePublished
-        }))
-      )
-      await installAddonVersion(page, older)
+        // The older build is genuinely on disk before ever touching update —
+        // otherwise a later "it changed" observation could not be trusted to
+        // mean what it claims.
+        const installedResult = await verifyModInstalled(modsDir, {
+          filename: installed.filename,
+          expectedSize: installed.fileSize,
+          expectedSha1: installed.sha1 ?? undefined
+        })
+        if (!installedResult.ok) {
+          throw new Error(
+            `"${TEST_TITLE_UPDATE}": older-build disk verification failed:\n` +
+              installedResult.problems.map((p) => `  - ${p}`).join("\n")
+          )
+        }
 
-      const mods = await openInstanceAddons(page, instanceName)
-      const installed = mods.find(matchesClothConfig)
-      if (!installed) {
-        throw new Error(
-          `"${TEST_TITLE_UPDATE}": instance.getInstanceMods has no entry ` +
-            `matching project ${RESOLUTION_PROJECT_MODRINTH_ID} after ` +
-            `installing the deliberately-older build (version id ` +
-            `${older.fileId})`
-        )
-      }
+        // Waits for the update to become available, not asserts it: this
+        // helper cannot return without `hasUpdate: true` on the matched mod —
+        // it either finds that or throws its own named timeout — so an
+        // `expect` on its result here would check a condition the call
+        // already guarantees, proving nothing (the exact mistake
+        // `modLifecycle.spec.ts`'s own update test doc comment flags, caught
+        // once already on this branch). This observed TRUE is also half of
+        // this test's negative control: `waitForModUpdateToClear` below
+        // observes the SAME mod return to false later in this same test, so
+        // the pair is a genuine transition — something a `has_update` wired to
+        // a constant `false` could never produce, since it would have failed
+        // this wait instead.
+        await waitForModUpdateAvailable(page, instanceName, matchesClothConfig)
 
-      // The older build is genuinely on disk before ever touching update —
-      // otherwise a later "it changed" observation could not be trusted to
-      // mean what it claims.
-      const installedResult = await verifyModInstalled(modsDir, {
-        filename: installed.filename,
-        expectedSize: installed.fileSize,
-        expectedSha1: installed.sha1 ?? undefined
-      })
-      if (!installedResult.ok) {
-        throw new Error(
-          `"${TEST_TITLE_UPDATE}": older-build disk verification failed:\n` +
-            installedResult.problems.map((p) => `  - ${p}`).join("\n")
-        )
-      }
+        const row = page.locator(byModRow(installed.filename))
+        await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
 
-      // Waits for the update to become available, not asserts it: this
-      // helper cannot return without `hasUpdate: true` on the matched mod —
-      // it either finds that or throws its own named timeout — so an
-      // `expect` on its result here would check a condition the call
-      // already guarantees, proving nothing (the exact mistake
-      // `modLifecycle.spec.ts`'s own update test doc comment flags, caught
-      // once already on this branch). This observed TRUE is also half of
-      // this test's negative control: `waitForModUpdateToClear` below
-      // observes the SAME mod return to false later in this same test, so
-      // the pair is a genuine transition — something a `has_update` wired to
-      // a constant `false` could never produce, since it would have failed
-      // this wait instead.
-      await waitForModUpdateAvailable(page, instanceName, matchesClothConfig)
+        // Same reasoning as the wait above: `waitForModFilenameChange` cannot
+        // return without the filename having changed, so there is nothing to
+        // usefully assert about `updated.filename` itself — the assertion
+        // this test actually needs is WHICH build it changed to, checked
+        // next.
+        const updated = await waitForModFilenameChange(page, instanceName, {
+          oldFilename: installed.filename,
+          matches: matchesClothConfig
+        })
 
-      const row = page.locator(byModRow(installed.filename))
-      await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
+        // Ordering comes from the SCOPED list — see the module doc comment.
+        // find_mod_update (managers/instance/mods.rs:616) sorts newest-first
+        // and walks the instance's allowed channels in order, taking the
+        // first candidate at or above that channel's level; under the
+        // shipped default ('stable:true,beta:true,alpha:true') the stable
+        // pass runs first, so this is the newest STABLE build, not merely
+        // the newest outright — modelled by newestUpdateCandidate, never
+        // newestByDate (that predicate is the INSTALL path's model, used by
+        // the two tests above this one). On a mismatch the message names
+        // both ids plus the full candidate list, since the backend's own
+        // candidate list is unobservable from here and a divergence needs
+        // this list to diagnose.
+        const expected = newestUpdateCandidate(versions.scoped)
+        if (updated.modrinthVersionId !== expected.id) {
+          throw new Error(
+            `"${TEST_TITLE_UPDATE}": updated modrinthVersionId ` +
+              `"${updated.modrinthVersionId}" does not match ` +
+              `newestUpdateCandidate(scoped)'s "${expected.id}" (published ` +
+              `${expected.datePublished}, channel ${expected.channel}) — ` +
+              "find_mod_update did not pick the build this test's oracle " +
+              "expected. Full scoped candidate list: " +
+              JSON.stringify(
+                versions.scoped.map((c) => ({
+                  id: c.id,
+                  datePublished: c.datePublished,
+                  channel: c.channel
+                }))
+              )
+          )
+        }
 
-      // Same reasoning as the wait above: `waitForModFilenameChange` cannot
-      // return without the filename having changed, so there is nothing to
-      // usefully assert about `updated.filename` itself — the assertion
-      // this test actually needs is WHICH build it changed to, checked
-      // next.
-      const updated = await waitForModFilenameChange(page, instanceName, {
-        oldFilename: installed.filename,
-        matches: matchesClothConfig
-      })
+        const updatedResult = await verifyModInstalled(modsDir, {
+          filename: updated.filename,
+          expectedSize: updated.fileSize,
+          expectedSha1: updated.sha1 ?? undefined
+        })
+        if (!updatedResult.ok) {
+          throw new Error(
+            `"${TEST_TITLE_UPDATE}": updated-build disk verification ` +
+              "failed:\n" +
+              updatedResult.problems.map((p) => `  - ${p}`).join("\n")
+          )
+        }
 
-      // Ordering comes from the SCOPED list — see the module doc comment.
-      // find_mod_update (managers/instance/mods.rs:616) sorts newest-first
-      // and walks the instance's allowed channels in order, taking the
-      // first candidate at or above that channel's level; under the
-      // shipped default ('stable:true,beta:true,alpha:true') the stable
-      // pass runs first, so this is the newest STABLE build, not merely
-      // the newest outright — modelled by newestUpdateCandidate, never
-      // newestByDate (that predicate is the INSTALL path's model, used by
-      // the two tests above this one). On a mismatch the message names
-      // both ids plus the full candidate list, since the backend's own
-      // candidate list is unobservable from here and a divergence needs
-      // this list to diagnose.
-      const expected = newestUpdateCandidate(versions.scoped)
-      if (updated.modrinthVersionId !== expected.id) {
-        throw new Error(
-          `"${TEST_TITLE_UPDATE}": updated modrinthVersionId ` +
-            `"${updated.modrinthVersionId}" does not match ` +
-            `newestUpdateCandidate(scoped)'s "${expected.id}" (published ` +
-            `${expected.datePublished}, channel ${expected.channel}) — ` +
-            "find_mod_update did not pick the build this test's oracle " +
-            "expected. Full scoped candidate list: " +
-            JSON.stringify(
-              versions.scoped.map((c) => ({
-                id: c.id,
-                datePublished: c.datePublished,
-                channel: c.channel
-              }))
-            )
-        )
-      }
+        // The old build's file is genuinely gone, not left behind alongside
+        // the new one — same reasoning as modLifecycle.spec.ts's identical
+        // check on its own update test.
+        const remaining = await listModFiles(modsDir)
+        if (remaining.includes(installed.filename)) {
+          throw new Error(
+            `"${TEST_TITLE_UPDATE}": the pre-update file ` +
+              `"${installed.filename}" is still present in ${modsDir} after ` +
+              `updating to "${updated.filename}" (found: ` +
+              `${JSON.stringify(remaining)})`
+          )
+        }
 
-      const updatedResult = await verifyModInstalled(modsDir, {
-        filename: updated.filename,
-        expectedSize: updated.fileSize,
-        expectedSha1: updated.sha1 ?? undefined
-      })
-      if (!updatedResult.ok) {
-        throw new Error(
-          `"${TEST_TITLE_UPDATE}": updated-build disk verification ` +
-            "failed:\n" +
-            updatedResult.problems.map((p) => `  - ${p}`).join("\n")
-        )
-      }
-
-      // The old build's file is genuinely gone, not left behind alongside
-      // the new one — same reasoning as modLifecycle.spec.ts's identical
-      // check on its own update test.
-      const remaining = await listModFiles(modsDir)
-      if (remaining.includes(installed.filename)) {
-        throw new Error(
-          `"${TEST_TITLE_UPDATE}": the pre-update file ` +
-            `"${installed.filename}" is still present in ${modsDir} after ` +
-            `updating to "${updated.filename}" (found: ` +
-            `${JSON.stringify(remaining)})`
-        )
-      }
-
-      // The negative control. waitForModUpdateAvailable already observed
-      // hasUpdate go TRUE for this exact mod earlier in this test;
-      // observing it return to false here, now that nothing newer is left
-      // to move to, is the other half of a transition a constant-false
-      // hasUpdate could never have produced (it would have failed the wait
-      // above instead of ever reaching this point).
-      await waitForModUpdateToClear(page, instanceName, matchesClothConfig)
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      try {
+        // The negative control. waitForModUpdateAvailable already observed
+        // hasUpdate go TRUE for this exact mod earlier in this test;
+        // observing it return to false here, now that nothing newer is left
+        // to move to, is the other half of a transition a constant-false
+        // hasUpdate could never have produced (it would have failed the wait
+        // above instead of ever reaching this point).
+        await waitForModUpdateToClear(page, instanceName, matchesClothConfig)
+      },
+      async () => {
         await cleanupInstalledMod(
           page,
           instanceName,
@@ -1067,17 +1059,9 @@ test.describe("mod resolution", () => {
           matchesClothConfig,
           `"${TEST_TITLE_UPDATE}"`
         )
-      } catch (cleanupError) {
-        if (!bodyFailed) {
-          // eslint-disable-next-line no-unsafe-finally
-          throw cleanupError
-        }
-        console.error(
-          `cleanup for "${TEST_TITLE_UPDATE}" also failed:`,
-          cleanupError
-        )
-      }
-    }
+      },
+      `cleanup for "${TEST_TITLE_UPDATE}" also failed:`
+    )
   })
 
   const TEST_TITLE_CONVERGE =
@@ -1096,122 +1080,121 @@ test.describe("mod resolution", () => {
   test(TEST_TITLE_CONVERGE, async ({ installedInstance }) => {
     const { page, instanceName, modsDir } = installedInstance
 
-    let bodyFailed = false
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        // Install latest via the addon page's main button —
+        // install_latest_modrinth_mod applies NO channel filter at all
+        // (`.get(0)` of the filtered response, beta or not; modelled by
+        // newestByDate, already exercised by the two tests above this file).
+        await openInstanceAddons(page, instanceName)
+        await searchForMod(page, {
+          platform: "modrinth",
+          query: RESOLUTION_PROJECT_QUERY
+        })
+        await openAddonPage(page, RESOLUTION_PROJECT_MODRINTH_ID)
+        await installModIntoInstance(page, { instanceName })
 
-    try {
-      // Install latest via the addon page's main button —
-      // install_latest_modrinth_mod applies NO channel filter at all
-      // (`.get(0)` of the filtered response, beta or not; modelled by
-      // newestByDate, already exercised by the two tests above this file).
-      await openInstanceAddons(page, instanceName)
-      await searchForMod(page, {
-        platform: "modrinth",
-        query: RESOLUTION_PROJECT_QUERY
-      })
-      await openAddonPage(page, RESOLUTION_PROJECT_MODRINTH_ID)
-      await installModIntoInstance(page, { instanceName })
+        let mods = await openInstanceAddons(page, instanceName)
+        let installed = mods.find(matchesClothConfig)
+        if (!installed) {
+          throw new Error(
+            `"${TEST_TITLE_CONVERGE}": instance.getInstanceMods has no entry ` +
+              `matching project ${RESOLUTION_PROJECT_MODRINTH_ID} after ` +
+              "installing latest"
+          )
+        }
+        const installLatestId = installed.modrinthVersionId
+        if (!installLatestId) {
+          throw new Error(
+            `"${TEST_TITLE_CONVERGE}": install-latest entry for project ` +
+              `${RESOLUTION_PROJECT_MODRINTH_ID} has a null modrinthVersionId`
+          )
+        }
 
-      let mods = await openInstanceAddons(page, instanceName)
-      let installed = mods.find(matchesClothConfig)
-      if (!installed) {
-        throw new Error(
-          `"${TEST_TITLE_CONVERGE}": instance.getInstanceMods has no entry ` +
-            `matching project ${RESOLUTION_PROJECT_MODRINTH_ID} after ` +
-            "installing latest"
-        )
-      }
-      const installLatestId = installed.modrinthVersionId
-      if (!installLatestId) {
-        throw new Error(
-          `"${TEST_TITLE_CONVERGE}": install-latest entry for project ` +
-            `${RESOLUTION_PROJECT_MODRINTH_ID} has a null modrinthVersionId`
-        )
-      }
+        // Genuinely empty afterward, not holding two builds side by side —
+        // the second half below installs its own, deliberately-older build
+        // into what must be a clean instance.
+        await deleteModViaUi(page, installed.filename)
 
-      // Genuinely empty afterward, not holding two builds side by side —
-      // the second half below installs its own, deliberately-older build
-      // into what must be a clean instance.
-      await deleteModViaUi(page, installed.filename)
+        // Re-derive independently: a fresh search+addon-page visit, a fresh
+        // Versions-tab read. No channel data is needed here (unlike
+        // TEST_TITLE_UPDATE above) — both ids being compared are observed
+        // outcomes, not oracle predictions — so this uses openAddonVersions
+        // directly rather than resolutionCapture's richer, channel-aware
+        // capture.
+        await openInstanceAddons(page, instanceName)
+        await searchForMod(page, {
+          platform: "modrinth",
+          query: RESOLUTION_PROJECT_QUERY
+        })
+        await openAddonPage(page, RESOLUTION_PROJECT_MODRINTH_ID)
 
-      // Re-derive independently: a fresh search+addon-page visit, a fresh
-      // Versions-tab read. No channel data is needed here (unlike
-      // TEST_TITLE_UPDATE above) — both ids being compared are observed
-      // outcomes, not oracle predictions — so this uses openAddonVersions
-      // directly rather than resolutionCapture's richer, channel-aware
-      // capture.
-      await openInstanceAddons(page, instanceName)
-      await searchForMod(page, {
-        platform: "modrinth",
-        query: RESOLUTION_PROJECT_QUERY
-      })
-      await openAddonPage(page, RESOLUTION_PROJECT_MODRINTH_ID)
+        const versions = await openAddonVersions(page)
+        const older = pickOlderVersion(versions)
+        await installAddonVersion(page, older)
 
-      const versions = await openAddonVersions(page)
-      const older = pickOlderVersion(versions)
-      await installAddonVersion(page, older)
+        mods = await openInstanceAddons(page, instanceName)
+        installed = mods.find(matchesClothConfig)
+        if (!installed) {
+          throw new Error(
+            `"${TEST_TITLE_CONVERGE}": instance.getInstanceMods has no entry ` +
+              `matching project ${RESOLUTION_PROJECT_MODRINTH_ID} after ` +
+              `installing the deliberately-older build (version id ` +
+              `${older.fileId})`
+          )
+        }
 
-      mods = await openInstanceAddons(page, instanceName)
-      installed = mods.find(matchesClothConfig)
-      if (!installed) {
-        throw new Error(
-          `"${TEST_TITLE_CONVERGE}": instance.getInstanceMods has no entry ` +
-            `matching project ${RESOLUTION_PROJECT_MODRINTH_ID} after ` +
-            `installing the deliberately-older build (version id ` +
-            `${older.fileId})`
-        )
-      }
+        await waitForModUpdateAvailable(page, instanceName, matchesClothConfig)
 
-      await waitForModUpdateAvailable(page, instanceName, matchesClothConfig)
+        const row = page.locator(byModRow(installed.filename))
+        await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
 
-      const row = page.locator(byModRow(installed.filename))
-      await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
+        const updated = await waitForModFilenameChange(page, instanceName, {
+          oldFilename: installed.filename,
+          matches: matchesClothConfig
+        })
+        const updateId = updated.modrinthVersionId
+        if (!updateId) {
+          throw new Error(
+            `"${TEST_TITLE_CONVERGE}": updated entry for project ` +
+              `${RESOLUTION_PROJECT_MODRINTH_ID} has a null modrinthVersionId`
+          )
+        }
 
-      const updated = await waitForModFilenameChange(page, instanceName, {
-        oldFilename: installed.filename,
-        matches: matchesClothConfig
-      })
-      const updateId = updated.modrinthVersionId
-      if (!updateId) {
-        throw new Error(
-          `"${TEST_TITLE_CONVERGE}": updated entry for project ` +
-            `${RESOLUTION_PROJECT_MODRINTH_ID} has a null modrinthVersionId`
-        )
-      }
-
-      // The central assertion, and the one place this test's failure
-      // message must name the channel-divergence hypothesis explicitly:
-      // install_latest_modrinth_mod applies NO channel filter at all
-      // (`.get(0)` of the filtered response, beta or not), while
-      // find_mod_update prefers the newest STABLE build first (see the
-      // module doc comment). For a project whose newest compatible build is
-      // a beta, the two genuinely disagree — and find_mod_update would then
-      // offer an OLDER stable build as an "update", a downgrade presented
-      // as an upgrade. Cloth Config API was chosen specifically because
-      // its 1.20.1 line is stable-only to keep this test
-      // off that ground, so a failure here is a product finding to triage
-      // first, not a harness defect to patch.
-      if (installLatestId !== updateId) {
-        throw new Error(
-          `"${TEST_TITLE_CONVERGE}": install-latest resolved ` +
-            `"${installLatestId}" but the update path resolved a ` +
-            `different build, "${updateId}". install_latest_modrinth_mod ` +
-            "applies NO channel filter at all (.get(0) of the filtered " +
-            "response, beta or not), while find_mod_update prefers the " +
-            "newest STABLE build first — so for a project whose newest " +
-            "compatible build is a beta, the two genuinely disagree, and " +
-            "find_mod_update would then offer an OLDER stable build as an " +
-            "'update', a downgrade presented as an upgrade. Cloth Config " +
-            "API was chosen specifically because its 1.20.1 line is " +
-            "stable-only to keep this test off that " +
-            "ground — treat this as a product finding to triage first, " +
-            "not a harness defect to patch."
-        )
-      }
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      try {
+        // The central assertion, and the one place this test's failure
+        // message must name the channel-divergence hypothesis explicitly:
+        // install_latest_modrinth_mod applies NO channel filter at all
+        // (`.get(0)` of the filtered response, beta or not), while
+        // find_mod_update prefers the newest STABLE build first (see the
+        // module doc comment). For a project whose newest compatible build is
+        // a beta, the two genuinely disagree — and find_mod_update would then
+        // offer an OLDER stable build as an "update", a downgrade presented
+        // as an upgrade. Cloth Config API was chosen specifically because
+        // its 1.20.1 line is stable-only to keep this test
+        // off that ground, so a failure here is a product finding to triage
+        // first, not a harness defect to patch.
+        if (installLatestId !== updateId) {
+          throw new Error(
+            `"${TEST_TITLE_CONVERGE}": install-latest resolved ` +
+              `"${installLatestId}" but the update path resolved a ` +
+              `different build, "${updateId}". install_latest_modrinth_mod ` +
+              "applies NO channel filter at all (.get(0) of the filtered " +
+              "response, beta or not), while find_mod_update prefers the " +
+              "newest STABLE build first — so for a project whose newest " +
+              "compatible build is a beta, the two genuinely disagree, and " +
+              "find_mod_update would then offer an OLDER stable build as an " +
+              "'update', a downgrade presented as an upgrade. Cloth Config " +
+              "API was chosen specifically because its 1.20.1 line is " +
+              "stable-only to keep this test off that " +
+              "ground — treat this as a product finding to triage first, " +
+              "not a harness defect to patch."
+          )
+        }
+      },
+      async () => {
         await cleanupInstalledMod(
           page,
           instanceName,
@@ -1219,16 +1202,8 @@ test.describe("mod resolution", () => {
           matchesClothConfig,
           `"${TEST_TITLE_CONVERGE}"`
         )
-      } catch (cleanupError) {
-        if (!bodyFailed) {
-          // eslint-disable-next-line no-unsafe-finally
-          throw cleanupError
-        }
-        console.error(
-          `cleanup for "${TEST_TITLE_CONVERGE}" also failed:`,
-          cleanupError
-        )
-      }
-    }
+      },
+      `cleanup for "${TEST_TITLE_CONVERGE}" also failed:`
+    )
   })
 })

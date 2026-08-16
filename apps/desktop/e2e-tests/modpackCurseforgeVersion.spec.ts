@@ -20,6 +20,7 @@ import {
   MODPACK_CF_PROJECT,
   MODPACK_CF_QUERY
 } from "./helpers/modpackFixtures.js"
+import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 
 /**
  * The only CurseForge **version change** in this suite. Everything else that
@@ -138,125 +139,128 @@ test.describe("curseforge modpack version change", () => {
   }) => {
     const { page, harness } = authenticatedApp
     let subjectName: string | undefined
-    let bodyFailed = false
 
-    try {
-      // --- The twin: a FRESH install of the target file, snapshotted and
-      // then removed before the subject is created (see the header for why
-      // they cannot coexist).
-      const twinName = await installModpackVersion(
-        page,
-        MODPACK_CF_QUERY,
-        "curseforge",
-        MODPACK_CF_FILE
-      )
-      const twinRoot = rootFor(harness.runtimePath, twinName)
-      const twinTree: Tree = await snapshotTree(path.join(twinRoot, "instance"))
-      const twinPackinfo: Packinfo = await readPackinfo(twinRoot)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        // --- The twin: a FRESH install of the target file, snapshotted and
+        // then removed before the subject is created (see the header for why
+        // they cannot coexist).
+        const twinName = await installModpackVersion(
+          page,
+          MODPACK_CF_QUERY,
+          "curseforge",
+          MODPACK_CF_FILE
+        )
+        const twinRoot = rootFor(harness.runtimePath, twinName)
+        const twinTree: Tree = await snapshotTree(
+          path.join(twinRoot, "instance")
+        )
+        const twinPackinfo: Packinfo = await readPackinfo(twinRoot)
 
-      expect(
-        twinTree.size,
-        "the twin install produced an empty instance tree"
-      ).toBeGreaterThan(0)
+        expect(
+          twinTree.size,
+          "the twin install produced an empty instance tree"
+        ).toBeGreaterThan(0)
 
-      await page.click(byTestId(TEST_IDS.navbarLogo))
-      await deleteInstanceViaUi(page, twinName)
+        await page.click(byTestId(TEST_IDS.navbarLogo))
+        await deleteInstanceViaUi(page, twinName)
 
-      // --- The subject: installed at the OLD file, then version-changed onto
-      // the same target the twin was installed at directly.
-      subjectName = await installModpackVersion(
-        page,
-        MODPACK_CF_QUERY,
-        "curseforge",
-        MODPACK_CF_FILE_OLD
-      )
-      const subjectRoot = rootFor(harness.runtimePath, subjectName)
+        // --- The subject: installed at the OLD file, then version-changed onto
+        // the same target the twin was installed at directly.
+        subjectName = await installModpackVersion(
+          page,
+          MODPACK_CF_QUERY,
+          "curseforge",
+          MODPACK_CF_FILE_OLD
+        )
+        const subjectRoot = rootFor(harness.runtimePath, subjectName)
 
-      const beforeConfig = await readInstanceConfig(subjectRoot)
-      expect(
-        beforeConfig.modpack?.curseforgeProjectId,
-        `the subject instance is not pinned to project ${MODPACK_CF_PROJECT} — ` +
-          "CurseForge's search ranking for MODPACK_CF_QUERY may have drifted, " +
-          "so the wrong pack was opened"
-      ).toBe(Number(MODPACK_CF_PROJECT))
-      expect(
-        beforeConfig.modpack?.curseforgeFileId,
-        "the subject instance did not install the pinned OLD file"
-      ).toBe(Number(MODPACK_CF_FILE_OLD))
+        const beforeConfig = await readInstanceConfig(subjectRoot)
+        expect(
+          beforeConfig.modpack?.curseforgeProjectId,
+          `the subject instance is not pinned to project ${MODPACK_CF_PROJECT} — ` +
+            "CurseForge's search ranking for MODPACK_CF_QUERY may have drifted, " +
+            "so the wrong pack was opened"
+        ).toBe(Number(MODPACK_CF_PROJECT))
+        expect(
+          beforeConfig.modpack?.curseforgeFileId,
+          "the subject instance did not install the pinned OLD file"
+        ).toBe(Number(MODPACK_CF_FILE_OLD))
 
-      await changeModpackVersion(page, subjectName, MODPACK_CF_FILE)
+        await changeModpackVersion(page, subjectName, MODPACK_CF_FILE)
 
-      const subjectTree = await snapshotTree(path.join(subjectRoot, "instance"))
+        const subjectTree = await snapshotTree(
+          path.join(subjectRoot, "instance")
+        )
 
-      // THE assertion. A divergence is a finding — see the header. Do not
-      // loosen this to toContain or subtract a hardcoded set without
-      // characterising why first.
-      expect(
-        comparable(subjectTree),
-        "a CurseForge version change did not leave the instance byte-identical " +
-          "to a fresh install of the same target file"
-      ).toEqual(comparable(twinTree))
+        // THE assertion. A divergence is a finding — see the header. Do not
+        // loosen this to toContain or subtract a hardcoded set without
+        // characterising why first.
+        expect(
+          comparable(subjectTree),
+          "a CurseForge version change did not leave the instance byte-identical " +
+            "to a fresh install of the same target file"
+        ).toEqual(comparable(twinTree))
 
-      const afterConfig = await readInstanceConfig(subjectRoot)
-      expect(
-        afterConfig.modpack?.curseforgeFileId,
-        "the version change did not repin the instance to the target file"
-      ).toBe(Number(MODPACK_CF_FILE))
-      expect(
-        afterConfig.modpack?.locked,
-        "the version change altered the instance's lock state"
-      ).toBe(beforeConfig.modpack?.locked)
+        const afterConfig = await readInstanceConfig(subjectRoot)
+        expect(
+          afterConfig.modpack?.curseforgeFileId,
+          "the version change did not repin the instance to the target file"
+        ).toBe(Number(MODPACK_CF_FILE))
+        expect(
+          afterConfig.modpack?.locked,
+          "the version change altered the instance's lock state"
+        ).toBe(beforeConfig.modpack?.locked)
 
-      // packinfo now matches the tree — finding 4 (scan_dir dropping files
-      // unchanged between versions, `helpers/packinfo.js`) is fixed:
-      // `process_modpack`'s snapshot block merges the skip-oracle's hash
-      // back in for every skip-optimised path, so the version-changed
-      // instance's packinfo is exactly the same set of paths a fresh
-      // install of the same target produces — the per-key bytes check this
-      // needs is subsumed by the strict tree assertion above, which already
-      // proves every path's bytes are correct.
-      const subjectPackinfo = await readPackinfo(subjectRoot)
-      const missing = [...twinPackinfo.keys()]
-        .filter((k) => !subjectPackinfo.has(k))
-        .sort()
-      const extra = [...subjectPackinfo.keys()]
-        .filter((k) => !twinPackinfo.has(k))
-        .sort()
+        // packinfo now matches the tree — finding 4 (scan_dir dropping files
+        // unchanged between versions, `helpers/packinfo.js`) is fixed:
+        // `process_modpack`'s snapshot block merges the skip-oracle's hash
+        // back in for every skip-optimised path, so the version-changed
+        // instance's packinfo is exactly the same set of paths a fresh
+        // install of the same target produces — the per-key bytes check this
+        // needs is subsumed by the strict tree assertion above, which already
+        // proves every path's bytes are correct.
+        const subjectPackinfo = await readPackinfo(subjectRoot)
+        const missing = [...twinPackinfo.keys()]
+          .filter((k) => !subjectPackinfo.has(k))
+          .sort()
+        const extra = [...subjectPackinfo.keys()]
+          .filter((k) => !twinPackinfo.has(k))
+          .sort()
 
-      expect(
-        extra,
-        "the version-changed instance's packinfo records paths a fresh " +
-          "install does not — scan_dir gained a source of paths, which is " +
-          "new behaviour"
-      ).toEqual([])
-      expect(
-        missing,
-        "packinfo lost entries across a version change — the skip-optimised " +
-          "merge fix (process_modpack's snapshot block, run/modpack.rs) " +
-          "regressed"
-      ).toEqual([])
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (subjectName) {
-        try {
-          await page
-            .locator(byTestId(TEST_IDS.navbarLogo))
-            .click({ timeout: 5_000 })
-            .catch(() => {})
-          await deleteInstanceViaUi(page, subjectName)
-        } catch (cleanupError) {
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
+        expect(
+          extra,
+          "the version-changed instance's packinfo records paths a fresh " +
+            "install does not — scan_dir gained a source of paths, which is " +
+            "new behaviour"
+        ).toEqual([])
+        expect(
+          missing,
+          "packinfo lost entries across a version change — the skip-optimised " +
+            "merge fix (process_modpack's snapshot block, run/modpack.rs) " +
+            "regressed"
+        ).toEqual([])
+      },
+      async (alreadyFailed) => {
+        if (subjectName) {
+          try {
+            await page
+              .locator(byTestId(TEST_IDS.navbarLogo))
+              .click({ timeout: 5_000 })
+              .catch(() => {})
+            await deleteInstanceViaUi(page, subjectName)
+          } catch (cleanupError) {
+            reportCleanupFailure(
+              cleanupError,
+              alreadyFailed,
+              `cleanup for "${subjectName}" also failed:`
+            )
           }
-          console.error(
-            `cleanup for "${subjectName}" also failed:`,
-            cleanupError
-          )
         }
       }
-    }
+    )
   })
 })

@@ -78,6 +78,7 @@ import {
   newestLogFile,
   readLogMessages
 } from "./helpers/gameLog.js"
+import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 
 const INSTANCE_NAME = "gdl-e2e-game-launch"
 const MC_VERSION = "1.20.1"
@@ -125,7 +126,6 @@ test.describe("game launch", () => {
       pageErrors: Error[]
       stdout: string[]
     } | null = null
-    let bodyFailed = false
     let stdout: string[] = []
     /** GAME_CLOSED count at the moment before Play was clicked. Declared out
      *  here because `finally` is a different block scope from `try`, and
@@ -140,165 +140,165 @@ test.describe("game launch", () => {
     const closedCount = () => stdout.join("").split("GAME_CLOSED").length
     const launchedCount = () => stdout.join("").split("GAME_LAUNCHED").length
 
-    try {
-      current = await launchApp(launchOpts)
-      const page = current.page
-      stdout = current.stdout
-      await completeLogin(page, harness)
-      await dismissStartupModals(page)
+    // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
+    // must never re-throw over an already-failing body, only over a passing
+    // one.
+    await withCleanup(
+      async () => {
+        current = await launchApp(launchOpts)
+        const page = current.page
+        stdout = current.stdout
+        await completeLogin(page, harness)
+        await dismissStartupModals(page)
 
-      await test.step("install a Forge instance", async () => {
-        await createInstanceViaUi(page, {
-          name: INSTANCE_NAME,
-          version: MC_VERSION,
-          loader: LOADER
+        await test.step("install a Forge instance", async () => {
+          await createInstanceViaUi(page, {
+            name: INSTANCE_NAME,
+            version: MC_VERSION,
+            loader: LOADER
+          })
+          await waitForInstallComplete(page, INSTANCE_NAME)
         })
-        await waitForInstallComplete(page, INSTANCE_NAME)
-      })
 
-      const row = readInstanceByName(harness.runtimePath, INSTANCE_NAME)
-      const logsDir = instanceLogsDir(harness.runtimePath, row.shortpath)
-      closedBeforeLaunch = closedCount()
+        const row = readInstanceByName(harness.runtimePath, INSTANCE_NAME)
+        const logsDir = instanceLogsDir(harness.runtimePath, row.shortpath)
+        closedBeforeLaunch = closedCount()
 
-      await test.step("launch the game", async () => {
-        const tile = page.locator(byInstanceName(INSTANCE_NAME))
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+        await test.step("launch the game", async () => {
+          const tile = page.locator(byInstanceName(INSTANCE_NAME))
+          await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
-        await expect
-          .poll(() => launchedCount(), {
-            timeout: FIRST_OUTPUT_TIMEOUT,
-            message:
-              "the core never reported GAME_LAUNCHED after Play was clicked"
-          })
-          .toBeGreaterThan(1)
-      })
+          await expect
+            .poll(() => launchedCount(), {
+              timeout: FIRST_OUTPUT_TIMEOUT,
+              message:
+                "the core never reported GAME_LAUNCHED after Play was clicked"
+            })
+            .toBeGreaterThan(1)
+        })
 
-      await test.step("wait for the client to finish loading", async () => {
-        // Growth first. A log that never grows means the JVM produced
-        // nothing, which is a different failure from one that started and
-        // stopped, and is worth distinguishing in the message.
-        await expect
-          .poll(() => logSize(newestLogFile(logsDir)), {
-            timeout: FIRST_OUTPUT_TIMEOUT,
-            message:
-              `no game log appeared under ${logsDir} after launch — the ` +
-              "client produced no output at all"
-          })
-          .toBeGreaterThan(0)
+        await test.step("wait for the client to finish loading", async () => {
+          // Growth first. A log that never grows means the JVM produced
+          // nothing, which is a different failure from one that started and
+          // stopped, and is worth distinguishing in the message.
+          await expect
+            .poll(() => logSize(newestLogFile(logsDir)), {
+              timeout: FIRST_OUTPUT_TIMEOUT,
+              message:
+                `no game log appeared under ${logsDir} after launch — the ` +
+                "client produced no output at all"
+            })
+            .toBeGreaterThan(0)
 
-        // Then quiescence: the same size held across QUIESCENCE_HOLD_MS.
-        const deadline = Date.now() + QUIESCENCE_TIMEOUT
-        let lastSize = -1
-        let steadySince = Date.now()
+          // Then quiescence: the same size held across QUIESCENCE_HOLD_MS.
+          const deadline = Date.now() + QUIESCENCE_TIMEOUT
+          let lastSize = -1
+          let steadySince = Date.now()
 
-        while (Date.now() < deadline) {
-          const size = logSize(newestLogFile(logsDir))
-          if (size !== lastSize) {
-            lastSize = size
-            steadySince = Date.now()
-          } else if (Date.now() - steadySince >= QUIESCENCE_HOLD_MS) {
-            break
+          while (Date.now() < deadline) {
+            const size = logSize(newestLogFile(logsDir))
+            if (size !== lastSize) {
+              lastSize = size
+              steadySince = Date.now()
+            } else if (Date.now() - steadySince >= QUIESCENCE_HOLD_MS) {
+              break
+            }
+
+            // Checked every poll rather than once at the end: a client that
+            // died is not going to start logging again, so continuing to wait
+            // for quiescence would just burn the timeout before reporting the
+            // real cause.
+            expect(
+              closedCount(),
+              "the game exited while still loading — it crashed rather than " +
+                "reaching the main menu. The captured game log is attached."
+            ).toBe(closedBeforeLaunch)
+
+            await sleep(POLL_MS)
           }
 
-          // Checked every poll rather than once at the end: a client that
-          // died is not going to start logging again, so continuing to wait
-          // for quiescence would just burn the timeout before reporting the
-          // real cause.
+          expect(
+            Date.now() - steadySince,
+            `the game log under ${logsDir} never stopped growing within ` +
+              `${QUIESCENCE_TIMEOUT}ms — the client never finished loading`
+          ).toBeGreaterThanOrEqual(QUIESCENCE_HOLD_MS)
+        })
+
+        await test.step("assert it is idle at a menu, not dead", async () => {
+          // Still running. This is the assertion that separates "reached the
+          // main menu" from "crashed and stopped writing".
           expect(
             closedCount(),
-            "the game exited while still loading — it crashed rather than " +
-              "reaching the main menu. The captured game log is attached."
+            "the game exited before the test could observe it idling at the " +
+              "main menu"
           ).toBe(closedBeforeLaunch)
 
-          await sleep(POLL_MS)
-        }
+          const messages = readLogMessages(newestLogFile(logsDir))
 
-        expect(
-          Date.now() - steadySince,
-          `the game log under ${logsDir} never stopped growing within ` +
-            `${QUIESCENCE_TIMEOUT}ms — the client never finished loading`
-        ).toBeGreaterThanOrEqual(QUIESCENCE_HOLD_MS)
-      })
+          const fatal = findFatalSignature(messages)
+          expect(
+            fatal,
+            `the game log contains a JVM-fatal signature: ${fatal}`
+          ).toBeUndefined()
 
-      await test.step("assert it is idle at a menu, not dead", async () => {
-        // Still running. This is the assertion that separates "reached the
-        // main menu" from "crashed and stopped writing".
-        expect(
-          closedCount(),
-          "the game exited before the test could observe it idling at the " +
-            "main menu"
-        ).toBe(closedBeforeLaunch)
+          // Corroboration, deliberately a quorum — see LAUNCH_MARKERS.
+          const matched = countMatchedMarkers(messages, LAUNCH_MARKERS)
+          expect(
+            matched,
+            `only ${matched} of ${LAUNCH_MARKERS.length} startup markers ` +
+              `appeared in the game log (need ${LAUNCH_MARKER_QUORUM}). The ` +
+              "client stayed alive and went quiet, so either it idled somewhere " +
+              "that is not the main menu, or these markers have drifted with a " +
+              "Minecraft version and need updating in gameLog.ts."
+          ).toBeGreaterThanOrEqual(LAUNCH_MARKER_QUORUM)
+        })
+      },
+      async (alreadyFailed) => {
+        if (current) {
+          try {
+            const before = closedCount()
 
-        const messages = readLogMessages(newestLogFile(logsDir))
+            // Only stop what is still running. The tile's play control doubles
+            // as stop *while the instance runs* (`Tile.tsx`'s `handlePlay`
+            // calls killInstance when isRunning) — so clicking it
+            // unconditionally would **launch a fresh game** in exactly the
+            // case where the body failed because the client had already died,
+            // and then wait out the full timeout for a close that cannot come.
+            // Observed doing precisely that. A GAME_CLOSED since launch is the
+            // signal that there is nothing left to kill.
+            if (before > closedBeforeLaunch) {
+              console.log(
+                `"${INSTANCE_NAME}" already stopped on its own; nothing to kill`
+              )
+            } else {
+              const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
+              await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
-        const fatal = findFatalSignature(messages)
-        expect(
-          fatal,
-          `the game log contains a JVM-fatal signature: ${fatal}`
-        ).toBeUndefined()
-
-        // Corroboration, deliberately a quorum — see LAUNCH_MARKERS.
-        const matched = countMatchedMarkers(messages, LAUNCH_MARKERS)
-        expect(
-          matched,
-          `only ${matched} of ${LAUNCH_MARKERS.length} startup markers ` +
-            `appeared in the game log (need ${LAUNCH_MARKER_QUORUM}). The ` +
-            "client stayed alive and went quiet, so either it idled somewhere " +
-            "that is not the main menu, or these markers have drifted with a " +
-            "Minecraft version and need updating in gameLog.ts."
-        ).toBeGreaterThanOrEqual(LAUNCH_MARKER_QUORUM)
-      })
-    } catch (error) {
-      bodyFailed = true
-      throw error
-    } finally {
-      if (current) {
-        try {
-          const before = closedCount()
-
-          // Only stop what is still running. The tile's play control doubles
-          // as stop *while the instance runs* (`Tile.tsx`'s `handlePlay`
-          // calls killInstance when isRunning) — so clicking it
-          // unconditionally would **launch a fresh game** in exactly the
-          // case where the body failed because the client had already died,
-          // and then wait out the full timeout for a close that cannot come.
-          // Observed doing precisely that. A GAME_CLOSED since launch is the
-          // signal that there is nothing left to kill.
-          if (before > closedBeforeLaunch) {
-            console.log(
-              `"${INSTANCE_NAME}" already stopped on its own; nothing to kill`
+              await expect
+                .poll(() => closedCount(), {
+                  timeout: GAME_STOP_TIMEOUT,
+                  message:
+                    "the game never reported a new GAME_CLOSED after its stop " +
+                    "control was clicked — a Minecraft process may have been " +
+                    "left running"
+                })
+                .toBeGreaterThan(before)
+            }
+          } catch (cleanupError) {
+            // See `withCleanup`'s doc comment (`helpers/cleanup.ts`): only
+            // re-throw over a body that itself succeeded, so cleanup failure
+            // never buries the real failure.
+            reportCleanupFailure(
+              cleanupError,
+              alreadyFailed,
+              `cleanup for "${INSTANCE_NAME}" also failed:`
             )
-          } else {
-            const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
-            await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-            await expect
-              .poll(() => closedCount(), {
-                timeout: GAME_STOP_TIMEOUT,
-                message:
-                  "the game never reported a new GAME_CLOSED after its stop " +
-                  "control was clicked — a Minecraft process may have been " +
-                  "left running"
-              })
-              .toBeGreaterThan(before)
           }
-        } catch (cleanupError) {
-          // See instanceInstall.spec.ts's identical branch: only re-throw
-          // over a body that itself succeeded, so cleanup failure never
-          // buries the real failure.
-          if (!bodyFailed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw cleanupError
-          }
-          console.error(
-            `cleanup for "${INSTANCE_NAME}" also failed:`,
-            cleanupError
-          )
+          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await current.app.close()
         }
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-        await current.app.close()
+        await stopHarness(harness)
       }
-      await stopHarness(harness)
-    }
+    )
   })
 })
