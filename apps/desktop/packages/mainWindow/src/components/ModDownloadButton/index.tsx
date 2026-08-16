@@ -280,12 +280,10 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
   // Watch for installation completion and clear states reactively
   const [wasInstalled, setWasInstalled] = createSignal(false)
-  const [wasLoading, setWasLoading] = createSignal(false)
   const [isInitialized, setIsInitialized] = createSignal(false)
 
   createEffect(() => {
     const installed = isInstalled()
-    const isCurrentlyLoading = loading()
     const isWorld = props.addon?.type === "world"
 
     // For other addon types: show toast when transitioning from not installed to installed
@@ -300,9 +298,6 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     if (installed !== wasInstalled()) {
       setWasInstalled(installed)
     }
-
-    // Track loading state changes
-    setWasLoading(isCurrentlyLoading)
 
     // For worlds, `taskId() === null` conflates "the install has not started
     // yet" with "the install finished". `pendingInstall` marks the
