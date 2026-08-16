@@ -29,9 +29,8 @@ export function reportCleanupFailure(
 
 /**
  * Runs `body`, tracking whether it failed, then always runs `cleanup` in a
- * `finally`. This is the `bodyFailed`/try/catch/finally scaffolding that
- * used to be copy-pasted at every spec's cleanup site in this suite,
- * centralized to one implementation.
+ * `finally`. Centralizes the `bodyFailed`/try/catch/finally scaffolding so
+ * no spec's cleanup site in this suite has to hand-write it.
  *
  * Failure is tracked with an explicit boolean rather than an
  * "error is undefined" sentinel: a literal `throw undefined` from `body`

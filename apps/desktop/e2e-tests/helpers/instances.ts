@@ -358,20 +358,14 @@ export async function waitForInstallComplete(
 
 /** How long the core is given to report `GAME_LAUNCHED` after Play is
  *  clicked, in `clickPlayAndAwaitLaunched` below. Generous: a cold instance
- *  re-resolves Java and assets first. Shared by every spec that drives a
- *  real launch — previously re-declared independently in each one
- *  (`gameLaunch.spec.ts`'s `FIRST_OUTPUT_TIMEOUT`,
- *  `modpackLifecycle.spec.ts`/`modpackChangeVersionGuard.spec.ts`/
- *  `modpackReinstall.spec.ts`'s `LAUNCH_TIMEOUT`), linked only by "Mirrors
- *  X's constant" doc comments pointing back at whichever of those files
- *  happened to be written first. */
+ *  re-resolves Java and assets first. Shared by every spec in this suite
+ *  that drives a real launch — imported from here rather than redeclared. */
 export const LAUNCH_TIMEOUT = 180_000
 
 /** How long the core is given to report a new `GAME_CLOSED` after the stop
  *  control — the same Play control, while the instance is running — is
- *  clicked. Shared for the same reason as `LAUNCH_TIMEOUT` above; previously
- *  `gameLaunch.spec.ts`'s `GAME_STOP_TIMEOUT` and every other launch spec's
- *  own `STOP_TIMEOUT`. */
+ *  clicked. Shared for the same reason as `LAUNCH_TIMEOUT` above: imported
+ *  from here rather than redeclared per spec. */
 export const STOP_TIMEOUT = 60_000
 
 /**

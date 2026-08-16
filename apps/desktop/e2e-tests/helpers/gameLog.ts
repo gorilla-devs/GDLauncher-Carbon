@@ -176,10 +176,9 @@ function sleep(ms: number): Promise<void> {
  * the JVM produced nothing, a different failure from one that started and
  * stopped, worth distinguishing in the message.
  *
- * Previously two independent copies — one inlined in `gameLaunch.spec.ts`'s
- * test body, one a local function in `modpackLifecycle.spec.ts` explicitly
- * documented as a copy of the former. Centralized here; both files now call
- * this instead.
+ * A single shared implementation: both `gameLaunch.spec.ts` and
+ * `modpackLifecycle.spec.ts` call this rather than each keeping their own
+ * copy.
  */
 export async function waitForLogQuiescence(
   logsDir: string,

@@ -972,16 +972,13 @@ test.describe("modpack lifecycle", () => {
         // making it *look* correct while a different mechanism still leaked a
         // stale file onto disk.
         //
-        // Before this task's fix, this mattered acutely: the deletion pass was
-        // driven *exclusively* by packinfo's own keys, so a path `scan_dir`
-        // silently dropped from packinfo after the upgrade (the previous
-        // finding) was a path the downgrade's deletion could never visit, no
-        // matter what OLD's own manifest said about it — nine of this pack's
-        // mods survived every downgrade forever, undeleted, with zero audit
-        // trace. `process_modpack_staging`'s deletion comes from
-        // `apply_plan::plan`'s `universe` (`old.keys() ∪ target.keys()`),
-        // built fresh each time from a packinfo the merge fix keeps complete,
-        // so no such leak path exists.
+        // This matters because `process_modpack_staging`'s deletion pass is
+        // driven *exclusively* by `apply_plan::plan`'s `universe`
+        // (`old.keys() ∪ target.keys()`), built fresh each time from
+        // packinfo — so any path silently missing from packinfo (whichever
+        // version's) is a path the downgrade's deletion could never visit,
+        // no matter what OLD's own manifest says about it. The merge logic
+        // keeps packinfo complete precisely so no such leak path exists.
         //
         // So the expectation here is that nothing is left unexplained: every
         // path physically present under a directory this pack has ever owned

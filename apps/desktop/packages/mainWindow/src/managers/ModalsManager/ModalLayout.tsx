@@ -21,9 +21,10 @@ const ModalLayout = (props: Props) => {
   const stackEntry = useModalStackEntry()
 
   // Publishes this instance's live `preventClose` prop onto its stack entry
-  // so the manager's Escape handler and backdrop click can see it too — both
-  // previously only consulted the static registry, which JavaSetup (a
-  // prop-only `preventClose`, no registry entry) never appeared in.
+  // so the manager's Escape handler and backdrop click can see it too — the
+  // manager also consults the static registry, but a prop-only
+  // `preventClose` (e.g. JavaSetup's) has no registry entry, so this is the
+  // only path that value reaches Escape/backdrop through.
   onMount(() => {
     stackEntry?.registerPreventClose(() => props.preventClose === true)
   })

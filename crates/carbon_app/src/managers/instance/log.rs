@@ -629,13 +629,17 @@ impl<'a> LogProcessor<'a> {
                     // `<log4j:Event>`) already advanced the buffer past the
                     // bad bytes before returning, so it's safe -- and
                     // necessary, to reach any good events buffered right
-                    // behind it -- to keep parsing the same chunk. A few
-                    // paths leave the buffer untouched, in which case
-                    // retrying immediately would just reproduce the same
-                    // error on the same bytes forever; stop for this call
-                    // and wait for more data next time, exactly like a
-                    // `Partial` result. Either way `buffered_len` strictly
-                    // decreases or the loop exits, so this can't spin.
+                    // behind it -- to keep parsing the same chunk. The
+                    // remaining paths leave the buffer untouched, so this
+                    // stops for this call rather than re-erroring on the same
+                    // bytes in a tight loop. Some of those resolve once more
+                    // data arrives, the same as a `Partial` result -- but the
+                    // leading-text non-UTF-8 arm does not: the bad prefix is
+                    // already fully buffered, so no amount of further data
+                    // makes it valid, and parsing stays stuck on it until the
+                    // parser itself is reset (a preexisting gap, not fixed
+                    // here). Either way `buffered_len` strictly decreases or
+                    // the loop exits, so this can't spin.
                     if self.parser.buffered_len() < buffered_before {
                         continue;
                     }
