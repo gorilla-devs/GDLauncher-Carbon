@@ -294,37 +294,34 @@ export async function openInstanceAddons(
  *  after the first call in a worker). `OnboardingTip`'s own click handler
  *  fires on a 200ms delay (`EnhancedSearchBar.tsx`'s `delay={200}`), so this
  *  needs to clear that plus render time — generous margin over it, not a
- *  tuned minimum. Independent copy of `helpers/modpacks.ts`'s constant of the
- *  same name and value — see `dismissSearchOnboardingTip`'s doc comment for
- *  why this file carries its own rather than importing that one. */
-const ONBOARDING_TIP_WAIT = 1_000
+ *  tuned minimum. */
+export const ONBOARDING_TIP_WAIT = 1_000
 
 /**
  * Dismisses the `search-input-syntax` onboarding tip
- * (`components/Onboarding/SpotlightOverlay.tsx`) if the click that just
- * landed on `AddonTypeDropdown`'s trigger triggered it. A no-op, bounded by
- * `ONBOARDING_TIP_WAIT`, when the tip does not appear (already seen, or
- * `settings.isFirstLaunch` never resolved to `false` — see
+ * (`components/Onboarding/SpotlightOverlay.tsx`) if a click that just landed
+ * inside `EnhancedSearchBar`'s `OnboardingTip`-wrapped div triggered it. A
+ * no-op, bounded by `ONBOARDING_TIP_WAIT`, when the tip does not appear
+ * (already seen, or `settings.isFirstLaunch` never resolved to `false` — see
  * `OnboardingContext.tsx`'s `isEnabled`).
  *
  * Dismissed via Escape (`SpotlightOverlay`'s own `keydown` handler calls
  * `onboarding.hideTip()`), not a click on the backdrop or its popover:
- * neither carries a `data-testid`, and Escape needs no selector at all.
+ * neither carries a `data-testid`, and Escape needs no selector at all. The
+ * backdrop itself — `div.fixed.inset-0.z-99999` — is used only to *detect*
+ * the tip; grepping the frontend source turned up exactly one component
+ * rendering that exact class combination, so this is safe from hazard 2 in
+ * `selectors.ts`'s header (nothing else on this page can match it), but it
+ * is still a class selector, not an anchor, so it is kept unexported from
+ * `selectors.ts` — this one detection use is the only thing that needs it.
  *
- * `helpers/modpacks.ts`'s `openModpackPage` carries an identically-named,
- * identically-implemented private function for the identical hazard — that
- * one guards a click on `TEST_IDS.searchInput`, this one guards
- * `searchForMod`'s click on `TEST_IDS.addonTypeDropdownTrigger`, both
- * descendants of the same `OnboardingTip`-wrapped div in
- * `EnhancedSearchBar.tsx`. Kept as two small, independent copies rather than
- * one shared export: `mods.ts` is the more foundational of the two files
- * (every mod spec depends on it; only the modpack specs depend on
- * `modpacks.ts`), so importing "downward" from there would be the wrong
- * direction, and this is the first place in `mods.ts` that ever makes a real
- * `.click()` inside that region — see `searchForMod`'s `searchType` branch
- * below, the one caller.
+ * Shared between the two drivers in this suite that click somewhere inside
+ * that wrapped div and can trigger the tip: `searchForMod` below, on
+ * `TEST_IDS.addonTypeDropdownTrigger`, and `helpers/modpacks.ts`'s
+ * `openModpackPage`, on `TEST_IDS.searchInput` — see that function's call
+ * site for why it, uniquely among modpack specs, needs this at all.
  */
-async function dismissSearchOnboardingTip(page: Page): Promise<void> {
+export async function dismissSearchOnboardingTip(page: Page): Promise<void> {
   const overlay = page.locator("div.fixed.inset-0.z-99999").first()
   const appeared = await overlay
     .waitFor({ state: "visible", timeout: ONBOARDING_TIP_WAIT })

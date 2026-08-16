@@ -27,7 +27,7 @@ import {
   byTestId,
   TEST_IDS
 } from "./selectors.js"
-import { scrollVersionRowIntoView } from "./mods.js"
+import { dismissSearchOnboardingTip, scrollVersionRowIntoView } from "./mods.js"
 import { waitForInstallComplete } from "./instances.js"
 
 export interface PackFile {
@@ -260,45 +260,6 @@ const MODPACK_SEARCH_TIMEOUT = 90_000
  *  `ModpackDownloadButton` navigates to `/library` from its `prepareInstance`
  *  success handler, so this only covers a render, not a download. */
 const TILE_APPEAR_TIMEOUT = 30_000
-
-/** How long `dismissSearchOnboardingTip` waits for the spotlight overlay to
- *  appear before concluding this tip has already been seen (the common case
- *  after the first call in a worker). `OnboardingTip`'s own click handler
- *  fires on a 200ms delay (`EnhancedSearchBar.tsx`'s `delay={200}`), so this
- *  needs to clear that plus render time — generous margin over it, not a
- *  tuned minimum. */
-const ONBOARDING_TIP_WAIT = 1_000
-
-/**
- * Dismisses the `search-input-syntax` onboarding tip
- * (`components/Onboarding/SpotlightOverlay.tsx`) if the click that just
- * landed on `TEST_IDS.searchInput` triggered it. See `openModpackPage`'s
- * call site for why this driver — uniquely in this suite — needs to handle
- * it. A no-op, bounded by `ONBOARDING_TIP_WAIT`, when the tip does not
- * appear (already seen, or `settings.isFirstLaunch` never resolved to
- * `false` — see `OnboardingContext.tsx`'s `isEnabled`).
- *
- * Dismissed via Escape (`SpotlightOverlay`'s own `keydown` handler calls
- * `onboarding.hideTip()`), not a click on the backdrop or its popover:
- * neither carries a `data-testid`, and Escape needs no selector at all. The
- * backdrop itself — `div.fixed.inset-0.z-99999` — is used only to *detect*
- * the tip; grepping the frontend source turned up exactly one component
- * rendering that exact class combination, so this is safe from hazard 2 in
- * `selectors.ts`'s header (nothing else on this page can match it), but it
- * is still a class selector, not an anchor, so it is kept private to this
- * one detection use rather than promoted to a `selectors.ts` export.
- */
-async function dismissSearchOnboardingTip(page: Page): Promise<void> {
-  const overlay = page.locator("div.fixed.inset-0.z-99999").first()
-  const appeared = await overlay
-    .waitFor({ state: "visible", timeout: ONBOARDING_TIP_WAIT })
-    .then(() => true)
-    .catch(() => false)
-  if (!appeared) return
-
-  await page.keyboard.press("Escape")
-  await overlay.waitFor({ state: "hidden", timeout: 5_000 })
-}
 
 /**
  * Navigates from wherever `page` is to a modpack's addon page, by search.
