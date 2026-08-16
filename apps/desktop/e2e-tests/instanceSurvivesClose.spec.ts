@@ -54,7 +54,8 @@ import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
   createInstanceViaUi,
-  waitForInstallComplete
+  waitForInstallComplete,
+  LAUNCH_TIMEOUT
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { isPidAlive, pidsMatching } from "./helpers/processes.js"
@@ -67,8 +68,6 @@ const LOADER = "forge"
  *  rather than inside `instance/`, so a repair that wipes the data dir does
  *  not take it with it. */
 const PID_FILE_NAME = ".gdl_instance.pid"
-
-const LAUNCH_TIMEOUT = 180_000
 
 /**
  * The game as the OS still sees it: alive *and* still carrying its own

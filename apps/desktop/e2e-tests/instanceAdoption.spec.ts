@@ -44,7 +44,8 @@ import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
   createInstanceViaUi,
-  waitForInstallComplete
+  waitForInstallComplete,
+  LAUNCH_TIMEOUT
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
@@ -55,8 +56,6 @@ const LOADER = "forge"
 
 /** `PID_FILE_NAME` in `managers/instance/mod.rs`. */
 const PID_FILE_NAME = ".gdl_instance.pid"
-
-const LAUNCH_TIMEOUT = 180_000
 
 /** `ADOPTED_POLL_INTERVAL` in `managers/instance/run/mod.rs` is 5s, so a
  *  release is noticed within one tick of the game exiting. Left far wider than

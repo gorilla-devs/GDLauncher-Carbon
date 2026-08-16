@@ -732,13 +732,57 @@ mod tests {
             universe(&["/mods/enabled.jar", "/mods/disabled.jar", "/mods/twin.jar"])
         );
 
-        let direct_scan = scan_disk_state(dir.path(), &file_universe).await.unwrap();
+        // The oracle (`scan_instance_as_packinfo`'s own `DiskScan`) only ever
+        // inserts a `states` entry for a path its walk actually found on
+        // disk, in either spelling — a universe drawn solely from
+        // `packinfo.files.keys()`, like `file_universe` above, can therefore
+        // never contain a path absent from disk, since the oracle would
+        // never have produced a key for one anyway. `absent` is added
+        // directly to the universe passed to `scan_disk_state` below, which
+        // — unlike the oracle — always inserts an explicit
+        // `DiskState::Missing` entry for every universe path it's given.
+        // The two maps are consequently never literally equal over this
+        // wider universe; what both must actually agree on is the effective
+        // lookup `apply_plan::plan` itself performs
+        // (`disk.get(path).copied().unwrap_or(DiskState::Missing)`), so
+        // that's what's compared below instead of raw map equality.
+        const ABSENT: &str = "/mods/absent.jar";
+        let mut universe_with_absent = file_universe.clone();
+        universe_with_absent.insert(ABSENT.to_string());
 
-        assert_eq!(
-            oracle_scan.states, direct_scan.states,
-            "the oracle-derived DiskScan states must exactly match a direct scan_disk_state \
-             over the same universe"
+        let direct_scan = scan_disk_state(dir.path(), &universe_with_absent)
+            .await
+            .unwrap();
+
+        assert!(
+            !oracle_scan.states.contains_key(ABSENT),
+            "the oracle must report no states entry at all for a path absent from disk, got {:?}",
+            oracle_scan.states.get(ABSENT)
         );
+        assert_eq!(
+            direct_scan.states.get(ABSENT).copied(),
+            Some(apply_plan::DiskState::Missing),
+            "scan_disk_state must report an explicit Missing for a universe path absent from disk"
+        );
+
+        for path in &universe_with_absent {
+            let oracle_effective = oracle_scan
+                .states
+                .get(path)
+                .copied()
+                .unwrap_or(apply_plan::DiskState::Missing);
+            let direct_effective = direct_scan
+                .states
+                .get(path)
+                .copied()
+                .unwrap_or(apply_plan::DiskState::Missing);
+            assert_eq!(
+                oracle_effective, direct_effective,
+                "effective disk state (the oracle's `.get(path).copied().unwrap_or(Missing)`, \
+                 matching apply_plan::plan's own lookup) must match a direct scan_disk_state \
+                 for {path}"
+            );
+        }
         assert_eq!(
             oracle_scan.coexisting_disabled_twin_md5, direct_scan.coexisting_disabled_twin_md5,
             "the oracle-derived coexisting-twin md5s must exactly match a direct scan_disk_state"
