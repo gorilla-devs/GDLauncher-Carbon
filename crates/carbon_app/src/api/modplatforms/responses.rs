@@ -9,7 +9,7 @@ use specta::Type;
 use std::{collections::HashMap, ops::Deref};
 use strum_macros::EnumIter;
 
-#[derive(Type, Debug, Deserialize, Serialize, Clone, EnumIter)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone, PartialEq, Eq, EnumIter)]
 #[serde(rename_all = "camelCase")]
 pub enum FEUnifiedSearchType {
     Mod,
@@ -19,6 +19,7 @@ pub enum FEUnifiedSearchType {
     World,
     Plugin,
     Datapack,
+    MinecraftJavaServer,
     Unknown,
 }
 
@@ -32,6 +33,7 @@ impl ToString for FEUnifiedSearchType {
             FEUnifiedSearchType::World => "world",
             FEUnifiedSearchType::Plugin => "plugin",
             FEUnifiedSearchType::Datapack => "datapack",
+            FEUnifiedSearchType::MinecraftJavaServer => "minecraft_java_server",
             FEUnifiedSearchType::Unknown => "unknown",
         }
         .to_string()
@@ -47,6 +49,7 @@ impl From<ProjectType> for FEUnifiedSearchType {
             ProjectType::Shader => FEUnifiedSearchType::Shader,
             ProjectType::Plugin => FEUnifiedSearchType::Plugin,
             ProjectType::DataPack => FEUnifiedSearchType::Datapack,
+            ProjectType::MinecraftJavaServer => FEUnifiedSearchType::MinecraftJavaServer,
             ProjectType::Unknown => FEUnifiedSearchType::Unknown,
         }
     }
@@ -61,6 +64,7 @@ impl From<FEUnifiedSearchType> for ProjectType {
             FEUnifiedSearchType::Shader => ProjectType::Shader,
             FEUnifiedSearchType::Plugin => ProjectType::Plugin,
             FEUnifiedSearchType::Datapack => ProjectType::DataPack,
+            FEUnifiedSearchType::MinecraftJavaServer => ProjectType::MinecraftJavaServer,
             FEUnifiedSearchType::World => ProjectType::Unknown,
             FEUnifiedSearchType::Unknown => ProjectType::Unknown,
         }
@@ -94,6 +98,7 @@ impl From<FEUnifiedSearchType> for ClassId {
             FEUnifiedSearchType::World => ClassId::Worlds,
             FEUnifiedSearchType::Plugin => ClassId::BukkitPlugins,
             FEUnifiedSearchType::Datapack => ClassId::Datapacks,
+            FEUnifiedSearchType::MinecraftJavaServer => ClassId::Other(0),
             FEUnifiedSearchType::Unknown => ClassId::Other(0),
         }
     }
@@ -707,4 +712,40 @@ pub struct FEUnifiedSearchResultWithDescription {
     pub full_description_body: String,
     #[serde(flatten)]
     pub result: FEUnifiedSearchResult,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use carbon_platforms::modrinth::project::ProjectType;
+
+    #[test]
+    fn fe_unified_search_type_round_trip_minecraft_java_server() {
+        let raw = r#""minecraftJavaServer""#;
+        let parsed: FEUnifiedSearchType = serde_json::from_str(raw).unwrap();
+        assert_eq!(parsed, FEUnifiedSearchType::MinecraftJavaServer);
+        // JSON serialization uses camelCase for the FE-facing enum
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap(),
+            r#""minecraftJavaServer""#
+        );
+        // The API facet must use the Modrinth snake_case spelling
+        assert_eq!(parsed.to_string(), "minecraft_java_server");
+    }
+
+    #[test]
+    fn fe_unified_search_type_converts_to_and_from_project_type() {
+        let pt: ProjectType = FEUnifiedSearchType::MinecraftJavaServer.into();
+        assert_eq!(pt, ProjectType::MinecraftJavaServer);
+        let fet: FEUnifiedSearchType = pt.into();
+        assert_eq!(fet, FEUnifiedSearchType::MinecraftJavaServer);
+    }
+
+    #[test]
+    fn fe_unified_search_type_maps_to_class_ids() {
+        let class_id: ClassId = FEUnifiedSearchType::MinecraftJavaServer.into();
+        assert!(matches!(class_id, ClassId::Other(0)));
+        let back: FEUnifiedSearchType = class_id.into();
+        assert_eq!(back, FEUnifiedSearchType::Unknown);
+    }
 }

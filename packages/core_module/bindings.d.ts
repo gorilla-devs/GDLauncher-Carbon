@@ -211,7 +211,7 @@ export type Procedures = {
     subscriptions: never
 };
 
-export type FEUnifiedSearchType = "mod" | "modpack" | "resourcePack" | "shader" | "world" | "plugin" | "datapack" | "unknown"
+export type FEUnifiedSearchType = "mod" | "modpack" | "resourcePack" | "shader" | "world" | "plugin" | "datapack" | "minecraftJavaServer" | "unknown"
 
 export type FEQuotaInfo = { usedKilobytes: number; totalKilobytes: number }
 
@@ -337,7 +337,7 @@ export type FEUploadProfileIcon = { uuid: string; iconPath: string }
 
 export type FEMoveServerTarget = { beforeServer: FEServerId } | { endOfGroup: FEServerGroupId } | { beforeGroup: FEServerGroupId }
 
-export type MRFEProjectType = "mod" | "shader" | "modpack" | "resourcepack" | "plugin" | "datapack" | "unknown"
+export type MRFEProjectType = "mod" | "shader" | "modpack" | "resourcepack" | "plugin" | "datapack" | "minecraft_java_server" | "unknown"
 
 export type FERequestEmailChange = { email: string; uuid: string }
 

@@ -64,6 +64,8 @@ pub enum MRFEProjectType {
     ResourcePack,
     Plugin,
     DataPack,
+    #[serde(rename = "minecraft_java_server")]
+    MinecraftJavaServer,
     #[serde(other)]
     Unknown,
 }
@@ -77,6 +79,7 @@ impl From<ProjectType> for MRFEProjectType {
             ProjectType::ResourcePack => MRFEProjectType::ResourcePack,
             ProjectType::Plugin => MRFEProjectType::Plugin,
             ProjectType::DataPack => MRFEProjectType::DataPack,
+            ProjectType::MinecraftJavaServer => MRFEProjectType::MinecraftJavaServer,
             ProjectType::Unknown => MRFEProjectType::Unknown,
         }
     }
@@ -91,6 +94,7 @@ impl From<MRFEProjectType> for ProjectType {
             MRFEProjectType::ResourcePack => ProjectType::ResourcePack,
             MRFEProjectType::Plugin => ProjectType::Plugin,
             MRFEProjectType::DataPack => ProjectType::DataPack,
+            MRFEProjectType::MinecraftJavaServer => ProjectType::MinecraftJavaServer,
             MRFEProjectType::Unknown => ProjectType::Unknown,
         }
     }
@@ -292,6 +296,7 @@ pub enum MRFELoaderType {
     Vanilla,
     Velocity,
     Waterfall,
+    #[serde(other)]
     Other,
 }
 
@@ -320,7 +325,8 @@ impl From<LoaderType> for MRFELoaderType {
             LoaderType::Vanilla => MRFELoaderType::Vanilla,
             LoaderType::Velocity => MRFELoaderType::Velocity,
             LoaderType::Waterfall => MRFELoaderType::Waterfall,
-            LoaderType::Other(other) => MRFELoaderType::Other,
+            LoaderType::Other(_) => MRFELoaderType::Other,
+            _ => MRFELoaderType::Other,
         }
     }
 }
@@ -1089,5 +1095,50 @@ impl From<TeamMember> for MRFETeamMember {
             role: value.role,
             ordering: value.ordering.map(|v| v.to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn mrfe_project_type_round_trip_minecraft_java_server() {
+        let raw = r#""minecraft_java_server""#;
+        let parsed: MRFEProjectType = serde_json::from_str(raw).unwrap();
+        assert_eq!(parsed, MRFEProjectType::MinecraftJavaServer);
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap(),
+            r#""minecraft_java_server""#
+        );
+    }
+
+    #[test]
+    fn mrfe_project_type_converts_to_and_from_project_type() {
+        let pt: ProjectType = MRFEProjectType::MinecraftJavaServer.into();
+        assert_eq!(pt, ProjectType::MinecraftJavaServer);
+        let mrfe: MRFEProjectType = pt.into();
+        assert_eq!(mrfe, MRFEProjectType::MinecraftJavaServer);
+    }
+
+    #[test]
+    fn mrfe_project_type_unknown_falls_back() {
+        let raw = r#""some_future_type""#;
+        let parsed: MRFEProjectType = serde_json::from_str(raw).unwrap();
+        assert_eq!(parsed, MRFEProjectType::Unknown);
+    }
+
+    #[test]
+    fn mrfe_loader_type_unknown_falls_back() {
+        // new Modrinth loaders must never fail to deserialize
+        let raw = r#""geyser""#;
+        let parsed: MRFELoaderType = serde_json::from_str(raw).unwrap();
+        assert_eq!(parsed, MRFELoaderType::Other);
+    }
+
+    #[test]
+    fn mrfe_loader_converts_new_loader_types_to_other() {
+        let loader: MRFELoaderType = LoaderType::Geyser.into();
+        assert_eq!(loader, MRFELoaderType::Other);
     }
 }
