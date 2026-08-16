@@ -64,7 +64,9 @@ import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
+  clickPlayAndAwaitLaunched,
   createInstanceViaUi,
+  STOP_TIMEOUT,
   waitForInstallComplete
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
@@ -83,12 +85,6 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 const INSTANCE_NAME = "gdl-e2e-game-launch"
 const MC_VERSION = "1.20.1"
 const LOADER = "forge"
-
-/** How long the client is given to produce its first log output after Play.
- *  Generous: a cold instance re-resolves Java and assets first. */
-const FIRST_OUTPUT_TIMEOUT = 180_000
-
-const GAME_STOP_TIMEOUT = 60_000
 
 test.describe("game launch", () => {
   // eslint-disable-next-line no-empty-pattern
@@ -122,7 +118,6 @@ test.describe("game launch", () => {
      *  before anything launches, and a plain `includes` check is satisfied
      *  instantly and proves nothing. */
     const closedCount = () => stdout.join("").split("GAME_CLOSED").length
-    const launchedCount = () => stdout.join("").split("GAME_LAUNCHED").length
 
     // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
     // must never re-throw over an already-failing body, only over a passing
@@ -149,16 +144,7 @@ test.describe("game launch", () => {
         closedBeforeLaunch = closedCount()
 
         await test.step("launch the game", async () => {
-          const tile = page.locator(byInstanceName(INSTANCE_NAME))
-          await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-          await expect
-            .poll(() => launchedCount(), {
-              timeout: FIRST_OUTPUT_TIMEOUT,
-              message:
-                "the core never reported GAME_LAUNCHED after Play was clicked"
-            })
-            .toBeGreaterThan(1)
+          await clickPlayAndAwaitLaunched(page, INSTANCE_NAME, { stdout })
         })
 
         await test.step("wait for the client to finish loading", async () => {
@@ -220,7 +206,7 @@ test.describe("game launch", () => {
 
               await expect
                 .poll(() => closedCount(), {
-                  timeout: GAME_STOP_TIMEOUT,
+                  timeout: STOP_TIMEOUT,
                   message:
                     "the game never reported a new GAME_CLOSED after its stop " +
                     "control was clicked — a Minecraft process may have been " +

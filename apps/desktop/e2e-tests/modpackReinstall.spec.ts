@@ -12,8 +12,10 @@ import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
+  clickPlayAndAwaitLaunched,
   deleteInstanceViaUi,
-  ensureLibraryInteractive
+  ensureLibraryInteractive,
+  STOP_TIMEOUT
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { classifyPackinfo, packinfoDataPath } from "./helpers/packinfo.js"
@@ -134,13 +136,6 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  * `InfiniteScrollVersionsQueryWrapper` tearing the list down on an unchanged
  * scope, and that is fixed in the product now.
  */
-
-/** Mirrors `gameLaunch.spec.ts`'s `FIRST_OUTPUT_TIMEOUT` /
- *  `modpackLifecycle.spec.ts`'s `LAUNCH_TIMEOUT`. */
-const LAUNCH_TIMEOUT = 180_000
-
-/** Mirrors `gameLaunch.spec.ts`'s `GAME_STOP_TIMEOUT`. */
-const STOP_TIMEOUT = 60_000
 
 test.describe("modpack reinstall", () => {
   test("reinstalling restores a deleted pack file and repairs a damaged one", async ({
@@ -326,7 +321,6 @@ test.describe("modpack reinstall", () => {
     // would be satisfied before the game ever launches — see
     // `gameLaunch.spec.ts`'s header.
     const closedCount = () => stdout.join("").split("GAME_CLOSED").length
-    const launchedCount = () => stdout.join("").split("GAME_LAUNCHED").length
 
     // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
     // must never re-throw over an already-failing body, only over a passing
@@ -350,15 +344,7 @@ test.describe("modpack reinstall", () => {
 
         const tile = page.locator(byInstanceName(name))
         closedBeforeLaunch = closedCount()
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-        await expect
-          .poll(() => launchedCount(), {
-            timeout: LAUNCH_TIMEOUT,
-            message:
-              "the core never reported GAME_LAUNCHED after Play was clicked"
-          })
-          .toBeGreaterThan(1)
+        await clickPlayAndAwaitLaunched(page, name, { stdout })
 
         await expect(
           tile,

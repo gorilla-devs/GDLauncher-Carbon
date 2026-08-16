@@ -12,6 +12,7 @@ import {
 import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
+import { clickPlayAndAwaitLaunched, STOP_TIMEOUT } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
 import {
@@ -246,14 +247,6 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  *      surfacing at the earliest read of the file this test happens to make.
  */
 
-/** How long the core is given to report `GAME_LAUNCHED` after Play is
- *  clicked. Mirrors `gameLaunch.spec.ts`'s `FIRST_OUTPUT_TIMEOUT`. */
-const LAUNCH_TIMEOUT = 180_000
-
-/** How long the core is given to report a new `GAME_CLOSED` after the stop
- *  control is clicked. Mirrors `gameLaunch.spec.ts`'s `GAME_STOP_TIMEOUT`. */
-const STOP_TIMEOUT = 60_000
-
 /**
  * Attaches the game's own per-launch log to the Playwright report on a
  * failing run — the game-log analogue of `attachCoreLogOnFailure`, which
@@ -315,7 +308,6 @@ test.describe("modpack lifecycle", () => {
     // plain `.includes()` on GAME_CLOSED would be satisfied instantly by the
     // install's own completion and prove nothing about the real launch.
     const closedCount = () => stdout.join("").split("GAME_CLOSED").length
-    const launchedCount = () => stdout.join("").split("GAME_LAUNCHED").length
 
     // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
     // must never re-throw over an already-failing body, only over a passing
@@ -362,15 +354,7 @@ test.describe("modpack lifecycle", () => {
         // --- launch leg ---------------------------------------------------
         const tile = page.locator(byInstanceName(name))
         closedBeforeLaunch = closedCount()
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-        await expect
-          .poll(() => launchedCount(), {
-            timeout: LAUNCH_TIMEOUT,
-            message:
-              "the core never reported GAME_LAUNCHED after Play was clicked"
-          })
-          .toBeGreaterThan(1)
+        await clickPlayAndAwaitLaunched(page, name, { stdout })
 
         const logsDir = instanceLogsDir(harness.runtimePath, shortpath)
         await waitForLogQuiescence(

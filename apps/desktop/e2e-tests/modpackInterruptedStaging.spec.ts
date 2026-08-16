@@ -16,7 +16,8 @@ import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
   deleteInstanceViaUi,
-  ensureLibraryInteractive
+  ensureLibraryInteractive,
+  STOP_TIMEOUT
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
@@ -131,9 +132,6 @@ const STAGING_FILL_TIMEOUT = 120_000
 /** How long the resumed change is given to complete after the relaunch: a
  *  full re-download of a 28 MiB pack plus the apply. */
 const RESUME_TIMEOUT = 300_000
-
-/** Mirrors `modpackReinstall.spec.ts`. */
-const STOP_TIMEOUT = 60_000
 
 test.describe("modpack interrupted staging", () => {
   // eslint-disable-next-line no-empty-pattern

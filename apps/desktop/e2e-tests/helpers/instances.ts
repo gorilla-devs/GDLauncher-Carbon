@@ -356,6 +356,64 @@ export async function waitForInstallComplete(
   }
 }
 
+/** How long the core is given to report `GAME_LAUNCHED` after Play is
+ *  clicked, in `clickPlayAndAwaitLaunched` below. Generous: a cold instance
+ *  re-resolves Java and assets first. Shared by every spec that drives a
+ *  real launch — previously re-declared independently in each one
+ *  (`gameLaunch.spec.ts`'s `FIRST_OUTPUT_TIMEOUT`,
+ *  `modpackLifecycle.spec.ts`/`modpackChangeVersionGuard.spec.ts`/
+ *  `modpackReinstall.spec.ts`'s `LAUNCH_TIMEOUT`), linked only by "Mirrors
+ *  X's constant" doc comments pointing back at whichever of those files
+ *  happened to be written first. */
+export const LAUNCH_TIMEOUT = 180_000
+
+/** How long the core is given to report a new `GAME_CLOSED` after the stop
+ *  control — the same Play control, while the instance is running — is
+ *  clicked. Shared for the same reason as `LAUNCH_TIMEOUT` above; previously
+ *  `gameLaunch.spec.ts`'s `GAME_STOP_TIMEOUT` and every other launch spec's
+ *  own `STOP_TIMEOUT`. */
+export const STOP_TIMEOUT = 60_000
+
+/**
+ * Clicks an instance tile's Play control and waits for the core to report a
+ * new `GAME_LAUNCHED`, i.e. a real launch actually started — not merely that
+ * the click landed. Counted via `opts.stdout`, never searched for with a
+ * plain `.includes()`: an install ending in its own `GAME_CLOSED`-to-Inactive
+ * transition already primes that string before anything launches (see
+ * `gameLaunch.spec.ts`'s module doc comment), and while `GAME_LAUNCHED` has
+ * no equivalent false-positive source, counting a rising baseline is what
+ * also makes this safe to call a *second* time in the same test (a relaunch
+ * after a stop) — `before` is read immediately before the click, so the poll
+ * below only needs to see the count rise past whatever it already was, first
+ * launch or not.
+ *
+ * Was five independent copies of this exact click-then-poll block (one
+ * inlined in `gameLaunch.spec.ts`'s test body, the rest each re-declaring
+ * their own `LAUNCH_TIMEOUT` "Mirrors"ing it), differing only in the
+ * poll's failure message and, in `modpackChangeVersionGuard.spec.ts`'s
+ * second call, that baseline.
+ */
+export async function clickPlayAndAwaitLaunched(
+  page: Page,
+  name: string,
+  opts: { stdout: string[]; timeout?: number; message?: string }
+): Promise<void> {
+  const launchedCount = () => opts.stdout.join("").split("GAME_LAUNCHED").length
+  const before = launchedCount()
+
+  const tile = page.locator(byInstanceName(name))
+  await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+
+  await expect
+    .poll(() => launchedCount(), {
+      timeout: opts.timeout ?? LAUNCH_TIMEOUT,
+      message:
+        opts.message ??
+        "the core never reported GAME_LAUNCHED after Play was clicked"
+    })
+    .toBeGreaterThan(before)
+}
+
 /** Removes an instance so the next matrix entry starts from a clean library. */
 export async function deleteInstanceViaUi(
   page: Page,

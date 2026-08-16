@@ -11,6 +11,7 @@ import {
 import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
+import { clickPlayAndAwaitLaunched, STOP_TIMEOUT } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
 import {
@@ -117,12 +118,6 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  * assertion instead, independent of which backend guard is in play.
  */
 
-/** Mirrors `modpackReinstall.spec.ts`'s `LAUNCH_TIMEOUT`. */
-const LAUNCH_TIMEOUT = 180_000
-
-/** Mirrors `modpackReinstall.spec.ts`'s `STOP_TIMEOUT`. */
-const STOP_TIMEOUT = 60_000
-
 /** How long `.setup/` is given to stay swept — i.e. absent — once a launch
  *  has had the chance to create it. The guard refuses before `create_dir_all`
  *  ever runs, so in practice this bound is never approached; kept generous
@@ -190,7 +185,6 @@ test.describe("modpack change version guard", () => {
     // a GAME_CLOSED transition to Inactive, so an unscoped `.includes()` would
     // be satisfied before the game ever launches.
     const closedCount = () => stdout.join("").split("GAME_CLOSED").length
-    const launchedCount = () => stdout.join("").split("GAME_LAUNCHED").length
 
     // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
     // must never re-throw over an already-failing body, only over a passing
@@ -222,15 +216,7 @@ test.describe("modpack change version guard", () => {
 
         const tile = page.locator(byInstanceName(name))
         closedBeforeLaunch = closedCount()
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-        await expect
-          .poll(() => launchedCount(), {
-            timeout: LAUNCH_TIMEOUT,
-            message:
-              "the core never reported GAME_LAUNCHED after Play was clicked"
-          })
-          .toBeGreaterThan(1)
+        await clickPlayAndAwaitLaunched(page, name, { stdout })
         await expect(
           tile,
           "the instance never reached the running state after GAME_LAUNCHED"
@@ -340,16 +326,11 @@ test.describe("modpack change version guard", () => {
         // refused must not resurrect itself on a later, perfectly normal
         // launch — there was never anything queued for it to find.
         closedBeforeLaunch = closedCount()
-        const launchedBeforeRelaunch = launchedCount()
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-        await expect
-          .poll(() => launchedCount(), {
-            timeout: LAUNCH_TIMEOUT,
-            message:
-              "the core never reported GAME_LAUNCHED after the second Play click"
-          })
-          .toBeGreaterThan(launchedBeforeRelaunch)
+        await clickPlayAndAwaitLaunched(page, name, {
+          stdout,
+          message:
+            "the core never reported GAME_LAUNCHED after the second Play click"
+        })
 
         await page.waitForTimeout(SECOND_ATTEMPT_SETTLE)
         expect(
