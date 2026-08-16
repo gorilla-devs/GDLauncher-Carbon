@@ -27,7 +27,7 @@
  */
 
 import fs from "node:fs"
-import { expect, type Page } from "@playwright/test"
+import { expect, type Page, type Response } from "@playwright/test"
 import {
   byAddonTypeOption,
   byAddonVersionRow,
@@ -870,6 +870,79 @@ export interface AddonVersionSummary {
 const VERSIONS_RESPONSE_TIMEOUT = 30_000
 
 /**
+ * Attaches a `response` listener matching `matcher`, runs `opts.run`, then
+ * waits for the matched list to stop growing — held steady for a full
+ * second — before returning it. Always detaches the listener before
+ * returning, success or failure, so a caller's own later navigation never
+ * accumulates a stale listener from an earlier call.
+ *
+ * A single matching response is not necessarily the last one: this suite has
+ * two confirmed sources of a legitimate second (still-matching) fetch for the
+ * same list — `openAddonVersions` below, once the addon's supported loaders
+ * are known, `ExploreVersionsNavbar` resets a loader filter the addon does
+ * not offer (a Forge instance opening a Fabric-only mod); `resolutionCapture.ts`'s
+ * `captureModrinthVersions`, the scoping effect firing twice in a row behind
+ * its own `getInstanceDetails` round trip. Either kind of refetch replaces
+ * the whole result set out from under a caller that raced ahead on the
+ * first response — observed hard-failing `openAddonVersions`'s original
+ * caller with a mid-click "element detached" error. So this never returns on
+ * the instant one match lands; it waits for the count to stop changing for a
+ * full `SETTLE_WINDOW`, so a caller that immediately acts on the returned
+ * list isn't racing a re-render still in flight.
+ *
+ * Listening starts before `opts.run`, not after: attaching the listener
+ * first is what makes catching every matching response (including one that
+ * fires synchronously off `run`'s own first await) deterministic rather than
+ * a race against Playwright's own event delivery.
+ *
+ * Was two independent copies of this exact attach/settle/detach loop, one in
+ * `openAddonVersions` below, one in `resolutionCapture.ts`'s
+ * `captureModrinthVersions` — same `lastCount`/`stableSince`/`SETTLE_WINDOW`
+ * logic, differing only in what counted as a match and how long the overall
+ * wait was given, both of which are exactly `matcher` and `opts.timeout`
+ * here.
+ */
+export async function settleOnScopedResponses(
+  page: Page,
+  matcher: (response: Response) => boolean,
+  opts: { timeout: number; run: () => Promise<void> }
+): Promise<Response[]> {
+  const SETTLE_WINDOW = 1_000
+  const POLL_INTERVAL_MS = 250
+
+  const matched: Response[] = []
+  const onResponse = (r: Response) => {
+    if (matcher(r)) matched.push(r)
+  }
+  page.on("response", onResponse)
+
+  try {
+    await opts.run()
+
+    const deadline = Date.now() + opts.timeout
+    let lastCount = 0
+    let stableSince: number | null = null
+    while (Date.now() < deadline) {
+      if (matched.length !== lastCount) {
+        lastCount = matched.length
+        stableSince = Date.now()
+      } else if (
+        lastCount > 0 &&
+        stableSince !== null &&
+        Date.now() - stableSince >= SETTLE_WINDOW
+      ) {
+        break
+      }
+      await page.waitForTimeout(POLL_INTERVAL_MS)
+    }
+  } finally {
+    page.off("response", onResponse)
+  }
+
+  return matched
+}
+
+/**
  * From an addon page reached with `?instanceId=<id>` (i.e. via
  * `openAddonPage`, called right after `searchForMod` — same precondition
  * chain), opens the Versions tab and returns every Modrinth version reported
@@ -884,10 +957,10 @@ const VERSIONS_RESPONSE_TIMEOUT = 30_000
  * symmetric-looking coverage that nothing in this suite executes —
  * CurseForge's `getModFiles` is actually paginated
  * (`ModFilesParametersQuery`'s `index`/`pageSize`), unlike Modrinth's
- * single-response `getProjectVersions`, so the dual-request race logic below
- * (tuned against Modrinth's specific timing — see the next paragraph) is not
- * merely untested against CurseForge, it is plausibly wrong for it. A future
- * CurseForge update test should write that branch fresh, against
+ * single-response `getProjectVersions`, so the dual-request race logic
+ * `settleOnScopedResponses` runs (tuned against Modrinth's specific timing)
+ * is not merely untested against CurseForge, it is plausibly wrong for it. A
+ * future CurseForge update test should write that branch fresh, against
  * CurseForge's real paginated behavior confirmed live, not inherit this.
  *
  * This list is scoped to the instance's own Minecraft version and loader.
@@ -904,7 +977,6 @@ const VERSIONS_RESPONSE_TIMEOUT = 30_000
  * answer replaces the list under whoever is already clicking it. Waiting on
  * `game_version` specifically keeps that failure visible instead of silently
  * accepting whichever response is first.
- * Listening from before the click, not after, is what makes it deterministic.
  *
  * Also waits for at least one row to mount in the DOM
  * (`TEST_IDS.addonVersionRow`), since `installAddonVersion` needs it there,
@@ -918,54 +990,22 @@ export async function openAddonVersions(
   // Present on the URL of the scoped request only — confirmed live.
   const scopedMarker = "game_version"
 
-  const scopedResponses: import("@playwright/test").Response[] = []
-  const onResponse = (r: import("@playwright/test").Response) => {
-    if (r.url().includes(queryName) && r.url().includes(scopedMarker)) {
-      scopedResponses.push(r)
-    }
-  }
-  page.on("response", onResponse)
+  const scopedResponses = await settleOnScopedResponses(
+    page,
+    (r) => r.url().includes(queryName) && r.url().includes(scopedMarker),
+    {
+      timeout: VERSIONS_RESPONSE_TIMEOUT,
+      run: async () => {
+        await page.getByRole("tab", { name: "Versions" }).click()
 
-  try {
-    await page.getByRole("tab", { name: "Versions" }).click()
-
-    await expect(page.locator(byTestId(TEST_IDS.addonVersionRow)).first(), {
-      message:
-        "openAddonVersions: no " +
-        `"${TEST_IDS.addonVersionRow}" row ever mounted`
-    }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
-
-    // One scoped response is not necessarily the last one: once the addon's
-    // supported loaders are known, `ExploreVersionsNavbar` resets a loader
-    // filter the addon does not offer (a Forge instance opening a
-    // Fabric-only mod), and that legitimately refetches — still scoped, so
-    // still counted here. Each refetch replaces the whole virtualized row
-    // set, which raced a caller's click on a specific row hard enough to
-    // fail it outright (element detached mid-click). So this does not return
-    // the instant one scoped
-    // response lands; it waits for the count to stop changing for a full
-    // `SETTLE_WINDOW`, so a caller that immediately clicks into the returned
-    // list isn't racing a re-render still in flight.
-    const deadline = Date.now() + VERSIONS_RESPONSE_TIMEOUT
-    const SETTLE_WINDOW = 1_000
-    let lastCount = 0
-    let stableSince: number | null = null
-    while (Date.now() < deadline) {
-      if (scopedResponses.length !== lastCount) {
-        lastCount = scopedResponses.length
-        stableSince = Date.now()
-      } else if (
-        lastCount > 0 &&
-        stableSince !== null &&
-        Date.now() - stableSince >= SETTLE_WINDOW
-      ) {
-        break
+        await expect(page.locator(byTestId(TEST_IDS.addonVersionRow)).first(), {
+          message:
+            "openAddonVersions: no " +
+            `"${TEST_IDS.addonVersionRow}" row ever mounted`
+        }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
       }
-      await page.waitForTimeout(250)
     }
-  } finally {
-    page.off("response", onResponse)
-  }
+  )
 
   if (scopedResponses.length === 0) {
     throw new Error(

@@ -53,6 +53,7 @@
  */
 
 import { expect, type Page, type Response } from "@playwright/test"
+import { settleOnScopedResponses } from "./mods.js"
 import {
   curseforgeChannel,
   modrinthChannel,
@@ -94,7 +95,6 @@ export interface VersionLists {
  */
 const SCOPED_MARKER = "game_version"
 const CAPTURE_TIMEOUT = 30_000
-const SETTLE_WINDOW = 1_000
 
 /** The `input` object `InfiniteScrollVersionsQueryWrapper`'s Modrinth branch
  *  serialises as `modplatforms.modrinth.getProjectVersions`'s rspc query
@@ -163,7 +163,12 @@ const DIRECT_FETCH_TIMEOUT_MS = 30_000
 /**
  * `run` drives whatever UI navigation the caller needs (typically opening
  * the addon page and its Versions tab) while this function listens for the
- * app's own scoped `modplatforms.modrinth.getProjectVersions` response.
+ * app's own scoped `modplatforms.modrinth.getProjectVersions` response —
+ * via `helpers/mods.ts`'s `settleOnScopedResponses`, which also covers why
+ * this waits for the matched list to settle rather than returning on the
+ * first match (the scoping effect fires from behind its own
+ * `getInstanceDetails` round trip and has been observed firing twice, each
+ * replacing the whole virtualized row set).
  * `projectId` is used only for the direct, unauthenticated fetch that
  * supplies `unfiltered` — see the module doc comment for why that no longer
  * comes from observing the app's own traffic.
@@ -174,40 +179,12 @@ export async function captureModrinthVersions(
   run: () => Promise<void>
 ): Promise<VersionLists> {
   const queryName = "modplatforms.modrinth.getProjectVersions"
-  const scoped: Response[] = []
 
-  const onResponse = (r: Response) => {
-    if (r.url().includes(queryName) && r.url().includes(SCOPED_MARKER)) {
-      scoped.push(r)
-    }
-  }
-  page.on("response", onResponse)
-
-  try {
-    await run()
-    // Settle on the scoped list, not the first response: the scoping effect
-    // fires from behind its own getInstanceDetails round trip and has been
-    // observed firing twice, each replacing the whole virtualized row set
-    // (see `openAddonVersions`'s identical reasoning in `helpers/mods.ts`).
-    const deadline = Date.now() + CAPTURE_TIMEOUT
-    let lastCount = 0
-    let stableSince: number | null = null
-    while (Date.now() < deadline) {
-      if (scoped.length !== lastCount) {
-        lastCount = scoped.length
-        stableSince = Date.now()
-      } else if (
-        lastCount > 0 &&
-        stableSince !== null &&
-        Date.now() - stableSince >= SETTLE_WINDOW
-      ) {
-        break
-      }
-      await page.waitForTimeout(250)
-    }
-  } finally {
-    page.off("response", onResponse)
-  }
+  const scoped = await settleOnScopedResponses(
+    page,
+    (r) => r.url().includes(queryName) && r.url().includes(SCOPED_MARKER),
+    { timeout: CAPTURE_TIMEOUT, run }
+  )
 
   if (scoped.length === 0) {
     throw new Error(
