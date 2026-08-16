@@ -1,6 +1,6 @@
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { useLocation, useParams } from "@solidjs/router"
-import { Match, Show, Switch, createEffect, createMemo } from "solid-js"
+import { Match, Show, Switch, createMemo } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
 import { rspc } from "@/utils/rspcClient"
@@ -11,6 +11,7 @@ import { getServerImageUrl } from "@/utils/instances"
 import DetailPageLayout, {
   type DetailPageTab
 } from "@/pages/Library/shared/DetailPageLayout"
+import { useEntityGoneGuard } from "@/pages/Library/shared/useEntityGoneGuard"
 import { isConsoleFullScreen } from "./Tabs/ConsoleTab"
 
 interface ServerTab {
@@ -125,16 +126,16 @@ const Server = (props: { children?: any }) => {
     navigator.navigate(path)
   }
 
-  // Navigate back if server was deleted
-  createEffect(() => {
-    if (
-      routeData.allServers.data &&
-      !routeData.allServers.data?.find(
-        (s: { id: number }) => s.id === serverId()
-      )
-    ) {
-      navigator.navigate("/library?mode=servers")
-    }
+  // Leaves the page when the server this route points at is gone — deleted
+  // from under the user, most often from another surface. Same hardened
+  // guard as Instance/index.tsx; see `useEntityGoneGuard` for why both the
+  // NaN-id and isFetching guards matter.
+  useEntityGoneGuard({
+    id: serverId,
+    list: () => routeData.allServers.data,
+    isFetching: () => routeData.allServers.isFetching,
+    matches: (server: { id: number }, id) => server.id === id,
+    redirectTo: "/library?mode=servers"
   })
 
   const tabs = (): DetailPageTab[] =>

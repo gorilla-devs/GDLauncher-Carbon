@@ -50,6 +50,7 @@ import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DetailPageLayout, {
   type DetailPageTab
 } from "@/pages/Library/shared/DetailPageLayout"
+import { useEntityGoneGuard } from "@/pages/Library/shared/useEntityGoneGuard"
 
 interface InstancePage {
   label: string | JSX.Element
@@ -449,42 +450,25 @@ const Instance = (props: { children?: any }) => {
   ]
 
   // Leaves the page when the instance this route points at is gone — deleted
-  // from under the user, most often from another surface.
+  // from under the user, most often from another surface. See
+  // `useEntityGoneGuard` for why both the NaN-id and isFetching guards
+  // matter (also used by Server/index.tsx).
   //
-  // Both guards below narrow what counts as evidence of "gone", because the
-  // raw signal — "the id is not in the list I can see" — is also what an
-  // unparseable route id and a list that is not current yet look like, and
-  // acting on either navigates the user off a page that is perfectly valid.
-  //
-  // Neither guard has been observed firing on a real bounce. Instrumenting
-  // this effect and every navigation to /library across three specs,
-  // including two that run against a fresh first-ever session, recorded zero
-  // NaN ids, zero navigations from here, and no case where the instance was
-  // genuinely absent; every /library navigation out of an addon route came
-  // from the download button's own `onSuccess`. So these close a window that
-  // is reachable by construction rather than one caught in the act — worth
-  // keeping at this price, but do not cite them as the cure for a bounce
-  // until something actually reproduces one.
-  createEffect(() => {
-    const id = instanceId()
-
-    // A route id that does not parse is not evidence the instance was
-    // deleted, and it matches nothing in the list.
-    if (!Number.isInteger(id)) return
-
-    const instances = routeData.instancesUngrouped.data
-    if (!instances) return
-
-    // `data` is the last *successful* result and keeps being served unchanged
-    // while a refetch is in flight, so it can predate this instance
-    // entirely — `instance.getAllInstances` is invalidated repeatedly while
-    // any task runs. Waiting costs nothing: the effect re-runs when the
-    // refetch lands, and a genuinely deleted instance leaves then.
-    if (routeData.instancesUngrouped.isFetching) return
-
-    if (!instances.some((instance: { id: number }) => instance.id === id)) {
-      navigator.navigate("/library")
-    }
+  // Neither guard has been observed firing on a real bounce here.
+  // Instrumenting this effect and every navigation to /library across three
+  // specs, including two that run against a fresh first-ever session,
+  // recorded zero NaN ids, zero navigations from here, and no case where the
+  // instance was genuinely absent; every /library navigation out of an
+  // addon route came from the download button's own `onSuccess`. So these
+  // close a window that is reachable by construction rather than one caught
+  // in the act — worth keeping at this price, but do not cite them as the
+  // cure for a bounce until something actually reproduces one.
+  useEntityGoneGuard({
+    id: instanceId,
+    list: () => routeData.instancesUngrouped.data,
+    isFetching: () => routeData.instancesUngrouped.isFetching,
+    matches: (instance: { id: number }, id) => instance.id === id,
+    redirectTo: "/library"
   })
 
   const iconUrl = () =>
