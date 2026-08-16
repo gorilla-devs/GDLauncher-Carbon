@@ -74,9 +74,9 @@ import {
   instanceLogsDir,
   LAUNCH_MARKERS,
   LAUNCH_MARKER_QUORUM,
-  logSize,
   newestLogFile,
-  readLogMessages
+  readLogMessages,
+  waitForLogQuiescence
 } from "./helpers/gameLog.js"
 import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 
@@ -88,23 +88,7 @@ const LOADER = "forge"
  *  Generous: a cold instance re-resolves Java and assets first. */
 const FIRST_OUTPUT_TIMEOUT = 180_000
 
-/** How long to wait for the log to stop growing once it has started. */
-const QUIESCENCE_TIMEOUT = 240_000
-
-/** How long the log must hold steady to count as "finished loading". Long
- *  enough to clear the gaps between startup phases — texture stitching pauses
- *  for seconds at a time under software GL — without waiting out the whole
- *  test budget. */
-const QUIESCENCE_HOLD_MS = 20_000
-
-/** Poll interval for log growth. */
-const POLL_MS = 2_000
-
 const GAME_STOP_TIMEOUT = 60_000
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
 
 test.describe("game launch", () => {
   // eslint-disable-next-line no-empty-pattern
@@ -178,50 +162,10 @@ test.describe("game launch", () => {
         })
 
         await test.step("wait for the client to finish loading", async () => {
-          // Growth first. A log that never grows means the JVM produced
-          // nothing, which is a different failure from one that started and
-          // stopped, and is worth distinguishing in the message.
-          await expect
-            .poll(() => logSize(newestLogFile(logsDir)), {
-              timeout: FIRST_OUTPUT_TIMEOUT,
-              message:
-                `no game log appeared under ${logsDir} after launch — the ` +
-                "client produced no output at all"
-            })
-            .toBeGreaterThan(0)
-
-          // Then quiescence: the same size held across QUIESCENCE_HOLD_MS.
-          const deadline = Date.now() + QUIESCENCE_TIMEOUT
-          let lastSize = -1
-          let steadySince = Date.now()
-
-          while (Date.now() < deadline) {
-            const size = logSize(newestLogFile(logsDir))
-            if (size !== lastSize) {
-              lastSize = size
-              steadySince = Date.now()
-            } else if (Date.now() - steadySince >= QUIESCENCE_HOLD_MS) {
-              break
-            }
-
-            // Checked every poll rather than once at the end: a client that
-            // died is not going to start logging again, so continuing to wait
-            // for quiescence would just burn the timeout before reporting the
-            // real cause.
-            expect(
-              closedCount(),
-              "the game exited while still loading — it crashed rather than " +
-                "reaching the main menu. The captured game log is attached."
-            ).toBe(closedBeforeLaunch)
-
-            await sleep(POLL_MS)
-          }
-
-          expect(
-            Date.now() - steadySince,
-            `the game log under ${logsDir} never stopped growing within ` +
-              `${QUIESCENCE_TIMEOUT}ms — the client never finished loading`
-          ).toBeGreaterThanOrEqual(QUIESCENCE_HOLD_MS)
+          await waitForLogQuiescence(
+            logsDir,
+            () => closedCount() === closedBeforeLaunch
+          )
         })
 
         await test.step("assert it is idle at a menu, not dead", async () => {

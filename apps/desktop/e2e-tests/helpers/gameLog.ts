@@ -10,10 +10,15 @@
  *
  * The pure parsing and matching live here rather than in the spec so they are
  * unit-testable without a running game, following `installVerify.ts`'s split.
+ * `waitForLogQuiescence` is the one exception — a real Playwright polling
+ * loop, not a pure function — kept here anyway because it is built directly
+ * on `newestLogFile`/`logSize` above and is shared by every spec that drives
+ * a real launch (`gameLaunch.spec.ts`, `modpackLifecycle.spec.ts`).
  */
 
 import fs from "node:fs"
 import path from "node:path"
+import { expect } from "@playwright/test"
 
 /** Matches one log4j event's message payload, including multi-line ones —
  *  the launcher pretty-prints Rust structs across a dozen lines inside a
@@ -127,4 +132,97 @@ export function logSize(logFile: string | undefined): number {
 export function readLogMessages(logFile: string | undefined): string[] {
   if (!logFile || !fs.existsSync(logFile)) return []
   return parseLogMessages(fs.readFileSync(logFile, "utf8"))
+}
+
+/**
+ * How long the client is given to produce its first byte of log output after
+ * Play is clicked, inside `waitForLogQuiescence` below. Generous: a cold
+ * instance re-resolves Java and assets first. The two callers
+ * (`gameLaunch.spec.ts`, `modpackLifecycle.spec.ts`) independently arrived at
+ * this same 180s figure for their own, separate GAME_LAUNCHED poll — this is
+ * the stricter (i.e. no looser) of the two values either ever used for the
+ * first-log-output wait specifically, kept as the single figure now that both
+ * share one implementation.
+ */
+const LOG_FIRST_OUTPUT_TIMEOUT = 180_000
+
+/** How long to wait for the game log to stop growing once it has started. */
+const LOG_QUIESCENCE_TIMEOUT = 240_000
+
+/** How long the log must hold steady to count as "finished loading". Long
+ *  enough to clear the gaps between startup phases — texture stitching
+ *  pauses for seconds at a time under software GL — without waiting out the
+ *  whole test budget. */
+const LOG_QUIESCENCE_HOLD_MS = 20_000
+
+/** Poll interval for log growth. */
+const LOG_QUIESCENCE_POLL_MS = 2_000
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Waits for the newest game log under `logsDir` to grow and then stop
+ * growing — the operational proxy this suite uses for "reached a stable main
+ * menu" wherever it drives a real launch (see `gameLaunch.spec.ts`'s module
+ * doc comment for why no log wording is trusted as the primary signal).
+ * `isAlive` is polled throughout so a crash mid-load is reported as a crash
+ * rather than as a slow, eventually-satisfied quiescence; both current
+ * callers pass a predicate over their own tracked `GAME_CLOSED` count
+ * compared against its pre-launch baseline.
+ *
+ * Growth is checked before stillness: a log that never grows at all means
+ * the JVM produced nothing, a different failure from one that started and
+ * stopped, worth distinguishing in the message.
+ *
+ * Previously two independent copies — one inlined in `gameLaunch.spec.ts`'s
+ * test body, one a local function in `modpackLifecycle.spec.ts` explicitly
+ * documented as a copy of the former. Centralized here; both files now call
+ * this instead.
+ */
+export async function waitForLogQuiescence(
+  logsDir: string,
+  isAlive: () => boolean
+): Promise<void> {
+  await expect
+    .poll(() => logSize(newestLogFile(logsDir)), {
+      timeout: LOG_FIRST_OUTPUT_TIMEOUT,
+      message:
+        `no game log appeared under ${logsDir} after launch — the client ` +
+        "produced no output at all"
+    })
+    .toBeGreaterThan(0)
+
+  const deadline = Date.now() + LOG_QUIESCENCE_TIMEOUT
+  let lastSize = -1
+  let steadySince = Date.now()
+
+  while (Date.now() < deadline) {
+    const size = logSize(newestLogFile(logsDir))
+    if (size !== lastSize) {
+      lastSize = size
+      steadySince = Date.now()
+    } else if (Date.now() - steadySince >= LOG_QUIESCENCE_HOLD_MS) {
+      break
+    }
+
+    // Checked every poll rather than once at the end: a client that died is
+    // not going to start logging again, so continuing to wait for
+    // quiescence would just burn the timeout before reporting the real
+    // cause.
+    expect(
+      isAlive(),
+      "the game exited while still loading — it crashed rather than " +
+        "reaching the main menu"
+    ).toBe(true)
+
+    await sleep(LOG_QUIESCENCE_POLL_MS)
+  }
+
+  expect(
+    Date.now() - steadySince,
+    `the game log under ${logsDir} never stopped growing within ` +
+      `${LOG_QUIESCENCE_TIMEOUT}ms — the client never finished loading`
+  ).toBeGreaterThanOrEqual(LOG_QUIESCENCE_HOLD_MS)
 }

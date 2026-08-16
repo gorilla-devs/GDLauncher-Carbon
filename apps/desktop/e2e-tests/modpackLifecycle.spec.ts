@@ -27,9 +27,9 @@ import {
   instanceLogsDir,
   LAUNCH_MARKER_QUORUM,
   LAUNCH_MARKERS,
-  logSize,
   newestLogFile,
-  readLogMessages
+  readLogMessages,
+  waitForLogQuiescence
 } from "./helpers/gameLog.js"
 import {
   changeModpackVersion,
@@ -70,10 +70,10 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  * capture in a try/finally, which is what is reproduced here. Copied rather
  * than imported: importing a value from a `.spec.ts` file re-registers that
  * file's own `test()` calls in this one, and the project has a standing
- * decision not to churn passing specs to avoid that. For the same reason,
- * `waitForLogQuiescence` below is a local copy of `gameLaunch.spec.ts`'s
- * log-growth-then-stillness loop rather than an import — it isn't a separate
- * function there either, just inlined in that file's test body.
+ * decision not to churn passing specs to avoid that. The log-growth-then-
+ * stillness wait itself is not subject to that constraint — it lives in
+ * `helpers/gameLog.ts`'s `waitForLogQuiescence`, shared with
+ * `gameLaunch.spec.ts`.
  *
  * Stopping the game reuses the *same* `instancePlay` control used to start
  * it (there is no separate `instanceStop` test id) — `Tile.tsx`'s play
@@ -253,69 +253,6 @@ const LAUNCH_TIMEOUT = 180_000
 /** How long the core is given to report a new `GAME_CLOSED` after the stop
  *  control is clicked. Mirrors `gameLaunch.spec.ts`'s `GAME_STOP_TIMEOUT`. */
 const STOP_TIMEOUT = 60_000
-
-/** How long to wait for the game log to stop growing once it has started. */
-const QUIESCENCE_TIMEOUT = 240_000
-
-/** How long the log must hold steady to count as "finished loading". */
-const QUIESCENCE_HOLD_MS = 20_000
-
-/** Poll interval for log growth. */
-const POLL_MS = 2_000
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-/**
- * Waits for the newest game log under `logsDir` to grow and then stop
- * growing — the same operational proxy `gameLaunch.spec.ts` uses for
- * "reached a stable main menu" (see that file's header for why no log
- * wording is trusted). `isStillAlive` is polled throughout so a crash mid-
- * load is reported as a crash rather than as a slow, eventually-satisfied
- * quiescence.
- */
-async function waitForLogQuiescence(
-  logsDir: string,
-  isStillAlive: () => boolean
-): Promise<void> {
-  await expect
-    .poll(() => logSize(newestLogFile(logsDir)), {
-      timeout: LAUNCH_TIMEOUT,
-      message:
-        `no game log appeared under ${logsDir} after launch — the client ` +
-        "produced no output at all"
-    })
-    .toBeGreaterThan(0)
-
-  const deadline = Date.now() + QUIESCENCE_TIMEOUT
-  let lastSize = -1
-  let steadySince = Date.now()
-
-  while (Date.now() < deadline) {
-    const size = logSize(newestLogFile(logsDir))
-    if (size !== lastSize) {
-      lastSize = size
-      steadySince = Date.now()
-    } else if (Date.now() - steadySince >= QUIESCENCE_HOLD_MS) {
-      break
-    }
-
-    expect(
-      isStillAlive(),
-      "the game exited while still loading — it crashed rather than " +
-        "reaching the main menu"
-    ).toBe(true)
-
-    await sleep(POLL_MS)
-  }
-
-  expect(
-    Date.now() - steadySince,
-    `the game log under ${logsDir} never stopped growing within ` +
-      `${QUIESCENCE_TIMEOUT}ms — the client never finished loading`
-  ).toBeGreaterThanOrEqual(QUIESCENCE_HOLD_MS)
-}
 
 /**
  * Attaches the game's own per-launch log to the Playwright report on a
