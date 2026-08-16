@@ -653,6 +653,7 @@ impl From<FEUnifiedSearchType> for CFFEClassId {
             FEUnifiedSearchType::World => CFFEClassId::Worlds,
             FEUnifiedSearchType::Plugin => CFFEClassId::BukkitPlugins,
             FEUnifiedSearchType::Datapack => CFFEClassId::Datapacks,
+            FEUnifiedSearchType::MinecraftJavaServer => CFFEClassId::Other(0),
             FEUnifiedSearchType::Unknown => CFFEClassId::Other(0),
         }
     }

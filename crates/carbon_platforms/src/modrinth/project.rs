@@ -202,6 +202,7 @@ pub enum ProjectSupportRange {
     /// The mod will not run on this side
     Unsupported,
     /// It is unknown if the project will run on this side
+    #[serde(other)]
     Unknown,
 }
 
@@ -214,6 +215,8 @@ pub enum ProjectType {
     ResourcePack,
     Plugin,
     DataPack,
+    #[serde(rename = "minecraft_java_server")]
+    MinecraftJavaServer,
     #[serde(other)]
     Unknown,
 }

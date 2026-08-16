@@ -68,6 +68,16 @@ pub enum LoaderType {
     Vanilla,
     Velocity,
     Waterfall,
+    Babric,
+    #[serde(rename = "bta-babric")]
+    BtaBabric,
+    Geyser,
+    #[serde(rename = "java-agent")]
+    JavaAgent,
+    #[serde(rename = "legacy-fabric")]
+    LegacyFabric,
+    Nilloader,
+    Ornithe,
     #[serde(other)]
     Other(String),
 }
@@ -111,4 +121,48 @@ pub enum GameVersionType {
     Alpha,
     #[serde(other)]
     Unknown,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn deserializes_new_minecraft_java_server_category() {
+        // Fixture like the live API: icon may be an empty string
+        let raw = r#"{"icon":"","name":"adventure-mode","project_type":"minecraft_java_server","header":"minecraft_server_meta"}"#;
+        let cat: Category = serde_json::from_str(raw).unwrap();
+        assert_eq!(cat.project_type, project::ProjectType::MinecraftJavaServer);
+        assert_eq!(cat.header, "minecraft_server_meta");
+        // Serialization round-trip: exactly "minecraft_java_server"
+        assert_eq!(
+            serde_json::to_string(&cat.project_type).unwrap(),
+            r#""minecraft_java_server""#
+        );
+    }
+
+    #[test]
+    fn unknown_project_type_falls_back_to_unknown() {
+        // The crash-guard: future Modrinth types must never crash
+        let raw = r#"{"icon":"","name":"whatever","project_type":"some_future_type","header":"x"}"#;
+        let cat: Category = serde_json::from_str(raw).unwrap();
+        assert_eq!(cat.project_type, project::ProjectType::Unknown);
+    }
+
+    #[test]
+    fn deserializes_new_modrinth_loaders() {
+        let raw = r#"{"icon":"","name":"geyser","supported_project_types":["mod","project","minecraft_java_server"]}"#;
+        let loader: Loader = serde_json::from_str(raw).unwrap();
+        assert_eq!(loader.name, LoaderType::Geyser);
+        assert!(
+            loader
+                .supported_project_types
+                .contains(&project::ProjectType::MinecraftJavaServer)
+        );
+        assert!(
+            loader
+                .supported_project_types
+                .contains(&project::ProjectType::Unknown)
+        ); // "project" -> Unknown
+    }
 }
