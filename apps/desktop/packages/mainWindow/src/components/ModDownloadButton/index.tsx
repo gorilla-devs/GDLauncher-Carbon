@@ -69,6 +69,19 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     props.addon
   )
 
+  // Last non-`Indeterminate`/`null` progress seen for the tracked task. Used
+  // to tell a genuine completion (progress goes `Known` then the task is
+  // forgotten, `data` becomes `null`) apart from a task that failed and was
+  // then dismissed (`data` also becomes `null` once forgotten) — only the
+  // former should trigger the success toast below. Reset alongside `taskId`
+  // whenever a new task starts being tracked (the two effects right below)
+  // and when a tracked task is dismissed after failing (the poll effect's
+  // `"failed"` branch further down) — otherwise a `Failed` observed for one
+  // task would keep suppressing the success toast for whatever task gets
+  // tracked next. Mirrors `useTaskProgress.ts`'s per-instance map, which
+  // retires its own entry the same way on both failure and completion.
+  const [lastProgress, setLastProgress] = createSignal<Progress | null>(null)
+
   createEffect(() => {
     if (installLatestModMutation.isPending) {
       setLoading(true)
@@ -76,6 +89,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
     if (installLatestModMutation.isSuccess) {
       setTaskId(installLatestModMutation.data)
+      setLastProgress(null)
     }
   })
 
@@ -86,6 +100,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
     if (installModMutation.isSuccess) {
       setTaskId(installModMutation.data)
+      setLastProgress(null)
     }
   })
 
@@ -98,13 +113,6 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const dismissTaskMutation = rspc.createMutation(() => ({
     mutationKey: ["vtask.dismissTask"]
   }))
-
-  // Last non-`Indeterminate`/`null` progress seen for the tracked task. Used
-  // to tell a genuine completion (progress goes `Known` then the task is
-  // forgotten, `data` becomes `null`) apart from a task that failed and was
-  // then dismissed (`data` also becomes `null` once forgotten) — only the
-  // former should trigger the success toast below.
-  const [lastProgress, setLastProgress] = createSignal<Progress | null>(null)
 
   createEffect(() => {
     if (taskId() === null) return
@@ -130,6 +138,10 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       const failedTaskId = taskId()
       setTaskId(null)
       setProgress(null)
+      // Retire the failure from `lastProgress` too — otherwise it would
+      // outlive this task and suppress the success toast of whatever gets
+      // tracked next (see this signal's own doc comment above).
+      setLastProgress(null)
       if (failedTaskId !== null) {
         dismissTaskMutation.mutate(failedTaskId)
       }

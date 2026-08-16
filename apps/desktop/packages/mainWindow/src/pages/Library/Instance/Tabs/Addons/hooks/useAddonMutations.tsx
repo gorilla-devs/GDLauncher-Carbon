@@ -39,11 +39,18 @@ export const useAddonMutations = (
   // dialog they already opted out of.
   const isWorldWarningDismissed = () =>
     resolveBooleanPreference(worldWarningDismissed, () =>
-      queryClient.ensureQueryData({
-        queryKey: ["settings.getWorldDeletionWarningDismissed"],
-        queryFn: () =>
-          ctx.client.query(["settings.getWorldDeletionWarningDismissed"])
-      })
+      queryClient
+        .ensureQueryData({
+          queryKey: ["settings.getWorldDeletionWarningDismissed"],
+          queryFn: () =>
+            ctx.client.query(["settings.getWorldDeletionWarningDismissed"])
+        })
+        // A rejected fetch must not read as "dismissed" — that would silently
+        // skip the confirmation dialog and delete a world with no prompt.
+        // Failing toward `false` instead means the worst case on error is an
+        // extra confirmation the user already opted out of, never a silent
+        // deletion.
+        .catch(() => false)
     )
 
   // Track active polling intervals for cleanup
