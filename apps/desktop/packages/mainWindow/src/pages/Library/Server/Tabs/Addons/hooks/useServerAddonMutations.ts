@@ -3,6 +3,7 @@ import { rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { FEServerId, ServerAddon } from "@gd/core_module/bindings"
 import { RowSelectionState } from "@tanstack/solid-table"
+import { serverAllowedAddonTypes } from "@/utils/platformSearch"
 
 export const useServerAddonMutations = (
   refetchAddons: () => Promise<any>,
@@ -112,11 +113,14 @@ export const useServerAddonMutations = (
   }
 
   const gotoSearchPage = () => {
-    // Servers only ever allow ["mod", "datapack"] (modded) or ["datapack"]
-    // (vanilla) — see allowedAddonTypes() in utils/platformSearch.ts. "shader"
-    // is never a valid tab for a server.
-    const hasModloader = !!serverDetails.data?.modloaderType
-    const target = hasModloader ? "mod" : "datapack"
+    // Reuses serverAllowedAddonTypes() — the same rule allowedAddonTypes()
+    // in utils/platformSearch.ts applies for its server branch — so the
+    // default tab can't drift from what the search page itself allows:
+    // ["mod", "datapack"] (modded) or ["datapack"] (vanilla). "shader" is
+    // never a valid tab for a server.
+    const target = serverAllowedAddonTypes(
+      !!serverDetails.data?.modloaderType
+    )[0]
     navigator.navigate(`/search/${target}?serverId=${params.id}`)
   }
 

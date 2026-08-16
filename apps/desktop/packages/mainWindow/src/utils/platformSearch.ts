@@ -51,6 +51,17 @@ export interface SearchResultItem {
   platform?: "curseforge" | "modrinth"
 }
 
+/** Addon types a server variant allows: mods only when a modloader is
+ *  installed, datapacks always — servers never expose shaders or resource
+ *  packs. Pulled out of `allowedAddonTypes`'s server branch below so
+ *  `useServerAddonMutations`'s `gotoSearchPage` can derive its default tab
+ *  from the same rule instead of hardcoding a second copy of it. */
+export function serverAllowedAddonTypes(
+  hasModloader: boolean
+): FEUnifiedSearchType[] {
+  return hasModloader ? ["mod", "datapack"] : ["datapack"]
+}
+
 export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const rspcContext = rspc.useContext()
 
@@ -682,9 +693,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const allowedAddonTypes = createMemo<FEUnifiedSearchType[]>(() => {
     if (selectedServerId()) {
       // A server with no modloader can still run datapacks, but not mods.
-      return selectedServer.data?.modloaderType
-        ? ["mod", "datapack"]
-        : ["datapack"]
+      return serverAllowedAddonTypes(!!selectedServer.data?.modloaderType)
     }
 
     if (selectedInstanceId()) {
