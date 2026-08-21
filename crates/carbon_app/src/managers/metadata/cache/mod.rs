@@ -1870,8 +1870,6 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                                     .update_items(current_count as u32, total_files);
                             }
 
-                            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
                             if stored {
                                 update_notifier.send(CacheEntityId::Instance(instance_id));
                             }

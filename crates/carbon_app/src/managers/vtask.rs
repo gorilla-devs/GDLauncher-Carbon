@@ -54,6 +54,17 @@ impl ManagerRef<'_, VisualTaskManager> {
 
                 app.invalidate(GET_TASKS, None);
                 app.invalidate(GET_TASK, Some(id.0.into()));
+
+                // Cap invalidations at ~5/s per task. `notify` is a watch
+                // channel, so updates arriving during this pause collapse onto
+                // one slot: the first update still invalidates immediately, and
+                // whatever the progress settled on is always delivered, because
+                // the next `changed()` returns straight away for anything that
+                // landed while sleeping. Invalidations carry no payload — the
+                // frontend re-reads current state — so dropping the ticks in
+                // between loses nothing. Without this, a fast scan emits one
+                // pair of invalidations per file processed.
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             }
 
             app.task_manager().tasks.write().await.remove(&id);
@@ -598,6 +609,66 @@ mod test {
         // give the queue time to poll
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         assert_eq!(tasks, app.task_manager().get_tasks().await);
+    }
+
+    /// The watcher loop caps invalidations at ~5/s per task, but the first
+    /// update must still invalidate immediately and the value the task settles
+    /// on must always be delivered — otherwise the UI would sit on a stale
+    /// progress figure until something unrelated woke it.
+    #[tokio::test]
+    async fn progress_invalidations_are_throttled_but_keep_first_and_last() {
+        let app = crate::setup_managers_for_test().await;
+        let mut events = app.invalidation_channel.subscribe();
+
+        let task = VisualTask::new(Translation::Test);
+        let _id = app.task_manager().spawn_task(&task).await;
+        let subtask = task.subtask(Translation::Test);
+        task.edit(|data| data.state = TaskState::KnownProgress)
+            .await;
+
+        // A burst standing in for a fast scan: one progress update per file,
+        // as fast as the files are processed.
+        // Spaced like a real scan: hashing a file takes milliseconds, which is
+        // slow enough for the watcher to observe every update individually. A
+        // tight loop instead lets the watch channel coalesce the whole burst on
+        // its own, which would exercise nothing.
+        const N: u32 = 100;
+        for i in 1..=N {
+            subtask.update_items(i, N);
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+
+        // Long enough for several throttle windows to elapse.
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+
+        let mut count = 0usize;
+        loop {
+            match events.try_recv() {
+                Ok(_) => count += 1,
+                // The unthrottled path can overrun the broadcast buffer; those
+                // dropped events still count as events that were emitted.
+                Err(tokio::sync::broadcast::error::TryRecvError::Lagged(n)) => count += n as usize,
+                Err(_) => break,
+            }
+        }
+
+        println!("invalidations emitted for {N} spaced updates: {count}");
+
+        assert!(
+            count >= 2,
+            "expected the leading invalidation plus a trailing one after the \
+             burst, got {count}"
+        );
+        assert!(
+            count <= 30,
+            "{N} rapid updates must collapse into a handful of invalidations, \
+             got {count}"
+        );
+        assert_eq!(
+            app.task_manager().get_tasks().await[0].progress,
+            domain::Progress::Known(1.0),
+            "the settled progress value must be what a refetch would read"
+        );
     }
 }
 
