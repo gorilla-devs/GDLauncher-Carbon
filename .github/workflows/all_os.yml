@@ -23,7 +23,7 @@ jobs:
           node-version: "24.14.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.85.1
+          toolchain: 1.95.0
           targets: aarch64-apple-darwin, x86_64-apple-darwin
           components: clippy, rustfmt
       - name: Prepare
@@ -101,7 +101,7 @@ jobs:
           node-version: "24.14.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.85.1
+          toolchain: 1.95.0
           targets: x86_64-unknown-linux-gnu
           components: clippy, rustfmt
       - name: Prepare
@@ -188,7 +188,7 @@ jobs:
           node-version: "24.14.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.85.1
+          toolchain: 1.95.0
           targets: x86_64-pc-windows-msvc
           components: clippy, rustfmt
       - name: Install scoop and llvm
