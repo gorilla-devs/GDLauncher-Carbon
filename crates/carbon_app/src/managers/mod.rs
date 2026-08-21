@@ -214,7 +214,17 @@ mod app {
             account::AccountRefreshService::start(Arc::downgrade(&app)).await;
             info!("Account refresh service started in {:?}", timer.elapsed());
 
+            // Not under `cfg(test)`: this task is spawned during app
+            // construction and can never be joined, so it interleaves at
+            // whatever `await` a unit test happens to reach next. Several
+            // tests set up on-disk state that `scan_instances` is entitled to
+            // act on — a pidfile for a pid that is not a live JVM is stale by
+            // definition, so the reconcile pass deletes it — and whether that
+            // lands before or after the test's own writes comes down to
+            // scheduling. Tests drive the managers they are testing directly.
+            #[cfg(not(test))]
             let _app = app.clone();
+            #[cfg(not(test))]
             tokio::spawn(async move {
                 let bg_total = std::time::Instant::now();
 
