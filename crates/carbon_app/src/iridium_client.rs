@@ -342,8 +342,13 @@ mod test {
                 )
                 .await
                 .expect("failed to write headers");
-            // A chunk every 100ms for 3s: no single gap trips a 500ms read
-            // budget, even though the transfer as a whole vastly exceeds it.
+            // A chunk every 100ms for 3s. What is under test is that the
+            // budget applies per read gap and not to the transfer as a whole,
+            // so the total has to exceed it while no single gap comes close.
+            // The gap budget below is 2s against a 100ms cadence: a loaded CI
+            // box has to stall a sleep by 20x before this reports a cap that
+            // did not happen. At 500ms it only took a 5x stall, which a
+            // Windows runner under a full parallel suite does hit.
             for _ in 0..CHUNK_COUNT {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 socket
@@ -354,8 +359,8 @@ mod test {
         });
 
         let client = super::shared_client_builder(
-            std::time::Duration::from_secs(5),
-            std::time::Duration::from_millis(500),
+            std::time::Duration::from_secs(10),
+            std::time::Duration::from_secs(2),
         )
         .build()
         .expect("failed to build client");
