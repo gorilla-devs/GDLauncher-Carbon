@@ -34,10 +34,10 @@ export const Select = <
 >(
   props: PolymorphicProps<T, selectRootProps<Option, OptGroup>>
 ) => {
-  const [local, rest] = splitProps(
-    props as selectRootProps<Option, OptGroup>,
-    ["options", "optionKey"]
-  )
+  const [local, rest] = splitProps(props as selectRootProps<Option, OptGroup>, [
+    "options",
+    "optionKey"
+  ])
 
   // `Select`'s listbox is keyed off `options`' identity, so a fresh-but-
   // equivalent array (a memo invalidated by an unrelated field, a refetch

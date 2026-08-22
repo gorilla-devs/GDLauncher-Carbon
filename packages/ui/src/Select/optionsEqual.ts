@@ -31,7 +31,12 @@ function sameOption<T>(a: T, b: T, optionKey?: (option: T) => string): boolean {
 
   if (optionKey) return optionKey(a) === optionKey(b)
 
-  if (typeof a !== "object" || a === null || typeof b !== "object" || b === null) {
+  if (
+    typeof a !== "object" ||
+    a === null ||
+    typeof b !== "object" ||
+    b === null
+  ) {
     // Primitives already failed the `===` check above — they differ.
     return false
   }
