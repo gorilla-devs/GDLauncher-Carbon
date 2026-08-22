@@ -2051,4 +2051,33 @@ mod tests {
         );
         drop(concurrent_holder);
     }
+
+    /// `override_caching_and_wait` resolves through a callback that only the
+    /// startup cache loops ever fire, so those loops have to be running in
+    /// test builds too. Gating them out does not fail anything — it blocks
+    /// forever, which is far more expensive to diagnose in CI than a failure.
+    /// Exporting an instance goes through this path.
+    #[tokio::test]
+    async fn override_caching_and_wait_resolves_in_test_builds() {
+        let app = crate::setup_managers_for_test().await;
+
+        // A missing instance is enough: the local cacher logs and returns
+        // `Ok(())` for it, which still fires the callback this awaits. What
+        // is under test is that something fires it at all.
+        let waited = tokio::time::timeout(
+            std::time::Duration::from_secs(20),
+            app.meta_cache_manager().override_caching_and_wait(
+                CacheEntityId::Instance(InstanceId(1)),
+                false,
+                false,
+            ),
+        )
+        .await;
+
+        assert!(
+            waited.is_ok(),
+            "override_caching_and_wait never resolved — the startup cache \
+             loops are not running in this build"
+        );
+    }
 }

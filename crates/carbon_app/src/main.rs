@@ -242,6 +242,12 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         t.elapsed().as_secs_f64()
     );
 
+    // Detached: a full instance scan must not hold up the rest of startup.
+    tokio::spawn({
+        let app = app.clone();
+        async move { app.start_background_tasks().await }
+    });
+
     // Re-exchange GDL tokens on every startup to ensure they're valid
     // (handles backend target changes where JWT signing keys differ)
     //
@@ -402,6 +408,28 @@ struct TestEnv {
 }
 
 #[cfg(test)]
+/// Every test waits for startup to settle, so a hang in there stops the whole
+/// suite rather than one test. Failing fast turns that into something with a
+/// message on it. Deliberately test-only: the app spawns the same work
+/// detached, where a slow scan on a large install is not a fault and
+/// cancelling it half-way would leave the instance map worse than late.
+const STARTUP_TASKS_TEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+#[cfg(test)]
+async fn start_background_tasks_or_panic(app: &App) {
+    if tokio::time::timeout(STARTUP_TASKS_TEST_TIMEOUT, app.start_background_tasks())
+        .await
+        .is_err()
+    {
+        panic!(
+            "startup background tasks did not finish within {:?} — instance \
+             scanning, server scanning or the metadata cache loops are stuck",
+            STARTUP_TASKS_TEST_TIMEOUT
+        );
+    }
+}
+
+#[cfg(test)]
 impl TestEnv {
     async fn restart_in_place(&mut self) {
         let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
@@ -411,6 +439,7 @@ impl TestEnv {
             crate::util::base_api::get_base_api_env!(),
         )
         .await;
+        start_background_tasks_or_panic(&self.app).await;
     }
 }
 
@@ -442,12 +471,22 @@ async fn setup_managers_for_test() -> TestEnv {
         tmpdir: temp_path.clone(),
         // log_guard,
         invalidation_recv,
-        app: AppInner::new(
-            invalidation_sender,
-            temp_path,
-            crate::util::base_api::get_base_api_env!(),
-        )
-        .await,
+        app: {
+            let app = AppInner::new(
+                invalidation_sender,
+                temp_path,
+                crate::util::base_api::get_base_api_env!(),
+            )
+            .await;
+
+            // Awaited rather than spawned: the scan reconciles on-disk
+            // pidfiles and removes the stale ones, so a test that writes one
+            // would otherwise be racing it. Finishing here means every test
+            // starts from an app whose startup has already settled.
+            start_background_tasks_or_panic(&app).await;
+
+            app
+        },
     }
 }
 
