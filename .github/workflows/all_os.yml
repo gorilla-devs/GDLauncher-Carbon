@@ -36,8 +36,9 @@ jobs:
       - name: Iridium patchfix
         run: node iridium_patchfix.js
       - name: Build
-        run: pnpm build:mac-universal-e2e
+        run: pnpm build:mac-universal
         env:
+          GDL_E2E: "1"
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           TEST_BASE_API: ${{ vars.TEST_BASE_API }}
@@ -114,8 +115,9 @@ jobs:
       - name: Iridium patchfix
         run: node iridium_patchfix.js
       - name: Build
-        run: pnpm build:linux-x64-e2e
+        run: pnpm build:linux-x64
         env:
+          GDL_E2E: "1"
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           TEST_BASE_API: ${{ vars.TEST_BASE_API }}
@@ -208,8 +210,9 @@ jobs:
         run: node iridium_patchfix.js
       - name: Build
         shell: bash
-        run: pnpm build:win-x64-e2e
+        run: pnpm build:win-x64
         env:
+          GDL_E2E: "1"
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           TEST_BASE_API: ${{ vars.TEST_BASE_API }}

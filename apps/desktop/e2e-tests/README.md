@@ -4,13 +4,14 @@ Playwright drives the **packaged** launcher, so a build must exist before the
 suite can run.
 
 ```bash
-pnpm build:linux-x64-e2e      # or :win-x64-e2e / :mac-universal-e2e
+GDL_E2E=1 pnpm build:linux-x64      # or build:win-x64 / build:mac-universal
 pnpm test:e2e
 ```
 
-The `-e2e` build variants add the `e2e` cargo feature, which is what makes
-`--gdl_e2e_auth_base` and `--gdl_e2e_entitlement_key` do anything. A normal
-build ignores both flags, and no published artifact carries the feature.
+`GDL_E2E` adds the `e2e` cargo feature, which is what makes
+`--gdl_e2e_auth_base` and `--gdl_e2e_entitlement_key` do anything. Without it
+the same command builds the shipping artifact, which ignores both flags — no
+published artifact carries the feature.
 
 ## What the mock replaces
 

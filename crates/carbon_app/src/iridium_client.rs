@@ -319,7 +319,7 @@ mod test {
 
     #[tokio::test]
     async fn slow_stream_is_not_capped() {
-        use tokio::io::AsyncWriteExt;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
         use tokio::net::TcpListener;
 
         const CHUNK: &[u8] = b"0123456789";
@@ -332,6 +332,17 @@ mod test {
 
         tokio::spawn(async move {
             let (mut socket, _) = listener.accept().await.expect("accept failed");
+            // Drain the request before responding. Nothing here needs its
+            // contents, but leaving it unread means this socket still holds
+            // received data when the task ends and drops it, and closing a
+            // socket with unread data in its receive buffer sends an RST
+            // rather than a FIN. That RST discards what the peer has not yet
+            // consumed, so the client surfaces `ConnectionReset` partway
+            // through decoding instead of the complete body asserted below —
+            // deterministically so on Windows, where the reset wins the race
+            // against the last chunks every time.
+            let mut request = [0u8; 2048];
+            let _ = socket.read(&mut request).await;
             socket
                 .write_all(
                     format!(
