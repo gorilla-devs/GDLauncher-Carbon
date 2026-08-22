@@ -212,6 +212,9 @@ jobs:
         shell: bash
         run: pnpm build:win-x64
         env:
+          OW_BUILD_KEY: ${{ secrets.OW_BUILD_KEY }}
+          OW_CLI_EMAIL: ${{ secrets.OW_CLI_EMAIL }}
+          OW_CLI_API_KEY: ${{ secrets.OW_CLI_API_KEY }}
           GDL_E2E: "1"
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
