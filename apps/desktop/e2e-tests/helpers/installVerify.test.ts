@@ -468,8 +468,12 @@ describe("verifyLibrariesPresent", () => {
 
     expect(result.ok).toBe(false)
     expect(result.problems).toHaveLength(2)
-    expect(result.problems.some((p) => p.includes(missingA))).toBe(true)
-    expect(result.problems.some((p) => p.includes(missingB))).toBe(true)
+    expect(
+      result.problems.some((p) => p.includes(path.normalize(missingA)))
+    ).toBe(true)
+    expect(
+      result.problems.some((p) => p.includes(path.normalize(missingB)))
+    ).toBe(true)
   })
 })
 
