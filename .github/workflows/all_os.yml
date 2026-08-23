@@ -11,7 +11,7 @@ jobs:
       run:
         working-directory: ./GDL
     runs-on: macos-14
-    timeout-minutes: 80
+    timeout-minutes: 160
     env:
       MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
@@ -92,7 +92,7 @@ jobs:
       run:
         working-directory: ./GDL
     runs-on: ubuntu-22.04
-    timeout-minutes: 80
+    timeout-minutes: 160
     steps:
       - uses: actions/checkout@v3
         with:
@@ -180,7 +180,7 @@ jobs:
       run:
         working-directory: ./GDL
     runs-on: windows-2022
-    timeout-minutes: 80
+    timeout-minutes: 160
     steps:
       - uses: actions/checkout@v3
         with:

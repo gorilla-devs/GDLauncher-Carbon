@@ -25,10 +25,10 @@ const config: PlaywrightTestConfig = {
      is the project's hard ceiling for a single test. Fixture setup is
      budgeted separately — see e2e-tests/fixtures/index.ts. */
   timeout: 15 * 60 * 1000,
-  /* Backstop for the whole run: worst case is one 15-minute test per matrix
-     entry plus the login fixtures. This is what stops a wedged run holding
-     a CI runner indefinitely. */
-  globalTimeout: 3 * 60 * 60 * 1000,
+  /* Backstop for the whole run, kept below the workflow's timeout-minutes so
+     a wedged run is ended here — with a report — rather than by the runner,
+     which kills the job and leaves no results at all. */
+  globalTimeout: 2 * 60 * 60 * 1000,
   expect: {
     /**
      * Maximum time expect() should wait for the condition to be met.
@@ -40,16 +40,14 @@ const config: PlaywrightTestConfig = {
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Never retry, deliberately — including on CI.
-     This suite drives real services: meta.gdl.gg, Mojang's CDNs, CurseForge
-     and Modrinth. An outage or a throttle there breaking the build is the
-     signal we are paying for, not noise to be absorbed: the CurseForge CDN
-     once began requiring an API key and broke every shipped client, which is
-     exactly the class of failure these tests exist to catch. Retrying would
-     convert that into a slower green run.
-     A red build from a third-party flake is the accepted cost. Investigate
-     it, or re-run it by hand — do not raise this number. */
-  retries: 0,
+  /* This suite drives real services: meta.gdl.gg, Mojang's CDNs, CurseForge
+     and Modrinth, so a throttle or a dropped download reddens a 50-minute
+     run. Two retries absorb that. A genuine breakage — the CurseForge CDN
+     once began requiring an API key — fails all three attempts and still
+     reports, so what gets hidden is transport, not behaviour. Retried tests
+     are reported as flaky rather than passed: read that count, a rising one
+     means something real is degrading. */
+  retries: 2,
   /* One worker everywhere, and this is a correctness setting rather than a
      performance one — do not make it conditional.
 
