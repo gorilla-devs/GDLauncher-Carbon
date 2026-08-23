@@ -171,6 +171,32 @@ function validateArgument(arg: string): Argument | null {
   return null
 }
 
+/**
+ * `arg`'s CLI value, falling back to `envVar` in e2e builds.
+ *
+ * ow-electron 39.8.11 on Windows exits before Node initialises as soon as two
+ * argv tokens contain `://` (upstream; a minimal Electron app reproduces it).
+ * The e2e harness needs three URLs, so it passes them by environment instead.
+ * CLI still wins, and the fallback is `__E2E_BUILD__`-only so released builds
+ * gain no new redirect vector.
+ */
+function argumentOrE2EEnv(arg: string, envVar: string): Argument | null {
+  const fromCli = validateArgument(arg)
+  if (fromCli?.value) {
+    return fromCli
+  }
+
+  if (__E2E_BUILD__) {
+    const fromEnv = process.env[envVar]
+    if (fromEnv) {
+      console.log("Argument taken from environment:", arg, envVar)
+      return { argument: arg, value: fromEnv }
+    }
+  }
+
+  return fromCli
+}
+
 export function getPatchedUserData() {
   console.log("Getting patched user data...")
   const isSnapshot = __APP_VERSION__.includes("snapshot")
@@ -252,8 +278,11 @@ const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
 )
 
-const overrideBaseApi = validateArgument("--gdl_override_base_api")
-const e2eAuthBase = validateArgument("--gdl_e2e_auth_base")
+const overrideBaseApi = argumentOrE2EEnv(
+  "--gdl_override_base_api",
+  "GDL_OVERRIDE_BASE_API"
+)
+const e2eAuthBase = argumentOrE2EEnv("--gdl_e2e_auth_base", "GDL_E2E_AUTH_BASE")
 const e2eEntitlementKey = validateArgument("--gdl_e2e_entitlement_key")
 // Gated at the build, not merely parsed and ignored. Unlike the two flags
 // above — which are forwarded to the core and are inert unless it was built
@@ -265,7 +294,7 @@ const e2eEntitlementKey = validateArgument("--gdl_e2e_entitlement_key")
 // not help. `__E2E_BUILD__` is false in every released artifact, and the
 // argument is not even read there.
 const e2eUpdateFeed = __E2E_BUILD__
-  ? validateArgument("--gdl_e2e_update_feed")
+  ? argumentOrE2EEnv("--gdl_e2e_update_feed", "GDL_E2E_UPDATE_FEED")
   : null
 
 if (!allowMultipleInstances) {

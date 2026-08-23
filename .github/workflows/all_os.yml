@@ -45,7 +45,7 @@ jobs:
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
-          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
       - name: Lint
         id: lint
@@ -63,7 +63,7 @@ jobs:
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
-          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: pnpm test:all
       - name: Upload Playwright report
@@ -124,7 +124,7 @@ jobs:
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
-          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
       - name: Lint
         id: lint
@@ -143,7 +143,7 @@ jobs:
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
-          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: |
           sudo apt-get install -y xvfb
@@ -222,7 +222,7 @@ jobs:
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
-          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - name: Lint
@@ -244,7 +244,7 @@ jobs:
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
-          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm test:all

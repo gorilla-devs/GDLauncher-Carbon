@@ -114,20 +114,25 @@ export async function launchApp(opts: LaunchOptions): Promise<{
   const binaryPath = getBinaryPath()
   const args = ["--gdl_allow_multiple_instances", "--gdl_disable_sentry"]
 
+  // Passed by environment, not argv: ow-electron 39.8.11 on Windows exits
+  // before Node initialises when two argv tokens contain `://`, which killed
+  // every launch here. Read by `main/index.ts`'s `argumentOrE2EEnv`. The
+  // entitlement key stays an argument — it is a path, not a URL.
+  const urlEnv: Record<string, string> = {}
   if (opts.baseApi) {
-    args.push("--gdl_override_base_api", opts.baseApi)
+    urlEnv.GDL_OVERRIDE_BASE_API = opts.baseApi
   }
 
   if (opts.e2eAuthBase) {
-    args.push("--gdl_e2e_auth_base", opts.e2eAuthBase)
+    urlEnv.GDL_E2E_AUTH_BASE = opts.e2eAuthBase
+  }
+
+  if (opts.e2eUpdateFeed) {
+    urlEnv.GDL_E2E_UPDATE_FEED = opts.e2eUpdateFeed
   }
 
   if (opts.e2eEntitlementKey) {
     args.push("--gdl_e2e_entitlement_key", opts.e2eEntitlementKey)
-  }
-
-  if (opts.e2eUpdateFeed) {
-    args.push("--gdl_e2e_update_feed", opts.e2eUpdateFeed)
   }
 
   console.log("Launching Electron from:", binaryPath)
@@ -147,7 +152,12 @@ export async function launchApp(opts: LaunchOptions): Promise<{
       executablePath: binaryPath,
       env: {
         ...process.env,
-        GDL_RUNTIME_PATH: opts.runtimePath
+        GDL_RUNTIME_PATH: opts.runtimePath,
+        ...urlEnv,
+        // A fresh runtime dir derives its heap from total RAM, which on a
+        // 7 GB CI runner exceeds what is available by launch time. Pin one
+        // that fits; overridable for roomier runners.
+        GDL_E2E_DEFAULT_XMX_MB: process.env.GDL_E2E_DEFAULT_XMX_MB ?? "1024"
       } as Record<string, string>
     })
     .catch((error) => {

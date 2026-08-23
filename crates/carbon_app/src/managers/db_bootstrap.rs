@@ -354,6 +354,21 @@ fn decide_foreign_keys(db_path: &std::path::Path) -> Result<bool, anyhow::Error>
 }
 
 async fn find_appropriate_default_xmx() -> i32 {
+    // The heap below is sized from *total* RAM but checked against
+    // *available* RAM at launch, so a 7 GB CI runner picks 3072 and then
+    // refuses to start. 1024 is the floor: `xms` is created at 1024 and
+    // nothing orders the pair, so lower values give the JVM `-Xms` > `-Xmx`.
+    #[cfg(feature = "e2e")]
+    if let Ok(raw) = std::env::var("GDL_E2E_DEFAULT_XMX_MB") {
+        match raw.parse::<i32>() {
+            Ok(mb) if mb > 0 => {
+                tracing::warn!("E2E MODE: default xmx overridden to {mb} MB");
+                return mb;
+            }
+            _ => tracing::warn!("E2E MODE: ignoring unusable GDL_E2E_DEFAULT_XMX_MB={raw:?}"),
+        }
+    }
+
     let mut memory = System::new();
     memory.refresh_memory();
 
