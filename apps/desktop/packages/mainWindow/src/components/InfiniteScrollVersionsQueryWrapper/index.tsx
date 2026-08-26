@@ -96,7 +96,25 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const [scope, setScope] = createSignal<InstanceScope | undefined>(undefined)
 
   const infiniteQuery = createInfiniteQuery(() => ({
-    queryKey: ["modplatforms.versions", props.modId, props.modplatform],
+    /* The scope belongs in the key, not just in the request. `queryFn` filters
+       by the instance's loader and game version, so two instances asking about
+       the same mod get genuinely different answers — but keyed on the mod
+       alone they shared one cache entry. Opening a mod from a 1.12.2 Forge
+       instance after viewing it from a 1.20.1 Fabric one served the Fabric
+       list from cache, and because `enabled` stays false until this instance's
+       scope resolves, no corrected request was in flight behind it: the list
+       a user could click Install on was the other instance's. Keying by scope
+       makes a different instance a different entry, so the worst case is an
+       empty list while the scope resolves rather than a wrong one.
+
+       The `removeQueries` calls below still match: they pass this key's prefix,
+       and TanStack matches prefixes unless told to be exact. */
+    queryKey: [
+      "modplatforms.versions",
+      props.modId,
+      props.modplatform,
+      scope()
+    ],
     queryFn: async (ctx) => {
       // Only set index for CurseForge, Modrinth doesn't use pagination
       if (props.modplatform === "curseforge") {
