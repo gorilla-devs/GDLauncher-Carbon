@@ -1001,28 +1001,55 @@ export async function openAddonVersions(
   // Present on the URL of the scoped request only — confirmed live.
   const scopedMarker = "game_version"
 
-  const scopedResponses = await settleOnScopedResponses(
-    page,
-    (r) => r.url().includes(queryName) && r.url().includes(scopedMarker),
-    {
-      timeout: VERSIONS_RESPONSE_TIMEOUT,
-      run: async () => {
-        await page.getByRole("tab", { name: "Versions" }).click()
+  // Every response for this query, scoped or not, so a failure can say which
+  // of two very different things happened. Either no request reached the wire
+  // at all — the list came from the query cache and this assertion is watching
+  // a window nothing was ever going to appear in — or an unscoped one did,
+  // which is the scoping regression this assertion exists to catch. The two
+  // need opposite fixes and the message alone could not tell them apart.
+  const seenForQuery: string[] = []
+  const recordAnyForQuery = (r: Response) => {
+    if (r.url().includes(queryName)) seenForQuery.push(r.url())
+  }
+  page.on("response", recordAnyForQuery)
 
-        await expect(page.locator(byTestId(TEST_IDS.addonVersionRow)).first(), {
-          message:
-            "openAddonVersions: no " +
-            `"${TEST_IDS.addonVersionRow}" row ever mounted`
-        }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
+  let scopedResponses: Response[]
+  try {
+    scopedResponses = await settleOnScopedResponses(
+      page,
+      (r) => r.url().includes(queryName) && r.url().includes(scopedMarker),
+      {
+        timeout: VERSIONS_RESPONSE_TIMEOUT,
+        run: async () => {
+          await page.getByRole("tab", { name: "Versions" }).click()
+
+          await expect(
+            page.locator(byTestId(TEST_IDS.addonVersionRow)).first(),
+            {
+              message:
+                "openAddonVersions: no " +
+                `"${TEST_IDS.addonVersionRow}" row ever mounted`
+            }
+          ).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
+        }
       }
-    }
-  )
+    )
+  } finally {
+    page.off("response", recordAnyForQuery)
+  }
 
   if (scopedResponses.length === 0) {
     throw new Error(
       `openAddonVersions: no ${queryName} request scoped to the instance's ` +
         `own Minecraft version/loader (a "${scopedMarker}" URL param) was ` +
-        `observed within ${VERSIONS_RESPONSE_TIMEOUT}ms`
+        `observed within ${VERSIONS_RESPONSE_TIMEOUT}ms. ` +
+        (seenForQuery.length === 0
+          ? `No ${queryName} request reached the wire at all, scoped or ` +
+            "not, yet the version rows still mounted — so the list came " +
+            "from the query cache and there was never a request to observe."
+          : `${seenForQuery.length} unscoped request(s) did reach the wire, ` +
+            "so the scoping gate let an unscoped fetch through rather than " +
+            `nothing being requested: ${JSON.stringify(seenForQuery.slice(0, 3))}`)
     )
   }
 
