@@ -1013,6 +1013,20 @@ export async function openAddonVersions(
   }
   page.on("response", recordAnyForQuery)
 
+  // `InfiniteScrollVersionsQueryWrapper` gates the versions query on the scope
+  // it derives from `instance.getInstanceDetails`, so a lookup that never
+  // settles leaves the gate shut: no request is issued, and the cache renders
+  // whatever it already holds for the key. That is indistinguishable from an
+  // ordinary cache hit unless the lookup itself is counted, and the two point
+  // at different fixes — a stuck gate is the app showing one scope's list
+  // while waiting on another, not a harness timing problem.
+  const detailsQuery = "instance.getInstanceDetails"
+  let detailsResponses = 0
+  const recordDetails = (r: Response) => {
+    if (r.url().includes(detailsQuery)) detailsResponses += 1
+  }
+  page.on("response", recordDetails)
+
   let scopedResponses: Response[]
   try {
     scopedResponses = await settleOnScopedResponses(
@@ -1036,6 +1050,7 @@ export async function openAddonVersions(
     )
   } finally {
     page.off("response", recordAnyForQuery)
+    page.off("response", recordDetails)
   }
 
   if (scopedResponses.length === 0) {
@@ -1046,7 +1061,12 @@ export async function openAddonVersions(
         (seenForQuery.length === 0
           ? `No ${queryName} request reached the wire at all, scoped or ` +
             "not, yet the version rows still mounted — so the list came " +
-            "from the query cache and there was never a request to observe."
+            "from the query cache and there was never a request to observe. " +
+            `${detailsResponses} ${detailsQuery} response(s) arrived in the ` +
+            "same window: none means the scope never resolved, so the gate " +
+            "stayed shut and the rows on screen belong to whatever scope was " +
+            "cached before — the app showing one instance's list while " +
+            "waiting on another, rather than a harness timing problem."
           : `${seenForQuery.length} unscoped request(s) did reach the wire, ` +
             "so the scoping gate let an unscoped fetch through rather than " +
             `nothing being requested: ${JSON.stringify(seenForQuery.slice(0, 3))}`)
