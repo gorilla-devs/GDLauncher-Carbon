@@ -276,13 +276,42 @@ export async function waitForPidExit(
 
     if (Date.now() >= deadline) {
       throw new Error(
-        `relaunchApp: core process (pid ${pid}) did not exit within ${timeoutMs}ms of app.close(). ` +
+        `core process (pid ${pid}) did not exit within ${timeoutMs}ms of app.close(). ` +
           "Relaunching against the same runtime path now would race the old process's SQLite handles " +
           "and surface as a locked-database failure that looks like corruption but isn't."
       )
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+  }
+}
+
+/**
+ * Closes `app` and returns only once the core module it spawned has actually
+ * exited.
+ *
+ * `app.close()` resolves when Electron is gone, but the core is a separate
+ * child process that outlives it — briefly, and sometimes for well over ten
+ * seconds — holding SQLite handles under the runtime path. Deleting that path
+ * before the core lets go fails with EPERM out of teardown, which reads as a
+ * test failure long after every assertion has passed.
+ *
+ * Teardown-only, so a core that never exits is reported rather than thrown:
+ * masking a real test failure behind a cleanup error is worse than leaking a
+ * directory the next run's sweep will collect.
+ */
+export async function closeAppAndCore(
+  app: ElectronApplication,
+  { timeoutMs = 30_000 } = {}
+): Promise<void> {
+  const corePid = await getCoreProcessId(app).catch(() => null)
+  await app.close().catch(() => {})
+  if (corePid === null) return
+
+  try {
+    await waitForPidExit(corePid, { timeoutMs })
+  } catch (error) {
+    console.error("closeAppAndCore:", error)
   }
 }
 

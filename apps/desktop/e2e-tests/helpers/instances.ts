@@ -449,9 +449,12 @@ export async function deleteInstanceViaUi(
  * than silently.
  */
 export async function ensureLibraryInteractive(page: Page): Promise<void> {
-  const closeButton = page.locator(byTestId(TEST_IDS.modalClose)).first()
+  const closeButton = page.locator(byTestId(TEST_IDS.modalClose)).last()
   if (await closeButton.isVisible().catch(() => false)) {
-    await closeButton.click({ timeout: 5_000 }).catch(() => {})
+    // A real click times out on actionability here. Nothing in this helper
+    // asserts the button is clickable, so bypassing the check costs no
+    // coverage — unlike `openAddonPage`, where the click is under test.
+    await closeButton.dispatchEvent("click")
   }
 
   await expect(page.locator("#overlay")).toBeHidden()

@@ -35,6 +35,7 @@ import type { ElectronApplication, Page } from "playwright"
 import {
   attachCoreLogOnFailure,
   isCoreModulePresent,
+  closeAppAndCore,
   launchApp,
   quitLauncherMidGame,
   type LaunchOptions
@@ -265,7 +266,7 @@ test.describe("adopting a running game across a launcher restart", () => {
       })
     } finally {
       await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-      if (reopened) await reopened.app.close()
+      if (reopened) await closeAppAndCore(reopened.app)
       killIfAlive(gamePid)
       await stopHarness(harness)
     }
@@ -324,7 +325,7 @@ test.describe("adopting a running game across a launcher restart", () => {
         .toBe(false)
     } finally {
       await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-      if (reopened) await reopened.app.close()
+      if (reopened) await closeAppAndCore(reopened.app)
       killIfAlive(gamePid)
       await stopHarness(harness)
     }

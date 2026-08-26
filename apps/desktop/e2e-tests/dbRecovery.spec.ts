@@ -117,6 +117,7 @@ import { expect, test } from "@playwright/test"
 import type { ElectronApplication, Page } from "playwright"
 import {
   attachCoreLogOnFailure,
+  closeAppAndCore,
   getBinaryPath,
   getCoreModulePath,
   isCoreModulePresent,
@@ -317,7 +318,7 @@ for (const { seed, event } of FATAL_STATES) {
         await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
           () => {}
         )
-        await launched.app.close().catch(() => {})
+        await closeAppAndCore(launched.app)
       }
       await stopHarness(harness)
     }
@@ -381,7 +382,7 @@ test("seeding BACKWARDS_MIGRATION drives the dedicated version-mismatch screen, 
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
         () => {}
       )
-      await launched.app.close().catch(() => {})
+      await closeAppAndCore(launched.app)
     }
     await stopHarness(harness)
   }
@@ -434,7 +435,7 @@ test("seeding DB_DOWNGRADED is non-fatal: the core emits it and the app boots no
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
         () => {}
       )
-      await launched.app.close().catch(() => {})
+      await closeAppAndCore(launched.app)
     }
     await stopHarness(harness)
   }
@@ -507,7 +508,7 @@ test("a genuinely healthy, unseeded first launch reports success and none of the
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
         () => {}
       )
-      await launched.app.close().catch(() => {})
+      await closeAppAndCore(launched.app)
     }
     await stopHarness(harness)
   }
@@ -783,7 +784,7 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
         () => {}
       )
-      await launched.app.close().catch(() => {})
+      await closeAppAndCore(launched.app)
     }
     await cleanupRelaunchSiblings(beforePids, harness.runtimePath)
     await stopHarness(harness)
@@ -840,7 +841,7 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
         () => {}
       )
-      await launched.app.close().catch(() => {})
+      await closeAppAndCore(launched.app)
     }
     await cleanupRelaunchSiblings(beforePids, harness.runtimePath)
     await stopHarness(harness)

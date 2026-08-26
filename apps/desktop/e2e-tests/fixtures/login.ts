@@ -84,13 +84,27 @@ async function appearsWithin(
  * longer need to wait out that window here.
  */
 export async function dismissStartupModals(page: Page): Promise<void> {
-  // Changelogs stacks on top of onboarding (later entry in the modal stack
-  // renders with the higher z-index), so it blocks onboarding underneath
-  // and must be dismissed first.
-  const changelogsClose = page.locator(byTestId(TEST_IDS.modalClose)).first()
-  if (await appearsWithin(changelogsClose, STARTUP_MODAL_POLL_MS)) {
-    await changelogsClose.click()
-    await changelogsClose.waitFor({ state: "hidden" })
+  // `ModalsManager` gives each modal `z-index: index + 1`, so only the
+  // topmost one is clickable: a lower modal's X sits under the higher one's
+  // backdrop, which swallows every click until the timeout. Dismiss from the
+  // top of the stack down, hence `.last()` rather than `.first()`.
+  //
+  // The wait is keyed on the stack shrinking rather than on a locator going
+  // hidden, because `.last()` re-resolves to the next modal down the instant
+  // the top one closes — waiting for it to hide never completes while any
+  // modal is left.
+  const modalCloses = page.locator(byTestId(TEST_IDS.modalClose))
+  while (await appearsWithin(modalCloses.last(), STARTUP_MODAL_POLL_MS)) {
+    const before = await modalCloses.count()
+    await modalCloses.last().click()
+    await expect
+      .poll(() => modalCloses.count(), {
+        timeout: 15_000,
+        message:
+          "a startup modal did not close after its X was clicked — the " +
+          "stack never shrank"
+      })
+      .toBeLessThan(before)
   }
 
   const onboardingNext = page.locator(byTestId(TEST_IDS.onboardingNext))
