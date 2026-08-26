@@ -168,7 +168,7 @@ function commandLineOf(pid: number): string | null {
  * the process's own command line is already proof of identity, and a recycled
  * pid cannot fake it.
  */
-function pidBelongsToRun(pid: number, runtimePath: string): boolean {
+export function pidBelongsToRun(pid: number, runtimePath: string): boolean {
   const command = commandLineOf(pid)
   if (!command) {
     return false
