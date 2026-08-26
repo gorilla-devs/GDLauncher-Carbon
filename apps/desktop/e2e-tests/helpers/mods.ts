@@ -27,7 +27,12 @@
  */
 
 import fs from "node:fs"
-import { expect, type Page, type Response } from "@playwright/test"
+import {
+  expect,
+  type Page,
+  type Request,
+  type Response
+} from "@playwright/test"
 import {
   byAddonTypeOption,
   byAddonVersionRow,
@@ -880,6 +885,14 @@ export interface AddonVersionSummary {
  *  whatever `SEARCH_RESULTS_TIMEOUT` happens to be. */
 const VERSIONS_RESPONSE_TIMEOUT = 30_000
 
+/** How much longer to wait once a scoped request is known to have gone out.
+ *  Only reachable with a request already in flight, so this waits on something
+ *  observed rather than guessed at. Sized by what the core can legitimately
+ *  spend before answering: `iridium_client.rs` waits out a declared
+ *  rate-limit window of up to `MAX_HONOURED_RATE_LIMIT_WAIT` (70s) rather than
+ *  surfacing the 429, which by itself exceeds `VERSIONS_RESPONSE_TIMEOUT`. */
+const VERSIONS_SLOW_RESPONSE_TIMEOUT = 90_000
+
 /**
  * Attaches a `response` listener matching `matcher`, runs `opts.run`, then
  * waits for the matched list to stop growing — held steady for a full
@@ -1027,6 +1040,29 @@ export async function openAddonVersions(
   }
   page.on("response", recordDetails)
 
+  // Requests, not just responses. Everything above listens for responses, so a
+  // request that was issued and simply answered slowly is indistinguishable
+  // from one that was never issued — and those are opposite problems. The core
+  // can hold this one for a while: it waits out a rate-limit window of up to
+  // `MAX_HONOURED_RATE_LIMIT_WAIT` (70s) before answering, which alone exceeds
+  // the window below.
+  const scopedRequests: string[] = []
+  const isScoped = (url: string) =>
+    url.includes(queryName) && url.includes(scopedMarker)
+  const recordScopedRequest = (req: Request) => {
+    if (isScoped(req.url())) scopedRequests.push(req.url())
+  }
+  page.on("request", recordScopedRequest)
+
+  // Kept separate from the settle loop's own listener so it can outlive it:
+  // once a request is known to be in flight, waiting for that request's answer
+  // is a condition, not a guess at a timeout.
+  const lateScoped: Response[] = []
+  const recordScopedResponse = (r: Response) => {
+    if (isScoped(r.url())) lateScoped.push(r)
+  }
+  page.on("response", recordScopedResponse)
+
   let scopedResponses: Response[]
   try {
     scopedResponses = await settleOnScopedResponses(
@@ -1048,9 +1084,27 @@ export async function openAddonVersions(
         }
       }
     )
+    // The request went out but had not been answered yet. Wait for the answer
+    // it is already owed rather than failing on a window that was only ever a
+    // guess — the core can legitimately hold this call for over a minute while
+    // it waits out a rate-limit window.
+    if (scopedResponses.length === 0 && scopedRequests.length > 0) {
+      await expect
+        .poll(() => lateScoped.length, {
+          timeout: VERSIONS_SLOW_RESPONSE_TIMEOUT,
+          message:
+            `openAddonVersions: ${scopedRequests.length} scoped ` +
+            `${queryName} request(s) went out but none was answered within ` +
+            `${VERSIONS_SLOW_RESPONSE_TIMEOUT}ms`
+        })
+        .toBeGreaterThan(0)
+      scopedResponses = lateScoped
+    }
   } finally {
     page.off("response", recordAnyForQuery)
     page.off("response", recordDetails)
+    page.off("response", recordScopedResponse)
+    page.off("request", recordScopedRequest)
   }
 
   if (scopedResponses.length === 0) {
@@ -1060,13 +1114,10 @@ export async function openAddonVersions(
         `observed within ${VERSIONS_RESPONSE_TIMEOUT}ms. ` +
         (seenForQuery.length === 0
           ? `No ${queryName} request reached the wire at all, scoped or ` +
-            "not, yet the version rows still mounted — so the list came " +
-            "from the query cache and there was never a request to observe. " +
-            `${detailsResponses} ${detailsQuery} response(s) arrived in the ` +
-            "same window: none means the scope never resolved, so the gate " +
-            "stayed shut and the rows on screen belong to whatever scope was " +
-            "cached before — the app showing one instance's list while " +
-            "waiting on another, rather than a harness timing problem."
+            `not (${scopedRequests.length} scoped request(s) seen), yet the ` +
+            "version rows still mounted — so the list came from the query " +
+            `cache. ${detailsResponses} ${detailsQuery} response(s) arrived ` +
+            "in the same window, so the scope itself did resolve."
           : `${seenForQuery.length} unscoped request(s) did reach the wire, ` +
             "so the scoping gate let an unscoped fetch through rather than " +
             `nothing being requested: ${JSON.stringify(seenForQuery.slice(0, 3))}`)
