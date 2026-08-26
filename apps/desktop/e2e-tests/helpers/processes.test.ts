@@ -48,33 +48,49 @@ afterEach(() => {
   }
 })
 
+/**
+ * These spawn real processes and read the OS process table, so they carry
+ * fixed waits and a PowerShell round-trip on Windows. Vitest's 5s default is
+ * sized for pure logic and left roughly 3s of headroom locally — not enough on
+ * a loaded CI runner, where this timed out.
+ */
+const PROCESS_TEST_TIMEOUT = 30_000
+
 describe("killGameProcesses", () => {
-  it("kills a recorded process that belongs to this runtime path", async () => {
-    const runtimePath = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-owner-"))
-    runtimePaths.push(runtimePath)
-    const child = spawnChildMarkedWith(runtimePath)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+  it(
+    "kills a recorded process that belongs to this runtime path",
+    async () => {
+      const runtimePath = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-owner-"))
+      runtimePaths.push(runtimePath)
+      const child = spawnChildMarkedWith(runtimePath)
+      await new Promise((resolve) => setTimeout(resolve, 1500))
 
-    const instanceDir = path.join(runtimePath, "instances", "an-instance")
-    fs.mkdirSync(instanceDir, { recursive: true })
-    fs.writeFileSync(
-      path.join(instanceDir, ".gdl_instance.pid"),
-      `${child.pid}\n1700000000`
-    )
+      const instanceDir = path.join(runtimePath, "instances", "an-instance")
+      fs.mkdirSync(instanceDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(instanceDir, ".gdl_instance.pid"),
+        `${child.pid}\n1700000000`
+      )
 
-    expect(killGameProcesses(runtimePath)).toEqual([child.pid])
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    expect(isPidAlive(child.pid!)).toBe(false)
-  })
+      expect(killGameProcesses(runtimePath)).toEqual([child.pid])
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      expect(isPidAlive(child.pid!)).toBe(false)
+    },
+    PROCESS_TEST_TIMEOUT
+  )
 
-  it("leaves a recorded pid alone when it is not this run's process", async () => {
-    const child = spawnChildMarkedWith("an-unrelated-marker")
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    const runtimePath = runtimeWithPidfile(child.pid!)
+  it(
+    "leaves a recorded pid alone when it is not this run's process",
+    async () => {
+      const child = spawnChildMarkedWith("an-unrelated-marker")
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const runtimePath = runtimeWithPidfile(child.pid!)
 
-    expect(killGameProcesses(runtimePath)).toEqual([])
-    expect(isPidAlive(child.pid!)).toBe(true)
-  })
+      expect(killGameProcesses(runtimePath)).toEqual([])
+      expect(isPidAlive(child.pid!)).toBe(true)
+    },
+    PROCESS_TEST_TIMEOUT
+  )
 
   it("reports nothing when there are no pidfiles", () => {
     const runtimePath = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-empty-"))
