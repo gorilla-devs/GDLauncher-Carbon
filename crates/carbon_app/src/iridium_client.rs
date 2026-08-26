@@ -88,7 +88,7 @@ pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
                     }
                     _ => None,
                 };
-                if declared_wait.is_some_and(|wait| wait > MAX_HONOURED_RATE_LIMIT_WAIT) {
+                if exceeds_honoured_rate_limit_wait(declared_wait) {
                     tracing::warn!(
                         "rate limited by {} for longer than we will wait; returning the response",
                         req.url()
@@ -390,9 +390,16 @@ mod test {
 }
 
 /// How long a server-declared rate-limit window may be before the request is
-/// handed back instead of waited out. Beyond this, holding the caller is worse
-/// than surfacing the 429.
-const MAX_HONOURED_RATE_LIMIT_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+/// handed back instead of waited out. Both platforms limit per minute, so a
+/// genuine window never exceeds ~60s; beyond that, holding the caller is
+/// worse than surfacing the 429.
+const MAX_HONOURED_RATE_LIMIT_WAIT: std::time::Duration = std::time::Duration::from_secs(70);
+
+/// Separate from the middleware so the policy can be asserted without
+/// sleeping through a real window.
+fn exceeds_honoured_rate_limit_wait(declared_wait: Option<std::time::Duration>) -> bool {
+    declared_wait.is_some_and(|wait| wait > MAX_HONOURED_RATE_LIMIT_WAIT)
+}
 
 /// The wait a 429 response asks for, from `Retry-After` (delta-seconds) or
 /// Modrinth's `X-Ratelimit-Reset` (seconds until the window rolls over).
@@ -556,6 +563,28 @@ mod tests {
             wait <= Duration::from_secs(5),
             "expected a delta close to 5s, got {wait:?}"
         );
+    }
+
+    #[test]
+    fn a_window_length_rate_limit_is_waited_out_not_surfaced() {
+        assert!(!exceeds_honoured_rate_limit_wait(Some(
+            Duration::from_secs(45)
+        )));
+        assert!(!exceeds_honoured_rate_limit_wait(Some(
+            Duration::from_secs(60)
+        )));
+    }
+
+    #[test]
+    fn a_wait_beyond_a_full_window_is_still_surfaced() {
+        assert!(exceeds_honoured_rate_limit_wait(Some(Duration::from_secs(
+            600
+        ))));
+    }
+
+    #[test]
+    fn no_declared_wait_is_not_treated_as_too_long() {
+        assert!(!exceeds_honoured_rate_limit_wait(None));
     }
 
     #[test]

@@ -58,7 +58,11 @@ import {
   LAUNCH_TIMEOUT
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
-import { isPidAlive, pidsMatching } from "./helpers/processes.js"
+import {
+  isPidAlive,
+  killProcessTree,
+  pidsMatching
+} from "./helpers/processes.js"
 
 const INSTANCE_NAME = "gdl-e2e-survives-close"
 const MC_VERSION = "1.20.1"
@@ -193,7 +197,18 @@ test.describe("running game outlives the launcher", () => {
       ).toBe(true)
     } finally {
       await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-      if (current) await current.app.close()
+      if (current) {
+        // `app.close()` never returns while the app still owns a running
+        // game, and bounding it alone leaves a launcher the next spec trips on.
+        const electronPid = current.app.process().pid
+        await Promise.race([
+          current.app.close().catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 15_000))
+        ])
+        if (electronPid !== undefined && isPidAlive(electronPid)) {
+          killProcessTree(electronPid)
+        }
+      }
       // Kill the game explicitly: it now survives the launcher by design, so
       // nothing else in teardown would end it. `stopHarness` sweeps the same
       // process as a backstop, but this runs first and by pid, so a failure

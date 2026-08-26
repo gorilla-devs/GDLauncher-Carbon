@@ -190,6 +190,16 @@ export async function launchApp(opts: LaunchOptions): Promise<{
   const page = await app.firstWindow()
   page.on("console", (msg) => console.log(msg.text()))
 
+  // A failing request otherwise reaches the log as a bare "Failed to load
+  // resource: 500" with no URL, which names nothing.
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      console.log(
+        `[http ${response.status()}] ${response.request().method()} ${response.url()}`
+      )
+    }
+  })
+
   const pageErrors: Error[] = []
   page.on("pageerror", (error) => {
     console.error(error)

@@ -471,6 +471,9 @@ export async function searchForMod(
  * sites is safe, and not the "constructing a filename" anti-pattern this
  * suite avoids) from the current search results.
  */
+/** Covers the row's 100ms hover transition, with room for a slow frame. */
+const HOVER_SETTLE_MS = 300
+
 export async function openAddonPage(
   page: Page,
   identifier: string
@@ -479,6 +482,14 @@ export async function openAddonPage(
     `${byTestId(TEST_IDS.searchResultRow)}[data-project-id="${identifier}"]`
   )
   await expect(row).toBeVisible({ timeout: SEARCH_RESULTS_TIMEOUT })
+  // Hovered and settled before the click. The row lifts on hover
+  // (`hover:scale-[1.02]` over `duration-100`, `Search/ListItem.tsx`) inside a
+  // virtualised list, so a click delivered in the same breath as the hover
+  // arrives while the row is still moving and lands somewhere with no handler:
+  // the route never changes and the addon page never opens. A real user has
+  // long since settled the hover by the time they click.
+  await row.hover()
+  await page.waitForTimeout(HOVER_SETTLE_MS)
   await row.click()
   await expect(
     page.locator(byTestId(TEST_IDS.addonInstallButton))

@@ -7,14 +7,14 @@
  * teardown is the only thing standing between a failed test and a Minecraft
  * JVM that runs until the machine is rebooted.
  *
- * Everything here is best-effort and Unix-only. `pgrep`/`ps`/`kill` have no
- * equivalent wired up for Windows, so on win32 these degrade to "found
- * nothing" rather than throwing — a miss leaves one idle process for the
- * remainder of an already-ephemeral CI VM, which is a better trade than a
- * second, less-tested cleanup path.
+ * Everything here is best-effort: a failure reports "found nothing" rather
+ * than throwing, so a caller sweeping leaked processes reads that as "leave
+ * it alone", never as "assume it's mine and kill it".
  */
 
 import { execSync } from "node:child_process"
+import nodeFs from "node:fs"
+import path from "node:path"
 
 /**
  * The env var `launchApp` sets on every spawned app/core process to point it
@@ -24,9 +24,32 @@ import { execSync } from "node:child_process"
  */
 const RUNTIME_PATH_ENV_VAR = "GDL_RUNTIME_PATH"
 
-/** Pids whose command line contains `needle`. Empty on win32 and on no match. */
+/**
+ * Pids whose command line contains `needle`. Empty on no match.
+ *
+ * Case-insensitive on Windows, where the needle travels by environment so a
+ * path containing quotes cannot change what runs.
+ */
 export function pidsMatching(needle: string): number[] {
-  if (process.platform === "win32") return []
+  if (process.platform === "win32") {
+    try {
+      return execSync(
+        "powershell -NoProfile -NonInteractive -Command " +
+          '"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ' +
+          "$_.CommandLine.ToLower().Contains($env:GDL_PID_NEEDLE.ToLower()) } | " +
+          'ForEach-Object { $_.ProcessId }"',
+        {
+          encoding: "utf8",
+          env: { ...process.env, GDL_PID_NEEDLE: needle }
+        }
+      )
+        .split("\n")
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0)
+    } catch {
+      return []
+    }
+  }
 
   try {
     return execSync(`pgrep -f ${JSON.stringify(needle)}`, { encoding: "utf8" })
@@ -41,9 +64,8 @@ export function pidsMatching(needle: string): number[] {
 
 /**
  * Best-effort check that `pid` was launched with `GDL_RUNTIME_PATH` set to
- * `runtimePath` — the only thing tying a matching process back to *this*
- * harness rather than another worker's, since the runtime path travels by
- * env rather than argv.
+ * `runtimePath`. For the app and core this is the only attribution available,
+ * because they receive the path by environment rather than argv.
  *
  * `ps e` (BSD syntax, native on both Linux's procps and macOS) appends the
  * process environment to its output. Substring search rather than parsing
@@ -94,12 +116,95 @@ export function isPidAlive(pid: number): boolean {
  * `GDL_RUNTIME_PATH`, before anything is signalled: a pid that cannot be
  * confirmed is left alone.
  */
+/** Kills `pid` and its descendants; Electron's children outlive a bare kill. */
+export function killProcessTree(pid: number): void {
+  try {
+    if (process.platform === "win32") {
+      execSync(`taskkill /PID ${pid} /T /F`, { stdio: "ignore" })
+    } else {
+      process.kill(pid, "SIGKILL")
+    }
+  } catch {
+    // Already gone, or never ours.
+  }
+}
+
+/** `PID_FILE_NAME` in `managers/instance/mod.rs`. */
+const PID_FILE_NAME = ".gdl_instance.pid"
+
+/** The full command line `pid` is running, or null when it cannot be read. */
+function commandLineOf(pid: number): string | null {
+  try {
+    if (process.platform === "win32") {
+      return (
+        execSync(
+          "powershell -NoProfile -NonInteractive -Command " +
+            '"Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -eq ' +
+            '[int]$env:GDL_PID } | ForEach-Object { $_.CommandLine }"',
+          { encoding: "utf8", env: { ...process.env, GDL_PID: String(pid) } }
+        ).trim() || null
+      )
+    }
+
+    return (
+      execSync(`ps -p ${pid} -o args=`, { encoding: "utf8" }).trim() || null
+    )
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether `pid` is still the process a pidfile under `runtimePath` recorded.
+ *
+ * The launcher verifies a recorded pid by start time (`orphan_pid.rs`) because
+ * a user's runtime path is stable, so a recycled pid could legitimately name
+ * it. Here every run gets its own temp runtime path, so the path appearing in
+ * the process's own command line is already proof of identity, and a recycled
+ * pid cannot fake it.
+ */
+function pidBelongsToRun(pid: number, runtimePath: string): boolean {
+  const command = commandLineOf(pid)
+  if (!command) {
+    return false
+  }
+
+  return process.platform === "win32"
+    ? command.toLowerCase().includes(runtimePath.toLowerCase())
+    : command.includes(runtimePath)
+}
+
+/** Pids recorded by every instance pidfile under `runtimePath`. */
+function recordedGamePids(runtimePath: string): number[] {
+  const instancesDir = path.join(runtimePath, "instances")
+
+  let entries: string[]
+  try {
+    entries = nodeFs.readdirSync(instancesDir)
+  } catch {
+    return []
+  }
+
+  return entries
+    .map((entry) => path.join(instancesDir, entry, PID_FILE_NAME))
+    .flatMap((pidFile) => {
+      try {
+        const pid = Number(
+          nodeFs.readFileSync(pidFile, "utf8").split("\n")[0].trim()
+        )
+        return Number.isInteger(pid) && pid > 0 ? [pid] : []
+      } catch {
+        return []
+      }
+    })
+}
+
 export function killGameProcesses(runtimePath: string): number[] {
   const killed: number[] = []
 
-  for (const pid of pidsMatching(`${runtimePath}/managed_javas`)) {
+  for (const pid of recordedGamePids(runtimePath)) {
     if (!isPidAlive(pid)) continue
-    if (!pidRuntimePathMatches(pid, runtimePath)) continue
+    if (!pidBelongsToRun(pid, runtimePath)) continue
 
     try {
       process.kill(pid, "SIGKILL")
