@@ -773,15 +773,13 @@ const Instance = (props: { children?: any }) => {
               </h3>
               <p class="m-0 text-sm text-yellow-300/70">
                 <Trans
-                  key={
-                    (() => {
-                      const isLocked = !!routeData.instanceDetails.data?.modpack
-                        ?.locked
-                      return isLocked
-                        ? "content:_trn_duplicated_mods_locked_message"
-                        : "content:_trn_duplicated_mods_message"
-                    })()
-                  }
+                  key={(() => {
+                    const isLocked =
+                      !!routeData.instanceDetails.data?.modpack?.locked
+                    return isLocked
+                      ? "content:_trn_duplicated_mods_locked_message"
+                      : "content:_trn_duplicated_mods_message"
+                  })()}
                 />
               </p>
             </div>

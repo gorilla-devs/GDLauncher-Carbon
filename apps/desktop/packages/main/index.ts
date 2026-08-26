@@ -390,7 +390,10 @@ let coreProcessHandle: ChildProcessWithoutNullStreams | null = null
 // on Windows the holding process has to have exited first.
 async function killCoreProcess(timeoutMs = 5000): Promise<void> {
   const proc = coreProcessHandle
-  if (!proc || proc.exitCode !== null || proc.signalCode !== null) {
+  if (!proc) {
+    return
+  }
+  if (proc.exitCode !== null || proc.signalCode !== null) {
     return
   }
   await new Promise<void>((resolve) => {
@@ -1515,9 +1518,7 @@ app.whenReady().then(async () => {
   // rewriting for the renderer session lives in this single pair. See
   // ./utils/headerRewrite.ts for what each listener does and why both guard
   // against missing headers and always invoke `callback` exactly once.
-  session.defaultSession.webRequest.onBeforeSendHeaders(
-    handleBeforeSendHeaders
-  )
+  session.defaultSession.webRequest.onBeforeSendHeaders(handleBeforeSendHeaders)
   session.defaultSession.webRequest.onHeadersReceived(handleHeadersReceived)
 
   app.on("second-instance", (_e, argv) => {

@@ -92,7 +92,6 @@ test.describe("mod install", () => {
       // a passing one.
       await withCleanup(
         async () => {
-          let installed: InstalledMod | undefined
           await openInstanceAddons(page, instanceName)
           await searchForMod(page, {
             platform: testCase.platform,
@@ -109,7 +108,7 @@ test.describe("mod install", () => {
           // regression that changes what gets served would change what this
           // list reports too, not just break a hand-built URL.
           const mods = await openInstanceAddons(page, instanceName)
-          installed = mods.find(testCase.matches)
+          const installed = mods.find(testCase.matches)
           if (!installed) {
             throw new Error(
               `"${testCase.title}": instance.getInstanceMods for ` +

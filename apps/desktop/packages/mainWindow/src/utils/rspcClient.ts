@@ -158,9 +158,13 @@ function showDedupedErrorToast(display: string, source: "query" | "mutation") {
 // it so they can never drift out of sync with each other.
 // ---------------------------------------------------------------------------
 
-type RspcErrorCause = { display: string; code?: string; data?: unknown }
+interface RspcErrorCause {
+  display: string
+  code?: string
+  data?: unknown
+}
 
-type ParsedRspcError = {
+interface ParsedRspcError {
   code?: number
   message?: string
   cause?: RspcErrorCause[]
@@ -209,7 +213,9 @@ function parseRspcErrorPayload(raw: string): ParsedRspcError | undefined {
 export function extractErrorDisplay(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   const parsed = parseRspcErrorPayload(message)
-  return parsed?.cause?.[0]?.display ?? parsed?.message ?? parsed?.display ?? message
+  return (
+    parsed?.cause?.[0]?.display ?? parsed?.message ?? parsed?.display ?? message
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -479,7 +485,9 @@ interface InvalidateOperation {
  *  instead of throwing on a malformed frame — a bad frame should drop
  *  silently rather than take down the socket's message handler. Exported
  *  for unit testing. */
-export function parseInvalidateFrame(raw: unknown): InvalidateOperation | undefined {
+export function parseInvalidateFrame(
+  raw: unknown
+): InvalidateOperation | undefined {
   try {
     return JSON.parse(raw as string) as InvalidateOperation
   } catch (error) {

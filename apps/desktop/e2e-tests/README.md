@@ -247,13 +247,13 @@ from meta.gdl.gg.
 
 ### The matrix
 
-| Loader | Minecraft version | Why it's in the matrix |
-|---|---|---|
-| Forge | 1.20.1 (pinned) | Runs install processors — the case the processor-artifact assertion below exists for. |
-| Forge | 1.12.2 (pinned) | Pre-flattening Forge: its loader JSON genuinely declares zero processors (`"processors":[],"data":{}`), asserted as exactly zero rather than skipped. |
-| NeoForge | newest supported (resolved live off the app's own manifest) | The actively developed fork; runs processors like modern Forge. |
-| Fabric | 1.20.1 (pinned) | No install processors at all — `PartialVersionInfoCache` is never populated for it, a structurally different case from 1.12.2's confirmed zero. |
-| Quilt | 1.20.1 (pinned) | Same as Fabric. |
+| Loader   | Minecraft version                                           | Why it's in the matrix                                                                                                                                |
+| -------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Forge    | 1.20.1 (pinned)                                             | Runs install processors — the case the processor-artifact assertion below exists for.                                                                 |
+| Forge    | 1.12.2 (pinned)                                             | Pre-flattening Forge: its loader JSON genuinely declares zero processors (`"processors":[],"data":{}`), asserted as exactly zero rather than skipped. |
+| NeoForge | newest supported (resolved live off the app's own manifest) | The actively developed fork; runs processors like modern Forge.                                                                                       |
+| Fabric   | 1.20.1 (pinned)                                             | No install processors at all — `PartialVersionInfoCache` is never populated for it, a structurally different case from 1.12.2's confirmed zero.       |
+| Quilt    | 1.20.1 (pinned)                                             | Same as Fabric.                                                                                                                                       |
 
 Five combinations, one test per row. Client jar and asset-index verification
 (see "Install verification" above) run for all five; the processor-artifact
@@ -310,7 +310,7 @@ them at all.
 `crates/carbon_app/src/managers/minecraft/processor_outputs.rs`'s
 `required_files` — there is no Rust binding into the Playwright process, so
 the e2e suite carries its own copy of that logic to know what a given
-install *should* have produced.
+install _should_ have produced.
 
 Two independent implementations of the same logic can silently drift apart.
 `processor_outputs.rs`'s `required_files_matches_committed_golden` test
@@ -513,7 +513,7 @@ both loaders, with no beta/alpha noise to fight).
 
 **Install path** (two tests, both loaders): "resolves the newest compatible
 Modrinth build for each instance's loader" and its CurseForge counterpart.
-Each drives the *same* project through **two** instances pinned to the same
+Each drives the _same_ project through **two** instances pinned to the same
 Minecraft version but different loaders — `installedInstance` (Fabric) and
 the `forgeInstance` fixture below (Forge) — and asserts the two resolve to
 **different** version/file ids. That cross-instance differ is the assertion
@@ -579,7 +579,7 @@ single mistake this whole suite is built to make impossible:
    if both API-side oracles above somehow agreed with it.
 
 **Why the rule matters**: a `scoped` entry is compatible with the instance
-*by construction* — the query that produced it was already filtered to this
+_by construction_ — the query that produced it was already filtered to this
 Minecraft version and loader — so asserting compatibility against it checks a
 tautology that can never fail. This is not a hypothetical risk: pointing the
 compatibility check at `scoped` instead of `unfiltered`, as a deliberate
@@ -601,7 +601,7 @@ all** — modelled by `newestByDate`. `find_mod_update`
 allowed channels (`AppConfiguration.mod_channels`) in list order, taking the
 first candidate at or above each channel's level in turn — under the shipped
 default (`'stable:true,beta:true,alpha:true'`) the **stable** pass runs
-first, so this resolves to the newest *stable* build, not merely the newest
+first, so this resolves to the newest _stable_ build, not merely the newest
 outright — modelled by `newestUpdateCandidate`. On Cloth Config's all-stable
 1.20.1 line the two predicates happen to agree (there's no beta/alpha to
 diverge on), which is exactly why this project was picked and exactly why
@@ -614,7 +614,7 @@ The fourth test's whole point is that these two paths **could** disagree.
 Because install applies no channel filter at all while update prefers the
 newest stable first, a project whose newest compatible build happens to be a
 beta would install that beta via the addon page's main button, and then have
-`find_mod_update` offer an *older stable* build as the "update" — a downgrade
+`find_mod_update` offer an _older stable_ build as the "update" — a downgrade
 presented as an upgrade. Exactly one candidate project (JEI) was rejected
 for this reason: its entire 1.20.1 line is beta-only, which would have made
 this test fail by design rather than by regression. If this test ever goes
@@ -648,11 +648,11 @@ rather than let it silently corrupt an oracle.
   exercised only via the default, never via an instance configured to prefer
   beta or alpha first.
 - **`find_mod_update`'s CurseForge/Modrinth candidate fetch is asymmetric on
-  multi-loader instances.** For CurseForge, it filters by only the *first*
+  multi-loader instances.** For CurseForge, it filters by only the _first_
   modloader in the instance's configured list
   (`version.modloaders.iter().next()`, a single `mod_loader_type` value —
   CurseForge's API only accepts one). For Modrinth, it sends the instance's
-  *entire* modloader list (`loaders: Vec<String>`). An instance that only
+  _entire_ modloader list (`loaders: Vec<String>`). An instance that only
   ever has one modloader configured never exercises this difference, and
   neither does this suite — no test here drives a multi-loader instance
   through the update path, so this asymmetry is real (read directly off
@@ -677,17 +677,17 @@ disk — against the pack's own `.mrpack` index, `packinfo.json`, the install
 audit, or a twin instance — never by trusting what the app renders about the
 same fact.
 
-| File | Tests | What it proves | Wall-clock |
-|---|---|---|---|
-| `modpackInstall.spec.ts` | 2 | A first install from each platform lays every declared file and override on disk and writes a correct `packinfo.json`. | ~1.2 min |
-| `modpackLifecycle.spec.ts` | 1 | An upgrade *and* a downgrade against a **dirtied** instance preserve user and game data while correctly replacing, deleting and creating pack files. | ~1.5 min |
-| `modpackSaveGuard.spec.ts` | 2 | `PlanReason::InSaveFolder` actually stops a version change *and* a repair from touching a pack-tracked file under `saves/`. | ~1.1 min |
-| `modpackLock.spec.ts` | 4 | A fresh install starts locked; unlocking flips the flag and unblocks Addons; unpairing drops the association entirely. | ~4 min |
-| `modpackReinstall.spec.ts` | 2 | Repair restores a *deleted* pack file **and** repairs a *damaged* one — the same treatment for both — and is refused outright while the game is running. | ~1.6 min |
-| `modpackRepairPreview.spec.ts` | 2 | The repair preview's counts and per-file verdicts match what a real repair then does, for a deleted/truncated/edited file and a disabled pack mod, both left disabled and re-enabled. | ~1.1 min |
-| `modpackCurseforgeVersion.spec.ts` | 1 | A **CurseForge** version change lands the instance byte-identical to a fresh install of the same target file. | ~1.2 min |
-| `modpackChangeVersionGuard.spec.ts` | 1 | A version change started mid-game is **refused outright, not deferred** — `change_modpack` now carries the same `LaunchState` guard `repair_modpack` always had. | ~1.1 min |
-| `modpackInterruptedStaging.spec.ts` | 2 | A download killed by a core crash resumes on the next launch; a lost packinfo promotion strands the new files as untouchable. | ~2.1 min |
+| File                                | Tests | What it proves                                                                                                                                                                        | Wall-clock |
+| ----------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `modpackInstall.spec.ts`            | 2     | A first install from each platform lays every declared file and override on disk and writes a correct `packinfo.json`.                                                                | ~1.2 min   |
+| `modpackLifecycle.spec.ts`          | 1     | An upgrade _and_ a downgrade against a **dirtied** instance preserve user and game data while correctly replacing, deleting and creating pack files.                                  | ~1.5 min   |
+| `modpackSaveGuard.spec.ts`          | 2     | `PlanReason::InSaveFolder` actually stops a version change _and_ a repair from touching a pack-tracked file under `saves/`.                                                           | ~1.1 min   |
+| `modpackLock.spec.ts`               | 4     | A fresh install starts locked; unlocking flips the flag and unblocks Addons; unpairing drops the association entirely.                                                                | ~4 min     |
+| `modpackReinstall.spec.ts`          | 2     | Repair restores a _deleted_ pack file **and** repairs a _damaged_ one — the same treatment for both — and is refused outright while the game is running.                              | ~1.6 min   |
+| `modpackRepairPreview.spec.ts`      | 2     | The repair preview's counts and per-file verdicts match what a real repair then does, for a deleted/truncated/edited file and a disabled pack mod, both left disabled and re-enabled. | ~1.1 min   |
+| `modpackCurseforgeVersion.spec.ts`  | 1     | A **CurseForge** version change lands the instance byte-identical to a fresh install of the same target file.                                                                         | ~1.2 min   |
+| `modpackChangeVersionGuard.spec.ts` | 1     | A version change started mid-game is **refused outright, not deferred** — `change_modpack` now carries the same `LaunchState` guard `repair_modpack` always had.                      | ~1.1 min   |
+| `modpackInterruptedStaging.spec.ts` | 2     | A download killed by a core crash resumes on the next launch; a lost packinfo promotion strands the new files as untouchable.                                                         | ~2.1 min   |
 
 Four of the nine own their harness instead of using the shared
 `authenticatedApp` fixture, for two different reasons. Three —
@@ -707,11 +707,11 @@ re-registers that file's own `test()` calls, the same reason
 **Modrinth `remarkably` (`MNW3LUwK`), Fabric 1.20.1**, three pinned version
 ids:
 
-| id | name | mods | mod bytes | overrides |
-|---|---|---|---|---|
-| `eGIPjEwN` | 1.15.11 (NEW) | 25 | 28.4 MiB | 9 (8 config) |
-| `8QjqOzvP` | 1.15.9 (MID) | 24 | 28.1 MiB | 9 (8 config) |
-| `PVccZjDs` | 1.13 (OLD) | 27 | 25.6 MiB | 12 (11 config) |
+| id         | name          | mods | mod bytes | overrides      |
+| ---------- | ------------- | ---- | --------- | -------------- |
+| `eGIPjEwN` | 1.15.11 (NEW) | 25   | 28.4 MiB  | 9 (8 config)   |
+| `8QjqOzvP` | 1.15.9 (MID)  | 24   | 28.1 MiB  | 9 (8 config)   |
+| `PVccZjDs` | 1.13 (OLD)    | 27   | 25.6 MiB  | 12 (11 config) |
 
 Deltas, measured 2026-08-01: MID → NEW is +4 / −5 / =20, a small bump;
 MID → OLD is +16 / −13 / =11, a large jump.
@@ -746,7 +746,7 @@ mods differ in bytes between MID and NEW** — the bump is pure add/remove,
 unsurprising since a mod update ordinarily changes its own versioned filename
 rather than keeping it and changing the bytes underneath. That is why
 `modpackLifecycle.spec.ts`'s `deleteReturning` case uses `/options.txt` rather
-than a jar, and why `/options.txt` is currently the *only* spare pristine
+than a jar, and why `/options.txt` is currently the _only_ spare pristine
 non-mod candidate (`/config/lithium.properties` is taken by `editTarget`).
 There is zero margin: a launch that happens to rewrite `options.txt` exhausts
 both, and the test fails loudly naming that rather than silently weakening.
@@ -777,7 +777,7 @@ reader — no Playwright, no DOM — so each is unit-tested directly:
 - **`<root>/.install_audit/audit.txt`** — a plain-text record of every
   decision the pass made: per file, whether it replaced, deleted, created, or
   refused to touch it and why. This is the single best oracle in the feature,
-  because it lets a test prove *why* a file survived rather than only that it
+  because it lets a test prove _why_ a file survived rather than only that it
   did. The directory is deleted and recreated on every pass, so it always
   describes the most recent one only. `helpers/installAudit.ts` parses it,
   with two deliberate non-normalisations: `null` (no audit directory, "the
@@ -788,7 +788,7 @@ reader — no Playwright, no DOM — so each is unit-tested directly:
   so the parser preserves it and each comparison site normalises.
 - **`<root>/.setup/`** — present only while an install or version change is in
   flight (`run/mod.rs:527-528` removes it once the setup path completes), which
-  is what makes its *absence* the assertion in `modpackReinstall.spec.ts`'s
+  is what makes its _absence_ the assertion in `modpackReinstall.spec.ts`'s
   refused-while-running test.
 
 `helpers/instanceTree.ts`'s `snapshotTree` is the fourth reader: a recursive
@@ -804,17 +804,17 @@ no pack in the fixture set ships one.
 **two independent passes**, and almost every surprise in this feature comes
 from the fact that they do not talk to each other:
 
-1. a loop over `packinfo.files`, which can *skip*, *delete* or *replace* an
+1. a loop over `packinfo.files`, which can _skip_, _delete_ or _replace_ an
    already-known file, and
 2. a walk over whatever physically landed in the staging directory, which
    moves a staged file into any path that is currently **empty**. It iterates
-   *staged* entries, not on-disk ones, so a path nothing was staged for is
+   _staged_ entries, not on-disk ones, so a path nothing was staged for is
    invisible to it — which is why a wholly-untracked user file is structurally
    unreachable by this pass, not merely skipped by it.
 
 **On a fresh install only pass 2 runs at all.** `process_modpack` writes its
 scan to `tmp-packinfo.json` (`run/modpack.rs:638`) and renames it to
-`packinfo.json` only at :899, *after* the staging apply. So the first time
+`packinfo.json` only at :899, _after_ the staging apply. So the first time
 through, `process_modpack_staging` reads no packinfo, pass 1 is skipped
 entirely, and the staging walk places 100% of the pack's files. That matters
 for anyone sabotaging this code to check a test really fails: disabling the
@@ -824,27 +824,27 @@ of on the assertion under test. Gate such a sabotage on
 `instance_root.join("packinfo.json").exists()` to confine it to the
 second-and-later passes.
 
-| On-disk state of a pack file | Pass 1 | Pass 2 | Net result |
-|---|---|---|---|
-| Untouched, target version ships it | replace | path occupied | updated |
-| Untouched, target version drops it | delete | nothing staged | removed |
-| Untouched, under `/saves` | skip `in-save-folder` | nothing staged | **kept** |
-| Edited by user | skip `modified-by-user` | path occupied | **kept as edited** |
-| Truncated by user | skip `modified-by-user` | path occupied | **corruption preserved** |
-| Deleted by user, staged copy exists | skip `deleted-by-user` | path empty → created | **silently reinstated** |
-| Deleted by user, nothing staged | skip `deleted-by-user` | nothing staged | stays deleted |
-| Not in packinfo at all (a user's own file) | never visited | never staged | untouched |
+| On-disk state of a pack file               | Pass 1                  | Pass 2               | Net result               |
+| ------------------------------------------ | ----------------------- | -------------------- | ------------------------ |
+| Untouched, target version ships it         | replace                 | path occupied        | updated                  |
+| Untouched, target version drops it         | delete                  | nothing staged       | removed                  |
+| Untouched, under `/saves`                  | skip `in-save-folder`   | nothing staged       | **kept**                 |
+| Edited by user                             | skip `modified-by-user` | path occupied        | **kept as edited**       |
+| Truncated by user                          | skip `modified-by-user` | path occupied        | **corruption preserved** |
+| Deleted by user, staged copy exists        | skip `deleted-by-user`  | path empty → created | **silently reinstated**  |
+| Deleted by user, nothing staged            | skip `deleted-by-user`  | nothing staged       | stays deleted            |
+| Not in packinfo at all (a user's own file) | never visited           | never staged         | untouched                |
 
 **What gets staged is itself not obvious**, and the last three rows turn on
 it. `prepare_modpack_from_mrpack`
 (`crates/carbon_app/src/managers/minecraft/modrinth.rs:277-289`) skips
 downloading any `files[]` entry whose target-version sha512 already matches
-what the *old* packinfo recorded — so a mod whose bytes are unchanged across
+what the _old_ packinfo recorded — so a mod whose bytes are unchanged across
 the bump never gets a fresh copy placed in staging, and pass 2 has nothing to
 recreate a deleted one from. Overrides have no such optimisation: they are
 re-extracted unconditionally on every pass. That asymmetry is why
 `modpackReinstall.spec.ts` draws all three of its target files from the pack's
-overrides rather than its mods — on a *same-version* reinstall the comparison
+overrides rather than its mods — on a _same-version_ reinstall the comparison
 is packinfo-against-itself and therefore always matches, so **every**
 `.files`-declared mod is skip-optimised unconditionally and a deleted mod can
 never come back, however the UI labels the action.
@@ -856,7 +856,7 @@ Modrinth tests fetch the version's own `.mrpack` index live and compare bytes
 against it. That does not port to CurseForge, for two independent reasons.
 
 First, `packinfo.json` cannot substitute. `packinfo::scan_dir` hashes the
-**staging** copy of each file, *before* the rename into its final location, so
+**staging** copy of each file, _before_ the rename into its final location, so
 comparing on-disk bytes against packinfo is self-referential — it can catch a
 change made after the install (a user edit), never a bug that staged the wrong
 bytes in the first place. Second, CurseForge file downloads require an
@@ -866,13 +866,13 @@ standalone mode, so there is no index to fetch.
 `modpackCurseforgeVersion.spec.ts` solves it with a **twin instance**: install
 the target file fresh, snapshot it, delete it, then build a second instance at
 the older file and version-change it onto the same target. The twin was
-produced by the *install* path, so it is genuinely external to the
-*version-change* path under test, and it needs no API key. What that buys is
+produced by the _install_ path, so it is genuinely external to the
+_version-change_ path under test, and it needs no API key. What that buys is
 the property that matters most about the whole feature and that nothing here
 proved before — **a version change lands you where a fresh install of the
 target would have** — confirmed byte-for-byte across 60-odd paths.
 
-The twin is built and torn down *before* the subject exists, which is not
+The twin is built and torn down _before_ the subject exists, which is not
 fussiness. `next_folder` (`managers/instance/mod.rs:1563`) de-duplicates an
 instance's **shortpath**, but nothing de-duplicates its **display name**, so
 two installs of one modpack produce two rows with an identical `name`. That
@@ -890,7 +890,7 @@ is one md5 pass plus a handful of renames. Racing that would be flaky, and
 against, since the core's `debug!`/`trace!` output does not reach this suite's
 stdout capture — only `_STATUS_:` lines do.
 
-So the second test reproduces the *consequence* instead, exactly and without a
+So the second test reproduces the _consequence_ instead, exactly and without a
 synthetic `.setup/`. Promotion is the last step: `process_modpack` writes its
 scan to `tmp-packinfo.json` and only renames it over `packinfo.json` at
 `run/modpack.rs:899`, after the apply. A crash during the apply therefore
@@ -909,7 +909,7 @@ misclassification set would come back empty and the assertion would be vacuous.
 ### Why `modpackSaveGuard` seeds state
 
 `SkipReplaceReason::InSaveFolder` only fires for a path that is **already in
-packinfo** *and* starts `/saves`. No pack in this fixture set ships
+packinfo** _and_ starts `/saves`. No pack in this fixture set ships
 `overrides/saves/**`, so nothing about a real install ever puts a save under
 packinfo's tracking, and the branch is unreachable through any realistic
 fixture. That test seeds the state deliberately — the same class of tampering
@@ -921,7 +921,7 @@ Writing `packinfo.json` back has one trap worth restating: the real file is
 `{"_version":"1","files":{…}}` (`PackInfoWrapper` is
 `#[serde(tag = "_version")]`), so the test mutates `raw.files` in place rather
 than reserialising a fresh `{files}` object. The latter would silently drop
-the tag and make the *next* read fail to parse at all — a `serde_json` error
+the tag and make the _next_ read fail to parse at all — a `serde_json` error
 on an unrelated line instead of a clean red on the assertion the test is
 actually about.
 
@@ -930,7 +930,7 @@ actually about.
 Sodium and Iris normalise their own configs on first run, and this pack ships
 both as overrides. Their packinfo entries still carry the pack's original md5,
 so once a launch has rewritten them on disk they legitimately classify as
-`modified by user` for the *next* version change. That is correct product
+`modified by user` for the _next_ version change. That is correct product
 behaviour — preserve, don't replace — not a bug, but it means any test that
 launches the game must partition with `classifyPackinfo` **after** the launch
 and **before** any mutation, and pick its edit target from the pristine list
@@ -953,11 +953,11 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
    next launch.** `repair_modpack` refuses outright while the instance is
    launching, queued, running or being deleted
    (`managers/instance/modpack/mod.rs:210-217`); `change_modpack` has no such
-   guard. The consequence is *not* a mid-game `mods/` rewrite — both route
+   guard. The consequence is _not_ a mid-game `mods/` rewrite — both route
    through `prepare_game`, which bails on `LaunchState::Running` of its own
    accord (`run/mod.rs:194-196`), so no staging ever runs under a live JVM.
    It is that `change_modpack` has already created `.setup/` and written
-   `change-pack-version.json` into it (`modpack/mod.rs:161-176`) *before*
+   `change-pack-version.json` into it (`modpack/mod.rs:161-176`) _before_
    reaching that refusal. So a version change started mid-game is not
    cancelled, it is **deferred**: the next legitimate launch finds the file
    and applies it. Until then every further `change_modpack` call bails with
@@ -977,7 +977,7 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
    still ships it and something was staged for that path — the two passes are
    independent, so pass 1's `deleted by user` decision does not stop pass 2
    recreating it. The same path then lands in **two contradictory audit
-   sections at once**, `Files that could not be replaced:` *and*
+   sections at once**, `Files that could not be replaced:` _and_
    `Files created:`. "User-deleted stays deleted" is only true for a file the
    target version drops.
    **Fixed:** `process_modpack_staging` now reconciles every path through a
@@ -989,7 +989,7 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
 3. **Reinstall repairs a missing file but not a damaged one.** A truncated
    file still exists and its md5 no longer matches packinfo, so pass 1 classes
    it `ModifiedByUser` and pass 2 skips it because the path is occupied. A
-   *deleted* file is restored. So the repair a user is most likely to want —
+   _deleted_ file is restored. So the repair a user is most likely to want —
    "this jar is broken, give me a clean copy" — is the one reinstall does not
    perform, while the UI presents it as a general repair action.
    **Fixed:** `repair_modpack` now writes a `.setup/repair` marker
@@ -1017,7 +1017,7 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
    manifest) — **they survive permanently, with no audit trace at all.**
    `modpackLifecycle.spec.ts` pins those nine by name in
    `KNOWN_STALE_SURVIVORS_AFTER_DOWNGRADE`, as a bidirectional `toEqual`, so
-   the assertion catches that set *growing* and also catches one spuriously
+   the assertion catches that set _growing_ and also catches one spuriously
    disappearing. **Platform-independent**, confirmed on CurseForge by
    `modpackCurseforgeVersion.spec.ts`: the version-changed instance's packinfo
    is missing entries a fresh install records, while every one of those files
@@ -1057,7 +1057,7 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
    the misclassification happens and that the skipped files' bytes are left
    untouched.
    **Fixed:** `repair_modpack`'s repair mode (see finding #3 above)
-   resolves each path by deciding it against the *target* version alone —
+   resolves each path by deciding it against the _target_ version alone —
    `apply_plan::decide_repair` never consults the stale `old` record for a
    path `target` still ships, unlike `ApplyMode::VersionChange`. A file the
    crash already landed correctly now decides `Keep`/`Unchanged` (disk
@@ -1069,7 +1069,7 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
    `modpackInterruptedStaging.spec.ts`'s second test.
 7. **A CurseForge modpack's `packinfo.json` could record files that were not
    on disk.** Not a pre-existing bug like #1-6 above — found in this same
-   branch's own first full packaged-build run, and *caused* by this branch:
+   branch's own first full packaged-build run, and _caused_ by this branch:
    a fresh-install regression introduced by the single-planner staging
    rewrite (`apply_plan::plan`, finding #2's fix above), caught by
    `modpackInstall.spec.ts`'s CurseForge test (`boosted-fps`, file
@@ -1079,14 +1079,14 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
    install (`old = None`) a pack's own shipped world files are staged and
    hashed into `tmp-packinfo.json` by `packinfo::scan_dir` — which has no
    saves-specific branch at all, it unconditionally hashes whatever its
-   whitelist names — *before* the planner ever runs; the planner then
+   whitelist names — _before_ the planner ever runs; the planner then
    decided `Keep` for those `/saves` paths, so `execute_plan`'s no-op `Keep`
    arm never moved them out of staging, and the staging directory is deleted
    immediately after. packinfo promised three files
    (`saves/FPS Stress Test.zip`, `saves/FPS Test.zip`,
    `saves/FPS Winter Stress Test.zip`) that were never written to disk,
    reproducible 3/3. The pre-planner two-pass code never had this failure
-   mode — its saves guard only ever covered the *delete* branch, not
+   mode — its saves guard only ever covered the _delete_ branch, not
    creation.
    **Fixed:** the `/saves` rule is now conditional instead of absolute.
    Existing save bytes (disk `Present` or `Disabled`) are still protected
@@ -1104,7 +1104,7 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
    since navigated to.** `AuthFlow.tsx`'s `handleExit`
    (`pages/Login/AuthFlow.tsx:638-672`) runs once as a side effect of the
    login flow's own state machine reaching its `exiting` phase, and ends with
-   `navigator.navigate("/library")` — but only *after* awaiting a sidebar
+   `navigator.navigate("/library")` — but only _after_ awaiting a sidebar
    slide-out, an optional seasonal splash, and (on every fresh runtime path,
    since `flow.data.isFirstLaunch` is always true here) a ~2.6s welcome-text
    fade sequence. Nothing synchronized that final `navigate()` against
@@ -1141,13 +1141,13 @@ same reason as the rest — pinned by an assertion, fixed, verified green.
 (`helpers/modpacks.ts`) are both **90s**. Measured directly on 2026-08-01, a
 cold Modrinth search takes **30.204s** and returns HTTP 200, then 0.084s and
 0.078s warm. Both constants used to be `30_000` — sitting exactly on the
-measured cold path, so the *first* search of any suite run failed
+measured cold path, so the _first_ search of any suite run failed
 deterministically on a perfectly good response. That cost four spec runs
 before it was diagnosed. Re-measure before lowering either; `mods.ts`'s old
 comment claimed "a couple of seconds", which was stale by an order of
 magnitude.
 
-A fast repeat is not necessarily a cached *success*. Modrinth caches its own
+A fast repeat is not necessarily a cached _success_. Modrinth caches its own
 5xx too: the literal query `"fabric api"` returned HTTP 500
 (`Typesense search failed: Request Timeout`) cold at 30.2s and then served
 that same 500 from cache at 0.08s, while a control query returned 200. No
@@ -1173,7 +1173,7 @@ genuinely exited, not merely that `app.close()` resolved.
 
 Those are different events. `window-all-closed` in `main/index.ts` calls
 `coreModule.kill()` and `app.quit()` without awaiting the core's own `exit`
-event, so `app.close()` resolving only proves the *Electron* main process is
+event, so `app.close()` resolving only proves the _Electron_ main process is
 gone — the core (holding the SQLite connections everything this spec reads
 back depends on) can still be alive. Relaunching before it has released those
 handles races the old process's open file/DB handles against the new one:
@@ -1209,7 +1209,7 @@ app's own UI/API response, and the on-disk state directly:
 
 1. **An instance** (name + Minecraft version) — UI: a fresh
    `instance.getInstanceDetails` response. Disk: both the `Instance` DB row
-   *and* the instance's own on-disk `instance.json`
+   _and_ the instance's own on-disk `instance.json`
    (`helpers/instanceConfig.ts`) — two disk-side checks, deliberately, since
    this spec's whole point is SQLite survival specifically, not just "some
    file exists somewhere".
@@ -1223,7 +1223,7 @@ app's own UI/API response, and the on-disk state directly:
    taken as proof of anything SQLite-specific.
 4. **A disabled mod** — same two channels, `enabled: false`. Genuinely
    persistence-adjacent in a way (3) is not: the `.disabled` filename suffix
-   *is* the ground truth for this fact, not a proxy for something else, and
+   _is_ the ground truth for this fact, not a proxy for something else, and
    there is no network fallback that can reconstruct it.
 
 Checking only the UI would pass on stale in-memory state the running process
@@ -1231,7 +1231,7 @@ never actually persisted — a query cache that survived the restart in memory
 would satisfy it for the wrong reason. Checking only disk would pass even if
 the app never loaded what it wrote back on boot — a write-only bug, where the
 next launch silently ignores its own data, would go undetected. Both
-channels have to agree on the *pre-restart* captured value for an assertion
+channels have to agree on the _pre-restart_ captured value for an assertion
 to mean what it claims.
 
 ### Mod state in the database is a cache, not a persistence store
@@ -1266,7 +1266,7 @@ filename, size, enabled flag, or platform association — is uniquely tied to
 any SQLite row surviving a restart.** The launcher fully rebuilds it from the
 jar alone: a local disk scan for the file-level facts, plus an unconditional
 background network lookup for the platform association. Mod state in the
-database is a *cache* of what disk (and, for platform association, the
+database is a _cache_ of what disk (and, for platform association, the
 network) already says, not the thing that makes it durable.
 
 Assertion (3) is kept, but documented — in the spec's own module and
@@ -1274,13 +1274,13 @@ assertion-level doc comments, and here — as a **regression check on that
 reconciliation pipeline surviving a restart**, not as proof that any
 SQLite row persisted. A bug that silently broke the local scan, or that
 stopped the background re-association task from running at all, would still
-be caught by this assertion; a bug that broke *only* `ModFileCache`/
+be caught by this assertion; a bug that broke _only_ `ModFileCache`/
 `ModrinthModCache` persistence itself, with the reconciliation pipeline
 intact, would not be.
 
 **Open question this raises, not chased down here:** if the platform
 association is re-derived by a live Modrinth API call on every boot, what
-does an *offline* launch show for an installed mod? That lookup cannot run
+does an _offline_ launch show for an installed mod? That lookup cannot run
 without a network, and nothing in this suite exercises a launch with the
 network unavailable.
 
@@ -1293,7 +1293,7 @@ contract every launch-time status relies on — that the core actually emitted
 the expected `_STATUS_:<EVENT>` line
 (`crates/carbon_app/src/managers/db_bootstrap.rs`'s `DbStatus` funnel), and
 that `apps/desktop/packages/main/index.ts` parsed that line and drove the
-*correct* rung of the recovery screen
+_correct_ rung of the recovery screen
 (`packages/preload/loading.ts`'s `fatalError`/`backwardsMigrationError`).
 Asserting only the log line would pass even if the UI rendered nothing;
 asserting only the UI would pass if the shell happened to guess right for the
@@ -1319,7 +1319,7 @@ confirms the seeded database file is genuinely gone from disk afterward.
 **The one deliberate omission.** `DB_DOWNGRADE_FAILED`'s "Restore Previous
 Database" rung is asserted **absent**, never exercised. `compat.rs`'s
 `down_run` runs every stored-down migration inside one transaction and rolls
-the *whole* thing back on any failure, including the "no stored down" branch
+the _whole_ thing back on any failure, including the "no stored down" branch
 the seed for this state drives — so the on-disk database after a failed
 down-run is, byte for byte, identical to the pre-down-run snapshot `down_run`
 just took. `snapshot_if_restorable` finds no difference and reports no
@@ -1334,7 +1334,7 @@ explicitly rather than skipping the check.
 Read `compat.rs`'s `handle_ahead` directly rather than assume: a
 migration-count tail that is entirely additive overlays **silently** —
 `Proceed`, a `tracing::info!` line, no `_STATUS_:` event at all. `Downgraded`
-only fires once a tail containing a *breaking* migration has its stored
+only fires once a tail containing a _breaking_ migration has its stored
 `down_sql` run successfully and the resulting schema matches this binary's
 own reference schema byte-for-byte. `dbSeed.ts`'s `DB_DOWNGRADED` seed
 reflects this: it replays the checked-in `baseline.sql` and adds one
@@ -1351,7 +1351,7 @@ Every fatal database-open path used to terminate with a direct
 blocks until the background worker thread has actually flushed pending log
 lines to `__gdl_logs__/*.log`. On an idle machine that worker thread
 typically gets scheduled before the process dies anyway; under CPU
-contention it does not, so the one line naming *why* the process was exiting
+contention it does not, so the one line naming _why_ the process was exiting
 could be silently lost, producing an attached core log that is empty at
 exactly the moment it mattered most.
 
@@ -1426,20 +1426,20 @@ Per-file figures below are **isolated** runs, several re-measured
 2026-08-07 alongside the new spec. Do not add them up and expect the total
 above:
 
-| File | Tests | Isolated |
-|---|---|---|
-| `modpackInstall.spec.ts` | 2 | ~1.2 min |
-| `modpackLifecycle.spec.ts` | 1 | ~1.5 min |
-| `modpackSaveGuard.spec.ts` | 2 | ~1.1 min |
-| `modpackLock.spec.ts` | 4 | ~4 min |
-| `modpackReinstall.spec.ts` | 2 | ~1.6 min |
-| `modpackRepairPreview.spec.ts` | 2 | ~1.1 min |
-| `modpackCurseforgeVersion.spec.ts` | 1 | ~1.2 min |
-| `modpackChangeVersionGuard.spec.ts` | 1 | ~1.1 min |
-| `modpackInterruptedStaging.spec.ts` | 2 | ~2.1 min |
-| `persistence.spec.ts` | 1 | ~66s |
-| `dbRecovery.spec.ts` | 9 | ~46–48s |
-| `modResolution.spec.ts` | 4 | ~9 min |
+| File                                | Tests | Isolated |
+| ----------------------------------- | ----- | -------- |
+| `modpackInstall.spec.ts`            | 2     | ~1.2 min |
+| `modpackLifecycle.spec.ts`          | 1     | ~1.5 min |
+| `modpackSaveGuard.spec.ts`          | 2     | ~1.1 min |
+| `modpackLock.spec.ts`               | 4     | ~4 min   |
+| `modpackReinstall.spec.ts`          | 2     | ~1.6 min |
+| `modpackRepairPreview.spec.ts`      | 2     | ~1.1 min |
+| `modpackCurseforgeVersion.spec.ts`  | 1     | ~1.2 min |
+| `modpackChangeVersionGuard.spec.ts` | 1     | ~1.1 min |
+| `modpackInterruptedStaging.spec.ts` | 2     | ~2.1 min |
+| `persistence.spec.ts`               | 1     | ~66s     |
+| `dbRecovery.spec.ts`                | 9     | ~46–48s  |
+| `modResolution.spec.ts`             | 4     | ~9 min   |
 
 Those sum to well over the measured 16.8 minutes, and the discrepancy is the
 point: **an isolated run pays for the whole Minecraft substrate itself**,
@@ -1474,7 +1474,7 @@ test-step compute across the three jobs combined.
 per-PR run**, but the margin is no longer generous: it was ~5 minutes before
 the mod-resolution and modpack suites, and it is now a little over a fifth of
 the budget. Two things would eat the rest faster than test count alone
-suggests — a third-party slowdown, since each *distinct* search query in the
+suggests — a third-party slowdown, since each _distinct_ search query in the
 suite pays Modrinth's ~30s cold path once and there are roughly half a dozen
 of them, and any spec that launches the real game, which the modpack suite
 added two of. That is a statement about the current measured
@@ -1551,10 +1551,10 @@ behavior, not evidence the suite itself is broken.
   errors explicitly discarded, and they write `modpack_update_curseforge` /
   `modpack_update_modrinth`. Neither field appears in `api/`, in `domain/`, or
   anywhere in `mainWindow` — the `has_update` that does reach the API is on the
-  *Mod* struct, a different feature. So this fires two live platform requests
+  _Mod_ struct, a different feature. So this fires two live platform requests
   per modpack instance and nothing consumes the result. Not a coverage gap:
   there is no UI to test. Worth confirming before it grows one.
-- **Interrupting the *apply* phase is uncovered**, as opposed to the download
+- **Interrupting the _apply_ phase is uncovered**, as opposed to the download
   phase, which `modpackInterruptedStaging.spec.ts` does crash for real. Its
   consequence is covered by reconstruction (see above), but no test kills the
   core between `staging-packinfo.json` appearing and `modpack-complete` being

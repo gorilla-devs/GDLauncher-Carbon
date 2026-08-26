@@ -19,7 +19,10 @@ describe("NETWORK_ERROR_RE", () => {
   test.each([
     ["Failed to fetch version manifest", "missing resource"],
     ["Failed to fetch server pack file info: 404 Not Found", "http status"],
-    ["Failed to fetch minecraft version: unexpected end of JSON", "parse error"],
+    [
+      "Failed to fetch minecraft version: unexpected end of JSON",
+      "parse error"
+    ],
     ["Failed to fetch latest consent sha: 500", "server error"]
   ])("does not treat %j as a network error (%s)", (message) => {
     expect(NETWORK_ERROR_RE.test(message)).toBe(false)

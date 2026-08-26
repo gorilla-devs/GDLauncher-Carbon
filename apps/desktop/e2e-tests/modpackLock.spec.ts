@@ -19,8 +19,7 @@ import {
   openInstanceSettings,
   packPaths,
   unlockModpack,
-  unpairModpack,
-  type PackIndex
+  unpairModpack
 } from "./helpers/modpacks.js"
 import {
   MODPACK_MR_QUERY,
@@ -184,7 +183,6 @@ test.describe("modpack lock, unlock and unpair", () => {
 
   let name: string
   let root: string
-  let midIndex: PackIndex
   let installedUserMod: InstalledMod
 
   test.beforeAll(async ({ authenticatedApp }) => {
@@ -197,7 +195,6 @@ test.describe("modpack lock, unlock and unpair", () => {
     )
     const { shortpath } = readInstanceByName(harness.runtimePath, name)
     root = path.join(harness.runtimePath, "instances", shortpath)
-    midIndex = await fetchMrpackIndex(MODPACK_MR_V_MID)
   })
 
   test.afterAll(async ({ authenticatedApp }) => {

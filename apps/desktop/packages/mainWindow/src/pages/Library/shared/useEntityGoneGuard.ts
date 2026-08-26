@@ -29,7 +29,9 @@ interface UseEntityGoneGuardOptions<T> {
  *    currently being viewed. Waiting for `isFetching` to clear costs
  *    nothing: the effect re-runs when the refetch lands, and a genuinely
  *    deleted entity leaves then. */
-export const useEntityGoneGuard = <T>(options: UseEntityGoneGuardOptions<T>) => {
+export const useEntityGoneGuard = <T>(
+  options: UseEntityGoneGuardOptions<T>
+) => {
   const navigator = useGDNavigate()
 
   createEffect(() => {

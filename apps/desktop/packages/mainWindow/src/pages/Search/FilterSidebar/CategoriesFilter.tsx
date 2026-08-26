@@ -32,8 +32,11 @@ export function CategoriesFilter() {
         label: formatModrinthCategory(category.name),
         value: category.id,
         icon: (
-          // eslint-disable-next-line solid/no-innerhtml
-          <div class="h-4 w-4" innerHTML={sanitizeSvgIcon(category.icon?.value)} />
+          <div
+            class="h-4 w-4"
+            // eslint-disable-next-line solid/no-innerhtml
+            innerHTML={sanitizeSvgIcon(category.icon?.value)}
+          />
         )
       }))
   )

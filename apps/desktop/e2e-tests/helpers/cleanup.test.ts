@@ -84,7 +84,7 @@ describe("withCleanup", () => {
     await expect(
       withCleanup(
         async () => {
-          // eslint-disable-next-line no-throw-literal
+          // eslint-disable-next-line @typescript-eslint/only-throw-error
           throw undefined
         },
         cleanup,

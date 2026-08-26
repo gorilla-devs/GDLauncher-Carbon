@@ -51,7 +51,8 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
       // Leave the modal open so the user can retry instead of silently
       // losing the request to an unhandled rejection.
       toast.error("Request Failed", {
-        description: "Unable to process deletion request. Please try again later."
+        description:
+          "Unable to process deletion request. Please try again later."
       })
     }
   }

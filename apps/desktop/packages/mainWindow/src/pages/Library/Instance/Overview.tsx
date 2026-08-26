@@ -93,7 +93,10 @@ const Overview = () => {
         <Show when={routeData.instanceDetails.data?.lastPlayed}>
           <Card
             title={t("instances:_trn_overview_card_last_played_title")}
-            text={safeFormat(routeData.instanceDetails.data?.lastPlayed!, "PPP")}
+            text={safeFormat(
+              routeData.instanceDetails.data?.lastPlayed!,
+              "PPP"
+            )}
             icon="sign"
             class="flex-1"
           />

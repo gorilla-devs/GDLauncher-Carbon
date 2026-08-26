@@ -41,9 +41,7 @@ describe("handleGlobalError", () => {
   })
 
   it("message 'null' surfaces a fallback toast instead of throwing", () => {
-    expect(() =>
-      handleGlobalError(new Error("null"), "query")
-    ).not.toThrow()
+    expect(() => handleGlobalError(new Error("null"), "query")).not.toThrow()
     expect(toastError).toHaveBeenCalledTimes(1)
     expect(toastError.mock.calls[0][0]).toBe("null")
   })

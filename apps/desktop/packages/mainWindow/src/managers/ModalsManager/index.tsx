@@ -265,7 +265,7 @@ interface Context {
   hasOpenModals: () => boolean
 }
 
-export type StackEntry = {
+export interface StackEntry {
   name: ModalName
   data: any
   /** Live `preventClose` read for this modal instance, set by its mounted

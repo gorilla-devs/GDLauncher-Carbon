@@ -129,7 +129,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     } else if (action.kind === "failed") {
       toast.error(
         t("notifications:_trn_addon_install_failed", {
-          title: props.addon?.title || t("notifications:_trn_addon_fallback_name")
+          title:
+            props.addon?.title || t("notifications:_trn_addon_fallback_name")
         }),
         action.message ? { description: action.message } : undefined
       )
