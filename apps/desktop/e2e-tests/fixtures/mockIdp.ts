@@ -245,9 +245,6 @@ export async function stopHarness(
       // under `<scratch>/data` briefly handle-locked after `app.close()`
       // returns — retrying rides out that window instead of throwing
       // EBUSY/EPERM straight out of teardown.
-      // The original 500ms budget (5 × 100ms) was measurably too short: it
-      // threw EPERM on the runtime path once in ten adoption runs, after
-      // every assertion had passed.
       fs.rmSync(harness.runtimePath, {
         recursive: true,
         force: true,

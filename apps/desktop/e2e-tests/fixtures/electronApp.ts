@@ -287,18 +287,11 @@ export async function waitForPidExit(
 }
 
 /**
- * Closes `app` and returns only once the core module it spawned has actually
- * exited.
+ * Closes `app` and waits for the core it spawned to exit. `app.close()` only
+ * covers Electron; the core outlives it holding handles under the runtime
+ * path, and deleting that path first fails.
  *
- * `app.close()` resolves when Electron is gone, but the core is a separate
- * child process that outlives it — briefly, and sometimes for well over ten
- * seconds — holding SQLite handles under the runtime path. Deleting that path
- * before the core lets go fails with EPERM out of teardown, which reads as a
- * test failure long after every assertion has passed.
- *
- * Teardown-only, so a core that never exits is reported rather than thrown:
- * masking a real test failure behind a cleanup error is worse than leaking a
- * directory the next run's sweep will collect.
+ * Teardown-only, so a core that never exits is reported rather than thrown.
  */
 export async function closeAppAndCore(
   app: ElectronApplication,

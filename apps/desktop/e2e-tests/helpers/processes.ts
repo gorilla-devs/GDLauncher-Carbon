@@ -136,11 +136,8 @@ const PID_FILE_NAME = ".gdl_instance.pid"
 function commandLineOf(pid: number): string | null {
   try {
     if (process.platform === "win32") {
-      // Filtered by WMI rather than enumerated and filtered in PowerShell:
-      // `Get-CimInstance Win32_Process | Where-Object ...` walks every process
-      // on the machine, which cost enough on a loaded CI runner to time the
-      // unit tests out. ProcessId is an integer, so the filter needs no
-      // quoting or escaping.
+      // Filtered by WMI rather than enumerating every process and filtering
+      // afterwards.
       return (
         execSync(
           "powershell -NoProfile -NonInteractive -Command " +

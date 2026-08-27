@@ -84,15 +84,9 @@ async function appearsWithin(
  * longer need to wait out that window here.
  */
 export async function dismissStartupModals(page: Page): Promise<void> {
-  // `ModalsManager` gives each modal `z-index: index + 1`, so only the
-  // topmost one is clickable: a lower modal's X sits under the higher one's
-  // backdrop, which swallows every click until the timeout. Dismiss from the
-  // top of the stack down, hence `.last()` rather than `.first()`.
-  //
-  // The wait is keyed on the stack shrinking rather than on a locator going
-  // hidden, because `.last()` re-resolves to the next modal down the instant
-  // the top one closes — waiting for it to hide never completes while any
-  // modal is left.
+  // Only the topmost modal is clickable, so dismiss from the top down. The
+  // wait is on the stack shrinking: `.last()` re-resolves to the next modal
+  // as soon as one closes, so waiting for it to hide never completes.
   const modalCloses = page.locator(byTestId(TEST_IDS.modalClose))
   while (await appearsWithin(modalCloses.last(), STARTUP_MODAL_POLL_MS)) {
     const before = await modalCloses.count()

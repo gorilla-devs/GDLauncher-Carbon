@@ -954,45 +954,14 @@ export async function settleOnScopedResponses(
 }
 
 /**
- * From an addon page reached with `?instanceId=<id>` (i.e. via
- * `openAddonPage`, called right after `searchForMod` — same precondition
- * chain), opens the Versions tab and returns every Modrinth version reported
- * for this project, read off the underlying
- * `modplatforms.modrinth.getProjectVersions` rspc response rather than
- * parsed from the rendered `safeFormat`'d date text — so `pickOlderVersion`'s
- * ordering never depends on a display string round-tripping back into a
- * real timestamp.
+ * Opens the Versions tab on an addon page and returns the versions it renders.
  *
- * Modrinth only, deliberately: a symmetric CurseForge branch
- * (`modplatforms.curseforge.getModFiles`) would be unvalidated,
- * symmetric-looking coverage that nothing in this suite executes —
- * CurseForge's `getModFiles` is actually paginated
- * (`ModFilesParametersQuery`'s `index`/`pageSize`), unlike Modrinth's
- * single-response `getProjectVersions`, so the dual-request race logic
- * `settleOnScopedResponses` runs (tuned against Modrinth's specific timing)
- * is not merely untested against CurseForge, it is plausibly wrong for it. A
- * future CurseForge update test should write that branch fresh, against
- * CurseForge's real paginated behavior confirmed live, not inherit this.
+ * Reads the rendered rows, not the network: a warm query cache serves this
+ * list without any request, so watching for one fails while the product is
+ * fine. Asserts the rows on screen belong to a single instance's scope.
  *
- * This list is scoped to the instance's own Minecraft version and loader.
- * `InfiniteScrollVersionsQueryWrapper` gates its query on that scope, so the
- * request only goes out once `instance.getInstanceDetails` has resolved and
- * it carries `game_versions`/`loaders` from the start — which is what this
- * matches on, by the `game_version` param the request URL carries.
- *
- * Matching the URL rather than the query name is still deliberate. The query
- * name is shared by every fetch for this project, so it cannot distinguish
- * them, and an unscoped request reaching the wire again would mean the gate
- * has regressed: unscoped, this call returns 1165 versions for Fabric API
- * where the instance matches 27, and renders all of them until the scoped
- * answer replaces the list under whoever is already clicking it. Waiting on
- * `game_version` specifically keeps that failure visible instead of silently
- * accepting whichever response is first.
- *
- * Also waits for at least one row to mount in the DOM
- * (`TEST_IDS.addonVersionRow`), since `installAddonVersion` needs it there,
- * not merely present in the network response — this list is virtualized
- * (`@tanstack/solid-virtual`) and only mounts rows near the viewport.
+ * Modrinth only. CurseForge's equivalent is paginated and needs its own
+ * handling rather than inheriting this.
  */
 export async function openAddonVersions(
   page: Page,
@@ -1016,13 +985,8 @@ export async function openAddonVersions(
       }))
     )
 
-  // Let the list stop changing before reading it. A first render can be
-  // replaced as the scoped answer arrives, and a caller handed rows from the
-  // outgoing list clicks a button that is detached by the time the click
-  // lands — which surfaces as `<html> intercepts pointer events`, not as
-  // anything naming this function. The old network-settle did this as a side
-  // effect of waiting for responses to stop; this waits on the rows
-  // themselves, so it holds when a warm cache means no response ever arrives.
+  // The list can re-render, so read it only once it stops changing —
+  // otherwise callers act on rows that are about to be detached.
   const ROWS_SETTLE_MS = 1_000
   const deadline = Date.now() + VERSIONS_RESPONSE_TIMEOUT
   let rendered = await readRows()
@@ -1051,13 +1015,8 @@ export async function openAddonVersions(
     )
   }
 
-  // The scoping guard, asserted on what is displayed. Unscoped, this list is
-  // every version the project ever published — 1165 for Fabric API against an
-  // instance that matches 27 — so a row offering a build for some other
-  // Minecraft version means the list on screen is not this instance's, however
-  // it got there. Checking the rendered rows catches that whether it came from
-  // an unscoped request or from a cache entry belonging to another instance,
-  // which watching the wire could not.
+  // A row offering some other Minecraft version means the list on screen is
+  // not this instance's, however it got there.
   const declared = rendered.filter((v) => v.gameVersions.length > 0)
 
   if (opts.gameVersion) {
@@ -1073,12 +1032,8 @@ export async function openAddonVersions(
       )
     }
   } else if (declared.length > 1) {
-    // Without the instance's version to compare against, the scoped list is
-    // still recognisable by what it has in common: every row in it builds for
-    // the instance's Minecraft version, so at least one version is shared by
-    // all of them. An unscoped list is the project's entire history — 1165
-    // versions for Fabric API spanning years of Minecraft releases — and has
-    // no version common to every row.
+    // With no expected version to compare against: a scoped list shares one,
+    // an unscoped list spans the project's whole history and shares none.
     const shared = declared
       .map((v) => v.gameVersions)
       .reduce((acc, next) => acc.filter((g) => next.includes(g)))

@@ -48,12 +48,8 @@ afterEach(() => {
   }
 })
 
-/**
- * These spawn real processes and read the OS process table, so they carry
- * fixed waits and a PowerShell round-trip on Windows. Vitest's 5s default is
- * sized for pure logic and left roughly 3s of headroom locally — not enough on
- * a loaded CI runner, where this timed out.
- */
+/** These spawn real processes and read the OS process table; the default is
+ *  sized for pure logic and is not enough on a loaded CI runner. */
 const PROCESS_TEST_TIMEOUT = 30_000
 
 describe("killGameProcesses", () => {

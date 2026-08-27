@@ -87,13 +87,9 @@ const PID_FILE_NAME = ".gdl_instance.pid"
  * carry a command line rules that out — the same attribution
  * `killGameProcesses` uses to decide what it may kill.
  *
- * Matched on the runtime path rather than on `managed_javas`: the launcher
- * only downloads a managed JRE when it cannot find a system one, and a CI
- * runner ships several (the GitHub images carry Temurin 8 through 25), so the
- * game launches as `/usr/lib/jvm/.../bin/java` and no `managed_javas` path
- * ever exists. The runtime path is in the game's arguments either way, and is
- * per-run here, so it identifies the process without assuming which JRE ran
- * it.
+ * Matched on the runtime path, not on a managed-JRE path: the launcher uses a
+ * system JRE when it finds one, and the runtime path is in the game's
+ * arguments either way.
  */
 function gameIsRunning(runtimePath: string, pid: number): boolean {
   return pidBelongsToRun(pid, runtimePath)
