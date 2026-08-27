@@ -27,12 +27,7 @@
  */
 
 import fs from "node:fs"
-import {
-  expect,
-  type Page,
-  type Request,
-  type Response
-} from "@playwright/test"
+import { expect, type Page, type Response } from "@playwright/test"
 import {
   byAddonTypeOption,
   byAddonVersionRow,
@@ -885,14 +880,6 @@ export interface AddonVersionSummary {
  *  whatever `SEARCH_RESULTS_TIMEOUT` happens to be. */
 const VERSIONS_RESPONSE_TIMEOUT = 30_000
 
-/** How much longer to wait once a scoped request is known to have gone out.
- *  Only reachable with a request already in flight, so this waits on something
- *  observed rather than guessed at. Sized by what the core can legitimately
- *  spend before answering: `iridium_client.rs` waits out a declared
- *  rate-limit window of up to `MAX_HONOURED_RATE_LIMIT_WAIT` (70s) rather than
- *  surfacing the 429, which by itself exceeds `VERSIONS_RESPONSE_TIMEOUT`. */
-const VERSIONS_SLOW_RESPONSE_TIMEOUT = 90_000
-
 /**
  * Attaches a `response` listener matching `matcher`, runs `opts.run`, then
  * waits for the matched list to stop growing — held steady for a full
@@ -1008,147 +995,117 @@ export async function settleOnScopedResponses(
  * (`@tanstack/solid-virtual`) and only mounts rows near the viewport.
  */
 export async function openAddonVersions(
-  page: Page
+  page: Page,
+  opts: { gameVersion?: string } = {}
 ): Promise<AddonVersionSummary[]> {
-  const queryName = "modplatforms.modrinth.getProjectVersions"
-  // Present on the URL of the scoped request only — confirmed live.
-  const scopedMarker = "game_version"
+  const rows = page.locator(byTestId(TEST_IDS.addonVersionRow))
 
-  // Every response for this query, scoped or not, so a failure can say which
-  // of two very different things happened. Either no request reached the wire
-  // at all — the list came from the query cache and this assertion is watching
-  // a window nothing was ever going to appear in — or an unscoped one did,
-  // which is the scoping regression this assertion exists to catch. The two
-  // need opposite fixes and the message alone could not tell them apart.
-  const seenForQuery: string[] = []
-  const recordAnyForQuery = (r: Response) => {
-    if (r.url().includes(queryName)) seenForQuery.push(r.url())
-  }
-  page.on("response", recordAnyForQuery)
+  await page.getByRole("tab", { name: "Versions" }).click()
+  await expect(rows.first(), {
+    message: `openAddonVersions: no "${TEST_IDS.addonVersionRow}" row ever mounted`
+  }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
 
-  // `InfiniteScrollVersionsQueryWrapper` gates the versions query on the scope
-  // it derives from `instance.getInstanceDetails`, so a lookup that never
-  // settles leaves the gate shut: no request is issued, and the cache renders
-  // whatever it already holds for the key. That is indistinguishable from an
-  // ordinary cache hit unless the lookup itself is counted, and the two point
-  // at different fixes — a stuck gate is the app showing one scope's list
-  // while waiting on another, not a harness timing problem.
-  const detailsQuery = "instance.getInstanceDetails"
-  let detailsResponses = 0
-  const recordDetails = (r: Response) => {
-    if (r.url().includes(detailsQuery)) detailsResponses += 1
-  }
-  page.on("response", recordDetails)
-
-  // Requests, not just responses. Everything above listens for responses, so a
-  // request that was issued and simply answered slowly is indistinguishable
-  // from one that was never issued — and those are opposite problems. The core
-  // can hold this one for a while: it waits out a rate-limit window of up to
-  // `MAX_HONOURED_RATE_LIMIT_WAIT` (70s) before answering, which alone exceeds
-  // the window below.
-  const scopedRequests: string[] = []
-  const isScoped = (url: string) =>
-    url.includes(queryName) && url.includes(scopedMarker)
-  const recordScopedRequest = (req: Request) => {
-    if (isScoped(req.url())) scopedRequests.push(req.url())
-  }
-  page.on("request", recordScopedRequest)
-
-  // Kept separate from the settle loop's own listener so it can outlive it:
-  // once a request is known to be in flight, waiting for that request's answer
-  // is a condition, not a guess at a timeout.
-  const lateScoped: Response[] = []
-  const recordScopedResponse = (r: Response) => {
-    if (isScoped(r.url())) lateScoped.push(r)
-  }
-  page.on("response", recordScopedResponse)
-
-  let scopedResponses: Response[]
-  try {
-    scopedResponses = await settleOnScopedResponses(
-      page,
-      (r) => r.url().includes(queryName) && r.url().includes(scopedMarker),
-      {
-        timeout: VERSIONS_RESPONSE_TIMEOUT,
-        run: async () => {
-          await page.getByRole("tab", { name: "Versions" }).click()
-
-          await expect(
-            page.locator(byTestId(TEST_IDS.addonVersionRow)).first(),
-            {
-              message:
-                "openAddonVersions: no " +
-                `"${TEST_IDS.addonVersionRow}" row ever mounted`
-            }
-          ).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
-        }
-      }
+  const readRows = () =>
+    rows.evaluateAll((nodes) =>
+      nodes.map((n) => ({
+        fileId: n.getAttribute("data-file-id") ?? "",
+        datePublished: n.getAttribute("data-date-published") ?? "",
+        gameVersions: (n.getAttribute("data-game-versions") ?? "")
+          .split(",")
+          .filter(Boolean)
+      }))
     )
-    // The request went out but had not been answered yet. Wait for the answer
-    // it is already owed rather than failing on a window that was only ever a
-    // guess — the core can legitimately hold this call for over a minute while
-    // it waits out a rate-limit window.
-    if (scopedResponses.length === 0 && scopedRequests.length > 0) {
-      await expect
-        .poll(() => lateScoped.length, {
-          timeout: VERSIONS_SLOW_RESPONSE_TIMEOUT,
-          message:
-            `openAddonVersions: ${scopedRequests.length} scoped ` +
-            `${queryName} request(s) went out but none was answered within ` +
-            `${VERSIONS_SLOW_RESPONSE_TIMEOUT}ms`
-        })
-        .toBeGreaterThan(0)
-      scopedResponses = lateScoped
+
+  // Let the list stop changing before reading it. A first render can be
+  // replaced as the scoped answer arrives, and a caller handed rows from the
+  // outgoing list clicks a button that is detached by the time the click
+  // lands — which surfaces as `<html> intercepts pointer events`, not as
+  // anything naming this function. The old network-settle did this as a side
+  // effect of waiting for responses to stop; this waits on the rows
+  // themselves, so it holds when a warm cache means no response ever arrives.
+  const ROWS_SETTLE_MS = 1_000
+  const deadline = Date.now() + VERSIONS_RESPONSE_TIMEOUT
+  let rendered = await readRows()
+  let signature = JSON.stringify(rendered.map((v) => v.fileId))
+  let stableSince = Date.now()
+
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(250)
+    const next = await readRows()
+    const nextSignature = JSON.stringify(next.map((v) => v.fileId))
+
+    if (nextSignature !== signature) {
+      signature = nextSignature
+      rendered = next
+      stableSince = Date.now()
+      continue
     }
-  } finally {
-    page.off("response", recordAnyForQuery)
-    page.off("response", recordDetails)
-    page.off("response", recordScopedResponse)
-    page.off("request", recordScopedRequest)
+
+    rendered = next
+    if (Date.now() - stableSince >= ROWS_SETTLE_MS) break
   }
 
-  if (scopedResponses.length === 0) {
+  if (rendered.length === 0) {
     throw new Error(
-      `openAddonVersions: no ${queryName} request scoped to the instance's ` +
-        `own Minecraft version/loader (a "${scopedMarker}" URL param) was ` +
-        `observed within ${VERSIONS_RESPONSE_TIMEOUT}ms. ` +
-        (seenForQuery.length === 0
-          ? `No ${queryName} request reached the wire at all, scoped or ` +
-            `not (${scopedRequests.length} scoped request(s) seen), yet the ` +
-            "version rows still mounted — so the list came from the query " +
-            `cache. ${detailsResponses} ${detailsQuery} response(s) arrived ` +
-            "in the same window, so the scope itself did resolve."
-          : `${seenForQuery.length} unscoped request(s) did reach the wire, ` +
-            "so the scoping gate let an unscoped fetch through rather than " +
-            `nothing being requested: ${JSON.stringify(seenForQuery.slice(0, 3))}`)
+      "openAddonVersions: the Versions tab rendered no version rows at all"
     )
   }
 
-  // Last, not first: `InfiniteScrollVersionsQueryWrapper`'s scoping effect
-  // has been observed to fire its scoped request twice in a row — harmless
-  // (same params, same result), but the last
-  // one is closest to whatever the DOM ends up rendering.
-  const response = scopedResponses[scopedResponses.length - 1]
-  const body = (await response.json()) as RspcEnvelope
-  if (body.result?.type === "error") {
+  // The scoping guard, asserted on what is displayed. Unscoped, this list is
+  // every version the project ever published — 1165 for Fabric API against an
+  // instance that matches 27 — so a row offering a build for some other
+  // Minecraft version means the list on screen is not this instance's, however
+  // it got there. Checking the rendered rows catches that whether it came from
+  // an unscoped request or from a cache entry belonging to another instance,
+  // which watching the wire could not.
+  const declared = rendered.filter((v) => v.gameVersions.length > 0)
+
+  if (opts.gameVersion) {
+    const foreign = declared.filter(
+      (v) => !v.gameVersions.includes(opts.gameVersion!)
+    )
+    if (foreign.length > 0) {
+      throw new Error(
+        `openAddonVersions: ${foreign.length} of ${rendered.length} rendered ` +
+          `version rows are not scoped to the instance's Minecraft version ` +
+          `(${opts.gameVersion}) — the list on screen belongs to a different ` +
+          `scope: ${JSON.stringify(foreign.slice(0, 3))}`
+      )
+    }
+  } else if (declared.length > 1) {
+    // Without the instance's version to compare against, the scoped list is
+    // still recognisable by what it has in common: every row in it builds for
+    // the instance's Minecraft version, so at least one version is shared by
+    // all of them. An unscoped list is the project's entire history — 1165
+    // versions for Fabric API spanning years of Minecraft releases — and has
+    // no version common to every row.
+    const shared = declared
+      .map((v) => v.gameVersions)
+      .reduce((acc, next) => acc.filter((g) => next.includes(g)))
+
+    if (shared.length === 0) {
+      const spread = [...new Set(declared.flatMap((v) => v.gameVersions))]
+      throw new Error(
+        `openAddonVersions: the ${rendered.length} rendered version rows ` +
+          "share no common Minecraft version, so the list on screen is not " +
+          "scoped to one instance — it spans " +
+          `${spread.length} versions: ${JSON.stringify(spread.slice(0, 8))}`
+      )
+    }
+  }
+
+  const missingDate = rendered.filter((v) => !v.datePublished)
+  if (missingDate.length > 0) {
     throw new Error(
-      `openAddonVersions: ${queryName} returned an rspc error: ` +
-        JSON.stringify(body.result.data)
+      `openAddonVersions: ${missingDate.length} rendered row(s) carry no ` +
+        "data-date-published, so version ordering cannot be established"
     )
   }
 
-  const versions: AddonVersionSummary[] = (
-    body.result?.data as { id: string; date_published: string }[]
-  ).map((v) => ({ fileId: v.id, datePublished: v.date_published }))
-
-  if (versions.length === 0) {
-    throw new Error(
-      `openAddonVersions: ${queryName} answered with zero versions scoped ` +
-        "to the instance's own Minecraft version/loader"
-    )
-  }
-
-  return versions
+  return rendered.map((v) => ({
+    fileId: v.fileId,
+    datePublished: v.datePublished
+  }))
 }
 
 /**

@@ -193,6 +193,12 @@ const Versions = () => {
                     // reachable without scrolling.
                     data-testid="addon-version-row"
                     data-file-id={version.fileId}
+                    // What this row is actually offering, so a test can assert
+                    // the list on screen is the one scoped to the instance
+                    // rather than inferring it from a network request that a
+                    // warm cache legitimately skips.
+                    data-date-published={version.datePublished}
+                    data-game-versions={(version.gameVersions ?? []).join(",")}
                   >
                     <VersionRow
                       project={mod?.data}
