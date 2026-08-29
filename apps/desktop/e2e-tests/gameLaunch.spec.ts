@@ -173,6 +173,18 @@ test.describe("game launch", () => {
 
           // Corroboration, deliberately a quorum — see LAUNCH_MARKERS.
           const matched = countMatchedMarkers(messages, LAUNCH_MARKERS)
+          if (matched < LAUNCH_MARKER_QUORUM) {
+            // Attached here rather than in teardown: which markers the log
+            // actually carries is the whole question, and the shared helper
+            // cannot see a status that is not final yet.
+            const logFile = newestLogFile(logsDir)
+            if (logFile) {
+              await testInfo.attach("game-log", {
+                path: logFile,
+                contentType: "text/plain"
+              })
+            }
+          }
           expect(
             matched,
             `only ${matched} of ${LAUNCH_MARKERS.length} startup markers ` +
