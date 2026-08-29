@@ -400,6 +400,5 @@ describe("seedDatabase", () => {
     for (const state of states) {
       await expect(seedDatabase(runtimePath, state)).resolves.toBeUndefined()
     }
-  }, // Seeds a real database per state; the default is sized for pure logic.
-  30_000)
+  }, 30_000) // Seeds a real database per state; the default is too tight.
 })
