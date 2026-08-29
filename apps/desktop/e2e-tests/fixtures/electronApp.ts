@@ -477,4 +477,39 @@ export async function attachCoreLogOnFailure(
     path: newest.filePath,
     contentType: "text/plain"
   })
+
+  await attachGameLogs(testInfo, runtimePath)
+}
+
+/** The game's own log, which is where a launch that never reaches the menu
+ *  says why. Separate from the core log, and not otherwise collected. */
+async function attachGameLogs(
+  testInfo: TestInfo,
+  runtimePath: string
+): Promise<void> {
+  const instancesDir = path.join(runtimePath, "instances")
+  if (!fs.existsSync(instancesDir)) return
+
+  for (const entry of fs.readdirSync(instancesDir)) {
+    const logsDir = path.join(instancesDir, entry, "logs")
+    if (!fs.existsSync(logsDir)) continue
+
+    const newestGameLog = fs
+      .readdirSync(logsDir)
+      .filter((f) => f.endsWith(".log"))
+      .map((name) => {
+        const filePath = path.join(logsDir, name)
+        return { filePath, mtimeMs: fs.statSync(filePath).mtimeMs }
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)[0]
+
+    if (!newestGameLog || fs.statSync(newestGameLog.filePath).size === 0) {
+      continue
+    }
+
+    await testInfo.attach(`game-log-${entry}`, {
+      path: newestGameLog.filePath,
+      contentType: "text/plain"
+    })
+  }
 }

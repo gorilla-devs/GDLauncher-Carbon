@@ -196,6 +196,8 @@ jobs:
       - name: Install scoop and llvm
         run: |
           Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+          # The installer only puts scoop on PATH for future sessions.
+          $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
           scoop install llvm
       - name: Prepare
         shell: bash
