@@ -171,9 +171,25 @@ export function pidBelongsToRun(pid: number, runtimePath: string): boolean {
     return false
   }
 
-  return process.platform === "win32"
-    ? command.toLowerCase().includes(runtimePath.toLowerCase())
-    : command.includes(runtimePath)
+  if (process.platform !== "win32") {
+    return command.includes(runtimePath)
+  }
+
+  // Both spellings: a Windows temp path can reach us in 8.3 form (a user name
+  // over eight characters gets one) while the process was launched with the
+  // long form, and neither is a substring of the other.
+  const needles = new Set([runtimePath, longPathOf(runtimePath)])
+  const haystack = command.toLowerCase()
+  return [...needles].some((n) => haystack.includes(n.toLowerCase()))
+}
+
+/** The canonical long form of `p`, or `p` unchanged if it cannot be resolved. */
+function longPathOf(p: string): string {
+  try {
+    return nodeFs.realpathSync.native(p)
+  } catch {
+    return p
+  }
 }
 
 /** Pids recorded by every instance pidfile under `runtimePath`. */
