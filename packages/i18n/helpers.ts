@@ -226,3 +226,23 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
   // Default to a valid key if type isn't mapped
   return mapping[taskType] ?? ('tasks:_trn_instance_task_prepare' as NamespacedTranslationKey)
 }
+
+/** Maps an invalid import entry's reason (a Translation variant) to a translation key */
+export function getImportErrorTranslationKey(reason: string): NamespacedTranslationKey {
+  const mapping: Record<string, NamespacedTranslationKey> = {
+    'InstanceImportLegacyBadConfigFile': 'instances:_trn_import_error_bad_config',
+    'InstanceImportCfZipMalformed': 'instances:_trn_import_error_archive_malformed',
+    'InstanceImportMrpackMalformed': 'instances:_trn_import_error_archive_malformed',
+    'InstanceImportGdlpackMalformed': 'instances:_trn_import_error_archive_malformed',
+    'InstanceImportMmcZipMalformed': 'instances:_trn_import_error_archive_malformed',
+    'InstanceImportCfZipMissingManifest': 'instances:_trn_import_error_archive_missing_manifest',
+    'InstanceImportMrpackMissingManifest': 'instances:_trn_import_error_archive_missing_manifest',
+    'InstanceImportGdlpackMissingManifest': 'instances:_trn_import_error_archive_missing_manifest',
+    'InstanceImportMmcZipMissingConfig': 'instances:_trn_import_error_archive_missing_manifest',
+    'InstanceImportCfZipMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
+    'InstanceImportMrpackMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
+    'InstanceImportGdlpackMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
+    'InstanceImportCfZipNotMinecraftModpack': 'instances:_trn_import_error_not_minecraft_modpack',
+  }
+  return mapping[reason] ?? 'instances:_trn_import_error_bad_config'
+}

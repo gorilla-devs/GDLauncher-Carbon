@@ -1,6 +1,7 @@
 use super::{
     GET_IMPORT_SCAN_STATUS, ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter,
     InternalImportEntry, InvalidImportEntry,
+    common::{ImportedSettings, apply_imported_settings},
 };
 use crate::api::translation::Translation;
 use crate::domain::instance::info::{CurseforgeModpack, GameVersion, Modpack};
@@ -37,6 +38,26 @@ struct CfMetadata {
     last_played: Option<String>,
     is_unlocked: bool,
     profile_image_path: Option<String>,
+    /// Memory in MB, meaningful when `isMemoryOverride` is set.
+    #[serde(default)]
+    allocated_memory: Option<u32>,
+    #[serde(default)]
+    is_memory_override: Option<bool>,
+    #[serde(default)]
+    java_args_override: Option<String>,
+}
+
+impl CfMetadata {
+    fn settings(&self) -> ImportedSettings {
+        let mut settings = ImportedSettings::default();
+        if self.is_memory_override == Some(true) {
+            settings.memory_max_mb = self.allocated_memory.filter(|m| *m > 0);
+        }
+        if let Some(args) = self.java_args_override.as_deref() {
+            settings.absorb_jvm_args(args);
+        }
+        settings
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -243,7 +264,7 @@ impl InstanceImporter for CurseforgeImporter {
                                 }
                             }
 
-                            dbg!(name).to_string()
+                            name.to_string()
                         },
                         primary: true,
                     })
@@ -282,9 +303,58 @@ impl InstanceImporter for CurseforgeImporter {
             )
             .await?;
 
+        apply_imported_settings(app, id, &instance.meta.settings()).await;
+
         app.instance_manager()
             .prepare_game(id, None, None, false)
             .await
             .map(|r| r.1)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn instance_overrides_are_read_from_minecraftinstance_json() {
+        let meta: CfMetadata = serde_json::from_value(serde_json::json!({
+            "name": "ATM9",
+            "projectID": 715572,
+            "fileID": 5142600,
+            "gameVersion": "1.20.1",
+            "isUnlocked": false,
+            "allocatedMemory": 8192,
+            "isMemoryOverride": true,
+            "javaArgsOverride": "-XX:+UseG1GC -Xms2G"
+        }))
+        .unwrap();
+        let settings = meta.settings();
+        assert_eq!(settings.memory(), Some((2048, 8192)));
+        assert_eq!(settings.extra_java_args.as_deref(), Some("-XX:+UseG1GC"));
+
+        // Without the override flag the memory value is the app's global, not the instance's.
+        let meta: CfMetadata = serde_json::from_value(serde_json::json!({
+            "name": "Old",
+            "projectID": 1,
+            "fileID": 2,
+            "gameVersion": "1.12.2",
+            "isUnlocked": true,
+            "allocatedMemory": 4096,
+            "isMemoryOverride": false,
+            "javaArgsOverride": null
+        }))
+        .unwrap();
+        assert_eq!(meta.settings(), ImportedSettings::default());
+
+        let meta: CfMetadata = serde_json::from_value(serde_json::json!({
+            "name": "Older",
+            "projectID": 1,
+            "fileID": 2,
+            "gameVersion": "1.7.10",
+            "isUnlocked": true
+        }))
+        .unwrap();
+        assert_eq!(meta.settings(), ImportedSettings::default());
     }
 }

@@ -1,6 +1,7 @@
 use super::{
     ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
     InvalidImportEntry,
+    common::{ImportedSettings, apply_imported_settings},
 };
 use crate::{
     api::keys::instance::*,
@@ -255,6 +256,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             }
         };
 
+        let settings = instance.config.settings();
+
         let id = app
             .instance_manager()
             .create_instance_ext(
@@ -264,10 +267,12 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 seconds_played,
                 last_played,
                 instance_version_source,
-                String::new(),
+                settings.notes.clone().unwrap_or_default(),
                 initializer,
             )
             .await?;
+
+        apply_imported_settings(app, id, &settings).await;
 
         app.instance_manager()
             .prepare_game(id, None, None, true)
@@ -283,6 +288,63 @@ pub struct LegacyGDLauncherConfig {
     time_played: Option<u32>,
     last_played: Option<u64>,
     background: Option<String>,
+    #[serde(default)]
+    java_memory: Option<u32>,
+    /// A string in practice; tolerated as an array too.
+    #[serde(default)]
+    java_args: Option<serde_json::Value>,
+    #[serde(default)]
+    custom_java_path: Option<String>,
+    #[serde(default)]
+    resolution: Option<LegacyResolution>,
+    #[serde(default)]
+    notes: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct LegacyResolution {
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+impl LegacyGDLauncherConfig {
+    fn settings(&self) -> ImportedSettings {
+        let mut settings = ImportedSettings {
+            notes: self
+                .notes
+                .as_deref()
+                .map(str::trim)
+                .filter(|n| !n.is_empty())
+                .map(str::to_string),
+            memory_max_mb: self.java_memory.filter(|m| *m > 0),
+            java_path: self
+                .custom_java_path
+                .as_deref()
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .map(str::to_string),
+            game_resolution: self
+                .resolution
+                .as_ref()
+                .and_then(|r| Some((r.width.filter(|w| *w > 0)?, r.height.filter(|h| *h > 0)?))),
+            ..Default::default()
+        };
+
+        let args = match &self.java_args {
+            Some(serde_json::Value::String(s)) => s.clone(),
+            Some(serde_json::Value::Array(items)) => items
+                .iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(" "),
+            _ => String::new(),
+        };
+        if !args.trim().is_empty() {
+            settings.absorb_jvm_args(&args);
+        }
+
+        settings
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -297,4 +359,39 @@ struct _Loader {
     project_id: Option<i32>,
     source: Option<String>,
     source_name: Option<String>,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn instance_settings_are_read_from_config_json() {
+        let config: LegacyGDLauncherConfig = serde_json::from_value(serde_json::json!({
+            "loader": { "loaderType": "forge", "loaderVersion": "47.2.0", "mcVersion": "1.20.1" },
+            "timePlayed": 5,
+            "javaMemory": 6144,
+            "javaArgs": "-XX:+UseG1GC -Xms1G",
+            "customJavaPath": "/opt/jdk/bin/java",
+            "resolution": { "width": 1600, "height": 900 },
+            "notes": "hello"
+        }))
+        .unwrap();
+        let settings = config.settings();
+        assert_eq!(settings.notes.as_deref(), Some("hello"));
+        assert_eq!(settings.memory(), Some((1024, 6144)));
+        assert_eq!(settings.extra_java_args.as_deref(), Some("-XX:+UseG1GC"));
+        assert_eq!(settings.java_path.as_deref(), Some("/opt/jdk/bin/java"));
+        assert_eq!(settings.game_resolution, Some((1600, 900)));
+
+        let config: LegacyGDLauncherConfig = serde_json::from_value(serde_json::json!({
+            "loader": { "loaderType": "vanilla", "mcVersion": "1.16.5" },
+            "javaArgs": ["-XX:+UseZGC"]
+        }))
+        .unwrap();
+        let settings = config.settings();
+        assert_eq!(settings.extra_java_args.as_deref(), Some("-XX:+UseZGC"));
+        assert_eq!(settings.memory(), None);
+        assert_eq!(settings.notes, None);
+    }
 }

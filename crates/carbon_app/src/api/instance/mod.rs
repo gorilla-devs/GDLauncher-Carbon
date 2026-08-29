@@ -1979,6 +1979,14 @@ pub enum ImportEntity {
     MultiMC,
     PrismLauncher,
     GDLPack,
+    MultiMCZip,
+    Minecraft,
+    XMCL,
+    LunarClient,
+    BadlionClient,
+    FeatherClient,
+    HMCL,
+    PCL2,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -2512,6 +2520,14 @@ impl From<ImportEntity> for importer::Entity {
             ImportEntity::MultiMC => Self::MultiMC,
             ImportEntity::PrismLauncher => Self::PrismLauncher,
             ImportEntity::GDLPack => Self::GDLPack,
+            ImportEntity::MultiMCZip => Self::MultiMCZip,
+            ImportEntity::Minecraft => Self::Minecraft,
+            ImportEntity::XMCL => Self::XMCL,
+            ImportEntity::LunarClient => Self::LunarClient,
+            ImportEntity::BadlionClient => Self::BadlionClient,
+            ImportEntity::FeatherClient => Self::FeatherClient,
+            ImportEntity::HMCL => Self::HMCL,
+            ImportEntity::PCL2 => Self::PCL2,
         }
     }
 }
@@ -2532,6 +2548,14 @@ impl From<importer::Entity> for ImportEntity {
             backend::MultiMC => Self::MultiMC,
             backend::PrismLauncher => Self::PrismLauncher,
             backend::GDLPack => Self::GDLPack,
+            backend::MultiMCZip => Self::MultiMCZip,
+            backend::Minecraft => Self::Minecraft,
+            backend::XMCL => Self::XMCL,
+            backend::LunarClient => Self::LunarClient,
+            backend::BadlionClient => Self::BadlionClient,
+            backend::FeatherClient => Self::FeatherClient,
+            backend::HMCL => Self::HMCL,
+            backend::PCL2 => Self::PCL2,
         }
     }
 }
