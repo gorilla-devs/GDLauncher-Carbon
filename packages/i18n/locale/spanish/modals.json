@@ -15,7 +15,7 @@
   "_trn_unpair_instance": "Desemparejar instancia",
   "_trn_notification": "Notificación",
   "_trn_confirm_instance_deletion": "Confirmar eliminación de instancia",
-  "_trn_confirm_reinstall": "Reinstalar modpack",
+  "_trn_repair_modpack": "Reparar modpack",
   "_trn_confirm_batch_instance_deletion": "Eliminar instancias",
   "_trn_confirm_batch_server_deletion": "Eliminar servidores",
   "_trn_server_eula_acceptance": "Aceptar EULA de Minecraft",

@@ -123,6 +123,7 @@
   "_trn_disable_mod": "Deshabilitar mod",
   "_trn_duplicated_mods_detected": "Mods duplicados detectados",
   "_trn_duplicated_mods_message": "Los siguientes mods están duplicados",
+  "_trn_duplicated_mods_locked_message": "Este modpack está bloqueado — usa Reparar para revisar y eliminar archivos duplicados",
   "_trn_filter.all": "Todos",
   "_trn_filter.local": "Local",
   "_trn_multi_select_hint": "Mantén pulsado Ctrl/Cmd para seleccionar varios",

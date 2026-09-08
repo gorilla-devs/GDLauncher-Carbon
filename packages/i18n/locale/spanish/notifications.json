@@ -10,5 +10,9 @@
   "_trn_eula_accept_failed": "No se pudo aceptar el EULA",
   "_trn_custom_java_added": "Ruta de Java personalizada añadida exitosamente",
   "_trn_addon_downloading_to_server": "{{title}} descargándose al servidor",
-  "_trn_addon_fallback_name": "Complemento"
+  "_trn_addon_fallback_name": "Complemento",
+  "_trn_addon_install_failed": "Error al instalar {{title}}",
+  "_trn_shader_install_cancelled": "Instalación de shaders cancelada — no hay ningún cargador de shaders compatible instalado",
+  "_trn_shader_install_cancelled_mid_install": "Instalación de shaders cancelada — se conservaron los pasos que ya habían finalizado",
+  "_trn_shader_preflight_failed": "No se pudieron comprobar los requisitos del cargador de shaders"
 }
