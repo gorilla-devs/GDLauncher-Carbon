@@ -100,6 +100,7 @@
   "_trn_requires_gdl_account_modal_description": "Esta característica requiere una cuenta de GDLauncher. Vincula tu cuenta para desbloquear el uso compartido, los guardados en la nube y más.",
   "_trn_link_account": "Vincular cuenta",
   "_trn_gdl_account_unavailable": "Cuenta GDL no disponible",
+  "_trn_gdl_account_unavailable_expired_description": "La sesión de tu cuenta de GDLauncher ha caducado y no se pudo renovar automáticamente. Cierra sesión y vincúlala de nuevo para recuperar el acceso.",
   "_trn_verification_required_title": "Se requiere verificación de correo",
   "_trn_verification_required_description": "Verifica tu dirección de correo electrónico para desbloquear esta característica. Revisa tu bandeja de entrada para encontrar el enlace de verificación.",
   "_trn_verification_sent_to_email": "Se ha enviado un correo de verificación a {{email}}",

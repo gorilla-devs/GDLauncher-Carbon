@@ -100,6 +100,7 @@
   "_trn_requires_gdl_account_modal_description": "This feature requires a GDLauncher account. Link your account to unlock sharing, cloud saves, and more.",
   "_trn_link_account": "Link Account",
   "_trn_gdl_account_unavailable": "GDL Account Unavailable",
+  "_trn_gdl_account_unavailable_expired_description": "Your GDLauncher account's session has expired and could not be refreshed automatically. Log out and link it again to restore access.",
   "_trn_verification_required_title": "Email Verification Required",
   "_trn_verification_required_description": "Verify your email address to unlock this feature. Check your inbox for a verification link.",
   "_trn_verification_sent_to_email": "Verification email was sent to {{email}}",

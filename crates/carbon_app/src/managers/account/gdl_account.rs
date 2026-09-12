@@ -545,6 +545,22 @@ pub enum TokenExchangeError {
     RequestFailed { status: u16, body: String },
 }
 
+impl crate::error::FeErrorCode for TokenExchangeError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            // The GDL backend itself rejected the Microsoft id_token (HTTP 401).
+            // This is the one variant that means "these credentials are dead,
+            // no amount of retrying will help" — the frontend uses this to
+            // offer unlinking the GDL account instead of an endlessly-failing
+            // retry.
+            Self::InvalidToken => "GDL_TOKEN_EXCHANGE_INVALID_TOKEN",
+            Self::ServiceUnavailable(_) => "GDL_TOKEN_EXCHANGE_SERVICE_UNAVAILABLE",
+            Self::Network(_) => "GDL_TOKEN_EXCHANGE_NETWORK_ERROR",
+            Self::RequestFailed { .. } => "GDL_TOKEN_EXCHANGE_REQUEST_FAILED",
+        }
+    }
+}
+
 impl GDLAccountTask {
     pub fn new(client: reqwest_middleware::ClientWithMiddleware, base_api: String) -> Self {
         Self { client, base_api }

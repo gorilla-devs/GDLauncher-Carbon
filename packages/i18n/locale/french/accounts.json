@@ -100,6 +100,7 @@
   "_trn_requires_gdl_account_modal_description": "Cette fonctionnalité nécessite un compte GDLauncher. Liez votre compte pour débloquer le partage, les sauvegardes cloud, et plus encore.",
   "_trn_link_account": "Lier un compte",
   "_trn_gdl_account_unavailable": "Compte GDL indisponible",
+  "_trn_gdl_account_unavailable_expired_description": "La session de votre compte GDLauncher a expiré et n'a pas pu être actualisée automatiquement. Déconnectez-vous puis reliez à nouveau votre compte pour retrouver l'accès.",
   "_trn_verification_required_title": "Vérification de l'e-mail requise",
   "_trn_verification_required_description": "Vérifiez votre adresse e-mail pour débloquer cette fonctionnalité. Vérifiez votre boîte de réception pour un lien de vérification.",
   "_trn_verification_sent_to_email": "L'e-mail de vérification a été envoyé à {{email}}",
