@@ -100,6 +100,7 @@
   "_trn_requires_gdl_account_modal_description": "此功能需要 GDLauncher 账户。关联您的账户以解锁分享、云存档等更多功能。",
   "_trn_link_account": "关联账户",
   "_trn_gdl_account_unavailable": "GDL 账户不可用",
+  "_trn_gdl_account_unavailable_expired_description": "您的 GDLauncher 账户会话已过期，且无法自动刷新。请退出登录并重新关联账户以恢复访问。",
   "_trn_verification_required_title": "需要邮箱验证",
   "_trn_verification_required_description": "验证您的邮箱地址以解锁此功能。请检查收件箱中的验证链接。",
   "_trn_verification_sent_to_email": "验证邮件已发送至 {{email}}",

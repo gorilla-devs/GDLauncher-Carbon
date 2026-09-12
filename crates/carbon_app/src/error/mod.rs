@@ -39,7 +39,9 @@ pub type AxumError = (axum::http::StatusCode, String);
 fn extract_fe_error(
     entry: &(dyn std::error::Error + 'static),
 ) -> (Option<String>, Option<serde_json::Value>) {
-    use crate::managers::account::gdl_account::{AvatarUploadError, InstanceShareError};
+    use crate::managers::account::gdl_account::{
+        AvatarUploadError, InstanceShareError, TokenExchangeError
+    };
     use crate::managers::instance::run::InsufficientMemoryError;
     use crate::managers::server::EulaNotAcceptedError;
 
@@ -58,7 +60,8 @@ fn extract_fe_error(
         InstanceShareError,
         AvatarUploadError,
         InsufficientMemoryError,
-        EulaNotAcceptedError
+        EulaNotAcceptedError,
+        TokenExchangeError
     );
 
     (None, None)

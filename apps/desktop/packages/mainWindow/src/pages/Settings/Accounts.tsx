@@ -39,6 +39,13 @@ import { convertSecondsToHumanTime } from "@/utils/helpers"
 import { useModal } from "@/managers/ModalsManager"
 import { AccountEntry } from "@gd/core_module/bindings"
 import { getAccountImageUuid } from "@/utils/showcaseHelpers"
+import { getErrorCode } from "@/components/SharePreviewContent"
+
+// The GDL backend answers 401 on token exchange only when it has confirmed
+// the stored Microsoft id_token is dead — no amount of retrying fixes that,
+// unlike a network hiccup or a transient GDL outage (see TokenExchangeError
+// in crates/carbon_app/src/managers/account/gdl_account.rs).
+const GDL_TOKEN_EXCHANGE_INVALID_TOKEN_CODE = "GDL_TOKEN_EXCHANGE_INVALID_TOKEN"
 
 const defaultColumns: ColumnDef<AccountEntry>[] = [
   {
@@ -180,6 +187,15 @@ const Accounts = () => {
 
   const gdlAccountUnavailable = () =>
     globalStore.gdlAccount.isError && !!globalStore.settings.data?.gdlAccountId
+
+  // The GDL backend responds with a structured `GDL_TOKEN_EXCHANGE_INVALID_TOKEN`
+  // code only when it has actually rejected the stored Microsoft id_token
+  // (HTTP 401) — a definitive signal that the account's tokens are dead and a
+  // Retry can never succeed, as opposed to a transient GDL backend/network
+  // error where Retry is still the right call.
+  const gdlAccountTokensLikelyDead = () =>
+    getErrorCode(globalStore.gdlAccount.error) ===
+    GDL_TOKEN_EXCHANGE_INVALID_TOKEN_CODE
 
   // Initialize avatar preview from GDL account
   createEffect(() => {
@@ -606,17 +622,37 @@ const Accounts = () => {
                 </span>
               </Title>
               <RightHandSide>
-                <Button
-                  type="secondary"
-                  onClick={() => {
-                    globalStore.gdlAccount.refetch()
-                  }}
-                >
-                  <div class="i-hugeicons:refresh" />
-                  <Trans key="general:_trn_retry" />
-                </Button>
+                <div class="flex items-center gap-2">
+                  <Button
+                    type="secondary"
+                    onClick={() => {
+                      globalStore.gdlAccount.refetch()
+                    }}
+                  >
+                    <div class="i-hugeicons:refresh" />
+                    <Trans key="general:_trn_retry" />
+                  </Button>
+                  <Show when={gdlAccountTokensLikelyDead()}>
+                    <Button
+                      type="secondary"
+                      onClick={() => {
+                        removeGDLAccountMutation.mutate(undefined)
+                      }}
+                    >
+                      <div class="i-hugeicons:logout-01" />
+                      <Trans key="accounts:_trn_log_out_gdl_account" />
+                    </Button>
+                  </Show>
+                </div>
               </RightHandSide>
             </Row>
+            <Show when={gdlAccountTokensLikelyDead()}>
+              <Row>
+                <p class="text-lightSlate-500 m-0 text-sm">
+                  <Trans key="accounts:_trn_gdl_account_unavailable_expired_description" />
+                </p>
+              </Row>
+            </Show>
           </RowsContainer>
         </Match>
 

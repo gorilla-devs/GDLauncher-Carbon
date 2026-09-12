@@ -100,6 +100,7 @@
   "_trn_requires_gdl_account_modal_description": "この機能にはGDLauncherアカウントが必要です。アカウントをリンクすると、共有やクラウドセーブなどが利用できます。",
   "_trn_link_account": "アカウントをリンク",
   "_trn_gdl_account_unavailable": "GDLアカウント利用不可",
+  "_trn_gdl_account_unavailable_expired_description": "GDLauncherアカウントのセッションの有効期限が切れており、自動更新に失敗しました。ログアウトして再度アカウントをリンクするとアクセスを復元できます。",
   "_trn_verification_required_title": "メール認証が必要",
   "_trn_verification_required_description": "この機能を利用するにはメール認証が必要です。受信トレイの認証リンクをご確認ください。",
   "_trn_verification_sent_to_email": "{{email}} に認証メールを送信しました",
