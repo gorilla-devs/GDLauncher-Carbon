@@ -15,7 +15,7 @@ use super::{
     InternalImportEntry, InvalidImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, ParsedVersionId, apply_imported_settings,
-        copy_game_dir, dir_name, find_image_with_any_extension, first_existing_dir,
+        copy_game_dir, dedup_paths, dir_name, find_image_with_any_extension, first_existing_dir,
         group_for_import, json_bool, json_i64, json_positive_u32, json_string, json_trimmed_string,
         looks_like_minecraft_version, normalize_forge_version, parse_loader_type, read_json_value,
         resolve_standard_version, trimmed_non_empty,
@@ -742,7 +742,10 @@ fn hmcl_home_candidates() -> Vec<PathBuf> {
     candidates.push(home.join(".local/share/hmcl"));
     candidates.push(home.join(".hmcl"));
 
-    candidates.into_iter().filter(|p| p.is_dir()).collect()
+    dedup_paths(candidates)
+        .into_iter()
+        .filter(|p| p.is_dir())
+        .collect()
 }
 
 /// Only absolute paths can be resolved; relative ones are relative to the launcher's working directory.

@@ -16,9 +16,9 @@ use super::{
     InternalImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, ParsedVersionId, apply_imported_settings,
-        copy_game_dir, first_existing_dir, group_for_import, icon_from_data_url, json_i64,
-        json_positive_u32, json_string, json_trimmed_string, looks_like_minecraft_version,
-        parse_version_id, read_json_value, resolve_standard_version,
+        copy_game_dir, dedup_paths, first_existing_dir, group_for_import, icon_from_data_url,
+        json_i64, json_positive_u32, json_string, json_trimmed_string,
+        looks_like_minecraft_version, parse_version_id, read_json_value, resolve_standard_version,
     },
     technic::versions_from_version_json,
 };
@@ -622,7 +622,7 @@ pub(super) fn minecraft_dir_candidates() -> Vec<PathBuf> {
     candidates.push(home.join(".var/app/com.mojang.Minecraft/.minecraft"));
     candidates.push(home.join("snap/minecraft-launcher/current/.minecraft"));
 
-    candidates
+    dedup_paths(candidates)
 }
 
 fn client_dir_candidates(flavor: VanillaFlavor) -> Vec<PathBuf> {
@@ -653,12 +653,22 @@ fn client_dir_candidates(flavor: VanillaFlavor) -> Vec<PathBuf> {
         }
     }
 
-    candidates.into_iter().filter(|p| p.is_dir()).collect()
+    dedup_paths(candidates)
+        .into_iter()
+        .filter(|p| p.is_dir())
+        .collect()
 }
 
 /// None of the clients documents where a custom game directory is stored; look through their small json files for one.
+/// Clients record a relocated game directory in a settings file a couple of
+/// levels under their own folder, so the search has to cover more than one fixed
+/// name. It must not cover the whole install: `offline/`, `jre/` and `textures/`
+/// hold thousands of files between them, and reading every JSON in there cost
+/// ~400ms per candidate directory. Only config-shaped subdirectories are opened.
 async fn game_dir_hint_from_settings(client_dir: &Path) -> Option<PathBuf> {
     const MAX_FILE_SIZE: u64 = 1024 * 1024;
+    const SETTINGS_SUBDIRS: [&str; 5] = ["settings", "config", "configs", "launcher", "profiles"];
+    const MAX_JSON_FILES: usize = 64;
 
     let mut json_files = Vec::new();
     let mut dirs = vec![(client_dir.to_path_buf(), 0u8)];
@@ -673,12 +683,26 @@ async fn game_dir_hint_from_settings(client_dir: &Path) -> Option<PathBuf> {
                 continue;
             };
             if meta.is_dir() {
-                if depth < 2 {
+                // Below the client folder the subtrees are small, so only the
+                // first level needs gating.
+                let worth_opening = depth > 0
+                    || SETTINGS_SUBDIRS.iter().any(|name| {
+                        path.file_name()
+                            .is_some_and(|n| n.eq_ignore_ascii_case(name))
+                    });
+                if depth < 2 && worth_opening {
                     dirs.push((path, depth + 1));
                 }
             } else if meta.len() <= MAX_FILE_SIZE && path.extension().is_some_and(|e| e == "json") {
                 json_files.push(path);
+                if json_files.len() >= MAX_JSON_FILES {
+                    break;
+                }
             }
+        }
+
+        if json_files.len() >= MAX_JSON_FILES {
+            break;
         }
     }
 
@@ -709,6 +733,11 @@ fn find_game_dir_string(value: &serde_json::Value) -> Option<PathBuf> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn minecraft_dir_candidates_are_unique() {
+        super::super::common::assert_paths_unique(&minecraft_dir_candidates());
+    }
     use crate::domain::instance::info::ModLoaderType;
 
     fn write_version(game_dir: &Path, id: &str, json: serde_json::Value) {
@@ -1025,5 +1054,27 @@ mod test {
             game_dir_hint_from_settings(&tmp.path().join("nope")).await,
             None
         );
+    }
+
+    #[tokio::test]
+    async fn settings_search_skips_bulk_subdirectories() {
+        let tmp = tempfile::tempdir().unwrap();
+        let client = tmp.path().join("client");
+        let decoy = tmp.path().join("decoy");
+        std::fs::create_dir_all(decoy.join("saves")).unwrap();
+
+        // A real install keeps thousands of files under offline/ and jre/. A game
+        // directory recorded in there must not be found, because finding it would
+        // mean the whole subtree was read.
+        for sub in ["offline/multiver", "jre/zulu17"] {
+            std::fs::create_dir_all(client.join(sub)).unwrap();
+            std::fs::write(
+                client.join(sub).join("cache.json"),
+                serde_json::json!({ "game": { "directory": decoy.to_string_lossy() } }).to_string(),
+            )
+            .unwrap();
+        }
+
+        assert_eq!(game_dir_hint_from_settings(&client).await, None);
     }
 }

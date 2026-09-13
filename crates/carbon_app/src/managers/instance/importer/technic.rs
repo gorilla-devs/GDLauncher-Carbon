@@ -13,8 +13,8 @@ use super::{
     InternalImportEntry, InvalidImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, ParsedVersionId, apply_imported_settings,
-        copy_game_dir, dir_name, first_existing_dir, json_i64, json_positive_u32, json_string,
-        json_trimmed_string, loaders_from_library_names, looks_like_minecraft_version,
+        copy_game_dir, dedup_paths, dir_name, first_existing_dir, json_i64, json_positive_u32,
+        json_string, json_trimmed_string, loaders_from_library_names, looks_like_minecraft_version,
         parse_version_id, read_json_value, resolve_standard_version, trimmed_non_empty,
     },
 };
@@ -69,26 +69,7 @@ impl TechnicImporter {
     }
 
     pub async fn get_default_scan_path() -> anyhow::Result<Option<PathBuf>> {
-        let Some(basedirs) = directories::BaseDirs::new() else {
-            return Ok(None);
-        };
-        let home = basedirs.home_dir().to_path_buf();
-
-        let mut candidates = Vec::new();
-        #[cfg(target_os = "windows")]
-        {
-            candidates.push(basedirs.data_dir().join(".technic"));
-        }
-        #[cfg(target_os = "macos")]
-        {
-            candidates.push(home.join("Library/Application Support/technic"));
-        }
-        candidates.push(home.join(".technic"));
-        candidates.push(home.join("technic"));
-        candidates.push(basedirs.data_dir().join(".technic"));
-        candidates.push(basedirs.data_dir().join("technic"));
-
-        Ok(first_existing_dir(candidates))
+        Ok(first_existing_dir(launcher_dir_candidates()))
     }
 
     async fn locate_pack_info(pack: &LocatedPack) -> (ParsedVersionId, Option<PathBuf>) {
@@ -555,6 +536,26 @@ struct PlatformPackInfo {
     icon_url: Option<String>,
 }
 
+fn launcher_dir_candidates() -> Vec<PathBuf> {
+    let Some(basedirs) = directories::BaseDirs::new() else {
+        return Vec::new();
+    };
+    let home = basedirs.home_dir().to_path_buf();
+
+    let mut candidates = Vec::new();
+    #[cfg(target_os = "windows")]
+    candidates.push(basedirs.data_dir().join(".technic"));
+    #[cfg(target_os = "macos")]
+    candidates.push(home.join("Library/Application Support/technic"));
+
+    candidates.push(home.join(".technic"));
+    candidates.push(home.join("technic"));
+    candidates.push(basedirs.data_dir().join(".technic"));
+    candidates.push(basedirs.data_dir().join("technic"));
+
+    dedup_paths(candidates)
+}
+
 fn parse_platform_pack_info(json: &serde_json::Value) -> PlatformPackInfo {
     PlatformPackInfo {
         display_name: trimmed_non_empty(
@@ -610,6 +611,11 @@ async fn fetch_platform_pack_info(app: &Arc<AppInner>, slug: &str) -> Option<Pla
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn technic_launcher_dir_candidates_are_unique() {
+        super::super::common::assert_paths_unique(&launcher_dir_candidates());
+    }
     use crate::domain::instance::info::ModLoaderType;
 
     #[test]

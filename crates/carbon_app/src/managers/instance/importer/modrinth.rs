@@ -14,8 +14,8 @@ use super::{
     InternalImportEntry, InvalidImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
-        datetime_from_epoch_secs_or_millis, dir_name, first_existing_dir, group_for_import,
-        json_i64, json_string, parse_loader_type, positive_u32, read_json_value,
+        datetime_from_epoch_secs_or_millis, dedup_paths, dir_name, first_existing_dir,
+        group_for_import, json_i64, json_string, parse_loader_type, positive_u32, read_json_value,
         resolve_standard_version, seconds_played_from_i64, trimmed_non_empty,
     },
 };
@@ -844,12 +844,17 @@ fn settings_dir_candidates() -> Vec<PathBuf> {
             .join(".var/app/com.modrinth.theseus/config/com.modrinth.theseus"),
     );
 
-    candidates
+    dedup_paths(candidates)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn modrinth_settings_dir_candidates_are_unique() {
+        super::super::common::assert_paths_unique(&settings_dir_candidates());
+    }
 
     fn new_schema_db(path: &Path) {
         let conn = rusqlite::Connection::open(path).unwrap();

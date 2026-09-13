@@ -14,7 +14,7 @@ use super::{
     InternalImportEntry, InvalidImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
-        datetime_from_epoch_secs_or_millis, dir_name, find_image_with_any_extension,
+        datetime_from_epoch_secs_or_millis, dedup_paths, dir_name, find_image_with_any_extension,
         first_existing_dir, group_for_import, icon_from_data_url, json_i64, json_positive_u32,
         json_string, json_trimmed_string, normalize_forge_version, parse_version_id,
         read_json_value, resolve_standard_version, seconds_played_from_i64,
@@ -565,25 +565,74 @@ fn percent_decode(s: &str) -> String {
 }
 
 fn app_data_candidates() -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
     let Some(basedirs) = directories::BaseDirs::new() else {
-        return candidates;
+        return Vec::new();
     };
     let home = basedirs.home_dir().to_path_buf();
 
-    #[cfg(target_os = "linux")]
-    candidates.push(basedirs.config_dir().join("xmcl"));
-    candidates.push(basedirs.data_dir().join("xmcl"));
-    candidates.push(basedirs.config_dir().join("xmcl"));
-    candidates.push(home.join(".xmcl"));
-    candidates.push(home.join(".var/app/app.xmcl.voxelum/config/xmcl"));
+    // XMCL keeps its data in Electron's `appData`: `~/.config/xmcl` on Linux,
+    // `%APPDATA%\xmcl` on Windows, `~/Library/Application Support/xmcl` on macOS.
+    let mut candidates = vec![
+        basedirs.config_dir().join("xmcl"),
+        basedirs.data_dir().join("xmcl"),
+        home.join(".xmcl"),
+        home.join(".var/app/app.xmcl.voxelum/config/xmcl"),
+    ];
 
-    candidates
+    // `Packages` only exists on Windows; elsewhere this is one failed read.
+    candidates.extend(appx_candidates(&basedirs.data_local_dir().join("Packages")));
+
+    dedup_paths(candidates)
+}
+
+/// A Microsoft Store build is sandboxed into a package folder whose name carries
+/// a publisher hash that changes between releases, so it has to be matched by
+/// prefix rather than named outright.
+fn appx_candidates(packages_dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(packages_dir) else {
+        return Vec::new();
+    };
+
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("XMCL"))
+        })
+        .map(|path| path.join("LocalCache").join("Roaming").join("xmcl"))
+        .collect()
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn microsoft_store_packages_are_found_by_prefix() {
+        let tmp = tempfile::tempdir().unwrap();
+        let packages = tmp.path().join("Packages");
+        std::fs::create_dir_all(packages.join("XMCL_68mcaawk44tpj")).unwrap();
+        std::fs::create_dir_all(packages.join("SomethingElse_abc")).unwrap();
+
+        assert_eq!(
+            appx_candidates(&packages),
+            vec![
+                packages
+                    .join("XMCL_68mcaawk44tpj")
+                    .join("LocalCache")
+                    .join("Roaming")
+                    .join("xmcl")
+            ]
+        );
+        assert!(appx_candidates(&tmp.path().join("nope")).is_empty());
+    }
+
+    #[test]
+    fn xmcl_app_data_candidates_are_unique() {
+        super::super::common::assert_paths_unique(&app_data_candidates());
+    }
 
     #[test]
     fn launch_settings_are_read() {

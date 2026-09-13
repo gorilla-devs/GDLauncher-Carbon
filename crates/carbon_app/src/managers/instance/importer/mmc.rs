@@ -14,9 +14,9 @@ use super::{
     InternalImportEntry, InvalidImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
-        datetime_from_epoch_millis, dir_name, find_image_with_any_extension, first_existing_dir,
-        group_for_import, normalize_forge_version, parse_loader_type, read_json_value,
-        resolve_standard_version, seconds_played_from_i64,
+        datetime_from_epoch_millis, dedup_paths, dir_name, find_image_with_any_extension,
+        first_existing_dir, group_for_import, normalize_forge_version, parse_loader_type,
+        read_json_value, resolve_standard_version, seconds_played_from_i64,
     },
 };
 use crate::{
@@ -779,12 +779,19 @@ fn data_dir_candidates(flavor: MmcFlavor) -> Vec<PathBuf> {
         }
     }
 
-    candidates
+    dedup_paths(candidates)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn data_dir_candidates_are_unique_per_flavor() {
+        for flavor in [MmcFlavor::Prism, MmcFlavor::MultiMC] {
+            super::super::common::assert_paths_unique(&data_dir_candidates(flavor));
+        }
+    }
 
     #[test]
     fn instance_overrides_are_read_only_when_enabled() {

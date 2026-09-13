@@ -367,6 +367,20 @@ pub fn first_existing_dir(candidates: impl IntoIterator<Item = PathBuf>) -> Opti
     candidates.into_iter().find(|p| p.is_dir())
 }
 
+/// Keeps the first occurrence of each path and drops the rest.
+///
+/// Launcher candidate lists name the same directory more than once: `data_dir`
+/// and `config_dir` are the same directory on macOS and Windows, and `data_dir`
+/// is `~/.local/share` on Linux, which several lists also spell out by hand. The
+/// repeats are only visible at runtime, so they cannot be removed at the call site.
+pub fn dedup_paths(candidates: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut seen = HashSet::new();
+    candidates
+        .into_iter()
+        .filter(|path| seen.insert(path.clone()))
+        .collect()
+}
+
 pub fn find_image_with_any_extension(dir: &Path, stem: &str) -> Option<PathBuf> {
     const EXTENSIONS: [&str; 8] = ["png", "jpg", "jpeg", "gif", "webp", "ico", "svg", "bmp"];
 
@@ -440,6 +454,21 @@ pub fn json_trimmed_string(value: &serde_json::Value, key: &str) -> Option<Strin
 
 pub fn json_positive_u32(value: &serde_json::Value, key: &str) -> Option<u32> {
     positive_u32(json_i64(value, key))
+}
+
+/// Fails with the offending path when a candidate list repeats an entry.
+///
+/// Which paths coincide depends on the platform, so this only proves the list is
+/// clean on the host it runs on; CI covers Linux, macOS and Windows separately.
+#[cfg(test)]
+pub fn assert_paths_unique(candidates: &[PathBuf]) {
+    let mut seen = HashSet::new();
+    for path in candidates {
+        assert!(
+            seen.insert(path),
+            "duplicate candidate {path:?} in {candidates:?}"
+        );
+    }
 }
 
 pub fn icon_from_data_url(data_url: &str) -> Option<(String, Vec<u8>)> {
@@ -920,6 +949,27 @@ mod test {
             Some("12".to_string())
         );
         assert_eq!(trimmed_non_empty(None), None);
+    }
+
+    #[test]
+    fn repeated_candidate_paths_collapse_to_the_first() {
+        let candidates = vec![
+            PathBuf::from("/a"),
+            PathBuf::from("/b"),
+            PathBuf::from("/a"),
+            PathBuf::from("/c"),
+            PathBuf::from("/b"),
+        ];
+
+        assert_eq!(
+            dedup_paths(candidates),
+            vec![
+                PathBuf::from("/a"),
+                PathBuf::from("/b"),
+                PathBuf::from("/c")
+            ]
+        );
+        assert!(dedup_paths(Vec::new()).is_empty());
     }
 
     #[test]

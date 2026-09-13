@@ -13,8 +13,8 @@ use super::{
     InternalImportEntry, InvalidImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
-        datetime_from_epoch_secs_or_millis, dir_name, first_existing_dir, group_for_import,
-        json_bool, json_i64, json_positive_u32, json_string, json_trimmed_string,
+        datetime_from_epoch_secs_or_millis, dedup_paths, dir_name, first_existing_dir,
+        group_for_import, json_bool, json_i64, json_positive_u32, json_string, json_trimmed_string,
         normalize_forge_version, parse_loader_type, parse_version_id, resolve_standard_version,
         trimmed_non_empty,
     },
@@ -63,46 +63,8 @@ impl AtLauncherImporter {
     }
 
     pub async fn get_default_scan_path() -> anyhow::Result<Option<PathBuf>> {
-        let Some(basedirs) = directories::BaseDirs::new() else {
-            return Ok(None);
-        };
-        let home = basedirs.home_dir().to_path_buf();
-        let data = basedirs.data_dir().to_path_buf();
-
-        let mut candidates = vec![
-            data.join("ATLauncher"),
-            data.join("atlauncher"),
-            home.join("ATLauncher"),
-            home.join("atlauncher"),
-            home.join(".atlauncher"),
-            home.join(".local/share/atlauncher"),
-            home.join("Desktop/ATLauncher"),
-            home.join("Downloads/ATLauncher"),
-            home.join("Documents/ATLauncher"),
-            home.join("Games/ATLauncher"),
-            home.join("Applications/ATLauncher"),
-        ];
-
-        #[cfg(target_os = "windows")]
-        {
-            candidates.push(basedirs.data_local_dir().join("ATLauncher"));
-            candidates.push(
-                basedirs
-                    .data_local_dir()
-                    .join("Programs")
-                    .join("ATLauncher"),
-            );
-            candidates.push(PathBuf::from("C:\\ATLauncher"));
-            candidates.push(PathBuf::from("C:\\Games\\ATLauncher"));
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            candidates.push(PathBuf::from("/opt/atlauncher"));
-        }
-
         // Only a directory that actually has instances counts.
-        let launcher_dir = first_existing_dir(candidates.into_iter())
+        let launcher_dir = first_existing_dir(launcher_dir_candidates())
             .filter(|dir| dir.join("instances").is_dir() || dir.join("configs").is_dir());
 
         Ok(launcher_dir.map(|dir| dir.join("instances")))
@@ -289,6 +251,46 @@ fn is_launcher_file(relative: &Path) -> bool {
         || first == ".atlauncher"
 }
 
+fn launcher_dir_candidates() -> Vec<PathBuf> {
+    let Some(basedirs) = directories::BaseDirs::new() else {
+        return Vec::new();
+    };
+    let home = basedirs.home_dir().to_path_buf();
+    let data = basedirs.data_dir().to_path_buf();
+
+    let mut candidates = vec![
+        data.join("ATLauncher"),
+        data.join("atlauncher"),
+        home.join("ATLauncher"),
+        home.join("atlauncher"),
+        home.join(".atlauncher"),
+        home.join(".local/share/atlauncher"),
+        home.join("Desktop/ATLauncher"),
+        home.join("Downloads/ATLauncher"),
+        home.join("Documents/ATLauncher"),
+        home.join("Games/ATLauncher"),
+        home.join("Applications/ATLauncher"),
+    ];
+
+    #[cfg(target_os = "windows")]
+    {
+        candidates.push(basedirs.data_local_dir().join("ATLauncher"));
+        candidates.push(
+            basedirs
+                .data_local_dir()
+                .join("Programs")
+                .join("ATLauncher"),
+        );
+        candidates.push(PathBuf::from("C:\\ATLauncher"));
+        candidates.push(PathBuf::from("C:\\Games\\ATLauncher"));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    candidates.push(PathBuf::from("/opt/atlauncher"));
+
+    dedup_paths(candidates)
+}
+
 fn find_icon(instance_root: &Path, pack_name: Option<&str>) -> Option<PathBuf> {
     let custom = instance_root.join("instance.png");
     if custom.is_file() {
@@ -460,6 +462,11 @@ fn parse_instant(value: &serde_json::Value) -> Option<DateTime<Utc>> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn atlauncher_launcher_dir_candidates_are_unique() {
+        super::super::common::assert_paths_unique(&launcher_dir_candidates());
+    }
 
     #[test]
     fn launcher_settings_are_read() {
