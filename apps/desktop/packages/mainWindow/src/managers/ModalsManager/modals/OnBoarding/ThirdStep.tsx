@@ -10,17 +10,34 @@ import { Trans } from "@gd/i18n"
 import { ENTITIES } from "@/utils/constants"
 
 const LAUNCHER_ENTITIES: ImportEntity[] = [
-  "LegacyGDLauncher",
-  "ATLauncher",
+  "Minecraft",
   "CurseForge",
-  "FTB",
-  "MultiMC",
-  "Technic",
+  "Modrinth",
   "PrismLauncher",
-  "Modrinth"
+  "MultiMC",
+  "ATLauncher",
+  "FTB",
+  "Technic",
+  "XMCL",
+  "HMCL",
+  "PCL2",
+  "LunarClient",
+  "BadlionClient",
+  "FeatherClient",
+  "LegacyGDLauncher"
 ]
 
-const FILE_ENTITIES: ImportEntity[] = ["CurseForgeZip", "MRPack", "GDLPack"]
+const FILE_ENTITIES: ImportEntity[] = [
+  "GDLPack",
+  "CurseForgeZip",
+  "MRPack",
+  "MultiMCZip"
+]
+
+const byDisplayOrder =
+  (order: ImportEntity[]) => (a: ImportEntityStatus, b: ImportEntityStatus) =>
+    Number(b.supported) - Number(a.supported) ||
+    order.indexOf(a.entity) - order.indexOf(b.entity)
 
 interface Props {
   prevStep: () => void
@@ -70,8 +87,8 @@ const ThirdStep = (props: Props) => {
         </Match>
         <Match when={!entity()}>
           <div
-            class={`flex w-full flex-1 flex-col overflow-y-auto ${
-              props.isImportInstance ? "px-4 pt-4" : ""
+            class={`flex min-h-0 w-full flex-1 flex-col overflow-y-auto ${
+              props.isImportInstance ? "px-4 pt-4" : "pb-4"
             }`}
           >
             <div class="flex w-full items-center">
@@ -82,15 +99,15 @@ const ThirdStep = (props: Props) => {
               </span>
               <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
             </div>
-            <ul class="mt-3 mb-8 grid grid-cols-4 gap-1.5 p-0">
+            <ul
+              class={`mt-3 mb-6 grid gap-1.5 p-0 ${
+                props.isImportInstance ? "grid-cols-4" : "grid-cols-5"
+              }`}
+            >
               <For
                 each={entities.data
                   ?.filter((e) => LAUNCHER_ENTITIES.includes(e.entity))
-                  .sort(
-                    (a, b) =>
-                      (b.supported === true ? 1 : 0) -
-                      (a.supported === true ? 1 : 0)
-                  )}
+                  .sort(byDisplayOrder(LAUNCHER_ENTITIES))}
               >
                 {(entity) => (
                   <EntityCard
@@ -110,15 +127,15 @@ const ThirdStep = (props: Props) => {
               </span>
               <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
             </div>
-            <ul class="mt-3 grid grid-cols-4 gap-1.5 p-0">
+            <ul
+              class={`mt-3 grid gap-1.5 p-0 ${
+                props.isImportInstance ? "grid-cols-4" : "grid-cols-5"
+              }`}
+            >
               <For
                 each={entities.data
                   ?.filter((e) => FILE_ENTITIES.includes(e.entity))
-                  .sort(
-                    (a, b) =>
-                      (b.supported === true ? 1 : 0) -
-                      (a.supported === true ? 1 : 0)
-                  )}
+                  .sort(byDisplayOrder(FILE_ENTITIES))}
               >
                 {(entity) => (
                   <EntityCard
@@ -132,7 +149,7 @@ const ThirdStep = (props: Props) => {
             </ul>
           </div>
           <Show when={!props.isImportInstance}>
-            <div class="flex w-full justify-between">
+            <div class="flex w-full shrink-0 justify-between pt-2">
               <Button
                 onClick={() => {
                   props.prevStep()

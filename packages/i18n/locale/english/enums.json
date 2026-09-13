@@ -19,5 +19,13 @@
   "_trn_entity.technic": "Technic",
   "_trn_entity.atlauncher": "ATLauncher",
   "_trn_entity.prismlauncher": "PrismLauncher",
-  "_trn_entity.gdlpack": "GDLPack"
+  "_trn_entity.gdlpack": "GDLPack",
+  "_trn_entity.multimczip": "Prism / MultiMC Zip",
+  "_trn_entity.minecraft": "Minecraft",
+  "_trn_entity.xmcl": "XMCL",
+  "_trn_entity.lunarclient": "Lunar Client",
+  "_trn_entity.badlionclient": "Badlion Client",
+  "_trn_entity.featherclient": "Feather Client",
+  "_trn_entity.hmcl": "HMCL",
+  "_trn_entity.pcl2": "PCL2"
 }

@@ -72,6 +72,8 @@ pub enum Translation {
     InstanceImportGdlpackMalformed,
     InstanceImportGdlpackMissingManifest,
     InstanceImportGdlpackMalformedManifest,
+    InstanceImportMmcZipMalformed,
+    InstanceImportMmcZipMissingConfig,
     InstanceExport,
     InstanceExportCreatingBundle,
     InstanceExportCalculateSize,

@@ -26,6 +26,7 @@ import { createAsyncEffect } from "@/utils/asyncEffect"
 import { createStore } from "solid-js/store"
 import SingleCheckBox from "./SingleCheckBox"
 import { Trans, useTransContext } from "@gd/i18n"
+import { getImportErrorTranslationKey } from "@gd/i18n/helpers"
 import { ENTITIES } from "@/utils/constants"
 import { useModal } from "../.."
 
@@ -74,9 +75,11 @@ const SingleEntity = (props: {
       const index = globalInstances().findIndex(
         (x: any) => x.filename === filename
       )
+      // filename is only the selection key and is often a UUID
+      const entry = globalInstances()[index]
       return importInstanceMutation
         .mutateAsync({
-          name: filename,
+          name: entry?.instance_name || filename,
           index
         })
         .catch((error) => {
@@ -94,6 +97,11 @@ const SingleEntity = (props: {
   const importScanStatus = rspc.createQuery(() => ({
     queryKey: ["instance.getImportScanStatus"]
   }))
+
+  const selectableFilenames = () =>
+    (instance.multiResult ?? [])
+      .filter((entry): entry is ImportableInstance => "filename" in entry)
+      .map((entry) => entry.filename)
 
   createEffect(() => {
     if (!entityDefaultPath.data) {
@@ -143,8 +151,8 @@ const SingleEntity = (props: {
       }
       if (typeof data === "object") {
         if ("SingleResult" in data) {
-          if ("Valid" in data.SingleResult) {
-            const res = data.SingleResult
+          const res = data.SingleResult
+          if ("Valid" in res) {
             setGlobalInstances([res.Valid])
             setInstance({
               singleResult: res.Valid,
@@ -152,26 +160,31 @@ const SingleEntity = (props: {
               noResult: undefined,
               isLoading: false
             })
+          } else {
+            setGlobalInstances([res.Invalid])
+            setInstance({
+              singleResult: undefined,
+              multiResult: [res.Invalid],
+              noResult: undefined,
+              isLoading: false
+            })
           }
         } else if ("MultiResult" in data) {
-          const res = data.MultiResult
-          setGlobalInstances(
-            res.map((e) => {
-              if ("Valid" in e) {
-                return e.Valid
-              } else {
-                return e.Invalid
-              }
+          const entries = data.MultiResult.map((e) =>
+            "Valid" in e ? e.Valid : e.Invalid
+          ).sort((a, b) => {
+            const aValid = "filename" in a
+            const bValid = "filename" in b
+            if (aValid !== bValid) return aValid ? -1 : 1
+            const aName = "filename" in a ? a.instance_name : a.name
+            const bName = "filename" in b ? b.instance_name : b.name
+            return aName.localeCompare(bName, undefined, {
+              sensitivity: "base"
             })
-          )
+          })
+          setGlobalInstances(entries)
           setInstance({
-            multiResult: res.map((e) => {
-              if ("Valid" in e) {
-                return e.Valid
-              } else {
-                return e.Invalid
-              }
-            }),
+            multiResult: entries,
             singleResult: undefined,
             noResult: undefined,
             isLoading: false
@@ -292,7 +305,8 @@ const SingleEntity = (props: {
                             {
                               name: "Modpack Files",
                               extensions:
-                                props.entity.entity === "CurseForgeZip"
+                                props.entity.entity === "CurseForgeZip" ||
+                                props.entity.entity === "MultiMCZip"
                                   ? ["zip"]
                                   : props.entity.entity === "GDLPack"
                                     ? ["gdlpack"]
@@ -321,30 +335,25 @@ const SingleEntity = (props: {
       </div>
 
       {/* Selection Header - fixed outside scroll */}
-      <Show when={typeof instance.multiResult !== "undefined"}>
+      <Show
+        when={
+          typeof instance.multiResult !== "undefined" &&
+          selectableFilenames().length > 0
+        }
+      >
         <div class="flex shrink-0 items-center justify-between px-4 pb-3">
           <Checkbox
-            checked={instances().length === instance.multiResult?.length}
+            checked={instances().length === selectableFilenames().length}
             indeterminate={
               instances().length > 0 &&
-              instances().length < (instance.multiResult?.length || 0)
+              instances().length < selectableFilenames().length
             }
             onChange={(e) => {
-              if (e) {
-                setInstances(
-                  typeof instance.multiResult !== "undefined"
-                    ? (instance.multiResult.map(
-                        (entry: any) => entry.filename
-                      ) as string[])
-                    : []
-                )
-              } else {
-                setInstances([])
-              }
+              setInstances(e ? selectableFilenames() : [])
             }}
           >
             <span class="text-lightSlate-400 text-sm">
-              {instances().length} / {instance.multiResult?.length}{" "}
+              {instances().length} / {selectableFilenames().length}{" "}
               <Trans key="instances:_trn_import_select_all_instances" />
             </span>
           </Checkbox>
@@ -383,15 +392,22 @@ const SingleEntity = (props: {
             {/* Instance List */}
             <div class="flex flex-col gap-2">
               <For each={instance.multiResult}>
-                {(entry) => (
-                  <SingleCheckBox
-                    title={
-                      "instance_name" in entry ? entry.instance_name : undefined
-                    }
-                    filename={"filename" in entry ? entry.filename : undefined}
-                    setList={setInstances}
-                  />
-                )}
+                {(entry) =>
+                  "filename" in entry ? (
+                    <SingleCheckBox
+                      title={entry.instance_name}
+                      filename={entry.filename}
+                      setList={setInstances}
+                    />
+                  ) : (
+                    <SingleCheckBox
+                      title={entry.name}
+                      invalidReason={t(
+                        getImportErrorTranslationKey(entry.reason.translation)
+                      )}
+                    />
+                  )
+                }
               </For>
             </div>
           </Match>

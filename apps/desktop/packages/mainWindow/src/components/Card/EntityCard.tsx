@@ -16,7 +16,7 @@ const EntityCard = (props: EntityCardProps) => {
   const [t] = useTransContext()
   return (
     <li
-      class={`rounded-lg p-2 text-center h-20 ${
+      class={`rounded-lg p-2 text-center min-h-20 ${
         props.entity.supported ? "cursor-pointer" : ""
       } flex-col gap-1.5 shadow-md ${
         props.entity.selection_type
@@ -39,8 +39,8 @@ const EntityCard = (props: EntityCardProps) => {
       <div class="relative">
         <img
           src={props.icon}
-          alt="icon"
-          class={`h-7 w-7 ${props.entity.supported ? "" : "opacity-20"}`}
+          alt={t(props.translation)}
+          class={`h-7 w-7 object-contain ${props.entity.supported ? "" : "opacity-20"}`}
         />
       </div>
 

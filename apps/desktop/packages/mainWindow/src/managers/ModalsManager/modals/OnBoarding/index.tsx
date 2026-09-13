@@ -50,7 +50,7 @@ const OnBoarding = (props: ModalProps) => {
         />
       }
     >
-      <div class="lg:w-160 box-border flex h-full select-none flex-col">
+      <div class="lg:w-160 relative z-10 box-border flex h-full select-none flex-col">
         <div class="h-15 max-w-90 mx-auto w-full">
           <Steps steps={onBoardingSteps} currentStep={currentStep()} />
         </div>

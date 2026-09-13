@@ -6,6 +6,13 @@ import TechnicLogo from "/assets/images/icons/technic_logo.svg"
 import PrismLogo from "/assets/images/icons/prism_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg"
+import MinecraftLogo from "/assets/images/icons/vanilla.png"
+import XMCLLogo from "/assets/images/icons/xmcl_logo.svg"
+import LunarLogo from "/assets/images/icons/lunar_logo.png"
+import BadlionLogo from "/assets/images/icons/badlion_logo.png"
+import FeatherLogo from "/assets/images/icons/feather_logo.png"
+import HMCLLogo from "/assets/images/icons/hmcl_logo.png"
+import PCL2Logo from "/assets/images/icons/pcl2_logo.png"
 import GDLauncherLogo from "/assets/images/gdlauncher_logo.svg"
 import {
   CFFEModSearchSortField,
@@ -93,5 +100,37 @@ export const ENTITIES: Record<ImportEntity, EntityValue> = {
   GDLPack: {
     translation: "enums:_trn_entity.gdlpack",
     icon: GDLauncherLogo
+  },
+  MultiMCZip: {
+    translation: "enums:_trn_entity.multimczip",
+    icon: MultiMCLogo
+  },
+  Minecraft: {
+    translation: "enums:_trn_entity.minecraft",
+    icon: MinecraftLogo
+  },
+  XMCL: {
+    translation: "enums:_trn_entity.xmcl",
+    icon: XMCLLogo
+  },
+  LunarClient: {
+    translation: "enums:_trn_entity.lunarclient",
+    icon: LunarLogo
+  },
+  BadlionClient: {
+    translation: "enums:_trn_entity.badlionclient",
+    icon: BadlionLogo
+  },
+  FeatherClient: {
+    translation: "enums:_trn_entity.featherclient",
+    icon: FeatherLogo
+  },
+  HMCL: {
+    translation: "enums:_trn_entity.hmcl",
+    icon: HMCLLogo
+  },
+  PCL2: {
+    translation: "enums:_trn_entity.pcl2",
+    icon: PCL2Logo
   }
 }
