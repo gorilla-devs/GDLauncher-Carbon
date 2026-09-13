@@ -16,8 +16,9 @@ use super::{
     common::{
         DeclaredModLoader, ImportedSettings, ParsedVersionId, apply_imported_settings,
         copy_game_dir, dir_name, find_image_with_any_extension, first_existing_dir,
-        group_for_import, json_bool, json_i64, json_string, looks_like_minecraft_version,
-        normalize_forge_version, parse_loader_type, read_json_value, resolve_standard_version,
+        group_for_import, json_bool, json_i64, json_positive_u32, json_string, json_trimmed_string,
+        looks_like_minecraft_version, normalize_forge_version, parse_loader_type, read_json_value,
+        resolve_standard_version, trimmed_non_empty,
     },
     technic::versions_from_version_json,
     vanilla::{is_launcher_managed, minecraft_dir_candidates},
@@ -347,10 +348,7 @@ fn versions_from_hmcl_json(json: &serde_json::Value) -> ParsedVersionId {
             let Some(id) = json_string(patch, "id") else {
                 continue;
             };
-            let Some(version) = json_string(patch, "version")
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-            else {
+            let Some(version) = json_trimmed_string(patch, "version") else {
                 continue;
             };
 
@@ -513,11 +511,11 @@ fn pcl_settings(setup: &HashMap<String, String>) -> ImportedSettings {
     // A specific Java is stored as a serialized Java object; any path-like string in it is the executable or its folder.
     if let Some(java) = value("VersionArgumentJavaSelect") {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&java) {
-            settings.java_path = ["PathJava", "PathJavaw", "Path", "PathFolder"]
-                .iter()
-                .find_map(|key| json_string(&json, key))
-                .map(|p| p.trim().to_string())
-                .filter(|p| !p.is_empty());
+            settings.java_path = trimmed_non_empty(
+                ["PathJava", "PathJavaw", "Path", "PathFolder"]
+                    .iter()
+                    .find_map(|key| json_string(&json, key)),
+            );
         }
     }
 
@@ -608,18 +606,14 @@ fn hmcl_current_settings(
     };
 
     let text = |key: &str| {
-        (is_local(key))
-            .then(|| json_string(json, key))
+        is_local(key)
+            .then(|| json_trimmed_string(json, key))
             .flatten()
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty())
     };
     let number = |key: &str| {
         is_local(key)
-            .then(|| json_i64(json, key))
+            .then(|| json_positive_u32(json, key))
             .flatten()
-            .filter(|v| *v > 0)
-            .and_then(|v| u32::try_from(v).ok())
     };
 
     let run_dir = match text("runningDirectory") {
@@ -668,11 +662,7 @@ fn hmcl_legacy_settings(
     version_root: &Path,
     base_dir: &Path,
 ) -> (PathBuf, ImportedSettings) {
-    let text = |key: &str| {
-        json_string(json, key)
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty())
-    };
+    let text = |key: &str| json_trimmed_string(json, key);
 
     // gameDirType: 0 root, 1 version folder, 2 custom
     let dir_type = match json.get("gameDirType") {
@@ -703,11 +693,7 @@ fn hmcl_legacy_settings(
         return (run_dir, ImportedSettings::default());
     }
 
-    let positive = |key: &str| {
-        json_i64(json, key)
-            .filter(|v| *v > 0)
-            .and_then(|v| u32::try_from(v).ok())
-    };
+    let positive = |key: &str| json_positive_u32(json, key);
 
     let mut settings = ImportedSettings {
         java_path: (text("java").is_some_and(|j| j.eq_ignore_ascii_case("custom")))

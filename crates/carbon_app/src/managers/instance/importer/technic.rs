@@ -13,9 +13,9 @@ use super::{
     InternalImportEntry, InvalidImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, ParsedVersionId, apply_imported_settings,
-        copy_game_dir, dir_name, first_existing_dir, json_i64, json_string,
-        loaders_from_library_names, looks_like_minecraft_version, parse_version_id,
-        read_json_value, resolve_standard_version,
+        copy_game_dir, dir_name, first_existing_dir, json_i64, json_positive_u32, json_string,
+        json_trimmed_string, loaders_from_library_names, looks_like_minecraft_version,
+        parse_version_id, read_json_value, resolve_standard_version, trimmed_non_empty,
     },
 };
 use crate::{
@@ -158,9 +158,7 @@ impl TechnicImporter {
         let settings = ImportedSettings {
             memory_max_mb: read_json_value(&pack.path.join("bin").join("runData"))
                 .await
-                .and_then(|run_data| json_i64(&run_data, "memory"))
-                .filter(|m| *m > 0)
-                .and_then(|m| u32::try_from(m).ok()),
+                .and_then(|run_data| json_positive_u32(&run_data, "memory")),
             ..Default::default()
         };
 
@@ -559,16 +557,12 @@ struct PlatformPackInfo {
 
 fn parse_platform_pack_info(json: &serde_json::Value) -> PlatformPackInfo {
     PlatformPackInfo {
-        display_name: json_string(json, "displayName")
-            .or_else(|| json_string(json, "name"))
-            .map(|n| n.trim().to_string())
-            .filter(|n| !n.is_empty()),
-        minecraft: json_string(json, "minecraft")
-            .map(|v| v.trim().to_string())
+        display_name: trimmed_non_empty(
+            json_string(json, "displayName").or_else(|| json_string(json, "name")),
+        ),
+        minecraft: json_trimmed_string(json, "minecraft")
             .filter(|v| looks_like_minecraft_version(v)),
-        forge: json_string(json, "forge")
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty() && v != "null"),
+        forge: json_trimmed_string(json, "forge").filter(|v| v != "null"),
         icon_url: json
             .get("icon")
             .and_then(|icon| match icon {

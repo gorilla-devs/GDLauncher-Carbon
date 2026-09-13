@@ -422,6 +422,26 @@ pub fn json_bool(value: &serde_json::Value, key: &str) -> Option<bool> {
     }
 }
 
+/// Trims, and treats an all-whitespace value as absent.
+pub fn trimmed_non_empty(value: Option<String>) -> Option<String> {
+    value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+/// Rejects zero, negatives, and anything too wide for a `u32`.
+pub fn positive_u32(value: Option<i64>) -> Option<u32> {
+    value.filter(|v| *v > 0).and_then(|v| u32::try_from(v).ok())
+}
+
+pub fn json_trimmed_string(value: &serde_json::Value, key: &str) -> Option<String> {
+    trimmed_non_empty(json_string(value, key))
+}
+
+pub fn json_positive_u32(value: &serde_json::Value, key: &str) -> Option<u32> {
+    positive_u32(json_i64(value, key))
+}
+
 pub fn icon_from_data_url(data_url: &str) -> Option<(String, Vec<u8>)> {
     use base64::Engine;
 
@@ -876,5 +896,49 @@ mod test {
         assert_eq!(json_bool(&value, "flag"), Some(true));
         assert_eq!(json_bool(&value, "flagnum"), Some(false));
         assert_eq!(json_i64(&value, "missing"), None);
+    }
+
+    #[test]
+    fn blank_strings_are_treated_as_absent() {
+        let value = serde_json::json!({
+            "name": "  Pack  ",
+            "blank": "   ",
+            "empty": "",
+            "number": 12,
+        });
+
+        assert_eq!(
+            json_trimmed_string(&value, "name"),
+            Some("Pack".to_string())
+        );
+        assert_eq!(json_trimmed_string(&value, "blank"), None);
+        assert_eq!(json_trimmed_string(&value, "empty"), None);
+        assert_eq!(json_trimmed_string(&value, "missing"), None);
+        // `json_string` coerces numbers, so the trimmed form does too.
+        assert_eq!(
+            json_trimmed_string(&value, "number"),
+            Some("12".to_string())
+        );
+        assert_eq!(trimmed_non_empty(None), None);
+    }
+
+    #[test]
+    fn non_positive_and_oversized_numbers_are_rejected() {
+        let value = serde_json::json!({
+            "ok": 4096,
+            "zero": 0,
+            "negative": -1,
+            "huge": 5_000_000_000i64,
+            "stringy": "2048",
+        });
+
+        assert_eq!(json_positive_u32(&value, "ok"), Some(4096));
+        assert_eq!(json_positive_u32(&value, "zero"), None);
+        assert_eq!(json_positive_u32(&value, "negative"), None);
+        assert_eq!(json_positive_u32(&value, "huge"), None);
+        assert_eq!(json_positive_u32(&value, "missing"), None);
+        // `json_i64` parses numeric strings, so the positive form does too.
+        assert_eq!(json_positive_u32(&value, "stringy"), Some(2048));
+        assert_eq!(positive_u32(None), None);
     }
 }

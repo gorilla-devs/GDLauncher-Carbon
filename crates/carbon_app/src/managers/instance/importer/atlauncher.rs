@@ -14,8 +14,9 @@ use super::{
     common::{
         DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
         datetime_from_epoch_secs_or_millis, dir_name, first_existing_dir, group_for_import,
-        json_bool, json_i64, json_string, normalize_forge_version, parse_loader_type,
-        parse_version_id, resolve_standard_version,
+        json_bool, json_i64, json_positive_u32, json_string, json_trimmed_string,
+        normalize_forge_version, parse_loader_type, parse_version_id, resolve_standard_version,
+        trimmed_non_empty,
     },
 };
 use crate::{
@@ -329,29 +330,21 @@ fn instance_settings(launcher: Option<&serde_json::Value>) -> ImportedSettings {
         return ImportedSettings::default();
     };
 
-    let text = |key: &str| {
-        json_string(launcher, key)
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty())
-    };
-
     let mut settings = ImportedSettings {
-        notes: text("description"),
-        memory_max_mb: json_i64(launcher, "maximumMemory")
-            .filter(|m| *m > 0)
-            .and_then(|m| u32::try_from(m).ok()),
-        java_path: text("javaPath"),
+        notes: json_trimmed_string(launcher, "description"),
+        memory_max_mb: json_positive_u32(launcher, "maximumMemory"),
+        java_path: json_trimmed_string(launcher, "javaPath"),
         ..Default::default()
     };
 
-    if let Some(args) = text("javaArguments") {
+    if let Some(args) = json_trimmed_string(launcher, "javaArguments") {
         settings.absorb_jvm_args(&args);
     }
 
     if json_bool(launcher, "enableCommands").unwrap_or(false) {
-        settings.pre_launch_hook = text("preLaunchCommand");
-        settings.post_exit_hook = text("postExitCommand");
-        settings.wrapper_command = text("wrapperCommand");
+        settings.pre_launch_hook = json_trimmed_string(launcher, "preLaunchCommand");
+        settings.post_exit_hook = json_trimmed_string(launcher, "postExitCommand");
+        settings.wrapper_command = json_trimmed_string(launcher, "wrapperCommand");
     }
 
     settings
@@ -362,13 +355,10 @@ fn parse_instance_json(value: &serde_json::Value, fallback_name: &str) -> Option
     let launcher_str = |key: &str| launcher.and_then(|l| json_string(l, key));
     let launcher_obj = |key: &str| launcher.and_then(|l| l.get(key)).filter(|v| v.is_object());
 
-    let name = launcher_str("name")
-        .or_else(|| json_string(value, "name"))
-        .map(|n| n.trim().to_string())
-        .filter(|n| !n.is_empty())
+    let name = trimmed_non_empty(launcher_str("name").or_else(|| json_string(value, "name")))
         .unwrap_or_else(|| fallback_name.to_string());
 
-    let pack_name = launcher_str("pack").filter(|p| !p.trim().is_empty());
+    let pack_name = trimmed_non_empty(launcher_str("pack"));
 
     // `id` is the vanilla version id; older layouts used `minecraftVersion`.
     let raw_id = json_string(value, "id")
@@ -385,10 +375,10 @@ fn parse_instance_json(value: &serde_json::Value, fallback_name: &str) -> Option
     let mut loaders = Vec::new();
     if let Some(loader_version) = loader_version {
         let type_ = json_string(loader_version, "type").and_then(|t| parse_loader_type(&t));
-        let version = json_string(loader_version, "version")
-            .or_else(|| json_string(loader_version, "rawVersion"))
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty());
+        let version = trimmed_non_empty(
+            json_string(loader_version, "version")
+                .or_else(|| json_string(loader_version, "rawVersion")),
+        );
 
         if let (Some(type_), Some(version)) = (type_, version) {
             let version = if type_ == ModLoaderType::Forge {

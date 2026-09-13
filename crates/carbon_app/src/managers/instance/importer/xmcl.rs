@@ -15,9 +15,9 @@ use super::{
     common::{
         DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
         datetime_from_epoch_secs_or_millis, dir_name, find_image_with_any_extension,
-        first_existing_dir, group_for_import, icon_from_data_url, json_i64, json_string,
-        normalize_forge_version, parse_version_id, read_json_value, resolve_standard_version,
-        seconds_played_from_i64,
+        first_existing_dir, group_for_import, icon_from_data_url, json_i64, json_positive_u32,
+        json_string, json_trimmed_string, normalize_forge_version, parse_version_id,
+        read_json_value, resolve_standard_version, seconds_played_from_i64,
     },
 };
 use crate::{
@@ -300,10 +300,7 @@ async fn instance_groups(app_data: &Path, instances_dir: &Path) -> HashMap<PathB
         };
 
         for entry in list {
-            let Some(name) = json_string(entry, "name")
-                .map(|n| n.trim().to_string())
-                .filter(|n| !n.is_empty())
-            else {
+            let Some(name) = json_trimmed_string(entry, "name") else {
                 continue;
             };
             let Some(members) = entry.get("instances").and_then(|i| i.as_array()) else {
@@ -406,25 +403,17 @@ struct ParsedInstance {
 }
 
 fn instance_settings(json: &serde_json::Value) -> ImportedSettings {
-    let text = |key: &str| {
-        json_string(json, key)
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty())
-    };
-    let positive =
-        |value: Option<i64>| value.filter(|v| *v > 0).and_then(|v| u32::try_from(v).ok());
-
     let mut settings = ImportedSettings {
-        notes: text("description"),
-        memory_min_mb: positive(json_i64(json, "minMemory")),
-        memory_max_mb: positive(json_i64(json, "maxMemory")),
-        java_path: text("java"),
-        pre_launch_hook: text("preExecuteCommand"),
-        wrapper_command: text("prependCommand"),
+        notes: json_trimmed_string(json, "description"),
+        memory_min_mb: json_positive_u32(json, "minMemory"),
+        memory_max_mb: json_positive_u32(json, "maxMemory"),
+        java_path: json_trimmed_string(json, "java"),
+        pre_launch_hook: json_trimmed_string(json, "preExecuteCommand"),
+        wrapper_command: json_trimmed_string(json, "prependCommand"),
         game_resolution: json.get("resolution").and_then(|r| {
             Some((
-                positive(json_i64(r, "width"))?,
-                positive(json_i64(r, "height"))?,
+                json_positive_u32(r, "width")?,
+                json_positive_u32(r, "height")?,
             ))
         }),
         ..Default::default()
@@ -449,18 +438,10 @@ fn instance_settings(json: &serde_json::Value) -> ImportedSettings {
 }
 
 fn parse_instance_json(json: &serde_json::Value, fallback_name: &str) -> Option<ParsedInstance> {
-    let name = json_string(json, "name")
-        .map(|n| n.trim().to_string())
-        .filter(|n| !n.is_empty())
-        .unwrap_or_else(|| fallback_name.to_string());
+    let name = json_trimmed_string(json, "name").unwrap_or_else(|| fallback_name.to_string());
 
     let runtime = json.get("runtime").filter(|r| r.is_object());
-    let runtime_str = |key: &str| {
-        runtime
-            .and_then(|r| json_string(r, key))
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty())
-    };
+    let runtime_str = |key: &str| runtime.and_then(|r| json_trimmed_string(r, key));
 
     // `version` is the resolved id XMCL launched; a fallback for instances written before `runtime`.
     let from_version_id = json_string(json, "version")
@@ -529,9 +510,7 @@ fn parse_instance_json(json: &serde_json::Value, fallback_name: &str) -> Option<
         minecraft_version,
         loaders,
         modpack,
-        icon: json_string(json, "icon")
-            .map(|i| i.trim().to_string())
-            .filter(|i| !i.is_empty()),
+        icon: json_trimmed_string(json, "icon"),
         seconds_played,
         last_played,
         settings: instance_settings(json),

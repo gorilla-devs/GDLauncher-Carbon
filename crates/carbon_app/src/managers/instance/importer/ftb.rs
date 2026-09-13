@@ -14,8 +14,9 @@ use super::{
     common::{
         DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
         datetime_from_epoch_secs_or_millis, dir_name, first_existing_dir, group_for_import,
-        icon_from_data_url, json_i64, json_string, looks_like_minecraft_version, parse_version_id,
-        read_json_value, resolve_standard_version, seconds_played_from_i64,
+        icon_from_data_url, json_i64, json_positive_u32, json_string, json_trimmed_string,
+        looks_like_minecraft_version, parse_version_id, read_json_value, resolve_standard_version,
+        seconds_played_from_i64, trimmed_non_empty,
     },
 };
 use crate::{
@@ -70,25 +71,7 @@ impl FtbImporter {
     }
 
     pub async fn get_default_scan_path() -> anyhow::Result<Option<PathBuf>> {
-        let Some(basedirs) = directories::BaseDirs::new() else {
-            return Ok(None);
-        };
-        let home = basedirs.home_dir().to_path_buf();
-
-        let mut candidates = Vec::new();
-        #[cfg(target_os = "windows")]
-        {
-            candidates.push(basedirs.data_local_dir().join(".ftba"));
-        }
-        #[cfg(target_os = "macos")]
-        {
-            candidates.push(home.join("Library/Application Support/.ftba"));
-        }
-        candidates.push(home.join(".ftba"));
-        candidates.push(basedirs.data_local_dir().join(".ftba"));
-        candidates.push(basedirs.data_dir().join(".ftba"));
-
-        let Some(root) = first_existing_dir(candidates) else {
+        let Some(root) = first_existing_dir(app_home_candidates()) else {
             return Ok(None);
         };
 
@@ -152,11 +135,11 @@ impl FtbImporter {
 async fn category_name(instances_dir: &Path, json: &serde_json::Value) -> Option<String> {
     let mut name = None;
 
-    if let Some(category_id) = json_string(json, "categoryId").filter(|id| !id.trim().is_empty()) {
+    if let Some(category_id) = json_trimmed_string(json, "categoryId") {
         if let Some(categories) = read_json_value(&instances_dir.join("categories.json")).await {
             name = categories.as_array().and_then(|list| {
                 list.iter().find_map(|category| {
-                    (json_string(category, "uuid")?.eq_ignore_ascii_case(category_id.trim()))
+                    (json_string(category, "uuid")?.eq_ignore_ascii_case(&category_id))
                         .then(|| json_string(category, "name"))
                         .flatten()
                 })
@@ -164,9 +147,8 @@ async fn category_name(instances_dir: &Path, json: &serde_json::Value) -> Option
         }
     }
 
-    name.or_else(|| json_string(json, "category"))
-        .map(|n| n.trim().to_string())
-        .filter(|n| !n.is_empty() && !n.eq_ignore_ascii_case("default"))
+    trimmed_non_empty(name.or_else(|| json_string(json, "category")))
+        .filter(|n| !n.eq_ignore_ascii_case("default"))
 }
 
 #[async_trait::async_trait]
@@ -319,6 +301,28 @@ fn is_app_root(path: &Path) -> bool {
         || path.join("bin").join("settings.json").is_file()
 }
 
+/// The app home the FTB App computes for itself: `%LOCALAPPDATA%\.ftba` on
+/// Windows, `~/Library/Application Support/.ftba` on macOS, `~/.ftba` elsewhere.
+fn app_home_candidates() -> Vec<PathBuf> {
+    let Some(basedirs) = directories::BaseDirs::new() else {
+        return Vec::new();
+    };
+    let home = basedirs.home_dir();
+
+    #[cfg(target_os = "windows")]
+    let candidates = vec![
+        basedirs.data_local_dir().join(".ftba"),
+        home.join(".ftba"),
+        basedirs.data_dir().join(".ftba"),
+    ];
+    #[cfg(target_os = "macos")]
+    let candidates = vec![basedirs.data_dir().join(".ftba"), home.join(".ftba")];
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let candidates = vec![home.join(".ftba"), basedirs.data_local_dir().join(".ftba")];
+
+    candidates
+}
+
 async fn instances_dir_for_root(root: &Path) -> PathBuf {
     for settings in [
         root.join("storage").join("settings.json"),
@@ -328,10 +332,7 @@ async fn instances_dir_for_root(root: &Path) -> PathBuf {
         let Some(json) = read_json_value(&settings).await else {
             continue;
         };
-        if let Some(location) = json_string(&json, "instanceLocation")
-            .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty())
-        {
+        if let Some(location) = json_trimmed_string(&json, "instanceLocation") {
             let location = PathBuf::from(location);
             let resolved = if location.is_absolute() {
                 location
@@ -362,12 +363,8 @@ struct ParsedInstance {
 /// Width/height are always written from the app's defaults, so they aren't per-instance.
 fn instance_settings(json: &serde_json::Value) -> ImportedSettings {
     let mut settings = ImportedSettings {
-        memory_max_mb: json_i64(json, "memory")
-            .filter(|m| *m > 0)
-            .and_then(|m| u32::try_from(m).ok()),
-        java_path: json_string(json, "jrePath")
-            .map(|p| p.trim().to_string())
-            .filter(|p| !p.is_empty()),
+        memory_max_mb: json_positive_u32(json, "memory"),
+        java_path: json_trimmed_string(json, "jrePath"),
         ..Default::default()
     };
 
@@ -379,21 +376,15 @@ fn instance_settings(json: &serde_json::Value) -> ImportedSettings {
 }
 
 fn parse_instance_json(json: &serde_json::Value, fallback_name: &str) -> Option<ParsedInstance> {
-    let name = json_string(json, "name")
-        .map(|n| n.trim().to_string())
-        .filter(|n| !n.is_empty())
-        .unwrap_or_else(|| fallback_name.to_string());
+    let name = json_trimmed_string(json, "name").unwrap_or_else(|| fallback_name.to_string());
 
-    let mod_loader = json_string(json, "modLoader")
-        .map(|m| m.trim().to_string())
-        .filter(|m| !m.is_empty());
+    let mod_loader = json_trimmed_string(json, "modLoader");
     let parsed_loader = mod_loader
         .as_deref()
         .map(parse_version_id)
         .unwrap_or_default();
 
-    let minecraft_version = json_string(json, "mcVersion")
-        .map(|v| v.trim().to_string())
+    let minecraft_version = json_trimmed_string(json, "mcVersion")
         .filter(|v| looks_like_minecraft_version(v))
         .or(parsed_loader.minecraft)?;
 

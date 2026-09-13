@@ -15,8 +15,8 @@ use super::{
     common::{
         DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
         datetime_from_epoch_secs_or_millis, dir_name, first_existing_dir, group_for_import,
-        json_i64, json_string, parse_loader_type, read_json_value, resolve_standard_version,
-        seconds_played_from_i64,
+        json_i64, json_string, parse_loader_type, positive_u32, read_json_value,
+        resolve_standard_version, seconds_played_from_i64, trimmed_non_empty,
     },
 };
 use crate::{
@@ -549,17 +549,10 @@ fn read_instance_groups(conn: &rusqlite::Connection) -> anyhow::Result<HashMap<S
 
 fn settings_from_overrides_json(json: &serde_json::Value) -> ImportedSettings {
     let text = |value: Option<&serde_json::Value>| {
-        value
-            .and_then(|v| v.as_str())
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .map(str::to_string)
+        trimmed_non_empty(value.and_then(|v| v.as_str()).map(str::to_string))
     };
     let positive = |value: Option<&serde_json::Value>| {
-        value
-            .and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64)))
-            .filter(|v| *v > 0)
-            .and_then(|v| u32::try_from(v).ok())
+        positive_u32(value.and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64))))
     };
 
     let hooks = json.get("hooks").filter(|h| h.is_object());
@@ -607,24 +600,16 @@ fn read_profiles_table(
         "SELECT path, name, icon_path, game_version, mod_loader, mod_loader_version, linked_project_id, linked_version_id, last_played, submitted_time_played, recent_time_played, override_java_path, override_extra_launch_args, override_mc_memory_max, override_mc_game_resolution_x, override_mc_game_resolution_y, override_hook_pre_launch, override_hook_wrapper, override_hook_post_exit, groups FROM profiles",
     )?;
     let rows = stmt.query_map([], |row| {
-        let text = |value: Option<String>| {
-            value
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-        };
-        let positive =
-            |value: Option<i64>| value.filter(|v| *v > 0).and_then(|v| u32::try_from(v).ok());
-
         let mut settings = ImportedSettings {
-            java_path: text(row.get(11)?),
-            memory_max_mb: positive(row.get(13)?),
-            game_resolution: match (positive(row.get(14)?), positive(row.get(15)?)) {
+            java_path: trimmed_non_empty(row.get(11)?),
+            memory_max_mb: positive_u32(row.get(13)?),
+            game_resolution: match (positive_u32(row.get(14)?), positive_u32(row.get(15)?)) {
                 (Some(w), Some(h)) => Some((w, h)),
                 _ => None,
             },
-            pre_launch_hook: text(row.get(16)?),
-            wrapper_command: text(row.get(17)?),
-            post_exit_hook: text(row.get(18)?),
+            pre_launch_hook: trimmed_non_empty(row.get(16)?),
+            wrapper_command: trimmed_non_empty(row.get(17)?),
+            post_exit_hook: trimmed_non_empty(row.get(18)?),
             group: row
                 .get::<_, Option<String>>(19)?
                 .and_then(|g| serde_json::from_str::<Vec<String>>(&g).ok())

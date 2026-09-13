@@ -17,8 +17,8 @@ use super::{
     common::{
         DeclaredModLoader, ImportedSettings, ParsedVersionId, apply_imported_settings,
         copy_game_dir, first_existing_dir, group_for_import, icon_from_data_url, json_i64,
-        json_string, looks_like_minecraft_version, parse_version_id, read_json_value,
-        resolve_standard_version,
+        json_positive_u32, json_string, json_trimmed_string, looks_like_minecraft_version,
+        parse_version_id, read_json_value, resolve_standard_version,
     },
     technic::versions_from_version_json,
 };
@@ -462,26 +462,23 @@ async fn launcher_profile_entries(
 
             let profile_type = json_string(profile, "type").unwrap_or_default();
 
-            let name = json_string(profile, "name")
-                .map(|n| n.trim().to_string())
-                .filter(|n| !n.is_empty())
-                .unwrap_or_else(|| match profile_type.as_str() {
+            let name = json_trimmed_string(profile, "name").unwrap_or_else(|| {
+                match profile_type.as_str() {
                     "latest-release" => "Latest release".to_string(),
                     "latest-snapshot" => "Latest snapshot".to_string(),
                     _ => key.clone(),
-                });
+                }
+            });
 
-            let version_id = json_string(profile, "lastVersionId")
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-                .unwrap_or_else(|| match profile_type.as_str() {
+            let version_id =
+                json_trimmed_string(profile, "lastVersionId").unwrap_or_else(|| match profile_type
+                    .as_str()
+                {
                     "latest-snapshot" => "latest-snapshot".to_string(),
                     _ => "latest-release".to_string(),
                 });
 
-            let profile_game_dir = json_string(profile, "gameDir")
-                .map(|d| d.trim().to_string())
-                .filter(|d| !d.is_empty())
+            let profile_game_dir = json_trimmed_string(profile, "gameDir")
                 .map(|d| {
                     let d = PathBuf::from(d);
                     if d.is_absolute() { d } else { game_dir.join(d) }
@@ -507,13 +504,12 @@ async fn launcher_profile_entries(
             }
 
             let mut settings = ImportedSettings {
-                java_path: json_string(profile, "javaDir")
-                    .map(|p| p.trim().to_string())
-                    .filter(|p| !p.is_empty()),
+                java_path: json_trimmed_string(profile, "javaDir"),
                 game_resolution: profile.get("resolution").and_then(|r| {
-                    let width = json_i64(r, "width").filter(|v| *v > 0)?;
-                    let height = json_i64(r, "height").filter(|v| *v > 0)?;
-                    Some((u32::try_from(width).ok()?, u32::try_from(height).ok()?))
+                    Some((
+                        json_positive_u32(r, "width")?,
+                        json_positive_u32(r, "height")?,
+                    ))
                 }),
                 ..Default::default()
             };
