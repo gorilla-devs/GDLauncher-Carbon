@@ -9,6 +9,7 @@ use tokio::sync::broadcast::{self, error::RecvError};
 use tracing::error;
 
 pub use app::AppInner;
+pub mod runtime_lifecycle;
 
 use crate::api::InvalidationEvent;
 use crate::api::keys::Key;
@@ -69,6 +70,7 @@ mod app {
     };
 
     pub struct AppInner {
+        pub(crate) runtime_lifecycle: Arc<super::runtime_lifecycle::RuntimeLifecycle>,
         settings_manager: SettingsManager,
         java_manager: JavaManager,
         pub(crate) minecraft_manager: MinecraftManager,
@@ -181,6 +183,11 @@ mod app {
                 let inner = Arc::into_raw(app);
 
                 (*inner).get().write(MaybeUninit::new(AppInner {
+                    runtime_lifecycle: Arc::new(
+                        super::runtime_lifecycle::RuntimeLifecycle::with_runtime_path(
+                            &runtime_path,
+                        ),
+                    ),
                     settings_manager: SettingsManager::new(
                         runtime_path,
                         http_client.clone(),
@@ -281,6 +288,24 @@ mod app {
         /// hold up startup, tests await it so it is finished before they run.
         pub(crate) async fn start_background_tasks(self: &Arc<Self>) {
             let bg_total = std::time::Instant::now();
+            let ownership = async {
+                self.runtime_lifecycle.reconcile_children().await?;
+                let runtime = &self.settings_manager().runtime_path;
+                self.runtime_lifecycle
+                    .reconcile_root(&runtime.get_instances().to_path(), instance::PID_FILE_NAME)
+                    .await?;
+                self.runtime_lifecycle
+                    .reconcile_root(
+                        &runtime.get_servers().to_path(),
+                        server::provider::PID_FILE_NAME,
+                    )
+                    .await?;
+                Ok(())
+            }
+            .await;
+            if let Err(error) = ownership {
+                self.runtime_lifecycle.reconciliation_finished(Err(error));
+            }
 
             let t = std::time::Instant::now();
             self.clone()
@@ -302,6 +327,7 @@ mod app {
                 t.elapsed().as_secs_f64()
             );
 
+            self.runtime_lifecycle.reconciliation_finished(Ok(()));
             let t = std::time::Instant::now();
             self.meta_cache_manager().launch_background_tasks().await;
             debug!(

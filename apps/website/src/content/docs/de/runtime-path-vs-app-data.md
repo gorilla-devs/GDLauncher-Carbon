@@ -63,17 +63,19 @@ Für den normalen Betrieb musst du nichts verschieben. Der Default passt.
 
 **Settings → Runtime Path** öffnen. Neuen Pfad eintippen oder per Ordner-Icon wählen. Der Apply-Button (das Kreis-Pfeil-Icon rechts in der Zeile) wird aktiv, sobald der Pfad neu und gültig ist. Klick öffnet ein Bestätigungs-Modal, das alten und neuen Pfad zeigt.
 
-Ist der Zielordner leer (oder existiert noch nicht), startet die volle Migration, wenn du bestätigst: Ein Overlay zeigt Scan, dateiweises Kopieren, dateiweises Entfernen der Quelle. Nicht App oder Rechner schließen, solange das läuft. Danach startet der Launcher automatisch neu.
+Ist der Zielordner leer (oder existiert noch nicht), startet die volle Migration, wenn du bestätigst: Ein Overlay zeigt Scan, dateiweises Kopieren, dateiweises Entfernen der Quelle. Nicht App oder Rechner schließen, solange das läuft. Danach startet der Launcher automatisch neu. Bleiben einzelne Dateien am alten Ort, weil sie sich nach dem Kopieren geändert haben oder nicht gelöscht werden konnten, listet der Launcher sie beim ersten Start vom neuen Ort auf, mit einer Schaltfläche, die den alten Ordner öffnet.
 
 Enthält das Ziel schon einen GDLauncher-Runtime-Path (du hast ihn früher verschoben und willst eine frische Installation darauf zeigen lassen), warnt das Modal gelb, dass der Ordner nicht leer ist. Bestätigen macht einen "Switch only": Der Marker wird umgeschrieben, keine Dateien werden kopiert, der Launcher startet neu. Die Daten am alten Ort bleiben verwaist liegen, die kannst du händisch löschen.
 
-Bricht eine Migration mittendrin ab, wird das Overlay rot und zeigt den Fehler. Der Launcher rollt zurück: Im neuen Pfad angelegte Dateien werden entfernt, der Marker bleibt auf den alten Pfad zeigend, du kannst ohne Datenverlust neu versuchen. Häufige Ursachen sind fehlende Schreibrechte auf dem Ziellaufwerk und zu wenig freier Speicher.
+Bricht eine Migration mittendrin ab, wird das Overlay rot und zeigt den Fehler. Es geht nichts verloren: Bis jede Datei kopiert und geprüft ist, nutzt der Launcher weiter den alten Ort und lässt deine Dateien dort unangetastet; nach dem Neustart zeigt Settings → Runtime Path weiterhin den alten Pfad. Der Launcher entfernt außerdem die Dateien, die er in den neuen Ordner kopiert hatte, damit ihr Platz wieder frei wird; nachdem du die Ursache behoben hast, kannst du es erneut versuchen. Kann er einige davon nicht entfernen (etwa weil ein anderes Programm sie geöffnet hat), behält der neue Ordner sie sowie eine Datei `.gdl_migration_in_progress`, die ihn als unfertigen Umzug markiert. Der Launcher verwendet diesen Ordner nicht und zieht auch nicht erneut dorthin um; wählst du ihn in den Settings, wird er als unfertiger Umzug gemeldet. Lösche diesen Ordner (oder wähle einen anderen leeren Ordner), bevor du es erneut versuchst. Häufige Ursachen sind fehlende Schreibrechte auf dem Ziellaufwerk und zu wenig freier Speicher.
 
 ### Die Marker-Datei runtime_path_override
 
 Beim Verschieben schreibt GDLauncher eine kleine Textdatei namens `runtime_path_override` in den **App Data Path** (nicht in den Runtime Path). Inhalt ist der neue Runtime Path als Klartext. Jeden Start liest der Launcher die Datei, um zu wissen, wo deine Daten liegen.
 
 Wird der Marker gelöscht, fällt GDLauncher auf den Default-Runtime-Path (`<App Data>/data/`) zurück. Deine Daten sind nicht weg, sie liegen noch da, wo du sie hin verschoben hast, aber der Launcher sieht sie nicht, bis du in **Settings → Runtime Path** den Ordner wieder eingibst. Da der Ordner schon GDLauncher-Daten enthält, behandelt der Launcher das als "Switch only" und aktualisiert nur den Marker, ohne zu kopieren.
+
+Lässt sich der Ordner, auf den der Marker zeigt, beim Start nicht öffnen (zum Beispiel weil er auf einem nicht angeschlossenen Laufwerk liegt), startet der Launcher mit dem Default-Runtime-Path und sagt das bei jedem Start. Schließ das Laufwerk an und starte neu, dann sind deine Daten wieder da. Ist das Laufwerk endgültig weg, wähl in dieser Meldung **Keep the default folder**: GDLauncher entfernt den Marker, zeigt die Meldung nicht mehr und löscht nichts im alten Ordner. Zurückwechseln kannst du später wie oben beschrieben.
 
 ## Warum die Datenbank nicht geteilt werden darf
 

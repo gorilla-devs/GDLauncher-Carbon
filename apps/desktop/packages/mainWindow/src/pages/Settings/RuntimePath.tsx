@@ -9,11 +9,30 @@ import {
   createResource,
   createSignal,
   Match,
+  onCleanup,
   Switch
 } from "solid-js"
 import Center from "./components/Center"
 import { useModal } from "@/managers/ModalsManager"
 import { isChangingRuntimePath } from "@/managers/ModalsManager/modals/ConfirmChangeRuntimePath/state"
+import type { RuntimeTargetRefusal } from "../../../../main/utils/runtimePathGuard"
+
+// Why a folder was refused, with what to pick instead.
+const refusalTooltip = {
+  not_absolute: "ui:_trn_tooltip.rtp_not_absolute",
+  network_path: "ui:_trn_tooltip.rtp_network_path",
+  filesystem_root: "ui:_trn_tooltip.rtp_drive_root",
+  nested: "ui:_trn_tooltip.rtp_nested",
+  install_overlap: "ui:_trn_tooltip.rtp_install_overlap",
+  system_dir: "ui:_trn_tooltip.rtp_system_dir",
+  removable_not_mounted: "ui:_trn_tooltip.rtp_not_mounted",
+  not_a_folder: "ui:_trn_tooltip.rtp_not_a_folder",
+  not_writable: "ui:_trn_tooltip.rtp_not_writable"
+} as const satisfies Record<RuntimeTargetRefusal, string>
+const refusalKey = (classification: string | undefined) =>
+  classification && Object.hasOwn(refusalTooltip, classification)
+    ? refusalTooltip[classification as RuntimeTargetRefusal]
+    : undefined
 
 const RuntimePath = () => {
   const modalsContext = useModal()
@@ -73,7 +92,9 @@ const RuntimePath = () => {
                       return
                     }
 
-                    setRuntimePath(result.filePaths[0])
+                    // Picking the same folder again is a request to check it again.
+                    if (result.filePaths[0] === runtimePath()) revalidate()
+                    else setRuntimePath(result.filePaths[0])
                   }}
                 />
               }

@@ -63,17 +63,19 @@ Non hai bisogno di spostare il runtime path per uso normale. La posizione di def
 
 Apri **Settings → Runtime Path**. Digita la nuova posizione o scegliela con l'icona della cartella. Il pulsante di applicazione (l'icona della freccia circolare a destra della riga) si illumina quando il path differisce da quello corrente ed è valido. Cliccarlo apre un modal di conferma che mostra i path vecchio e nuovo.
 
-Se la cartella target è vuota (o non esiste ancora), confermare lancia una migrazione completa: un overlay mostra la scansione, poi la copia file per file, poi la rimozione file per file dalla sorgente. Non chiudere l'app né spegnere la macchina mentre questo è in corso. Quando finisce il launcher si riavvia.
+Se la cartella target è vuota (o non esiste ancora), confermare lancia una migrazione completa: un overlay mostra la scansione, poi la copia file per file, poi la rimozione file per file dalla sorgente. Non chiudere l'app né spegnere la macchina mentre questo è in corso. Quando finisce il launcher si riavvia. Se alcuni file restano nella vecchia posizione perché sono cambiati dopo la copia o non è stato possibile eliminarli, il launcher li elenca quando riparte dalla nuova posizione, con un pulsante che apre la vecchia cartella.
 
 Se il target contiene già un runtime path GDLauncher (l'hai spostato prima e vuoi che un'install fresca lo raccolga), il modal ti avvisa in giallo che la cartella non è vuota. Confermare lì fa uno "switch only": il marker viene riscritto per puntare ai dati esistenti, nessun file viene copiato, e il launcher si riavvia. I dati lasciati nella vecchia posizione diventano orfani e puoi cancellarli a mano.
 
-Se una migrazione fallisce a metà, l'overlay diventa rosso e mostra l'errore. Il launcher fa rollback: i file che ha creato nel nuovo path vengono rimossi e il marker resta a puntare al vecchio path, così puoi riprovare senza perdere dati. Le due cause comuni sono permessi di scrittura mancanti sul drive di destinazione e spazio libero esaurito.
+Se una migrazione fallisce a metà, l'overlay diventa rosso e mostra l'errore. Non si perde nulla: finché ogni file non è stato copiato e verificato, il launcher continua a usare il vecchio path senza toccare i tuoi file, e dopo il riavvio Settings → Runtime Path mostra ancora quello. Il launcher rimuove anche i file che aveva copiato nella nuova cartella, così il loro spazio torna libero e puoi riprovare dopo aver risolto la causa. Se non riesce a rimuoverne alcuni (per esempio perché un altro programma li tiene aperti), la nuova cartella li conserva, più un file `.gdl_migration_in_progress` che la segna come spostamento non completato. Il launcher non userà quella cartella e non ci sposterà più nulla; se la scegli, Settings la segnala come spostamento non completato. Elimina quella cartella (o scegline un'altra vuota) prima di riprovare. Le due cause comuni sono permessi di scrittura mancanti sul drive di destinazione e spazio libero esaurito.
 
 ### Il marker runtime_path_override
 
 Quando cambi il runtime path, GDLauncher scrive un piccolo file di testo chiamato `runtime_path_override` dentro l'**app data path** (non dentro il runtime path). Il file contiene il nuovo runtime path come testo. A ogni launch l'app lo legge per sapere dove sono i tuoi dati.
 
 Se cancelli il marker, GDLauncher torna al suo runtime path di default (`<app data>/data/`). I tuoi dati non sono persi, sono ancora dove li hai spostati, ma il launcher non li vedrà finché non vai in **Settings → Runtime Path** e lo punti di nuovo a quella cartella. Dato che la cartella contiene già dati di GDLauncher, il launcher la tratta come operazione "switch only" e aggiorna solo il marker senza copiare nulla.
+
+Se la cartella indicata dal marker non si può aprire all'avvio (per esempio perché è su un'unità non collegata), il launcher parte con il runtime path di default e lo segnala a ogni avvio. Collega l'unità e riavvia per ritrovare i tuoi dati. Se l'unità non c'è più, scegli **Keep the default folder** in quel messaggio: GDLauncher rimuove il marker, non mostra più il messaggio e non cancella nulla nella vecchia cartella. Puoi tornare a quella cartella più avanti come descritto sopra.
 
 ## Cosa contiene il database, e perché non dovresti condividerlo
 

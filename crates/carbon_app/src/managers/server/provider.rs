@@ -28,6 +28,14 @@ pub struct ServerHandle {
 pub struct ExitSignal(watch::Receiver<bool>);
 
 impl ExitSignal {
+    pub async fn wait_confirmed(&mut self) -> anyhow::Result<()> {
+        self.0
+            .wait_for(|exited| *exited)
+            .await
+            .map(|_| ())
+            .map_err(|_| anyhow::anyhow!("Server supervisor disappeared without confirmed exit"))
+    }
+
     /// Resolves once the process has exited, immediately if it already had.
     pub async fn wait(&mut self) {
         // `wait_for` inspects the current value before it waits, so an exit
@@ -59,6 +67,7 @@ pub trait ServerProvider: Send + Sync {
         launch_config: &LaunchConfig,
         modloader_type: Option<&str>,
         log_tx: mpsc::UnboundedSender<String>,
+        runtime_activity: crate::managers::runtime_lifecycle::RuntimeActivity,
     ) -> Result<ServerHandle>;
 
     async fn stop(&self, handle: &ServerHandle) -> Result<()>;
@@ -110,6 +119,23 @@ pub async fn read_pid_file(server_root: &Path) -> Result<Option<(u32, Option<u64
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn task04_runtime_exit_requires_true_not_sender_loss_or_timeout() {
+        let (tx, mut signal) = exit_signal();
+        drop(tx);
+        assert!(signal.wait_confirmed().await.is_err());
+        let (tx, mut signal) = exit_signal();
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(5), signal.wait_confirmed())
+                .await
+                .is_err()
+        );
+        tx.send(true).unwrap();
+        signal.wait_confirmed().await.unwrap();
+        drop(tx);
+        signal.wait_confirmed().await.unwrap();
+    }
 
     #[tokio::test]
     async fn exit_signalled_before_a_waiter_attaches_is_still_observed() {

@@ -1006,3 +1006,99 @@ async fn round1_r1_genuinely_uncached_root_registers_once() -> anyhow::Result<()
     assert_eq!(instance_repo::get_all_instances(&app.db).await?.len(), 2);
     Ok(())
 }
+
+#[tokio::test]
+async fn task04_runtime_prepare_admission_serializes_with_relocation() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let id = InstanceId(-404);
+    let pause = app.instance_manager.test_hooks.arm("runtime_admitted", id);
+    let admitted = app.instance_manager().prepare_game(id, None, None, false);
+    tokio::pin!(admitted);
+    tokio::select! {
+        _ = &mut admitted => panic!("prepare should be paused before taking instance locks"),
+        _ = pause.entered.notified() => {},
+    }
+    assert!(app.runtime_lifecycle.begin_relocation("move").is_err());
+    pause.release.notify_one();
+    assert!(admitted.await.is_err()); // absent synthetic instance, no child or download
+    app.runtime_lifecycle.begin_relocation("move")?;
+    let error = app
+        .instance_manager()
+        .prepare_game(id, None, None, false)
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("relocation"));
+    app.runtime_lifecycle.cancel_relocation("move")?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn task04_runtime_server_entry_points_obey_same_freeze() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    app.runtime_lifecycle.begin_relocation("move")?;
+    let manager = app.server_manager();
+    let id = crate::domain::server::ServerId(-404);
+    let error = manager.start_server(id).await.unwrap_err();
+    assert!(error.to_string().contains("relocation"));
+    let error = manager.reinstall_server_from_modpack(id).await.unwrap_err();
+    assert!(error.to_string().contains("relocation"));
+    let error = manager
+        .create_server(
+            crate::domain::server::ServerGroupId(-404),
+            "fixture".into(),
+            "1.20".into(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("relocation"));
+    app.runtime_lifecycle.cancel_relocation("move")?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn task04_runtime_reconciliation_survives_legacy_pid_cleanup_and_restart()
+-> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (_, root) = fixture(&app, "legacy-owner").await?;
+    // The test runner is an existing benign non-Java process; never signal it.
+    tokio::fs::write(root.join(PID_FILE_NAME), std::process::id().to_string()).await?;
+    app.instance_manager().scan_instances().await?;
+    assert!(app.runtime_lifecycle.begin_relocation("one").is_err());
+    let restarted = crate::managers::runtime_lifecycle::RuntimeLifecycle::with_runtime_path(
+        &app.settings_manager().runtime_path.to_path_buf(),
+    );
+    restarted.reconcile_children().await?;
+    restarted
+        .reconcile_root(
+            &app.settings_manager()
+                .runtime_path
+                .get_instances()
+                .to_path(),
+            PID_FILE_NAME,
+        )
+        .await?;
+    restarted.reconciliation_finished(Ok(()));
+    assert!(
+        restarted.begin_relocation("two").is_err(),
+        "best-effort pid cleanup must not erase a present relocation owner across restart"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn task04_runtime_reconciliation_preserves_corrupt_pid_evidence() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (_, root) = fixture(&app, "corrupt-owner").await?;
+    tokio::fs::write(root.join(PID_FILE_NAME), "malformed ownership").await?;
+    app.instance_manager().scan_instances().await?;
+    assert!(app.runtime_lifecycle.begin_relocation("one").is_err());
+    assert_eq!(
+        tokio::fs::read_to_string(root.join(PID_FILE_NAME)).await?,
+        "malformed ownership",
+        "a best-effort UI scan must preserve strict reconciliation failure evidence for restart"
+    );
+    Ok(())
+}

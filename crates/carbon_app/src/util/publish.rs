@@ -471,7 +471,8 @@ fn copy_noclobber(source: &Path, destination: &Path, cross_device: io::Error) ->
         // A rename keeps the modification time; the copy follows suit.
         let _ = private.as_file().set_modified(modified);
     }
-    private.as_file().sync_all()?;
+    // Through the helper: a macOS network share refuses std's F_FULLFSYNC.
+    crate::util::durable::sync_file(private.as_file())?;
     // The copy sits next to its destination, so no further copy can help.
     no_replace(private.into_temp_path(), destination).map_err(|(error, _)| error)?;
     if let Err(error) = remove_source(source, destination) {
@@ -869,6 +870,29 @@ mod tests {
         assert_eq!(std::fs::read(&destination).unwrap(), b"artifact");
         assert!(!source.exists());
         assert!(leftovers(&mods).is_empty());
+    }
+
+    /// A move onto a macOS network share, which refuses std's F_FULLFSYNC,
+    /// still lands: the copy is synced through `util::durable`, which falls
+    /// back to the plain fsync the share supports. The test stands in for
+    /// that share on every platform.
+    #[cfg(unix)]
+    #[test]
+    fn cross_device_move_lands_on_a_drive_that_refuses_a_full_flush() {
+        let syncs = crate::util::durable::test_hooks::FileSyncs::refusing_full_flush();
+        let tmp = tempfile::tempdir().unwrap();
+        let source = tmp.path().join("artifact");
+        let destination = tmp.path().join("mod.jar");
+        std::fs::write(&source, b"artifact").unwrap();
+        inject(Step::NoReplace, &destination, CROSS_DEVICE);
+        move_noclobber(&source, &destination).unwrap();
+        assert_eq!(std::fs::read(&destination).unwrap(), b"artifact");
+        assert!(!source.exists());
+        assert!(
+            syncs.synced(&destination),
+            "the copy is synced through the helper"
+        );
+        assert!(leftovers(tmp.path()).is_empty());
     }
 
     /// The datapack copy is written in the instance root and published into

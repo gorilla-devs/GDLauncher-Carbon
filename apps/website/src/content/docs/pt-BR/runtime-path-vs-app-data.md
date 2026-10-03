@@ -63,17 +63,19 @@ Para uso normal, não precisa mover. O local padrão atende bem.
 
 Abra **Settings → Runtime Path**. Digite o novo destino, ou use o ícone de pasta pra procurar. O botão aplicar (ícone de seta em círculo à direita da linha) acende assim que o caminho difere do atual e é válido. Clicar abre um modal de confirmação mostrando o caminho antigo e o novo.
 
-Se a pasta destino estiver vazia (ou ainda não existir), confirmar dispara uma migração completa: um overlay mostra scan, depois cópia arquivo por arquivo, depois remoção arquivo por arquivo da origem. Não feche a app nem desligue a máquina enquanto isso roda. No fim o launcher reinicia sozinho.
+Se a pasta destino estiver vazia (ou ainda não existir), confirmar dispara uma migração completa: um overlay mostra scan, depois cópia arquivo por arquivo, depois remoção arquivo por arquivo da origem. Não feche a app nem desligue a máquina enquanto isso roda. No fim o launcher reinicia sozinho. Se alguns arquivos ficarem no local antigo porque mudaram depois de copiados ou não puderam ser excluídos, o launcher lista esses arquivos quando inicia de novo a partir do novo local, com um botão que abre a pasta antiga.
 
 Se o destino já contém um Runtime Path do GDLauncher (você moveu antes e quer que uma instalação nova aponte pra esses dados), o modal avisa em amarelo que a pasta não está vazia. Confirmar faz um "switch only": o marcador é reescrito apontando pros dados existentes, nada é copiado, e o launcher reinicia. Os dados no local antigo viram órfãos, dá pra apagar manualmente.
 
-Se uma migração falhar no meio, o overlay fica vermelho e mostra o erro. O launcher faz rollback: arquivos criados no novo caminho são removidos e o marcador continua apontando pro caminho antigo, então dá pra tentar de novo sem perder nada. As duas causas comuns são permissão de escrita ausente no drive destino e falta de espaço livre.
+Se uma migração falhar no meio, o overlay fica vermelho e mostra o erro. Nada se perde: até todos os arquivos serem copiados e conferidos, o launcher continua usando o local antigo sem mexer nos seus arquivos, e depois de reiniciar Settings → Runtime Path ainda mostra esse local. O launcher também apaga os arquivos que tinha copiado pra pasta nova, então o espaço deles volta a ficar livre e dá pra tentar de novo depois de corrigir a causa. Se ele não conseguir apagar alguns (por exemplo, porque outro programa está com eles abertos), a pasta nova guarda esses arquivos, mais um arquivo `.gdl_migration_in_progress` que a marca como uma mudança inacabada. O launcher não vai usar essa pasta nem mover dados pra ela de novo, e Settings avisa que ela tem uma mudança inacabada se você escolhê-la. Apague essa pasta (ou escolha outra pasta vazia) antes de tentar de novo. As duas causas comuns são permissão de escrita ausente no drive destino e falta de espaço livre.
 
 ### O marcador runtime_path_override
 
 Ao mudar o Runtime Path, o GDLauncher escreve um arquivo de texto chamado `runtime_path_override` dentro do **App Data Path** (não dentro do Runtime Path). O conteúdo é o novo Runtime Path em texto puro. A cada boot a app lê esse arquivo pra saber onde estão seus dados.
 
 Se apagar o marcador, o GDLauncher cai no Runtime Path padrão (`<App Data>/data/`). Os dados em si não somem, continuam onde você moveu, mas o launcher não vê até você ir em **Settings → Runtime Path** e apontar pra essa pasta de novo. Como a pasta já tem dados do GDLauncher, o launcher trata como "switch only" e só atualiza o marcador sem copiar nada.
+
+Se a pasta indicada pelo marcador não puder ser aberta quando o GDLauncher inicia (por exemplo, porque está num drive que não está conectado), o launcher inicia com o Runtime Path padrão e avisa a cada inicialização. Conecte o drive e reinicie pra recuperar seus dados. Se o drive não existe mais, escolha **Keep the default folder** nesse aviso: o GDLauncher remove o marcador, para de mostrar o aviso e não apaga nada na pasta antiga. Depois dá pra voltar pra essa pasta do mesmo jeito descrito acima.
 
 ## Por que não compartilhar o banco
 

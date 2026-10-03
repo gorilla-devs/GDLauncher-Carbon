@@ -22,6 +22,7 @@ mod mc;
 mod metrics;
 mod modplatforms;
 pub mod router;
+mod runtime;
 pub mod server;
 pub mod settings;
 mod system_info;
@@ -233,6 +234,7 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
                 },
             ),
         )
+        .nest("/runtime", runtime::mount())
         .nest("/account", account::mount_axum_router())
         .nest("/instance", instance::mount_axum_router())
         .nest("/server", server::mount_axum_router())

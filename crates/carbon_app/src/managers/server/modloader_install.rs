@@ -16,6 +16,7 @@ use tracing::info;
 /// - Quilt: 2 stages (download installer, run installer)
 /// - Forge/NeoForge: 3 stages (download installer, run installer, finalize)
 pub async fn install_modloader(
+    lifecycle: &std::sync::Arc<crate::managers::runtime_lifecycle::RuntimeLifecycle>,
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
     game_version: &str,
@@ -37,6 +38,7 @@ pub async fn install_modloader(
         }
         "quilt" => {
             install_quilt(
+                lifecycle,
                 reqwest_client,
                 server_path,
                 game_version,
@@ -48,6 +50,7 @@ pub async fn install_modloader(
         }
         "forge" => {
             install_forge(
+                lifecycle,
                 reqwest_client,
                 server_path,
                 game_version,
@@ -59,6 +62,7 @@ pub async fn install_modloader(
         }
         "neoforge" => {
             install_neoforge(
+                lifecycle,
                 reqwest_client,
                 server_path,
                 game_version,
@@ -143,6 +147,7 @@ async fn install_fabric(
 /// generated launcher picks up the vanilla `server.jar` already downloaded
 /// next to it.
 async fn install_quilt(
+    lifecycle: &std::sync::Arc<crate::managers::runtime_lifecycle::RuntimeLifecycle>,
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
     game_version: &str,
@@ -188,18 +193,20 @@ async fn install_quilt(
     }
 
     info!("Running Quilt installer...");
-    let output = tokio::process::Command::new(java_path)
-        .arg("-jar")
-        .arg("quilt-installer.jar")
-        .arg("install")
-        .arg("server")
-        .arg(game_version)
-        .arg(loader_version)
-        .arg(format!("--install-dir={}", data_path.display()))
-        .current_dir(&data_path)
-        .output()
-        .await
-        .context("Failed to run Quilt installer")?;
+    let output = crate::managers::runtime_lifecycle::tracked_output(
+        lifecycle,
+        tokio::process::Command::new(java_path)
+            .arg("-jar")
+            .arg("quilt-installer.jar")
+            .arg("install")
+            .arg("server")
+            .arg(game_version)
+            .arg(loader_version)
+            .arg(format!("--install-dir={}", data_path.display()))
+            .current_dir(&data_path),
+    )
+    .await
+    .context("Failed to run Quilt installer")?;
 
     // Clean up installer
     let _ = tokio::fs::remove_file(&installer_path).await;
@@ -292,6 +299,7 @@ async fn latest_quilt_installer(reqwest_client: &ClientWithMiddleware) -> Result
 /// Forge uses an installer jar that must be executed to set up the server.
 /// For now, downloads the installer and runs it.
 async fn install_forge(
+    lifecycle: &std::sync::Arc<crate::managers::runtime_lifecycle::RuntimeLifecycle>,
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
     game_version: &str,
@@ -341,7 +349,14 @@ async fn install_forge(
     // We count "Processing:" lines as processor steps.
     info!("Running Forge installer...");
     let data_path = server_path.get_data_path();
-    run_installer_with_progress(java_path, &data_path, "forge-installer.jar", progress).await?;
+    run_installer_with_progress(
+        lifecycle,
+        java_path,
+        &data_path,
+        "forge-installer.jar",
+        progress,
+    )
+    .await?;
 
     // Clean up installer
     let _ = tokio::fs::remove_file(&installer_path).await;
@@ -388,6 +403,7 @@ async fn install_forge(
 /// Install NeoForge server.
 /// NeoForge uses a similar installer approach to Forge.
 async fn install_neoforge(
+    lifecycle: &std::sync::Arc<crate::managers::runtime_lifecycle::RuntimeLifecycle>,
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
     _game_version: &str,
@@ -425,7 +441,14 @@ async fn install_neoforge(
     // Run the installer with --installServer using the managed Java, streaming stdout
     info!("Running NeoForge installer...");
     let data_path = server_path.get_data_path();
-    run_installer_with_progress(java_path, &data_path, "neoforge-installer.jar", progress).await?;
+    run_installer_with_progress(
+        lifecycle,
+        java_path,
+        &data_path,
+        "neoforge-installer.jar",
+        progress,
+    )
+    .await?;
 
     // Clean up installer
     let _ = tokio::fs::remove_file(&installer_path).await;
@@ -464,6 +487,7 @@ async fn install_neoforge(
 /// - Once processors start appearing, we update to (1 + seen)/estimated_total and adjust
 ///   estimated_total if `seen` exceeds it.
 async fn run_installer_with_progress(
+    lifecycle: &std::sync::Arc<crate::managers::runtime_lifecycle::RuntimeLifecycle>,
     java_path: &Path,
     data_path: &Path,
     jar_name: &str,
@@ -480,15 +504,24 @@ async fn run_installer_with_progress(
         p.update_items(0, initial_estimate);
     }
 
-    let mut child = Command::new(java_path)
+    let mut ownership = lifecycle.admit("server installer child")?;
+    ownership.external_child()?;
+    let child_result = Command::new(java_path)
         .arg("-jar")
         .arg(jar_name)
         .arg("--installServer")
         .current_dir(data_path)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        .spawn()
-        .context("Failed to spawn installer")?;
+        .spawn();
+    let mut child = match child_result {
+        Ok(child) => child,
+        Err(error) => {
+            ownership.finish();
+            return Err(error).context("Failed to spawn installer");
+        }
+    };
+    ownership.record_child_pid(child.id())?;
 
     let stdout = child
         .stdout
@@ -546,6 +579,7 @@ async fn run_installer_with_progress(
     }
 
     let status = child.wait().await.context("Failed to wait for installer")?;
+    ownership.finish();
     let stderr_output = stderr_handle.await.unwrap_or_default();
 
     if !status.success() {

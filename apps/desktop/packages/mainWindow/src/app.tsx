@@ -15,6 +15,7 @@ import { parseSearchQuery } from "./utils/searchQueryParser"
 import { checkForUpdates } from "./utils/updater"
 import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning"
 import { ACCOUNT_BANNED_EVENT } from "./utils/bannedEventBridge"
+import { showRuntimeMoveNotice } from "./utils/runtimeMoveNotice"
 
 interface Props {
   createInvalidateQuery: () => void
@@ -71,6 +72,22 @@ const App = (props: Props) => {
         navigate.navigate(`/search?q=${encodeURIComponent(url)}`)
       }
     })
+  })
+
+  // Every start from the new data folder after a move names what stayed in the old
+  // one, until the user acknowledges it.
+  onMount(() => {
+    void showRuntimeMoveNotice((notice) =>
+      modalsContext?.openModal({ name: "runtimeMoveNotice" }, notice)
+    )
+  })
+
+  // A start that could not open the data folder (its drive not connected, say)
+  // uses the default one and says so, until the folder can be opened again.
+  onMount(() => {
+    void showUnavailableRuntimePath((value) =>
+      modalsContext?.openModal({ name: "runtimePathUnavailable" }, value)
+    )
   })
 
   // First launch detection using semantic query

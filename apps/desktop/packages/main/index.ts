@@ -27,14 +27,29 @@ import path, { join, resolve } from "path"
 import fs from "fs/promises"
 import fss from "fs"
 import fse, { ensureDirSync } from "fs-extra"
-import fg from "fast-glob"
 import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
 import crypto from "crypto"
 import log from "electron-log/main"
 import { hashEmailForOverwolf } from "./utils/emailHash"
 import { buildCoreModuleArgs } from "./utils/coreArgs.js"
-import { assertSafeRuntimeTarget } from "./utils/runtimePathGuard.js"
+import {
+  IncompleteMigrationError,
+  forgetUnavailableRuntimePath,
+  leftInOldFolder,
+  leftPartialCopy,
+  relocateRuntime,
+  removedPartialCopy,
+  runtimeTargetRefusal,
+  selectRuntimePath,
+  validateRuntimeDestination,
+  type RuntimePathValidation
+} from "./utils/runtimeRelocation"
+import { stopCoreForRelocation } from "./utils/coreShutdown"
+import {
+  runtimeOperationActive,
+  withRuntimeOperation
+} from "./utils/runtimeOperation"
 import {
   handleBeforeSendHeaders,
   handleHeadersReceived
@@ -95,6 +110,8 @@ export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override"
 const RUNTIME_PATH_DEFAULT_NAME = "data"
 
 export let CURRENT_RUNTIME_PATH: string | null = null
+// The data folder the pointer names when this start could not open it.
+let UNAVAILABLE_RUNTIME_PATH: string | null = null
 
 let win: BrowserWindow | null = null
 let lastCoreModuleProgress: number | null = null
@@ -110,32 +127,14 @@ app.enableSandbox()
 app.commandLine.appendSwitch("proxy-bypass-list", "127.0.0.1,localhost")
 
 export function initRTPath(override: string | null | undefined) {
-  console.log("Initializing runtime path...")
-  if (override) {
-    CURRENT_RUNTIME_PATH = override
-    console.log("Runtime path overridden:", CURRENT_RUNTIME_PATH)
-    return
-  }
-
-  const runtimeOverridePath = path.join(
+  CURRENT_RUNTIME_PATH = selectRuntimePath(
+    override,
     app.getPath("userData"),
-    RUNTIME_PATH_OVERRIDE_NAME
+    (folder) => {
+      UNAVAILABLE_RUNTIME_PATH = folder
+      console.warn("Data folder not available, using the default:", folder)
+    }
   )
-
-  let file_override: string | null = null
-  try {
-    const tmp_path = fss.readFileSync(runtimeOverridePath).toString()
-    fse.ensureDirSync(tmp_path)
-    file_override = tmp_path
-    console.log("Runtime path read from file:", file_override)
-  } catch {
-    console.log("No runtime path override file found")
-  }
-
-  CURRENT_RUNTIME_PATH =
-    file_override ||
-    path.join(app.getPath("userData"), RUNTIME_PATH_DEFAULT_NAME)
-  console.log("Current runtime path set to:", CURRENT_RUNTIME_PATH)
 }
 
 const args = process.argv.slice(1)
@@ -254,10 +253,9 @@ log.eventLogger.startLogging()
 console.log("Logging initialized")
 Object.assign(console, log.functions)
 
+const overrideCLIDataPath = validateArgument("--runtime_path")
+const overrideEnvDataPath = process.env.GDL_RUNTIME_PATH
 if (app.isPackaged) {
-  const overrideCLIDataPath = validateArgument("--runtime_path")
-  const overrideEnvDataPath = process.env.GDL_RUNTIME_PATH
-
   initRTPath(overrideCLIDataPath?.value || overrideEnvDataPath)
 } else {
   const rtPath = import.meta.env.RUNTIME_PATH
@@ -1066,100 +1064,42 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 // Handlers
-ipcMain.handle("relaunch", async () => {
-  console.log("relaunching app...")
+ipcMain.handle("relaunch", async () =>
+  withRuntimeOperation(async () => {
+    console.log("relaunching app...")
 
-  await killCoreProcess()
+    await killCoreProcess()
 
-  app.relaunch()
-  app.exit()
-})
+    app.relaunch()
+    app.exit()
+  })
+)
 
-ipcMain.handle("deleteDbAndRestart", async () => {
-  console.log("deleting database and restarting app...")
+ipcMain.handle("deleteDbAndRestart", async () =>
+  withRuntimeOperation(async () => {
+    console.log("deleting database and restarting app...")
 
-  // Kill the core FIRST: on Windows, unlinking a file the core still holds
-  // open fails, so the process must exit before we delete the database. This
-  // also covers a startup that hung before READY, where the process is still
-  // alive.
-  await killCoreProcess()
-
-  const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
-
-  // Delete the database, its WAL/SHM sidecars, and any stale pre-downgrade
-  // snapshot — leaving a sidecar behind would let SQLite reconstruct the old
-  // (broken) state on relaunch. Relaunch then lands on the fresh baseline path.
-  const targets = [
-    dbPath,
-    `${dbPath}-wal`,
-    `${dbPath}-shm`,
-    path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.pre-downgrade.db")
-  ]
-  for (const target of targets) {
-    try {
-      await fs.unlink(target)
-      console.log(`deleted ${target}`)
-    } catch {
-      // File might not exist, that's ok
-    }
-  }
-
-  app.relaunch()
-  app.exit()
-})
-
-ipcMain.handle(
-  "restoreDbSnapshotAndRestart",
-  async (_event, snapshotPath: string) => {
-    console.log(`restoring database from snapshot ${snapshotPath}...`)
-
-    // Kill the core FIRST so the database file is not held open while we
-    // overwrite it (same Windows open-file constraint as the reset path). This
-    // also covers a startup that hung before READY.
+    // Kill the core FIRST: on Windows, unlinking a file the core still holds
+    // open fails, so the process must exit before we delete the database. This
+    // also covers a startup that hung before READY, where the process is still
+    // alive.
     await killCoreProcess()
 
     const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
 
-    // Only the core-emitted pre-downgrade snapshot beside the database may be
-    // restored. Reject any other path so a compromised renderer cannot copy an
-    // arbitrary file over the database.
-    const expectedSnapshot = path.join(
-      CURRENT_RUNTIME_PATH!,
-      "gdl_conf.pre-downgrade.db"
-    )
-    if (path.resolve(snapshotPath) !== path.resolve(expectedSnapshot)) {
-      console.error(
-        `refusing to restore from unexpected snapshot path: ${snapshotPath}`
-      )
-      return
-    }
-
-    const tmpPath = `${dbPath}.restore-tmp`
-    try {
-      // Copy to a sibling temp file, then atomically rename it over the
-      // database. A crash or error mid-copy then leaves the original database
-      // intact rather than a half-written one whose sidecars we're about to
-      // drop below.
-      await fs.copyFile(snapshotPath, tmpPath)
-      await fs.rename(tmpPath, dbPath)
-      console.log("snapshot restored over gdl_conf.db")
-    } catch (e) {
-      console.error("failed to restore snapshot:", e)
+    // Delete the database, its WAL/SHM sidecars, and any stale pre-downgrade
+    // snapshot — leaving a sidecar behind would let SQLite reconstruct the old
+    // (broken) state on relaunch. Relaunch then lands on the fresh baseline path.
+    const targets = [
+      dbPath,
+      `${dbPath}-wal`,
+      `${dbPath}-shm`,
+      path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.pre-downgrade.db")
+    ]
+    for (const target of targets) {
       try {
-        await fs.unlink(tmpPath)
-      } catch {
-        // best effort — the temp file may not have been created
-      }
-      // Leave the existing database and its sidecars untouched rather than
-      // relaunching onto a half-restored file.
-      return
-    }
-
-    // Drop the WAL/SHM sidecars so the restored file is opened as-is rather
-    // than replayed against the pre-restore log.
-    for (const suffix of ["-wal", "-shm"]) {
-      try {
-        await fs.unlink(`${dbPath}${suffix}`)
+        await fs.unlink(target)
+        console.log(`deleted ${target}`)
       } catch {
         // File might not exist, that's ok
       }
@@ -1167,7 +1107,70 @@ ipcMain.handle(
 
     app.relaunch()
     app.exit()
-  }
+  })
+)
+
+ipcMain.handle(
+  "restoreDbSnapshotAndRestart",
+  async (_event, snapshotPath: string) =>
+    withRuntimeOperation(async () => {
+      console.log(`restoring database from snapshot ${snapshotPath}...`)
+
+      // Kill the core FIRST so the database file is not held open while we
+      // overwrite it (same Windows open-file constraint as the reset path). This
+      // also covers a startup that hung before READY.
+      await killCoreProcess()
+
+      const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
+
+      // Only the core-emitted pre-downgrade snapshot beside the database may be
+      // restored. Reject any other path so a compromised renderer cannot copy an
+      // arbitrary file over the database.
+      const expectedSnapshot = path.join(
+        CURRENT_RUNTIME_PATH!,
+        "gdl_conf.pre-downgrade.db"
+      )
+      if (path.resolve(snapshotPath) !== path.resolve(expectedSnapshot)) {
+        console.error(
+          `refusing to restore from unexpected snapshot path: ${snapshotPath}`
+        )
+        return
+      }
+
+      const tmpPath = `${dbPath}.restore-tmp`
+      try {
+        // Copy to a sibling temp file, then atomically rename it over the
+        // database. A crash or error mid-copy then leaves the original database
+        // intact rather than a half-written one whose sidecars we're about to
+        // drop below.
+        await fs.copyFile(snapshotPath, tmpPath)
+        await fs.rename(tmpPath, dbPath)
+        console.log("snapshot restored over gdl_conf.db")
+      } catch (e) {
+        console.error("failed to restore snapshot:", e)
+        try {
+          await fs.unlink(tmpPath)
+        } catch {
+          // best effort — the temp file may not have been created
+        }
+        // Leave the existing database and its sidecars untouched rather than
+        // relaunching onto a half-restored file.
+        return
+      }
+
+      // Drop the WAL/SHM sidecars so the restored file is opened as-is rather
+      // than replayed against the pre-restore log.
+      for (const suffix of ["-wal", "-shm"]) {
+        try {
+          await fs.unlink(`${dbPath}${suffix}`)
+        } catch {
+          // File might not exist, that's ok
+        }
+      }
+
+      app.relaunch()
+      app.exit()
+    })
 )
 
 ipcMain.handle("getAdSize", async () => {
@@ -1253,227 +1256,74 @@ ipcMain.handle("getRuntimePath", async () => {
   return CURRENT_RUNTIME_PATH
 })
 
+function runtimeDestinationContext() {
+  const installationRoots = [
+    path.dirname(process.execPath),
+    process.resourcesPath
+  ]
+  if (process.platform === "darwin")
+    installationRoots.push(path.resolve(process.resourcesPath, "../.."))
+  return { installationRoots }
+}
+
 ipcMain.handle(
   "changeRuntimePath",
   async (_, newPath: string, switchOnly = false) => {
-    interface Progress {
-      action: "scan" | "copy" | "remove"
-      currentName: string
-      current: number
-      total: number
-    }
-
-    console.log(
-      `[RTP] Migration request: ${CURRENT_RUNTIME_PATH} -> ${newPath} (switchOnly=${switchOnly})`
-    )
-
-    if (newPath === CURRENT_RUNTIME_PATH) {
-      console.log(`[RTP] No-op: same path`)
-      return
-    }
-
-    // Reject dangerous targets before creating/copying/deleting anything.
-    assertSafeRuntimeTarget(newPath, CURRENT_RUNTIME_PATH)
-
-    const runtimeOverridePath = path.join(
-      app.getPath("userData"),
-      RUNTIME_PATH_OVERRIDE_NAME
-    )
-
-    if (switchOnly) {
-      // Switch-only mode: the renderer already detected the dir exists with
-      // user data via validateRuntimePath. Don't mkdir — that would silently
-      // recreate the dir empty if it was deleted between confirm and now,
-      // resulting in a successful "switch" to an empty runtime.
-      if (!(await fse.pathExists(newPath))) {
-        console.error(`[RTP] Switch-only: target no longer exists: ${newPath}`)
+    return withRuntimeOperation(async () => {
+      if (!CURRENT_RUNTIME_PATH) throw new Error("Runtime is not initialized")
+      if (overrideCLIDataPath?.value || overrideEnvDataPath) {
         throw new Error(
-          `Target directory no longer exists: ${newPath}. Aborting switch.`
+          "Remove the explicit runtime path override and restart before relocating"
         )
       }
-    } else {
-      try {
-        await fs.mkdir(newPath, { recursive: true })
-        console.log(`[RTP] Destination ready`)
-      } catch (e) {
-        console.error(`[RTP] Failed to create destination:`, e)
-        throw e
-      }
-    }
-
-    // Kill the core FIRST so the database file (SQLite WAL, logs) is not held
-    // open while its directory is copied to the new location — same Windows
-    // open-file constraint as the reset/restore paths above. This also covers
-    // a startup that hung before READY.
-    console.log(`[RTP] Killing core module`)
-    await killCoreProcess()
-
-    // Switch-only path: the target dir already contains the user's data and
-    // they want to use it as-is. Don't touch any files in either dir; just
-    // update the override pointer and relaunch. The previous runtime data
-    // remains as orphan disk space the user can delete manually.
-    if (switchOnly) {
-      console.log(`[RTP] Switch-only: writing override to point at ${newPath}`)
-      await fse.writeFile(runtimeOverridePath, newPath)
-      console.log(`[RTP] Switch complete, relaunching`)
+      const source = CURRENT_RUNTIME_PATH
+      const warnings = await relocateRuntime({
+        source,
+        target: newPath,
+        switchOnly,
+        pointer: path.join(app.getPath("userData"), RUNTIME_PATH_OVERRIDE_NAME),
+        context: runtimeDestinationContext(),
+        stopCore: async () => {
+          const core = await coreModule
+          if (core.type !== "success")
+            throw new Error("Core is not ready; restart and retry relocation")
+          await stopCoreForRelocation(
+            { ...core.result, process: coreProcessHandle },
+            source
+          )
+        },
+        progress: (value) =>
+          win?.webContents.send("changeRuntimePathProgress", value)
+      })
+      for (const warning of warnings) console.warn(warning)
+      if (warnings.length)
+        await dialog.showMessageBox({
+          type: "info",
+          title: "Runtime location changed",
+          message:
+            "The new runtime is ready. Review the retained files before restarting.",
+          detail: warnings.join("\n\n"),
+          buttons: ["Restart"],
+          defaultId: 0,
+          noLink: true
+        })
       app.relaunch()
       app.exit()
-      return
-    }
-
-    // Surface activity to the renderer immediately so the user doesn't
-    // see only the spinner during the (potentially slow) glob scan.
-    win?.webContents.send("changeRuntimePathProgress", {
-      action: "scan",
-      currentName: "",
-      current: 0,
-      total: 0
-    } satisfies Progress)
-
-    console.log(`[RTP] Scanning source files...`)
-    const t0 = Date.now()
-    const files = await fg("**/*", {
-      cwd: CURRENT_RUNTIME_PATH!,
-      onlyFiles: true,
-      dot: true,
-      followSymbolicLinks: false,
-      suppressErrors: true,
-      ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
     })
-    console.log(`[RTP] Scan: ${files.length} files in ${Date.now() - t0}ms`)
-
-    const total = files.length
-
-    // Drop a marker so a future startup can detect an interrupted migration if
-    // the host process crashes (we still won't have written the override file
-    // in that case).
-    const migrationMarker = path.join(newPath, ".gdl_migration_in_progress")
-    try {
-      await fse.writeFile(migrationMarker, "")
-    } catch (e) {
-      console.warn(`[RTP] Failed to write migration marker:`, e)
-    }
-
-    // Track which files we successfully copied, so a rollback only removes
-    // files we created — not pre-existing content the user had in newPath.
-    const copiedFiles: string[] = []
-    const cleanupPartial = async () => {
-      console.log(
-        `[RTP] Rolling back ${copiedFiles.length} files copied to ${newPath}`
-      )
-      for (const f of copiedFiles) {
-        try {
-          await fse.remove(path.join(newPath, f))
-        } catch {
-          // best-effort
-        }
-      }
-      try {
-        await fse.remove(migrationMarker)
-      } catch {
-        // best-effort
-      }
-    }
-
-    for (let i = 0; i < total; i++) {
-      const file = files[i]
-      const dest = path.join(newPath, file)
-
-      win?.webContents.send("changeRuntimePathProgress", {
-        action: "copy",
-        currentName: path.basename(file),
-        current: i,
-        total: total * 2
-      } satisfies Progress)
-
-      // Skip files that already exist with the same content — we don't want to
-      // touch (and later potentially roll back) files the user already had.
-      const destExisted = await fse.pathExists(dest)
-
-      try {
-        await fse.copy(path.join(CURRENT_RUNTIME_PATH!, file), dest, {
-          overwrite: true,
-          errorOnExist: false,
-          recursive: true
-        })
-        // Only track for rollback if we actually created the destination —
-        // overwriting a pre-existing file is destructive and we don't try to
-        // recover those.
-        if (!destExisted) {
-          copiedFiles.push(file)
-        }
-      } catch (e) {
-        console.error(`[RTP] Failed to copy ${file}:`, e)
-        await cleanupPartial()
-        throw new Error(`Failed to copy ${file}: ${(e as Error).message}`)
-      }
-    }
-    console.log(`[RTP] Copy complete, writing override`)
-
-    try {
-      await fse.writeFile(runtimeOverridePath, newPath)
-    } catch (e) {
-      // Override write failed *after* we copied everything — old path is still
-      // authoritative; new path is duplicated data. Clean up the new path.
-      console.error(`[RTP] Failed to write override file, rolling back:`, e)
-      await cleanupPartial()
-      throw e
-    }
-
-    // Clear marker — past this point, newPath is the authoritative location.
-    try {
-      await fse.remove(migrationMarker)
-    } catch {
-      // best-effort
-    }
-
-    console.log(`[RTP] Removing source files`)
-    for (let i = 0; i < total; i++) {
-      const file = files[i]
-
-      win?.webContents.send("changeRuntimePathProgress", {
-        action: "remove",
-        currentName: path.basename(file),
-        current: total + i,
-        total: total * 2
-      } satisfies Progress)
-
-      // Don't fail the migration if a single remove fails — data is already
-      // safely in the new path and the override file points at it.
-      try {
-        await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file))
-      } catch (e) {
-        console.error(`[RTP] Failed to remove ${file}:`, e)
-      }
-    }
-
-    console.log(`[RTP] Migration complete, relaunching`)
-    app.relaunch()
-    app.exit()
   }
 )
 
 ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
-  if (!newPath || newPath === CURRENT_RUNTIME_PATH) {
+  if (!newPath) return "invalid"
+  try {
+    return await validateRuntimeDestination(
+      newPath,
+      CURRENT_RUNTIME_PATH,
+      runtimeDestinationContext()
+    )
+  } catch {
     return "invalid"
   }
-
-  const pathExists = await fse.pathExists(newPath)
-  if (!pathExists) {
-    return "valid"
-  }
-
-  const newPathStat = await fs.stat(newPath)
-  if (!newPathStat.isDirectory()) {
-    return "invalid"
-  }
-
-  const files = await fs.readdir(newPath)
-  if (files.length > 0) {
-    return "potentially_valid"
-  }
-
-  return "valid"
 })
 
 ipcMain.handle("getCoreModule", async () => {
@@ -1586,6 +1436,7 @@ app.whenReady().then(async () => {
 })
 
 app.on("window-all-closed", async () => {
+  if (runtimeOperationActive()) return
   if (isSpawningWindow) {
     return
   }
@@ -1608,7 +1459,11 @@ app.on("window-all-closed", async () => {
   app.quit()
 })
 
-app.on("before-quit", async () => {
+app.on("before-quit", async (event) => {
+  if (runtimeOperationActive()) {
+    event.preventDefault()
+    return
+  }
   try {
     const _coreModule = await coreModule
     if (_coreModule.type === "success") {

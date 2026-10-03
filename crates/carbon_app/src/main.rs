@@ -344,7 +344,9 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     tokio::spawn(async move {
         wait_for_termination_signal().await;
         info!("Termination signal received, shutting down running servers before exit");
-        app2.server_manager().shutdown_running().await;
+        if !app2.runtime_lifecycle.relocation_shutdown() {
+            app2.server_manager().shutdown_running().await;
+        }
         // Through `flush_and_exit` rather than a bare `std::process::exit`
         // so the `info!` line just above reaches disk before the process
         // dies, the same reasoning as the fatal-DB-error exit in

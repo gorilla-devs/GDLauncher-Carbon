@@ -7,6 +7,8 @@ interface Props extends ModalProps {
   children: JSX.Element | Element
   class?: string
   preventClose?: boolean
+  // Runs in place of closing the modal when its header's close button is pressed.
+  onClose?: () => void
   noPadding?: boolean
   overflowHiddenDisabled?: boolean
   background?: JSX.Element
@@ -66,7 +68,8 @@ const ModalLayout = (props: Props) => {
               class="text-darkSlate-300 i-hugeicons:cancel-01 hover:text-lightSlate-100 h-5 w-5 press-effect active:scale-90 cursor-pointer"
               onClick={() => {
                 if (!props.preventClose) {
-                  modalsContext?.closeModal()
+                  if (props.onClose) props.onClose()
+                  else modalsContext?.closeModal()
                 }
               }}
             />

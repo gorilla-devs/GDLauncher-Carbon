@@ -120,7 +120,14 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
               <Match when={migrationError()}>
                 <div class="max-w-2xl text-center">
                   <div class="text-2xl">
-                    <Trans key="java:_trn_migration_errored">
+                    {/* A partial copy means nothing was published or removed: say so calmly. */}
+                    <Trans
+                      key={
+                        incompleteTarget()
+                          ? "java:_trn_migration_stopped"
+                          : "java:_trn_migration_errored"
+                      }
+                    >
                       {""}
                       <span
                         class="text-lightSlate-50 hover:text-lightSlate-400 cursor-pointer underline"
@@ -170,13 +177,36 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                       <Match when={RTprogress()?.action === "copy"}>
                         <Trans
                           key="java:_trn_copying_file"
-                          options={{ file: RTprogress()?.currentName }}
+                          options={{
+                            file: RTprogress()?.currentName,
+                            // Rendered as text; escaping would show "&#x2F;" for "/".
+                            interpolation: { escapeValue: false }
+                          }}
                         />
+                      </Match>
+                      {/* The copy is complete and is being written to the drive. */}
+                      <Match when={RTprogress()?.action === "flush"}>
+                        <Trans key="java:_trn_saving_copy" />
                       </Match>
                       <Match when={RTprogress()?.action === "remove"}>
                         <Trans
                           key="java:_trn_removing_file"
-                          options={{ file: RTprogress()?.currentName }}
+                          options={{
+                            file: RTprogress()?.currentName,
+                            // Rendered as text; escaping would show "&#x2F;" for "/".
+                            interpolation: { escapeValue: false }
+                          }}
+                        />
+                      </Match>
+                      {/* The move stopped; its copy is removed from the new folder. */}
+                      <Match when={RTprogress()?.action === "rollback"}>
+                        <Trans
+                          key="java:_trn_removing_partial_copy"
+                          options={{
+                            file: RTprogress()?.currentName,
+                            // Rendered as text; escaping would show "&#x2F;" for "/".
+                            interpolation: { escapeValue: false }
+                          }}
                         />
                       </Match>
                     </Switch>

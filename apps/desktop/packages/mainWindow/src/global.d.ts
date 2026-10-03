@@ -93,7 +93,7 @@ declare global {
     ) => void
     validateRuntimePath: (
       newPath: string | null
-    ) => Promise<"valid" | "invalid" | "potentially_valid">
+    ) => Promise<RuntimePathValidation>
     skipIntroAnimation: boolean
     closeWindow: () => void
     onShowWindowCloseModal: (cb: () => void) => void

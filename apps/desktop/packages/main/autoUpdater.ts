@@ -1,3 +1,4 @@
+import { assertRuntimeOperationAvailable } from "./utils/runtimeOperation"
 import { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BrowserWindow, ipcMain } from "electron"
 import { autoUpdater, UpdateInfo } from "electron-updater"
@@ -144,6 +145,7 @@ export default function initAutoUpdater(updateFeedOverride?: string | null) {
   )
 
   ipcMain.handle("installUpdate", async () => {
+    assertRuntimeOperationAvailable()
     autoUpdater.quitAndInstall(true, true)
   })
 

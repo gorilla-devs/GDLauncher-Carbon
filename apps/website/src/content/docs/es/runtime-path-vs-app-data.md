@@ -63,17 +63,19 @@ Para uso normal no necesitas mover el Runtime Path. La ubicación por defecto va
 
 Abre **Settings → Runtime Path**. Escribe el nuevo destino, o usa el icono de carpeta para navegar. El botón de aplicar (el icono de flecha en círculo a la derecha de la fila) se enciende en cuanto la ruta es distinta de la actual y es válida. Pulsarlo abre un modal de confirmación mostrando la ruta antigua y la nueva.
 
-Si la carpeta destino está vacía (o no existe aún), al confirmar arranca una migración completa: un overlay muestra escaneo, luego copia archivo a archivo, luego eliminación archivo a archivo del origen. No cierres la app ni apagues el equipo mientras esto corre. Al terminar el launcher se reinicia solo.
+Si la carpeta destino está vacía (o no existe aún), al confirmar arranca una migración completa: un overlay muestra escaneo, luego copia archivo a archivo, luego eliminación archivo a archivo del origen. No cierres la app ni apagues el equipo mientras esto corre. Al terminar el launcher se reinicia solo. Si algunos archivos se quedan en la ubicación antigua porque cambiaron después de copiarse o no se pudieron eliminar, el launcher los enumera cuando vuelve a arrancar desde la ubicación nueva, con un botón que abre la carpeta antigua.
 
 Si el destino ya contiene un Runtime Path de GDLauncher (lo moviste antes y quieres que una instalación nueva apunte a esos datos), el modal te avisa en amarillo de que la carpeta no está vacía. Confirmar hace un "switch only": el marcador se reescribe apuntando a los datos existentes, no se copia nada y el launcher se reinicia. Los datos que queden en la ubicación antigua se vuelven huérfanos; puedes borrarlos a mano.
 
-Si una migración falla a medias, el overlay se pone rojo y muestra el error. El launcher hace rollback: los archivos que creó en la ruta nueva se eliminan y el marcador sigue apuntando a la ruta antigua, así puedes reintentar sin perder datos. Las dos causas habituales son permisos de escritura ausentes en la unidad destino y espacio libre insuficiente.
+Si una migración falla a medias, el overlay se pone rojo y muestra el error. No se pierde nada: hasta que todos los archivos se han copiado y comprobado, el launcher sigue usando la ubicación antigua y no toca tus archivos allí, y tras reiniciar Settings → Runtime Path sigue mostrándola. Además, el launcher elimina los archivos que había copiado en la carpeta nueva, así que su espacio vuelve a quedar libre y puedes reintentar cuando hayas corregido la causa. Si no puede eliminar algunos (por ejemplo, porque otro programa los tiene abiertos), la carpeta nueva los conserva, más un archivo `.gdl_migration_in_progress` que la marca como un traslado sin terminar. El launcher no usará esa carpeta ni volverá a mover datos a ella, y Settings la señala como un traslado sin terminar si la eliges. Borra esa carpeta (o elige otra carpeta vacía) antes de reintentar. Las dos causas habituales son permisos de escritura ausentes en la unidad destino y espacio libre insuficiente.
 
 ### El marcador runtime_path_override
 
 Al cambiar el Runtime Path, GDLauncher escribe un pequeño archivo de texto llamado `runtime_path_override` dentro del **App Data Path** (no dentro del Runtime Path). Su contenido es el nuevo Runtime Path en texto plano. En cada arranque la app lee ese archivo para saber dónde viven tus datos.
 
 Si borras el marcador, GDLauncher cae a su Runtime Path por defecto (`<App Data>/data/`). Tus datos no se pierden, siguen donde los moviste, pero el launcher no los ve hasta que vayas a **Settings → Runtime Path** y vuelvas a apuntar a esa carpeta. Como la carpeta ya tiene datos de GDLauncher, el launcher lo trata como un "switch only" y solo actualiza el marcador sin copiar nada.
+
+Si la carpeta que indica el marcador no se puede abrir al iniciar GDLauncher (por ejemplo, porque está en una unidad que no está conectada), el launcher arranca con el Runtime Path por defecto y lo avisa en cada arranque. Conecta la unidad y reinicia para recuperar tus datos. Si la unidad ya no existe, elige **Keep the default folder** en ese aviso: GDLauncher quita el marcador, deja de mostrar el aviso y no borra nada de la carpeta antigua. Más adelante puedes volver a esa carpeta igual que arriba.
 
 ## Por qué no compartir la base de datos
 

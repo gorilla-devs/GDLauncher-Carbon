@@ -246,6 +246,7 @@ type ProgressCallback<'a> = Box<dyn Fn(u32, u32) + Send + Sync + 'a>;
 
 #[cfg_attr(clippy, allow(clippy::too_many_arguments))]
 pub async fn execute_processors<'callback>(
+    lifecycle: &std::sync::Arc<crate::managers::runtime_lifecycle::RuntimeLifecycle>,
     processors: &Vec<Processor>,
     data: &HashMap<String, SidedDataEntry>,
     java_binary: PathBuf,
@@ -301,16 +302,16 @@ pub async fn execute_processors<'callback>(
             })?;
         let arguments = get_processor_arguments(&libraries_path.to_path(), &processor.args, &data)?;
 
-        let child = Command::new(java_binary.to_string_lossy().to_string())
-            .arg("-cp")
-            .arg(classpath)
-            .arg(main_class)
-            .args(arguments)
-            .output()
-            .await
-            .map_err(|err| {
-                anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err)
-            })?;
+        let child = crate::managers::runtime_lifecycle::tracked_output(
+            lifecycle,
+            Command::new(java_binary.to_string_lossy().to_string())
+                .arg("-cp")
+                .arg(classpath)
+                .arg(main_class)
+                .args(arguments),
+        )
+        .await
+        .map_err(|err| anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err))?;
 
         if !child.status.success() {
             let stdout = String::from_utf8_lossy(&child.stdout);

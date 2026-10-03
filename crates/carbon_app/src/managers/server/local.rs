@@ -40,6 +40,7 @@ impl ServerProvider for LocalServerProvider {
         launch_config: &LaunchConfig,
         modloader_type: Option<&str>,
         log_tx: mpsc::UnboundedSender<String>,
+        mut runtime_activity: crate::managers::runtime_lifecycle::RuntimeActivity,
     ) -> Result<ServerHandle> {
         let data_path = server_path.get_data_path();
         let server_root = server_path.get_root();
@@ -146,7 +147,17 @@ impl ServerProvider for LocalServerProvider {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
-        let mut child = cmd.spawn().context("Failed to spawn server process")?;
+        runtime_activity.external_child()?;
+        let mut child = match cmd.spawn() {
+            Ok(child) => child,
+            Err(error) => {
+                runtime_activity.finish();
+                return Err(error).context("Failed to spawn server process");
+            }
+        };
+        // The server runs from here on: a record that cannot be written must
+        // not drop it unsupervised, holding the port and the world.
+        runtime_activity.record_spawned_child(child.id());
         let pid = child.id().unwrap_or(0);
 
         info!("Server process started with PID {}", pid);
@@ -222,12 +233,12 @@ impl ServerProvider for LocalServerProvider {
         let log_tx_exit = log_tx;
         let exit_server_root = server_root.clone();
         tokio::spawn(async move {
-            tokio::select! {
+            let confirmed = tokio::select! {
                 _ = kill_rx.recv() => {
                     info!("Kill signal received, terminating server process");
                     let _ = child.kill().await;
                     // Wait for process to fully exit after kill
-                    let _ = child.wait().await;
+                    child.wait().await.is_ok()
                 }
                 status = child.wait() => {
                     match status {
@@ -237,15 +248,21 @@ impl ServerProvider for LocalServerProvider {
                             // see the actual exit status, not just "exited unexpectedly".
                             let _ = log_tx_exit
                                 .send(format!("[GDLauncher] Server process exited: {}", s));
+                            true
                         }
                         Err(e) => {
                             error!("Error waiting for server process: {}", e);
                             let _ = log_tx_exit
                                 .send(format!("[GDLauncher] Error waiting for server process: {}", e));
+                            false
                         }
                     }
                 }
+            };
+            if !confirmed {
+                return;
             }
+            runtime_activity.finish();
             // Best-effort: the process is gone either way (killed or exited
             // on its own), so the pidfile no longer refers to anything a
             // future `load_servers` pass needs to clean up.
@@ -336,6 +353,11 @@ mod tests {
                 &LaunchConfig::vanilla(),
                 Some("neoforge"),
                 log_tx,
+                std::sync::Arc::new(
+                    crate::managers::runtime_lifecycle::RuntimeLifecycle::default(),
+                )
+                .admit("test server")
+                .unwrap(),
             )
             .await;
 
@@ -368,6 +390,11 @@ mod tests {
                 &LaunchConfig::vanilla(),
                 None,
                 log_tx,
+                std::sync::Arc::new(
+                    crate::managers::runtime_lifecycle::RuntimeLifecycle::default(),
+                )
+                .admit("test server")
+                .unwrap(),
             )
             .await;
 

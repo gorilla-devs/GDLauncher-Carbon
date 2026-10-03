@@ -63,17 +63,19 @@ You don't need to move the runtime path for normal use. The default location is 
 
 Open **Settings → Runtime Path**. Type the new location or pick it with the folder icon. The apply button (the circle-arrow icon at the right of the row) lights up once the path differs from the current one and is valid. Clicking it opens a confirmation modal showing the old and new paths.
 
-If the target folder is empty (or doesn't exist yet), confirming runs a full migration: an overlay shows scanning, then per-file copying, then per-file removal of the source. Don't close the app or shut the machine down while this is running. After it finishes the launcher restarts itself.
+If the target folder is empty (or doesn't exist yet), confirming runs a full migration: an overlay shows scanning, then per-file copying, then per-file removal of the source. Don't close the app or shut the machine down while this is running. After it finishes the launcher restarts itself. If some files stay in the old location, because they changed after they were copied or could not be deleted, the launcher lists them when it starts again from the new location, with a button that opens the old folder.
 
 If the target already contains a GDLauncher runtime path (you previously moved it and want a fresh install to pick it up), the modal warns you in yellow that the folder isn't empty. Confirming there does a "switch only": the marker is rewritten to point at the existing data, no files are copied, and the launcher restarts. The data left at the old location becomes orphaned and you can delete it manually.
 
-If a migration fails part-way, the overlay turns red and shows the error. The launcher rolls back: files it created in the new path are removed and the marker stays pointing at the old path, so you can retry without losing data. The two common causes are missing write permissions on the target drive and running out of free space.
+If a migration fails part-way, the overlay turns red and shows the error. Nothing is lost: until every file has been copied and checked, the launcher keeps using the old location and leaves your files there untouched, and after the restart Settings → Runtime Path still shows it. The launcher also removes the files it had copied to the new folder, so their space comes back and you can retry once you've fixed the cause. If it can't remove some of them (another program has them open, say), the new folder keeps them, plus a `.gdl_migration_in_progress` file that marks it as an unfinished move. The launcher won't use that folder or move into it again, and Settings says "This folder holds an unfinished move" if you pick it. Delete that folder (or pick another empty one) before you retry. The two common causes are missing write permissions on the target drive and running out of free space.
 
 ### The runtime_path_override marker
 
 When you change the runtime path, GDLauncher writes a small text file called `runtime_path_override` inside the **app data path** (not inside the runtime path). The file contains the new runtime path as plain text. On every launch the app reads it to know where your data is.
 
 If you delete the marker, GDLauncher falls back to its default runtime path (`<app data>/data/`). Your data isn't gone, it's still wherever you moved it to, but the launcher won't see it until you go to **Settings → Runtime Path** and point it back at that folder. Since the folder already contains GDLauncher data, the launcher treats it as a "switch only" operation and just updates the marker without copying anything.
+
+If the folder the marker names can't be opened when GDLauncher starts (for example, it's on a drive that isn't connected), the launcher starts with the default runtime path and says so on every start. Connect the drive and restart to get your data back. If the drive is gone for good, choose **Keep the default folder** in that message: GDLauncher removes the marker and stops showing the message, and deletes nothing in the old folder. You can switch back to that folder later the same way as above.
 
 ## What the database holds, and why you shouldn't share it
 

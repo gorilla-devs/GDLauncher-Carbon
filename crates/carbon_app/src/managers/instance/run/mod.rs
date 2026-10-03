@@ -165,6 +165,12 @@ impl ManagerRef<'_, InstanceManager> {
         callback_task: Option<InstanceCallback>,
         deep_check: bool,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
+        let runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit(format!("instance {instance_id} preparation/session"))?;
+        #[cfg(test)]
+        self.test_hooks.pause("runtime_admitted", instance_id).await;
         let initial_time = Utc::now();
 
         let mut instances = self.instances.write().await;
@@ -424,6 +430,8 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         let installation_task = tokio::spawn(async move {
+            let _runtime_activity = runtime_activity;
+            let mut game_activity = None;
             let mut time_at_start = None;
 
             let instance_root = instance_path.get_root();
@@ -544,11 +552,13 @@ impl ManagerRef<'_, InstanceManager> {
 
                             let pre_launch_command = tokio::time::timeout(
                                 HOOK_TIMEOUT,
-                                tokio::process::Command::new(main_command)
-                                    .args(split)
-                                    .current_dir(instance_path.get_data_path())
-                                    .kill_on_drop(true)
-                                    .output(),
+                                crate::managers::runtime_lifecycle::tracked_output(
+                                    &app.runtime_lifecycle,
+                                    tokio::process::Command::new(main_command)
+                                        .args(split)
+                                        .current_dir(instance_path.get_data_path())
+                                        .kill_on_drop(true),
+                                ),
                             )
                             .await
                             .map_err(|_| {
@@ -575,23 +585,33 @@ impl ManagerRef<'_, InstanceManager> {
                             );
                         }
 
-                        Ok(Some(
-                            managers::minecraft::minecraft::launch_minecraft(
-                                java,
-                                account,
-                                xmx_memory,
-                                xms_memory,
-                                game_resolution,
-                                &extra_java_args,
-                                &runtime_path,
-                                version_info,
-                                &lwjgl_group,
-                                instance_path.clone(),
-                                assets_dir,
-                                wrapper_command,
-                            )
-                            .await?,
-                        ))
+                        let mut ownership =
+                            app.runtime_lifecycle.admit(format!("game {instance_id}"))?;
+                        ownership.external_child()?;
+                        game_activity = Some(ownership);
+                        let launched = managers::minecraft::minecraft::launch_minecraft(
+                            java,
+                            account,
+                            xmx_memory,
+                            xms_memory,
+                            game_resolution,
+                            &extra_java_args,
+                            &runtime_path,
+                            version_info,
+                            &lwjgl_group,
+                            instance_path.clone(),
+                            assets_dir,
+                            wrapper_command,
+                        )
+                        .await;
+                        if let Ok(child) = &launched {
+                            if let Some(ownership) = &game_activity {
+                                ownership.record_child_pid(child.id())?;
+                            }
+                        } else if let Some(ownership) = game_activity.take() {
+                            ownership.finish();
+                        }
+                        Ok(Some(launched?))
                     }
                     None => {
                         if let Some(callback_task) = callback_task {
@@ -813,6 +833,9 @@ impl ManagerRef<'_, InstanceManager> {
                     }
 
                     if let Ok(exitcode) = child.wait().await {
+                        if let Some(ownership) = game_activity.take() {
+                            ownership.finish();
+                        }
                         let msg = format!("{exitcode}");
 
                         if let Some(file) = file.as_mut() {
@@ -848,11 +871,13 @@ impl ManagerRef<'_, InstanceManager> {
                                 Some(main_command) => {
                                     let post_exit_command = tokio::time::timeout(
                                         HOOK_TIMEOUT,
-                                        tokio::process::Command::new(main_command)
-                                            .args(split)
-                                            .current_dir(instance_path.get_data_path())
-                                            .kill_on_drop(true)
-                                            .output(),
+                                        crate::managers::runtime_lifecycle::tracked_output(
+                                            &app.runtime_lifecycle,
+                                            tokio::process::Command::new(main_command)
+                                                .args(split)
+                                                .current_dir(instance_path.get_data_path())
+                                                .kill_on_drop(true),
+                                        ),
                                     )
                                     .await;
 
@@ -1101,6 +1126,7 @@ impl ManagerRef<'_, InstanceManager> {
                     // rather than dropped as the poller has to drop them.
                     self.observe_adopted_alive(instance_id, Utc::now()).await;
                     self.bank_adopted_playtime(instance_id).await;
+                    return Ok(()); // liveness poller owns release after observed exit
                 } else {
                     // Already gone, or the number now belongs to something
                     // else (a start-time mismatch is treated exactly the same

@@ -364,6 +364,7 @@ pub async fn process_minecraft(
 
                             if let Some(processors) = &version_info.processors {
                                 managers::minecraft::forge::execute_processors(
+                                    &app.runtime_lifecycle,
                                     processors,
                                     version_info
                                         .data
@@ -453,6 +454,7 @@ pub async fn process_minecraft(
 
                             if let Some(processors) = &version_info.processors {
                                 managers::minecraft::neoforge::execute_processors(
+                                    &app.runtime_lifecycle,
                                     processors,
                                     version_info
                                         .data

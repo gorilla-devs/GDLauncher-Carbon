@@ -282,7 +282,7 @@ const ILLEGAL_NAMES: &[&str] = &[
 /// game it did not spawn is still running: `LaunchState` lives in memory and
 /// dies with the process that held it, so without the pidfile a game that
 /// outlived the launcher would be invisible to the instance it belongs to.
-const PID_FILE_NAME: &str = ".gdl_instance.pid";
+pub(crate) const PID_FILE_NAME: &str = ".gdl_instance.pid";
 
 fn sanitize_name(name: &str) -> String {
     let mut sanitized = name.trim().to_string();
@@ -410,11 +410,38 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn launch_background_tasks(self) {
         if let Err(e) = self.scan_instances().await {
             error!("failed to scan instances: {e:?}");
+            self.app.runtime_lifecycle.reconciliation_finished(Err(e));
         }
         self.import_manager().launch_background_tasks();
     }
 
     pub async fn scan_instances(self) -> anyhow::Result<()> {
+        let _runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit("instance ownership rescan")?;
+        let ownership = self
+            .app
+            .runtime_lifecycle
+            .reconcile_root(
+                &self
+                    .app
+                    .settings_manager()
+                    .runtime_path
+                    .get_instances()
+                    .to_path(),
+                PID_FILE_NAME,
+            )
+            .await;
+        let ownership_reconciled = match ownership {
+            Ok(()) => true,
+            Err(error) => {
+                self.app
+                    .runtime_lifecycle
+                    .reconciliation_finished(Err(error));
+                false
+            }
+        };
         let scan_start = std::time::Instant::now();
 
         // Before scanning populates the in-memory instance map, reconcile
@@ -425,7 +452,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // session that ended without stopping it, most often because the user
         // closed the launcher. Each one found is applied to its instance as
         // it is inserted below, so the map is never briefly wrong about it.
-        let adopted = self.reconcile_running_instances().await;
+        let adopted = if ownership_reconciled {
+            self.reconcile_running_instances().await
+        } else {
+            // Preserve unknown pid evidence; best-effort cleanup must not make
+            // the next startup falsely quiescent. Config scanning remains usable.
+            HashMap::new()
+        };
 
         let instance_path = self
             .app
@@ -436,7 +469,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         #[cfg(test)]
         self.test_hooks.pause("scan_admission", InstanceId(0)).await;
-        let mut stream = tokio::fs::read_dir(instance_path).await?;
+        let mut stream = match tokio::fs::read_dir(instance_path).await {
+            Ok(stream) => stream,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.into()),
+        };
 
         let updates_semaphore = Arc::new(tokio::sync::Semaphore::new(20));
         let mut scanned_count: u32 = 0;

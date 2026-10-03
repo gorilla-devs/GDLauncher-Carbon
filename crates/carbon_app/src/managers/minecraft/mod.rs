@@ -399,6 +399,7 @@ mod tests {
 
         if let Some(processors) = &version_info.processors {
             execute_processors(
+                &app.runtime_lifecycle,
                 processors,
                 version_info
                     .data

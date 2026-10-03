@@ -132,6 +132,17 @@ const getDefaultModals = (t: TypedTFunction) => ({
     // runtime paths.
     preventClose: () => isChangingRuntimePath()
   },
+  runtimeMoveNotice: {
+    component: lazy(() => import("./modals/RuntimeMoveNotice")),
+    title: t("java:_trn_runtime_recovery.moved_title"),
+    // It may be the only list of files newer than their copy: a stray Escape
+    // or backdrop click must not dismiss it, only OK or the close button.
+    preventClose: true
+  },
+  runtimePathUnavailable: {
+    component: lazy(() => import("./modals/RuntimePathUnavailable")),
+    title: t("java:_trn_runtime_recovery.unavailable_title")
+  },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
     noHeader: true

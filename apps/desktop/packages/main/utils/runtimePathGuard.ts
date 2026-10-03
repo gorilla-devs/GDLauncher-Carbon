@@ -2,10 +2,57 @@ import os from "os"
 import path from "path"
 
 /** Whether `child` is `parent` itself or nested under it. */
-function isPathInside(child: string, parent: string): boolean {
-  const rel = path.relative(parent, child)
-  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel))
+export function isPathInside(
+  child: string,
+  parent: string,
+  api = path
+): boolean {
+  const rel = api.relative(parent, child)
+  return (
+    rel === "" ||
+    (rel !== ".." && !rel.startsWith(".." + api.sep) && !api.isAbsolute(rel))
+  )
 }
+
+export interface RuntimePathContext {
+  homePath?: string
+  installationRoots?: string[]
+  // Only supplied after filesystem/mount validation by the main process.
+  validatedRemovableMount?: string
+  /**
+   * The target is the resolved form of a path that already passed this guard.
+   * Windows resolves a folder on a mapped network drive (Z:\GDL) to its share
+   * (\\server\share\GDL), which is then checked like any other folder. Only
+   * the main process sets this, never the renderer.
+   */
+  resolved?: boolean
+}
+
+/** Why a folder cannot be the data folder; Settings names each one. */
+export type RuntimeTargetRefusal =
+  | "not_absolute"
+  | "network_path"
+  | "filesystem_root"
+  | "nested"
+  | "install_overlap"
+  | "system_dir"
+  | "removable_not_mounted"
+  | "not_a_folder"
+  | "not_writable"
+
+export class RuntimeTargetError extends Error {
+  constructor(
+    readonly reason: RuntimeTargetRefusal,
+    message: string,
+    options?: { cause?: unknown }
+  ) {
+    super(message, options)
+    this.name = "RuntimeTargetError"
+  }
+}
+
+// \\server\share\..., but not the verbatim (\\?\) or device (\\.\) forms.
+const uncShare = /^[\\/]{2}[^\\/?.][^\\/]*[\\/][^\\/]+/
 
 /**
  * Authoritative guard for a runtime-path relocation target. `changeRuntimePath`
@@ -23,8 +70,12 @@ function isPathInside(child: string, parent: string): boolean {
 export function assertSafeRuntimeTarget(
   target: string,
   currentRuntimePath: string | null = null,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  context: RuntimePathContext = {}
 ): void {
+  const api = platform === "win32" ? path.win32 : path.posix
+  const inside = (child: string, parent: string) =>
+    isPathInside(child, parent, api)
   // Verbatim (\\?\...), device (\\.\...) and UNC (\\server\share...) forms
   // all start with two path separators. They defeat the containment checks
   // below because path.relative across different path roots (e.g. a UNC
@@ -32,9 +83,17 @@ export function assertSafeRuntimeTarget(
   // `..`-prefixed relative one, so every denylist comparison silently
   // reports "not contained". None of these forms is a supported runtime
   // location, so the whole class is refused up front instead of relying on
-  // the textual comparisons further down to catch it.
-  if (platform === "win32" && /^[\\/]{2}/.test(target)) {
-    throw new Error(
+  // the textual comparisons further down to catch it. The resolved form of a
+  // folder on a mapped drive is a share path, and only that is compared: it
+  // never sits inside a local system folder, and two share paths compare
+  // like any other two paths.
+  if (
+    platform === "win32" &&
+    /^[\\/]{2}/.test(target) &&
+    !(context.resolved && uncShare.test(target))
+  ) {
+    throw new RuntimeTargetError(
+      "network_path",
       "Runtime path may not be a network or verbatim (\\\\-prefixed) path"
     )
   }
@@ -45,15 +104,19 @@ export function assertSafeRuntimeTarget(
   const normalizedTarget =
     platform === "win32" ? path.win32.normalize(target) : target
 
-  if (!path.isAbsolute(normalizedTarget)) {
-    throw new Error(`Runtime path must be absolute: ${target}`)
+  if (!api.isAbsolute(normalizedTarget)) {
+    throw new RuntimeTargetError(
+      "not_absolute",
+      `Runtime path must be absolute: ${target}`
+    )
   }
 
-  const resolved = path.resolve(normalizedTarget)
+  const resolved = api.resolve(normalizedTarget)
 
   // A filesystem/drive root (its own parent).
-  if (path.dirname(resolved) === resolved) {
-    throw new Error(
+  if (api.dirname(resolved) === resolved) {
+    throw new RuntimeTargetError(
+      "filesystem_root",
       `Refusing to use a filesystem root as the runtime path: ${target}`
     )
   }
@@ -61,9 +124,10 @@ export function assertSafeRuntimeTarget(
   // Nesting with the current runtime in either direction would copy a directory
   // into itself, or delete a parent of the source.
   if (currentRuntimePath) {
-    const current = path.resolve(currentRuntimePath)
-    if (isPathInside(resolved, current) || isPathInside(current, resolved)) {
-      throw new Error(
+    const current = api.resolve(currentRuntimePath)
+    if (inside(resolved, current) || inside(current, resolved)) {
+      throw new RuntimeTargetError(
+        "nested",
         `Runtime path may not nest with the current runtime: ${target}`
       )
     }
@@ -71,8 +135,29 @@ export function assertSafeRuntimeTarget(
 
   // Anything under the user's home is allowed; otherwise reject known system
   // directories (and their descendants).
-  const home = path.resolve(os.homedir())
-  if (isPathInside(resolved, home)) {
+  for (const root of context.installationRoots ?? []) {
+    if (
+      inside(resolved, api.resolve(root)) ||
+      inside(api.resolve(root), resolved)
+    ) {
+      throw new RuntimeTargetError(
+        "install_overlap",
+        `Runtime path may not overlap the application installation: ${target}`
+      )
+    }
+  }
+  const mount = context.validatedRemovableMount
+  if (
+    platform === "linux" &&
+    mount &&
+    mount !== "/run/media" &&
+    inside(mount, "/run/media") &&
+    resolved !== api.resolve(mount) &&
+    inside(resolved, mount)
+  )
+    return
+  const home = api.resolve(context.homePath ?? os.homedir())
+  if (inside(resolved, home)) {
     return
   }
 
@@ -115,9 +200,10 @@ export function assertSafeRuntimeTarget(
 
   for (const dir of systemDirs) {
     if (!dir) continue
-    const resolvedDir = path.resolve(dir)
-    if (resolved === resolvedDir || isPathInside(resolved, resolvedDir)) {
-      throw new Error(
+    const resolvedDir = api.resolve(dir)
+    if (resolved === resolvedDir || inside(resolved, resolvedDir)) {
+      throw new RuntimeTargetError(
+        "system_dir",
         `Refusing to use a system directory as the runtime path: ${target}`
       )
     }

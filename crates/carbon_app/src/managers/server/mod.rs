@@ -363,6 +363,7 @@ impl ManagerRef<'_, ServerManager> {
     pub async fn launch_background_tasks(self) {
         if let Err(e) = self.load_servers().await {
             error!("Failed to load servers: {}", e);
+            self.app.runtime_lifecycle.reconciliation_finished(Err(e));
         }
 
         // Queue caching for all servers on startup
@@ -379,6 +380,7 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     async fn load_servers(self) -> anyhow::Result<()> {
+        let _runtime_activity = self.app.runtime_lifecycle.admit("server ownership scan")?;
         let db_servers = server_repo::get_all_servers(&self.app.db).await?;
 
         // Before any server is registered in memory as Stopped, reconcile
@@ -386,7 +388,26 @@ impl ManagerRef<'_, ServerManager> {
         // the core didn't shut down cleanly (crash, force-quit, Windows
         // TerminateProcess) is otherwise invisible here and keeps holding
         // its port forever.
-        self.clean_up_orphaned_servers(&db_servers).await;
+        match self
+            .app
+            .runtime_lifecycle
+            .reconcile_root(
+                &self
+                    .app
+                    .settings_manager()
+                    .runtime_path
+                    .get_servers()
+                    .to_path(),
+                provider::PID_FILE_NAME,
+            )
+            .await
+        {
+            Ok(()) => self.clean_up_orphaned_servers(&db_servers).await,
+            Err(error) => self
+                .app
+                .runtime_lifecycle
+                .reconciliation_finished(Err(error)),
+        }
 
         let mut servers = self.servers.write().await;
         for db_server in db_servers {
@@ -593,6 +614,7 @@ impl ManagerRef<'_, ServerManager> {
         modloader_type: Option<String>,
         modloader_version: Option<String>,
     ) -> anyhow::Result<ServerId> {
+        let runtime_activity = self.app.runtime_lifecycle.admit("server create_server")?;
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
 
@@ -717,6 +739,7 @@ impl ManagerRef<'_, ServerManager> {
         // Do the heavy work (jar download, modloader install) in background
         let app = self.app.clone();
         tokio::spawn(async move {
+            let _runtime_activity = runtime_activity;
             let runtime_path = &app.settings_manager().runtime_path;
             let server_path = runtime_path.get_servers().get_server_path(&shortpath);
 
@@ -774,6 +797,7 @@ impl ManagerRef<'_, ServerManager> {
                     );
 
                     let launch_config = modloader_install::install_modloader(
+                        &app.runtime_lifecycle,
                         &app.reqwest_client,
                         &server_path,
                         &game_version,
@@ -831,6 +855,10 @@ impl ManagerRef<'_, ServerManager> {
         port: Option<i32>,
         icon_url: Option<String>,
     ) -> anyhow::Result<ServerId> {
+        let runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit("server create_server_from_modpack")?;
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
 
@@ -987,6 +1015,7 @@ impl ManagerRef<'_, ServerManager> {
             modpack_source,
             task,
             task_id,
+            runtime_activity,
         );
 
         Ok(server_id)
@@ -1003,10 +1032,12 @@ impl ManagerRef<'_, ServerManager> {
         modpack_source: modpack::ServerModpackSource,
         task: crate::managers::vtask::VisualTask,
         task_id: VisualTaskId,
+        runtime_activity: crate::managers::runtime_lifecycle::RuntimeActivity,
     ) {
         use crate::api::translation::Translation;
 
         tokio::spawn(async move {
+            let _runtime_activity = runtime_activity;
             let runtime_path = &app.settings_manager().runtime_path;
             let server_path = runtime_path.get_servers().get_server_path(&shortpath);
 
@@ -1116,6 +1147,7 @@ impl ManagerRef<'_, ServerManager> {
                                 .context("Cannot install modloader: no Java available")?;
 
                             modloader_install::install_modloader(
+                        &app.runtime_lifecycle,
                                 &app.reqwest_client,
                                 &server_path,
                                 &pack_result.game_version,
@@ -1196,6 +1228,10 @@ impl ManagerRef<'_, ServerManager> {
     /// while a server is installing or running would corrupt the active task
     /// or the live process.
     pub async fn reinstall_server_from_modpack(self, id: ServerId) -> anyhow::Result<VisualTaskId> {
+        let runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit("server reinstall_server_from_modpack")?;
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
 
@@ -1317,6 +1353,7 @@ impl ManagerRef<'_, ServerManager> {
             modpack_source,
             task,
             task_id,
+            runtime_activity,
         );
 
         Ok(task_id)
@@ -1436,6 +1473,10 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     async fn start_server_impl(self, id: ServerId) -> anyhow::Result<()> {
+        let runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit("server start_server_impl")?;
         let lock = self.get_op_lock(id);
         let _guard = lock.lock().await;
 
@@ -1565,6 +1606,7 @@ impl ManagerRef<'_, ServerManager> {
                 &launch_config,
                 db_server.modloader_type.as_deref(),
                 log_tx,
+                runtime_activity,
             )
             .await?;
 
@@ -1609,7 +1651,9 @@ impl ManagerRef<'_, ServerManager> {
         // backing-off retry so a server that crashes instantly cannot tight-loop.
         let app = self.app.clone();
         tokio::spawn(async move {
-            exited.wait().await;
+            if exited.wait_confirmed().await.is_err() {
+                return;
+            }
 
             // Check if the exit was unexpected (state is still Running).
             // If stop_server/kill_server initiated the shutdown, they will have
