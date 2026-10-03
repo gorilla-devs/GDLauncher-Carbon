@@ -84,6 +84,17 @@ fn ensure_toggleable(addon_type: domain::AddonType) -> anyhow::Result<()> {
 }
 
 impl ManagerRef<'_, InstanceManager> {
+    pub(super) async fn get_owned_mod_file(
+        &self,
+        instance_id: InstanceId,
+        id: &str,
+    ) -> anyhow::Result<mfcdb::ModFileCacheRow> {
+        mfcdb::get_mod_file_cache_by_id(&self.app.db, id)
+            .await?
+            .filter(|row| row.instance_id == *instance_id)
+            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.to_owned()).into())
+    }
+
     async fn ensure_modpack_not_locked(&self, instance_id: InstanceId) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
         let instance = instances
@@ -368,10 +379,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let shortpath = &instance.shortpath;
 
-        let lookup_id = id.clone();
-        let m = mfcdb::get_mod_file_cache_by_id(&self.app.db, &lookup_id)
-            .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
+        let m = self.get_owned_mod_file(instance_id, &id).await?;
 
         let addon_type =
             domain::AddonType::from_db_string(&m.addon_type).unwrap_or(domain::AddonType::Mods);
@@ -440,10 +448,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let shortpath = &instance.shortpath;
 
-        let lookup_id = id.clone();
-        let m = mfcdb::get_mod_file_cache_by_id(&self.app.db, &lookup_id)
-            .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
+        let m = self.get_owned_mod_file(instance_id, &id).await?;
 
         let addon_type =
             domain::AddonType::from_db_string(&m.addon_type).unwrap_or(domain::AddonType::Mods);
@@ -717,6 +722,8 @@ impl ManagerRef<'_, InstanceManager> {
         let config = data.config.clone();
         drop(instances);
 
+        self.get_owned_mod_file(instance_id, &id).await?;
+
         let Some(GameVersion::Standard(version)) = &config.game_configuration.version else {
             bail!(
                 "Instance uses a custom game version file. Cannot resolve minecraft version for mod installation"
@@ -908,6 +915,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
+        self.get_owned_mod_file(instance_id, &id).await?;
         let lookup_id = id.clone();
         let cf = mfcdb::get_instance_mod_cf_ids(&self.app.db, &lookup_id)
             .await?
@@ -983,6 +991,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
+        self.get_owned_mod_file(instance_id, &id).await?;
         let lookup_id = id.clone();
         let mr = mfcdb::get_instance_mod_mr_ids(&self.app.db, &lookup_id)
             .await?
@@ -1041,6 +1050,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
+        self.get_owned_mod_file(instance_id, &mod_id).await?;
         let lookup_id = mod_id.clone();
         let r = mfcdb::get_instance_mod_icon_data(&self.app.db, &lookup_id)
             .await?
@@ -1124,15 +1134,350 @@ mod test {
 
 #[cfg(test)]
 mod tests {
-    use super::{ensure_toggleable, remove_addon_from_disk};
+    use super::{InvalidInstanceModIdError, ensure_toggleable, remove_addon_from_disk};
     use crate::domain::instance::AddonType;
     use crate::domain::instance::info;
-    use crate::managers::instance::InstanceVersionSource;
+    use crate::managers::AppInner;
+    use crate::managers::instance::installer::{DependencyIterator, Installer, ResourceInstaller};
+    use crate::managers::instance::{InstanceData, InstanceId, InstanceVersionSource};
+    use carbon_net::Downloadable;
+    use carbon_platforms::ModChannel;
     use carbon_repos::dbtypes::DbDateTime;
     use carbon_repos::repos::mod_file_cache as mfcdb;
     use carbon_repos::repos::mod_metadata as metarepo;
+    use carbon_rt_path::InstancePath;
     use chrono::Utc;
     use std::collections::HashSet;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    async fn addon_fixture(
+        app: &Arc<AppInner>,
+        name: &str,
+        addon_type: AddonType,
+        filename: &str,
+        contents: &[u8],
+    ) -> (InstanceId, mfcdb::ModFileCacheRow, PathBuf) {
+        let group = app.instance_manager().get_default_group().await.unwrap();
+        let instance_id = app
+            .instance_manager()
+            .create_instance(
+                group,
+                name.to_owned(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.20.1"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await
+            .unwrap();
+        let shortpath = app.instance_manager().instances.read().await[&instance_id]
+            .shortpath
+            .clone();
+        let instance_path = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath);
+        let folder = addon_type.get_folder_path(&instance_path);
+        let path = folder.join(filename);
+        tokio::fs::create_dir_all(&folder).await.unwrap();
+        if addon_type == AddonType::Worlds {
+            tokio::fs::create_dir_all(&path).await.unwrap();
+            tokio::fs::write(path.join("level.dat"), contents)
+                .await
+                .unwrap();
+        } else {
+            tokio::fs::write(&path, contents).await.unwrap();
+        }
+
+        let metadata_id = format!("{name}-metadata");
+        let now = DbDateTime(Utc::now().fixed_offset());
+        metarepo::insert_metadata(
+            &app.db,
+            &metadata_id,
+            0,
+            name.as_bytes(),
+            name.as_bytes(),
+            "vanilla",
+            None,
+            None,
+            None,
+            None,
+            None,
+            now,
+        )
+        .await
+        .unwrap();
+        mfcdb::upsert_mod_file_cache(
+            &app.db,
+            *instance_id,
+            filename.to_owned(),
+            0,
+            true,
+            addon_type.to_db_string().to_owned(),
+            metadata_id,
+            now,
+        )
+        .await
+        .unwrap();
+        let row = mfcdb::get_mod_file_cache_by_instance_filename(&app.db, *instance_id, filename)
+            .await
+            .unwrap()
+            .unwrap();
+        (instance_id, row, path)
+    }
+
+    fn assert_foreign_addon_error(error: anyhow::Error) {
+        assert!(
+            error.downcast_ref::<InvalidInstanceModIdError>().is_some(),
+            "must reject the instance/addon pair before any addon work, got: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn foreign_addon_delete_preserves_both_worlds_and_cache_rows() {
+        let app = crate::setup_managers_for_test().await;
+        let (a, row_a, path_a) =
+            addon_fixture(&app, "A", AddonType::Worlds, "MyWorld", b"world A").await;
+        let (b, row_b, path_b) =
+            addon_fixture(&app, "B", AddonType::Worlds, "MyWorld", b"world B").await;
+
+        assert_foreign_addon_error(
+            app.instance_manager()
+                .delete_mod(b, row_a.id.clone())
+                .await
+                .expect_err("a foreign addon ID must not delete a same-named world"),
+        );
+        assert_eq!(
+            tokio::fs::read(path_a.join("level.dat")).await.unwrap(),
+            b"world A"
+        );
+        assert_eq!(
+            tokio::fs::read(path_b.join("level.dat")).await.unwrap(),
+            b"world B"
+        );
+        for row in [&row_a, &row_b] {
+            assert_eq!(
+                mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                    .await
+                    .unwrap(),
+                Some(row.clone())
+            );
+        }
+
+        app.instance_manager()
+            .delete_mod(a, row_a.id.clone())
+            .await
+            .unwrap();
+        assert!(!path_a.exists());
+        assert!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row_a.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            tokio::fs::read(path_b.join("level.dat")).await.unwrap(),
+            b"world B"
+        );
+        assert_eq!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row_b.id)
+                .await
+                .unwrap(),
+            Some(row_b)
+        );
+    }
+
+    #[tokio::test]
+    async fn foreign_addon_toggle_preserves_both_files_and_cache_rows() {
+        let app = crate::setup_managers_for_test().await;
+        let (a, row_a, path_a) =
+            addon_fixture(&app, "A", AddonType::Mods, "mod.jar", b"mod A").await;
+        let (b, row_b, path_b) =
+            addon_fixture(&app, "B", AddonType::Mods, "mod.jar", b"mod B").await;
+
+        assert_foreign_addon_error(
+            app.instance_manager()
+                .enable_mod(b, row_a.id.clone(), false)
+                .await
+                .expect_err("a foreign addon ID must not toggle a same-named file"),
+        );
+        assert_eq!(tokio::fs::read(&path_a).await.unwrap(), b"mod A");
+        assert_eq!(tokio::fs::read(&path_b).await.unwrap(), b"mod B");
+        assert!(!path_a.with_file_name("mod.jar.disabled").exists());
+        assert!(!path_b.with_file_name("mod.jar.disabled").exists());
+        for row in [&row_a, &row_b] {
+            assert_eq!(
+                mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                    .await
+                    .unwrap(),
+                Some(row.clone())
+            );
+        }
+
+        app.instance_manager()
+            .enable_mod(a, row_a.id.clone(), false)
+            .await
+            .unwrap();
+        assert!(!path_a.exists());
+        assert_eq!(
+            tokio::fs::read(path_a.with_file_name("mod.jar.disabled"))
+                .await
+                .unwrap(),
+            b"mod A"
+        );
+        assert!(
+            !mfcdb::get_mod_file_cache_by_id(&app.db, &row_a.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .enabled
+        );
+        app.instance_manager()
+            .enable_mod(a, row_a.id.clone(), true)
+            .await
+            .unwrap();
+        assert_eq!(tokio::fs::read(&path_a).await.unwrap(), b"mod A");
+        assert!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row_a.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .enabled
+        );
+        assert_eq!(tokio::fs::read(&path_b).await.unwrap(), b"mod B");
+        assert_eq!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row_b.id)
+                .await
+                .unwrap(),
+            Some(row_b)
+        );
+    }
+
+    #[tokio::test]
+    async fn foreign_addon_update_and_icon_reject_the_pair_before_platform_work() {
+        let app = crate::setup_managers_for_test().await;
+        let (a, row, path) = addon_fixture(&app, "A", AddonType::Mods, "mod.jar", b"mod A").await;
+        let (b, _, _) = addon_fixture(&app, "B", AddonType::Mods, "mod.jar", b"mod B").await;
+        let manager = app.instance_manager();
+        let results = [
+            manager.find_mod_update(b, row.id.clone()).await.map(|_| ()),
+            manager.update_mod(b, row.id.clone()).await.map(|_| ()),
+            manager
+                .update_curseforge_mod(b, row.id.clone())
+                .await
+                .map(|_| ()),
+            manager
+                .update_modrinth_mod(b, row.id.clone())
+                .await
+                .map(|_| ()),
+            manager.get_mod_icon(b, row.id.clone(), 0).await.map(|_| ()),
+        ];
+        for result in results {
+            assert_foreign_addon_error(result.expect_err("a foreign addon ID must be rejected"));
+        }
+        assert!(
+            manager
+                .find_mod_update(a, row.id.clone())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            manager.get_mod_icon(a, row.id.clone(), 0).await.unwrap(),
+            None
+        );
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), b"mod A");
+        assert_eq!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                .await
+                .unwrap(),
+            Some(row)
+        );
+    }
+
+    struct PreflightOnlyInstaller;
+
+    #[async_trait::async_trait]
+    impl ResourceInstaller for PreflightOnlyInstaller {
+        fn id(&self) -> String {
+            panic!("must stop at installed-state check")
+        }
+
+        async fn downloadable(&self, _: &InstancePath) -> Option<Downloadable> {
+            panic!("must stop before download")
+        }
+
+        fn get_install_path(&self, _: &InstancePath) -> PathBuf {
+            panic!("must stop before publication")
+        }
+
+        async fn post_process(&self, _: &InstancePath) -> anyhow::Result<()> {
+            panic!("must stop before post-processing")
+        }
+
+        fn dependencies(
+            &self,
+            _: &Arc<AppInner>,
+            _: InstanceId,
+            _: &InstanceData,
+            _: ModChannel,
+        ) -> DependencyIterator {
+            panic!("must stop before dependencies")
+        }
+
+        async fn is_already_installed(
+            &self,
+            _: &Arc<AppInner>,
+            _: InstanceId,
+        ) -> anyhow::Result<bool> {
+            anyhow::bail!("test installer stopped at preflight")
+        }
+
+        fn display_name(&self) -> String {
+            panic!("must stop before task creation")
+        }
+
+        async fn rollback(&self, _: &mut InstanceData) -> anyhow::Result<()> {
+            panic!("must stop before rollback")
+        }
+    }
+
+    #[tokio::test]
+    async fn foreign_addon_replacement_is_rejected_before_installation() {
+        let app = crate::setup_managers_for_test().await;
+        let (a, row, path) = addon_fixture(&app, "A", AddonType::Mods, "mod.jar", b"mod A").await;
+        let (b, row_b, path_b) =
+            addon_fixture(&app, "B", AddonType::Mods, "mod.jar", b"mod B").await;
+        let installer = Installer::new(Box::new(PreflightOnlyInstaller));
+        assert_foreign_addon_error(
+            installer
+                .install(&app, b, false, Some(row.id.clone()))
+                .await
+                .expect_err("a foreign replacement must fail before preparing an install"),
+        );
+
+        let own_error = installer
+            .install(&app, a, false, Some(row.id.clone()))
+            .await
+            .expect_err("the controlled installer stops before download");
+        assert_eq!(own_error.to_string(), "test installer stopped at preflight");
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), b"mod A");
+        assert_eq!(tokio::fs::read(&path_b).await.unwrap(), b"mod B");
+        for row in [&row, &row_b] {
+            assert_eq!(
+                mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                    .await
+                    .unwrap(),
+                Some(row.clone())
+            );
+        }
+    }
 
     #[test]
     fn rejects_toggling_a_world() {

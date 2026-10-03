@@ -7,6 +7,14 @@ import { requiresDeletionConfirmation } from "@/pages/Library/shared/addons/addo
 import { onCleanup } from "solid-js"
 import { resolveBooleanPreference } from "./resolveBooleanPreference"
 
+type AddonDeletionTarget = Pick<ModType, "id" | "filename" | "addon_type">
+
+const snapshotDeletionTarget = (mod: ModType): AddonDeletionTarget => ({
+  id: mod.id,
+  filename: mod.filename,
+  addon_type: mod.addon_type
+})
+
 export const useAddonMutations = (
   refetchAddons: () => Promise<any>,
   optimisticUpdates: {
@@ -150,78 +158,89 @@ export const useAddonMutations = (
     }
   }
 
-  const performDeleteMod = async (mod: ModType) => {
-    // Deselect the addon being deleted
-    setRowSelection((prev) => {
-      const next = { ...prev }
-      delete next[mod.id]
-      return next
-    })
+  const isCurrentInstance = (instanceId: number) =>
+    parseInt(params.id, 10) === instanceId
 
-    // Optimistic update
-    optimisticUpdates.optimisticDeleteAddon(mod.id)
+  const performDeleteMod = async (
+    instanceId: number,
+    mod: AddonDeletionTarget
+  ) => {
+    if (isCurrentInstance(instanceId)) {
+      setRowSelection((prev) => {
+        const next = { ...prev }
+        delete next[mod.id]
+        return next
+      })
+      optimisticUpdates.optimisticDeleteAddon(mod.id)
+    }
 
     try {
       await deleteModMutation.mutateAsync({
-        instance_id: parseInt(params.id, 10),
+        instance_id: instanceId,
         mod_id: mod.id
       })
-      // Refetch to ensure consistency with server state
-      await refetchAddons()
+      if (isCurrentInstance(instanceId)) await refetchAddons()
     } catch (error) {
       console.error("Failed to delete mod:", error)
-      // Rollback optimistic update on error
-      optimisticUpdates.rollbackToServerState()
+      if (isCurrentInstance(instanceId)) {
+        optimisticUpdates.rollbackToServerState()
+      }
     }
   }
 
   const handleDeleteMod = async (mod: ModType) => {
+    // Preferences and confirmation can outlive the current route or row.
+    const instanceId = parseInt(params.id, 10)
+    const target = snapshotDeletionTarget(mod)
     if (
-      requiresDeletionConfirmation(mod.addon_type) &&
+      requiresDeletionConfirmation(target.addon_type) &&
       !(await isWorldWarningDismissed())
     ) {
       modalsContext?.openModal(
         { name: "confirmWorldDeletion" },
         {
-          worldName: mod.filename,
-          onConfirm: () => void performDeleteMod(mod)
+          worldName: target.filename,
+          onConfirm: () => void performDeleteMod(instanceId, target)
         }
       )
       return
     }
 
-    await performDeleteMod(mod)
+    await performDeleteMod(instanceId, target)
   }
 
-  const performDeleteSelected = async (selectedMods: ModType[]) => {
-    // Clear selection (all selected items are being deleted)
-    setRowSelection({})
-
+  const performDeleteSelected = async (
+    instanceId: number,
+    selectedMods: AddonDeletionTarget[]
+  ) => {
     const selectedIds = selectedMods.map((mod) => mod.id)
-
-    // Optimistic update
-    optimisticUpdates.optimisticDeleteAddons(selectedIds)
+    if (isCurrentInstance(instanceId)) {
+      setRowSelection({})
+      optimisticUpdates.optimisticDeleteAddons(selectedIds)
+    }
 
     try {
       await Promise.all(
         selectedMods.map((mod) =>
           deleteModMutation.mutateAsync({
-            instance_id: parseInt(params.id, 10),
+            instance_id: instanceId,
             mod_id: mod.id
           })
         )
       )
-      // Refetch to ensure consistency with server state
-      await refetchAddons()
+      if (isCurrentInstance(instanceId)) await refetchAddons()
     } catch (error) {
       console.error("Failed to delete selected mods:", error)
-      // Rollback optimistic update on error
-      optimisticUpdates.rollbackToServerState()
+      if (isCurrentInstance(instanceId)) {
+        optimisticUpdates.rollbackToServerState()
+      }
     }
   }
 
   const handleDeleteSelected = async (selectedMods: ModType[]) => {
-    const worldsSelected = selectedMods.filter((mod) =>
+    const instanceId = parseInt(params.id, 10)
+    const targets = selectedMods.map(snapshotDeletionTarget)
+    const worldsSelected = targets.filter((mod) =>
       requiresDeletionConfirmation(mod.addon_type)
     )
 
@@ -235,14 +254,14 @@ export const useAddonMutations = (
           // it — the dialog is raised *because* a world is among them, but
           // `performDeleteSelected` below removes every selected addon. The
           // dialog names that total so it describes what the button does.
-          totalCount: selectedMods.length,
-          onConfirm: () => void performDeleteSelected(selectedMods)
+          totalCount: targets.length,
+          onConfirm: () => void performDeleteSelected(instanceId, targets)
         }
       )
       return
     }
 
-    await performDeleteSelected(selectedMods)
+    await performDeleteSelected(instanceId, targets)
   }
 
   const handleOpenFolder = () => {

@@ -265,6 +265,12 @@ impl Installer {
         install_deps: bool,
         replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        if let Some(id) = replaces_mod_id.as_deref() {
+            app.instance_manager()
+                .get_owned_mod_file(instance_id, id)
+                .await?;
+        }
+
         let download_deps = app
             .settings_manager()
             .get_settings()
