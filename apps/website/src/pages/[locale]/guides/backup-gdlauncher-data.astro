@@ -24,9 +24,9 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
     description: "フォーマットや新しい PC への移行の前に GDLauncher のデータ (インスタンス、ワールド、アカウント、Java、設定) をバックアップし、進行状況を失わずに復元する手順。",
     steps: [
       { name: "Runtime Path を確認", text: "GDLauncher を開き Settings → Runtime Path。入力欄のパスをコピー。そのフォルダーにインスタンス、ワールド、Java、ランチャーデータベース、アカウントが入っています。バックアップが必要なのはこれ 1 つだけ。" },
-      { name: "GDLauncher を終了", text: "コピーの前に GDLauncher を完全に終了。SQLite データベースはランチャーが書き込んでいる最中にコピーすると壊れたコピーになることがあります。" },
+      { name: "ゲームとサーバーを保存して停止し、GDLauncher を終了", text: "各ゲームを保存して通常の方法で終了してください。各ローカルサーバーで Stop を使い、保存と停止の完了を待ちます。その後 GDLauncher を完全に終了し、コアプロセスの終了を待ってからコピーします。gdl_conf.db と、存在する場合は gdl_conf.db-wal と gdl_conf.db-shm を一緒に保存してください。" },
       { name: "Runtime Path フォルダーをコピー", text: "Runtime Path フォルダー全体をバックアップ先にコピー。外付けドライブ、USB メモリ、NAS、オフラインのクラウドアーカイブ、何でも構いません。フォルダー構造はそのまま保つこと。" },
-      { name: "コピーを検証", text: "コピー先のサイズが元と数 MB 以内で一致するか確認。インスタンスのサブフォルダーを 1 つ開き、プレースホルダーやショートカットではなく実ファイルとして読めることを確認。" }
+      { name: "コピーを検証", text: "停止したコピー元とファイル数・合計ファイルサイズを比較します。インスタンス、サーバー、データベースのファイルが揃い、実ファイルとして読めることを確認してください。復元を確認するまで元データを残してください。" }
     ],
     body: `<h2>実際にバックアップが必要なもの</h2>
 <p>フォルダー 1 つ、Runtime Path だけです。この中に全インスタンス (Mod、ワールド、config、スクリーンショット、ワールドデータ)、共有の Minecraft アセット、共有ライブラリ、GDLauncher がダウンロードした Java ランタイム、アカウントと設定が入ったランチャーの SQLite データベース (<code>gdl_conf.db</code>)、そして <code>__gdl_logs__/</code> のアプリ全体ログが揃っています。このフォルダーさえバックアップすれば、大事なものは全部残ります。</p>
@@ -43,7 +43,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 <p>Settings から Runtime Path を移動したことがある場合、上のデフォルトフォルダーは存在しないか空で、その隣の <code>runtime_path_override</code> というファイルが実際の場所を指しています。テキストエディターで開けば、1 行だけ書かれた絶対パスが本当のデータの場所です。</p>
 
 <h2>バックアップの手順</h2>
-<p>まず GDLauncher を終了します。Runtime Path の SQLite データベースはランチャーが閉じていれば安全にコピーできますが、書き込み中につかむと壊れたコピーができることがあります。</p>
+<p>各ゲームを保存して通常の方法で終了してください。各ローカルサーバーで <strong>Stop</strong> を使い、保存と停止の完了を待ちます。その後 GDLauncher を完全に終了し、コアプロセスの終了を待ちます。コピーが終わるまでゲーム、サーバー、ランチャーを起動しないでください。</p>
+<p><code>gdl_conf.db</code> と、存在する場合は <code>gdl_conf.db-wal</code> と <code>gdl_conf.db-shm</code> を一緒にコピーしてください。終了後も最近の確定済み変更が WAL に残ることがあります。同じ停止済み Runtime Path のファイルを一組として保存し、容量を減らすために WAL を削除しないでください。</p>
 <p>あとは Runtime Path フォルダーを構造ごとバックアップ先にコピーするだけ。別のドライブ、USB メモリ、NAS、オフラインのクラウドアーカイブ、どこでも構いません。これから消すドライブの上でなければ大丈夫です。</p>
 
 <h2>初期化後に復元する</h2>
@@ -71,8 +72,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 </ul>
 
 <h2>空き容量が足りないときの最小構成</h2>
-<p>Runtime Path 全体が入らない場合は <code>&lt;runtime_path&gt;/instances/</code> と <code>&lt;runtime_path&gt;/gdl_conf.db</code> だけをコピーしてください。instances にワールドと config が、データベースにアカウントと設定が入っています。キャッシュされた Minecraft アセット、ライブラリ、Java インストールは失われますが、これらは初回起動で再ダウンロードされます。</p>
-<p>本当に最低限で済ませるなら、各インスタンスの <code>instance/saves/</code> サブフォルダーだけをコピー。これはワールドファイルだけです。インスタンスの構成 (Mod リスト、バージョン、Mod ローダー) は失われますが、ワールドデータは残り、あとから新規作成したインスタンスに読み込めます。</p>
+<p>Runtime Path 全体が入らない場合は、上記の手順ですべて停止してから <code>&lt;runtime_path&gt;/instances/</code>、<code>&lt;runtime_path&gt;/servers/</code>、<code>&lt;runtime_path&gt;/gdl_conf.db</code> と、存在する場合は <code>gdl_conf.db-wal</code>、<code>gdl_conf.db-shm</code> をコピーしてください。instances と servers にワールドや設定が、データベースのファイルにアカウントと設定が入っています。キャッシュされた Minecraft アセット、ライブラリ、管理対象の Java は再ダウンロードできます。</p>
+<p>各インスタンスの <code>instance/saves/</code> だけをコピーすると、残るのはクライアントのワールドだけです。サーバーのワールド、アカウント、Mod やインスタンス設定は含まれません。コピーしたワールドを開く前に、対応する Minecraft バージョン、Mod ローダー、Mod を復元してください。サーバーのデータは、設定や独自のワールドディレクトリを含む <code>&lt;runtime_path&gt;/servers/</code> 内の該当フォルダー全体を保存してください。</p>
 
 <h2>初期化だけでなくドライブや PC も変える場合</h2>
 <p>バックアップは同じで、復元先が新しいマシンになるだけです。GDLauncher の Runtime Path データは同じ OS 系統の間ならそのまま移せます。Windows → Windows、Linux → Linux は直接動きます。Windows ↔ macOS ↔ Linux をまたぐ場合もワールド、config、リソースパック、ほとんどの Mod は動きますが、Java は OS ごとにバイナリが違うため再検出され、ネイティブライブラリが初回起動で再ダウンロードされることがあります。</p>
@@ -86,9 +87,9 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
     description: "포맷하거나 새 PC로 옮기기 전에 GDLauncher 데이터(인스턴스, 월드, 계정, Java, 설정)를 백업하고 진행 상황을 잃지 않고 복원하는 방법.",
     steps: [
       { name: "런타임 경로 확인", text: "GDLauncher를 열고 Settings → Runtime Path로 이동해 입력란의 경로를 복사하세요. 그 폴더에 인스턴스, 월드, Java, 런처 데이터베이스, 계정이 전부 들어 있습니다. 백업할 건 이거 하나뿐입니다." },
-      { name: "GDLauncher 종료", text: "복사 전에 GDLauncher를 완전히 종료하세요. SQLite 데이터베이스 같은 파일은 런처가 쓰고 있는 도중에 복사하면 손상된 사본이 될 수 있습니다." },
+      { name: "게임과 서버 저장·중지 후 GDLauncher 종료", text: "각 게임을 저장하고 정상적으로 종료하세요. 각 로컬 서버에서 Stop을 누르고 저장과 중지가 끝날 때까지 기다리세요. 그다음 GDLauncher를 완전히 종료하고 코어 프로세스가 끝난 뒤 복사하세요. gdl_conf.db와, 존재한다면 gdl_conf.db-wal 및 gdl_conf.db-shm을 함께 보관하세요." },
       { name: "런타임 경로 폴더 복사", text: "런타임 경로 폴더 전체를 백업할 곳으로 복사하세요. 외장 드라이브, USB, NAS, 오프라인 클라우드 보관소 등 아무거나 괜찮습니다. 폴더 구조만 그대로 유지하세요." },
-      { name: "복사본 확인", text: "대상 폴더 용량이 원본과 몇 MB 이내로 일치하는지 확인하세요. 인스턴스 하위 폴더를 하나 열어 자리표시자나 바로가기가 아니라 실제로 읽을 수 있는 파일인지 확인합니다." }
+      { name: "복사본 확인", text: "중지된 원본과 파일 수 및 전체 파일 크기를 비교하세요. 인스턴스, 서버, 데이터베이스 파일이 모두 있고 실제 파일로 읽히는지 확인하세요. 복원 결과를 확인할 때까지 원본을 보관하세요." }
     ],
     body: `<h2>실제로 백업해야 하는 것</h2>
 <p>폴더 하나, 런타임 경로면 됩니다. 그 안에 모든 인스턴스(모드, 세이브, 설정, 스크린샷, 월드 데이터), 공유 Minecraft 에셋, 공유 라이브러리, GDLauncher가 받아둔 Java 런타임, 계정과 설정이 담긴 런처 SQLite 데이터베이스(<code>gdl_conf.db</code>), 그리고 <code>__gdl_logs__/</code>의 앱 전역 로그가 들어 있습니다. 이 폴더만 백업하면 중요한 건 전부 챙긴 겁니다.</p>
@@ -105,7 +106,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 <p>Settings에서 런타임 경로를 옮긴 적이 있다면 위 기본 폴더는 없거나 비어 있고, 그 옆의 <code>runtime_path_override</code> 파일이 실제 위치를 가리킵니다. 아무 텍스트 편집기로 열면 한 줄짜리 절대 경로가 진짜 데이터 위치입니다.</p>
 
 <h2>백업하기</h2>
-<p>먼저 GDLauncher를 종료하세요. 런타임 경로의 SQLite 데이터베이스는 런처가 닫혀 있으면 안전하게 복사되지만, 쓰는 중에 가져가면 손상된 사본이 나올 수 있습니다.</p>
+<p>각 게임을 저장하고 정상적으로 종료하세요. 각 로컬 서버에서 <strong>Stop</strong>을 누르고 저장과 중지가 끝날 때까지 기다리세요. 그다음 GDLauncher를 완전히 종료하고 코어 프로세스가 끝날 때까지 기다리세요. 복사하는 동안 게임, 서버, 런처를 실행하지 마세요.</p>
+<p><code>gdl_conf.db</code>와, 존재한다면 <code>gdl_conf.db-wal</code> 및 <code>gdl_conf.db-shm</code>을 함께 복사하세요. 종료 후에도 최근 커밋된 변경 사항이 WAL에 남을 수 있습니다. 같은 중지된 런타임의 파일을 한 세트로 보관하고 용량을 줄이려고 WAL을 삭제하지 마세요.</p>
 <p>그다음 런타임 경로 폴더를 구조 그대로 원하는 백업 위치로 복사하세요. 다른 드라이브, USB, NAS, 오프라인 클라우드 보관소 어디든 상관없습니다. 곧 지울 그 드라이브만 아니면 됩니다.</p>
 
 <h2>포맷 후 복원하기</h2>
@@ -133,8 +135,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 </ul>
 
 <h2>공간이 부족할 때의 최소 백업</h2>
-<p>런타임 경로 전체가 안 들어가면 <code>&lt;runtime_path&gt;/instances/</code>와 <code>&lt;runtime_path&gt;/gdl_conf.db</code>만 복사하세요. instances에는 월드와 설정이, 데이터베이스에는 계정과 설정이 들어 있습니다. 캐시된 Minecraft 에셋, 라이브러리, Java 설치본은 잃지만 이건 첫 실행에서 다시 받습니다.</p>
-<p>정말 최소한만 챙기려면 각 인스턴스의 <code>instance/saves/</code> 하위 폴더만 복사하세요. 월드 파일만 남습니다. 인스턴스 구성(모드 목록, 버전, 모드로더)은 잃지만 월드 데이터는 살아남아 나중에 새로 만든 인스턴스에 넣을 수 있습니다.</p>
+<p>런타임 경로 전체가 안 들어가면 위 절차대로 모두 중지한 뒤 <code>&lt;runtime_path&gt;/instances/</code>, <code>&lt;runtime_path&gt;/servers/</code>, <code>&lt;runtime_path&gt;/gdl_conf.db</code>와, 존재한다면 <code>gdl_conf.db-wal</code> 및 <code>gdl_conf.db-shm</code>을 복사하세요. instances와 servers에는 월드와 설정이, 데이터베이스 파일에는 계정과 설정이 있습니다. 캐시된 Minecraft 에셋, 라이브러리, 관리되는 Java는 다시 받을 수 있습니다.</p>
+<p>각 인스턴스의 <code>instance/saves/</code>만 복사하면 클라이언트 월드만 보존됩니다. 서버 월드, 계정, 모드와 인스턴스 설정은 포함되지 않습니다. 복사한 월드를 열기 전에 맞는 Minecraft 버전, 모드로더, 모드를 복원하세요. 서버 데이터는 설정과 사용자 지정 월드 디렉터리를 포함해 <code>&lt;runtime_path&gt;/servers/</code> 아래의 해당 폴더 전체를 보관하세요.</p>
 
 <h2>포맷만이 아니라 드라이브나 PC까지 바꾸는 경우</h2>
 <p>백업은 똑같고 복원만 새 기기에서 하면 됩니다. GDLauncher의 런타임 데이터는 같은 OS 계열끼리는 그대로 옮겨집니다. Windows → Windows, Linux → Linux는 바로 됩니다. Windows ↔ macOS ↔ Linux를 넘나드는 경우에도 월드, 설정, 리소스팩, 대부분의 모드는 그대로 쓰이지만, Java는 OS마다 바이너리가 달라 다시 감지되고 네이티브 라이브러리는 첫 실행에서 다시 받을 수 있습니다.</p>
@@ -148,9 +150,9 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
     description: "Sichere alle GDLauncher-Daten (Instanzen, Welten, Accounts, Java, Einstellungen) vor einer Formatierung oder einem PC-Wechsel und stelle sie ohne Fortschrittsverlust wieder her.",
     steps: [
       { name: "Runtime Path finden", text: "Öffne GDLauncher und geh zu Settings → Runtime Path. Kopier den Pfad aus dem Eingabefeld. In diesem Ordner liegen deine Instanzen, Welten, Java, die Launcher-Datenbank und deine Accounts. Mehr musst du nicht sichern." },
-      { name: "GDLauncher schließen", text: "Beende GDLauncher komplett, bevor du kopierst. Dateien wie die SQLite-Datenbank können beim Kopieren beschädigt werden, wenn der Launcher gleichzeitig hineinschreibt." },
+      { name: "Spiele und Server speichern und stoppen, dann GDLauncher schließen", text: "Speichere und beende jedes Spiel normal. Nutze Stop für jeden lokalen Server und warte, bis Speichern und Stoppen abgeschlossen sind. Beende dann GDLauncher vollständig und warte auf das Ende des Core-Prozesses. Kopiere gdl_conf.db zusammen mit gdl_conf.db-wal und gdl_conf.db-shm, falls vorhanden." },
       { name: "Runtime-Path-Ordner kopieren", text: "Kopier den kompletten Runtime-Path-Ordner dorthin, wo das Backup liegen soll: externe Festplatte, USB-Stick, NAS, Offline-Cloud-Archiv, was auch immer du hast. Lass die Ordnerstruktur unverändert." },
-      { name: "Kopie prüfen", text: "Vergleich die Größe am Ziel mit der Quelle, ein paar MB Abweichung sind normal. Öffne einen der Instanz-Unterordner und stell sicher, dass die Dateien lesbar sind und keine Platzhalter oder Verknüpfungen." }
+      { name: "Kopie prüfen", text: "Vergleiche Dateianzahl und Gesamtgröße der Dateien mit der gestoppten Quelle. Prüfe, ob Instanz-, Server- und Datenbankdateien vollständig und lesbar sind. Behalte das Original, bis du die Wiederherstellung geprüft hast." }
     ],
     body: `<h2>Was du wirklich sichern musst</h2>
 <p>Ein einziger Ordner: der Runtime Path. Darin steckt jede Instanz (mit Mods, Welten, Configs, Screenshots, Weltdaten), die gemeinsamen Minecraft-Assets, die gemeinsamen Libraries, die von GDLauncher heruntergeladenen Java-Runtimes, die SQLite-Datenbank des Launchers (<code>gdl_conf.db</code>) mit deinen Accounts und Einstellungen sowie die app-weiten Logs unter <code>__gdl_logs__/</code>. Sicher diesen Ordner und du hast alles, worauf es ankommt.</p>
@@ -167,7 +169,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 <p>Hast du den Runtime Path irgendwann über die Settings verschoben, ist der Standardordner oben leer oder gar nicht da, und eine Datei namens <code>runtime_path_override</code> daneben zeigt auf den echten Ort. Öffne sie mit einem beliebigen Texteditor: die einzelne Zeile darin ist der absolute Pfad zu deinen Runtime-Daten.</p>
 
 <h2>Das Backup anlegen</h2>
-<p>Schließ zuerst GDLauncher. Die SQLite-Datenbank im Runtime Path lässt sich gefahrlos kopieren, solange der Launcher zu ist, kann aber eine beschädigte Kopie ergeben, wenn du sie mitten im Schreiben greifst.</p>
+<p>Speichere und beende jedes Spiel normal. Nutze für jeden lokalen Server <strong>Stop</strong> und warte, bis Speichern und Stoppen abgeschlossen sind. Beende dann GDLauncher vollständig und warte auf das Ende seines Core-Prozesses. Lass Spiele, Server und Launcher während der gesamten Kopie geschlossen.</p>
+<p>Kopiere <code>gdl_conf.db</code> zusammen mit <code>gdl_conf.db-wal</code> und <code>gdl_conf.db-shm</code>, falls diese Dateien vorhanden sind. Auch nach dem Beenden können bestätigte Änderungen noch im WAL liegen. Behalte die Dateien aus demselben gestoppten Runtime Path zusammen; lösche das WAL nicht, um Platz zu sparen.</p>
 <p>Dann kopier den Runtime-Path-Ordner mit unveränderter Struktur dorthin, wo das Backup liegen soll. Andere Festplatte, USB-Stick, NAS, Offline-Cloud-Archiv, das Ziel ist egal, solange es nicht das Laufwerk ist, das du gleich löschst.</p>
 
 <h2>Nach dem Formatieren wiederherstellen</h2>
@@ -195,8 +198,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 </ul>
 
 <h2>Minimal-Backup, wenn der Platz knapp ist</h2>
-<p>Passt der komplette Runtime Path nicht, kopier nur <code>&lt;runtime_path&gt;/instances/</code> und <code>&lt;runtime_path&gt;/gdl_conf.db</code>. In instances liegen deine Welten und Configs, in der Datenbank deine Accounts und Einstellungen. Die zwischengespeicherten Minecraft-Assets, Libraries und Java-Installationen sind dann weg, die lädt der Launcher beim ersten Start aber neu.</p>
-<p>Als absolute Untergrenze kopier von jeder Instanz nur den Unterordner <code>instance/saves/</code>. Das sind bloß deine Weltdateien. Die Instanzkonfiguration (Modliste, Version, Modloader) ist damit weg, die Weltdaten überleben aber und lassen sich später in eine frisch erstellte Instanz legen.</p>
+<p>Passt der komplette Runtime Path nicht, stoppe zuerst alles wie oben beschrieben. Kopiere dann <code>&lt;runtime_path&gt;/instances/</code>, <code>&lt;runtime_path&gt;/servers/</code> und <code>&lt;runtime_path&gt;/gdl_conf.db</code> sowie <code>gdl_conf.db-wal</code> und <code>gdl_conf.db-shm</code>, falls vorhanden. In instances und servers liegen Welten und Configs, in den Datenbankdateien Accounts und Einstellungen. Minecraft-Assets, Libraries und verwaltetes Java lassen sich erneut herunterladen.</p>
+<p>Nur <code>instance/saves/</code> jeder Instanz zu kopieren bewahrt ausschließlich Client-Welten. Server-Welten, Accounts, Mods und Instanzkonfiguration fehlen. Stelle vor dem Öffnen einer kopierten Welt die passende Minecraft-Version, den Modloader und die Mods wieder her. Sichere für Server den kompletten zugehörigen Ordner unter <code>&lt;runtime_path&gt;/servers/</code>, einschließlich Konfiguration und eigener Weltverzeichnisse.</p>
 
 <h2>Wenn du nicht nur formatierst, sondern auch Laufwerk oder PC wechselst</h2>
 <p>Gleiches Backup, Wiederherstellung eben auf der neuen Maschine. Die Runtime-Daten von GDLauncher wandern innerhalb derselben Betriebssystemfamilie problemlos. Windows → Windows oder Linux → Linux geht direkt. Über Windows ↔ macOS ↔ Linux hinweg funktionieren Welten, Configs, Resource Packs und die meisten Mods weiterhin, der Launcher erkennt Java aber neu (andere Binaries pro System) und lädt beim ersten Start eventuell native Libraries nach.</p>
@@ -210,9 +213,9 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
     description: "Sauvegarde toutes les données GDLauncher (instances, mondes, comptes, Java, paramètres) avant un formatage ou un changement de machine, puis restaure-les sans perdre de progression.",
     steps: [
       { name: "Trouver le runtime path", text: "Ouvre GDLauncher et va dans Settings → Runtime Path. Copie le chemin affiché dans le champ. Ce dossier contient tes instances, tes mondes, Java, la base de données du launcher et tes comptes. C'est la seule chose à sauvegarder." },
-      { name: "Fermer GDLauncher", text: "Quitte complètement GDLauncher avant de copier. Des fichiers comme la base SQLite peuvent se corrompre en cours de copie si le launcher est en train d'écrire dedans." },
+      { name: "Sauvegarder et arrêter jeux et serveurs, puis fermer GDLauncher", text: "Sauvegarde et quitte chaque jeu normalement. Utilise Stop pour chaque serveur local et attends la fin de la sauvegarde et de l'arrêt. Quitte ensuite complètement GDLauncher et attends la fin de son processus core avant de copier. Garde gdl_conf.db avec gdl_conf.db-wal et gdl_conf.db-shm si ces fichiers existent." },
       { name: "Copier le dossier runtime path", text: "Copie l'intégralité du dossier runtime path là où tu gardes ta sauvegarde : disque externe, clé USB, NAS, archive cloud hors ligne, ce que tu as sous la main. Garde juste la structure des dossiers intacte." },
-      { name: "Vérifier la copie", text: "Vérifie que la taille à destination correspond à la source à quelques Mo près. Ouvre un des sous-dossiers d'instance pour confirmer que les fichiers sont bien lisibles, et pas des espaces réservés ou des raccourcis." }
+      { name: "Vérifier la copie", text: "Compare le nombre de fichiers et leur taille totale avec la source arrêtée. Vérifie que les fichiers des instances, des serveurs et de la base sont présents et lisibles. Garde l'original jusqu'à avoir vérifié la restauration." }
     ],
     body: `<h2>Ce qu'il faut vraiment sauvegarder</h2>
 <p>Un seul dossier : le runtime path. Dedans se trouvent toutes les instances (avec leurs mods, mondes, configs, captures, données de monde), les assets Minecraft partagés, les libraries partagées, les runtimes Java téléchargés par GDLauncher, la base SQLite du launcher (<code>gdl_conf.db</code>) avec tes comptes et paramètres, et les logs globaux dans <code>__gdl_logs__/</code>. Sauvegarde ce dossier et tu as tout ce qui compte.</p>
@@ -229,7 +232,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 <p>Si tu as déjà déplacé le runtime path via les Settings, le dossier par défaut ci-dessus sera absent ou vide, et un fichier nommé <code>runtime_path_override</code> juste à côté pointe vers le vrai emplacement. Ouvre-le avec n'importe quel éditeur de texte : sa ligne unique est le chemin absolu de tes données.</p>
 
 <h2>Faire la sauvegarde</h2>
-<p>Ferme GDLauncher d'abord. La base SQLite du runtime path se copie sans risque launcher fermé, mais peut produire une copie corrompue si tu l'attrapes pendant une écriture.</p>
+<p>Sauvegarde et quitte chaque jeu normalement. Pour chaque serveur local, utilise <strong>Stop</strong> et attends la fin de la sauvegarde et de l'arrêt. Quitte ensuite complètement GDLauncher et attends la fin de son processus core. Garde jeux, serveurs et launcher arrêtés pendant toute la copie.</p>
+<p>Copie <code>gdl_conf.db</code> avec <code>gdl_conf.db-wal</code> et <code>gdl_conf.db-shm</code> si ces fichiers existent. Des changements validés peuvent rester dans le WAL même après la fermeture. Conserve ensemble les fichiers du même runtime arrêté ; ne supprime pas le WAL pour réduire la sauvegarde.</p>
 <p>Ensuite copie le dossier runtime path, structure intacte, là où tu veux la sauvegarde. Autre disque, clé USB, NAS, archive cloud hors ligne, la destination importe peu tant que ce n'est pas le disque que tu t'apprêtes à effacer.</p>
 
 <h2>Restaurer après le formatage</h2>
@@ -257,8 +261,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 </ul>
 
 <h2>Sauvegarde minimale si tu manques de place</h2>
-<p>Si le runtime path complet ne rentre pas, copie seulement <code>&lt;runtime_path&gt;/instances/</code> et <code>&lt;runtime_path&gt;/gdl_conf.db</code>. instances contient tes mondes et tes configs, la base contient tes comptes et tes paramètres. Tu perdras les assets Minecraft, les libraries et les installations Java en cache, mais tout ça se retélécharge au premier lancement.</p>
-<p>Pour le strict minimum, copie le sous-dossier <code>instance/saves/</code> de chaque instance. Ce sont juste tes fichiers de monde. Tu perdras la configuration de l'instance (liste de mods, version, modloader) mais les mondes survivent et pourront être chargés plus tard dans une instance recréée.</p>
+<p>Si le runtime path complet ne rentre pas, arrête d'abord tout comme indiqué plus haut. Copie ensuite <code>&lt;runtime_path&gt;/instances/</code>, <code>&lt;runtime_path&gt;/servers/</code> et <code>&lt;runtime_path&gt;/gdl_conf.db</code>, ainsi que <code>gdl_conf.db-wal</code> et <code>gdl_conf.db-shm</code> s'ils existent. instances et servers contiennent mondes et configs ; les fichiers de base contiennent comptes et paramètres. Les assets Minecraft, libraries et installations Java gérées peuvent être retéléchargés.</p>
+<p>Copier seulement <code>instance/saves/</code> de chaque instance ne préserve que les mondes clients. Les mondes serveurs, comptes, mods et configurations d'instance ne sont pas inclus. Avant d'ouvrir un monde copié, restaure la version Minecraft, le modloader et les mods correspondants. Pour un serveur, conserve le dossier correspondant entier sous <code>&lt;runtime_path&gt;/servers/</code>, avec sa configuration et ses éventuels répertoires de mondes personnalisés.</p>
 
 <h2>Si tu changes aussi de disque ou de PC, pas seulement de système</h2>
 <p>Même sauvegarde, restauration sur la nouvelle machine. Les données runtime de GDLauncher se déplacent sans souci au sein d'une même famille d'OS. Windows → Windows ou Linux → Linux fonctionne directement. En passant de Windows ↔ macOS ↔ Linux, les mondes, configs, resource packs et la plupart des mods fonctionnent, mais le launcher redétectera Java (binaires différents selon l'OS) et pourra retélécharger des libraries natives au premier lancement.</p>
@@ -272,9 +276,9 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
     description: "Guarda todos los datos de GDLauncher (instancias, mundos, cuentas, Java, ajustes) antes de formatear o cambiar de equipo, y restáuralos sin perder progreso.",
     steps: [
       { name: "Localiza tu runtime path", text: "Abre GDLauncher y ve a Settings → Runtime Path. Copia la ruta que aparece en el campo. Esa carpeta contiene tus instancias, mundos, Java, la base de datos del launcher y tus cuentas. Es lo único que necesitas respaldar." },
-      { name: "Cierra GDLauncher", text: "Cierra GDLauncher del todo antes de copiar. Archivos como la base de datos SQLite pueden corromperse a mitad de copia si el launcher está escribiendo en ellos al mismo tiempo." },
+      { name: "Guarda y detén juegos y servidores, luego cierra GDLauncher", text: "Guarda y cierra cada juego normalmente. Usa Stop en cada servidor local y espera a que termine de guardar y se detenga. Después cierra GDLauncher por completo y espera a que salga su proceso core antes de copiar. Conserva gdl_conf.db junto con gdl_conf.db-wal y gdl_conf.db-shm si existen." },
       { name: "Copia la carpeta del runtime path", text: "Copia la carpeta del runtime path entera a donde vayas a guardar la copia: disco externo, USB, NAS, un archivo en la nube sin sincronización, lo que tengas. Solo mantén la estructura de carpetas intacta." },
-      { name: "Verifica la copia", text: "Comprueba que el tamaño del destino coincide con el del origen con unos pocos MB de margen. Abre una de las subcarpetas de instancia para confirmar que los archivos se leen de verdad, y no son marcadores o accesos directos." }
+      { name: "Verifica la copia", text: "Compara el número de archivos y su tamaño total con el origen detenido. Comprueba que los archivos de instancias, servidores y base de datos están presentes y se pueden leer. Conserva el original hasta verificar la restauración." }
     ],
     body: `<h2>Qué necesitas respaldar de verdad</h2>
 <p>Una sola carpeta: el runtime path. Dentro está cada instancia (con sus mods, mundos, configs, capturas, datos de mundo), los assets compartidos de Minecraft, las libraries compartidas, los runtimes de Java que descargó GDLauncher, la base de datos SQLite del launcher (<code>gdl_conf.db</code>) con tus cuentas y ajustes, y los logs generales en <code>__gdl_logs__/</code>. Respalda esa carpeta y tienes todo lo que importa.</p>
@@ -291,7 +295,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 <p>Si alguna vez moviste el runtime path desde los ajustes, la carpeta por defecto de arriba estará vacía o no existirá, y un archivo llamado <code>runtime_path_override</code> junto a ella apunta a la ubicación real. Ábrelo con cualquier editor de texto: su única línea es la ruta absoluta de tus datos.</p>
 
 <h2>Hacer la copia</h2>
-<p>Cierra GDLauncher primero. La base SQLite del runtime path se copia sin riesgo con el launcher cerrado, pero puede darte una copia corrupta si la pillas mientras escribe.</p>
+<p>Guarda y cierra cada juego normalmente. En cada servidor local, usa <strong>Stop</strong> y espera a que termine de guardar y se detenga. Después cierra GDLauncher por completo y espera a que salga su proceso core. Mantén juegos, servidores y launcher detenidos durante toda la copia.</p>
+<p>Copia <code>gdl_conf.db</code> junto con <code>gdl_conf.db-wal</code> y <code>gdl_conf.db-shm</code> si existen. Los cambios confirmados pueden seguir en el WAL incluso después de cerrar. Mantén juntos los archivos del mismo runtime detenido; no borres el WAL para reducir el tamaño de la copia.</p>
 <p>Luego copia la carpeta del runtime path, con su estructura intacta, a donde quieras la copia. Otro disco, un USB, un NAS, un archivo en la nube sin sincronizar: el destino da igual mientras no sea el disco que estás a punto de borrar.</p>
 
 <h2>Restaurar después del formateo</h2>
@@ -319,8 +324,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 </ul>
 
 <h2>Copia mínima si vas justo de espacio</h2>
-<p>Si no te cabe el runtime path entero, copia solo <code>&lt;runtime_path&gt;/instances/</code> y <code>&lt;runtime_path&gt;/gdl_conf.db</code>. En instances están tus mundos y configs, y en la base de datos tus cuentas y ajustes. Perderás los assets de Minecraft, las libraries y las instalaciones de Java en caché, pero todo eso se vuelve a descargar en el primer arranque.</p>
-<p>Como mínimo absoluto, copia la subcarpeta <code>instance/saves/</code> de cada instancia. Eso son solo tus archivos de mundo. Perderás la configuración de la instancia (lista de mods, versión, modloader) pero los mundos sobreviven y podrás cargarlos más adelante en una instancia creada de cero.</p>
+<p>Si no cabe el runtime path entero, detén primero todo como se explica arriba. Copia después <code>&lt;runtime_path&gt;/instances/</code>, <code>&lt;runtime_path&gt;/servers/</code> y <code>&lt;runtime_path&gt;/gdl_conf.db</code>, además de <code>gdl_conf.db-wal</code> y <code>gdl_conf.db-shm</code> si existen. instances y servers contienen mundos y configs; los archivos de base contienen cuentas y ajustes. Los assets de Minecraft, las libraries y el Java gestionado pueden descargarse de nuevo.</p>
+<p>Copiar solo <code>instance/saves/</code> de cada instancia conserva únicamente mundos de cliente. No incluye mundos de servidor, cuentas, mods ni configuración de la instancia. Antes de abrir un mundo copiado, restaura la versión de Minecraft, el modloader y los mods correspondientes. Para un servidor, conserva toda la carpeta correspondiente bajo <code>&lt;runtime_path&gt;/servers/</code>, con su configuración y los directorios de mundos personalizados.</p>
 
 <h2>Si además cambias de disco o de PC, no solo formateas</h2>
 <p>La misma copia, restaurada en la máquina nueva. Los datos del runtime de GDLauncher se mueven sin problema dentro de la misma familia de sistemas. Windows → Windows o Linux → Linux funciona directamente. Al cruzar entre Windows ↔ macOS ↔ Linux siguen funcionando mundos, configs, resource packs y la mayoría de mods, pero el launcher volverá a detectar Java (binarios distintos por sistema) y puede que redescargue libraries nativas en el primer arranque.</p>
@@ -334,9 +339,9 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
     description: "Faça backup de todos os dados do GDLauncher (instâncias, mundos, contas, Java, configurações) antes de formatar ou trocar de máquina, e restaure sem perder progresso.",
     steps: [
       { name: "Encontre seu runtime path", text: "Abra o GDLauncher e vá em Settings → Runtime Path. Copie o caminho mostrado no campo. Essa pasta guarda suas instâncias, mundos, Java, o banco do launcher e suas contas. É a única coisa que você precisa fazer backup." },
-      { name: "Feche o GDLauncher", text: "Encerre o GDLauncher por completo antes de copiar. Arquivos como o banco SQLite podem corromper no meio da cópia se o launcher estiver escrevendo neles ao mesmo tempo." },
+      { name: "Salve e pare jogos e servidores, depois feche o GDLauncher", text: "Salve e feche cada jogo normalmente. Use Stop em cada servidor local e espere terminar de salvar e parar. Depois encerre o GDLauncher por completo e espere seu processo core sair antes de copiar. Guarde gdl_conf.db junto com gdl_conf.db-wal e gdl_conf.db-shm, se existirem." },
       { name: "Copie a pasta do runtime path", text: "Copie a pasta do runtime path inteira pra onde você vai guardar o backup: HD externo, pendrive, NAS, um arquivo na nuvem sem sincronização, o que você tiver. Só mantenha a estrutura de pastas intacta." },
-      { name: "Confira a cópia", text: "Veja se o tamanho no destino bate com o da origem, com alguns MB de diferença. Abra uma das subpastas de instância pra confirmar que os arquivos são legíveis de verdade, e não placeholders ou atalhos." }
+      { name: "Confira a cópia", text: "Compare a quantidade de arquivos e o tamanho total deles com a origem parada. Confira se os arquivos das instâncias, dos servidores e do banco estão presentes e legíveis. Mantenha o original até verificar a restauração." }
     ],
     body: `<h2>O que você realmente precisa salvar</h2>
 <p>Uma pasta só: o runtime path. Dentro dela está cada instância (com mods, mundos, configs, screenshots, dados de mundo), os assets compartilhados do Minecraft, as libraries compartilhadas, os runtimes Java que o GDLauncher baixou, o banco SQLite do launcher (<code>gdl_conf.db</code>) com suas contas e configurações, e os logs gerais em <code>__gdl_logs__/</code>. Faça backup dessa pasta e você tem tudo que importa.</p>
@@ -353,7 +358,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 <p>Se você já moveu o runtime path pelas configurações, a pasta padrão acima vai estar vazia ou nem existir, e um arquivo chamado <code>runtime_path_override</code> ao lado dela aponta pro local real. Abra com qualquer editor de texto: a única linha dentro dele é o caminho absoluto dos seus dados.</p>
 
 <h2>Fazendo o backup</h2>
-<p>Feche o GDLauncher primeiro. O banco SQLite do runtime path é seguro de copiar com o launcher fechado, mas pode gerar uma cópia corrompida se você pegar ele no meio de uma escrita.</p>
+<p>Salve e feche cada jogo normalmente. Em cada servidor local, use <strong>Stop</strong> e espere terminar de salvar e parar. Depois encerre o GDLauncher por completo e espere seu processo core sair. Mantenha jogos, servidores e launcher parados durante toda a cópia.</p>
+<p>Copie <code>gdl_conf.db</code> junto com <code>gdl_conf.db-wal</code> e <code>gdl_conf.db-shm</code>, se existirem. Alterações confirmadas podem continuar no WAL mesmo depois de fechar. Mantenha juntos os arquivos do mesmo runtime parado; não apague o WAL para diminuir o backup.</p>
 <p>Depois copie a pasta do runtime path, com a estrutura intacta, pra onde você quer o backup. Outro drive, um pendrive, um NAS, um arquivo na nuvem offline: o destino não importa, desde que não seja o disco que você está prestes a apagar.</p>
 
 <h2>Restaurando depois de formatar</h2>
@@ -381,8 +387,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 </ul>
 
 <h2>Backup mínimo se estiver sem espaço</h2>
-<p>Se o runtime path inteiro não couber, copie só <code>&lt;runtime_path&gt;/instances/</code> e <code>&lt;runtime_path&gt;/gdl_conf.db</code>. Em instances estão seus mundos e configs, no banco estão suas contas e configurações. Você perde os assets do Minecraft, as libraries e as instalações de Java em cache, mas tudo isso baixa de novo na primeira execução.</p>
-<p>Pro mínimo absoluto, copie a subpasta <code>instance/saves/</code> de cada instância. Isso é só os arquivos de mundo. Você perde a configuração da instância (lista de mods, versão, modloader) mas os mundos sobrevivem e podem ser carregados depois numa instância criada do zero.</p>
+<p>Se o runtime path inteiro não couber, primeiro pare tudo como descrito acima. Depois copie <code>&lt;runtime_path&gt;/instances/</code>, <code>&lt;runtime_path&gt;/servers/</code> e <code>&lt;runtime_path&gt;/gdl_conf.db</code>, além de <code>gdl_conf.db-wal</code> e <code>gdl_conf.db-shm</code>, se existirem. instances e servers contêm mundos e configs; os arquivos do banco contêm contas e configurações. Assets do Minecraft, libraries e o Java gerenciado podem ser baixados novamente.</p>
+<p>Copiar apenas <code>instance/saves/</code> de cada instância preserva somente mundos de cliente. Não inclui mundos de servidor, contas, mods nem configurações da instância. Antes de abrir um mundo copiado, restaure a versão do Minecraft, o modloader e os mods correspondentes. Para dados de servidor, guarde toda a pasta correspondente em <code>&lt;runtime_path&gt;/servers/</code>, incluindo a configuração e diretórios de mundos personalizados.</p>
 
 <h2>Se você também vai trocar de disco ou de PC, não só formatar</h2>
 <p>Mesmo backup, restaurando na máquina nova. Os dados de runtime do GDLauncher viajam bem dentro da mesma família de sistema. Windows → Windows ou Linux → Linux funciona direto. Cruzando Windows ↔ macOS ↔ Linux, mundos, configs, resource packs e a maioria dos mods continuam funcionando, mas o launcher vai redetectar o Java (binários diferentes por sistema) e pode rebaixar libraries nativas na primeira execução.</p>
@@ -396,9 +402,9 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
     description: "Salva tutti i dati di GDLauncher (istanze, mondi, account, Java, impostazioni) prima di formattare o cambiare macchina, poi ripristinali senza perdere progressi.",
     steps: [
       { name: "Trova il tuo runtime path", text: "Apri GDLauncher e vai in Settings → Runtime Path. Copia il percorso mostrato nel campo. Quella cartella contiene istanze, mondi, Java, il database del launcher e i tuoi account. È l'unica cosa di cui devi fare il backup." },
-      { name: "Chiudi GDLauncher", text: "Esci completamente da GDLauncher prima di copiare. File come il database SQLite possono corrompersi a metà copia se il launcher ci sta scrivendo nello stesso momento." },
+      { name: "Salva e arresta giochi e server, poi chiudi GDLauncher", text: "Salva e chiudi normalmente ogni gioco. Usa Stop per ogni server locale e attendi che salvataggio e arresto siano completati. Poi esci completamente da GDLauncher e attendi la fine del processo core prima di copiare. Conserva gdl_conf.db insieme a gdl_conf.db-wal e gdl_conf.db-shm, se presenti." },
       { name: "Copia la cartella del runtime path", text: "Copia l'intera cartella del runtime path dove tieni il backup: disco esterno, chiavetta USB, NAS, un archivio cloud offline, quello che hai. Basta lasciare intatta la struttura delle cartelle." },
-      { name: "Verifica la copia", text: "Controlla che la dimensione a destinazione corrisponda a quella di origine a meno di qualche MB. Apri una delle sottocartelle di istanza per confermare che i file siano davvero leggibili, non segnaposto o collegamenti." }
+      { name: "Verifica la copia", text: "Confronta il numero di file e la loro dimensione totale con la sorgente arrestata. Verifica che i file di istanze, server e database siano presenti e leggibili. Conserva l'originale finché non hai verificato il ripristino." }
     ],
     body: `<h2>Cosa devi salvare davvero</h2>
 <p>Una cartella sola: il runtime path. Dentro ci sono tutte le istanze (con mod, mondi, config, screenshot, dati dei mondi), gli asset condivisi di Minecraft, le libraries condivise, i runtime Java scaricati da GDLauncher, il database SQLite del launcher (<code>gdl_conf.db</code>) con account e impostazioni, e i log a livello app sotto <code>__gdl_logs__/</code>. Fai il backup di quella cartella e hai tutto quello che conta.</p>
@@ -415,7 +421,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 <p>Se hai spostato il runtime path dalle impostazioni, la cartella di default qui sopra sarà vuota o non ci sarà proprio, e un file chiamato <code>runtime_path_override</code> lì accanto punta alla posizione reale. Aprilo con un editor di testo qualsiasi: la sua unica riga è il percorso assoluto dei tuoi dati.</p>
 
 <h2>Fare il backup</h2>
-<p>Prima chiudi GDLauncher. Il database SQLite nel runtime path si copia senza rischi a launcher chiuso, ma può darti una copia corrotta se lo prendi mentre ci sta scrivendo.</p>
+<p>Salva e chiudi normalmente ogni gioco. Per ogni server locale, usa <strong>Stop</strong> e attendi che salvataggio e arresto siano completati. Poi esci completamente da GDLauncher e attendi la fine del processo core. Lascia giochi, server e launcher arrestati durante tutta la copia.</p>
+<p>Copia <code>gdl_conf.db</code> insieme a <code>gdl_conf.db-wal</code> e <code>gdl_conf.db-shm</code>, se presenti. Le modifiche confermate possono restare nel WAL anche dopo la chiusura. Conserva insieme i file dello stesso runtime arrestato; non eliminare il WAL per ridurre il backup.</p>
 <p>Poi copia la cartella del runtime path, con la struttura intatta, dove vuoi tenere il backup. Un altro disco, una chiavetta, un NAS, un archivio cloud offline: la destinazione non conta, basta che non sia il disco che stai per cancellare.</p>
 
 <h2>Ripristinare dopo la formattazione</h2>
@@ -443,8 +450,8 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 </ul>
 
 <h2>Backup minimo se sei a corto di spazio</h2>
-<p>Se il runtime path intero non ci sta, copia solo <code>&lt;runtime_path&gt;/instances/</code> e <code>&lt;runtime_path&gt;/gdl_conf.db</code>. In instances ci sono mondi e config, nel database account e impostazioni. Perdi gli asset di Minecraft, le libraries e le installazioni Java in cache, ma quelli si riscaricano al primo avvio.</p>
-<p>Per il minimo assoluto, copia la sottocartella <code>instance/saves/</code> di ogni istanza. Sono solo i file dei mondi. Perdi la configurazione dell'istanza (lista mod, versione, modloader) ma i dati dei mondi sopravvivono e potrai caricarli in seguito in un'istanza creata da zero.</p>
+<p>Se il runtime path intero non ci sta, arresta prima tutto come descritto sopra. Poi copia <code>&lt;runtime_path&gt;/instances/</code>, <code>&lt;runtime_path&gt;/servers/</code> e <code>&lt;runtime_path&gt;/gdl_conf.db</code>, oltre a <code>gdl_conf.db-wal</code> e <code>gdl_conf.db-shm</code>, se presenti. instances e servers contengono mondi e config; i file del database contengono account e impostazioni. Gli asset Minecraft, le libraries e Java gestito possono essere riscaricati.</p>
+<p>Copiare solo <code>instance/saves/</code> di ogni istanza conserva esclusivamente mondi client. Non include mondi server, account, mod o configurazione dell'istanza. Prima di aprire un mondo copiato, ripristina la versione Minecraft, il modloader e le mod corrispondenti. Per i dati server, conserva l'intera cartella corrispondente sotto <code>&lt;runtime_path&gt;/servers/</code>, inclusi configurazione e directory dei mondi personalizzate.</p>
 
 <h2>Se oltre a formattare cambi anche disco o PC</h2>
 <p>Stesso backup, ripristino sulla macchina nuova. I dati runtime di GDLauncher si spostano bene all'interno della stessa famiglia di sistemi. Windows → Windows o Linux → Linux funziona direttamente. Passando tra Windows ↔ macOS ↔ Linux continuano a funzionare mondi, config, resource pack e la maggior parte delle mod, ma il launcher rileverà di nuovo Java (binari diversi per sistema) e potrebbe riscaricare librerie native al primo avvio.</p>
@@ -462,7 +469,7 @@ const m = meta[locale]
   title={m.title}
   description={m.description}
   keywords="backup gdlauncher, backup minecraft instances, save minecraft data before format, move gdlauncher new pc, restore gdlauncher, gdlauncher migration"
-  lastUpdated="May 2026"
+  lastUpdated="October 2026"
   howTo={{ totalTimeIso: "PT15M", steps: m.steps }}
 >
   <Fragment set:html={localizeInternalLinks(m.body, locale)} />
