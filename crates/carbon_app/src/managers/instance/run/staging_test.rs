@@ -23,7 +23,73 @@ use super::apply_plan::{
 };
 use super::disk_scan;
 use super::packinfo::{FileHashes, PackInfo};
-use super::{apply_user_cleanup, execute_plan, finish_promoted_staging, render_audit};
+use super::{finish_promoted_staging, render_audit};
+
+async fn bound_cleanup(
+    options: &super::RepairMarkerFile,
+    old: Option<&PackInfo>,
+    target: &PackInfo,
+    root: &std::path::Path,
+    insensitive: bool,
+) -> super::CleanupReport {
+    super::apply_bound_cleanup(
+        options,
+        old,
+        target,
+        root,
+        insensitive,
+        options.cleanup_selections.first().map(|s| &s.context),
+    )
+    .await
+}
+
+// Existing cleanup controls model a fresh explicit manual selection.
+async fn apply_user_cleanup(
+    paths: &[String],
+    old: Option<&PackInfo>,
+    target: &PackInfo,
+    root: &std::path::Path,
+    insensitive: bool,
+) -> Vec<String> {
+    let mut options = super::RepairMarkerFile::default();
+    for path in paths {
+        if live_path(root, path).is_file() && super::normalize_cleanup_path(path).is_some() {
+            let selected = cleanup_options(root, path).await;
+            options.cleanup_batch = selected.cleanup_batch;
+            options
+                .cleanup_selections
+                .extend(selected.cleanup_selections);
+        }
+    }
+    bound_cleanup(&options, old, target, root, insensitive)
+        .await
+        .removed
+}
+
+async fn execute_plan(
+    entries: &[PlanEntry],
+    root: &std::path::Path,
+    staging: &std::path::Path,
+) -> anyhow::Result<Vec<PlanEntry>> {
+    let mut target = super::packinfo::scan_dir(&staging.join("instance"), None).await?;
+    // Older planner fixtures use synthetic hashes. Supply the real fixture
+    // target for the supported pristine/no-download ReEnable executor control.
+    if entries
+        .iter()
+        .any(|e| e.action == PlanAction::ReEnable && !target.files.contains_key(&e.path))
+    {
+        let live = super::packinfo::scan_dir(&root.join("instance"), None).await?;
+        for entry in entries.iter().filter(|e| e.action == PlanAction::ReEnable) {
+            if let Some(hashes) = live.files.get(&entry.path) {
+                target
+                    .files
+                    .entry(entry.path.clone())
+                    .or_insert_with(|| hashes.clone());
+            }
+        }
+    }
+    super::execute_plan(entries, root, staging, &target).await
+}
 
 fn hashes(seed: u8) -> FileHashes {
     FileHashes {
@@ -288,8 +354,8 @@ async fn reenable_damaged_disabled_twin_uses_staged_bytes_and_drops_the_twin() {
         "the damaged twin must be dropped, not left behind"
     );
     assert!(
-        !staged_path(&staging_dir, PATH).exists(),
-        "the staged copy must be moved, not merely copied"
+        staged_path(&staging_dir, PATH).exists(),
+        "the original staged source must survive until finalization"
     );
 }
 
@@ -1827,5 +1893,2294 @@ async fn apply_started_marker_is_durably_creatable_and_discoverable() {
     assert!(
         marker_path.exists(),
         "the marker must be discoverable immediately after the sync sequence completes"
+    );
+}
+
+#[tokio::test]
+async fn task03_uppercase_save_is_preserved_by_real_execution() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/Saves/world/level.dat";
+    write_live(&root, path, b"played world").await;
+    write_staged(&staging, path, b"bundled world").await;
+    let target = packinfo(&[(path, 2)]);
+    let universe = [path.to_owned()].into_iter().collect();
+    let scan = disk_scan::scan_disk_state(&root.join("instance"), &universe)
+        .await
+        .unwrap();
+    let entries = apply_plan::plan(PlanInputs {
+        old: Some(&target),
+        target: &target,
+        staged: &[path.to_owned()].into_iter().collect(),
+        disk: &scan.states,
+        coexisting_disabled_twin_md5: &scan.coexisting_disabled_twin_md5,
+        mode: ApplyMode::Repair {
+            re_enable_disabled: false,
+        },
+        fs_case_insensitive: true,
+    })
+    .unwrap();
+    execute_plan(&entries, &root, &staging).await.unwrap();
+    assert_eq!(
+        std::fs::read(live_path(&root, path)).unwrap(),
+        b"played world"
+    );
+}
+
+#[tokio::test]
+async fn task03_late_save_create_is_preserved() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/saves/world/level.dat";
+    write_staged(&staging, path, b"bundled world").await;
+    let target = packinfo(&[(path, 2)]);
+    let entries = apply_plan::plan(PlanInputs {
+        old: None,
+        target: &target,
+        staged: &[path.to_owned()].into_iter().collect(),
+        disk: &HashMap::new(),
+        coexisting_disabled_twin_md5: &HashMap::new(),
+        mode: ApplyMode::Repair {
+            re_enable_disabled: false,
+        },
+        fs_case_insensitive: false,
+    })
+    .unwrap();
+    write_live(&root, path, b"late played world").await;
+    execute_plan(&entries, &root, &staging).await.unwrap();
+    assert_eq!(
+        std::fs::read(live_path(&root, path)).unwrap(),
+        b"late played world"
+    );
+    assert_eq!(
+        std::fs::read(staged_path(&staging, path)).unwrap(),
+        b"bundled world"
+    );
+}
+
+#[tokio::test]
+async fn task03_disabled_replace_failure_retains_source_for_retry() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/mods/b.jar";
+    write_staged(&staging, "/mods/b.jar.disabled", b"target disabled").await;
+    // Reject a non-file opposite before publication; retained staged input
+    // remains retryable once the invalid directory is repaired. The separate
+    // chmod regressions cover real IO failure after publication.
+    std::fs::create_dir_all(live_path(&root, path)).unwrap();
+    let entries = vec![PlanEntry {
+        path: path.into(),
+        action: PlanAction::Replace,
+        reason: PlanReason::PackUpdate,
+    }];
+    assert!(execute_plan(&entries, &root, &staging).await.is_err());
+    assert_eq!(
+        std::fs::read(staged_path(&staging, "/mods/b.jar.disabled")).unwrap(),
+        b"target disabled"
+    );
+    assert!(!disabled_path(&root, path).exists());
+    std::fs::remove_dir(live_path(&root, path)).unwrap();
+    write_live(&root, path, b"old bare").await;
+    execute_plan(&entries, &root, &staging).await.unwrap();
+    assert!(!live_path(&root, path).exists());
+    assert_eq!(
+        std::fs::read(disabled_path(&root, path)).unwrap(),
+        b"target disabled"
+    );
+}
+
+#[tokio::test]
+async fn task03_apply_refreshes_skip_oracle() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/mods/foo.jar";
+    let (_, oracle) = disk_scan::scan_instance_as_packinfo(&root.join("instance"))
+        .await
+        .unwrap();
+    write_disabled(&root, path, b"disabled mod").await;
+    write_staged(&staging, path, b"disabled mod").await;
+    let universe = [path.to_owned()].into_iter().collect();
+    let scan = super::scan_for_apply(&root.join("instance"), &universe, Some(oracle))
+        .await
+        .unwrap();
+    assert!(matches!(
+        scan.states.get(path),
+        Some(DiskState::Disabled { .. })
+    ));
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let entries = apply_plan::plan(PlanInputs {
+        old: Some(&target),
+        target: &target,
+        staged: &[path.to_owned()].into_iter().collect(),
+        disk: &scan.states,
+        coexisting_disabled_twin_md5: &scan.coexisting_disabled_twin_md5,
+        mode: ApplyMode::Repair {
+            re_enable_disabled: false,
+        },
+        fs_case_insensitive: false,
+    })
+    .unwrap();
+    let outcomes = super::execute_plan(&entries, &root, &staging, &target)
+        .await
+        .unwrap();
+    assert!(!live_path(&root, path).exists());
+    assert_eq!(
+        std::fs::read(disabled_path(&root, path)).unwrap(),
+        b"disabled mod"
+    );
+    assert!(render_audit(&outcomes, &[]).contains("/mods/foo.jar: disabled by user"));
+}
+
+#[tokio::test]
+async fn task03_legacy_cleanup_has_no_retroactive_consent() {
+    let (_tmp, root, _staging) = scaffold();
+    write_live(&root, "/config/retired.cfg", b"edited settings").await;
+    let target = packinfo(&[("/config/current.cfg", 1)]);
+    let removed = bound_cleanup(
+        &super::RepairMarkerFile {
+            cleanup_paths: vec!["/config/retired.cfg".into()],
+            ..Default::default()
+        },
+        None,
+        &target,
+        &root,
+        false,
+    )
+    .await
+    .removed;
+    assert!(removed.is_empty());
+    assert_eq!(
+        std::fs::read(live_path(&root, "/config/retired.cfg")).unwrap(),
+        b"edited settings"
+    );
+}
+
+async fn cleanup_options(root: &std::path::Path, path: &str) -> super::RepairMarkerFile {
+    use crate::managers::instance::modpack::{
+        CleanupSelection, PackProofContext, create_cleanup_batch, origin_check::hash_file_sha512,
+    };
+    super::RepairMarkerFile {
+        cleanup_selections: vec![CleanupSelection {
+            path: path.into(),
+            sha512: hex::encode(hash_file_sha512(&live_path(root, path)).await.unwrap()),
+            context: PackProofContext {
+                platform: "modrinth".into(),
+                project_id: "pack".into(),
+                version_id: "installed".into(),
+            },
+            proven: false,
+        }],
+        cleanup_batch: Some(create_cleanup_batch(root).unwrap()),
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn task03_selected_cleanup_preserves_later_edit() {
+    let (_tmp, root, _) = scaffold();
+    let path = "/config/retired.cfg";
+    write_live(&root, path, b"selected bytes").await;
+    let options = cleanup_options(&root, path).await;
+    write_live(&root, path, b"new edits").await;
+    let target = packinfo(&[("/config/current.cfg", 1)]);
+    let removed = bound_cleanup(&options, None, &target, &root, false)
+        .await
+        .removed;
+    assert!(removed.is_empty());
+    assert_eq!(std::fs::read(live_path(&root, path)).unwrap(), b"new edits");
+}
+
+#[tokio::test]
+async fn task03_cleanup_retains_payload_after_finalization_and_retry() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/config/retired.cfg";
+    write_live(&root, path, b"selected bytes").await;
+    let options = cleanup_options(&root, path).await;
+    let target = packinfo(&[("/config/current.cfg", 1)]);
+    assert_eq!(
+        bound_cleanup(&options, None, &target, &root, false)
+            .await
+            .removed,
+        vec![path]
+    );
+    let recovery = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap());
+    let entry = std::fs::read_dir(&recovery)
+        .unwrap()
+        .next()
+        .expect("retained entry")
+        .unwrap()
+        .path();
+    assert_eq!(
+        std::fs::read(entry.join("payload")).unwrap(),
+        b"selected bytes"
+    );
+    assert!(entry.join("entry.json").exists());
+    write_live(&root, path, b"replacement after cleanup").await;
+    bound_cleanup(&options, None, &target, &root, false).await;
+    assert_eq!(
+        std::fs::read(live_path(&root, path)).unwrap(),
+        b"replacement after cleanup"
+    );
+    finish_promoted_staging(&staging, &root.join(".setup"))
+        .await
+        .unwrap();
+    finish_promoted_staging(&staging, &root.join(".setup"))
+        .await
+        .unwrap();
+    std::fs::create_dir_all(root.join(".install_audit")).unwrap();
+    std::fs::write(root.join(".install_audit/audit.txt"), b"later audit").unwrap();
+    std::fs::remove_dir_all(root.join(".install_audit")).unwrap();
+    std::fs::remove_dir_all(root.join(".setup")).unwrap();
+    std::fs::create_dir(root.join(".setup")).unwrap();
+    assert!(entry.join("entry.json").exists());
+    assert_eq!(
+        std::fs::read(entry.join("payload")).unwrap(),
+        b"selected bytes"
+    );
+}
+
+// Path-scoped one-shot interleavings; only tests install hooks. The actual
+// publication/removal/move operations remain the production filesystem IO.
+type Hook = Box<dyn FnOnce() + Send>;
+static HOOKS: std::sync::LazyLock<std::sync::Mutex<HashMap<(&'static str, PathBuf), Hook>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+pub(in crate::managers::instance) fn hook(
+    event: &'static str,
+    path: PathBuf,
+    callback: impl FnOnce() + Send + 'static,
+) {
+    HOOKS
+        .lock()
+        .unwrap()
+        .insert((event, path), Box::new(callback));
+}
+pub(super) fn run_hook(event: &'static str, path: &std::path::Path) {
+    let callback = HOOKS.lock().unwrap().remove(&(event, path.to_owned()));
+    if let Some(callback) = callback {
+        callback();
+    }
+}
+
+/// A save written after the plan, just before the staged world is linked
+/// into place, is kept: the link never replaces what arrived first.
+#[tokio::test]
+async fn task03_no_clobber_at_actual_publication_boundary_and_audit() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/saves/new/level.dat";
+    write_staged(&staging, path, b"complete target").await;
+    let destination = live_path(&root, path);
+    let late = destination.clone();
+    hook("publish", destination, move || {
+        std::fs::write(late, b"late user world").unwrap()
+    });
+    let entries = vec![PlanEntry {
+        path: path.into(),
+        action: PlanAction::Create,
+        reason: PlanReason::RepairRestored,
+    }];
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+    assert_eq!(
+        std::fs::read(live_path(&root, path)).unwrap(),
+        b"late user world"
+    );
+    assert_eq!(
+        std::fs::read(staged_path(&staging, path)).unwrap(),
+        b"complete target"
+    );
+    assert!(!same_file::is_same_file(live_path(&root, path), staged_path(&staging, path)).unwrap());
+    assert_eq!(outcomes[0].action, PlanAction::Keep);
+    assert_eq!(outcomes[0].reason, PlanReason::PreservedExisting);
+    assert!(render_audit(&outcomes, &[]).contains("/saves/new/level.dat: already present"));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_permission_failure_resumes_original_disabled_repair_options() {
+    use std::os::unix::fs::PermissionsExt;
+    for flag in [false, true] {
+        let (_tmp, root, staging) = scaffold();
+        let path = "/mods/b.jar";
+        write_live(&root, path, b"old bare").await;
+        write_staged(&staging, "/mods/b.jar.disabled", b"verified target").await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let marker = super::RepairMarkerFile {
+            re_enable_disabled: flag,
+            ..Default::default()
+        };
+        let marker_bytes = serde_json::to_vec(&marker).unwrap();
+        let target_bytes = super::packinfo::make_packinfo(PackInfo {
+            files: target.files.clone(),
+        })
+        .unwrap()
+        .into_bytes();
+        std::fs::write(root.join(".setup/repair"), &marker_bytes).unwrap();
+        std::fs::write(root.join("tmp-packinfo.json"), &target_bytes).unwrap();
+        let live = live_path(&root, path);
+        let parent = live.parent().unwrap().to_owned();
+        let locked = parent.clone();
+        hook("remove-bare", live, move || {
+            std::fs::set_permissions(locked, std::fs::Permissions::from_mode(0o555)).unwrap()
+        });
+        let universe = [path.to_owned()].into_iter().collect();
+        for attempt in 0..2 {
+            let recorded: super::RepairMarkerFile =
+                serde_json::from_slice(&std::fs::read(root.join(".setup/repair")).unwrap())
+                    .unwrap();
+            let scan = super::scan_for_apply(&root.join("instance"), &universe, None)
+                .await
+                .unwrap();
+            let entries = apply_plan::plan(PlanInputs {
+                old: Some(&target),
+                target: &target,
+                staged: &[path.to_owned()].into_iter().collect(),
+                disk: &scan.states,
+                coexisting_disabled_twin_md5: &scan.coexisting_disabled_twin_md5,
+                mode: ApplyMode::Repair {
+                    re_enable_disabled: recorded.re_enable_disabled,
+                },
+                fs_case_insensitive: false,
+            })
+            .unwrap();
+            let result = super::execute_plan(&entries, &root, &staging, &target).await;
+            std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+            if attempt == 0 {
+                assert!(result.is_err(), "real permission-denied removal");
+                assert_eq!(std::fs::read(live_path(&root, path)).unwrap(), b"old bare");
+            } else {
+                result.unwrap();
+                assert!(!live_path(&root, path).exists());
+            }
+            assert_eq!(
+                std::fs::read(staged_path(&staging, "/mods/b.jar.disabled")).unwrap(),
+                b"verified target"
+            );
+            assert_eq!(
+                std::fs::read(disabled_path(&root, path)).unwrap(),
+                b"verified target"
+            );
+            assert_eq!(
+                std::fs::read(root.join(".setup/repair")).unwrap(),
+                marker_bytes
+            );
+            assert_eq!(
+                std::fs::read(root.join("tmp-packinfo.json")).unwrap(),
+                target_bytes
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn task03_cleanup_move_race_retains_and_restores_without_clobber() {
+    for occupied in [false, true] {
+        let (_tmp, root, _) = scaffold();
+        let path = "/config/retired.cfg";
+        write_live(&root, path, b"selected").await;
+        let options = cleanup_options(&root, path).await;
+        let live = live_path(&root, path);
+        let edit = live.clone();
+        hook("cleanup-move", live.clone(), move || {
+            std::fs::write(edit, b"racing edits").unwrap()
+        });
+        if occupied {
+            let new_live = live.clone();
+            hook("cleanup-moved", live, move || {
+                std::fs::write(new_live, b"new occupant").unwrap()
+            });
+        }
+        let result = bound_cleanup(
+            &options,
+            None,
+            &packinfo(&[("/config/current.cfg", 1)]),
+            &root,
+            false,
+        )
+        .await;
+        assert!(result.removed.is_empty());
+        assert_eq!(
+            std::fs::read(live_path(&root, path)).unwrap(),
+            if occupied {
+                b"new occupant".as_slice()
+            } else {
+                b"racing edits".as_slice()
+            }
+        );
+        let batch = root
+            .join(".repair-recovery")
+            .join(options.cleanup_batch.as_ref().unwrap());
+        let entry = std::fs::read_dir(batch)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        assert_eq!(
+            std::fs::read(entry.join("payload")).unwrap(),
+            b"racing edits"
+        );
+        assert!(
+            result
+                .notes
+                .join("\n")
+                .contains(&entry.join("payload").display().to_string())
+        );
+    }
+}
+
+#[tokio::test]
+async fn task03_interrupted_cleanup_finishes_same_payload_without_taking_new_file() {
+    let (_tmp, root, _) = scaffold();
+    let path = "/config/retired.cfg";
+    write_live(&root, path, b"selected").await;
+    let options = cleanup_options(&root, path).await;
+    let entry = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap())
+        .join(super::record_key(path));
+    std::fs::create_dir(&entry).unwrap();
+    let record = super::CleanupRecoveryEntry {
+        schema_version: 1,
+        selection: options.cleanup_selections[0].clone(),
+        payload: "payload".into(),
+        status: "pending".into(),
+    };
+    super::write_cleanup_record(&entry, &record).await.unwrap();
+    std::fs::rename(live_path(&root, path), entry.join("payload")).unwrap();
+    std::fs::write(entry.join("payload"), b"changed during interruption").unwrap();
+    let report = bound_cleanup(
+        &options,
+        None,
+        &packinfo(&[("/config/current.cfg", 1)]),
+        &root,
+        false,
+    )
+    .await;
+    assert!(report.removed.is_empty());
+    assert_eq!(
+        std::fs::read(live_path(&root, path)).unwrap(),
+        b"changed during interruption"
+    );
+    assert_eq!(
+        std::fs::read(entry.join("payload")).unwrap(),
+        b"changed during interruption"
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_physical_save_alias_and_sensitive_distinct_name() {
+    use std::os::unix::fs::symlink;
+    let (_tmp, root, staging) = scaffold();
+    // /Saves is a folder of its own on a case-sensitive volume, and the saves
+    // folder itself on a case-insensitive one (default APFS on macOS).
+    let insensitive = disk_scan::probe_case_insensitive(&root.join("instance")).await;
+    write_live(&root, "/saves/world/level.dat", b"played").await;
+    symlink("saves", root.join("instance/world-alias")).unwrap();
+    write_staged(&staging, "/world-alias/world/level.dat", b"bundled").await;
+    if !insensitive {
+        write_live(
+            &root,
+            "/Saves/world/level.dat",
+            b"separate sensitive content",
+        )
+        .await;
+    }
+    write_staged(&staging, "/Saves/world/level.dat", b"ordinary update").await;
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let scan = super::scan_for_apply(
+        &root.join("instance"),
+        &target.files.keys().cloned().collect(),
+        None,
+    )
+    .await
+    .unwrap();
+    let mut entries = apply_plan::plan(PlanInputs {
+        old: Some(&target),
+        target: &target,
+        staged: &target.files.keys().cloned().collect(),
+        disk: &scan.states,
+        coexisting_disabled_twin_md5: &scan.coexisting_disabled_twin_md5,
+        mode: ApplyMode::Repair {
+            re_enable_disabled: false,
+        },
+        fs_case_insensitive: insensitive,
+    })
+    .unwrap();
+    disk_scan::protect_resolved_saves(&mut entries, &root.join("instance"), Some(&target));
+    let outcomes = super::execute_plan(&entries, &root, &staging, &target)
+        .await
+        .unwrap();
+    assert_eq!(
+        std::fs::read(live_path(&root, "/saves/world/level.dat")).unwrap(),
+        b"played"
+    );
+    // A distinct /Saves takes the pack's update; the saves folder spelled
+    // /Saves keeps the played world.
+    assert_eq!(
+        std::fs::read(live_path(&root, "/Saves/world/level.dat")).unwrap(),
+        if insensitive {
+            b"played".as_slice()
+        } else {
+            b"ordinary update".as_slice()
+        }
+    );
+    assert!(render_audit(&outcomes, &[]).contains("/world-alias/world/level.dat: files in /saves"));
+    let candidates =
+        super::walk_untracked_files(&root.join("instance"), None, &target, insensitive).await;
+    assert!(!candidates.contains_key("/world-alias/world/level.dat"));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_case_ownership_fresh_scan_actual_update_and_modified_control() {
+    use std::os::unix::fs::symlink;
+    for modified in [false, true] {
+        let (_tmp, root, staging) = scaffold();
+        write_live(&root, "/Config/test.cfg", b"old").await;
+        let old = super::packinfo::scan_dir(&root.join("instance"), None)
+            .await
+            .unwrap();
+        // A case-insensitive volume (default APFS on macOS) already resolves
+        // config to Config; a case-sensitive one gets the same alias as a link.
+        if !disk_scan::probe_case_insensitive(&root.join("instance")).await {
+            symlink("Config", root.join("instance/config")).unwrap();
+        }
+        if modified {
+            write_live(&root, "/Config/test.cfg", b"user edits").await;
+        }
+        write_staged(&staging, "/config/test.cfg", b"new").await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let universe = old
+            .files
+            .keys()
+            .chain(target.files.keys())
+            .cloned()
+            .collect();
+        let scan = super::scan_for_apply(&root.join("instance"), &universe, None)
+            .await
+            .unwrap();
+        let entries = apply_plan::plan(PlanInputs {
+            old: Some(&old),
+            target: &target,
+            staged: &target.files.keys().cloned().collect(),
+            disk: &scan.states,
+            coexisting_disabled_twin_md5: &scan.coexisting_disabled_twin_md5,
+            mode: ApplyMode::VersionChange,
+            fs_case_insensitive: true,
+        })
+        .unwrap();
+        let outcomes = super::execute_plan(&entries, &root, &staging, &target)
+            .await
+            .unwrap();
+        assert_eq!(
+            std::fs::read(live_path(&root, "/Config/test.cfg")).unwrap(),
+            if modified {
+                b"user edits".as_slice()
+            } else {
+                b"new".as_slice()
+            }
+        );
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|e| e.action == PlanAction::Replace)
+                .count(),
+            usize::from(!modified)
+        );
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_publication_io_error_and_hash_mismatch_retain_source() {
+    use std::os::unix::fs::PermissionsExt;
+    let (_tmp, root, staging) = scaffold();
+    let path = "/mods/new.jar";
+    write_staged(&staging, path, b"complete target").await;
+    std::fs::create_dir_all(root.join("instance/mods")).unwrap();
+    let source = staged_path(&staging, path);
+    let destination = live_path(&root, path);
+    assert!(
+        super::publish_staged_copy(&source, &destination, Some([0; 64]), true)
+            .await
+            .is_err()
+    );
+    assert!(!destination.exists());
+    let parent = destination.parent().unwrap().to_owned();
+    let locked = parent.clone();
+    hook("publish", destination.clone(), move || {
+        std::fs::set_permissions(locked, std::fs::Permissions::from_mode(0o555)).unwrap()
+    });
+    let expected: [u8; 64] = sha2::Sha512::digest(b"complete target").into();
+    let result = super::publish_staged_copy(&source, &destination, Some(expected), true).await;
+    std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(result.is_err());
+    assert!(!destination.exists());
+    assert_eq!(std::fs::read(&source).unwrap(), b"complete target");
+    assert!(
+        super::publish_staged_copy(&source, &destination, Some(expected), true)
+            .await
+            .unwrap()
+    );
+    assert_eq!(std::fs::read(destination).unwrap(), b"complete target");
+    assert!(source.exists());
+}
+
+#[tokio::test]
+async fn task03_cleanup_context_change_preserves_selected_file() {
+    let (_tmp, root, _) = scaffold();
+    let path = "/config/retired.cfg";
+    write_live(&root, path, b"selected").await;
+    let options = cleanup_options(&root, path).await;
+    let mut context = options.cleanup_selections[0].context.clone();
+    context.version_id = "changed".into();
+    let report = super::apply_bound_cleanup(
+        &options,
+        None,
+        &packinfo(&[("/config/current.cfg", 1)]),
+        &root,
+        false,
+        Some(&context),
+    )
+    .await;
+    assert!(report.removed.is_empty());
+    assert_eq!(std::fs::read(live_path(&root, path)).unwrap(), b"selected");
+}
+
+#[test]
+fn task03_cleanup_audit_preserves_title_and_list_contract() {
+    let entries = vec![PlanEntry {
+        path: "/mods/new.jar".into(),
+        action: PlanAction::Create,
+        reason: PlanReason::PackUpdate,
+    }];
+    let cleanup = super::CleanupReport {
+        removed: vec!["/config/old.cfg".into()],
+        notes: vec!["Cleanup recovery: .repair-recovery/cleanup-example/".into()],
+    };
+    let audit = super::render_cleanup_audit(&entries, &cleanup);
+    assert!(audit.starts_with("GDLauncher Modpack Install/Update Audit\nCleanup recovery:"));
+    assert!(audit.contains("Files created:\n - /mods/new.jar\n"));
+    assert!(audit.contains(" - /config/old.cfg\n"));
+    assert_eq!(
+        super::render_cleanup_audit(&entries, &super::CleanupReport::default()),
+        render_audit(&entries, &[])
+    );
+}
+
+static IO_FAULTS: std::sync::LazyLock<std::sync::Mutex<HashSet<(&'static str, PathBuf)>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashSet::new()));
+pub(in crate::managers::instance) fn fail_io(event: &'static str, path: PathBuf) {
+    IO_FAULTS.lock().unwrap().insert((event, path));
+}
+pub(super) fn io_fault(event: &'static str, path: &std::path::Path) -> std::io::Result<()> {
+    if IO_FAULTS.lock().unwrap().remove(&(event, path.to_owned())) {
+        return Err(std::io::Error::other("one-shot durability barrier failure"));
+    }
+    Ok(())
+}
+
+/// One-shot hard-link failures, keyed by the publication's final destination
+/// (a replacement links to a private sibling first).
+static LINK_FAULTS: std::sync::LazyLock<std::sync::Mutex<HashMap<PathBuf, std::io::ErrorKind>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+fn fail_link(destination: PathBuf, kind: std::io::ErrorKind) {
+    LINK_FAULTS.lock().unwrap().insert(destination, kind);
+}
+pub(super) fn link_fault(destination: &std::path::Path) -> Option<std::io::Error> {
+    count_attempt("link", destination);
+    if under_any(&NO_LINKS, destination) {
+        // EPERM on Linux vfat and exfat; ERROR_INVALID_FUNCTION, the same
+        // code, from Windows FAT.
+        return Some(std::io::Error::from_raw_os_error(1));
+    }
+    LINK_FAULTS
+        .lock()
+        .unwrap()
+        .remove(destination)
+        .map(std::io::Error::from)
+}
+
+/// Folders on a volume that refuses every hard link (FAT32, exFAT, some
+/// network shares), and folders that no move from staging reaches (another
+/// drive), for every publication under them. Each test names its own.
+static NO_LINKS: std::sync::LazyLock<std::sync::Mutex<Vec<PathBuf>>> =
+    std::sync::LazyLock::new(Default::default);
+static OTHER_DRIVE: std::sync::LazyLock<std::sync::Mutex<Vec<PathBuf>>> =
+    std::sync::LazyLock::new(Default::default);
+pub(in crate::managers::instance) fn without_hard_links(dir: PathBuf) {
+    NO_LINKS.lock().unwrap().push(dir);
+}
+pub(in crate::managers::instance) fn on_another_drive(dir: PathBuf) {
+    OTHER_DRIVE.lock().unwrap().push(dir);
+}
+fn under_any(
+    dirs: &std::sync::LazyLock<std::sync::Mutex<Vec<PathBuf>>>,
+    path: &std::path::Path,
+) -> bool {
+    dirs.lock().unwrap().iter().any(|dir| path.starts_with(dir))
+}
+pub(super) fn move_fault(destination: &std::path::Path) -> Option<std::io::Error> {
+    count_attempt("move", destination);
+    under_any(&OTHER_DRIVE, destination)
+        .then(|| std::io::Error::from_raw_os_error(crate::util::publish::fault::CROSS_DEVICE))
+}
+
+/// Link and move attempts per destination, so parallel tests count only
+/// their own.
+static ATTEMPTS: std::sync::LazyLock<std::sync::Mutex<HashMap<(&'static str, PathBuf), usize>>> =
+    std::sync::LazyLock::new(Default::default);
+fn count_attempt(step: &'static str, destination: &std::path::Path) {
+    *ATTEMPTS
+        .lock()
+        .unwrap()
+        .entry((step, destination.to_owned()))
+        .or_default() += 1;
+}
+/// How many `step` ("link" or "move") attempts were made under `dir`.
+pub(in crate::managers::instance) fn attempts_under(
+    step: &'static str,
+    dir: &std::path::Path,
+) -> usize {
+    ATTEMPTS
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|((made, path), _)| *made == step && path.starts_with(dir))
+        .map(|(_, count)| count)
+        .sum()
+}
+
+/// Directory syncs per path, so parallel tests count only their own.
+/// Windows has no directory sync, so nothing is recorded there.
+static SYNCS: std::sync::LazyLock<std::sync::Mutex<HashMap<PathBuf, usize>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+#[cfg_attr(windows, allow(dead_code))]
+pub(super) fn record_sync(dir: &std::path::Path) {
+    *SYNCS.lock().unwrap().entry(dir.to_owned()).or_default() += 1;
+}
+pub(in crate::managers::instance) fn syncs_under(dir: &std::path::Path) -> HashMap<PathBuf, usize> {
+    SYNCS
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(path, _)| path.starts_with(dir))
+        .map(|(path, count)| (path.clone(), *count))
+        .collect()
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_r1_recovery_ancestor_barriers_precede_move() {
+    let (_tmp, root, _) = scaffold();
+    let path = "/config/retired.cfg";
+    write_live(&root, path, b"selected").await;
+    let options = cleanup_options(&root, path).await;
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    for (name, directory) in [
+        ("root", root.clone()),
+        ("recovery", root.join(".repair-recovery")),
+        (
+            "batch",
+            root.join(".repair-recovery")
+                .join(options.cleanup_batch.as_ref().unwrap()),
+        ),
+    ] {
+        let seen = seen.clone();
+        hook("sync-directory", directory, move || {
+            seen.lock().unwrap().push(name)
+        });
+    }
+    hook("cleanup-move", live_path(&root, path), move || {
+        assert_eq!(*seen.lock().unwrap(), vec!["root", "recovery", "batch"])
+    });
+    let report = bound_cleanup(
+        &options,
+        None,
+        &packinfo(&[("/config/current.cfg", 1)]),
+        &root,
+        false,
+    )
+    .await;
+    assert_eq!(report.removed, [path]);
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_r1_recovery_ancestor_failure_preserves_live() {
+    for ancestor in ["root", "recovery"] {
+        let (_tmp, root, _) = scaffold();
+        let path = "/config/retired.cfg";
+        write_live(&root, path, b"selected").await;
+        let options = cleanup_options(&root, path).await;
+        fail_io(
+            "sync-directory",
+            if ancestor == "root" {
+                root.clone()
+            } else {
+                root.join(".repair-recovery")
+            },
+        );
+        let report = bound_cleanup(
+            &options,
+            None,
+            &packinfo(&[("/config/current.cfg", 1)]),
+            &root,
+            false,
+        )
+        .await;
+        assert!(report.removed.is_empty());
+        assert_eq!(std::fs::read(live_path(&root, path)).unwrap(), b"selected");
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_r1_payload_sync_failure_is_not_reported_as_retained_success() {
+    let (_tmp, root, _) = scaffold();
+    let path = "/config/retired.cfg";
+    write_live(&root, path, b"selected").await;
+    let options = cleanup_options(&root, path).await;
+    let payload = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap())
+        .join(super::record_key(path))
+        .join("payload");
+    fail_io("sync-file", payload.clone());
+    let report = bound_cleanup(
+        &options,
+        None,
+        &packinfo(&[("/config/current.cfg", 1)]),
+        &root,
+        false,
+    )
+    .await;
+    assert!(report.removed.is_empty());
+    assert_eq!(std::fs::read(payload).unwrap(), b"selected");
+    assert!(
+        report
+            .notes
+            .join("\n")
+            .contains("durability barrier failure")
+    );
+}
+
+async fn round1_apply(
+    root: &std::path::Path,
+    staging: &std::path::Path,
+    target: &PackInfo,
+    options: &super::RepairMarkerFile,
+) -> anyhow::Result<String> {
+    let universe = target.files.keys().cloned().collect();
+    let scan = super::scan_for_apply(&root.join("instance"), &universe, None).await?;
+    let staged = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await?
+        .files
+        .into_keys()
+        .collect();
+    let entries = super::plan_staging(
+        PlanInputs {
+            old: Some(target),
+            target,
+            staged: &staged,
+            disk: &scan.states,
+            coexisting_disabled_twin_md5: &scan.coexisting_disabled_twin_md5,
+            mode: ApplyMode::Repair {
+                re_enable_disabled: options.re_enable_disabled,
+            },
+            fs_case_insensitive: false,
+        },
+        root,
+        Some(options),
+    )
+    .await?;
+    let mut report = super::CleanupReport::default();
+    let actual = super::execute_bound_plan(
+        &entries,
+        root,
+        staging,
+        target,
+        Some(options),
+        &mut report.notes,
+    )
+    .await?;
+    Ok(super::render_cleanup_audit(&actual, &report))
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_r1_reenable_removal_interruption_resumes_same_files_and_audit() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut audits = Vec::new();
+    for interrupted in [false, true] {
+        let (_tmp, root, staging) = scaffold();
+        let path = "/mods/a.jar";
+        write_live(&root, "/mods/a.jar.disabled", b"old twin").await;
+        write_staged(&staging, path, b"target").await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let options = super::RepairMarkerFile {
+            re_enable_disabled: true,
+            ..Default::default()
+        };
+        if interrupted {
+            let parent = disabled_path(&root, path).parent().unwrap().to_owned();
+            let locked = parent.clone();
+            hook("remove-twin", disabled_path(&root, path), move || {
+                std::fs::set_permissions(locked, std::fs::Permissions::from_mode(0o555)).unwrap()
+            });
+            let first = round1_apply(&root, &staging, &target, &options).await;
+            std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+            assert!(first.is_err(), "real first-attempt IO error");
+        }
+        audits.push(
+            round1_apply(&root, &staging, &target, &options)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(std::fs::read(live_path(&root, path)).unwrap(), b"target");
+        assert!(
+            !disabled_path(&root, path).exists(),
+            "resume must finish original ReEnable intent"
+        );
+    }
+    assert_eq!(audits[0], audits[1]);
+}
+
+#[tokio::test]
+async fn task03_r1_completed_disabled_replace_retries_both_flags_same_audit() {
+    for flag in [false, true] {
+        let (_tmp, root, staging) = scaffold();
+        let path = "/mods/a.jar";
+        write_live(&root, path, b"old bare").await;
+        write_staged(&staging, "/mods/a.jar.disabled", b"target").await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let options = super::RepairMarkerFile {
+            re_enable_disabled: flag,
+            ..Default::default()
+        };
+        let uninterrupted = round1_apply(&root, &staging, &target, &options)
+            .await
+            .unwrap();
+        let resumed = round1_apply(&root, &staging, &target, &options)
+            .await
+            .unwrap();
+        assert!(
+            !live_path(&root, path).exists(),
+            "flag {flag} must retain disabled-default Replace outcome"
+        );
+        assert_eq!(
+            std::fs::read(disabled_path(&root, path)).unwrap(),
+            b"target"
+        );
+        assert_eq!(
+            uninterrupted, resumed,
+            "flag {flag}: audit must describe original completed operation"
+        );
+    }
+}
+
+#[tokio::test]
+async fn task03_r1_opposite_edited_during_publication_is_preserved_with_audit() {
+    for disabled in [false, true] {
+        let (_tmp, root, staging) = scaffold();
+        let path = "/mods/a.jar";
+        let opposite = if disabled {
+            live_path(&root, path)
+        } else {
+            disabled_path(&root, path)
+        };
+        let dest = if disabled {
+            disabled_path(&root, path)
+        } else {
+            live_path(&root, path)
+        };
+        std::fs::create_dir_all(opposite.parent().unwrap()).unwrap();
+        std::fs::write(&opposite, b"old").unwrap();
+        write_staged(
+            &staging,
+            if disabled {
+                "/mods/a.jar.disabled"
+            } else {
+                path
+            },
+            b"target",
+        )
+        .await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let edited = opposite.clone();
+        hook("publish", dest, move || {
+            std::fs::write(edited, b"external edit").unwrap()
+        });
+        let options = super::RepairMarkerFile {
+            re_enable_disabled: true,
+            ..Default::default()
+        };
+        let audit = round1_apply(&root, &staging, &target, &options)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(&opposite).unwrap(), b"external edit");
+        assert!(
+            audit.contains("Representation conflict preserved"),
+            "{audit}"
+        );
+        assert_eq!(
+            round1_apply(&root, &staging, &target, &options)
+                .await
+                .unwrap(),
+            audit
+        );
+    }
+}
+
+#[tokio::test]
+async fn task03_r1_transition_binding_rejects_changed_options_target_and_malformed_record() {
+    for changed in ["options", "target", "malformed", "foreign"] {
+        let (_tmp, root, staging) = scaffold();
+        let path = "/mods/a.jar";
+        write_live(&root, path, b"old").await;
+        write_staged(&staging, "/mods/a.jar.disabled", b"target").await;
+        let mut target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let mut options = super::RepairMarkerFile::default();
+        round1_apply(&root, &staging, &target, &options)
+            .await
+            .unwrap();
+        let file = super::transition_path(&root, path);
+        match changed {
+            "options" => options.re_enable_disabled = true,
+            "target" => {
+                target.files.insert("/mods/another.jar".into(), hashes(42));
+            }
+            "malformed" => std::fs::write(&file, b"malformed record retained").unwrap(),
+            "foreign" => {
+                let mut r = super::read_transition(&file).await.unwrap();
+                r.schema_version = 999;
+                super::write_transition(&file, &r, false).await.unwrap();
+            }
+            _ => unreachable!(),
+        }
+        let diagnostic = std::fs::read(&file).unwrap();
+        assert!(
+            round1_apply(&root, &staging, &target, &options)
+                .await
+                .is_err(),
+            "{changed}"
+        );
+        assert_eq!(std::fs::read(&file).unwrap(), diagnostic);
+        assert!(!live_path(&root, path).exists());
+        assert_eq!(
+            std::fs::read(disabled_path(&root, path)).unwrap(),
+            b"target"
+        );
+    }
+}
+
+#[tokio::test]
+async fn task03_r1_completion_record_failure_reuses_original_payload_and_audit() {
+    for disabled in [false, true] {
+        let mut audits = Vec::new();
+        for interrupted in [false, true] {
+            let (_tmp, root, staging) = scaffold();
+            let path = "/mods/a.jar";
+            write_live(
+                &root,
+                if disabled {
+                    path
+                } else {
+                    "/mods/a.jar.disabled"
+                },
+                b"original",
+            )
+            .await;
+            write_staged(
+                &staging,
+                if disabled {
+                    "/mods/a.jar.disabled"
+                } else {
+                    path
+                },
+                b"target",
+            )
+            .await;
+            let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+                .await
+                .unwrap();
+            let options = super::RepairMarkerFile {
+                re_enable_disabled: true,
+                ..Default::default()
+            };
+            if interrupted {
+                fail_io("transition-complete", super::transition_path(&root, path));
+                assert!(
+                    round1_apply(&root, &staging, &target, &options)
+                        .await
+                        .is_err()
+                );
+            }
+            audits.push(
+                round1_apply(&root, &staging, &target, &options)
+                    .await
+                    .unwrap(),
+            );
+            let record = super::read_transition(&super::transition_path(&root, path))
+                .await
+                .unwrap();
+            let payload = super::transition_batch(&root, &record)
+                .join(super::record_key(path))
+                .join("payload");
+            assert_eq!(std::fs::read(&payload).unwrap(), b"original");
+            assert_eq!(
+                std::fs::read_dir(root.join(".repair-recovery"))
+                    .unwrap()
+                    .count(),
+                1
+            );
+            let opposite = if disabled {
+                live_path(&root, path)
+            } else {
+                disabled_path(&root, path)
+            };
+            std::fs::write(&opposite, b"new occupant after completion").unwrap();
+            let audit = round1_apply(&root, &staging, &target, &options)
+                .await
+                .unwrap();
+            assert!(audit.contains("Representation conflict preserved"));
+            assert_eq!(
+                std::fs::read(&opposite).unwrap(),
+                b"new occupant after completion"
+            );
+            assert_eq!(std::fs::read(payload).unwrap(), b"original");
+        }
+        assert_eq!(audits[0], audits[1]);
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_r1_intent_and_manifest_write_failure_preserve_live_and_resume() {
+    for barrier in ["intent", "manifest"] {
+        let (_tmp, root, staging) = scaffold();
+        let path = "/mods/a.jar";
+        write_live(&root, path, b"original").await;
+        write_staged(&staging, "/mods/a.jar.disabled", b"target").await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let options = super::RepairMarkerFile::default();
+        let record_path = super::transition_path(&root, path);
+        if barrier == "intent" {
+            fail_io("transition-record", record_path.clone());
+        } else {
+            // Fail the hierarchy barrier once, leaving only durable intent;
+            // then fail its immutable recovery manifest on the next attempt.
+            fail_io("sync-directory", root.clone());
+            assert!(
+                round1_apply(&root, &staging, &target, &options)
+                    .await
+                    .is_err()
+            );
+            let record = super::read_transition(&record_path).await.unwrap();
+            let manifest = super::transition_batch(&root, &record)
+                .join(super::record_key(path))
+                .join("entry.json");
+            fail_io("transition-record", manifest);
+        }
+        assert!(
+            round1_apply(&root, &staging, &target, &options)
+                .await
+                .is_err()
+        );
+        assert_eq!(std::fs::read(live_path(&root, path)).unwrap(), b"original");
+        assert!(!disabled_path(&root, path).exists());
+        round1_apply(&root, &staging, &target, &options)
+            .await
+            .unwrap();
+        let record = super::read_transition(&record_path).await.unwrap();
+        let payload = super::transition_batch(&root, &record)
+            .join(super::record_key(path))
+            .join("payload");
+        assert_eq!(std::fs::read(payload).unwrap(), b"original");
+        assert!(!live_path(&root, path).exists());
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_r1_conflict_restore_failure_resumes_retained_payload() {
+    use std::os::unix::fs::PermissionsExt;
+    let (_tmp, root, staging) = scaffold();
+    let path = "/mods/a.jar";
+    write_live(&root, path, b"original").await;
+    write_staged(&staging, "/mods/a.jar.disabled", b"target").await;
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let options = super::RepairMarkerFile::default();
+    let opposite = live_path(&root, path);
+    let edited = opposite.clone();
+    hook("publish", disabled_path(&root, path), move || {
+        std::fs::write(edited, b"external edit").unwrap()
+    });
+    let parent = opposite.parent().unwrap().to_owned();
+    let locked = parent.clone();
+    hook("publish", opposite.clone(), move || {
+        std::fs::set_permissions(locked, std::fs::Permissions::from_mode(0o555)).unwrap()
+    });
+    let result = round1_apply(&root, &staging, &target, &options).await;
+    std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(result.is_err(), "real denied no-clobber restore");
+    let record_path = super::transition_path(&root, path);
+    let record = super::read_transition(&record_path).await.unwrap();
+    let payload = super::transition_batch(&root, &record)
+        .join(super::record_key(path))
+        .join("payload");
+    assert_eq!(std::fs::read(&payload).unwrap(), b"external edit");
+    let audit = round1_apply(&root, &staging, &target, &options)
+        .await
+        .unwrap();
+    assert!(audit.contains("Representation conflict preserved"));
+    assert_eq!(std::fs::read(&opposite).unwrap(), b"external edit");
+    assert_eq!(std::fs::read(&payload).unwrap(), b"external edit");
+    assert_eq!(
+        std::fs::read_dir(root.join(".repair-recovery"))
+            .unwrap()
+            .count(),
+        1
+    );
+    assert_eq!(
+        round1_apply(&root, &staging, &target, &options)
+            .await
+            .unwrap(),
+        audit
+    );
+}
+
+#[tokio::test]
+async fn task03_r1_fresh_setup_uses_new_recovery_storage() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/mods/a.jar";
+    let options = super::RepairMarkerFile::default();
+    for original in [b"first original".as_slice(), b"second original".as_slice()] {
+        write_live(&root, path, original).await;
+        write_staged(&staging, "/mods/a.jar.disabled", b"target").await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        round1_apply(&root, &staging, &target, &options)
+            .await
+            .unwrap();
+        let record = super::read_transition(&super::transition_path(&root, path))
+            .await
+            .unwrap();
+        let payload = super::transition_batch(&root, &record)
+            .join(super::record_key(path))
+            .join("payload");
+        assert_eq!(std::fs::read(&payload).unwrap(), original);
+        std::fs::remove_dir_all(root.join(".setup")).unwrap();
+        std::fs::create_dir_all(staging.join("instance")).unwrap();
+        assert_eq!(std::fs::read(&payload).unwrap(), original);
+    }
+    assert_eq!(
+        std::fs::read_dir(root.join(".repair-recovery"))
+            .unwrap()
+            .count(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn task03_r1_pristine_no_download_reenable_has_same_resume_audit() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/mods/a.jar";
+    write_live(&root, "/mods/a.jar.disabled", b"verified installed bytes").await;
+    let target = super::packinfo::scan_dir(&root.join("instance"), None)
+        .await
+        .unwrap();
+    let options = super::RepairMarkerFile {
+        re_enable_disabled: true,
+        ..Default::default()
+    };
+    let first = round1_apply(&root, &staging, &target, &options)
+        .await
+        .unwrap();
+    assert_eq!(
+        round1_apply(&root, &staging, &target, &options)
+            .await
+            .unwrap(),
+        first
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, path)).unwrap(),
+        b"verified installed bytes"
+    );
+    assert!(!disabled_path(&root, path).exists());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn task03_r1_cleanup_payload_failure_resume_syncs_both_rename_directories() {
+    let (_tmp, root, _staging) = scaffold();
+    let path = "/config/retired.cfg";
+    write_live(&root, path, b"selected bytes").await;
+    let options = cleanup_options(&root, path).await;
+    let entry = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap())
+        .join(super::record_key(path));
+    fail_io("sync-file", entry.join("payload"));
+    let target = packinfo(&[("/config/current.cfg", 1)]);
+    assert!(
+        bound_cleanup(&options, None, &target, &root, false)
+            .await
+            .removed
+            .is_empty()
+    );
+    assert_eq!(
+        std::fs::read(entry.join("payload")).unwrap(),
+        b"selected bytes"
+    );
+    let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    for (name, path) in [
+        ("entry", entry.clone()),
+        (
+            "source",
+            live_path(&root, path).parent().unwrap().to_owned(),
+        ),
+    ] {
+        let events = events.clone();
+        hook("sync-directory", path, move || {
+            events.lock().unwrap().push(name)
+        });
+    }
+    assert_eq!(
+        bound_cleanup(&options, None, &target, &root, false)
+            .await
+            .removed,
+        vec![path]
+    );
+    assert_eq!(*events.lock().unwrap(), vec!["entry", "source"]);
+    assert_eq!(
+        std::fs::read(entry.join("payload")).unwrap(),
+        b"selected bytes"
+    );
+}
+
+#[tokio::test]
+async fn task03_r1_resume_keeps_full_case_ownership_for_other_entries() {
+    let (_tmp, root, staging) = scaffold();
+    let path = "/mods/a.jar";
+    let alias = "/mods/A.jar";
+    write_live(&root, "/mods/a.jar.disabled", b"target").await;
+    let target = super::packinfo::scan_dir(&root.join("instance"), None)
+        .await
+        .unwrap();
+    let options = super::RepairMarkerFile {
+        re_enable_disabled: true,
+        ..Default::default()
+    };
+    round1_apply(&root, &staging, &target, &options)
+        .await
+        .unwrap();
+    let old = PackInfo {
+        files: [(alias.into(), target.files[path].clone())]
+            .into_iter()
+            .collect(),
+    };
+    let disk = [
+        (
+            path.into(),
+            DiskState::Present {
+                md5: target.files[path].md5,
+            },
+        ),
+        (
+            alias.into(),
+            DiskState::Present {
+                md5: target.files[path].md5,
+            },
+        ),
+    ]
+    .into_iter()
+    .collect();
+    for insensitive in [false, true] {
+        let entries = super::plan_staging(
+            PlanInputs {
+                old: Some(&old),
+                target: &target,
+                staged: &HashSet::new(),
+                disk: &disk,
+                coexisting_disabled_twin_md5: &HashMap::new(),
+                mode: ApplyMode::Repair {
+                    re_enable_disabled: true,
+                },
+                fs_case_insensitive: insensitive,
+            },
+            &root,
+            Some(&options),
+        )
+        .await
+        .unwrap();
+        let alias_entry = entries.iter().find(|e| e.path == alias).unwrap();
+        assert_eq!(
+            alias_entry.action,
+            if insensitive {
+                PlanAction::Keep
+            } else {
+                PlanAction::Delete
+            }
+        );
+        if insensitive {
+            assert_eq!(
+                alias_entry.reason,
+                PlanReason::CaseAliasedByTarget {
+                    surviving_path: path.into()
+                }
+            );
+        }
+    }
+}
+
+/// Like [`scaffold`], under an instance root of 210+ characters built from
+/// several components, so it is valid on every OS. Windows (no longPathAware
+/// manifest in the test binary or the core) refuses plain Win32 paths of 260+
+/// characters, which every record and deep pack file below crosses.
+fn long_scaffold() -> (tempfile::TempDir, PathBuf, PathBuf) {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut root = tmp.path().to_path_buf();
+    while root.as_os_str().len() < 210 {
+        root.push("Vault Hunters 3rd Edition - instance");
+    }
+    let staging = root.join(".setup").join("staging");
+    std::fs::create_dir_all(root.join("instance")).unwrap();
+    std::fs::create_dir_all(staging.join("instance")).unwrap();
+    (tmp, root, staging)
+}
+
+#[tokio::test]
+async fn long_instance_root_publishes_deep_files_transitions_and_cleanup() {
+    let (_tmp, root, staging) = long_scaffold();
+    let deep = format!("/kubejs/{}/{}", "a".repeat(40), "b".repeat(40));
+    let create = format!("{deep}/created.json");
+    let replace = format!("{deep}/replaced.json");
+    const REENABLE: &str = "/mods/pristine.jar";
+    let retired = format!("{deep}/retired.cfg");
+    assert!(live_path(&root, &create).as_os_str().len() >= 270);
+
+    // (a) Ordinary Create and Replace whose live paths pass 270 characters.
+    write_staged(&staging, &create, b"created").await;
+    write_staged(&staging, &replace, b"new pack bytes").await;
+    write_live(&root, &replace, b"old pack bytes").await;
+    // (b) A ReEnable representation transition: intent record and manifest.
+    write_disabled(&root, REENABLE, b"pristine").await;
+    let entries = vec![
+        PlanEntry {
+            path: create.clone(),
+            action: PlanAction::Create,
+            reason: PlanReason::PackUpdate,
+        },
+        PlanEntry {
+            path: REENABLE.into(),
+            action: PlanAction::ReEnable,
+            reason: PlanReason::ReEnabled,
+        },
+        PlanEntry {
+            path: replace.clone(),
+            action: PlanAction::Replace,
+            reason: PlanReason::PackUpdate,
+        },
+    ];
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+    assert_eq!(
+        outcomes.iter().map(|e| &e.action).collect::<Vec<_>>(),
+        [
+            &PlanAction::Create,
+            &PlanAction::ReEnable,
+            &PlanAction::Replace
+        ]
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, &create)).unwrap(),
+        b"created"
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, &replace)).unwrap(),
+        b"new pack bytes"
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, REENABLE)).unwrap(),
+        b"pristine"
+    );
+    assert!(!disabled_path(&root, REENABLE).exists());
+    let record = super::transition_path(&root, REENABLE);
+    assert!(record.as_os_str().len() >= 260);
+    let transition: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+    assert_eq!(transition["completed"], true);
+    let recovery = root
+        .join(".repair-recovery")
+        .join(transition["recovery_batch"].as_str().unwrap())
+        .join(super::record_key(REENABLE));
+    assert!(recovery.join("entry.json").is_file());
+    assert_eq!(
+        std::fs::read(recovery.join("payload")).unwrap(),
+        b"pristine"
+    );
+
+    // (c) A ticked stale file is moved into retained recovery, not kept.
+    write_live(&root, &retired, b"stale").await;
+    let options = cleanup_options(&root, &retired).await;
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let report = bound_cleanup(&options, None, &target, &root, false).await;
+    assert_eq!(report.removed, [retired.clone()], "{:?}", report.notes);
+    assert!(!live_path(&root, &retired).exists());
+    let entry = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap())
+        .join(super::record_key(&retired));
+    assert!(entry.join("entry.json").is_file());
+    assert_eq!(std::fs::read(entry.join("payload")).unwrap(), b"stale");
+}
+
+#[test]
+fn record_names_stay_short_and_distinct() {
+    let key = super::record_key("/mods/a.jar");
+    assert_eq!(key.len(), 32);
+    assert!(key.bytes().all(|b| b.is_ascii_hexdigit()));
+    assert_ne!(key, super::record_key("/mods/b.jar"));
+    let root = std::path::Path::new("root");
+    let manifest = root
+        .join(".repair-recovery")
+        .join("cleanup-AbC123")
+        .join(&key)
+        .join("entry.json");
+    assert_eq!(manifest.as_os_str().len() - root.as_os_str().len(), 76);
+    let record = super::transition_path(root, "/mods/a.jar");
+    assert_eq!(record.as_os_str().len() - root.as_os_str().len(), 72);
+}
+
+/// macOS volumes without a no-replace rename (exFAT, FAT, NTFS, SMB, NFS)
+/// return ENOTSUP from it. Creates still publish there and never overwrite.
+#[cfg(unix)]
+#[tokio::test]
+async fn unsupported_no_replace_rename_still_publishes_without_overwriting() {
+    use crate::util::publish::fault::{ENOTSUP, Step, inject, pending};
+    let (_tmp, root, staging) = scaffold();
+    let path = "/mods/new.jar";
+    write_staged(&staging, path, b"complete target").await;
+    std::fs::create_dir_all(root.join("instance/mods")).unwrap();
+    let source = staged_path(&staging, path);
+    let destination = live_path(&root, path);
+    let expected: [u8; 64] = sha2::Sha512::digest(b"complete target").into();
+
+    inject(Step::NoReplace, &destination, ENOTSUP);
+    assert!(
+        super::publish_staged_copy(&source, &destination, Some(expected), true)
+            .await
+            .unwrap()
+    );
+    assert!(!pending(Step::NoReplace, &destination));
+    assert_eq!(std::fs::read(&destination).unwrap(), b"complete target");
+
+    std::fs::write(&destination, b"user copy").unwrap();
+    inject(Step::NoReplace, &destination, ENOTSUP);
+    assert!(
+        !super::publish_staged_copy(&source, &destination, Some(expected), true)
+            .await
+            .unwrap()
+    );
+    assert!(!pending(Step::NoReplace, &destination));
+    assert_eq!(std::fs::read(&destination).unwrap(), b"user copy");
+    assert_eq!(std::fs::read(&source).unwrap(), b"complete target");
+    let names: Vec<_> = std::fs::read_dir(root.join("instance/mods"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(names, [std::ffi::OsString::from("new.jar")]);
+}
+
+/// A mods or config folder junctioned to another drive than the instance
+/// root: the representation payload and a ticked cleanup file cross volumes
+/// on their way into `.repair-recovery`. They are copied there and the live
+/// side removed, so the repair finishes instead of staying in Applying.
+#[tokio::test]
+async fn cross_volume_recovery_payloads_are_copied_into_recovery() {
+    use crate::util::publish::fault::{CROSS_DEVICE, Step, inject, pending};
+    let (_tmp, root, staging) = scaffold();
+    const REENABLE: &str = "/mods/pristine.jar";
+    write_disabled(&root, REENABLE, b"pristine").await;
+    let transition = super::transition_path(&root, REENABLE);
+    let payload_of = {
+        let (root, transition) = (root.clone(), transition.clone());
+        move || {
+            let record: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&transition).unwrap()).unwrap();
+            root.join(".repair-recovery")
+                .join(record["recovery_batch"].as_str().unwrap())
+                .join(super::record_key(REENABLE))
+                .join("payload")
+        }
+    };
+    let arm = payload_of.clone();
+    hook("remove-twin", disabled_path(&root, REENABLE), move || {
+        inject(Step::NoReplace, &arm(), CROSS_DEVICE)
+    });
+    let entries = vec![PlanEntry {
+        path: REENABLE.into(),
+        action: PlanAction::ReEnable,
+        reason: PlanReason::ReEnabled,
+    }];
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+    assert_eq!(outcomes[0].action, PlanAction::ReEnable);
+    let payload = payload_of();
+    assert!(
+        !pending(Step::NoReplace, &payload),
+        "the payload move took the cross-volume copy"
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, REENABLE)).unwrap(),
+        b"pristine"
+    );
+    assert!(!disabled_path(&root, REENABLE).exists());
+    assert_eq!(std::fs::read(&payload).unwrap(), b"pristine");
+    let record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&transition).unwrap()).unwrap();
+    assert_eq!(record["completed"], true);
+    assert_eq!(record["conflict"], false);
+
+    let retired = "/config/retired.cfg";
+    write_live(&root, retired, b"stale").await;
+    let options = cleanup_options(&root, retired).await;
+    let payload = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap())
+        .join(super::record_key(retired))
+        .join("payload");
+    inject(Step::NoReplace, &payload, CROSS_DEVICE);
+    let report = bound_cleanup(
+        &options,
+        None,
+        &packinfo(&[("/config/current.cfg", 1)]),
+        &root,
+        false,
+    )
+    .await;
+    assert!(!pending(Step::NoReplace, &payload));
+    assert_eq!(report.removed, [retired], "{:?}", report.notes);
+    assert!(!live_path(&root, retired).exists());
+    assert_eq!(std::fs::read(&payload).unwrap(), b"stale");
+}
+
+fn names(dir: impl AsRef<std::path::Path>) -> Vec<String> {
+    let mut names: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+/// A fresh install publishes every staged file as a hard link, as cheap as
+/// 2.0.40's rename: no byte is copied, the staged original stays for a
+/// resumed apply, and each destination folder is synced once, not each file.
+#[tokio::test]
+async fn fresh_install_links_every_file_and_syncs_each_folder_once() {
+    let (_tmp, root, staging) = scaffold();
+    let mut paths = Vec::new();
+    for folder in ["/mods", "/config/pack", "/config/other"] {
+        for i in 0..10 {
+            let path = format!("{folder}/f{i}.txt");
+            write_staged(&staging, &path, path.as_bytes()).await;
+            paths.push(path);
+        }
+    }
+    // Shipped disabled: it lands as the disabled twin.
+    write_staged(&staging, "/mods/off.jar.disabled", b"off").await;
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let staged: HashSet<String> = target.files.keys().cloned().collect();
+    let entries = apply_plan::plan(PlanInputs {
+        old: None,
+        target: &target,
+        staged: &staged,
+        disk: &HashMap::new(),
+        coexisting_disabled_twin_md5: &HashMap::new(),
+        mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
+    })
+    .unwrap();
+    assert_eq!(entries.len(), 31);
+    assert!(entries.iter().all(|e| e.action == PlanAction::Create));
+
+    let outcomes = super::execute_plan(&entries, &root, &staging, &target)
+        .await
+        .unwrap();
+
+    assert_eq!(outcomes, entries);
+    for path in &paths {
+        let live = live_path(&root, path);
+        let source = staged_path(&staging, path);
+        assert_eq!(std::fs::read(&live).unwrap(), path.as_bytes());
+        assert!(
+            same_file::is_same_file(&live, &source).unwrap(),
+            "{path} was copied, not linked"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            assert_eq!(std::fs::metadata(&source).unwrap().nlink(), 2);
+        }
+    }
+    assert!(
+        same_file::is_same_file(
+            disabled_path(&root, "/mods/off.jar"),
+            staged_path(&staging, "/mods/off.jar.disabled")
+        )
+        .unwrap()
+    );
+    assert!(!live_path(&root, "/mods/off.jar").exists());
+    // Nothing else, such as a private copy, was left beside them.
+    assert_eq!(names(root.join("instance/mods")).len(), 11);
+    assert_eq!(names(root.join("instance/config/pack")).len(), 10);
+    assert_eq!(names(root.join("instance/config/other")).len(), 10);
+
+    if cfg!(not(windows)) {
+        let data = root.join("instance");
+        let config = data.join("config");
+        let expected: HashMap<PathBuf, usize> = [
+            config.join("other"),
+            config.join("pack"),
+            config,
+            data.join("mods"),
+            data.clone(),
+        ]
+        .into_iter()
+        .map(|folder| (folder, 1))
+        .collect();
+        assert_eq!(syncs_under(&data), expected);
+    }
+}
+
+/// Volumes without hard links (FAT32, exFAT, some network shares): the
+/// apply moves each staged file into place, as 2.0.40 did, instead of
+/// copying it. No byte is written again and the pack is on the drive once,
+/// a folder that refused one link isn't asked again, and every folder is
+/// synced once, the staging folders the files left included. A Create still
+/// never replaces a file that arrived first.
+#[tokio::test]
+async fn volumes_without_hard_links_move_staged_files_as_2_0_40_did() {
+    let (_tmp, root, staging) = scaffold();
+    let data = root.join("instance");
+    without_hard_links(root.clone());
+    const CREATE: [&str; 3] = ["/mods/a.jar", "/mods/b.jar", "/mods/c.jar"];
+    const LATE: &str = "/mods/late.jar";
+    const REPLACE: &str = "/config/a.cfg";
+    const REPLACE_DISABLED: &str = "/mods/off.jar";
+    const SHIPPED_DISABLED: &str = "/mods/shipped.jar";
+    for path in CREATE.into_iter().chain([LATE]) {
+        write_staged(&staging, path, path.as_bytes()).await;
+    }
+    write_staged(&staging, REPLACE, b"new config").await;
+    write_live(&root, REPLACE, b"old config").await;
+    write_staged(&staging, REPLACE_DISABLED, b"new off").await;
+    write_disabled(&root, REPLACE_DISABLED, b"old off").await;
+    write_staged(&staging, "/mods/shipped.jar.disabled", b"shipped off").await;
+    let late = live_path(&root, LATE);
+    let written = late.clone();
+    hook("publish", late.clone(), move || {
+        std::fs::write(written, b"late user file").unwrap()
+    });
+    let entry = |path: &str, action: PlanAction| PlanEntry {
+        path: path.into(),
+        action,
+        reason: PlanReason::PackUpdate,
+    };
+    let mut entries: Vec<_> = CREATE
+        .into_iter()
+        .map(|path| entry(path, PlanAction::Create))
+        .collect();
+    entries.extend([
+        entry(LATE, PlanAction::Create),
+        entry(SHIPPED_DISABLED, PlanAction::Create),
+        entry(REPLACE_DISABLED, PlanAction::ReplaceDisabled),
+        entry(REPLACE, PlanAction::Replace),
+    ]);
+
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+
+    for (outcome, entry) in outcomes.iter().zip(&entries) {
+        if entry.path == LATE {
+            assert_eq!(outcome.action, PlanAction::Keep);
+            assert_eq!(outcome.reason, PlanReason::PreservedExisting);
+        } else {
+            assert_eq!(outcome, entry);
+        }
+    }
+    for path in CREATE {
+        assert_eq!(
+            std::fs::read(live_path(&root, path)).unwrap(),
+            path.as_bytes()
+        );
+        assert!(!staged_path(&staging, path).exists(), "{path} was copied");
+    }
+    assert_eq!(std::fs::read(&late).unwrap(), b"late user file");
+    assert_eq!(
+        std::fs::read(staged_path(&staging, LATE)).unwrap(),
+        LATE.as_bytes()
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, REPLACE)).unwrap(),
+        b"new config"
+    );
+    assert_eq!(
+        std::fs::read(disabled_path(&root, REPLACE_DISABLED)).unwrap(),
+        b"new off"
+    );
+    assert_eq!(
+        std::fs::read(disabled_path(&root, SHIPPED_DISABLED)).unwrap(),
+        b"shipped off"
+    );
+    assert_eq!(
+        names(staging.join("instance/mods")),
+        ["late.jar"],
+        "only the file that stayed out is left in staging"
+    );
+    assert!(names(staging.join("instance/config")).is_empty());
+    // Nothing else, such as a private copy or link name, was left beside them.
+    assert_eq!(
+        names(data.join("mods")),
+        [
+            "a.jar",
+            "b.jar",
+            "c.jar",
+            "late.jar",
+            "off.jar.disabled",
+            "shipped.jar.disabled"
+        ]
+    );
+    assert_eq!(names(data.join("config")), ["a.cfg"]);
+    // One refused link per folder; the rest of it went straight to moves.
+    assert_eq!(attempts_under("link", &data.join("mods")), 1);
+    assert_eq!(attempts_under("link", &data.join("config")), 1);
+    assert_eq!(attempts_under("move", &data.join("mods")), 6);
+
+    if cfg!(not(windows)) {
+        let once = |folders: Vec<PathBuf>| -> HashMap<PathBuf, usize> {
+            folders.into_iter().map(|folder| (folder, 1)).collect()
+        };
+        assert_eq!(
+            syncs_under(&data),
+            once(vec![data.join("mods"), data.join("config"), data.clone()])
+        );
+        assert_eq!(
+            syncs_under(&staging),
+            once(vec![
+                staging.join("instance/mods"),
+                staging.join("instance/config")
+            ])
+        );
+    }
+}
+
+/// A folder on another drive (a mods folder linked there), which neither a
+/// link nor a move from staging reaches, gets copies: each checked against
+/// the target hash, with the staged original kept until the setup commits.
+/// One refused move is enough for the folder, and it is synced once, not
+/// once per file.
+#[tokio::test]
+async fn folders_on_another_drive_get_verified_copies() {
+    let (_tmp, root, staging) = scaffold();
+    let data = root.join("instance");
+    without_hard_links(root.clone());
+    on_another_drive(data.join("mods"));
+    const CREATE: [&str; 3] = ["/mods/a.jar", "/mods/b.jar", "/mods/c.jar"];
+    const REPLACE: &str = "/config/a.cfg";
+    for path in CREATE {
+        write_staged(&staging, path, path.as_bytes()).await;
+    }
+    write_staged(&staging, REPLACE, b"new config").await;
+    write_live(&root, REPLACE, b"old config").await;
+    let mut entries: Vec<_> = CREATE
+        .into_iter()
+        .map(|path| PlanEntry {
+            path: path.into(),
+            action: PlanAction::Create,
+            reason: PlanReason::PackUpdate,
+        })
+        .collect();
+    entries.push(PlanEntry {
+        path: REPLACE.into(),
+        action: PlanAction::Replace,
+        reason: PlanReason::PackUpdate,
+    });
+
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+
+    assert_eq!(outcomes, entries);
+    for path in CREATE {
+        let live = live_path(&root, path);
+        assert_eq!(std::fs::read(&live).unwrap(), path.as_bytes());
+        assert_eq!(
+            std::fs::read(staged_path(&staging, path)).unwrap(),
+            path.as_bytes()
+        );
+        assert!(!same_file::is_same_file(&live, staged_path(&staging, path)).unwrap());
+    }
+    // The config folder is on the staging drive: moved.
+    assert_eq!(
+        std::fs::read(live_path(&root, REPLACE)).unwrap(),
+        b"new config"
+    );
+    assert!(!staged_path(&staging, REPLACE).exists());
+    assert_eq!(names(data.join("mods")), ["a.jar", "b.jar", "c.jar"]);
+    assert_eq!(attempts_under("link", &data.join("mods")), 1);
+    assert_eq!(attempts_under("move", &data.join("mods")), 1);
+    if cfg!(not(windows)) {
+        let expected: HashMap<PathBuf, usize> =
+            [data.join("mods"), data.join("config"), data.clone()]
+                .into_iter()
+                .map(|folder| (folder, 1))
+                .collect();
+        assert_eq!(syncs_under(&data), expected);
+    }
+
+    // A staged file that no longer matches its verified hash is refused.
+    const CHANGED: &str = "/mods/changed.jar";
+    write_staged(&staging, CHANGED, b"changed after verification").await;
+    let mut target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    target.files.get_mut(CHANGED).unwrap().sha512 = sha2::Sha512::digest(b"verified bytes").into();
+    let error = super::execute_plan(
+        &[PlanEntry {
+            path: CHANGED.into(),
+            action: PlanAction::Create,
+            reason: PlanReason::PackUpdate,
+        }],
+        &root,
+        &staging,
+        &target,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        format!("{error:#}").contains("staged content changed before publication"),
+        "{error:#}"
+    );
+    assert!(!live_path(&root, CHANGED).exists());
+    assert_eq!(
+        std::fs::read(staged_path(&staging, CHANGED)).unwrap(),
+        b"changed after verification"
+    );
+}
+
+/// A link refused for any other reason, on a volume that has links, still
+/// publishes: by a move, as before the link existed.
+#[tokio::test]
+async fn other_link_refusals_fall_back_to_a_move() {
+    use std::io::ErrorKind;
+    for kind in [ErrorKind::Unsupported, ErrorKind::PermissionDenied] {
+        let (_tmp, root, staging) = scaffold();
+        const CREATE: &str = "/mods/new.jar";
+        const REPLACE: &str = "/config/a.cfg";
+        write_staged(&staging, CREATE, b"new mod").await;
+        write_staged(&staging, REPLACE, b"new config").await;
+        write_live(&root, REPLACE, b"old config").await;
+        let entries = vec![
+            PlanEntry {
+                path: REPLACE.into(),
+                action: PlanAction::Replace,
+                reason: PlanReason::PackUpdate,
+            },
+            PlanEntry {
+                path: CREATE.into(),
+                action: PlanAction::Create,
+                reason: PlanReason::PackUpdate,
+            },
+        ];
+        fail_link(live_path(&root, CREATE), kind);
+        fail_link(live_path(&root, REPLACE), kind);
+
+        let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+
+        assert_eq!(outcomes, entries);
+        for (path, bytes) in [(CREATE, b"new mod" as &[u8]), (REPLACE, b"new config")] {
+            let live = live_path(&root, path);
+            assert!(link_fault(&live).is_none(), "{path} never tried to link");
+            assert_eq!(std::fs::read(&live).unwrap(), bytes);
+            assert!(!staged_path(&staging, path).exists());
+        }
+        assert_eq!(names(root.join("instance/config")), ["a.cfg"]);
+
+        // A staged file that no longer matches its verified hash is refused.
+        const CHANGED: &str = "/mods/changed.jar";
+        write_staged(&staging, CHANGED, b"changed after verification").await;
+        let mut target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        target.files.get_mut(CHANGED).unwrap().sha512 =
+            sha2::Sha512::digest(b"verified bytes").into();
+        fail_link(live_path(&root, CHANGED), kind);
+        let error = super::execute_plan(
+            &[PlanEntry {
+                path: CHANGED.into(),
+                action: PlanAction::Create,
+                reason: PlanReason::PackUpdate,
+            }],
+            &root,
+            &staging,
+            &target,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("staged content changed before publication"),
+            "{error:#}"
+        );
+        assert!(!live_path(&root, CHANGED).exists());
+        assert_eq!(
+            std::fs::read(staged_path(&staging, CHANGED)).unwrap(),
+            b"changed after verification"
+        );
+    }
+}
+
+/// Replace and ReplaceDisabled publish through a private second name that
+/// never ends in `.jar`. A failure between the link and the rename keeps
+/// the old file, the staged source and nothing else; the retry finishes.
+#[tokio::test]
+async fn replacements_resume_after_a_failure_between_link_and_rename() {
+    for action in [PlanAction::Replace, PlanAction::ReplaceDisabled] {
+        let (_tmp, root, staging) = scaffold();
+        const PATH: &str = "/mods/b.jar";
+        let destination = if action == PlanAction::Replace {
+            write_live(&root, PATH, b"old pack bytes").await;
+            live_path(&root, PATH)
+        } else {
+            write_disabled(&root, PATH, b"old pack bytes").await;
+            disabled_path(&root, PATH)
+        };
+        let name = destination
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        write_staged(&staging, PATH, b"new pack bytes").await;
+        let entries = vec![PlanEntry {
+            path: PATH.into(),
+            action: action.clone(),
+            reason: PlanReason::PackUpdate,
+        }];
+
+        fail_io("link-rename", destination.clone());
+        assert!(execute_plan(&entries, &root, &staging).await.is_err());
+        assert_eq!(std::fs::read(&destination).unwrap(), b"old pack bytes");
+        assert_eq!(
+            std::fs::read(staged_path(&staging, PATH)).unwrap(),
+            b"new pack bytes"
+        );
+        assert_eq!(names(root.join("instance/mods")), [name.clone()]);
+
+        let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+        assert_eq!(outcomes, entries);
+        assert_eq!(std::fs::read(&destination).unwrap(), b"new pack bytes");
+        assert!(same_file::is_same_file(&destination, staged_path(&staging, PATH)).unwrap());
+        assert_eq!(names(root.join("instance/mods")), [name.clone()]);
+
+        // A retry that finds the destination already is the staged file,
+        // still holding the pack's bytes, publishes it as planned: a match
+        // alone (a 64-bit file index on Windows) never turns a replacement
+        // into a Keep. No private name is left beside it.
+        let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+        assert_eq!(outcomes, entries);
+        assert_eq!(std::fs::read(&destination).unwrap(), b"new pack bytes");
+        assert!(same_file::is_same_file(&destination, staged_path(&staging, PATH)).unwrap());
+        assert_eq!(names(root.join("instance/mods")), [name]);
+    }
+}
+
+/// A crash between a replacement's link and its rename leaves the private
+/// name behind. It sits next to its destination, is hidden on Unix and never
+/// looks like a mod or a disabled mod, and every attempt picks a new one.
+#[test]
+fn private_link_names_are_hidden_siblings_that_are_never_mods() {
+    for destination in ["/i/mods/b.jar", "/i/mods/b.jar.disabled", "/i/config/a.cfg"] {
+        let destination = std::path::Path::new(destination);
+        let first = super::private_link_path(destination).unwrap();
+        assert_ne!(first, super::private_link_path(destination).unwrap());
+        assert_eq!(first.parent(), destination.parent());
+        let name = first.file_name().unwrap().to_str().unwrap();
+        assert!(name.starts_with('.'), "{name}");
+        for mod_suffix in [".jar", ".zip", ".disabled"] {
+            assert!(!name.ends_with(mod_suffix), "{name}");
+        }
+    }
+}
+
+/// GPT-0215: a replacement the pack ships disabled, interrupted before the
+/// old bare file moves out, resumes from its staged source, which is still
+/// there.
+#[tokio::test]
+async fn disabled_replacement_interrupted_before_the_bare_file_moves_resumes() {
+    use crate::util::publish::fault::{IN_USE, Step, inject, pending};
+    let (_tmp, root, staging) = scaffold();
+    const PATH: &str = "/mods/b.jar";
+    const STAGED: &str = "/mods/b.jar.disabled";
+    write_live(&root, PATH, b"old bare").await;
+    write_staged(&staging, STAGED, b"new disabled").await;
+    let transition = super::transition_path(&root, PATH);
+    let recovery = root.join(".repair-recovery");
+    let payload = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let injected = payload.clone();
+    hook("remove-bare", live_path(&root, PATH), move || {
+        let record: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&transition).unwrap()).unwrap();
+        let payload = recovery
+            .join(record["recovery_batch"].as_str().unwrap())
+            .join(super::record_key(PATH))
+            .join("payload");
+        inject(Step::NoReplace, &payload, IN_USE);
+        *injected.lock().unwrap() = Some(payload);
+    });
+    let entries = vec![PlanEntry {
+        path: PATH.into(),
+        action: PlanAction::Replace,
+        reason: PlanReason::PackUpdate,
+    }];
+
+    assert!(execute_plan(&entries, &root, &staging).await.is_err());
+    // The bare file's move into recovery is what failed.
+    let payload = payload.lock().unwrap().take().expect("the hook ran");
+    assert!(!pending(Step::NoReplace, &payload));
+    assert_eq!(std::fs::read(live_path(&root, PATH)).unwrap(), b"old bare");
+    assert_eq!(
+        std::fs::read(staged_path(&staging, STAGED)).unwrap(),
+        b"new disabled"
+    );
+
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+    assert_eq!(outcomes, entries);
+    assert!(!live_path(&root, PATH).exists());
+    assert_eq!(
+        std::fs::read(disabled_path(&root, PATH)).unwrap(),
+        b"new disabled"
+    );
+    assert_eq!(
+        std::fs::read(staged_path(&staging, STAGED)).unwrap(),
+        b"new disabled"
+    );
+}
+
+/// Destinations past 260 characters (Windows MAX_PATH) publish by link too,
+/// both a Create and a replacement through its private sibling.
+#[tokio::test]
+async fn long_destinations_are_linked_into_place() {
+    let (_tmp, root, staging) = long_scaffold();
+    let deep = format!("/kubejs/{}/{}", "c".repeat(40), "d".repeat(40));
+    let create = format!("{deep}/created.json");
+    let replace = format!("{deep}/replaced.json");
+    write_staged(&staging, &create, b"created").await;
+    write_staged(&staging, &replace, b"new pack bytes").await;
+    write_live(&root, &replace, b"old pack bytes").await;
+    assert!(live_path(&root, &replace).as_os_str().len() >= 270);
+    let entries = vec![
+        PlanEntry {
+            path: create.clone(),
+            action: PlanAction::Create,
+            reason: PlanReason::PackUpdate,
+        },
+        PlanEntry {
+            path: replace.clone(),
+            action: PlanAction::Replace,
+            reason: PlanReason::PackUpdate,
+        },
+    ];
+
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+
+    assert_eq!(outcomes, entries);
+    for (path, bytes) in [
+        (&create, b"created" as &[u8]),
+        (&replace, b"new pack bytes"),
+    ] {
+        let live = live_path(&root, path);
+        assert_eq!(std::fs::read(&live).unwrap(), bytes);
+        assert!(same_file::is_same_file(&live, staged_path(&staging, path)).unwrap());
+    }
+    assert_eq!(
+        names(live_path(&root, &deep)),
+        ["created.json", "replaced.json"]
+    );
+}
+
+/// Run with `cargo test --release -p carbon_app -- --ignored
+/// fresh_install_of_3000_files`. Linking a fresh install costs about what
+/// 2.0.40's renames did; copying, hashing and flushing every file did not.
+#[tokio::test]
+#[ignore = "timing benchmark; run in release"]
+async fn fresh_install_of_3000_files_applies_about_as_fast_as_renaming() {
+    const FILES: usize = 3000;
+    let bytes = vec![7u8; 64 * 1024];
+    let paths: Vec<_> = (0..FILES)
+        .map(|i| format!("/config/{:02}/f{i:04}.bin", i % 30))
+        .collect();
+
+    // 2.0.40: one rename per staged file.
+    let (_renamed_tmp, root, staging) = scaffold();
+    for path in &paths {
+        write_staged(&staging, path, &bytes).await;
+    }
+    let started = std::time::Instant::now();
+    for path in &paths {
+        let live = live_path(&root, path);
+        tokio::fs::create_dir_all(live.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::rename(staged_path(&staging, path), live)
+            .await
+            .unwrap();
+    }
+    let renamed = started.elapsed();
+
+    let (_linked_tmp, root, staging) = scaffold();
+    for path in &paths {
+        write_staged(&staging, path, &bytes).await;
+    }
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let entries: Vec<_> = paths
+        .iter()
+        .map(|path| PlanEntry {
+            path: path.clone(),
+            action: PlanAction::Create,
+            reason: PlanReason::PackUpdate,
+        })
+        .collect();
+    let started = std::time::Instant::now();
+    super::execute_plan(&entries, &root, &staging, &target)
+        .await
+        .unwrap();
+    let linked = started.elapsed();
+
+    eprintln!("renamed in {renamed:?}, linked in {linked:?}");
+    assert!(
+        linked < renamed * 10 + std::time::Duration::from_millis(500),
+        "renamed in {renamed:?}, linked in {linked:?}"
     );
 }

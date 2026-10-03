@@ -102,6 +102,9 @@ winreg = { workspace = true }
 openssl = { workspace = true }
 wayland-sys = { workspace = true } # dlopen feature for runtime loading
 
+[target.'cfg(target_vendor = "apple")'.dependencies]
+libc = "0.2" # plain fsync; std's sync_all is F_FULLFSYNC there
+
 [build-dependencies]
 serde_json = { workspace = true }
 dotenvy = { workspace = true }

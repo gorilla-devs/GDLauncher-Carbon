@@ -210,6 +210,7 @@
   "_trn_repair_select_proven": "Select all proven stale",
   "_trn_repair_origin_shipped_in": "shipped in {{version}}",
   "_trn_repair_origin_current": "belongs to the installed version — Repair will re-track it",
+  "_trn_repair_origin_incomplete": "Origin check incomplete: installed pack membership could not be verified",
   "_trn_repair_origin_unknown": "unknown origin",
   "_trn_repair_no_record": "This instance has no local pack record yet. Repair will restore the pack's declared files and start tracking them.",
   "_trn_repair_duplicates_title": "Duplicate mods detected",

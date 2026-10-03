@@ -246,7 +246,7 @@ export type ServerLatestModSource = { Curseforge: number } | { Modrinth: string 
  * instance — `None` on an untracked file until then, or if that run never
  * assigned this exact path a verdict. See `manager::modpack::origin_verdict_for`.
  */
-export type FEOriginVerdict = { ShippedIn: { version_name: string; version_id: string } } | "CurrentVersion" | "Unknown"
+export type FEOriginVerdict = { ShippedIn: { version_name: string; version_id: string } } | "CurrentVersion" | "Incomplete" | "Unknown"
 
 export type ModrinthModMetadata = { project_id: string; version_id: string; title: string; version: string; urlslug: string; description: string; authors: string; has_image: boolean }
 
@@ -543,7 +543,7 @@ export type BanIpRequest = { serverId: FEServerId; ip: string; reason: string | 
 
 export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; issuesUrl: string | null; sourceUrl: string | null }
 
-export type FEUntrackedFile = { path: string; size: number; label: FEUntrackedLabel; deletable: boolean; origin: FEOriginVerdict | null }
+export type FEUntrackedFile = { path: string; size: number; label: FEUntrackedLabel; deletable: boolean; origin: FEOriginVerdict | null; selection: CleanupSelection | null }
 
 export type FEMoveServerGroupTarget = { beforeGroup: FEServerGroupId } | { beforeServer: FEServerId } | "endOfLibrary"
 
@@ -708,7 +708,7 @@ export type ValidListInstance = { mc_version: string | null; modloader: FEInstan
 
 export type FEDuplicateSide = { path: string; pack_owned: boolean }
 
-export type RepairModpack = { instance: FEInstanceId; cleanup_paths: string[]; re_enable_disabled: boolean }
+export type RepairModpack = { instance: FEInstanceId; cleanup_paths: string[]; cleanup_selections: CleanupSelection[]; re_enable_disabled: boolean }
 
 export type SetFavorite = { instance: FEInstanceId; favorite: boolean }
 
@@ -905,3 +905,6 @@ export type BanPlayerRequest = { serverId: FEServerId; username: string; reason:
 export type FERequestDeletionFailed = { cooldown: number | null; message: string | null }
 
 export type FECurseforgeSearchSortField = "featured" | "popularity" | "totalDownloads" | "lastUpdated" | "name" | "author" | "category" | "gameVersion"
+
+export type PackProofContext = { platform: string; project_id: string; version_id: string }
+export type CleanupSelection = { path: string; sha512: string; context: PackProofContext; proven: boolean }

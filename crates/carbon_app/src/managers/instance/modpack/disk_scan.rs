@@ -6,10 +6,11 @@
 //! actually on disk right now. Callers combine their output with `old`/
 //! `target` packinfos in [`apply_plan::plan`](super::apply_plan::plan).
 
+use futures::{StreamExt, TryStreamExt};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, SystemTime};
+#[cfg(test)]
+use std::time::SystemTime;
 
 use md5::Md5;
 use sha2::{Digest, Sha512};
@@ -19,21 +20,10 @@ use crate::util::NormalizedWalkdir;
 use super::apply_plan;
 use super::packinfo::{FileHashes, PackInfo};
 
-/// [`scan_disk_state`]'s result: every path's ordinary
-/// [`apply_plan::DiskState`], plus — only for a path currently `Present`
-/// under its bare spelling — the md5 of a `.disabled` twin that coexists
-/// with it right now, when one does. `DiskState::Disabled` already carries
-/// a twin's md5 for the twin-only case (bare spelling absent); this covers
-/// the shape `DiskState` alone can't express, both spellings present at
-/// once. That shape only ever arises mid-way through an interrupted
-/// disabled [`apply_plan::PlanAction::Replace`] — `run/modpack.rs::execute_plan`
-/// renames the staged bytes into the twin spelling *before* removing the
-/// stale bare copy, so a crash or a locked-file removal failure between the
-/// two leaves exactly this. [`apply_plan::decide_version_change`]'s
-/// pristine-unstaged-differs arm is the sole consumer, using it to
-/// recognize and finish that interrupted state on resume instead of
-/// erroring on it forever (staging is consumed either way and is never
-/// re-populated on resume).
+/// Fresh requested-path states and hashes for coexisting disabled twins.
+/// The twin hash supports the existing legacy VersionChange retry rule.
+/// New publication retains staged sources, so Repair retries use those
+/// verified sources instead of inferring ownership from a matching twin.
 pub struct DiskScan {
     pub states: HashMap<String, apply_plan::DiskState>,
     pub coexisting_disabled_twin_md5: HashMap<String, [u8; 16]>,
@@ -94,10 +84,10 @@ pub async fn scan_disk_state(
         });
     }
 
-    let results = futures::future::join_all(futures)
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, anyhow::Error>>()?;
+    let results = futures::stream::iter(futures)
+        .buffer_unordered(8)
+        .try_collect::<Vec<_>>()
+        .await?;
 
     let mut states = HashMap::with_capacity(results.len());
     let mut coexisting_disabled_twin_md5 = HashMap::new();
@@ -114,120 +104,66 @@ pub async fn scan_disk_state(
     })
 }
 
-/// Process-wide, so two concurrent [`probe_case_insensitive`] calls in the
-/// same process (e.g. a repair preview refetch racing a real staging apply
-/// against the same instance) never generate the same probe filename.
-static PROBE_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-/// A leftover `.gdl-case-probe*` (either casing) is only ever cleaned up by
-/// [`probe_case_insensitive`] itself deciding it's old enough to be a crash
-/// remnant rather than another call's file still in flight — comfortably
-/// above the microsecond-scale window a single write+stat+remove takes, and
-/// nowhere near how quickly two independent callers could plausibly race
-/// each other.
-const STALE_PROBE_AGE: Duration = Duration::from_secs(60);
-
-/// Probes whether `dir`'s filesystem folds path case together, by writing a
-/// uniquely-named marker file and checking whether an all-different-case
-/// spelling of that same unique name resolves to it too. Best-effort: both
-/// spellings of the probe file are always removed again before returning,
-/// regardless of the outcome or which one (if either) actually got written.
-/// On any I/O error other than the expected "not found" from the
-/// case-sensitive stat — including a failure to write the probe file in the
-/// first place — falls back to the platform default: Windows and macOS are
-/// case-insensitive by default, every other target isn't.
-///
-/// The probe name is unique per call (`.gdl-case-probe-<pid>-<nanos>-<call
-/// counter>`), not a fixed name: two callers can legitimately probe the same
-/// data dir concurrently (`repair_preview` is a query the frontend refetches
-/// on invalidation and can overlap a real `process_modpack_staging` run), and
-/// a fixed name meant one call's cleanup landing between the other's write
-/// and stat could report a false "case-sensitive" — silently reintroducing
-/// the exact Delete this whole mechanism exists to prevent. Before writing
-/// its own probe, this also sweeps `dir` for stale `.gdl-case-probe*`
-/// leftovers (either casing) older than [`STALE_PROBE_AGE`] — a crashed
-/// earlier probe's file, left behind because the process died between the
-/// write and the removal below — since an old fixed-name leftover would
-/// otherwise make a genuinely case-SENSITIVE filesystem report insensitive
-/// forever (only the exact spelling a normal exit wrote is ever cleaned up).
-/// The age threshold is what keeps that sweep from also deleting a
-/// *concurrent, still in-flight* call's own probe file.
+/// Probe the data directory itself (case policy can be per-directory).
+/// Only this call's exclusively created file is removed; old prefix matches
+/// provide no evidence of ownership and are never swept.
 pub async fn probe_case_insensitive(dir: &Path) -> bool {
-    cleanup_stale_probes(dir).await;
-
-    let unique = format!(
-        ".gdl-case-probe-{}-{}-{}",
-        std::process::id(),
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0),
-        PROBE_COUNTER.fetch_add(1, Ordering::Relaxed),
-    );
-    let probe = dir.join(&unique);
-    let folded = dir.join(unique.to_ascii_uppercase());
-
-    let outcome = async {
-        tokio::fs::write(&probe, b"gdl-case-probe").await?;
-        match tokio::fs::metadata(&folded).await {
+    let dir = dir.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let probe = tempfile::Builder::new()
+            .prefix(".gdl-case-probe-")
+            .tempfile_in(&dir)?;
+        let name = probe
+            .path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_ascii_uppercase();
+        match std::fs::metadata(dir.join(name)) {
             Ok(_) => Ok(true),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
             Err(e) => Err(e),
         }
-    }
-    .await;
-
-    // Both spellings, best-effort, on every exit path: on an insensitive
-    // filesystem they're the same physical file and either call removes it,
-    // but removing both keeps this correct even if this probe's own write
-    // landed under the "wrong" one of the two names for some reason, and
-    // costs nothing extra on a sensitive filesystem where at most one of the
-    // two ever existed.
-    let _ = tokio::fs::remove_file(&probe).await;
-    let _ = tokio::fs::remove_file(&folded).await;
-
-    outcome.unwrap_or_else(|_: std::io::Error| cfg!(any(windows, target_os = "macos")))
+    })
+    .await
+    .ok()
+    .and_then(Result::ok)
+    .unwrap_or(cfg!(any(windows, target_os = "macos")))
 }
 
-/// Removes any `.gdl-case-probe*` entry (either casing) in `dir` whose mtime
-/// is older than [`STALE_PROBE_AGE`] — see [`probe_case_insensitive`]'s own
-/// doc for why this exists and why it's age-gated rather than unconditional.
-/// Best-effort throughout: a directory that can't be read, an entry whose
-/// metadata can't be stat'd, or a removal that fails is silently skipped —
-/// this is hygiene for a hazard that's already merely theoretical once probe
-/// names are unique, never something worth failing the probe over.
-async fn cleanup_stale_probes(dir: &Path) {
-    let mut entries = match tokio::fs::read_dir(dir).await {
-        Ok(entries) => entries,
-        Err(_) => return,
+/// Resolve existing aliases of the actual saves root without conflating
+/// independent case-sensitive directories. Resolve ancestors too, so a new
+/// file under an existing symlink into saves is protected consistently.
+pub(crate) fn resolves_into_saves(data: &Path, path: &Path) -> bool {
+    let Ok(saves) = std::fs::canonicalize(data.join("saves")) else {
+        return false;
     };
-
-    loop {
-        let entry = match entries.next_entry().await {
-            Ok(Some(entry)) => entry,
-            Ok(None) => break,
-            Err(_) => break,
-        };
-
-        let Some(name) = entry.file_name().to_str().map(str::to_ascii_lowercase) else {
-            continue;
-        };
-        if !name.starts_with(".gdl-case-probe") {
-            continue;
+    let mut candidate = Some(path);
+    while let Some(current) = candidate {
+        if let Ok(resolved) = std::fs::canonicalize(current) {
+            return resolved.starts_with(&saves);
         }
+        candidate = current.parent();
+    }
+    false
+}
 
-        let is_stale = match entry.metadata().await.and_then(|m| m.modified()) {
-            Ok(modified) => SystemTime::now()
-                .duration_since(modified)
-                .map(|age| age >= STALE_PROBE_AGE)
-                // `modified` in the future (clock skew) is never "stale".
-                .unwrap_or(false),
-            // Can't even stat it — leave it alone rather than guess.
-            Err(_) => false,
-        };
-
-        if is_stale {
-            let _ = tokio::fs::remove_file(entry.path()).await;
+/// Physical save aliases get the same preview/apply decision as /saves.
+/// The executor repeats this check at publication to cover later aliases.
+pub(crate) fn protect_resolved_saves(
+    entries: &mut [apply_plan::PlanEntry],
+    data: &Path,
+    old: Option<&PackInfo>,
+) {
+    for entry in entries {
+        let live = data.join(entry.path.trim_start_matches('/'));
+        if resolves_into_saves(data, &live)
+            && (live.exists()
+                || disabled_sibling(&live).exists()
+                || old.is_some_and(|record| record.files.contains_key(&entry.path)))
+        {
+            entry.action = apply_plan::PlanAction::Keep;
+            entry.reason = apply_plan::PlanReason::InSaveFolder;
         }
     }
 }
@@ -247,7 +183,7 @@ fn disabled_sibling(path: &Path) -> PathBuf {
 
 /// Opens `path` and md5-hashes it, or `Ok(None)` if it doesn't exist —
 /// including when an intermediate directory component is missing.
-async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
+pub(crate) async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
     let mut file = match tokio::fs::File::open(path).await {
         Ok(file) => file,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -303,7 +239,9 @@ pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<(Pack
         }
 
         let relative_path = entry.relative_path;
-        if apply_plan::is_saves_path(relative_path) || relative_path.starts_with("/.install_audit")
+        if apply_plan::is_saves_path(relative_path)
+            || resolves_into_saves(data_path, &entry.entry.path())
+            || relative_path.starts_with("/.install_audit")
         {
             let mut key = relative_path.to_string();
             let from_disabled = key.ends_with(".disabled");
@@ -340,10 +278,10 @@ pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<(Pack
         });
     }
 
-    let results = futures::future::join_all(futures)
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, anyhow::Error>>()?;
+    let results = futures::stream::iter(futures)
+        .buffer_unordered(8)
+        .try_collect::<Vec<_>>()
+        .await?;
 
     // Enabled-wins, order-independent: a `.disabled`-sourced insertion never
     // overwrites an already-present entry unless that entry itself came from
@@ -844,7 +782,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn probe_case_insensitive_removes_a_stale_leftover_probe_of_either_casing() {
+    async fn probe_case_insensitive_preserves_unowned_old_files_of_either_casing() {
         let dir = tempfile::tempdir().unwrap();
         let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
 
@@ -859,13 +797,10 @@ mod tests {
         let _ = probe_case_insensitive(dir.path()).await;
 
         assert!(
-            !stale_lower.exists(),
-            "a stale leftover probe (crash remnant) must be swept before probing"
+            stale_lower.exists(),
+            "old prefix matches are not owned probes"
         );
-        assert!(
-            !stale_upper.exists(),
-            "a stale leftover probe must be swept regardless of its casing"
-        );
+        assert!(stale_upper.exists(), "case variants also remain unowned");
     }
 
     #[tokio::test]
@@ -874,7 +809,7 @@ mod tests {
         // concurrency: a file matching the probe's own naming prefix but
         // freshly written (as a genuinely concurrent caller's in-flight
         // probe file would be) must survive another call's cleanup sweep —
-        // only entries older than `STALE_PROBE_AGE` are ever removed by it.
+        // unowned names are never removed by another probe.
         let dir = tempfile::tempdir().unwrap();
         let concurrent = dir.path().join(".gdl-case-probe-concurrent-simulated");
         std::fs::write(&concurrent, b"in-flight-from-another-call").unwrap();
@@ -885,5 +820,31 @@ mod tests {
             concurrent.exists(),
             "a fresh, still-in-flight-looking probe file must not be swept as stale"
         );
+    }
+    #[tokio::test]
+    async fn task03_case_probe_preserves_aged_user_notes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".gdl-case-probe-user-notes.txt");
+        std::fs::write(&path, b"my notes").unwrap();
+        // Windows sets file times only through a write-capable handle.
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        probe_case_insensitive(dir.path()).await;
+        assert_eq!(std::fs::read(path).unwrap(), b"my notes");
+    }
+
+    #[tokio::test]
+    async fn task03_oracle_many_files() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("mods")).unwrap();
+        for n in 0..512 {
+            std::fs::write(dir.path().join(format!("mods/{n}.jar")), vec![42; 32768]).unwrap();
+        }
+        let (info, _) = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        assert_eq!(info.files.len(), 512);
     }
 }

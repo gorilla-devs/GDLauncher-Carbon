@@ -65,6 +65,8 @@ const MAX_TOTAL_HASHED_BYTES: u64 = 1024 * 1024 * 1024;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OriginResults {
     pub verdicts: HashMap<String, OriginVerdict>,
+    pub checked_hashes: HashMap<String, [u8; 64]>,
+    pub context: Option<super::PackProofContext>,
 }
 
 /// Pure matcher: given the untracked files still needing a verdict (path ->
@@ -146,6 +148,20 @@ fn record_matches(
         remaining.remove(&path);
         verdicts.entry(path).or_insert_with(|| verdict.clone());
     }
+}
+
+fn finalize_origin_verdicts(
+    mut verdicts: HashMap<String, OriginVerdict>,
+    installed_checked: bool,
+) -> HashMap<String, OriginVerdict> {
+    if !installed_checked {
+        for verdict in verdicts.values_mut() {
+            if !matches!(verdict, OriginVerdict::CurrentVersion) {
+                *verdict = OriginVerdict::Incomplete;
+            }
+        }
+    }
+    verdicts
 }
 
 /// Every key in `all_untracked` without an existing `verdicts` entry becomes
@@ -271,7 +287,9 @@ fn hash_bounded<R: std::io::Read>(reader: &mut R, limit: u64) -> anyhow::Result<
 /// file is never buffered in memory at once — mirrors `disk_scan.rs`'s
 /// `probe_md5`. Used both to hash untracked instance files and to verify (or
 /// decide to reuse) a downloaded `.mrpack`.
-async fn hash_file_sha512(path: &Path) -> anyhow::Result<[u8; 64]> {
+pub(crate) async fn hash_file_sha512(path: &Path) -> anyhow::Result<[u8; 64]> {
+    #[cfg(test)]
+    hash_count::record(path);
     let mut file = tokio::fs::File::open(path).await?;
     let mut hasher = Sha512::new();
 
@@ -281,6 +299,32 @@ async fn hash_file_sha512(path: &Path) -> anyhow::Result<[u8; 64]> {
     .await?;
 
     Ok(hasher.finalize().into())
+}
+
+/// [`hash_file_sha512`] calls per path, so tests can count full reads of a
+/// pack without seeing each other's files.
+#[cfg(test)]
+pub(crate) mod hash_count {
+    use std::collections::HashMap;
+    use std::path::{Path, PathBuf};
+    use std::sync::{LazyLock, Mutex};
+
+    static HASHED: LazyLock<Mutex<HashMap<PathBuf, usize>>> = LazyLock::new(Default::default);
+
+    pub(super) fn record(path: &Path) {
+        *HASHED.lock().unwrap().entry(path.to_owned()).or_default() += 1;
+    }
+
+    /// Hashes of paths under `dir`, per path.
+    pub(crate) fn under(dir: &Path) -> HashMap<PathBuf, usize> {
+        HASHED
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(path, _)| path.starts_with(dir))
+            .map(|(path, count)| (path.clone(), *count))
+            .collect()
+    }
 }
 
 /// Opens a downloaded `.mrpack`, parses its `modrinth.index.json`, and hashes
@@ -298,8 +342,11 @@ async fn hash_file_sha512(path: &Path) -> anyhow::Result<[u8; 64]> {
 /// [`MAX_TOTAL_HASHED_BYTES`] — the split exists only so tests can exercise
 /// both budgets with small injected limits instead of needing real
 /// multi-ten/hundred-megabyte archives to prove them.
+#[cfg(test)]
 async fn parse_mrpack(path: &Path) -> anyhow::Result<(ModpackIndex, HashMap<String, [u8; 64]>)> {
-    parse_mrpack_with_budgets(path, MAX_HASHED_ENTRY_BYTES, MAX_TOTAL_HASHED_BYTES).await
+    let (index, hashes, _) =
+        parse_mrpack_coverage(path, MAX_HASHED_ENTRY_BYTES, MAX_TOTAL_HASHED_BYTES).await?;
+    Ok((index, hashes))
 }
 
 /// See [`parse_mrpack`]. `entry_budget` is the fresh [`hash_bounded`] limit
@@ -316,11 +363,21 @@ async fn parse_mrpack(path: &Path) -> anyhow::Result<(ModpackIndex, HashMap<Stri
 /// hashed across every entry combined (see [`MAX_TOTAL_HASHED_BYTES`]):
 /// once reached, remaining entries are skipped (warned, not hashed) rather
 /// than continuing to spend unbounded total work on one archive.
+#[cfg(test)]
 async fn parse_mrpack_with_budgets(
     path: &Path,
     entry_budget: u64,
     total_budget: u64,
 ) -> anyhow::Result<(ModpackIndex, HashMap<String, [u8; 64]>)> {
+    let (index, hashes, _) = parse_mrpack_coverage(path, entry_budget, total_budget).await?;
+    Ok((index, hashes))
+}
+
+async fn parse_mrpack_coverage(
+    path: &Path,
+    entry_budget: u64,
+    total_budget: u64,
+) -> anyhow::Result<(ModpackIndex, HashMap<String, [u8; 64]>, bool)> {
     let path = path.to_path_buf();
 
     spawn_blocking(move || {
@@ -337,6 +394,7 @@ async fn parse_mrpack_with_budgets(
 
         let mut override_hashes = HashMap::new();
         let mut total_hashed_bytes: u64 = 0;
+        let mut complete = true;
 
         for i in 0..archive.len() {
             let mut entry = archive.by_index(i)?;
@@ -376,6 +434,7 @@ async fn parse_mrpack_with_budgets(
             // `MAX_TOTAL_HASHED_BYTES`'s own doc for why this is a separate
             // concern from the per-entry `entry_budget` above.
             if total_hashed_bytes >= total_budget {
+                complete = false;
                 tracing::warn!(
                     "origin check: skipping override entry {} — archive-wide hashed byte cap \
                      ({total_budget} bytes) already reached",
@@ -390,6 +449,7 @@ async fn parse_mrpack_with_budgets(
                     override_hashes.insert(key, hash);
                 }
                 Err(e) => {
+                    complete = false;
                     tracing::warn!(
                         "origin check: skipping oversized override entry {}: {e}",
                         enclosed.display()
@@ -398,7 +458,7 @@ async fn parse_mrpack_with_budgets(
             }
         }
 
-        Ok::<_, anyhow::Error>((index, override_hashes))
+        Ok::<_, anyhow::Error>((index, override_hashes, complete))
     })
     .await
     .context("archive parsing task panicked")?
@@ -461,7 +521,7 @@ async fn download_and_match(
     temp_root: &Path,
     file: &VersionFile,
     remaining: &HashMap<String, [u8; 64]>,
-) -> anyhow::Result<HashSet<String>> {
+) -> anyhow::Result<(HashSet<String>, bool)> {
     let expected_sha512 = decode_sha512_hex(&file.hashes.sha512).with_context(|| {
         format!(
             "version file {:?} has an invalid sha512 hash",
@@ -479,11 +539,15 @@ async fn download_and_match(
         return Err(e);
     }
 
-    let parsed = parse_mrpack(&temp_path).await;
+    let parsed =
+        parse_mrpack_coverage(&temp_path, MAX_HASHED_ENTRY_BYTES, MAX_TOTAL_HASHED_BYTES).await;
     let _ = tokio::fs::remove_file(&temp_path).await;
-    let (index, override_hashes) = parsed?;
+    let (index, override_hashes, complete) = parsed?;
 
-    Ok(match_against_index(remaining, &index, &override_hashes))
+    Ok((
+        match_against_index(remaining, &index, &override_hashes),
+        complete,
+    ))
 }
 
 /// Writes `verdicts` into the instance's `origin_checks` entry (replacing
@@ -498,13 +562,25 @@ async fn download_and_match(
 async fn store_and_invalidate(
     app: &Arc<AppInner>,
     instance_id: InstanceId,
-    verdicts: HashMap<String, OriginVerdict>,
+    results: OriginResults,
 ) {
+    if let Some(expected) = &results.context {
+        let manager = app.instance_manager();
+        let instances = manager.instances.read().await;
+        let current = instances
+            .get(&instance_id)
+            .and_then(|i| i.data().ok())
+            .and_then(|d| d.config.modpack.as_ref())
+            .map(|p| super::PackProofContext::from(&p.modpack));
+        if current.as_ref() != Some(expected) {
+            return;
+        }
+    }
     app.instance_manager()
         .origin_checks
         .write()
         .await
-        .insert(instance_id, OriginResults { verdicts });
+        .insert(instance_id, results);
 
     app.invalidate(
         GET_REPAIR_PREVIEW,
@@ -568,7 +644,7 @@ async fn run_check_pack_origin(
             match super::packinfo::parse_packinfo(&text).context("while parsing packinfo json") {
                 Ok(p) => p,
                 Err(e) => {
-                    store_and_invalidate(&app, instance_id, HashMap::new()).await;
+                    store_and_invalidate(&app, instance_id, OriginResults::default()).await;
                     task.fail(e).await;
                     return;
                 }
@@ -581,7 +657,7 @@ async fn run_check_pack_origin(
             files: HashMap::new(),
         },
         Err(e) => {
-            store_and_invalidate(&app, instance_id, HashMap::new()).await;
+            store_and_invalidate(&app, instance_id, OriginResults::default()).await;
             task.fail(e.into()).await;
             return;
         }
@@ -623,6 +699,12 @@ async fn run_check_pack_origin(
         }
     }
 
+    let context = super::PackProofContext {
+        platform: "modrinth".into(),
+        project_id: project_id.clone(),
+        version_id: current_version_id.clone(),
+    };
+    let mut installed_checked = false;
     let mut verdicts: HashMap<String, OriginVerdict> = HashMap::new();
 
     if !untracked.is_empty() {
@@ -675,7 +757,10 @@ async fn run_check_pack_origin(
                     };
 
                     match download_and_match(&temp_root, file, &remaining).await {
-                        Ok(matched) => {
+                        Ok((matched, complete)) => {
+                            if version.id == current_version_id {
+                                installed_checked = complete;
+                            }
                             record_matches(
                                 &mut verdicts,
                                 &mut remaining,
@@ -698,7 +783,16 @@ async fn run_check_pack_origin(
             }
             Err(e) => {
                 fill_unmatched_as_unknown(&mut verdicts, untracked.keys().cloned());
-                store_and_invalidate(&app, instance_id, verdicts).await;
+                store_and_invalidate(
+                    &app,
+                    instance_id,
+                    OriginResults {
+                        verdicts: finalize_origin_verdicts(verdicts, installed_checked),
+                        checked_hashes: untracked,
+                        context: Some(context),
+                    },
+                )
+                .await;
                 task.fail(e.context("fetching modrinth project versions"))
                     .await;
                 return;
@@ -707,7 +801,16 @@ async fn run_check_pack_origin(
     }
 
     fill_unmatched_as_unknown(&mut verdicts, untracked.keys().cloned());
-    store_and_invalidate(&app, instance_id, verdicts).await;
+    store_and_invalidate(
+        &app,
+        instance_id,
+        OriginResults {
+            verdicts: finalize_origin_verdicts(verdicts, installed_checked),
+            checked_hashes: untracked,
+            context: Some(context),
+        },
+    )
+    .await;
 }
 
 impl ManagerRef<'_, InstanceManager> {
@@ -1521,10 +1624,14 @@ mod tests {
             zip.finish().unwrap();
         }
 
-        let (_index, override_hashes) =
-            parse_mrpack_with_budgets(&archive_path, ENTRY_BUDGET, TOTAL_BUDGET)
+        let (_index, override_hashes, complete) =
+            parse_mrpack_coverage(&archive_path, ENTRY_BUDGET, TOTAL_BUDGET)
                 .await
                 .unwrap();
+        assert!(
+            !complete,
+            "skipped override coverage cannot prove installed absence"
+        );
 
         let expected_hash = Sha512::digest(&entry_data);
         for name in ["a.bin", "b.bin"] {
@@ -1546,5 +1653,23 @@ mod tests {
             2,
             "exactly the two entries within the aggregate cap must be hashed"
         );
+    }
+    #[test]
+    fn task03_failed_installed_check_cannot_prove_staleness() {
+        let mut verdicts = HashMap::new();
+        let mut remaining = HashMap::from([("/config/retired.cfg".to_string(), sha(1))]);
+        let older = test_version("older", "2023-01-01T00:00:00Z", vec![]);
+        record_matches(
+            &mut verdicts,
+            &mut remaining,
+            ["/config/retired.cfg".into()].into_iter().collect(),
+            &older,
+            "installed",
+        );
+        let results = finalize_origin_verdicts(verdicts, false);
+        assert!(!matches!(
+            results.get("/config/retired.cfg"),
+            Some(OriginVerdict::ShippedIn { .. })
+        ));
     }
 }

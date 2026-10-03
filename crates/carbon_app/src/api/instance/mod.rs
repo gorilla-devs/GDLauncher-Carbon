@@ -126,6 +126,8 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     manager::modpack::RepairMarkerFile {
                         re_enable_disabled: args.re_enable_disabled,
                         cleanup_paths: args.cleanup_paths,
+                        cleanup_selections: args.cleanup_selections,
+                        cleanup_batch: None,
                     },
                 )
                 .await
@@ -1192,7 +1194,10 @@ struct RepairModpack {
     /// User-ticked untracked paths from the repair preview
     /// (`RepairModpack/index.tsx`'s `ticked()` set) — packinfo-style keys,
     /// empty when the user ticked nothing.
+    #[serde(default)]
     cleanup_paths: Vec<String>,
+    #[serde(default)]
+    cleanup_selections: Vec<manager::modpack::CleanupSelection>,
     re_enable_disabled: bool,
 }
 
@@ -1382,6 +1387,7 @@ pub struct FEUntrackedFile {
     /// tracked path's enabled copy still coexists on disk.
     pub deletable: bool,
     pub origin: Option<FEOriginVerdict>,
+    pub selection: Option<manager::modpack::CleanupSelection>,
 }
 
 impl From<manager::modpack::UntrackedFile> for FEUntrackedFile {
@@ -1392,6 +1398,7 @@ impl From<manager::modpack::UntrackedFile> for FEUntrackedFile {
             label: value.label.into(),
             deletable: value.deletable,
             origin: value.origin.map(FEOriginVerdict::from),
+            selection: value.selection,
         }
     }
 }
@@ -1421,6 +1428,7 @@ pub enum FEOriginVerdict {
         version_id: String,
     },
     CurrentVersion,
+    Incomplete,
     Unknown,
 }
 
@@ -1436,6 +1444,7 @@ impl From<manager::modpack::OriginVerdict> for FEOriginVerdict {
             },
             manager::modpack::OriginVerdict::CurrentVersion => Self::CurrentVersion,
             manager::modpack::OriginVerdict::Unknown => Self::Unknown,
+            manager::modpack::OriginVerdict::Incomplete => Self::Incomplete,
         }
     }
 }

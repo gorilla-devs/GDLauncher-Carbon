@@ -24,7 +24,7 @@ use crate::managers::minecraft::{UpdateValue, curseforge, gdlpack};
 use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
 use crate::managers::modplatforms::modrinth::convert_mr_version_to_standard_version;
 use crate::managers::vtask::Subtask;
-use crate::util::NormalizedWalkdir;
+use crate::util::{NormalizedWalkdir, publish};
 use crate::{
     domain::instance::info::{GameVersion, ModLoader, ModLoaderType},
     managers::{
@@ -202,15 +202,9 @@ pub async fn process_modpack(
     // record — a corrupt or missing file must be re-fetched even when the
     // record says it was fine.
     //
-    // Repair mode's full-tree walk (`scan_instance_as_packinfo`) also yields
-    // a `DiskScan` with Present/Disabled/twin semantics identical to
-    // `process_modpack_staging`'s own `scan_disk_state` over the same
-    // directory (see that function's own doc) — carried alongside as
-    // `oracle_disk_scan` so `process_modpack_staging` can reuse this single
-    // walk instead of hashing every tracked file a second time. `None`
-    // outside repair mode: an ordinary version change never runs the oracle
-    // walk at all, so `process_modpack_staging` always scans for itself in
-    // that case.
+    // The download oracle avoids fetching already-verified bytes. Staging
+    // always performs a fresh bounded old/target scan before planning;
+    // the earlier oracle never authorizes a later live-file mutation.
     let (skip_oracle, oracle_disk_scan) = match &repair_options {
         Some(_) => {
             let (packinfo, disk_scan) =
@@ -959,23 +953,12 @@ pub async fn process_modpack_staging(
             .flat_map(|p| p.files.keys().cloned())
             .chain(target_packinfo.files.keys().cloned())
             .collect();
-        // `oracle_disk_scan`, when given, is repair's own skip-optimisation
-        // oracle walk (`scan_instance_as_packinfo`, called by `process_modpack`
-        // before this function ever runs) reused instead of hashing every
-        // tracked file a second time: nothing under `instance/` changes
-        // between that walk and this point — every write in between lands
-        // under `.setup/staging`, a separate tree, and `execute_plan` below
-        // is what first touches `instance/` at all — so the snapshot is
-        // still exactly accurate here. Falls back to a fresh scan whenever
-        // it's absent (an ordinary version change, which never runs the
-        // oracle walk at all).
+        // The pre-download oracle is only a skip optimization. External
+        // changes and filesystem aliases require a fresh declared-path scan.
         let disk_scan::DiskScan {
             states: disk,
             coexisting_disabled_twin_md5,
-        } = match oracle_disk_scan {
-            Some(scan) => scan,
-            None => disk_scan::scan_disk_state(&instance_root.join("instance"), &universe).await?,
-        };
+        } = scan_for_apply(&instance_root.join("instance"), &universe, oracle_disk_scan).await?;
 
         // Whether this instance's data dir lives on a filesystem that folds
         // path case together (Windows, default-configuration macOS) — see
@@ -998,62 +981,77 @@ pub async fn process_modpack_staging(
             None => apply_plan::ApplyMode::VersionChange,
         };
 
-        let entries = apply_plan::plan(apply_plan::PlanInputs {
-            old: old_packinfo.as_ref(),
-            target: &target_packinfo,
-            staged: &staged,
-            disk: &disk,
-            coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
-            mode,
-            fs_case_insensitive,
-        })?;
+        let mut entries = plan_staging(
+            apply_plan::PlanInputs {
+                old: old_packinfo.as_ref(),
+                target: &target_packinfo,
+                staged: &staged,
+                disk: &disk,
+                coexisting_disabled_twin_md5: &coexisting_disabled_twin_md5,
+                mode,
+                fs_case_insensitive,
+            },
+            &instance_root,
+            repair_options.as_ref(),
+        )
+        .await?;
 
-        // Written before `execute_plan` — the only thing that destructively
-        // consumes `staging_dir` — ever runs: from this point on, staging is
-        // no longer provably unconsumed, so `process_modpack` must not
-        // re-derive `tmp_packinfo_path` from it on any later resume (see
-        // `tmp_packinfo_must_be_regenerated`'s doc). Left in place until
-        // `.setup` itself is wiped (full completion, or a fresh
-        // `change_modpack`/`repair_modpack`) — no explicit removal needed.
-        //
-        // Explicitly fsynced — both the file's own bytes and the directory
-        // entry that makes it visible — before `execute_plan` is allowed to
-        // run. A plain `write` only guarantees the OS's page/dentry cache
-        // sees it, not that it has actually reached disk; on a filesystem
-        // without ordered metadata journaling (FAT32/exFAT — a real
-        // placement for an instance directory on an external or portable
-        // drive) the kernel is free to persist `execute_plan`'s later
-        // renames to `staging_dir` before it gets around to persisting this
-        // marker's creation. A power loss in that window would then resume
-        // with the marker gone but staging already partially consumed —
-        // the exact round-1 corruption this marker exists to rule out. The
-        // ordering (marker durable strictly before any rename below) is
-        // what's load-bearing here, not merely that the write eventually
-        // lands.
+        disk_scan::protect_resolved_saves(
+            &mut entries,
+            &instance_root.join("instance"),
+            old_packinfo.as_ref(),
+        );
+
+        // Preserve the existing durable apply boundary for retries. New
+        // publication retains sources and owned representation outcomes where
+        // the volume has hard links; legacy setup, and publication on volumes
+        // without them, may have consumed them, so the full target record
+        // remains authoritative in every case.
         {
             let marker_file = File::create(&apply_started_path).await?;
             marker_file.sync_all().await?;
         }
         fsync_dir(&setup_path).await?;
 
-        execute_plan(&entries, &instance_root, &staging_dir).await?;
+        let mut representation_notes = Vec::new();
+        let entries = execute_bound_plan(
+            &entries,
+            &instance_root,
+            &staging_dir,
+            &target_packinfo,
+            repair_options.as_ref(),
+            &mut representation_notes,
+        )
+        .await?;
 
         // Repair-only: paths the user explicitly ticked for removal in the
         // preview, applied after the plan so a cleanup can never race the
         // pack's own reconciliation of the same path.
-        let user_removed = match &repair_options {
+        let cleanup_context = {
+            let manager = app.instance_manager();
+            let instances = manager.instances.read().await;
+            instances
+                .get(&instance_id)
+                .and_then(|i| i.data().ok())
+                .and_then(|d| d.config.modpack.as_ref())
+                .map(|p| crate::managers::instance::modpack::PackProofContext::from(&p.modpack))
+        };
+        let mut user_removed = match &repair_options {
             Some(options) => {
-                apply_user_cleanup(
-                    &options.cleanup_paths,
+                apply_bound_cleanup(
+                    options,
                     old_packinfo.as_ref(),
                     &target_packinfo,
                     &instance_root,
                     fs_case_insensitive,
+                    cleanup_context.as_ref(),
                 )
                 .await
             }
-            None => Vec::new(),
+            None => CleanupReport::default(),
         };
+
+        user_removed.notes.extend(representation_notes);
 
         trace!("Creating update audit files");
         let audit_dir = instance_root.join(".install_audit");
@@ -1066,7 +1064,7 @@ pub async fn process_modpack_staging(
         tokio::fs::create_dir(&audit_dir).await?;
 
         let audit_file = audit_dir.join("audit.txt");
-        let audit_txt = render_audit(&entries, &user_removed);
+        let audit_txt = render_cleanup_audit(&entries, &user_removed);
         tokio::fs::write(audit_file, audit_txt).await?;
 
         // Promote before removing staging, not after: once this rename
@@ -1099,6 +1097,15 @@ pub async fn process_modpack_staging(
     Ok(())
 }
 
+async fn scan_for_apply(
+    data: &Path,
+    universe: &BTreeSet<String>,
+    oracle: Option<disk_scan::DiskScan>,
+) -> anyhow::Result<disk_scan::DiskScan> {
+    drop(oracle);
+    disk_scan::scan_disk_state(data, universe).await
+}
+
 /// Finishes the leftover cleanup of a staging pass whose apply already fully
 /// landed — `packinfo_path` (checked by the caller before this is invoked)
 /// already fully describes the target state, so all that is left is
@@ -1112,7 +1119,11 @@ pub async fn process_modpack_staging(
 /// invariant this is the tail of. Never touches `packinfo_path` or
 /// `tmp_packinfo_path` itself.
 async fn finish_promoted_staging(staging_dir: &Path, setup_path: &Path) -> anyhow::Result<()> {
-    tokio::fs::remove_dir_all(staging_dir).await?;
+    match tokio::fs::remove_dir_all(staging_dir).await {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
     tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
     Ok(())
 }
@@ -1128,13 +1139,8 @@ async fn finish_promoted_staging(staging_dir: &Path, setup_path: &Path) -> anyho
 /// on "this file exists" surviving a crash in a specific order relative to
 /// other writes.
 ///
-/// No-op on Windows: opening a bare directory as a `File` is rejected there
-/// (`ERROR_ACCESS_DENIED`), and it isn't needed — NTFS's own ordered
-/// metadata journaling already guarantees a completed file create is
-/// durable before any later write that depends on it, unlike a filesystem
-/// without ordered metadata journaling (FAT32/exFAT — a real placement for
-/// an instance directory on an external or portable drive), where this call
-/// is what closes that gap.
+/// Windows currently has no directory flush here. File sync and source
+/// retention do not promise power-loss ordering on every supported volume.
 #[cfg(windows)]
 async fn fsync_dir(_dir: &Path) -> anyhow::Result<()> {
     Ok(())
@@ -1142,22 +1148,919 @@ async fn fsync_dir(_dir: &Path) -> anyhow::Result<()> {
 
 #[cfg(not(windows))]
 async fn fsync_dir(dir: &Path) -> anyhow::Result<()> {
+    #[cfg(test)]
+    {
+        staging_test::record_sync(dir);
+        staging_test::run_hook("sync-directory", dir);
+        staging_test::io_fault("sync-directory", dir)?;
+    }
     File::open(dir).await?.sync_all().await?;
     Ok(())
 }
 
-/// Carries out every [`apply_plan::PlanEntry`] against the real filesystem.
-/// Pure mechanics — every decision (including whether a path even needs
-/// touching) was already made by [`apply_plan::plan`]; this only performs
-/// the rename/remove that `entry.action` names.
+/// Persist each newly-created recovery edge before moving a live file.
+async fn sync_recovery_hierarchy(root: &Path, batch: &Path) -> anyhow::Result<()> {
+    fsync_dir(root).await?;
+    fsync_dir(&root.join(".repair-recovery")).await?;
+    fsync_dir(batch).await
+}
+
+async fn sync_recovery_payload(payload: &Path) -> anyhow::Result<()> {
+    #[cfg(test)]
+    staging_test::io_fault("sync-file", payload)?;
+    let mut options = tokio::fs::OpenOptions::new();
+    options.read(true);
+    // Windows FlushFileBuffers requires a write-capable handle. Do not
+    // change permissions: an unsupported/denied flush preserves the payload
+    // and reports failure rather than claiming durable completion.
+    #[cfg(windows)]
+    options.write(true);
+    options.open(payload).await?.sync_all().await?;
+    Ok(())
+}
+
+/// Copy to a private, complete destination-volume file, verify it against
+/// the target record, then publish. Originals remain in staging until the
+/// complete target is promoted and staging is finalized. Representation
+/// changes and recovery restores publish this way; ordinary pack files are
+/// linked or moved ([`publish_staged`]) and copied only where neither
+/// reaches their folder.
+async fn publish_staged_copy(
+    source: &Path,
+    destination: &Path,
+    expected: Option<[u8; 64]>,
+    no_clobber: bool,
+) -> anyhow::Result<bool> {
+    let parent = destination
+        .parent()
+        .context("publication destination has no parent")?;
+    let published = copy_staged(source, destination, expected, no_clobber).await?;
+    if published {
+        fsync_dir(parent).await?;
+    }
+    Ok(published)
+}
+
+/// [`publish_staged_copy`] without the sync of the destination's folder: the
+/// copy's own bytes are synced before it is published, and the caller owes
+/// its folder one sync (see [`Publications::finish`]).
+async fn copy_staged(
+    source: &Path,
+    destination: &Path,
+    expected: Option<[u8; 64]>,
+    no_clobber: bool,
+) -> anyhow::Result<bool> {
+    let source = source.to_path_buf();
+    let destination = destination.to_path_buf();
+    let parent = destination
+        .parent()
+        .context("publication destination has no parent")?
+        .to_path_buf();
+    tokio::task::spawn_blocking(move || -> anyhow::Result<bool> {
+        use sha2::Digest;
+        use std::io::{Read, Write};
+        let mut input = std::fs::File::open(&source)?;
+        let mut private = publish::temp_in(&parent)?;
+        let mut digest = sha2::Sha512::new();
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            let n = input.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            digest.update(&buffer[..n]);
+            private.write_all(&buffer[..n])?;
+        }
+        let actual: [u8; 64] = digest.finalize().into();
+        if expected.is_some_and(|hash| hash != actual) {
+            bail!("staged content changed before publication: {source:?}");
+        }
+        private
+            .as_file()
+            .set_permissions(input.metadata()?.permissions())?;
+        private.as_file().sync_all()?;
+        #[cfg(test)]
+        staging_test::run_hook("publish", &destination);
+        if no_clobber {
+            match publish::persist_noclobber(private, &destination) {
+                Ok(()) => Ok(true),
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::AlreadyExists
+                        || destination.symlink_metadata().is_ok() =>
+                {
+                    Ok(false)
+                }
+                Err(error) => Err(error.into()),
+            }
+        } else {
+            publish::persist(private, &destination)?;
+            Ok(true)
+        }
+    })
+    .await?
+}
+
+/// What publishing one ordinary staged file did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Publication {
+    /// The destination is now a second name of the staged file. Its folder
+    /// still needs one sync before the apply is recorded as Applied.
+    Linked,
+    /// The destination's folder can't hold a link to the staged file
+    /// (`reason`), so the staged file itself was moved there, as 2.0.40
+    /// moved every pack file: no byte is written and no space is used, but
+    /// the staged name is gone, so a resumed apply finds the file at its
+    /// destination instead (see [`Session::verify_sources`]). The
+    /// destination's folder and the staging folder it left (`vacated`) still
+    /// need one sync each.
+    Moved { reason: String, vacated: PathBuf },
+    /// Neither a link nor a move reached the destination (`reason`): its
+    /// folder is on another drive, or the move was refused, say while
+    /// another program held the staged file. A verified copy, its bytes
+    /// synced, was published instead, and the staged original stays until
+    /// the setup commits. Its folder still needs one sync.
+    Copied { reason: String },
+    /// Nothing was published: a Create found its destination occupied.
+    Kept,
+    /// Nothing was published: the staged file no longer holds the pack's
+    /// bytes. Only a resumed apply meets this, after its earlier attempt
+    /// linked the file into the instance and it was edited there in place.
+    SourceChanged,
+}
+
+/// Destination folders whose earlier publications were refused, so that
+/// their later files skip what can't work there. Each apply learns its own.
+#[derive(Default)]
+struct Routes {
+    /// Folders that refused a link to a staged file: their files are moved.
+    unlinkable: HashSet<PathBuf>,
+    /// Folders a move can't reach (another drive): their files are copied.
+    unmovable: HashSet<PathBuf>,
+}
+
+/// Publishes an ordinary staged file as cheaply as 2.0.40's rename did.
+///
+/// Where the destination's folder takes one, that is a hard link: it writes
+/// no bytes and needs no flush, and the staged name stays until the setup is
+/// committed, so `verify_sources` and a resumed apply still find every
+/// original. That includes a disabled replacement interrupted before its
+/// bare file is gone. A Create (`no_clobber`) links straight to
+/// `destination`, which never replaces anything that arrived there first,
+/// such as a late save. A replacement links to a private, hidden, non-`.jar`
+/// sibling and renames that over `destination`.
+///
+/// Volumes without hard links (FAT32, exFAT, some network shares) get
+/// 2.0.40's move of the staged file instead, never replacing for a Create,
+/// and `routes` remembers the folder so its later files go straight to the
+/// move. That keeps the pack's bytes on the drive once and writes none of
+/// them again. Only a folder on another drive, which no rename reaches, or a
+/// move that was refused gets a copy, checked against the target hash. std
+/// adds the Windows long-path prefix to the link and the rename itself.
+async fn publish_staged(
+    source: &Path,
+    destination: &Path,
+    expected: [u8; 64],
+    no_clobber: bool,
+    routes: &mut Routes,
+) -> anyhow::Result<Publication> {
+    // A replacement whose destination already is the staged file resumes an
+    // earlier attempt that linked it. The planner replaces only a file that
+    // differs from the target, so the shared bytes were edited in place
+    // since, and there is no pack copy left to publish. The hash decides,
+    // not the match alone: Windows compares a 64-bit file index, which ReFS
+    // does not keep unique, and a source that still holds the pack's bytes
+    // is linked as usual.
+    if !no_clobber {
+        let (a, b) = (destination.to_owned(), source.to_owned());
+        if tokio::task::spawn_blocking(move || publish::same_file(&a, &b)).await?
+            && crate::managers::instance::modpack::origin_check::hash_file_sha512(source).await?
+                != expected
+        {
+            return Ok(Publication::SourceChanged);
+        }
+    }
+    let folder = destination
+        .parent()
+        .context("publication destination has no parent")?
+        .to_owned();
+    let mut reason = None;
+    if !routes.unlinkable.contains(&folder) {
+        let (source, destination) = (source.to_owned(), destination.to_owned());
+        let linked =
+            tokio::task::spawn_blocking(move || link_staged(&source, &destination, no_clobber))
+                .await??;
+        match linked {
+            Ok(publication) => return Ok(publication),
+            Err(error) => {
+                routes.unlinkable.insert(folder.clone());
+                reason = Some(format!("a link was refused: {error}"));
+            }
+        }
+    }
+    if !routes.unmovable.contains(&folder) {
+        let (moved_source, moved_destination) = (source.to_owned(), destination.to_owned());
+        let moved = tokio::task::spawn_blocking(move || {
+            move_staged(&moved_source, &moved_destination, no_clobber)
+        })
+        .await??;
+        match moved {
+            Ok(true) => {
+                return Ok(Publication::Moved {
+                    reason: reason
+                        .unwrap_or_else(|| "an earlier link in this folder was refused".into()),
+                    vacated: source
+                        .parent()
+                        .context("staged source has no parent")?
+                        .to_owned(),
+                });
+            }
+            Ok(false) => return Ok(Publication::Kept),
+            Err(error) => {
+                if publish::crosses_devices(&error) {
+                    routes.unmovable.insert(folder);
+                }
+                reason = Some(format!("a move was refused: {error}"));
+            }
+        }
+    }
+    let reason = reason.unwrap_or_else(|| "an earlier move into this folder was refused".into());
+    tracing::trace!(
+        "Copying {} instead of linking or moving it: {reason}",
+        destination.display()
+    );
+    Ok(
+        match copy_staged(source, destination, Some(expected), no_clobber).await? {
+            true => Publication::Copied { reason },
+            false => Publication::Kept,
+        },
+    )
+}
+
+/// The link half of [`publish_staged`]. The inner error is a link this
+/// volume or folder refused; the caller moves or copies instead.
+fn link_staged(
+    source: &Path,
+    destination: &Path,
+    no_clobber: bool,
+) -> anyhow::Result<Result<Publication, io::Error>> {
+    #[cfg(test)]
+    {
+        staging_test::run_hook("publish", destination);
+        staging_test::io_fault("link", destination)?;
+    }
+    if no_clobber {
+        return Ok(match staged_hard_link(source, destination, destination) {
+            Ok(()) => Ok(Publication::Linked),
+            Err(error)
+                if error.kind() == io::ErrorKind::AlreadyExists
+                    || destination.symlink_metadata().is_ok() =>
+            {
+                Ok(Publication::Kept)
+            }
+            Err(error) => Err(error),
+        });
+    }
+    let private = private_link_path(destination)?;
+    if let Err(error) = staged_hard_link(source, &private, destination) {
+        return Ok(Err(error));
+    }
+    let renamed = rename_staged_link(&private, destination);
+    if private.symlink_metadata().is_ok() {
+        // Only this attempt's own second name of the staged file goes. A
+        // failed rename leaves it, and so does a POSIX rename between two
+        // names of one file, which succeeds without doing anything.
+        let _ = std::fs::remove_file(&private);
+    }
+    renamed?;
+    Ok(Ok(Publication::Linked))
+}
+
+/// The move half of [`publish_staged`], 2.0.40's rename of the staged file:
+/// `true` once it is at `destination`, `false` when a Create found
+/// `destination` occupied (nothing moved). The inner error is a move this
+/// folder refused, such as one to another drive; the caller copies instead.
+fn move_staged(
+    source: &Path,
+    destination: &Path,
+    no_clobber: bool,
+) -> anyhow::Result<Result<bool, io::Error>> {
+    #[cfg(test)]
+    {
+        staging_test::run_hook("publish", destination);
+        staging_test::io_fault("move", destination)?;
+        if let Some(error) = staging_test::move_fault(destination) {
+            return Ok(Err(error));
+        }
+    }
+    if no_clobber {
+        return Ok(match publish::rename_noclobber(source, destination) {
+            Ok(()) => Ok(true),
+            Err(error)
+                if error.kind() == io::ErrorKind::AlreadyExists
+                    || destination.symlink_metadata().is_ok() =>
+            {
+                Ok(false)
+            }
+            Err(error) => Err(error),
+        });
+    }
+    Ok(std::fs::rename(source, destination).map(|()| true))
+}
+
+/// A unique name next to `destination` for a replacement's link. Hidden on
+/// Unix, and never a `.jar`, so a name left by a crash between the link and
+/// the rename is not loaded as a mod.
+fn private_link_path(destination: &Path) -> anyhow::Result<PathBuf> {
+    Ok(destination
+        .parent()
+        .context("publication destination has no parent")?
+        .join(format!(
+            ".gdl-publish-{}.tmp",
+            uuid::Uuid::new_v4().simple()
+        )))
+}
+
+/// `std::fs::hard_link`, with a test seam keyed by the final destination.
+fn staged_hard_link(source: &Path, link: &Path, destination: &Path) -> io::Result<()> {
+    #[cfg(test)]
+    if let Some(error) = staging_test::link_fault(destination) {
+        return Err(error);
+    }
+    #[cfg(not(test))]
+    let _ = destination;
+    std::fs::hard_link(source, link)
+}
+
+fn rename_staged_link(private: &Path, destination: &Path) -> io::Result<()> {
+    #[cfg(test)]
+    staging_test::io_fault("link-rename", destination)?;
+    std::fs::rename(private, destination)
+}
+
+/// The ordinary publications of one apply: their audit outcome, and what
+/// they still owe once every entry is done.
+struct Publications {
+    data: PathBuf,
+    /// Folders that received a link, a moved staged file or a copy, in this
+    /// attempt or an interrupted earlier one, and those above them inside
+    /// `data`, since the apply may have created them. Published files are
+    /// not flushed one by one; these folders are synced once each instead.
+    folders: BTreeSet<PathBuf>,
+    /// Staging folders that a moved file left, synced once each too, so a
+    /// staged name can't come back once committing deletes the staging.
+    vacated: BTreeSet<PathBuf>,
+    routes: Routes,
+    /// Files moved or copied because their folder refused the link, and the
+    /// first reason of each, for one log line per apply instead of one per
+    /// file.
+    moved: usize,
+    move_reason: Option<String>,
+    copied: usize,
+    copy_reason: Option<String>,
+}
+
+impl Publications {
+    fn new(data: PathBuf) -> Self {
+        Self {
+            data,
+            folders: BTreeSet::new(),
+            vacated: BTreeSet::new(),
+            routes: Routes::default(),
+            moved: 0,
+            move_reason: None,
+            copied: 0,
+            copy_reason: None,
+        }
+    }
+
+    /// Owes a sync to `published`'s folder and to those above it inside the
+    /// data folder.
+    fn published(&mut self, published: &Path) {
+        let mut folder = published.parent();
+        while let Some(current) = folder {
+            if !current.starts_with(&self.data) || !self.folders.insert(current.to_owned()) {
+                break;
+            }
+            folder = current.parent();
+        }
+    }
+
+    /// Records what publishing `entry` to `destination` did. `pack_md5` is
+    /// the target's md5 of the entry.
+    async fn record(
+        &mut self,
+        entry: &mut apply_plan::PlanEntry,
+        publication: Publication,
+        destination: &Path,
+        pack_md5: [u8; 16],
+        notes: &mut Vec<String>,
+    ) -> anyhow::Result<()> {
+        use apply_plan::{PlanAction, PlanReason};
+        match publication {
+            Publication::Linked => self.published(destination),
+            Publication::Moved { reason, vacated } => {
+                self.published(destination);
+                self.vacated.insert(vacated);
+                self.moved += 1;
+                self.move_reason.get_or_insert(reason);
+            }
+            // copy_staged synced the copy's bytes, not its folder.
+            Publication::Copied { reason } => {
+                self.published(destination);
+                self.copied += 1;
+                self.copy_reason.get_or_insert(reason);
+            }
+            Publication::Kept => {
+                entry.action = PlanAction::Keep;
+                entry.reason = PlanReason::PreservedExisting;
+            }
+            // Whatever the user made of the file in the meantime stays: an
+            // edit, a replacement or a deletion.
+            Publication::SourceChanged => {
+                entry.action = PlanAction::Keep;
+                entry.reason = match disk_scan::probe_md5(destination).await? {
+                    Some(current) => PlanReason::ModifiedByUser {
+                        original: pack_md5,
+                        current,
+                    },
+                    None => PlanReason::DeletedByUser,
+                };
+                let note = source_changed_note(&entry.path);
+                tracing::warn!("{note}");
+                notes.push(note);
+            }
+        }
+        Ok(())
+    }
+
+    /// Makes every published entry durable. The caller records Applied next,
+    /// and committing then deletes the staged names.
+    async fn finish(self) -> anyhow::Result<()> {
+        if let Some(reason) = &self.move_reason {
+            tracing::info!(
+                "Moved {} staged files instead of linking them ({reason})",
+                self.moved
+            );
+        }
+        if let Some(reason) = &self.copy_reason {
+            tracing::info!(
+                "Copied {} staged files instead of linking or moving them ({reason})",
+                self.copied
+            );
+        }
+        for folder in self.folders.iter().chain(&self.vacated) {
+            sync_linked_folder(folder).await?;
+        }
+        // The plain fsyncs above handed every folder to its drive in order;
+        // one full flush of each drive's cache makes them all durable. That
+        // is one drive unless a folder is linked to another one, which got
+        // copies.
+        #[cfg(target_vendor = "apple")]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let mut drives = HashSet::new();
+            for folder in self.folders.iter().chain(&self.vacated) {
+                if drives.insert(tokio::fs::metadata(folder).await?.dev()) {
+                    File::open(folder).await?.sync_all().await?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+// This records one representation change in the existing setup. It is not
+// setup admission or a session identifier. Task8 binds this consumer to its
+// sole versioned session; target/options binding already rejects re-use by
+// a changed request. No defaults turn legacy absence into ownership.
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct RepresentationTransition {
+    schema_version: u32,
+    target_digest: String,
+    options_digest: String,
+    recovery_batch: String,
+    entry: apply_plan::PlanEntry,
+    disabled: bool,
+    destination_before: Option<String>,
+    opposite_before: Option<String>,
+    published: bool,
+    completed: bool,
+    conflict: bool,
+}
+
+fn transition_binding(
+    target: &packinfo::PackInfo,
+    options: Option<&RepairMarkerFile>,
+) -> anyhow::Result<(String, String)> {
+    use sha2::Digest;
+    let ordered: std::collections::BTreeMap<_, _> = target
+        .files
+        .iter()
+        .map(|(path, hashes)| (path, (hex::encode(hashes.sha512), hex::encode(hashes.md5))))
+        .collect();
+    Ok((
+        hex::encode(sha2::Sha512::digest(serde_json::to_vec(&ordered)?)),
+        hex::encode(sha2::Sha512::digest(serde_json::to_vec(&options)?)),
+    ))
+}
+
+/// Names a path's representation record and its recovery entries (both the
+/// representation manifest and the cleanup entry). 32 hex characters, the
+/// first 16 bytes of the path's SHA-512, keep
+/// `.repair-recovery/<batch>/<key>/entry.json` about 76 characters past the
+/// instance root, short enough for Explorer, the Recycle Bin and backup tools
+/// on long instance names. Every record stores the full path and is refused
+/// on a mismatch, so the key only has to spread paths apart.
+fn record_key(path: &str) -> String {
+    use sha2::Digest;
+    hex::encode(&sha2::Sha512::digest(path.as_bytes())[..16])
+}
+
+fn transition_path(root: &Path, path: &str) -> PathBuf {
+    root.join(".setup/representation-transitions")
+        .join(format!("{}.json", record_key(path)))
+}
+
+fn transition_batch(root: &Path, record: &RepresentationTransition) -> PathBuf {
+    root.join(".repair-recovery").join(&record.recovery_batch)
+}
+
+fn check_plain_directory(path: &Path) -> anyhow::Result<()> {
+    let metadata = std::fs::symlink_metadata(path)?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        bail!("expected plain directory: {}", path.display());
+    }
+    Ok(())
+}
+
+async fn ensure_plain_directory(path: &Path) -> anyhow::Result<()> {
+    match tokio::fs::create_dir(path).await {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => check_plain_directory(path),
+        Err(e) => Err(e.into()),
+    }
+}
+
+fn validate_transition(
+    record: &RepresentationTransition,
+    binding: &(String, String),
+    target: &packinfo::PackInfo,
+) -> anyhow::Result<()> {
+    use apply_plan::PlanAction;
+    let mut batch_components = Path::new(&record.recovery_batch).components();
+    let valid_batch = matches!(
+        batch_components.next(),
+        Some(std::path::Component::Normal(_))
+    ) && batch_components.next().is_none();
+    if !valid_batch
+        || record.schema_version != 1
+        || record.target_digest != binding.0
+        || record.options_digest != binding.1
+        || normalize_cleanup_path(&record.entry.path).as_ref() != Some(&record.entry.path)
+        || !target.files.contains_key(&record.entry.path)
+        || !matches!(
+            (&record.entry.action, record.disabled),
+            (PlanAction::Replace, true) | (PlanAction::ReEnable, false)
+        )
+        || record.completed && !record.published && !record.conflict
+        || [&record.destination_before, &record.opposite_before]
+            .iter()
+            .any(|hash| {
+                hash.as_ref()
+                    .is_some_and(|hash| hex::decode(hash).map_or(true, |bytes| bytes.len() != 64))
+            })
+    {
+        bail!("representation transition does not match authoritative target/original options");
+    }
+    Ok(())
+}
+
+async fn read_transition(path: &Path) -> anyhow::Result<RepresentationTransition> {
+    let metadata = tokio::fs::symlink_metadata(path).await?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        bail!(
+            "representation transition is not a plain file: {}",
+            path.display()
+        );
+    }
+    Ok(serde_json::from_slice(&tokio::fs::read(path).await?)?)
+}
+
+async fn write_transition(
+    path: &Path,
+    record: &RepresentationTransition,
+    new: bool,
+) -> anyhow::Result<()> {
+    #[cfg(test)]
+    staging_test::io_fault("transition-record", path)?;
+    let bytes = serde_json::to_vec_pretty(record)?;
+    let path = path.to_owned();
+    let parent = path
+        .parent()
+        .context("transition path has no parent")?
+        .to_owned();
+    let sync_parent = parent.clone();
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        use std::io::Write;
+        let mut private = publish::temp_in(&parent)?;
+        private.write_all(&bytes)?;
+        private.as_file().sync_all()?;
+        if new {
+            publish::persist_noclobber(private, &path)?;
+        } else {
+            publish::persist(private, &path)?;
+        }
+        Ok(())
+    })
+    .await??;
+    fsync_dir(&sync_parent).await
+}
+
+async fn representation_hash(path: &Path) -> anyhow::Result<Option<String>> {
+    match tokio::fs::symlink_metadata(path).await {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.into()),
+        Ok(m) if m.is_file() && !m.file_type().is_symlink() => Ok(Some(hex::encode(
+            crate::managers::instance::modpack::origin_check::hash_file_sha512(path).await?,
+        ))),
+        _ => bail!(
+            "representation path is not a plain file: {}",
+            path.display()
+        ),
+    }
+}
+
+/// Owned transitions take precedence over fresh disk-derived decisions.
+/// Exclude them before pure planning, so resume never reinterprets the
+/// completed twin as a newly disabled file or demands a consumed legacy input.
+async fn plan_staging(
+    inputs: apply_plan::PlanInputs<'_>,
+    root: &Path,
+    options: Option<&RepairMarkerFile>,
+) -> anyhow::Result<Vec<apply_plan::PlanEntry>> {
+    let directory = root.join(".setup/representation-transitions");
+    if !directory.try_exists()? {
+        return Ok(apply_plan::plan(inputs)?);
+    }
+    check_plain_directory(&directory)?;
+    let binding = transition_binding(inputs.target, options)?;
+    let mut resumed = std::collections::BTreeMap::new();
+    let mut records = tokio::fs::read_dir(&directory).await?;
+    while let Some(file) = records.next_entry().await? {
+        // An interrupted private tempfile is diagnostic debris, never intent.
+        if file.path().extension().is_none_or(|ext| ext != "json") {
+            continue;
+        }
+        let record = read_transition(&file.path()).await.with_context(|| {
+            format!("preserved representation record: {}", file.path().display())
+        })?;
+        validate_transition(&record, &binding, inputs.target).with_context(|| {
+            format!("preserved representation record: {}", file.path().display())
+        })?;
+        if file.path() != transition_path(root, &record.entry.path) {
+            bail!(
+                "foreign representation transition filename: {}",
+                file.path().display()
+            );
+        }
+        resumed.insert(record.entry.path.clone(), record.entry);
+    }
+    let excluded = resumed.keys().cloned().collect();
+    let mut entries = apply_plan::plan_remaining(inputs, &excluded)?;
+    entries.extend(resumed.into_values());
+    entries.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(entries)
+}
+
+/// `binding` is [`transition_binding`] of `target` and the apply's options,
+/// computed once per apply: it covers the whole target.
+async fn execute_representation(
+    entry: &mut apply_plan::PlanEntry,
+    root: &Path,
+    staged: &Path,
+    target: &packinfo::PackInfo,
+    binding: &(String, String),
+    notes: &mut Vec<String>,
+) -> anyhow::Result<()> {
+    use apply_plan::{PlanAction, PlanReason};
+    let path = transition_path(root, &entry.path);
+    let bare = root.join("instance").join(
+        entry
+            .path
+            .strip_prefix('/')
+            .context("invalid representation path")?,
+    );
+    let twin = disabled_sibling(&bare);
+    let mut record = if path.try_exists()? {
+        let record = read_transition(&path).await?;
+        validate_transition(&record, &binding, target)?;
+        if record.entry.path != entry.path {
+            bail!("representation path mismatch");
+        }
+        record
+    } else {
+        let disabled = entry.action == PlanAction::Replace;
+        let (dest, other) = if disabled {
+            (&twin, &bare)
+        } else {
+            (&bare, &twin)
+        };
+        let record = RepresentationTransition {
+            schema_version: 1,
+            target_digest: binding.0,
+            options_digest: binding.1,
+            recovery_batch: crate::managers::instance::modpack::create_cleanup_batch(root)?,
+            entry: entry.clone(),
+            disabled,
+            destination_before: representation_hash(dest).await?,
+            opposite_before: representation_hash(other).await?,
+            published: false,
+            completed: false,
+            conflict: false,
+        };
+        validate_transition(&record, &transition_binding(target, options)?, target)?;
+        ensure_plain_directory(path.parent().unwrap()).await?;
+        fsync_dir(&root.join(".setup")).await?;
+        write_transition(&path, &record, true).await?;
+        record
+    };
+    let (dest, other) = if record.disabled {
+        (&twin, &bare)
+    } else {
+        (&bare, &twin)
+    };
+    let expected = target
+        .files
+        .get(&record.entry.path)
+        .context("transition target missing")?
+        .sha512;
+    let batch = transition_batch(root, &record);
+    let recovery_entry = batch.join(record_key(&entry.path));
+    let payload = recovery_entry.join("payload");
+    let expected_hex = Some(hex::encode(expected));
+    let current = representation_hash(dest).await?;
+    if record.completed {
+        // Never collect another live occupant after completion. The payload
+        // remains the original file, including later writes through open handles.
+        if current != expected_hex
+            || (!record.conflict && representation_hash(other).await?.is_some())
+        {
+            record.conflict = true;
+            write_transition(&path, &record, false).await?;
+        }
+        // A conflict that published nothing and moved nothing may be one an
+        // earlier attempt found from a changed source (see below). The record
+        // does not keep the reason, so a resumed apply checks the source
+        // again to give the same plain note. Only the note depends on it.
+        if record.conflict && !record.published && !payload.try_exists()? {
+            let source = resolve_staged(staged)
+                .map(|(path, _)| path)
+                .or_else(|| (!record.disabled).then(|| other.clone()));
+            if let Some(source) = source.filter(|source| source.is_file()) {
+                source_changed =
+                    crate::managers::instance::modpack::origin_check::hash_file_sha512(&source)
+                        .await
+                        .is_ok_and(|hash| hash != expected);
+            }
+        }
+    } else {
+        ensure_plain_directory(&root.join(".repair-recovery")).await?;
+        ensure_plain_directory(&batch).await?;
+        sync_recovery_hierarchy(root, &batch).await?;
+        ensure_plain_directory(&recovery_entry).await?;
+        let manifest = recovery_entry.join("entry.json");
+        if manifest.try_exists()? {
+            let saved = read_transition(&manifest).await?;
+            let mut initial = record.clone();
+            initial.published = false;
+            initial.completed = false;
+            initial.conflict = false;
+            if saved != initial {
+                bail!("retained representation manifest mismatch");
+            }
+        } else {
+            if payload.try_exists()? {
+                bail!("retained representation payload has no manifest");
+            }
+            let mut initial = record.clone();
+            initial.published = false;
+            initial.completed = false;
+            initial.conflict = false;
+            write_transition(&manifest, &initial, true).await?;
+        }
+        fsync_dir(&batch).await?;
+        if current != expected_hex {
+            if record.published || current != record.destination_before {
+                // A destination edited after intent was recorded is preserved.
+                record.conflict = true;
+                record.completed = true;
+            } else {
+                let source = resolve_staged(staged)
+                    .map(|(path, _)| path)
+                    .or_else(|| (!record.disabled).then(|| other.clone()))
+                    .ok_or_else(|| missing_staged_error(&entry.path))?;
+                tokio::fs::create_dir_all(dest.parent().unwrap()).await?;
+                publish_staged_copy(&source, dest, Some(expected), false).await?;
+            }
+        }
+        if !record.completed {
+            record.published = true;
+            write_transition(&path, &record, false).await?;
+            if !payload.try_exists()? && representation_hash(other).await?.is_some() {
+                #[cfg(test)]
+                staging_test::run_hook(
+                    if record.disabled {
+                        "remove-bare"
+                    } else {
+                        "remove-twin"
+                    },
+                    other,
+                );
+                // Retain the original inode rather than deleting a hash-matched
+                // pathname. A concurrent edit remains recoverable even after
+                // our post-move hash or through an already-open file handle.
+                // A mods folder linked to another drive than the instance root
+                // gets a published copy instead, and the hash below still
+                // catches an edit made before it.
+                publish::move_noclobber_async(other, &payload).await?;
+            }
+            if payload.try_exists()? {
+                sync_recovery_payload(&payload).await?;
+                fsync_dir(&recovery_entry).await?;
+                fsync_dir(other.parent().unwrap()).await?;
+                let moved = representation_hash(&payload).await?;
+                if moved != record.opposite_before {
+                    record.conflict = true;
+                    let moved_hash =
+                        crate::managers::instance::modpack::origin_check::hash_file_sha512(
+                            &payload,
+                        )
+                        .await?;
+                    publish_staged_copy(&payload, other, Some(moved_hash), true).await?;
+                } else if representation_hash(other).await?.is_some() {
+                    record.conflict = true;
+                }
+            }
+            record.completed = true;
+        }
+        #[cfg(test)]
+        staging_test::io_fault("transition-complete", &path)?;
+        write_transition(&path, &record, false).await?;
+    }
+    *entry = record.entry.clone();
+    if record.conflict {
+        entry.action = PlanAction::Keep;
+        entry.reason = PlanReason::PreservedExisting;
+        let location = payload.strip_prefix(root).unwrap_or(&payload).display();
+        let note = if payload.try_exists()? {
+            format!(
+                "Representation conflict preserved for {}; recovery: {location}",
+                entry.path
+            )
+        } else {
+            format!(
+                "Representation conflict preserved for {}; live files preserved, no counterpart moved",
+                entry.path
+            )
+        };
+        tracing::warn!("{note}");
+        notes.push(note);
+    } else if payload.try_exists()? {
+        tracing::info!("Representation original retained: {}", payload.display());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
 async fn execute_plan(
+    entries: &[apply_plan::PlanEntry],
+    root: &Path,
+    staging: &Path,
+    target: &packinfo::PackInfo,
+) -> anyhow::Result<Vec<apply_plan::PlanEntry>> {
+    execute_bound_plan(entries, root, staging, target, None, &mut Vec::new()).await
+}
+
+/// Carries out every [`apply_plan::PlanEntry`] against the real filesystem.
+/// Executes fresh decisions and resumes owned representation transitions;
+/// publication collisions and preserved conflicts become actual audit outcomes.
+async fn execute_bound_plan(
     entries: &[apply_plan::PlanEntry],
     instance_root: &Path,
     staging_dir: &Path,
-) -> anyhow::Result<()> {
-    use apply_plan::PlanAction;
+    target: &packinfo::PackInfo,
+    options: Option<&RepairMarkerFile>,
+    notes: &mut Vec<String>,
+) -> anyhow::Result<Vec<apply_plan::PlanEntry>> {
+    use apply_plan::{PlanAction, PlanReason};
+    // What every representation record binds to: the whole target, so once
+    // per apply rather than once per entry.
+    let binding = transition_binding(target, options)?;
     let data_path = instance_root.join("instance");
-    for entry in entries {
+    let mut outcomes = entries.to_vec();
+    let mut publications = Publications::new(data_path.clone());
+    for entry in &mut outcomes {
         // `strip_prefix` rather than `[1..]`: char-boundary-safe (an empty
         // key or one starting with a multibyte character would panic on a
         // byte-index slice), and it gives `None` instead of a garbage
@@ -1190,6 +2093,22 @@ async fn execute_plan(
             );
         }
         let twin = disabled_sibling(&live);
+        if disk_scan::resolves_into_saves(&data_path, &live)
+            && (live.exists() || twin.exists() || entry.action != PlanAction::Create)
+        {
+            entry.action = PlanAction::Keep;
+            entry.reason = PlanReason::InSaveFolder;
+        }
+        if entry.action != PlanAction::Keep
+            && (transition_path(instance_root, &entry.path).try_exists()?
+                || entry.action == PlanAction::ReEnable
+                || entry.action == PlanAction::Replace
+                    && resolve_staged(&staged).is_some_and(|(_, disabled)| disabled))
+        {
+            execute_representation(entry, instance_root, &staged, target, options, notes).await?;
+            continue;
+        }
+        let expected = target.files.get(&entry.path).map(|h| h.sha512);
         match entry.action {
             PlanAction::Keep => {}
             PlanAction::Delete => {
@@ -1198,16 +2117,17 @@ async fn execute_plan(
             PlanAction::Replace => {
                 let (source, is_disabled) =
                     resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
-                if is_disabled {
-                    // The target now ships this path disabled by default:
-                    // land it under the twin spelling, then drop the
-                    // previously-enabled live copy so only one spelling of
-                    // the file survives on disk.
-                    tokio::fs::rename(&source, &twin).await?;
-                    tokio::fs::remove_file(&live).await?;
-                } else {
-                    tokio::fs::rename(&source, &live).await?;
-                }
+                debug_assert!(
+                    !is_disabled,
+                    "disabled Replace uses durable representation intent"
+                );
+                publish_staged_copy(
+                    &source,
+                    &live,
+                    Some(expected.context("missing target hash for staged publication")?),
+                    false,
+                )
+                .await?;
             }
             PlanAction::Create => {
                 let (source, is_disabled) =
@@ -1216,183 +2136,287 @@ async fn execute_plan(
                 // enabled — the pack's own default is preserved.
                 let dest = if is_disabled { &twin } else { &live };
                 tokio::fs::create_dir_all(dest.parent().unwrap()).await?;
-                tokio::fs::rename(&source, dest).await?;
+                // Preserve observed representation intent as well as the
+                // destination itself. No-clobber publication closes the
+                // destination race after this twin check.
+                let other = if is_disabled { &live } else { &twin };
+                if other.try_exists()?
+                    || !publish_staged_copy(
+                        &source,
+                        dest,
+                        Some(expected.context("missing target hash for staged publication")?),
+                        true,
+                        &mut publications.routes,
+                    )
+                    .await?
+                {
+                    entry.action = PlanAction::Keep;
+                    entry.reason = if other == &twin && twin.exists() {
+                        PlanReason::DisabledByUser
+                    } else {
+                        PlanReason::PreservedExisting
+                    };
+                }
             }
             PlanAction::ReplaceDisabled => {
                 let (source, _) =
                     resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
-                tokio::fs::rename(&source, &twin).await?;
+                publish_staged_copy(
+                    &source,
+                    &twin,
+                    Some(expected.context("missing target hash for staged publication")?),
+                    false,
+                )
+                .await?;
             }
-            PlanAction::ReEnable => {
-                if let Some((source, _)) = resolve_staged(&staged) {
-                    tokio::fs::create_dir_all(live.parent().unwrap()).await?;
-                    tokio::fs::rename(&source, &live).await?;
-                    // Propagated rather than swallowed: repair is retryable,
-                    // so a twin that can't be removed (locked by another
-                    // process, or — in the pathological case — not even a
-                    // regular file) must fail the operation loudly. Silently
-                    // ignoring the error would leave both spellings on disk
-                    // (the newly re-enabled live file and the stale disabled
-                    // twin) with nothing to report it, and the caller would
-                    // go on to promote the apply and write an audit that
-                    // never mentions the leftover twin.
-                    tokio::fs::remove_file(&twin).await?;
-                } else {
-                    tokio::fs::rename(&twin, &live).await?;
-                }
-            }
+            PlanAction::ReEnable => unreachable!("ReEnable uses durable representation intent"),
         }
     }
-    Ok(())
+    publications.finish().await?;
+    Ok(outcomes)
 }
 
-/// Deletes every path in a repair's `cleanup_paths` from the live instance
-/// data dir, on the user's own explicit request from the repair preview.
-/// Runs after [`execute_plan`] so a cleanup can never race the pack's own
-/// reconciliation of the same path.
-///
-/// **Never bails.** `repair_modpack` already rejected a syntactically
-/// invalid path before this pipeline ever started (see
-/// [`crate::managers::instance::modpack::normalize_cleanup_path`]'s doc), so
-/// by the time execution reaches here every remaining failure mode — a
-/// tracked path, a symlink-widened escape, a plain I/O error — is either an
-/// adversarial input or a benign race, never a normal user mistake worth
-/// aborting the whole apply for. A single bad entry after [`execute_plan`]
-/// has already run would otherwise skip the audit write and the
-/// `packinfo.json` promotion entirely and leave `.setup/repair` in place, so
-/// every future relaunch re-enters repair and re-fails at the identical
-/// path forever. Every rejection is `tracing::warn!`-logged and the path is
-/// skipped instead: it simply stays on disk, absent from the returned list
-/// (and so absent from the audit's "removed at user request" section too).
-///
-/// **Walk-membership design.** A byte-exact string comparison against
-/// `/saves`, a `.disabled` suffix, or a packinfo key is not enough on its
-/// own: Windows and default-configuration macOS resolve paths
-/// case-insensitively (`/Saves/...` reaches the same file as `/saves/...`,
-/// `/Mods/tracked.jar` the same as `/mods/tracked.jar`), and Windows also
-/// silently drops a trailing dot/space — any of these would pass every
-/// string check here yet still delete the real `/saves` or pack-tracked
-/// file once the OS's own path resolution runs inside `remove_file`. Rather
-/// than chase every OS-specific aliasing rule with case-folds, this closes
-/// the whole class structurally: [`walk_untracked_files`] walks the REAL
-/// instance data dir once and returns the ground-truth set of untracked
-/// files, each keyed by the raw spelling **the walk itself observed** (never
-/// a spelling derived from user input) and mapped to that file's own real
-/// [`PathBuf`]. A `cleanup_paths` entry (already syntax-validated by
-/// [`normalize_cleanup_path`]) is honored only if it is an *exact* member of
-/// that set — **the `remove_file` target is always the walked entry's own
-/// `PathBuf`, never rebuilt from the user's string.** That is what makes
-/// alias divergence structurally impossible: whatever spelling the user
-/// typed, it only ever earns the deletion of a directory entry the walk
-/// itself enumerated and classified untracked — there is no code path left
-/// where a user-supplied string is turned into a deletion target on its
-/// own, so no OS path-resolution quirk can make the two diverge.
-///
-/// The canonicalize-parent containment check below is kept as defense in
-/// depth against a *walked* entry reached through a symlink somewhere in
-/// the instance tree (`NormalizedWalkdir` follows a symlinked subdirectory
-/// during traversal, same as `fs::metadata`) — `remove_file` itself never
-/// follows a symlink in the final path component, so only the parent chain
-/// needs checking. A path already absent from disk, or whose parent
-/// directory no longer exists at all (a benign race between the walk and
-/// this loop), is not a failure: the user's intent — this path gone — is
-/// already satisfied, though still `tracing::warn!`-logged rather than
-/// silently passed over, since by this point the walk itself just proved
-/// the entry existed a moment ago. Returns exactly the paths actually
-/// removed, for [`render_audit`]'s `user_removed`.
-async fn apply_user_cleanup(
-    cleanup_paths: &[String],
-    old_packinfo: Option<&packinfo::PackInfo>,
-    target_packinfo: &packinfo::PackInfo,
-    instance_root: &Path,
-    fs_case_insensitive: bool,
-) -> Vec<String> {
-    if cleanup_paths.is_empty() {
-        // Avoid walking the whole instance tree for nothing — `cleanup_paths`
-        // is whatever the user ticked in the repair preview's untracked-file
-        // list (`RepairModpack/index.tsx` sends `cleanup_paths: [...ticked()]`),
-        // so an empty list just means the user ticked nothing this time, not
-        // that the feature is unwired.
-        return Vec::new();
-    }
+#[derive(Default)]
+struct CleanupReport {
+    removed: Vec<String>,
+    notes: Vec<String>,
+}
 
-    let instance_data = instance_root.join("instance");
-    let canonical_data = match tokio::fs::canonicalize(&instance_data).await {
-        Ok(p) => p,
-        Err(e) => {
-            // The staging apply that runs immediately before this already
-            // requires this directory to exist — this should never happen,
-            // but "never bail" means treating even this as skip-all rather
-            // than propagating an error that would ALSO lose the audit
-            // write and packinfo promotion, the exact failure mode this
-            // function exists to avoid.
-            tracing::warn!(
-                "skipping all repair cleanup: failed to canonicalize instance data dir {instance_data:?}: {e}"
-            );
-            return Vec::new();
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CleanupRecoveryEntry {
+    schema_version: u32,
+    selection: crate::managers::instance::modpack::CleanupSelection,
+    payload: String,
+    status: String,
+}
+
+async fn write_cleanup_record(entry: &Path, record: &CleanupRecoveryEntry) -> anyhow::Result<()> {
+    let entry = entry.to_owned();
+    let bytes = serde_json::to_vec_pretty(record)?;
+    let parent = entry.clone();
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        use std::io::Write;
+        let mut private = publish::temp_in(&entry)?;
+        private.write_all(&bytes)?;
+        private.as_file().sync_all()?;
+        publish::persist(private, &entry.join("entry.json"))?;
+        Ok(())
+    })
+    .await??;
+    fsync_dir(&parent).await
+}
+
+async fn finish_cleanup_payload(
+    entry: &Path,
+    live: &Path,
+    record: &mut CleanupRecoveryEntry,
+    report: &mut CleanupReport,
+) -> anyhow::Result<()> {
+    use crate::managers::instance::modpack::origin_check::hash_file_sha512;
+    let payload = entry.join("payload");
+    sync_recovery_payload(&payload).await?;
+    fsync_dir(entry).await?;
+    fsync_dir(live.parent().context("cleanup path has no parent")?).await?;
+    let moved = hash_file_sha512(&payload).await?;
+    if hex::encode(moved) != record.selection.sha512.to_ascii_lowercase() {
+        record.status = "preserved-conflict".into();
+        let restored = publish_staged_copy(&payload, live, Some(moved), true).await?;
+        let note = format!(
+            "Cleanup preserved changed payload at {}; restored live copy: {restored}",
+            payload.display()
+        );
+        tracing::warn!("{note}");
+        report.notes.push(note);
+    } else {
+        record.status = "removed-at-user-request".into();
+        if !live.try_exists()? {
+            report.removed.push(record.selection.path.clone());
         }
+        report.notes.push(format!(
+            "Cleanup retained {}: {}",
+            record.selection.path,
+            payload.display()
+        ));
+    }
+    write_cleanup_record(entry, record).await
+}
+
+/// Selected bytes are moved into retained storage outside setup and audit.
+/// An existing entry is a retry, never consent to take a new live file.
+async fn apply_bound_cleanup(
+    options: &RepairMarkerFile,
+    old: Option<&packinfo::PackInfo>,
+    target: &packinfo::PackInfo,
+    root: &Path,
+    insensitive: bool,
+    context: Option<&crate::managers::instance::modpack::PackProofContext>,
+) -> CleanupReport {
+    use crate::managers::instance::modpack::origin_check::hash_file_sha512;
+    let mut report = CleanupReport::default();
+    if !options.cleanup_paths.is_empty() {
+        report
+            .notes
+            .push("Legacy cleanup paths preserved: no selected content proof.".into());
+    }
+    if options.cleanup_selections.is_empty() {
+        return report;
+    }
+    if options
+        .cleanup_selections
+        .iter()
+        .any(|s| Some(&s.context) != context)
+    {
+        report
+            .notes
+            .push("Cleanup preserved: installed pack context changed.".into());
+        return report;
+    }
+    let Some(batch_name) = options.cleanup_batch.as_ref().filter(|name| {
+        let mut components = Path::new(name).components();
+        matches!(components.next(), Some(std::path::Component::Normal(_)))
+            && components.next().is_none()
+    }) else {
+        report
+            .notes
+            .push("Cleanup skipped: no bound recovery batch.".into());
+        return report;
     };
-
-    let deletable = walk_untracked_files(
-        &instance_data,
-        old_packinfo,
-        target_packinfo,
-        fs_case_insensitive,
-    )
-    .await;
-
-    let mut user_removed = Vec::new();
-    for path in cleanup_paths {
-        let Some(key) = normalize_cleanup_path(path) else {
-            tracing::warn!("skipping repair cleanup of syntactically invalid path {path:?}");
-            continue;
-        };
-
-        let Some(real_path) = deletable.get(&key) else {
-            tracing::warn!(
-                "skipping repair cleanup of {key}: not an exact match for any untracked file \
-                 currently on disk (either it doesn't exist, or only a differently-spelled \
-                 alias of it does)"
-            );
-            continue;
-        };
-
-        let Some(parent) = real_path.parent() else {
-            tracing::warn!("skipping repair cleanup of {key}: path has no parent directory");
-            continue;
-        };
-        let canonical_parent = match tokio::fs::canonicalize(parent).await {
-            Ok(p) => p,
-            Err(e) => {
-                tracing::warn!(
-                    "skipping repair cleanup of {key}: failed to canonicalize parent directory \
-                     (the walk found it moments ago, so this is likely a race): {e}"
-                );
-                continue;
-            }
-        };
-        if !canonical_parent.starts_with(&canonical_data) {
-            tracing::warn!(
-                "skipping repair cleanup of {key}: resolves outside the instance data dir \
-                 once its parent directory's symlinks are followed"
-            );
-            continue;
-        }
-
-        match tokio::fs::remove_file(real_path).await {
-            Ok(()) => user_removed.push(key),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                tracing::warn!(
-                    "repair cleanup of {key}: the walk found it moments ago but it is gone now \
-                     (likely a race) — treating as already satisfied"
-                );
-            }
-            Err(e) => {
-                tracing::warn!("skipping repair cleanup of {key}: failed to remove: {e}");
-            }
+    let recovery = root.join(".repair-recovery");
+    let batch = recovery.join(batch_name);
+    for directory in [&recovery, &batch] {
+        if !std::fs::symlink_metadata(directory)
+            .is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink())
+        {
+            report.notes.push(format!(
+                "Cleanup skipped: recovery directory unavailable: {}",
+                directory.display()
+            ));
+            return report;
         }
     }
-    user_removed
+    if let Err(error) = sync_recovery_hierarchy(root, &batch).await {
+        report.notes.push(format!(
+            "Cleanup skipped: recovery durability prerequisite: {error:#}"
+        ));
+        return report;
+    }
+    report
+        .notes
+        .push(format!("Cleanup recovery: .repair-recovery/{batch_name}/"));
+    let data = root.join("instance");
+    let Ok(canonical_data) = tokio::fs::canonicalize(&data).await else {
+        return report;
+    };
+    let deletable = walk_untracked_files(&data, old, target, insensitive).await;
+    for selection in &options.cleanup_selections {
+        let key = &selection.path;
+        let mut expected = [0u8; 64];
+        if normalize_cleanup_path(key).as_ref() != Some(key)
+            || hex::decode_to_slice(&selection.sha512, &mut expected).is_err()
+        {
+            continue;
+        }
+        let entry = batch.join(record_key(key));
+        let payload = entry.join("payload");
+        // Do not reuse content-only ownership. The persisted entry belongs
+        // to this selected path in this admitted batch; never move twice.
+        if entry.exists() {
+            let resumed = async {
+                let mut record: CleanupRecoveryEntry =
+                    serde_json::from_slice(&tokio::fs::read(entry.join("entry.json")).await?)?;
+                if record.schema_version != 1
+                    || record.selection != *selection
+                    || record.payload != "payload"
+                {
+                    bail!("recovery entry does not match the admitted selection");
+                }
+                if !entry.symlink_metadata()?.is_dir()
+                    || entry.symlink_metadata()?.file_type().is_symlink()
+                {
+                    bail!("recovery entry is not a plain directory");
+                }
+                let live = data.join(key.strip_prefix('/').unwrap());
+                if record.status == "pending" && payload.is_file() {
+                    let parent = live.parent().context("cleanup path has no parent")?;
+                    if !tokio::fs::canonicalize(parent)
+                        .await?
+                        .starts_with(&canonical_data)
+                        || disk_scan::resolves_into_saves(&data, &live)
+                    {
+                        bail!("cleanup recovery destination no longer eligible");
+                    }
+                    finish_cleanup_payload(&entry, &live, &mut record, &mut report).await?;
+                }
+                Ok::<_, anyhow::Error>(())
+            }
+            .await;
+            report.notes.push(format!(
+                "Cleanup retry retained recovery entry: {}{}",
+                entry.display(),
+                resumed
+                    .err()
+                    .map(|e| format!(" ({e:#})"))
+                    .unwrap_or_default()
+            ));
+            continue;
+        }
+        let Some(live) = deletable.get(key) else {
+            continue;
+        };
+        let Some(parent) = live.parent() else {
+            continue;
+        };
+        if !tokio::fs::canonicalize(parent)
+            .await
+            .is_ok_and(|p| p.starts_with(&canonical_data))
+            || disk_scan::resolves_into_saves(&data, live)
+        {
+            continue;
+        }
+        if hash_file_sha512(live).await.ok() != Some(expected) {
+            report
+                .notes
+                .push(format!("Cleanup preserved changed file: {key}"));
+            continue;
+        }
+        // create_dir is exclusive. Its deterministic per-selection name is
+        // storage within this unique batch, not a setup admission marker.
+        if let Err(e) = tokio::fs::create_dir(&entry).await {
+            report.notes.push(format!("Cleanup skipped {key}: {e}"));
+            continue;
+        }
+        let mut record = CleanupRecoveryEntry {
+            schema_version: 1,
+            selection: selection.clone(),
+            payload: "payload".into(),
+            status: "pending".into(),
+        };
+        let result = async {
+            write_cleanup_record(&entry, &record).await?;
+            fsync_dir(&batch).await?;
+            #[cfg(test)]
+            staging_test::run_hook("cleanup-move", live);
+            // Copied when the file's folder is linked to another drive than
+            // the instance root; the payload is new in this batch.
+            publish::move_noclobber_async(live, &payload).await?;
+            #[cfg(test)]
+            staging_test::run_hook("cleanup-moved", live);
+            sync_recovery_payload(&payload).await?;
+            fsync_dir(&entry).await?;
+            fsync_dir(parent).await?;
+            finish_cleanup_payload(&entry, live, &mut record, &mut report).await
+        }
+        .await;
+        if let Err(error) = result {
+            let note = format!(
+                "Cleanup preserved/skipped {key}: {error:#}; recovery: {}",
+                payload.display()
+            );
+            tracing::warn!("{note}");
+            report.notes.push(note);
+        }
+    }
+    report
 }
 
 /// Resolves the physical staged file backing a plan entry, which may sit
@@ -1429,6 +2453,15 @@ fn disabled_sibling(path: &Path) -> PathBuf {
     let mut name = path.file_name().unwrap().to_owned();
     name.push(".disabled");
     path.with_file_name(name)
+}
+
+fn render_cleanup_audit(entries: &[apply_plan::PlanEntry], cleanup: &CleanupReport) -> String {
+    let mut audit = render_audit(entries, &cleanup.removed);
+    if !cleanup.notes.is_empty() {
+        let after_title = audit.find('\n').map(|i| i + 1).unwrap_or(audit.len());
+        audit.insert_str(after_title, &format!("{}\n", cleanup.notes.join("\n")));
+    }
+    audit
 }
 
 /// Renders the plain-text install audit `apps/desktop/e2e-tests/helpers/installAudit.ts`
@@ -1514,4 +2547,4 @@ fn render_audit(entries: &[apply_plan::PlanEntry], user_removed: &[String]) -> S
 
 #[cfg(test)]
 #[path = "staging_test.rs"]
-mod staging_test;
+pub(in crate::managers::instance) mod staging_test;

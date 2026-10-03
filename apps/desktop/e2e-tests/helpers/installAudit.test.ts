@@ -107,6 +107,14 @@ describe("parseInstallAudit", () => {
   })
 })
 
+it("keeps list semantics with retained cleanup recovery notes", () => {
+  const withRecovery = FULL.replace(
+    "GDLauncher Modpack Install/Update Audit\n",
+    "GDLauncher Modpack Install/Update Audit\nCleanup recovery: .repair-recovery/cleanup-example/\nCleanup retained /config/retired.cfg: .repair-recovery/cleanup-example/entry/payload\n"
+  )
+  expect(parseInstallAudit(withRecovery)).toEqual(parseInstallAudit(FULL))
+})
+
 describe("readInstallAudit", () => {
   let root: string
   beforeEach(() => {

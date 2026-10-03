@@ -50,7 +50,7 @@ pub enum DiskState {
 }
 
 /// What the planner decided to do with a path.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PlanAction {
     Replace,
     Create,
@@ -62,7 +62,7 @@ pub enum PlanAction {
 
 /// Why the planner made the [`PlanAction`] it did, for audit trails and UI
 /// explanations.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PlanReason {
     PackUpdate,
     Unchanged,
@@ -95,25 +95,17 @@ pub enum PlanReason {
     CaseAliasedByTarget {
         surviving_path: String,
     },
-    /// [`PlanAction::Delete`] of the bare spelling that finishes an
-    /// interrupted disabled-default [`PlanAction::Replace`]:
-    /// `run/modpack.rs::execute_plan`'s Replace arm renames the staged bytes
-    /// into the `.disabled` twin spelling *before* removing the stale bare
-    /// copy, so a crash or a locked-file removal failure between those two
-    /// steps leaves the twin already holding exactly what `target` wants
-    /// while the bare spelling still has the pre-update bytes. Staging is
-    /// consumed either way (the rename already happened) and is never
-    /// re-populated on resume, so the planner recognizes this state by the
-    /// twin's own md5 — see [`decide_version_change`]'s pristine-unstaged-
-    /// differs arm — and finishes the interrupted removal instead of
-    /// erroring on it forever. Renders in the audit's plain "Files deleted:"
-    /// section like any other Delete; no dedicated skip-reason string is
-    /// needed since Delete is the only action here, not a Keep.
+    /// Legacy VersionChange shortcut for an older apply that consumed its
+    /// staged source while publishing a disabled target. The old bare hash
+    /// and coexisting target twin permit finishing that legacy Delete. This
+    /// is not new-session provenance: Task8 must qualify legacy setup before
+    /// relying on it. New representation changes retain their sources and
+    /// resume through a target/options-bound record before this planner runs.
     DisabledReplaceResumed,
 }
 
 /// One path's worth of decision.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PlanEntry {
     pub path: String,
     pub action: PlanAction,
@@ -147,7 +139,8 @@ pub struct PlanInputs<'a> {
     pub mode: ApplyMode,
     /// Whether the instance's filesystem folds path case together (true on
     /// Windows and default-configuration macOS, false on ext4 and most
-    /// other Linux setups). Used only to keep [`plan`] from emitting a
+    /// other Linux setups). Resolves unique old/target case-equivalent ownership,
+    /// protects case aliases of saves, and prevents emitting a
     /// [`PlanAction::Delete`] for a path that merely case-aliases a
     /// surviving `target` path on such a filesystem — see the Delete-guard
     /// in [`plan`]'s own body.
@@ -160,6 +153,8 @@ pub enum PlanError {
         "planner requires a staged source for {path} but none exists — refusing to continue rather than silently skipping"
     )]
     MissingStagedSource { path: String },
+    #[error("ambiguous case-equivalent pack ownership for {path}")]
+    AmbiguousCaseOwnership { path: String },
 }
 
 /// Decide what to do with every path in `old ∪ target`, deterministically
@@ -187,6 +182,16 @@ pub enum PlanError {
 ///   when it isn't staged — instead of being silently promised in the target
 ///   packinfo and never written to disk.
 pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
+    plan_remaining(inputs, &HashSet::new())
+}
+
+/// Skip only paths with validated persisted representation intent. Keep the
+/// full old/target ownership maps for ambiguity and case-alias protection of
+/// all other entries; removing target membership would turn aliases into drops.
+pub(crate) fn plan_remaining(
+    inputs: PlanInputs,
+    resumed: &HashSet<String>,
+) -> Result<Vec<PlanEntry>, PlanError> {
     let PlanInputs {
         old,
         target,
@@ -203,51 +208,53 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
     }
     universe.extend(target.files.keys().cloned());
 
-    // ASCII-only case fold of every path `target` still ships, built once
-    // for the whole call rather than per path — consulted only by the
-    // Delete-guard below. ASCII fold only: NTFS/APFS case-folding tables
-    // differ from Unicode simple folding (e.g. Turkish İ), and ASCII covers
-    // the practical modpack namespace without chasing filesystem-specific
-    // folding rules.
-    //
-    // When two distinct `target` keys fold to the same spelling (a pack
-    // shipping both `/mods/Foo.jar` and `/mods/foo.jar` — broken, but not
-    // this planner's job to reject), the winner is resolved deterministically
-    // by lexicographically-smallest spelling rather than by whichever
-    // `target.files` (a `HashMap`) happens to iterate last: `PlanEntry`s are
-    // meant to be a deterministic function of their inputs, and an
-    // iteration-order-dependent `surviving_path` in the audit would silently
-    // vary run to run for no reason a user could see.
-    let target_folded: HashMap<String, &str> = if fs_case_insensitive {
-        let mut folded: HashMap<String, &str> = HashMap::new();
-        for key in target.files.keys() {
-            let folded_key = key.to_ascii_lowercase();
-            folded
-                .entry(folded_key)
-                .and_modify(|existing| {
-                    if key.as_str() < *existing {
-                        *existing = key.as_str();
+    let equivalent_owners =
+        |pack: Option<&PackInfo>| -> Result<HashMap<String, String>, PlanError> {
+            let mut folded = HashMap::new();
+            if fs_case_insensitive {
+                for key in pack.into_iter().flat_map(|p| p.files.keys()) {
+                    if folded
+                        .insert(key.to_ascii_lowercase(), key.clone())
+                        .is_some()
+                    {
+                        return Err(PlanError::AmbiguousCaseOwnership {
+                            path: key.to_ascii_lowercase(),
+                        });
                     }
-                })
-                .or_insert(key.as_str());
-        }
-        folded
-    } else {
-        HashMap::new()
-    };
+                }
+            }
+            Ok(folded)
+        };
+    let target_folded = equivalent_owners(Some(target))?;
+    let old_folded = equivalent_owners(old)?;
 
     let mut entries = Vec::with_capacity(universe.len());
 
-    for path in &universe {
-        let disk_state = disk.get(path).copied().unwrap_or(DiskState::Missing);
-        let old_hashes = old.and_then(|o| o.files.get(path));
+    for path in universe.iter().filter(|path| !resumed.contains(*path)) {
+        let disk_state = disk
+            .get(path)
+            .or_else(|| {
+                old_folded
+                    .get(&path.to_ascii_lowercase())
+                    .and_then(|p| disk.get(p))
+            })
+            .copied()
+            .unwrap_or(DiskState::Missing);
+        let old_hashes = old.and_then(|o| {
+            o.files.get(path).or_else(|| {
+                old_folded
+                    .get(&path.to_ascii_lowercase())
+                    .and_then(|key| o.files.get(key))
+            })
+        });
         let target_hashes = target.files.get(path);
 
         // Existing save bytes (Present or Disabled) are protected
         // unconditionally. A Missing save is only protected when `old`
         // already knew about it — otherwise it falls through to the normal
         // rows so a pack-staged world can actually be created.
-        if is_saves_path(path) {
+        if is_saves_path(path) || (fs_case_insensitive && is_saves_path(&path.to_ascii_lowercase()))
+        {
             let protect_missing_save = old_hashes.is_some();
             let protected = match disk_state {
                 DiskState::Present { .. } | DiskState::Disabled { .. } => true,
@@ -303,7 +310,7 @@ pub fn plan(inputs: PlanInputs) -> Result<Vec<PlanEntry>, PlanError> {
         // macOS) this whole mechanism exists to protect. Gating on `target`
         // not tracking `path` under its own exact spelling excludes it.
         if fs_case_insensitive && action == PlanAction::Delete && target.files.get(path).is_none() {
-            if let Some(&surviving) = target_folded.get(&path.to_ascii_lowercase()) {
+            if let Some(surviving) = target_folded.get(&path.to_ascii_lowercase()) {
                 action = PlanAction::Keep;
                 reason = PlanReason::CaseAliasedByTarget {
                     surviving_path: surviving.to_string(),
@@ -1990,7 +1997,7 @@ mod test {
             .iter()
             .find(|e| e.path == NEW_PATH)
             .expect("new spelling must still have an entry");
-        assert_eq!(new_entry.action, PlanAction::Create);
+        assert_eq!(new_entry.action, PlanAction::Replace);
         assert_eq!(new_entry.reason, PlanReason::PackUpdate);
     }
 
@@ -2063,7 +2070,7 @@ mod test {
             DiskState::Present { md5: hashes(1).md5 },
         );
 
-        let entries = plan(PlanInputs {
+        let result = plan(PlanInputs {
             old: Some(&old),
             target: &target,
             staged: &staged,
@@ -2071,20 +2078,57 @@ mod test {
             mode: ApplyMode::VersionChange,
             fs_case_insensitive: true,
             coexisting_disabled_twin_md5: &HashMap::new(),
-        })
-        .expect("a case-only rename must plan without error");
+        });
+        assert!(matches!(
+            result,
+            Err(PlanError::AmbiguousCaseOwnership { .. })
+        ));
+    }
 
-        let old_entry = entries
-            .iter()
-            .find(|e| e.path == OLD_PATH)
-            .expect("old spelling must still have an entry");
-        assert_eq!(
-            old_entry.reason,
-            PlanReason::CaseAliasedByTarget {
-                surviving_path: TARGET_SMALLER.to_string(),
-            },
-            "must deterministically prefer the lexicographically smallest \
-             colliding target spelling, got {old_entry:?}"
-        );
+    #[test]
+    fn task03_case_alias_pristine_update_and_save_protection() {
+        for (old_path, target_path, mode, expected) in [
+            (
+                "/Config/x.cfg",
+                "/config/x.cfg",
+                ApplyMode::VersionChange,
+                PlanAction::Replace,
+            ),
+            (
+                "/Saves/world/level.dat",
+                "/Saves/world/level.dat",
+                ApplyMode::Repair {
+                    re_enable_disabled: false,
+                },
+                PlanAction::Keep,
+            ),
+        ] {
+            let old = packinfo(&[(old_path, 1)]);
+            let target = packinfo(&[(target_path, 2)]);
+            let staged = [target_path.to_owned()].into_iter().collect();
+            let disk = [old_path, target_path]
+                .into_iter()
+                .map(|p| (p.to_owned(), DiskState::Present { md5: hashes(1).md5 }))
+                .collect();
+            let entries = plan(PlanInputs {
+                old: Some(&old),
+                target: &target,
+                staged: &staged,
+                disk: &disk,
+                coexisting_disabled_twin_md5: &HashMap::new(),
+                mode,
+                fs_case_insensitive: true,
+            })
+            .unwrap();
+            assert_eq!(
+                entries
+                    .iter()
+                    .find(|e| e.path == target_path)
+                    .unwrap()
+                    .action,
+                expected,
+                "{target_path}"
+            );
+        }
     }
 }

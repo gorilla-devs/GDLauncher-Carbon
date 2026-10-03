@@ -3,12 +3,18 @@ import { keepPreviousData } from "@tanstack/solid-query"
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
+import { freezeSelection, reconcileSelections } from "./selections"
 import { Button, Checkbox, Spinner, toast } from "@gd/ui"
 import { Trans, useTransContext, type TypedTFunction } from "@gd/i18n"
 import { useLocation } from "@solidjs/router"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { formatBytes } from "@/utils/formatBytes"
-import { FEOriginVerdict, FERepairReason } from "@gd/core_module/bindings"
+import {
+  CleanupSelection,
+  FEUntrackedFile,
+  FEOriginVerdict,
+  FERepairReason
+} from "@gd/core_module/bindings"
 
 /** Translated label for one `FERepairEntry.reason`, shown in the raw
  *  expandable file list. Every arm mirrors the exact `(PlanAction,
@@ -67,6 +73,9 @@ function originVerdictText(
   if (verdict === "CurrentVersion") {
     return t("instances:_trn_repair_origin_current")
   }
+  if (verdict === "Incomplete") {
+    return t("instances:_trn_repair_origin_incomplete")
+  }
   if (verdict === "Unknown") {
     return t("instances:_trn_repair_origin_unknown")
   }
@@ -85,19 +94,23 @@ const RepairModpack = (props: ModalProps) => {
   const instanceId = () => props.data?.id as number
 
   const [reEnable, setReEnable] = createSignal(false)
-  const [ticked, setTicked] = createSignal<Set<string>>(new Set(), {
-    equals: false
-  })
+  const [ticked, setTicked] = createSignal<Map<string, CleanupSelection>>(
+    new Map(),
+    {
+      equals: false
+    }
+  )
   const [expanded, setExpanded] = createSignal(false)
   const [originTaskId, setOriginTaskId] = createSignal<number | null>(null)
 
-  const toggleTicked = (path: string) => {
+  const toggleTicked = (file: FEUntrackedFile) => {
+    const path = file.path
     setTicked((prev) => {
-      const next = new Set(prev)
+      const next = new Map(prev)
       if (next.has(path)) {
         next.delete(path)
       } else {
-        next.add(path)
+        if (file.selection) next.set(path, freezeSelection(file.selection))
       }
       return next
     })
@@ -201,12 +214,18 @@ const RepairModpack = (props: ModalProps) => {
       .filter(
         (file) =>
           file.deletable &&
+          file.selection?.proven &&
           file.origin !== null &&
           typeof file.origin === "object" &&
           "ShippedIn" in file.origin
       )
-      .map((file) => file.path)
+      .map((file) => file.selection!)
   )
+
+  createEffect(() => {
+    const rows = preview.data?.untracked ?? []
+    setTicked((previous) => reconcileSelections(previous, rows))
+  })
 
   const repairInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.repairModpack"],
@@ -423,7 +442,16 @@ const RepairModpack = (props: ModalProps) => {
                         type="secondary"
                         size="small"
                         data-testid="repair-select-proven"
-                        onClick={() => setTicked(new Set(provenPaths()))}
+                        onClick={() =>
+                          setTicked(
+                            new Map(
+                              provenPaths().map((selection) => [
+                                selection.path,
+                                freezeSelection(selection)
+                              ])
+                            )
+                          )
+                        }
                       >
                         <div class="i-hugeicons:checkmark-circle-02" />
                         {t("instances:_trn_repair_select_proven")}
@@ -442,13 +470,14 @@ const RepairModpack = (props: ModalProps) => {
                             <Show
                               when={
                                 file.deletable &&
+                                file.selection !== null &&
                                 file.origin !== "CurrentVersion"
                               }
                             >
                               <div data-testid="repair-untracked-checkbox">
                                 <Checkbox
                                   checked={ticked().has(file.path)}
-                                  onChange={() => toggleTicked(file.path)}
+                                  onChange={() => toggleTicked(file)}
                                 />
                               </div>
                             </Show>
@@ -505,7 +534,8 @@ const RepairModpack = (props: ModalProps) => {
               } else {
                 repairInstanceMutation.mutate({
                   instance: instanceId(),
-                  cleanup_paths: [...ticked()],
+                  cleanup_paths: [],
+                  cleanup_selections: [...ticked().values()],
                   re_enable_disabled: reEnable()
                 })
               }

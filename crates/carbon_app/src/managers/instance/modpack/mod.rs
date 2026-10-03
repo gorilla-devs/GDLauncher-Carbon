@@ -206,7 +206,7 @@ impl ManagerRef<'_, InstanceManager> {
     pub async fn repair_modpack(
         self,
         instance_id: InstanceId,
-        options: RepairMarkerFile,
+        mut options: RepairMarkerFile,
     ) -> anyhow::Result<VisualTaskId> {
         use super::run::LaunchState;
 
@@ -253,6 +253,26 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instance_path(&instance.shortpath);
 
         drop(instances);
+
+        let context = PackProofContext::from(&modpack);
+        let origin = self.origin_checks.read().await.get(&instance_id).cloned();
+        validate_cleanup_selections(&options.cleanup_selections, &context, origin.as_ref())?;
+        if !options.cleanup_paths.is_empty() {
+            tracing::warn!("legacy path-only repair cleanup is unbound and will be preserved");
+        }
+        // Persist this storage identifier in the repair marker for retry.
+        // It never grants admission to setup or ownership of the instance.
+        options.cleanup_batch = if options.cleanup_selections.is_empty() {
+            None
+        } else {
+            match create_cleanup_batch(&instance_path.get_root()) {
+                Ok(batch) => Some(batch),
+                Err(error) => {
+                    tracing::warn!("cleanup will be preserved: {error:#}");
+                    None
+                }
+            }
+        };
 
         let setup_path = instance_path.get_root().join(".setup");
 
@@ -367,6 +387,12 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
         let shortpath = instance.shortpath.clone();
+        let context = instance
+            .data()?
+            .config
+            .modpack
+            .as_ref()
+            .map(|p| PackProofContext::from(&p.modpack));
         drop(instances);
 
         // Cloned out (rather than holding the read lock across the rest of
@@ -436,7 +462,7 @@ impl ManagerRef<'_, InstanceManager> {
         // doc for why both variants are computed unconditionally rather than
         // one selected by a parameter.
         let plan_variant = |re_enable_disabled: bool| -> anyhow::Result<RepairPlanVariant> {
-            let entries = apply_plan::plan(apply_plan::PlanInputs {
+            let mut entries = apply_plan::plan(apply_plan::PlanInputs {
                 old: Some(&recorded),
                 target: &recorded,
                 staged: &staged,
@@ -445,6 +471,7 @@ impl ManagerRef<'_, InstanceManager> {
                 mode: apply_plan::ApplyMode::Repair { re_enable_disabled },
                 fs_case_insensitive,
             })?;
+            disk_scan::protect_resolved_saves(&mut entries, &data_path, Some(&recorded));
             let counts = tally_counts(&entries);
             Ok(RepairPlanVariant { entries, counts })
         };
@@ -455,6 +482,7 @@ impl ManagerRef<'_, InstanceManager> {
             &data_path,
             &recorded,
             origin_results.as_ref(),
+            context.as_ref(),
             fs_case_insensitive,
         )
         .await?;
@@ -469,6 +497,92 @@ impl ManagerRef<'_, InstanceManager> {
     }
 }
 
+/// Identity of the installed pack whose preview was reviewed.
+#[derive(specta::Type, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct PackProofContext {
+    pub platform: String,
+    pub project_id: String,
+    pub version_id: String,
+}
+impl From<&Modpack> for PackProofContext {
+    fn from(pack: &Modpack) -> Self {
+        match pack {
+            Modpack::Modrinth(p) => Self {
+                platform: "modrinth".into(),
+                project_id: p.project_id.clone(),
+                version_id: p.version_id.clone(),
+            },
+            Modpack::Curseforge(p) => Self {
+                platform: "curseforge".into(),
+                project_id: p.project_id.to_string(),
+                version_id: p.file_id.to_string(),
+            },
+        }
+    }
+}
+
+/// Frozen at selection, including manual choices. Never refresh its hash
+/// at submission or while resuming a persisted repair.
+#[derive(specta::Type, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct CleanupSelection {
+    pub path: String,
+    pub sha512: String,
+    pub context: PackProofContext,
+    pub proven: bool,
+}
+
+pub(crate) fn validate_cleanup_selections(
+    selections: &[CleanupSelection],
+    context: &PackProofContext,
+    origin: Option<&origin_check::OriginResults>,
+) -> anyhow::Result<()> {
+    let mut seen = HashSet::new();
+    for selection in selections {
+        let mut hash = [0u8; 64];
+        if normalize_cleanup_path(&selection.path).as_ref() != Some(&selection.path)
+            || !seen.insert(&selection.path)
+            || &selection.context != context
+            || hex::decode_to_slice(&selection.sha512, &mut hash).is_err()
+        {
+            bail!(
+                "invalid or obsolete repair cleanup selection for {}",
+                selection.path
+            );
+        }
+        if selection.proven
+            && !matches!(
+                origin_verdict_for(origin, &selection.path, &hash, Some(context)),
+                Some(OriginVerdict::ShippedIn { .. })
+            )
+        {
+            bail!(
+                "repair origin proof no longer applies to {}",
+                selection.path
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn create_cleanup_batch(root: &Path) -> anyhow::Result<String> {
+    let recovery = root.join(".repair-recovery");
+    match std::fs::create_dir(&recovery) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            let metadata = std::fs::symlink_metadata(&recovery)?;
+            if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                bail!("repair recovery root is not a plain directory");
+            }
+        }
+        Err(e) => return Err(e.into()),
+    }
+    let batch = tempfile::Builder::new()
+        .prefix("cleanup-")
+        .tempdir_in(&recovery)?
+        .keep();
+    Ok(batch.file_name().unwrap().to_string_lossy().into_owned())
+}
+
 /// Body of the `.setup/repair` marker `repair_modpack` writes. Its mere
 /// presence (checked by `run/modpack.rs::process_modpack`) is what switches
 /// the staging pipeline from an ordinary version-change reconciliation to a
@@ -479,7 +593,13 @@ impl ManagerRef<'_, InstanceManager> {
 pub struct RepairMarkerFile {
     pub re_enable_disabled: bool,
     /// Packinfo-style keys the user ticked for removal in the preview.
+    #[serde(default)]
     pub cleanup_paths: Vec<String>,
+    #[serde(default)]
+    pub cleanup_selections: Vec<CleanupSelection>,
+    /// Relative storage batch, allocated by admission; not setup ownership.
+    #[serde(default)]
+    pub cleanup_batch: Option<String>,
 }
 
 /// Syntactically validates and normalizes one `RepairMarkerFile::cleanup_paths`
@@ -642,6 +762,7 @@ pub struct UntrackedFile {
     /// remove out from under the planner.
     pub deletable: bool,
     pub origin: Option<OriginVerdict>,
+    pub selection: Option<CleanupSelection>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -659,6 +780,7 @@ pub enum OriginVerdict {
         version_id: String,
     },
     CurrentVersion,
+    Incomplete,
     Unknown,
 }
 
@@ -779,7 +901,10 @@ pub async fn walk_data_files(
         }
 
         let key = entry.relative_path.to_string();
-        if apply_plan::is_saves_path(&key) || key.starts_with("/.install_audit") {
+        if apply_plan::is_saves_path(&key)
+            || disk_scan::resolves_into_saves(instance_data, &entry.entry.path())
+            || key.starts_with("/.install_audit")
+        {
             continue;
         }
         if !allowed_top_level.contains(top_level_segment(&key)) {
@@ -924,6 +1049,7 @@ async fn untracked_files_for_preview(
     instance_data: &Path,
     packinfo: &packinfo::PackInfo,
     origin_results: Option<&origin_check::OriginResults>,
+    context: Option<&PackProofContext>,
     fs_case_insensitive: bool,
 ) -> anyhow::Result<Vec<UntrackedFile>> {
     // old == target == packinfo for a preview (see `repair_preview`'s own
@@ -962,7 +1088,19 @@ async fn untracked_files_for_preview(
         };
 
         let size = tokio::fs::metadata(path).await?.len();
-        let origin = origin_verdict_for(origin_results, key);
+        let hash = origin_check::hash_file_sha512(path).await.ok();
+        let origin = hash
+            .as_ref()
+            .and_then(|hash| origin_verdict_for(origin_results, key, hash, context));
+        let selection = context
+            .zip(hash)
+            .filter(|_| deletable && origin != Some(OriginVerdict::CurrentVersion))
+            .map(|(context, hash)| CleanupSelection {
+                path: key.clone(),
+                sha512: hex::encode(hash),
+                context: context.clone(),
+                proven: matches!(origin, Some(OriginVerdict::ShippedIn { .. })),
+            });
 
         untracked.push(UntrackedFile {
             path: key.clone(),
@@ -970,6 +1108,7 @@ async fn untracked_files_for_preview(
             label,
             deletable,
             origin,
+            selection,
         });
     }
 
@@ -987,8 +1126,17 @@ async fn untracked_files_for_preview(
 fn origin_verdict_for(
     results: Option<&origin_check::OriginResults>,
     path: &str,
+    hash: &[u8; 64],
+    context: Option<&PackProofContext>,
 ) -> Option<OriginVerdict> {
-    results?.verdicts.get(path).cloned()
+    let results = results?;
+    if context.is_none()
+        || results.context.as_ref() != context
+        || results.checked_hashes.get(path) != Some(hash)
+    {
+        return None;
+    }
+    results.verdicts.get(path).cloned()
 }
 
 /// Tallies [`RepairPreview::counts`] from the `(action, reason)` of every
@@ -1176,6 +1324,7 @@ mod tests {
                 "/mods/leftover.jar".to_string(),
                 "/config/old.cfg".to_string(),
             ],
+            ..Default::default()
         };
 
         let text = serde_json::to_string(&marker).expect("marker must serialize");
@@ -1227,7 +1376,7 @@ mod tests {
         );
         let packinfo = PackInfo { files };
 
-        let result = untracked_files_for_preview(data, &packinfo, None, false)
+        let result = untracked_files_for_preview(data, &packinfo, None, None, false)
             .await
             .expect("walking a real temp dir must not fail");
 
@@ -1277,7 +1426,7 @@ mod tests {
         );
         let packinfo = PackInfo { files };
 
-        let result = untracked_files_for_preview(data, &packinfo, None, false)
+        let result = untracked_files_for_preview(data, &packinfo, None, None, false)
             .await
             .expect("walking a real temp dir must not fail");
 
@@ -1318,7 +1467,7 @@ mod tests {
         );
         let packinfo = PackInfo { files };
 
-        let result = untracked_files_for_preview(data, &packinfo, None, false)
+        let result = untracked_files_for_preview(data, &packinfo, None, None, false)
             .await
             .expect("walking a real temp dir must not fail");
 
@@ -1412,7 +1561,7 @@ mod tests {
             )]),
         };
 
-        let result = untracked_files_for_preview(data, &packinfo, None, true)
+        let result = untracked_files_for_preview(data, &packinfo, None, None, true)
             .await
             .expect("walking a real temp dir must not fail");
 
@@ -1440,7 +1589,7 @@ mod tests {
             )]),
         };
 
-        let result = untracked_files_for_preview(data, &packinfo, None, false)
+        let result = untracked_files_for_preview(data, &packinfo, None, None, false)
             .await
             .expect("walking a real temp dir must not fail");
 
@@ -1756,5 +1905,113 @@ mod tests {
         assert_eq!(preview.without_re_enable.counts, RepairCounts::default());
         assert!(preview.untracked.is_empty());
         assert!(preview.duplicates.is_empty());
+    }
+    #[tokio::test]
+    async fn task03_preview_rejects_origin_for_edited_content() {
+        use super::{OriginVerdict, origin_check::OriginResults};
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir(tmp.path().join("config")).unwrap();
+        let path = tmp.path().join("config/retired.cfg");
+        std::fs::write(&path, b"historical").unwrap();
+        let record = PackInfo {
+            files: [(
+                "/config/current.cfg".into(),
+                FileHashes {
+                    md5: [0; 16],
+                    sha512: [0; 64],
+                },
+            )]
+            .into_iter()
+            .collect(),
+        };
+        let context = super::PackProofContext {
+            platform: "modrinth".into(),
+            project_id: "pack".into(),
+            version_id: "current".into(),
+        };
+        let results = OriginResults {
+            context: Some(context.clone()),
+            checked_hashes: [(
+                "/config/retired.cfg".into(),
+                super::origin_check::hash_file_sha512(&path).await.unwrap(),
+            )]
+            .into_iter()
+            .collect(),
+            verdicts: [(
+                "/config/retired.cfg".into(),
+                OriginVerdict::ShippedIn {
+                    version_id: "older".into(),
+                    version_name: "Older".into(),
+                },
+            )]
+            .into_iter()
+            .collect(),
+        };
+        let before =
+            untracked_files_for_preview(tmp.path(), &record, Some(&results), Some(&context), false)
+                .await
+                .unwrap();
+        assert!(matches!(
+            before[0].origin,
+            Some(OriginVerdict::ShippedIn { .. })
+        ));
+        std::fs::write(&path, b"user edits").unwrap();
+        let after =
+            untracked_files_for_preview(tmp.path(), &record, Some(&results), Some(&context), false)
+                .await
+                .unwrap();
+        assert_eq!(after[0].origin, None);
+    }
+    #[test]
+    fn task03_selection_admission_and_persisted_marker_bind_content_context() {
+        use super::{
+            CleanupSelection, OriginVerdict, PackProofContext, origin_check::OriginResults,
+            validate_cleanup_selections,
+        };
+        let context = PackProofContext {
+            platform: "modrinth".into(),
+            project_id: "pack".into(),
+            version_id: "installed".into(),
+        };
+        let mut selection = CleanupSelection {
+            path: "/config/retired.cfg".into(),
+            sha512: hex::encode([1u8; 64]),
+            context: context.clone(),
+            proven: true,
+        };
+        let cache = OriginResults {
+            context: Some(context.clone()),
+            checked_hashes: [(selection.path.clone(), [1u8; 64])].into_iter().collect(),
+            verdicts: [(
+                selection.path.clone(),
+                OriginVerdict::ShippedIn {
+                    version_name: "Old".into(),
+                    version_id: "old".into(),
+                },
+            )]
+            .into_iter()
+            .collect(),
+        };
+        assert!(validate_cleanup_selections(&[selection.clone()], &context, Some(&cache)).is_ok());
+        assert!(validate_cleanup_selections(&[selection.clone()], &context, None).is_err());
+        selection.sha512 = hex::encode([2u8; 64]);
+        assert!(validate_cleanup_selections(&[selection.clone()], &context, Some(&cache)).is_err());
+        selection.proven = false;
+        assert!(validate_cleanup_selections(&[selection.clone()], &context, None).is_ok());
+        let marker = RepairMarkerFile {
+            cleanup_selections: vec![selection.clone()],
+            cleanup_batch: Some("cleanup-owned-storage".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::from_str::<RepairMarkerFile>(&serde_json::to_string(&marker).unwrap())
+                .unwrap(),
+            marker
+        );
+        selection.context.version_id = "different".into();
+        assert!(validate_cleanup_selections(&[selection.clone()], &context, None).is_err());
+        selection.context = context.clone();
+        selection.sha512 = "malformed".into();
+        assert!(validate_cleanup_selections(&[selection], &context, None).is_err());
     }
 }
