@@ -76,6 +76,16 @@ pub async fn remove_pid_file(root: &Path, file_name: &str) {
     }
 }
 
+/// Ownership transfer requires confirmed removal before publishing a copied
+/// root. Unlike exit cleanup, unexpected unlink errors must abort publication.
+pub async fn remove_pid_file_strict(root: &Path, file_name: &str) -> std::io::Result<()> {
+    match tokio::fs::remove_file(pid_file_path(root, file_name)).await {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
 /// Read and parse a pidfile. `Ok(None)` means no pidfile exists — there is
 /// nothing to reconcile for whatever lives at `root`. Any other I/O or parse
 /// failure comes back as `Err` so the caller can log it and fall back to

@@ -55,6 +55,8 @@ queries! {
         "SELECT id, name, shortpath, favorite, hasPackUpdate, \"index\", libraryPosition, groupId FROM Instance WHERE groupId = :group_id AND libraryPosition IS NOT NULL ORDER BY libraryPosition DESC LIMIT 1";
     fn min_index_instance_in_group(group_id: i32) -> Option<InstanceRow> =
         "SELECT id, name, shortpath, favorite, hasPackUpdate, \"index\", libraryPosition, groupId FROM Instance WHERE groupId = :group_id ORDER BY \"index\" ASC LIMIT 1";
+    fn max_index_instance_in_group(group_id: i32) -> Option<InstanceRow> =
+        "SELECT id, name, shortpath, favorite, hasPackUpdate, \"index\", libraryPosition, groupId FROM Instance WHERE groupId = :group_id ORDER BY \"index\" DESC LIMIT 1";
     fn first_instance_in_group(group_id: i32) -> Option<InstanceRow> =
         "SELECT id, name, shortpath, favorite, hasPackUpdate, \"index\", libraryPosition, groupId FROM Instance WHERE groupId = :group_id LIMIT 1";
     fn count_instances_in_group(group_id: i32) -> i64 =
@@ -143,7 +145,7 @@ queries! {
         "DELETE FROM InstanceGroup WHERE id = :id";
 }
 
-/// `INSERT` shared by `add_instance_tx` and its `QueryCheck`. `favorite` and
+/// `INSERT` shared by registration, `add_instance_tx` and its `QueryCheck`. `favorite` and
 /// `hasPackUpdate` are omitted so they take their DDL `DEFAULT false`.
 const INSERT_INSTANCE_SQL: &str =
     "INSERT INTO Instance (name, shortpath, \"index\", groupId, libraryPosition)
@@ -302,6 +304,33 @@ pub async fn set_instance_indexes_tx(db: &Db, updates: Vec<(i32, i32)>) -> DbRes
         }
         tx.commit()?;
         Ok(())
+    })
+    .await
+}
+
+/// Register a new identity without deleting an existing owner of shortpath.
+/// A uniqueness conflict is an error and leaves the existing row intact. The
+/// manager coordinates filesystem publication separately with its path lock.
+pub async fn register_instance_tx(
+    db: &Db,
+    name: String,
+    shortpath: String,
+    index: i32,
+    group_id: i32,
+    library_position: Option<i32>,
+) -> DbResult<i64> {
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        {
+            let mut st = tx.prepare_cached(INSERT_INSTANCE_SQL)?;
+            st.execute(named_params! {
+                ":name": name, ":shortpath": shortpath, ":index": index,
+                ":group_id": group_id, ":library_position": library_position,
+            })?;
+        }
+        let id = tx.last_insert_rowid();
+        tx.commit()?;
+        Ok(id)
     })
     .await
 }

@@ -283,3 +283,29 @@ async fn move_instance_tx_runs_shifts_then_final_update() {
         vec![(ids[1], 0), (ids[0], 1), (ids[2], 2)]
     );
 }
+
+#[tokio::test]
+async fn register_instance_tx_preserves_an_existing_shortpath_owner() {
+    let (_dir, db) = migrated_db().await;
+    let group = seed_group(&db, "group", 0).await;
+    let original =
+        i::register_instance_tx(&db, "original".into(), "reserved".into(), 0, group, Some(0))
+            .await
+            .unwrap() as i32;
+    let before = i::get_instance(&db, original).await.unwrap().unwrap();
+    let conflict = i::register_instance_tx(
+        &db,
+        "replacement".into(),
+        "reserved".into(),
+        1,
+        group,
+        Some(1),
+    )
+    .await;
+    assert!(conflict.is_err());
+    assert_eq!(
+        i::get_instance(&db, original).await.unwrap().unwrap(),
+        before
+    );
+    assert_eq!(i::get_all_instances(&db).await.unwrap().len(), 1);
+}

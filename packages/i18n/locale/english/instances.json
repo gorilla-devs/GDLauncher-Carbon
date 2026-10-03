@@ -142,7 +142,7 @@
   "_trn_remove_favorite": "Remove Favorite",
   "_trn_import_select_all_instances": "Select All",
   "_trn_import_deselect_all_instances": "Deselect All",
-  "_trn_error_invalid": "Instance Invalid or corrupted, try repairing it!",
+  "_trn_error_invalid": "Invalid or corrupted instance. Open its folder to fix it, or delete it.",
   "_trn_instance_version_release": "Stable",
   "_trn_instance_version_snapshot": "Snapshot",
   "_trn_instance_version_old_alpha": "Old alpha",

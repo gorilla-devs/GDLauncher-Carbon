@@ -109,8 +109,13 @@ const Tile = (props: Props) => {
       ? props.instance.status.value
       : undefined
 
+  // An instance whose instance.json is missing or broken can't run or be
+  // edited: its menu keeps Open folder, Favorite and Delete.
+  const unavailable = () =>
+    isLoading() || isInQueue() || props.isDeleting || props.isInvalid
+
   const handlePlay = () => {
-    if (props.isQueued || props.isPreparing) return
+    if (props.isQueued || props.isPreparing || props.isInvalid) return
     if (props.isRunning) {
       killInstanceMutation.mutate(props.instance.id)
       return
@@ -196,7 +201,7 @@ const Tile = (props: Props) => {
               <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={handlePlay}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
+                disabled={unavailable()}
               >
                 <div
                   class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
@@ -208,7 +213,7 @@ const Tile = (props: Props) => {
               <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={handleEdit}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
+                disabled={unavailable()}
               >
                 <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
                 {t("instances:_trn_action_edit")}
@@ -216,7 +221,7 @@ const Tile = (props: Props) => {
               <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={handleSettings}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
+                disabled={unavailable()}
               >
                 <div class="i-hugeicons:settings-01 h-4 w-4" />
                 {t("instances:_trn_action_settings")}
@@ -249,7 +254,7 @@ const Tile = (props: Props) => {
                     { instanceId: props.instance.id }
                   )
                 }}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
+                disabled={unavailable()}
               >
                 {t("instances:_trn_instance_share.title")}
               </GdlFeatureContextMenuItem>
@@ -272,7 +277,7 @@ const Tile = (props: Props) => {
                     { instanceId: instanceId }
                   )
                 }}
-                disabled={isLoading() || isInQueue() || props.isDeleting}
+                disabled={unavailable()}
               >
                 <div class="i-hugeicons:file-export h-4 w-4" />
                 {t("instances:_trn_export_instance")}

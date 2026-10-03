@@ -136,7 +136,7 @@
   "_trn_remove_favorite": "移除收藏",
   "_trn_import_select_all_instances": "全选",
   "_trn_import_deselect_all_instances": "全部取消",
-  "_trn_error_invalid": "实例无效或已损坏，请尝试修复！",
+  "_trn_error_invalid": "实例无效或已损坏。请打开其文件夹进行修复，或将其删除。",
   "_trn_instance_version_release": "稳定版",
   "_trn_instance_version_snapshot": "快照",
   "_trn_instance_version_old_alpha": "旧 Alpha",

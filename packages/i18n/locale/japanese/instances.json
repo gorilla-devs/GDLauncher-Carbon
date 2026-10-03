@@ -136,7 +136,7 @@
   "_trn_remove_favorite": "お気に入りから削除",
   "_trn_import_select_all_instances": "すべて選択",
   "_trn_import_deselect_all_instances": "すべて解除",
-  "_trn_error_invalid": "インスタンスが無効または破損しています。修復をお試しください。",
+  "_trn_error_invalid": "インスタンスが無効または破損しています。フォルダーを開いて修正するか、削除してください。",
   "_trn_instance_version_release": "安定版",
   "_trn_instance_version_snapshot": "スナップショット",
   "_trn_instance_version_old_alpha": "旧Alpha",

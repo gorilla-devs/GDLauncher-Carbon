@@ -15,7 +15,6 @@ use crate::managers::instance::modpack::{
     PackVersionFile, RepairMarkerFile, apply_plan, disk_scan, normalize_cleanup_path, packinfo,
     walk_untracked_files,
 };
-use crate::managers::instance::schema::make_instance_config;
 use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
 use crate::managers::minecraft::assets::get_assets_dir;
@@ -168,6 +167,7 @@ pub async fn process_modpack(
     Option<RepairMarkerFile>,
     Option<disk_scan::DiskScan>,
 )> {
+    let original_modpack = config.modpack.clone();
     let mut version: Option<StandardVersion> = None;
 
     let runtime_path = app.settings_manager().runtime_path.clone();
@@ -714,13 +714,6 @@ pub async fn process_modpack(
             tracing::info!("Modpack version: {v:?}");
 
             version = Some(v.clone());
-            let path = app
-                .settings_manager()
-                .runtime_path
-                .get_instances()
-                .to_path()
-                .join(instance_shortpath);
-
             config.modpack = modpack.map(|modpack| ModpackInfo {
                 modpack,
                 locked: config.modpack.map(|m| m.locked).unwrap_or(true),
@@ -735,23 +728,9 @@ pub async fn process_modpack(
                 modloaders: v.modloaders.clone(),
             }));
 
-            let json = make_instance_config(config.clone())?;
-            // Atomically replace the live config (matching update_instance/update_playtime) so a
-            // crash mid-write cannot leave a partial instance.json that fails to parse on startup.
-            app.settings_manager()
-                .runtime_path
-                .get_temp()
-                .write_file_atomic(path.join("instance.json"), json)
-                .await?;
-
             app.instance_manager()
-                .instances
-                .write()
-                .await
-                .get_mut(&instance_id)
-                .ok_or_else(|| anyhow!("Instance was deleted while loading"))?
-                .data_mut()?
-                .config = config;
+                .publish_modpack_config(instance_id, config, original_modpack)
+                .await?;
 
             app.invalidate(GET_MODPACK_INFO, Some(instance_id.0.into()));
         }

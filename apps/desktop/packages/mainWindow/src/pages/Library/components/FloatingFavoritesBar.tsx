@@ -498,13 +498,17 @@ function DockAvatar(props: DockAvatarProps) {
       ? serverStatus() === "deleting"
       : instanceState() === "deleting"
   const isLoading = () => isQueued() || isPreparing()
+  // instance.json missing or broken: it can't run or be edited, only opened,
+  // unfavorited or deleted.
+  const isInvalid = () =>
+    !isServerMode() && instance()?.status.status === "invalid"
   const isBusy = () =>
     isServerMode()
       ? serverStatus() === "starting" || serverStatus() === "stopping"
       : isLoading()
 
   const handleClick = () => {
-    if (isBusy() || isDeleting()) return
+    if (isBusy() || isDeleting() || isInvalid()) return
     if (isServerMode()) {
       navigate.navigate(`/library/server/${props.instanceId}`)
     } else {
@@ -528,7 +532,7 @@ function DockAvatar(props: DockAvatarProps) {
       return
     }
 
-    if (isQueued() || isPreparing()) return
+    if (isQueued() || isPreparing() || isInvalid()) return
 
     if (isRunning()) {
       killInstanceMutation.mutate(props.instanceId)
@@ -661,7 +665,7 @@ function DockAvatar(props: DockAvatarProps) {
               <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={() => handlePlay()}
-                disabled={isBusy() || isDeleting()}
+                disabled={isBusy() || isDeleting() || isInvalid()}
               >
                 <div
                   class={`${isRunning() ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
@@ -674,7 +678,7 @@ function DockAvatar(props: DockAvatarProps) {
                 <ContextMenuItem
                   class="flex items-center gap-2"
                   onClick={handleEdit}
-                  disabled={isLoading() || isDeleting()}
+                  disabled={isLoading() || isDeleting() || isInvalid()}
                 >
                   <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
                   {t("instances:_trn_action_edit")}
@@ -683,7 +687,7 @@ function DockAvatar(props: DockAvatarProps) {
               <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={handleSettings}
-                disabled={isBusy() || isDeleting()}
+                disabled={isBusy() || isDeleting() || isInvalid()}
               >
                 <div class="i-hugeicons:settings-01 h-4 w-4" />
                 {t("instances:_trn_action_settings")}
@@ -710,7 +714,7 @@ function DockAvatar(props: DockAvatarProps) {
                       { instanceId: props.instanceId }
                     )
                   }}
-                  disabled={isLoading() || isDeleting()}
+                  disabled={isLoading() || isDeleting() || isInvalid()}
                 >
                   {t("instances:_trn_instance_share.title")}
                 </GdlFeatureContextMenuItem>
@@ -732,7 +736,7 @@ function DockAvatar(props: DockAvatarProps) {
                       { instanceId: props.instanceId }
                     )
                   }}
-                  disabled={isLoading() || isDeleting()}
+                  disabled={isLoading() || isDeleting() || isInvalid()}
                 >
                   <div class="i-hugeicons:file-export h-4 w-4" />
                   {t("instances:_trn_export_instance")}
@@ -850,7 +854,10 @@ function DockAvatar(props: DockAvatarProps) {
                     class="absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-all duration-200"
                     classList={{
                       "group-hover:opacity-100":
-                        !isBusy() && !isDeleting() && !props.isDragActive,
+                        !isBusy() &&
+                        !isDeleting() &&
+                        !isInvalid() &&
+                        !props.isDragActive,
                       "!opacity-100":
                         isMenuOpen() && !isBusy() && !isDeleting(),
                       "bg-red-500/80": isRunning(),

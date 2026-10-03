@@ -136,7 +136,7 @@
   "_trn_remove_favorite": "Rimuovi dai Preferiti",
   "_trn_import_select_all_instances": "Seleziona Tutto",
   "_trn_import_deselect_all_instances": "Deseleziona Tutto",
-  "_trn_error_invalid": "Istanza non valida o corrotta, prova a ripararla!",
+  "_trn_error_invalid": "Istanza non valida o corrotta. Apri la sua cartella per sistemarla, oppure eliminala.",
   "_trn_instance_version_release": "Stabile",
   "_trn_instance_version_snapshot": "Snapshot",
   "_trn_instance_version_old_alpha": "Vecchia alpha",

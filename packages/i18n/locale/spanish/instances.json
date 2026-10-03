@@ -136,7 +136,7 @@
   "_trn_remove_favorite": "Eliminar de favoritos",
   "_trn_import_select_all_instances": "Seleccionar todo",
   "_trn_import_deselect_all_instances": "Deseleccionar todo",
-  "_trn_error_invalid": "¡Instancia inválida o corrupta, intenta repararla!",
+  "_trn_error_invalid": "Instancia inválida o dañada. Abre su carpeta para arreglarla o elimínala.",
   "_trn_instance_version_release": "Estable",
   "_trn_instance_version_snapshot": "Instantánea",
   "_trn_instance_version_old_alpha": "Alfa antigua",

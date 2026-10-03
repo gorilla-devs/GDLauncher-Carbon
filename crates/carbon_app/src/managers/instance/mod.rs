@@ -50,6 +50,9 @@ use tokio::sync::{Mutex, MutexGuard, RwLock, watch};
 use tracing::{error, info, trace, warn};
 use unicode_segmentation::UnicodeSegmentation;
 
+#[cfg(test)]
+mod lifecycle_tests;
+
 pub mod explore;
 pub mod export;
 pub mod importer;
@@ -63,13 +66,21 @@ pub mod shader_loader;
 
 #[derive(Debug)]
 pub struct InstanceManager {
+    #[cfg(test)]
+    test_hooks: lifecycle_tests::Hooks,
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
-    // Per-instance operation locks to allow parallel updates to different instances
-    // while preventing concurrent updates to the same instance
+    // Shared ownership gate for existing-instance config writers and root lifecycle.
+    // Always acquire before a map guard; never wait for this gate holding the map.
     instance_op_locks: Arc<DashMap<InstanceId, Arc<Mutex<()>>>>,
+    // Keeps an instance folder in place while a duplicate copies it without
+    // the gate (see `hold_root`). Order: gate, then this, then path_lock.
+    instance_root_locks: Arc<DashMap<InstanceId, Arc<RwLock<()>>>>,
+    // Playtime a failed instance.json write could not save, added to the
+    // instance's next playtime write instead of being lost.
+    unsaved_playtime: DashMap<InstanceId, u32>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
     import_manager: InstanceImportManager,
@@ -95,6 +106,71 @@ pub struct InstanceManager {
     pub(crate) origin_checks: RwLock<HashMap<InstanceId, modpack::origin_check::OriginResults>>,
 }
 
+/// Keeps a per-ID gate stable for every holder and queued waiter. Retire an
+/// idle entry only while holding its DashMap shard exclusively: a concurrent
+/// lookup either clones this gate before retirement or creates a new idle one.
+#[derive(Debug)]
+pub(crate) struct InstanceOperationGuard {
+    locks: Arc<DashMap<InstanceId, Arc<Mutex<()>>>>,
+    id: InstanceId,
+    lock: Option<Arc<Mutex<()>>>,
+    guard: Option<tokio::sync::OwnedMutexGuard<()>>,
+    #[cfg(test)]
+    drop_barrier: Option<Arc<std::sync::Barrier>>,
+}
+
+impl Drop for InstanceOperationGuard {
+    fn drop(&mut self) {
+        self.guard.take();
+        let departing = self
+            .lock
+            .take()
+            .expect("operation owns its gate until drop");
+        retire_if_idle(&self.locks, self.id, departing);
+        #[cfg(test)]
+        if let Some(barrier) = &self.drop_barrier {
+            barrier.wait();
+        }
+    }
+}
+
+/// Drops `departing`, one holder's reference to `id`'s entry, and retires the
+/// entry when no other holder or waiter has it.
+fn retire_if_idle<T>(locks: &DashMap<InstanceId, Arc<T>>, id: InstanceId, departing: Arc<T>) {
+    locks.remove_if(&id, |_, lock| {
+        let same_gate = Arc::ptr_eq(lock, &departing);
+        // Release the wrapper reference while the shard is exclusively
+        // held. Concurrent last departures cannot both leave that release
+        // until after checking the count and accidentally miss retirement.
+        drop(departing);
+        same_gate && Arc::strong_count(lock) == 1
+    });
+}
+
+/// Keeps an instance folder where it is (see
+/// [`hold_root`](InstanceManager::hold_root)). Retired like
+/// [`InstanceOperationGuard`].
+#[derive(Debug)]
+pub(crate) struct InstanceRootGuard {
+    locks: Arc<DashMap<InstanceId, Arc<RwLock<()>>>>,
+    id: InstanceId,
+    lock: Option<Arc<RwLock<()>>>,
+    shared: Option<tokio::sync::OwnedRwLockReadGuard<()>>,
+    exclusive: Option<tokio::sync::OwnedRwLockWriteGuard<()>>,
+}
+
+impl Drop for InstanceRootGuard {
+    fn drop(&mut self) {
+        self.shared.take();
+        self.exclusive.take();
+        let departing = self
+            .lock
+            .take()
+            .expect("a folder hold owns its lock until drop");
+        retire_if_idle(&self.locks, self.id, departing);
+    }
+}
+
 impl Default for InstanceManager {
     fn default() -> Self {
         Self::new()
@@ -102,14 +178,73 @@ impl Default for InstanceManager {
 }
 
 impl InstanceManager {
+    /// Lock before reading the current config/path. Global map guards must
+    /// remain short; release them before path/DB/filesystem/network waits.
+    /// Rename/delete take path_lock after this gate, never in reverse order,
+    /// and a folder hold (`hold_root`) between the two.
+    pub(crate) async fn lock_instance(&self, id: InstanceId) -> InstanceOperationGuard {
+        let lock = self
+            .instance_op_locks
+            .entry(id)
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone();
+        let mut operation = InstanceOperationGuard {
+            locks: self.instance_op_locks.clone(),
+            id,
+            lock: Some(lock),
+            guard: None,
+            #[cfg(test)]
+            drop_barrier: self.test_hooks.drop_barrier(id),
+        };
+        operation.guard = Some(operation.lock.as_ref().unwrap().clone().lock_owned().await);
+        operation
+    }
+
+    /// Keeps the instance's folder where it is, taken while holding its gate
+    /// (`operation`). A duplicate shares it and then releases the gate, so
+    /// copying a large folder never holds up Play, settings, logs or a game's
+    /// exit on the original. Deleting the folder or a rename that moves it
+    /// takes it exclusively, so they wait for those copies to finish rather
+    /// than break them. Writers hold the gate while they hold this, so a
+    /// shared hold taken under the gate never waits.
+    pub(crate) async fn hold_root(
+        &self,
+        operation: &InstanceOperationGuard,
+        exclusive: bool,
+    ) -> InstanceRootGuard {
+        let id = operation.instance_id();
+        let lock = self
+            .instance_root_locks
+            .entry(id)
+            .or_insert_with(|| Arc::new(RwLock::new(())))
+            .clone();
+        let mut root = InstanceRootGuard {
+            locks: self.instance_root_locks.clone(),
+            id,
+            lock: Some(lock),
+            shared: None,
+            exclusive: None,
+        };
+        if exclusive {
+            root.exclusive = Some(root.lock.as_ref().unwrap().clone().write_owned().await);
+        } else {
+            root.shared = Some(root.lock.as_ref().unwrap().clone().read_owned().await);
+        }
+        root
+    }
+
     pub fn new() -> Self {
         let any_instance_running = Arc::new(watch::channel(false).0);
 
         Self {
+            #[cfg(test)]
+            test_hooks: Default::default(),
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
             path_lock: Mutex::new(()),
             instance_op_locks: Arc::new(DashMap::new()),
+            instance_root_locks: Arc::new(DashMap::new()),
+            unsaved_playtime: DashMap::new(),
             loaded_icon: Mutex::new(None),
             persistence_manager: PersistenceManager::new(),
             import_manager: InstanceImportManager::new(),
@@ -171,11 +306,16 @@ fn sanitize_name(name: &str) -> String {
 }
 
 fn truncate_name(name: &str, instance_path: &Path) -> String {
-    let available_length = MAX_PATH - 3 /* for discriminators */ - 1 /* for _ the separator */ - 1 /* for final null character (on windows) */ - path_length(instance_path);
+    // Reserve three decimal digits for collision suffixes. Component limits
+    // apply independently of MAX_PATH (bytes on Unix, UTF-16 units on Windows).
+    let available_length = 255usize
+        .saturating_sub(3)
+        .min(MAX_PATH.saturating_sub(path_length(instance_path).saturating_add(1 + 3 + 1)));
+    let mut length = 0;
     name.graphemes(true)
         .take_while(|g| {
-            let new_len = path_length(&instance_path.join(g));
-            new_len <= available_length
+            length += path_length(Path::new(g));
+            length <= available_length
         })
         .collect()
 }
@@ -287,13 +427,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // it is inserted below, so the map is never briefly wrong about it.
         let adopted = self.reconcile_running_instances().await;
 
-        let instance_cache = instance_repo::get_all_instances(&self.app.db).await?;
-        tracing::debug!(
-            "[startup-timing] scan_instances: loaded {} cached instance row(s) from DB in {:.2}s",
-            instance_cache.len(),
-            scan_start.elapsed().as_secs_f64()
-        );
-
         let instance_path = self
             .app
             .settings_manager()
@@ -301,6 +434,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get_instances()
             .to_path();
 
+        #[cfg(test)]
+        self.test_hooks.pause("scan_admission", InstanceId(0)).await;
         let mut stream = tokio::fs::read_dir(instance_path).await?;
 
         let updates_semaphore = Arc::new(tokio::sync::Semaphore::new(20));
@@ -330,23 +465,59 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             // Isolated and logged instead so the rest of the scan keeps
             // going.
             let entry_result: anyhow::Result<Option<InstanceId>> = async {
-                let cached = instance_cache
-                    .iter()
-                    .find(|instance| instance.shortpath == shortpath);
+                // Resolve current root ownership, not the scan's starting DB
+                // snapshot. Creation/rename hold path_lock through publication.
+                // Never await an ID gate while holding path_lock: release it,
+                // acquire the gate, then revalidate under path ownership.
+                let (_operation, path_admission, cached) = loop {
+                    let path_admission = self.path_lock.lock().await;
+                    let cached =
+                        instance_repo::get_instance_by_shortpath(&self.app.db, &shortpath).await?;
+                    let Some(row) = cached else {
+                        // No identity exists yet. Keep root ownership through
+                        // config validation, non-replacing registration and map
+                        // publication; another producer cannot claim it midway.
+                        break (None, path_admission, None);
+                    };
+                    drop(path_admission);
+                    let operation = self.lock_instance(InstanceId(row.id)).await;
+                    let path_admission = self.path_lock.lock().await;
+                    let current =
+                        instance_repo::get_instance_by_shortpath(&self.app.db, &shortpath).await?;
+                    if current.as_ref().map(|row| row.id) == Some(row.id) {
+                        break (Some(operation), path_admission, current);
+                    }
+                    // The observed identity moved or was retired while we
+                    // waited. Re-admit the current owner before touching JSON.
+                    drop(path_admission);
+                    drop(operation);
+                };
+                if let Some(row) = &cached {
+                    let instances = self.instances.read().await;
+                    if instances.get(&InstanceId(row.id)).is_some_and(|instance| {
+                        instance.shortpath != shortpath
+                            || matches!(
+                                instance.data().map(|data| &data.state),
+                                Ok(LaunchState::Deleting)
+                            )
+                    }) {
+                        return Ok(None);
+                    }
+                }
 
                 let Some(mut instance) = self
-                    .scan_instance(shortpath.clone(), path.clone(), cached)
+                    .scan_instance(shortpath.clone(), path.clone(), cached.as_ref())
                     .await?
                 else {
                     return Ok(None);
                 };
-                let InstanceType::Valid(data) = &instance.type_ else {
-                    return Ok(None);
-                };
-
-                let instance_id = match cached {
+                let is_valid = matches!(&instance.type_, InstanceType::Valid(_));
+                let instance_id = match &cached {
                     Some(cached) => InstanceId(cached.id),
                     None => {
+                        let InstanceType::Valid(data) = &instance.type_ else {
+                            return Ok(None);
+                        };
                         self.add_instance(
                             data.config.name.clone(),
                             instance.shortpath.clone(),
@@ -357,6 +528,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 };
 
                 let mut instances = self.instances.write().await;
+                // Invalid startup entries need recovery tiles, but an invalid
+                // rescan must not discard an existing launch's state/kill owner.
+                if !is_valid
+                    && instances.get(&instance_id).is_some_and(|old| {
+                        old.data()
+                            .is_ok_and(|data| !matches!(data.state, LaunchState::Inactive { .. }))
+                    })
+                {
+                    return Ok(None);
+                }
 
                 if let (
                     Instance {
@@ -395,6 +576,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                 instances.insert(instance_id, instance);
                 drop(instances);
+                drop(path_admission);
+                drop(_operation);
+                if !is_valid {
+                    return Ok(None);
+                }
 
                 self.app
                     .meta_cache_manager()
@@ -488,6 +674,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 }
             }
         };
+
+        #[cfg(test)]
+        self.test_hooks.pause_path("scan_read", &shortpath).await;
+        #[cfg(test)]
+        if let Some(cached) = cached {
+            self.test_hooks.pause("scan", InstanceId(cached.id)).await;
+        }
 
         match schema::parse_and_update_instance_config(self.app.clone(), &config_text, config_path)
             .await
@@ -922,7 +1115,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceMoveTarget::EndOfGroup(group) => {
                 let group_val = *group;
                 let target_idx =
-                    instance_repo::count_instances_in_group(&self.app.db, group_val).await? as i32;
+                    instance_repo::max_index_instance_in_group(&self.app.db, group_val)
+                        .await?
+                        .map(|row| {
+                            row.index
+                                .checked_add(1)
+                                .ok_or_else(|| anyhow!("instance index overflow"))
+                        })
+                        .transpose()?
+                        .unwrap_or(0);
 
                 // If target is default group, find the maximum libraryPosition + 1
                 let lib_pos = if group == default_group_id {
@@ -967,26 +1168,35 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // The instance will be moved to the default group with target libraryPosition
                 let default_id = *default_group_id;
                 let target_idx =
-                    instance_repo::count_instances_in_group(&self.app.db, default_id).await? as i32;
+                    instance_repo::max_index_instance_in_group(&self.app.db, default_id)
+                        .await?
+                        .map(|row| {
+                            row.index
+                                .checked_add(1)
+                                .ok_or_else(|| anyhow!("instance index overflow"))
+                        })
+                        .transpose()?
+                        .unwrap_or(0);
 
                 (default_group_id, target_idx, Some(lib_pos))
             }
         };
 
         let index_shifts: Vec<IndexShift> = if start_group == target_group {
-            vec![match (start_idx, target_idx) {
-                (start, target) if start < target => IndexShift::DownExclusive {
+            match (start_idx, target_idx) {
+                (start, target) if start < target => vec![IndexShift::DownExclusive {
                     group_id: *target_group,
                     gt: start,
                     lt: target,
-                },
-                (start, target) if start > target => IndexShift::UpRange {
+                }],
+                (start, target) if start > target => vec![IndexShift::UpRange {
                     group_id: *target_group,
                     gte: target,
                     lt: start,
-                },
-                _ => return Ok(()),
-            }]
+                }],
+                _ if start_library_pos == target_library_pos => return Ok(()),
+                _ => Vec::new(),
+            }
         } else {
             vec![
                 IndexShift::DownAfter {
@@ -1454,7 +1664,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let p = instance_base + i as i32;
             instance_updates.push(instance_repo::InstanceArrange {
                 id: *instance_id,
-                index: p,
+                index: i as i32,
                 library_position: Some(p),
             });
         }
@@ -1547,7 +1757,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    /// Add an instance to the database without checking if it exists.
+    /// Register a new identity without replacing an existing shortpath row.
+    /// Production callers hold path_lock through DB and map publication.
     /// Does not invalidate.
     async fn add_instance(
         self,
@@ -1595,7 +1806,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let index_value = index.value;
         let group_id = *group;
-        let new_id = instance_repo::add_instance_tx(
+        let new_id = instance_repo::register_instance_tx(
             &self.app.db,
             name,
             shortpath,
@@ -1609,7 +1820,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     /// Remove an instance from the database without checking if it exists.
-    /// Does not invalidate.
+    /// Does not invalidate, and leaves the mod metadata it no longer uses for
+    /// the caller to collect (`gc_mod_metadata`) outside path_lock.
     ///
     /// Deletes the instance and its `ModFileCache` rows in the same write
     /// transaction (`delete_instance_tx`) rather than relying on the
@@ -1621,9 +1833,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     async fn remove_instance(self, instance: InstanceId) -> anyhow::Result<()> {
         let instance_id = *instance;
         instance_repo::delete_instance_tx(&self.app.db, instance_id).await?;
-
-        self.app.meta_cache_manager().gc_mod_metadata().await;
-
         Ok(())
     }
 
@@ -1658,8 +1867,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let instance = instances
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
-        let data = instance.data_mut()?;
-        data.favorite = favorite;
+        // An instance whose instance.json is missing or broken keeps its
+        // favorite only in the library row, which its tile and the dock show,
+        // so it can still be taken off the dock.
+        if let InstanceType::Valid(data) = &mut instance.type_ {
+            data.favorite = favorite;
+        }
         drop(instances);
 
         // Update database for target instance
@@ -1674,7 +1887,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
+    /// Requires path_lock. DB rows reserve their component even if their
+    /// folder is temporarily absent; creation must not publish into that identity.
+    async fn next_available_folder(self, name: &str) -> anyhow::Result<(String, PathBuf)> {
+        let reserved = instance_repo::get_all_instances(&self.app.db)
+            .await?
+            .into_iter()
+            .map(|row| row.shortpath)
+            .collect::<HashSet<_>>();
+        self.next_folder_excluding(name, &reserved)
+    }
+
     fn next_folder(&self, name: &str) -> anyhow::Result<(String, PathBuf)> {
+        self.next_folder_excluding(name, &HashSet::new())
+    }
+
+    fn next_folder_excluding(
+        &self,
+        name: &str,
+        reserved: &HashSet<String>,
+    ) -> anyhow::Result<(String, PathBuf)> {
         if name.is_empty() {
             bail!("Attempted to find an instance directory name for an unnamed instance");
         }
@@ -1687,15 +1919,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get_instances()
             .to_path();
 
-        if !instance_path.exists() {
-            return Ok((sanitized_name.clone(), instance_path.join(&sanitized_name)));
-        }
-
-        if !instance_path.is_dir() {
+        if instance_path.exists() && !instance_path.is_dir() {
             bail!("GDL instances path is not a directory. Please move the file blocking it.");
         }
 
         sanitized_name = truncate_name(&sanitized_name, &instance_path);
+        if sanitized_name.is_empty() {
+            bail!("Instance name or parent path leaves no usable folder component");
+        }
 
         for i in 0..1000 {
             let current_name = if i == 0 {
@@ -1705,7 +1936,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             };
 
             let full_path = instance_path.join(&current_name);
-            if !full_path.exists() {
+            if !full_path.exists() && !reserved.contains(&current_name) {
                 return Ok((current_name, full_path));
             }
         }
@@ -1925,15 +2156,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         trace!("Locking path_lock");
         let path_lock = self.path_lock.lock().await;
-        let (shortpath, path) = self.next_folder(&name)?;
+        let (shortpath, path) = self.next_available_folder(&name).await?;
 
         tmpdir
             .try_rename_or_move(&path)
             .await
             .context("moving tmpdir to instance location")?;
 
-        trace!("Created instance folder at '{path:?}'. Unlocking path_lock");
-        drop(path_lock);
+        trace!("Created instance folder at '{path:?}'. Registering under path_lock");
+        #[cfg(test)]
+        self.test_hooks.pause("create_publish", InstanceId(0)).await;
 
         let id = self
             .add_instance(name.clone(), shortpath.clone(), group)
@@ -1961,6 +2193,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             },
         );
 
+        drop(path_lock);
+
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
 
@@ -1973,23 +2207,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self,
         update: domain::InstanceSettingsUpdate,
     ) -> anyhow::Result<Option<VisualTaskId>> {
-        // Acquire per-instance operation lock to prevent concurrent updates to same instance
-        // while allowing parallel updates to different instances
-        let op_lock = self
-            .instance_op_locks
-            .entry(update.instance_id)
-            .or_insert_with(|| Arc::new(Mutex::new(())))
-            .clone();
-        let _instance_guard = op_lock.lock().await;
+        let _instance_guard = self.lock_instance(update.instance_id).await;
 
-        // Phase 1: Read instance data under write lock
+        // Snapshot only after taking ownership; disk writes never hold the map.
         let (mut shortpath, config, mut path, icon_revision) = {
-            let instances = self.instances.write().await;
+            let instances = self.instances.read().await;
             let instance = instances
                 .get(&update.instance_id)
                 .ok_or(InvalidInstanceIdError(update.instance_id))?;
 
             let data = instance.type_.data()?;
+            if matches!(data.state, LaunchState::Deleting) {
+                bail!("cannot update an instance that is being deleted");
+            }
 
             let path = self
                 .app
@@ -2005,10 +2235,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 path,
                 data.icon_revision,
             )
-            // Write lock released here - other instances can now operate
+            // Read guard released here - other instances can now operate
         };
 
+        #[cfg(test)]
+        self.test_hooks.pause("settings", update.instance_id).await;
+
         // Phase 2: Apply all updates WITHOUT holding global lock
+        let old_name = config.name.clone();
         let mut info = config;
 
         // Check what changed before consuming values (for conditional invalidation)
@@ -2145,25 +2379,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .write_file_atomic(path.join("instance.json"), json)
             .await?;
 
-        // Handle instance rename with path_lock
+        // A display-name edit always updates the library row, even when
+        // its existing folder already has the requested name. Retain root
+        // ownership through both DB and map publication.
+        let mut rename_path_guard = None;
         if let Some(name) = update.name {
-            let name_changed = shortpath != name;
-            if name_changed {
-                let _path_guard = self.path_lock.lock().await;
-                let (new_shortpath, new_path) = self.next_folder(&name)?;
-                tokio::fs::rename(&path, &new_path).await?;
-
-                let id = *update.instance_id;
+            if name != old_name {
+                rename_path_guard = Some(self.path_lock.lock().await);
+                if shortpath != name {
+                    let (new_shortpath, new_path) = self.next_available_folder(&name).await?;
+                    tokio::fs::rename(&path, &new_path).await?;
+                    shortpath = new_shortpath;
+                    path = new_path;
+                }
                 instance_repo::set_instance_name_and_shortpath(
                     &self.app.db,
-                    id,
+                    *update.instance_id,
                     &name,
-                    &new_shortpath,
+                    &shortpath,
                 )
                 .await?;
-
-                shortpath = new_shortpath;
-                path = new_path;
             }
         }
 
@@ -2182,6 +2417,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
             // Write lock released here
         }
+
+        drop(rename_path_guard);
+        drop(rename_root);
 
         // Send conditional invalidations (no lock needed)
         // Only invalidate queries that are actually affected by the changes
@@ -2202,6 +2440,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .await
                 .context("writing incomplete instance marker")?;
 
+            drop(_instance_guard);
             let (_handle, task_id) = self
                 .prepare_game(InstanceId(*update.instance_id), None, None, true)
                 .await?;
@@ -2211,42 +2450,114 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(None)
     }
 
-    pub async fn update_playtime(
+    /// Publish only the pack/version fields owned by preparation, merging
+    /// against the current gated config. Preserve a user's detach and lock edit.
+    pub(super) async fn publish_modpack_config(
         self,
         instance_id: InstanceId,
-        added_seconds: u32,
+        prepared: info::Instance,
+        original_modpack: Option<info::ModpackInfo>,
     ) -> anyhow::Result<()> {
-        let mut instances = self.instances.write().await;
+        let _operation = self.lock_instance(instance_id).await;
+        let (shortpath, mut config) = self.current_config(instance_id).await?;
+        let current_identity = config.modpack.as_ref().map(|pack| &pack.modpack);
+        let original_identity = original_modpack.as_ref().map(|pack| &pack.modpack);
+        if current_identity == original_identity {
+            let locked = config
+                .modpack
+                .as_ref()
+                .map(|pack| pack.locked)
+                .unwrap_or(true);
+            config.modpack = prepared.modpack.map(|mut pack| {
+                pack.locked = locked;
+                pack
+            });
+        }
+        config.game_configuration.version = prepared.game_configuration.version;
+        self.persist_config(instance_id, &shortpath, config).await
+    }
+
+    /// Requires lock_instance for this ID. Reject the recovering deletion state
+    /// as well as an absent identity before accessing its filesystem root.
+    async fn current_config(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<(String, info::Instance)> {
+        let instances = self.instances.read().await;
         let instance = instances
-            .get_mut(&instance_id)
+            .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
+        let data = instance.data()?;
+        if matches!(data.state, LaunchState::Deleting) {
+            bail!("cannot update an instance that is being deleted");
+        }
+        Ok((instance.shortpath.clone(), data.config.clone()))
+    }
 
-        let shortpath = &mut instance.shortpath;
-        let data = instance.type_.data_mut()?;
+    /// Requires lock_instance for this ID through both persistence and publish.
+    async fn persist_config(
+        self,
+        instance_id: InstanceId,
+        shortpath: &str,
+        config: info::Instance,
+    ) -> anyhow::Result<()> {
+        self.write_config(shortpath, &config).await?;
+        self.publish_config(instance_id, config).await
+    }
 
+    /// Writes `config` to the instance.json of the folder `shortpath`.
+    async fn write_config(self, shortpath: &str, config: &info::Instance) -> anyhow::Result<()> {
         let path = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
             .to_path()
-            .join(shortpath as &str);
-
-        data.config.last_played = Some(Utc::now());
-        data.config.seconds_played += added_seconds;
-
-        let json = schema::make_instance_config(data.config.clone())?;
-
+            .join(shortpath);
+        let json = schema::make_instance_config(config.clone())?;
         self.app
             .settings_manager()
             .runtime_path
             .get_temp()
             .write_file_atomic(path.join("instance.json"), json)
             .await?;
+        self.instances
+            .write()
+            .await
+            .get_mut(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?
+            .data_mut()?
+            .config = config;
+        Ok(())
+    }
 
+    pub async fn update_playtime(
+        self,
+        instance_id: InstanceId,
+        added_seconds: u32,
+    ) -> anyhow::Result<()> {
+        let _operation = self.lock_instance(instance_id).await;
+        let (shortpath, mut config) = self.current_config(instance_id).await?;
+        // Seconds an earlier write could not save ride along with this one.
+        let seconds = self
+            .unsaved_playtime
+            .remove(&instance_id)
+            .map_or(0, |(_, unsaved)| unsaved)
+            .saturating_add(added_seconds);
+        config.last_played = Some(Utc::now());
+        config.seconds_played = config.seconds_played.saturating_add(seconds);
+        if let Err(error) = self.write_config(&shortpath, &config).await {
+            // The library keeps showing what instance.json holds; the seconds
+            // wait for the next playtime write (a minute later while the game
+            // runs, or the next session's) instead of being lost. 2.0.40
+            // carried them the same way; a restart before then loses them.
+            let mut unsaved = self.unsaved_playtime.entry(instance_id).or_default();
+            *unsaved = unsaved.saturating_add(seconds);
+            return Err(error);
+        }
+        self.publish_config(instance_id, config).await?;
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
-
         Ok(())
     }
 
@@ -2307,22 +2618,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     async fn _delete_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
-        // Drop the per-instance op-lock entry on EVERY exit path. Without this,
-        // a deletion that errors mid-way leaves an orphan entry in the DashMap,
-        // and repeated failed deletes accumulate unbounded over a long session.
-        struct OpLockGuard {
-            locks: Arc<DashMap<InstanceId, Arc<Mutex<()>>>>,
-            id: InstanceId,
-        }
-        impl Drop for OpLockGuard {
-            fn drop(&mut self) {
-                self.locks.remove(&self.id);
-            }
-        }
-        let _op_lock_guard = OpLockGuard {
-            locks: self.instance_op_locks.clone(),
-            id: instance_id,
-        };
+        let operation = self.lock_instance(instance_id).await;
 
         let mut instances = self.instances.write().await;
         let Some(instance) = instances.get_mut(&instance_id) else {
@@ -2349,17 +2645,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     "Instance {instance_id} cannot be deleted while it is preparing or running; stop it first"
                 ));
             }
-        }
-
-        data.state = LaunchState::Deleting;
-
-        let instance_shortpath = instance.shortpath.clone();
+            InstanceType::Invalid(_) => false,
+        };
         drop(instances);
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+
+        // Waits, showing Deleting, for duplicates still copying the folder.
+        let _root = self.hold_root(&operation, true).await;
 
         let path = self
             .app
@@ -2369,6 +2665,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .to_path()
             .join(&instance_shortpath as &str);
 
+        #[cfg(test)]
+        self.test_hooks.pause("delete", instance_id).await;
+
         let should_go_to_trash = self
             .app
             .settings_manager()
@@ -2376,7 +2675,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?
             .deletion_through_recycle_bin;
 
+        // The removal runs without path_lock, so a slow Recycle Bin or a
+        // shell prompt never holds up creating, importing, renaming or
+        // duplicating other instances. Until the retirement below, this
+        // instance's library row keeps its folder name reserved.
         tokio::task::spawn_blocking(move || {
+            if !valid
+                && std::fs::symlink_metadata(&path)
+                    .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+            {
+                return Ok(());
+            }
             if should_go_to_trash {
                 trash::delete(&path)?;
             } else {
@@ -2393,10 +2702,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?
             .map(|inst| GroupId(inst.group_id));
 
-        let mut instances = self.instances.write().await;
-
-        instances.remove(&instance_id);
         self.remove_instance(instance_id).await?;
+        self.instances.write().await.remove(&instance_id);
+        drop(path_guard);
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -2425,11 +2733,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     /// # Locks
     /// - [InstanceManager::instances] (w) — only briefly at start (read) and
     ///   end (write); not held across the multi-second filesystem copy.
+    /// - the original's gate — only for the snapshot; its folder hold
+    ///   ([`hold_root`](InstanceManager::hold_root)) lasts until publication.
     pub async fn duplicate_instance(
         self,
         instance_id: InstanceId,
         name: String,
     ) -> anyhow::Result<InstanceId> {
+        let _operation = self.lock_instance(instance_id).await;
         // First snapshot what we need from `instances` under a read lock and
         // release it before the long fs copy. Holding `instances` across the
         // copy serializes every other op (prepare_game, list_mods, etc.) for
@@ -2439,8 +2750,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let instance = instances
                 .get(&instance_id)
                 .ok_or(InvalidInstanceIdError(instance_id))?;
-            (instance.data()?.config.clone(), instance.shortpath.clone())
+            let data = instance.data()?;
+            if matches!(data.state, LaunchState::Deleting) {
+                bail!("cannot duplicate an instance that is being deleted");
+            }
+            (data.config.clone(), instance.shortpath.clone())
         };
+        // The copy takes what the folder holds as it goes, as in 2.0.40, and
+        // never holds up Play, settings, logs or the game's exit on the
+        // original: only the snapshot above needs its gate.
+        drop(operation);
+        #[cfg(test)]
+        self.test_hooks.pause("duplicate_copy", instance_id).await;
 
         let id = *instance_id;
         let group_id = instance_repo::get_instance(&self.app.db, id)
@@ -2453,7 +2774,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .group_id;
 
         let _path_guard = self.path_lock.lock().await;
-        let (new_shortpath, new_path) = self.next_folder(&src_shortpath)?;
+        let (new_shortpath, new_path) = self.next_available_folder(&src_shortpath).await?;
         new_info.name = name;
 
         let path = self
@@ -2495,8 +2816,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // leaving the duplicate with the source's instance.json (its old name and metadata).
         tokio::fs::write(&tmppath.join("instance.json"), json).await?;
 
-        tokio::fs::rename(&tmppath, &new_path).await?;
-
         // `fs_extra::dir::copy` above copied the whole source root, pidfile
         // included if the source instance happened to be running — a game's
         // pid (and its verified start time) belongs to that one process,
@@ -2504,7 +2823,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // place, a future startup reconcile pass could adopt the duplicate
         // as if it were running the source's game, or Stop on the duplicate
         // could signal the source's real, unrelated game process.
-        orphan_pid::remove_pid_file(&new_path, PID_FILE_NAME).await;
+        orphan_pid::remove_pid_file_strict(&tmppath, PID_FILE_NAME).await?;
+        tokio::fs::rename(&tmppath, &new_path).await?;
 
         let id = self
             .add_instance(
@@ -2743,35 +3063,71 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self,
         instance_id: InstanceId,
     ) -> anyhow::Result<domain::InstanceDetails> {
-        let instances = self.instances.read().await;
-        let instance = instances
-            .get(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
+        let mut details = {
+            let instances = self.instances.read().await;
+            let instance = instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let instance = match &instance.type_ {
-            InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
-            InstanceType::Valid(x) => x,
-        };
+            let instance = match &instance.type_ {
+                InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
+                InstanceType::Valid(x) => x,
+            };
 
-        let icon_revision = match &instance.config.icon {
-            InstanceIcon::Default => None,
-            InstanceIcon::RelativePath(_) => instance.icon_revision,
-        };
+            let icon_revision = match &instance.config.icon {
+                InstanceIcon::Default => None,
+                InstanceIcon::RelativePath(_) => instance.icon_revision,
+            };
 
-        let mc_version = match &instance.config.game_configuration.version {
-            Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
-            Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
-            None => None,
+            let mc_version = match &instance.config.game_configuration.version {
+                Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
+                Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
+                None => None,
+            };
+
+            domain::InstanceDetails {
+                id: instance_id,
+                favorite: instance.favorite,
+                name: instance.config.name.clone(),
+                version: mc_version,
+                modpack: instance.config.modpack.clone(),
+                global_java_args: instance.config.game_configuration.global_java_args,
+                extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
+                memory: instance.config.game_configuration.memory,
+                game_resolution: instance.config.game_configuration.game_resolution.clone(),
+                last_played: instance.config.last_played,
+                seconds_played: instance.config.seconds_played as u32,
+                modloaders: match &instance.config.game_configuration.version {
+                    Some(info::GameVersion::Standard(version)) => {
+                        version.modloaders.iter().map(Clone::clone).collect()
+                    }
+                    Some(info::GameVersion::Custom(_)) => Vec::new(), // todo
+                    None => Vec::new(),
+                },
+                java_override: instance.config.game_configuration.java_override.clone(),
+                required_java_profile: None,
+                java_override_mismatch: false,
+                state: (&instance.state).into(),
+                notes: instance.config.notes.clone(),
+                icon_revision,
+                has_pack_update: instance.modpack_update_curseforge.unwrap_or(false)
+                    || instance.modpack_update_modrinth.unwrap_or(false),
+                pre_launch_hook: instance.config.pre_launch_hook.clone(),
+                post_exit_hook: instance.config.post_exit_hook.clone(),
+                wrapper_command: instance.config.wrapper_command.clone(),
+            }
         };
+        #[cfg(test)]
+        self.test_hooks.pause("details", instance_id).await;
 
         let mut mc_manifest = None;
 
-        if let Some(mc_version) = &mc_version {
+        if details.version.is_some() {
             let manifest = self.app.minecraft_manager().get_minecraft_manifest().await;
             mc_manifest = manifest.ok();
         }
 
-        let required_java_profile_name = mc_version.clone().and_then(|version| {
+        let required_java_profile_name = details.version.clone().and_then(|version| {
             let manifest = mc_manifest.as_ref()?;
             let required_java = manifest
                 .versions
@@ -2783,47 +3139,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         });
         let required_java_profile = required_java_profile_name.as_ref().map(|v| v.to_string());
 
-        let java_override = instance.config.game_configuration.java_override.clone();
-        let java_override_mismatch = self
-            .java_override_mismatch(&java_override, required_java_profile_name)
+        details.required_java_profile = required_java_profile;
+        details.java_override_mismatch = self
+            .java_override_mismatch(&details.java_override, required_java_profile_name)
             .await;
-
-        Ok(domain::InstanceDetails {
-            id: instance_id,
-            favorite: instance.favorite,
-            name: instance.config.name.clone(),
-            version: mc_version,
-            // is_being_cached: self
-            //     .app
-            //     .meta_cache_manager()
-            //     .is_instance_being_cached(instance_id)
-            //     .await,
-            modpack: instance.config.modpack.clone(),
-            global_java_args: instance.config.game_configuration.global_java_args,
-            extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
-            memory: instance.config.game_configuration.memory,
-            game_resolution: instance.config.game_configuration.game_resolution.clone(),
-            last_played: instance.config.last_played,
-            seconds_played: instance.config.seconds_played as u32,
-            modloaders: match &instance.config.game_configuration.version {
-                Some(info::GameVersion::Standard(version)) => {
-                    version.modloaders.iter().map(Clone::clone).collect()
-                }
-                Some(info::GameVersion::Custom(_)) => Vec::new(), // todo
-                None => Vec::new(),
-            },
-            java_override,
-            required_java_profile,
-            java_override_mismatch,
-            state: (&instance.state).into(),
-            notes: instance.config.notes.clone(),
-            icon_revision,
-            has_pack_update: instance.modpack_update_curseforge.unwrap_or(false)
-                || instance.modpack_update_modrinth.unwrap_or(false),
-            pre_launch_hook: instance.config.pre_launch_hook.clone(),
-            post_exit_hook: instance.config.post_exit_hook.clone(),
-            wrapper_command: instance.config.wrapper_command.clone(),
-        })
+        Ok(details)
     }
 
     pub async fn get_modpack_info(

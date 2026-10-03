@@ -136,7 +136,7 @@
   "_trn_remove_favorite": "Retirer des favoris",
   "_trn_import_select_all_instances": "Tout sélectionner",
   "_trn_import_deselect_all_instances": "Tout désélectionner",
-  "_trn_error_invalid": "Instance invalide ou corrompue, essayez de la réparer !",
+  "_trn_error_invalid": "Instance invalide ou corrompue. Ouvrez son dossier pour la réparer, ou supprimez-la.",
   "_trn_instance_version_release": "Stable",
   "_trn_instance_version_snapshot": "Snapshot",
   "_trn_instance_version_old_alpha": "Ancienne alpha",

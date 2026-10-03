@@ -136,7 +136,7 @@
   "_trn_remove_favorite": "Убрать из избранного",
   "_trn_import_select_all_instances": "Выбрать все для импорта",
   "_trn_import_deselect_all_instances": "Снять выделение",
-  "_trn_error_invalid": "Экземпляр недействителен или поврежден, попробуйте восстановить его!",
+  "_trn_error_invalid": "Экземпляр недействителен или повреждён. Откройте его папку, чтобы исправить, или удалите его.",
   "_trn_instance_version_release": "Релизы",
   "_trn_instance_version_snapshot": "Снапшоты",
   "_trn_instance_version_old_alpha": "Старая альфа",
