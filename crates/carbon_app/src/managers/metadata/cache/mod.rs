@@ -1375,6 +1375,26 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     /// Cache a mod file for an instance. Hashes, parses metadata, and upserts into mod_file_cache.
+    /// Refresh only an already-published artifact under the caller's instance
+    /// ownership. The scanner uses the same gate around its whole local snapshot.
+    pub(crate) async fn refresh_published_addon(
+        self,
+        ownership: &crate::managers::instance::InstanceOperationGuard,
+        folder: &PathBuf,
+        filename: String,
+        enabled: bool,
+        addon_type: String,
+    ) -> anyhow::Result<String> {
+        self.cache_mod_file_unchecked(
+            ownership.instance_id(),
+            folder,
+            filename,
+            enabled,
+            addon_type,
+        )
+        .await
+    }
+
     async fn cache_mod_file_unchecked(
         self,
         instance_id: InstanceId,
@@ -1624,6 +1644,13 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
         let update_notifier = &update_notifier;
 
         let cache_instance = |instance_id: InstanceId| async move {
+            let _activity = app.runtime_lifecycle.admit("local addon scan")?;
+            let instance_manager = app.instance_manager();
+            let _operation = instance_manager.lock_instance(instance_id).await;
+            #[cfg(test)]
+            instance_manager
+                .pause_addon_scan_for_test(instance_id)
+                .await;
             let app2 = app.clone();
             let cached_entries = tokio::spawn(async move {
                 let instance_id_val = *instance_id;
@@ -1709,6 +1736,9 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             continue;
                         };
                         if !metadata.is_dir() {
+                            continue;
+                        }
+                        if crate::managers::instance::installer::publication::world_install_incomplete(&entry.path()).await? {
                             continue;
                         }
 

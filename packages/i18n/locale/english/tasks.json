@@ -1,4 +1,5 @@
 {
+  "_trn_instance_task_install_world_copy": "Installing separate world copy {{world_name}} for {{instance_name}}; original save retained",
   "_trn_instance_task_launch": "Launching {{name}}",
   "_trn_instance_task_launch_request_versions": "Requesting versions",
   "_trn_instance_task_launch_download_files": "Downloading game files",

@@ -2,12 +2,19 @@ import { Button, Progress, Spinner } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
 import { createSignal, onMount, onCleanup, Match, Switch, Show } from "solid-js"
-import type { FETask, FESubtask, Translation } from "@gd/core_module/bindings"
+import type {
+  FETask,
+  FESubtask,
+  Translation,
+  ShaderLoaderVerification
+} from "@gd/core_module/bindings"
 import type { StepProps } from "."
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
 import { setShaderInstallRunning } from "./state"
 import { formatBytes } from "@/utils/formatBytes"
+
+import { runShaderSteps } from "./pipeline"
 
 type StepName = "modloader" | "loader" | "shader"
 
@@ -63,17 +70,14 @@ const Installing = (props: StepProps) => {
     ])
   }
 
-  const installShaderLoader = async (
-    instanceId: number,
-    projectId: string
-  ): Promise<number> => {
-    return ctx.client.mutation([
-      "instance.installLatestMod",
-      {
-        instance_id: instanceId,
-        mod_source: { Modrinth: projectId }
-      }
+  let loaderVerification: ShaderLoaderVerification | undefined
+  const installShaderLoader = async (instanceId: number): Promise<number> => {
+    const result = await ctx.client.mutation([
+      "instance.ensureShaderLoader",
+      instanceId
     ])
+    loaderVerification = result.verification
+    return result.task_id
   }
 
   const installShader = async (): Promise<number | null> => {
@@ -115,20 +119,12 @@ const Installing = (props: StepProps) => {
         })
         steps.push({
           name: "loader",
-          run: () =>
-            installShaderLoader(
-              props.data.instanceId,
-              recommendation.loader_modrinth_id
-            )
+          run: () => installShaderLoader(props.data.instanceId)
         })
       } else if (recommendation.kind === "RecommendLoader") {
         steps.push({
           name: "loader",
-          run: () =>
-            installShaderLoader(
-              props.data.instanceId,
-              recommendation.loader_modrinth_id
-            )
+          run: () => installShaderLoader(props.data.instanceId)
         })
       }
     }
@@ -140,33 +136,53 @@ const Installing = (props: StepProps) => {
 
     setStepCount(steps.length)
 
-    let lastTaskId: number | null = null
-    for (let i = 0; i < steps.length; i++) {
-      if (destroyed()) return
-      setStepIndex(i)
-      setStepName(steps[i].name)
-      setCurrentTask(null)
-      try {
-        const taskId = await steps[i].run()
-        if (taskId !== null) {
-          lastTaskId = taskId
-          await waitForTask(taskId)
+    try {
+      await runShaderSteps(
+        steps.map((step, i) => async () => {
+          setStepIndex(i)
+          setStepName(step.name)
+          setCurrentTask(null)
+          return step.run()
+        }),
+        waitForTask,
+        async () => {
+          if (loaderVerification)
+            return ctx.client.query([
+              "instance.verifyShaderLoader",
+              loaderVerification
+            ])
+          const result = await ctx.client.query([
+            "instance.checkShaderRequirements",
+            props.data.instanceId
+          ])
+          return result.kind === "LoaderPresent"
+        },
+        plan.fileOnly,
+        destroyed,
+        (task) => {
+          props.complete(task)
+          modalsContext?.closeModal()
+        },
+        async (index) => {
+          if (
+            steps[index].name === "loader" &&
+            (!loaderVerification ||
+              !(await ctx.client.query([
+                "instance.verifyShaderLoader",
+                loaderVerification
+              ])))
+          ) {
+            throw new Error(
+              "The required shader loader is not enabled. Retry setup."
+            )
+          }
         }
-      } catch (e) {
-        if (destroyed()) return
-        setError((e as Error)?.message ?? "Install failed")
-        // The pipeline is no longer running once it's errored, so backdrop
-        // close (gated on this signal via the modal registry) is available
-        // again even though the visible controls below are the primary way
-        // out of this state.
-        setShaderInstallRunning(false)
-        return
-      }
+      )
+    } catch (e) {
+      if (destroyed()) return
+      setError((e as Error)?.message ?? "Install failed")
+      setShaderInstallRunning(false)
     }
-
-    if (destroyed()) return
-    props.complete(lastTaskId)
-    modalsContext?.closeModal()
   }
 
   const cancel = () => {

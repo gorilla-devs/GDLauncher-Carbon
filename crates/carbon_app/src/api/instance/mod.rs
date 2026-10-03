@@ -494,6 +494,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        mutation ENSURE_SHADER_LOADER[app, instance_id: FEInstanceId] {
+            app.instance_manager().ensure_shader_loader(instance_id.into()).await
+        }
+
+        query VERIFY_SHADER_LOADER[app, verification: crate::managers::instance::shader_loader::ShaderLoaderVerification] {
+            app.instance_manager().verify_shader_loader(verification).await
+        }
+
         mutation INSTALL_FABRIC_LOADER_DEFAULT[app, instance_id: FEInstanceId] {
             let task_id = app.instance_manager()
                 .install_fabric_loader_default(instance_id.into())

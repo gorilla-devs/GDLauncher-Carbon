@@ -15,6 +15,21 @@ const snapshotDeletionTarget = (mod: ModType): AddonDeletionTarget => ({
   addon_type: mod.addon_type
 })
 
+// The folder held the addon twice (`x.jar` beside `x.jar.disabled`, listed
+// as one row), and Delete removed only the copy the row showed. The row comes
+// back showing the copy left, so say why instead of looking like a failed
+// delete. Toasts render text, so file names are not HTML-escaped.
+const announceKeptCopy = (kept: FEKeptAddonCopy | null | undefined) => {
+  if (!kept) return
+  toast.info(
+    i18n.t("notifications:_trn_addon_deleted_one_copy", {
+      deleted: kept.deleted,
+      kept: kept.kept,
+      interpolation: { escapeValue: false }
+    })
+  )
+}
+
 export const useAddonMutations = (
   refetchAddons: () => Promise<any>,
   optimisticUpdates: {
@@ -175,10 +190,11 @@ export const useAddonMutations = (
     }
 
     try {
-      await deleteModMutation.mutateAsync({
+      const kept = await deleteModMutation.mutateAsync({
         instance_id: instanceId,
         mod_id: mod.id
       })
+      announceKeptCopy(kept)
       if (isCurrentInstance(instanceId)) await refetchAddons()
     } catch (error) {
       console.error("Failed to delete mod:", error)
@@ -220,7 +236,7 @@ export const useAddonMutations = (
     }
 
     try {
-      await Promise.all(
+      const kept = await Promise.all(
         selectedMods.map((mod) =>
           deleteModMutation.mutateAsync({
             instance_id: instanceId,
@@ -228,6 +244,7 @@ export const useAddonMutations = (
           })
         )
       )
+      kept.forEach(announceKeptCopy)
       if (isCurrentInstance(instanceId)) await refetchAddons()
     } catch (error) {
       console.error("Failed to delete selected mods:", error)

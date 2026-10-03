@@ -27,38 +27,120 @@ use std::borrow::Cow;
 use std::str::FromStr;
 use thiserror::Error;
 
-/// Removes an addon's on-disk form — whichever of its enabled/disabled
-/// spellings exists — and reports whether anything was removed.
-///
-/// `is_directory` is true only for `AddonType::Worlds`. A world is installed by
-/// extracting its zip into `saves/` and deleting the zip
-/// (`managers/instance/installer/mod.rs`'s `post_process`), so the thing on
-/// disk is a directory and `remove_file` cannot touch it. Treating a world
-/// like a file would remove nothing while the caller drops the cache row
-/// anyway: the entry would vanish from the UI and the next scan would
-/// re-insert it from the still-present directory.
+/// A world has only its exact spelling; file addons have two mutually exclusive
+/// spellings. Probe strictly before removal and never choose between two copies.
 async fn remove_addon_from_disk(
     enabled_path: &std::path::Path,
     disabled_path: &std::path::Path,
     is_directory: bool,
 ) -> anyhow::Result<bool> {
-    for path in [enabled_path, disabled_path] {
-        let Ok(meta) = tokio::fs::metadata(path).await else {
-            continue;
-        };
+    let enabled = addon_metadata(enabled_path).await?;
+    let disabled = if is_directory {
+        None
+    } else {
+        addon_metadata(disabled_path).await?
+    };
+    if enabled.is_some() && disabled.is_some() {
+        bail!("both enabled and disabled addon paths exist; resolve the conflict before deletion");
+    }
+    let selected = enabled
+        .map(|m| (enabled_path, m))
+        .or_else(|| disabled.map(|m| (disabled_path, m)));
+    match selected {
+        Some((path, meta)) => remove_addon_entry(path, &meta, is_directory).await,
+        None => Ok(false),
+    }
+}
 
+/// Removes one addon entry `meta` (lstat) describes, reporting whether it did.
+/// A file addon may be a link to a jar or pack kept elsewhere: only the link
+/// is removed, never what it points to, as 2.0.40 did. A save that is a link
+/// is refused: the scanner never lists one, and the save it points to is not
+/// this instance's to delete.
+pub(super) async fn remove_addon_entry(
+    path: &std::path::Path,
+    meta: &std::fs::Metadata,
+    is_directory: bool,
+) -> anyhow::Result<bool> {
+    if meta.file_type().is_symlink() {
         if is_directory {
-            if meta.is_dir() {
-                tokio::fs::remove_dir_all(path).await?;
+            bail!(
+                "{} is a link to a save stored elsewhere. Remove the link in your file \
+                 manager; the save it points to is kept.",
+                path.display()
+            );
+        }
+        // Windows removes a link to a folder (or a junction) as a folder.
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::FileTypeExt;
+            if meta.file_type().is_symlink_dir() {
+                tokio::fs::remove_dir(path).await?;
                 return Ok(true);
             }
-        } else if meta.is_file() {
-            tokio::fs::remove_file(path).await?;
-            return Ok(true);
         }
+        tokio::fs::remove_file(path).await?;
+        return Ok(true);
     }
+    if is_directory && meta.is_dir() {
+        tokio::fs::remove_dir_all(path).await?;
+    } else if !is_directory && meta.is_file() {
+        tokio::fs::remove_file(path).await?;
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
 
-    Ok(false)
+/// What a Delete left when the folder held an addon twice, as `name` and
+/// `name.disabled` (one row): it removed the copy the row showed, and the row
+/// now shows the other.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeptAddonCopy {
+    /// The file name of the copy removed.
+    pub deleted: String,
+    /// The file name of the copy still in the folder.
+    pub kept: String,
+}
+
+/// Why an action cannot pick a copy: the scanner lists `name` and
+/// `name.disabled` as one row, and Delete in the Addons tab removes one of
+/// them at a time. `verb` is what the action would do to the copy
+/// ("enable", "update", ...).
+pub(super) fn twin_copies_refusal(
+    folder: &std::path::Path,
+    name: &str,
+    verb: &str,
+) -> anyhow::Error {
+    anyhow!(
+        "Both {name} and {name}.disabled are in {}, so GDLauncher cannot tell which copy to {verb}. \
+         Delete one of them (Delete in the Addons tab removes one copy at a time), then try again.",
+        folder.display(),
+    )
+}
+
+pub(super) async fn addon_metadata(
+    path: &std::path::Path,
+) -> anyhow::Result<Option<std::fs::Metadata>> {
+    match tokio::fs::symlink_metadata(path).await {
+        Ok(meta) => Ok(Some(meta)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// One name inside an addon folder: never empty, `.`, `..`, or a path. The
+/// rest is Windows-only: there `\` separates folders, `:` names a stream and a
+/// trailing `.` or space is dropped (so the name would alias another file).
+/// Elsewhere they are ordinary characters (macOS stores a `/` typed in Finder
+/// as `:`), and the scanner lists such files, so their actions must work.
+pub(super) fn validate_addon_basename(name: &str) -> anyhow::Result<()> {
+    let windows_only = cfg!(windows) && (name.contains(['\\', ':']) || name.ends_with(['.', ' ']));
+    if name.is_empty() || name == "." || name == ".." || name.contains(['/', '\0']) || windows_only
+    {
+        bail!("invalid addon filename");
+    }
+    Ok(())
 }
 
 /// Rejects an enable/disable toggle for an addon type that cannot express one.
@@ -95,7 +177,10 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.to_owned()).into())
     }
 
-    async fn ensure_modpack_not_locked(&self, instance_id: InstanceId) -> anyhow::Result<()> {
+    pub(super) async fn ensure_modpack_not_locked(
+        &self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -370,38 +455,38 @@ impl ManagerRef<'_, InstanceManager> {
         id: String,
         enabled: bool,
     ) -> anyhow::Result<()> {
+        let _activity = self.app.runtime_lifecycle.admit("addon mutation")?;
+        let _operation = self.lock_instance(instance_id).await;
+        self.ensure_modpack_not_locked(instance_id).await?;
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        self.ensure_modpack_not_locked(instance_id).await?;
-
-        let shortpath = &instance.shortpath;
+        let shortpath = instance.shortpath.clone();
+        drop(instances);
 
         let m = self.get_owned_mod_file(instance_id, &id).await?;
 
-        let addon_type =
-            domain::AddonType::from_db_string(&m.addon_type).unwrap_or(domain::AddonType::Mods);
+        let addon_type = domain::AddonType::from_db_string(&m.addon_type)
+            .ok_or_else(|| anyhow!("unknown addon kind"))?;
+        validate_addon_basename(&m.filename)?;
 
         ensure_toggleable(addon_type)?;
 
-        let mut disabled_path = {
+        let folder = {
             let instance_path = self
                 .app
                 .settings_manager()
                 .runtime_path
                 .get_instances()
-                .get_instance_path(shortpath);
+                .get_instance_path(&shortpath);
 
-            addon_type.get_folder_path(&instance_path)
+            super::installer::publication::checked_folder(&instance_path, addon_type).await?
         };
 
-        let enabled_path = disabled_path.join(&m.filename);
-
-        let mut disabled = m.filename.clone();
-        disabled.push_str(".disabled");
-        disabled_path.push(disabled);
+        let enabled_path = folder.join(&m.filename);
+        let disabled_path = folder.join(format!("{}.disabled", m.filename));
 
         if enabled {
             if enabled_path.exists() {
@@ -438,20 +523,30 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(())
     }
 
-    pub async fn delete_mod(self, instance_id: InstanceId, id: String) -> anyhow::Result<()> {
+    /// Deletes the copy of an addon its row shows. `Some` when the folder
+    /// held a second copy (`name` beside `name.disabled`), which stays and
+    /// which the row now shows.
+    pub async fn delete_mod(
+        self,
+        instance_id: InstanceId,
+        id: String,
+    ) -> anyhow::Result<Option<KeptAddonCopy>> {
+        let _activity = self.app.runtime_lifecycle.admit("addon mutation")?;
+        let _operation = self.lock_instance(instance_id).await;
+        self.ensure_modpack_not_locked(instance_id).await?;
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        self.ensure_modpack_not_locked(instance_id).await?;
-
-        let shortpath = &instance.shortpath;
+        let shortpath = instance.shortpath.clone();
+        drop(instances);
 
         let m = self.get_owned_mod_file(instance_id, &id).await?;
 
-        let addon_type =
-            domain::AddonType::from_db_string(&m.addon_type).unwrap_or(domain::AddonType::Mods);
+        let addon_type = domain::AddonType::from_db_string(&m.addon_type)
+            .ok_or_else(|| anyhow!("unknown addon kind"))?;
+        validate_addon_basename(&m.filename)?;
 
         let mut disabled_path = {
             let instance_path = self
@@ -459,9 +554,9 @@ impl ManagerRef<'_, InstanceManager> {
                 .settings_manager()
                 .runtime_path
                 .get_instances()
-                .get_instance_path(shortpath);
+                .get_instance_path(&shortpath);
 
-            addon_type.get_folder_path(&instance_path)
+            super::installer::publication::checked_folder(&instance_path, addon_type).await?
         };
 
         let enabled_path = disabled_path.join(&m.filename);
@@ -470,38 +565,29 @@ impl ManagerRef<'_, InstanceManager> {
         disabled.push_str(".disabled");
         disabled_path.push(disabled);
 
-        let removed = remove_addon_from_disk(
+        remove_addon_from_disk(
             &enabled_path,
             &disabled_path,
             addon_type == domain::AddonType::Worlds,
         )
         .await?;
 
-        // Removing nothing is fine when there is nothing left to remove — the
-        // user may have deleted the file by hand, and dropping the stale cache
-        // row is the correct reconciliation. It is NOT fine when the addon is
-        // still sitting there: that means the removal failed, and dropping the
-        // row would hide it from the UI until the next scan resurrected it.
-        //
-        // Both spellings are probed, and the message names whichever one
-        // actually survived: an addon left behind under its `.disabled` name
-        // reported as still sitting at its enabled path sends whoever reads
-        // the error looking at a path that does not exist.
-        if !removed {
-            let survivor = if tokio::fs::metadata(&enabled_path).await.is_ok() {
-                Some(&enabled_path)
-            } else if tokio::fs::metadata(&disabled_path).await.is_ok() {
-                Some(&disabled_path)
-            } else {
-                None
-            };
+        #[cfg(test)]
+        self.test_hooks.pause("addon_removed", instance_id).await;
 
-            if let Some(survivor) = survivor {
+        // Check both represented file spellings even after a successful removal.
+        // Worlds deliberately exclude the independent literal .disabled save.
+        for path in [&enabled_path, &disabled_path].into_iter().take(
+            if addon_type == domain::AddonType::Worlds {
+                1
+            } else {
+                2
+            },
+        ) {
+            if addon_metadata(path).await?.is_some() {
                 bail!(
-                    "refusing to drop the cache row for addon {} ({:?}): it is still on disk at {}",
-                    m.id,
-                    addon_type,
-                    survivor.display()
+                    "refusing to drop addon cache row: content remains at {}",
+                    path.display()
                 );
             }
         }
@@ -1133,7 +1219,7 @@ mod test {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{InvalidInstanceModIdError, ensure_toggleable, remove_addon_from_disk};
     use crate::domain::instance::AddonType;
     use crate::domain::instance::info;
@@ -1151,7 +1237,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    async fn addon_fixture(
+    pub(crate) async fn addon_fixture(
         app: &Arc<AppInner>,
         name: &str,
         addon_type: AddonType,
@@ -1230,6 +1316,393 @@ mod tests {
             .unwrap()
             .unwrap();
         (instance_id, row, path)
+    }
+
+    #[tokio::test]
+    async fn task05_delete_missing_world_preserves_literal_disabled_save() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) =
+            addon_fixture(&app, "stale-world", AddonType::Worlds, "World", b"old").await;
+        tokio::fs::remove_dir_all(&path).await.unwrap();
+        let independent = path.with_file_name("World.disabled");
+        tokio::fs::create_dir(&independent).await.unwrap();
+        tokio::fs::write(independent.join("level.dat"), b"independent")
+            .await
+            .unwrap();
+        app.instance_manager()
+            .delete_mod(id, row.id.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            tokio::fs::read(independent.join("level.dat"))
+                .await
+                .unwrap(),
+            b"independent"
+        );
+        assert!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn task05_delete_exact_world_preserves_other_spelling() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) =
+            addon_fixture(&app, "exact", AddonType::Worlds, "World", b"world").await;
+        let other = path.with_file_name("World.disabled");
+        std::fs::create_dir(&other).unwrap();
+        std::fs::write(other.join("level.dat"), b"other").unwrap();
+        app.instance_manager().delete_mod(id, row.id).await.unwrap();
+        assert!(!path.exists());
+        assert_eq!(std::fs::read(other.join("level.dat")).unwrap(), b"other");
+    }
+
+    #[tokio::test]
+    async fn task05_delete_literal_disabled_world_is_exact() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) = addon_fixture(
+            &app,
+            "literal",
+            AddonType::Worlds,
+            "World.disabled",
+            b"world",
+        )
+        .await;
+        let other = path.with_file_name("World.disabled.disabled");
+        std::fs::create_dir(&other).unwrap();
+        app.instance_manager().delete_mod(id, row.id).await.unwrap();
+        assert!(!path.exists());
+        assert!(other.is_dir());
+    }
+
+    #[tokio::test]
+    async fn task05_delete_invalid_kind_and_name_keep_row_and_bytes() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) =
+            addon_fixture(&app, "invalid", AddonType::Mods, "safe.jar", b"safe").await;
+        mfcdb::upsert_mod_file_cache(
+            &app.db,
+            *id,
+            row.filename.clone(),
+            4,
+            true,
+            "unknown".into(),
+            row.metadata_id.clone(),
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        assert!(
+            app.instance_manager()
+                .delete_mod(id, row.id.clone())
+                .await
+                .is_err()
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), b"safe");
+        assert!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        for name in ["../safe.jar", "x/y", ".", "..", "", "nul\0.jar"] {
+            assert!(super::validate_addon_basename(name).is_err());
+        }
+        // Only Windows reads these as a separator, a stream or an alias.
+        for name in ["x\\y", "C:foo", ".. ", "World."] {
+            assert_eq!(
+                super::validate_addon_basename(name).is_err(),
+                cfg!(windows),
+                "{name}"
+            );
+        }
+    }
+
+    /// A name Linux and macOS allow (Finder stores a typed `/` as `:`) is
+    /// listed by the scanner, so its toggle and Delete work there as well.
+    #[cfg(not(windows))]
+    #[tokio::test]
+    async fn names_only_windows_refuses_toggle_and_delete_elsewhere() {
+        let app = crate::setup_managers_for_test().await;
+        for (fixture, kind, name) in [
+            ("posix-colon", AddonType::ResourcePacks, "Faithful 1:2.zip"),
+            ("posix-backslash", AddonType::Mods, "back\\slash.jar"),
+            ("posix-dot", AddonType::Worlds, "Trailing dot."),
+        ] {
+            let (id, row, path) = addon_fixture(&app, fixture, kind, name, b"bytes").await;
+            if kind != AddonType::Worlds {
+                app.instance_manager()
+                    .enable_mod(id, row.id.clone(), false)
+                    .await
+                    .unwrap();
+                assert!(path.with_file_name(format!("{name}.disabled")).is_file());
+                app.instance_manager()
+                    .enable_mod(id, row.id.clone(), true)
+                    .await
+                    .unwrap();
+                assert!(path.is_file());
+            }
+            app.instance_manager()
+                .delete_mod(id, row.id.clone())
+                .await
+                .unwrap();
+            assert!(std::fs::symlink_metadata(&path).is_err(), "{name}");
+            assert!(
+                mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task05_delete_links_preserve_target_and_row() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) =
+            addon_fixture(&app, "link", AddonType::Worlds, "World", b"safe").await;
+        let target = path.with_file_name("Target");
+        std::fs::rename(&path, &target).unwrap();
+        std::os::unix::fs::symlink(&target, &path).unwrap();
+        assert!(
+            app.instance_manager()
+                .delete_mod(id, row.id.clone())
+                .await
+                .is_err()
+        );
+        assert_eq!(std::fs::read(target.join("level.dat")).unwrap(), b"safe");
+        assert!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    /// A mod or pack that is a link to a jar or zip kept elsewhere (shared
+    /// between instances) toggles by renaming the link, and Delete removes
+    /// the link only, as 2.0.40 did; what it points to is kept.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn linked_file_addons_toggle_and_delete_only_the_link() {
+        let app = crate::setup_managers_for_test().await;
+        let shared = tempfile::tempdir().unwrap();
+        for (fixture, kind, name, disable_first) in [
+            ("link-mod", AddonType::Mods, "shared.jar", false),
+            ("link-pack", AddonType::ResourcePacks, "shared.zip", false),
+            ("link-disabled", AddonType::Mods, "other.jar", true),
+        ] {
+            let (id, row, path) = addon_fixture(&app, fixture, kind, name, b"local").await;
+            let target = shared.path().join(fixture);
+            std::fs::write(&target, b"shared bytes").unwrap();
+            std::fs::remove_file(&path).unwrap();
+            std::os::unix::fs::symlink(&target, &path).unwrap();
+            let disabled = path.with_file_name(format!("{name}.disabled"));
+            if disable_first {
+                app.instance_manager()
+                    .enable_mod(id, row.id.clone(), false)
+                    .await
+                    .unwrap();
+                assert!(
+                    std::fs::symlink_metadata(&disabled)
+                        .unwrap()
+                        .file_type()
+                        .is_symlink()
+                );
+            }
+            app.instance_manager()
+                .delete_mod(id, row.id.clone())
+                .await
+                .unwrap();
+            assert!(std::fs::symlink_metadata(&path).is_err(), "{fixture}");
+            assert!(std::fs::symlink_metadata(&disabled).is_err(), "{fixture}");
+            assert_eq!(std::fs::read(&target).unwrap(), b"shared bytes");
+            assert!(
+                mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    /// On Windows a mod or pack can be a junction (`mklink /J`, which needs
+    /// no extra rights) named like the file. Windows removes a junction as a
+    /// folder; Delete removes only the junction, never what it points to.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn a_junction_named_like_a_file_addon_deletes_only_the_junction() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) = addon_fixture(
+            &app,
+            "junction-pack",
+            AddonType::ResourcePacks,
+            "shared.zip",
+            b"local",
+        )
+        .await;
+        let shared = tempfile::tempdir().unwrap();
+        let target = shared.path().join("pack");
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(target.join("pack.mcmeta"), b"{}").unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let status = std::process::Command::new("cmd")
+            .arg("/C")
+            .arg("mklink")
+            .arg("/J")
+            .arg(&path)
+            .arg(&target)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "mklink /J failed for {}", path.display());
+        app.instance_manager()
+            .delete_mod(id, row.id.clone())
+            .await
+            .unwrap();
+        assert!(std::fs::symlink_metadata(&path).is_err());
+        assert_eq!(std::fs::read(target.join("pack.mcmeta")).unwrap(), b"{}");
+        assert!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    /// `twin.jar` beside `twin.jar.disabled` is one row. Toggles explain the
+    /// two copies; Delete removes the copy the row shows, says which copy is
+    /// left, and the row then shows that copy's own details at once (the
+    /// queued scan waits while any game runs). A second Delete removes it,
+    /// as in 2.0.40.
+    #[tokio::test]
+    async fn delete_with_both_spellings_removes_one_copy_per_click() {
+        let app = crate::setup_managers_for_test().await;
+        for (fixture, shows_enabled) in [("twins-enabled", true), ("twins-disabled", false)] {
+            let (id, row, enabled) =
+                addon_fixture(&app, fixture, AddonType::Mods, "twin.jar", b"enabled copy").await;
+            let disabled = enabled.with_file_name("twin.jar.disabled");
+            std::fs::write(&disabled, b"disabled copy!").unwrap();
+            // Settle the scan create_instance queued before setting the row.
+            app.meta_cache_manager()
+                .override_caching_and_wait(
+                    crate::managers::metadata::cache::CacheEntityId::Instance(id),
+                    false,
+                    false,
+                )
+                .await
+                .unwrap();
+            // The row describes the copy it shows.
+            let (shown_bytes, kept_bytes) = if shows_enabled {
+                (&b"enabled copy"[..], &b"disabled copy!"[..])
+            } else {
+                (&b"disabled copy!"[..], &b"enabled copy"[..])
+            };
+            mfcdb::upsert_mod_file_cache(
+                &app.db,
+                *id,
+                "twin.jar".into(),
+                shown_bytes.len() as i32,
+                shows_enabled,
+                "mods".into(),
+                row.metadata_id.clone(),
+                DbDateTime(Utc::now().fixed_offset()),
+            )
+            .await
+            .unwrap();
+            for enable in [true, false] {
+                let error = app
+                    .instance_manager()
+                    .enable_mod(id, row.id.clone(), enable)
+                    .await
+                    .unwrap_err();
+                assert!(
+                    format!("{error:#}").contains("Both twin.jar and twin.jar.disabled"),
+                    "{error:#}"
+                );
+            }
+            let left = app
+                .instance_manager()
+                .delete_mod(id, row.id.clone())
+                .await
+                .unwrap();
+            let (gone, kept) = if shows_enabled {
+                (&enabled, &disabled)
+            } else {
+                (&disabled, &enabled)
+            };
+            assert_eq!(
+                left,
+                Some(super::KeptAddonCopy {
+                    deleted: gone.file_name().unwrap().to_str().unwrap().to_owned(),
+                    kept: kept.file_name().unwrap().to_str().unwrap().to_owned(),
+                })
+            );
+            assert!(!gone.exists());
+            assert_eq!(std::fs::read(kept).unwrap(), kept_bytes);
+            let current = mfcdb::get_mod_file_cache_by_instance_kind_filename(
+                &app.db, *id, "mods", "twin.jar",
+            )
+            .await
+            .unwrap()
+            .expect("the row stays for the copy that is left");
+            assert_eq!(current.id, row.id);
+            assert_eq!(current.enabled, !shows_enabled);
+            assert_eq!(current.filesize, kept_bytes.len() as i32);
+            assert_ne!(current.metadata_id, row.metadata_id);
+            let metadata = metarepo::get_metadata_by_id(&app.db, &current.metadata_id)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                metadata.sha512,
+                <sha2::Sha512 as sha2::Digest>::digest(kept_bytes).to_vec()
+            );
+            assert_eq!(
+                app.instance_manager()
+                    .delete_mod(id, current.id.clone())
+                    .await
+                    .unwrap(),
+                None
+            );
+            assert!(!enabled.exists() && !disabled.exists());
+            assert!(
+                mfcdb::get_mod_file_cache_by_instance_kind_filename(
+                    &app.db, *id, "mods", "twin.jar",
+                )
+                .await
+                .unwrap()
+                .is_none()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn task05_delete_late_survivor_keeps_cache_row_and_reports_error() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) =
+            addon_fixture(&app, "survivor", AddonType::Mods, "mod.jar", b"selected").await;
+        let pause = app.instance_manager().test_hooks.arm("addon_removed", id);
+        let actor = Arc::clone(&app);
+        let row_id = row.id.clone();
+        let deleting =
+            tokio::spawn(async move { actor.instance_manager().delete_mod(id, row_id).await });
+        pause.entered.notified().await;
+        let survivor = path.with_file_name("mod.jar.disabled");
+        std::fs::write(&survivor, b"later content").unwrap();
+        pause.release.notify_one();
+        assert!(deleting.await.unwrap().is_err());
+        assert_eq!(std::fs::read(survivor).unwrap(), b"later content");
+        assert!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 
     fn assert_foreign_addon_error(error: anyhow::Error) {
@@ -1417,7 +1890,7 @@ mod tests {
             panic!("must stop before publication")
         }
 
-        async fn post_process(&self, _: &InstancePath) -> anyhow::Result<()> {
+        async fn post_process(&self, _: &InstancePath, _: &std::path::Path) -> anyhow::Result<()> {
             panic!("must stop before post-processing")
         }
 

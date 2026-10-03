@@ -60,6 +60,7 @@ pub mod installer;
 pub mod log;
 pub mod modpack;
 mod mods;
+pub use mods::KeptAddonCopy;
 pub mod run;
 mod schema;
 pub mod shader_loader;
@@ -117,6 +118,12 @@ pub(crate) struct InstanceOperationGuard {
     guard: Option<tokio::sync::OwnedMutexGuard<()>>,
     #[cfg(test)]
     drop_barrier: Option<Arc<std::sync::Barrier>>,
+}
+
+impl InstanceOperationGuard {
+    pub(crate) fn instance_id(&self) -> InstanceId {
+        self.id
+    }
 }
 
 impl Drop for InstanceOperationGuard {
@@ -178,6 +185,11 @@ impl Default for InstanceManager {
 }
 
 impl InstanceManager {
+    #[cfg(test)]
+    pub(crate) async fn pause_addon_scan_for_test(&self, id: InstanceId) {
+        self.test_hooks.pause("addon_scan_owned", id).await;
+    }
+
     /// Lock before reading the current config/path. Global map guards must
     /// remain short; release them before path/DB/filesystem/network waits.
     /// Rename/delete take path_lock after this gate, never in reverse order,

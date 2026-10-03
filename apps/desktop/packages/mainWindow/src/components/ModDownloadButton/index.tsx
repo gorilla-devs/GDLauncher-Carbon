@@ -14,6 +14,7 @@ import { InstanceDropdown } from "./components/InstanceDropdown"
 import { InstallButton } from "./components/InstallButton"
 import { toast } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
+import { worldVersionCopy } from "./worldVersionCopy"
 
 interface ModDownloadButtonProps {
   fileId?: number | string
@@ -40,6 +41,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [t] = useTransContext()
   const [taskId, setTaskId] = createSignal<number | null>(null)
   const [pendingInstall, setPendingInstall] = createSignal(false)
+  const [copyRequest, setCopyRequest] =
+    createSignal<ReturnType<typeof worldVersionCopy>>()
 
   const {
     instanceLoadingStates,
@@ -149,7 +152,9 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     } else if (action.kind === "completed") {
       if (action.showSuccessToast) {
         toast.success(
-          `${props.addon?.title || "World"} installed successfully`,
+          copyRequest()
+            ? t(copyRequest()!.completion)
+            : `${props.addon?.title || "World"} installed successfully`,
           { duration: 2000 }
         )
       }
@@ -266,6 +271,9 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       return
     }
 
+    setCopyRequest(
+      worldVersionCopy(props.addon.type, props.fileId, installedMod()?.id)
+    )
     setPendingInstall(true)
     try {
       if (!props.fileId) {
@@ -371,6 +379,11 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           progress={progress}
           isInstalled={isInstalled}
           instanceLocked={() => props.instanceLocked ?? false}
+          copyPresentation={worldVersionCopy(
+            props.addon?.type,
+            props.fileId,
+            installedMod()?.id
+          )}
           fileId={props.fileId}
           installedMod={installedMod}
           onDownload={handleDownload}

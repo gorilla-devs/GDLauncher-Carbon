@@ -13,8 +13,8 @@ pub(super) struct Hooks {
 
 #[derive(Debug, Default)]
 pub(super) struct Pause {
-    entered: Notify,
-    release: Notify,
+    pub(super) entered: Notify,
+    pub(super) release: Notify,
 }
 
 impl Hooks {
@@ -43,7 +43,7 @@ impl Hooks {
         self.drop_barriers.lock().unwrap().get(&id).cloned()
     }
 
-    fn arm(&self, name: &'static str, id: InstanceId) -> Arc<Pause> {
+    pub(super) fn arm(&self, name: &'static str, id: InstanceId) -> Arc<Pause> {
         let pause = Arc::new(Pause::default());
         self.pauses
             .lock()

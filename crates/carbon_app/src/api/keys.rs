@@ -133,6 +133,8 @@ keys! {
         INSTALL_MOD                                 = "installMod";
         INSTALL_LATEST_MOD                          = "installLatestMod";
         CHECK_SHADER_REQUIREMENTS                   = "checkShaderRequirements";
+        ENSURE_SHADER_LOADER                       = "ensureShaderLoader";
+        VERIFY_SHADER_LOADER                       = "verifyShaderLoader";
         INSTALL_FABRIC_LOADER_DEFAULT               = "installFabricLoaderDefault";
         UPDATE_MOD                                  = "updateMod";
         FIND_MOD_UPDATE                             = "findModUpdate";

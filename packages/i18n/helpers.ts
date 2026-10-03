@@ -211,6 +211,7 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
     'InstanceTaskLaunchRunForgeProcessors': 'tasks:_trn_instance_task_launch_run_forge_processors',
     'InstanceTaskLaunchRunNeoforgeProcessors': 'tasks:_trn_instance_task_launch_run_neoforge_processors',
     'InstanceTaskInstallMod': 'tasks:_trn_instance_task_install_mod',
+    'InstanceTaskInstallWorldCopy': 'tasks:_trn_instance_task_install_world_copy',
     'InstanceTaskLaunchInstallJava': 'tasks:_trn_instance_task_launch_install_java',
     'FinalizingImport': 'tasks:_trn_finalizing_import',
     'InstanceTaskLaunchWaiting': 'tasks:_trn_instance_task_launch_waiting',

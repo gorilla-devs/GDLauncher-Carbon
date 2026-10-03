@@ -1,5 +1,6 @@
 import { Show, Switch, Match, Accessor } from "solid-js"
 import { Trans } from "@gd/i18n"
+import type { worldVersionCopy } from "../worldVersionCopy"
 import {
   Button,
   Tooltip,
@@ -19,6 +20,7 @@ interface InstallButtonProps {
   onDownload: () => void
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
+  copyPresentation?: ReturnType<typeof worldVersionCopy>
   testId?: string
 }
 
@@ -75,7 +77,12 @@ export const InstallButton = (props: InstallButtonProps) => {
                   >
                     <div class="flex items-center gap-1.5">
                       <div class="i-hugeicons:download-02 h-5 w-5" />
-                      <Trans key="instances:_trn_switch_version" />
+                      <Show
+                        when={props.copyPresentation}
+                        fallback={<Trans key="instances:_trn_switch_version" />}
+                      >
+                        {(copy) => <Trans key={copy().action} />}
+                      </Show>
                     </div>
                   </Match>
                   <Match when={!props.instanceLocked() && props.fileId}>
@@ -99,6 +106,19 @@ export const InstallButton = (props: InstallButtonProps) => {
           </Show>
         </Button>
       </TooltipTrigger>
+      <Show
+        when={
+          !props.instanceLocked() &&
+          !props.isInstalled() &&
+          props.copyPresentation
+        }
+      >
+        {(copy) => (
+          <TooltipContent>
+            <Trans key={copy().disclosure} />
+          </TooltipContent>
+        )}
+      </Show>
       {props.instanceLocked() && (
         <TooltipContent>
           <Trans key="instances:_trn_locked_cannot_apply_changes" />

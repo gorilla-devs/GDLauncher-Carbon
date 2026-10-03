@@ -1,4 +1,5 @@
-use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
+pub(crate) mod publication;
+use super::{InstanceData, InvalidInstanceIdError};
 use crate::{
     api::{
         keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS},
@@ -80,9 +81,16 @@ pub enum ResourceFingerprint {
 pub trait ResourceInstaller: Sync {
     /// a unique ID to identify dependency loops
     fn id(&self) -> String;
+    fn addon_type(&self) -> instance::AddonType {
+        instance::AddonType::Mods
+    }
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable>;
     fn get_install_path(&self, instance_path: &InstancePath) -> PathBuf;
-    async fn post_process(&self, instance_path: &InstancePath) -> Result<(), anyhow::Error>;
+    async fn post_process(
+        &self,
+        instance_path: &InstancePath,
+        staged: &std::path::Path,
+    ) -> Result<(), anyhow::Error>;
     fn dependencies(
         &self,
         app: &Arc<AppInner>,
@@ -106,6 +114,10 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
         (**self).id()
     }
 
+    fn addon_type(&self) -> instance::AddonType {
+        (**self).addon_type()
+    }
+
     #[inline]
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
         (**self).downloadable(instance_path).await
@@ -117,8 +129,12 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     }
 
     #[inline]
-    async fn post_process(&self, instance_path: &InstancePath) -> Result<(), anyhow::Error> {
-        (**self).post_process(instance_path).await
+    async fn post_process(
+        &self,
+        instance_path: &InstancePath,
+        staged: &std::path::Path,
+    ) -> Result<(), anyhow::Error> {
+        (**self).post_process(instance_path, staged).await
     }
 
     #[inline]
@@ -204,6 +220,9 @@ impl InstallerRollbackContext {
 }
 
 pub struct Installer {
+    pub(super) required_enabled: Option<super::shader_loader::ShaderLoaderVerification>,
+    #[cfg(test)]
+    download_fixture: Option<PathBuf>,
     inner: Arc<Mutex<BoxedResourceInstaller>>,
     rollback_context: Arc<Mutex<Option<InstallerRollbackContext>>>,
     abort_handle: Arc<Mutex<InstallerAbortHandle>>,
@@ -228,6 +247,9 @@ pub trait IntoInstaller: Sized {
 impl Installer {
     pub fn new(resource_installer: BoxedResourceInstaller) -> Self {
         Self {
+            required_enabled: None,
+            #[cfg(test)]
+            download_fixture: None,
             inner: Arc::new(Mutex::new(resource_installer)),
             rollback_context: Arc::new(Mutex::new(None)),
             abort_handle: Arc::new(Mutex::new(InstallerAbortHandle {
@@ -277,20 +299,23 @@ impl Installer {
             .await?
             .download_dependencies;
 
+        let _activity = app.runtime_lifecycle.admit("addon install admission")?;
+        let manager = app.instance_manager();
+        let operation = manager.lock_instance(instance_id).await;
+        manager.ensure_modpack_not_locked(instance_id).await?;
+        if let Some(target) = &self.required_enabled {
+            target.validate_target(app, instance_id).await?;
+        }
         let (task, task_id, instance_path) = async {
-            let instance_manager = app.instance_manager();
-            let instances = instance_manager.instances.write().await;
-            let instance = instances
-                .get(&instance_id)
-                .ok_or(InvalidInstanceIdError(instance_id))?;
-
-            let Instance {
-                type_: InstanceType::Valid(data),
-                shortpath,
-                ..
-            } = &instance
-            else {
-                bail!("install called with invalid instance");
+            let (name, shortpath) = {
+                let instances = manager.instances.read().await;
+                let instance = instances
+                    .get(&instance_id)
+                    .ok_or(InvalidInstanceIdError(instance_id))?;
+                (
+                    instance.data()?.config.name.clone(),
+                    instance.shortpath.clone(),
+                )
             };
 
             let task = {
@@ -301,12 +326,15 @@ impl Installer {
                     // metadata still being scanned), so a plain install of a file that
                     // is already on disk is a successful no-op rather than an error.
                     // Dropping the task right after spawning completes it immediately.
-                    // Replacing is still an error: skipping it would silently leave the
-                    // old version behind.
+                    // Explicit replacement continues into staged publication even when
+                    // bytes match; it never follows the ordinary no-op branch.
                     if replaces_mod_id.is_none() {
+                        if self.required_enabled.is_some() {
+                            publication::enable_satisfied(&**lock, app, &operation).await?;
+                        }
                         let task = VisualTask::new(Translation::InstanceTaskInstallMod {
                             mod_name: lock.display_name(),
-                            instance_name: data.config.name.clone(),
+                            instance_name: name.clone(),
                         });
 
                         let id = app.task_manager().spawn_task(&task).await;
@@ -315,16 +343,26 @@ impl Installer {
                         // installed-state is the usual reason we ended up here
                         app.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
 
-                        return Ok((None, id, None));
+                        return Ok::<_, anyhow::Error>((None, id, None));
                     }
 
-                    bail!("resource is already installed");
+                    // An explicit replacement must still publish and preserve its intent.
                 }
 
-                let task = VisualTask::new(Translation::InstanceTaskInstallMod {
-                    mod_name: lock.display_name(),
-                    instance_name: data.config.name.clone(),
-                });
+                let task = VisualTask::new(
+                    if replaces_mod_id.is_some() && lock.addon_type() == instance::AddonType::Worlds
+                    {
+                        Translation::InstanceTaskInstallWorldCopy {
+                            world_name: lock.display_name(),
+                            instance_name: name.clone(),
+                        }
+                    } else {
+                        Translation::InstanceTaskInstallMod {
+                            mod_name: lock.display_name(),
+                            instance_name: name.clone(),
+                        }
+                    },
+                );
 
                 Ok::<VisualTask, anyhow::Error>(task)
             }?;
@@ -333,7 +371,7 @@ impl Installer {
                 .settings_manager()
                 .runtime_path
                 .get_instances()
-                .get_instance_path(shortpath);
+                .get_instance_path(&shortpath);
 
             let id = app.task_manager().spawn_task(&task).await;
             Ok((Some(task), id, Some(instance_path)))
@@ -344,6 +382,21 @@ impl Installer {
             return Ok(task_id);
         };
 
+        let replacement = if let Some(id) = replaces_mod_id.as_deref() {
+            Some(
+                publication::ReplacementPlan::capture(
+                    app,
+                    instance_id,
+                    id,
+                    self.inner.lock().await.addon_type(),
+                )
+                .await?,
+            )
+        } else {
+            None
+        };
+        drop(operation);
+
         let visited_ids = Arc::new(Mutex::new(Vec::new()));
         let task = Arc::new(Mutex::new(task));
         self.install_inner(
@@ -353,7 +406,7 @@ impl Installer {
             &task,
             &visited_ids,
             install_deps && download_deps,
-            replaces_mod_id,
+            replacement,
         )
         .await?;
 
@@ -369,7 +422,7 @@ impl Installer {
         parent_task: &Arc<Mutex<VisualTask>>,
         visited_ids: &Arc<Mutex<Vec<String>>>,
         install_deps: bool,
-        replaces_mod_id: Option<String>,
+        replacement: Option<publication::ReplacementPlan>,
     ) -> anyhow::Result<()> {
         {
             let mut lock = visited_ids.lock().await;
@@ -447,12 +500,14 @@ impl Installer {
                 (dep_error, processed_deps)
             };
 
-            if self
-                .inner
-                .lock()
-                .await
-                .is_already_installed(app, instance_id)
-                .await?
+            if replacement.is_none()
+                && self.required_enabled.is_none()
+                && self
+                    .inner
+                    .lock()
+                    .await
+                    .is_already_installed(app, instance_id)
+                    .await?
             {
                 return Ok(());
             }
@@ -478,6 +533,12 @@ impl Installer {
             lock.subtask(Translation::InstanceTaskInstallModDownloadFile)
         };
 
+        let required_enabled = self.required_enabled.clone();
+        let activity = app
+            .runtime_lifecycle
+            .admit("addon download and publication")?;
+        #[cfg(test)]
+        let download_fixture = self.download_fixture.clone();
         let instance_path = instance_path.clone();
         let inner = Arc::clone(&self.inner);
         let app_clone = Arc::clone(app);
@@ -488,11 +549,28 @@ impl Installer {
             let mut abort_handle = self.abort_handle.lock().await;
             if !abort_handle.aborted {
                 let task_handle = tokio::spawn(async move {
+                    let _activity = activity;
+                    // Persist private staging on interruption/error: carbon_net worker drainage
+                    // belongs to Task6, so dropping this worker must not delete a live download.
+                    let staging = tempfile::Builder::new()
+                        .prefix(".addon-install-")
+                        .tempdir_in(
+                            app_clone
+                                .settings_manager()
+                                .runtime_path
+                                .get_root()
+                                .to_path(),
+                        );
                     let r = (|| async {
-                        let downloadable = {
+                        let staging = staging?.keep();
+                        let mut downloadable = {
                             let lock = inner.lock().await;
                             lock.downloadable(&instance_path).await
                         };
+
+                        if let Some(download) = downloadable.as_mut() {
+                            download.path = staging.join("artifact");
+                        }
 
                         parent_task
                             .lock()
@@ -522,26 +600,89 @@ impl Installer {
                                 t_download_file.complete_download();
                             });
 
-                            carbon_net::download_multiple(
-                                &[downloadable.clone()],
-                                DownloadOptions::builder().concurrency(1).build(),
-                            )
-                            .await
-                            .with_context(|| {
-                                format!("Failed to download addon file for `{:?}`", downloadable)
-                            })?;
+                            #[cfg(test)]
+                            if let Some(source) = &download_fixture {
+                                tokio::fs::create_dir_all(downloadable.path.parent().unwrap())
+                                    .await?;
+                                tokio::fs::copy(source, &downloadable.path).await?;
+                            }
+                            #[cfg(test)]
+                            let acquire = download_fixture.is_none();
+                            #[cfg(not(test))]
+                            let acquire = true;
+                            if acquire {
+                                carbon_net::download_multiple(
+                                    &[downloadable.clone()],
+                                    DownloadOptions::builder().concurrency(1).build(),
+                                )
+                                .await
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to download addon file for `{:?}`",
+                                        downloadable
+                                    )
+                                })?;
+                            }
 
                             {
                                 let lock = inner.lock().await;
-                                lock.post_process(&instance_path).await?;
+                                publication::verify_acquired(&downloadable.path, downloadable)
+                                    .await?;
+                                if lock.addon_type() == instance::AddonType::Worlds {
+                                    let manager = app_clone.instance_manager();
+                                    let _operation = manager.lock_instance(instance_id).await;
+                                    manager.ensure_modpack_not_locked(instance_id).await?;
+                                    let current =
+                                        publication::current_path(&app_clone, instance_id).await?;
+                                    publication::filename(&**lock, &current)?;
+                                    if let Some(plan) = replacement.as_ref() {
+                                        let destination = publication::publish_world_version(
+                                            &**lock,
+                                            &app_clone,
+                                            &_operation,
+                                            &downloadable.path,
+                                            plan,
+                                        )
+                                        .await?;
+                                        parent_task
+                                            .lock()
+                                            .await
+                                            .edit(|data| {
+                                                if let Translation::InstanceTaskInstallWorldCopy {
+                                                    world_name,
+                                                    ..
+                                                } = &mut data.name
+                                                {
+                                                    *world_name = destination
+                                                        .file_name()
+                                                        .unwrap()
+                                                        .to_string_lossy()
+                                                        .into_owned();
+                                                }
+                                            })
+                                            .await;
+                                    } else {
+                                        lock.post_process(&current, &downloadable.path).await?;
+                                    }
+                                } else {
+                                    publication::publish_file(
+                                        &**lock,
+                                        &app_clone,
+                                        instance_id,
+                                        &downloadable.path,
+                                        replacement.as_ref(),
+                                        required_enabled.as_ref(),
+                                    )
+                                    .await?;
+                                }
                             }
-                        }
-
-                        if let Some(id) = replaces_mod_id {
-                            app_clone
-                                .instance_manager()
-                                .delete_mod(instance_id, id)
-                                .await?;
+                            if super::mods::addon_metadata(&downloadable.path)
+                                .await?
+                                .is_some()
+                            {
+                                tokio::fs::remove_file(&downloadable.path).await?;
+                            }
+                            tokio::fs::remove_dir(&staging).await?;
                         }
 
                         // ensure the task stays alive until the mod is cached
@@ -647,6 +788,16 @@ impl CurseforgeModInstaller {
 
 #[async_trait::async_trait]
 impl ResourceInstaller for CurseforgeModInstaller {
+    fn addon_type(&self) -> instance::AddonType {
+        match self.addon_type {
+            curseforge::ClassId::ResourcePacks => instance::AddonType::ResourcePacks,
+            curseforge::ClassId::Worlds => instance::AddonType::Worlds,
+            curseforge::ClassId::Shaders => instance::AddonType::Shaders,
+            curseforge::ClassId::Datapacks => instance::AddonType::DataPacks,
+            _ => instance::AddonType::Mods,
+        }
+    }
+
     fn id(&self) -> String {
         format!("curseforge:{}:{}", &self.file.mod_id, &self.file.id)
     }
@@ -685,15 +836,19 @@ impl ResourceInstaller for CurseforgeModInstaller {
         )
     }
 
-    async fn post_process(&self, instance_path: &InstancePath) -> Result<(), anyhow::Error> {
+    async fn post_process(
+        &self,
+        instance_path: &InstancePath,
+        staged: &std::path::Path,
+    ) -> Result<(), anyhow::Error> {
         if self.addon_type == curseforge::ClassId::Worlds {
-            let original_path = self.get_install_path(instance_path);
-            let dest_folder = original_path
-                .parent()
-                .ok_or_else(|| anyhow::anyhow!("Can't find instance path parent folder"))?;
-
-            carbon_compression::decompress(&original_path, dest_folder).await?;
-            tokio::fs::remove_file(&original_path).await?;
+            let name = std::path::Path::new(&self.file.file_name)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .context("invalid world archive name")?;
+            let saves =
+                publication::checked_folder(instance_path, instance::AddonType::Worlds).await?;
+            publication::publish_world(staged, &saves, name).await?;
         }
         Ok(())
     }
@@ -844,15 +999,7 @@ impl ResourceInstaller for CurseforgeModInstaller {
         app: &Arc<AppInner>,
         instance_id: InstanceId,
     ) -> anyhow::Result<bool> {
-        // TODO: check with fingerprint?
-        let instance_id_val = *instance_id;
-        let filename = self.file.file_name.clone();
-        let is_installed =
-            mfcdb::get_mod_file_cache_by_instance_filename(&app.db, instance_id_val, &filename)
-                .await?
-                .is_some();
-
-        Ok(is_installed)
+        publication::is_satisfied(self, app, instance_id).await
     }
 
     fn display_name(&self) -> String {
@@ -966,6 +1113,15 @@ impl ModrinthModInstaller {
 
 #[async_trait::async_trait]
 impl ResourceInstaller for ModrinthModInstaller {
+    fn addon_type(&self) -> instance::AddonType {
+        match self.mod_info.project_type {
+            modrinth::project::ProjectType::ResourcePack => instance::AddonType::ResourcePacks,
+            modrinth::project::ProjectType::Shader => instance::AddonType::Shaders,
+            modrinth::project::ProjectType::DataPack => instance::AddonType::DataPacks,
+            _ => instance::AddonType::Mods,
+        }
+    }
+
     fn id(&self) -> String {
         format!("modrinth:{}:{}", &self.version.project_id, &self.version.id)
     }
@@ -994,7 +1150,11 @@ impl ResourceInstaller for ModrinthModInstaller {
         )
     }
 
-    async fn post_process(&self, instance_path: &InstancePath) -> Result<(), anyhow::Error> {
+    async fn post_process(
+        &self,
+        instance_path: &InstancePath,
+        staged: &std::path::Path,
+    ) -> Result<(), anyhow::Error> {
         // No post-processing required for modrinth
         Ok(())
     }
@@ -1168,15 +1328,7 @@ impl ResourceInstaller for ModrinthModInstaller {
         app: &Arc<AppInner>,
         instance_id: InstanceId,
     ) -> anyhow::Result<bool> {
-        // TODO: check with fingerprint?
-        let instance_id_val = *instance_id;
-        let filename = self.file.filename.clone();
-        let is_installed =
-            mfcdb::get_mod_file_cache_by_instance_filename(&app.db, instance_id_val, &filename)
-                .await?
-                .is_some();
-
-        Ok(is_installed)
+        publication::is_satisfied(self, app, instance_id).await
     }
 
     fn display_name(&self) -> String {
@@ -1212,3 +1364,6 @@ impl IntoInstaller for ModrinthModInstaller {
         Installer::new(Box::new(self) as BoxedResourceInstaller)
     }
 }
+
+#[cfg(test)]
+mod tests;

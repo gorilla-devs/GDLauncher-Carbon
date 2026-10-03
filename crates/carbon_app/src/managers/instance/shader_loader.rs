@@ -3,7 +3,7 @@ use crate::domain::instance::InstanceSettingsUpdate;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::ManagerRef;
-use anyhow::{anyhow, bail};
+use anyhow::{Context, anyhow, bail};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -79,7 +79,181 @@ impl From<ModLoaderType> for ApiModLoaderType {
     }
 }
 
+/// Exact provider artifact and instance target selected by the Auto action.
+/// Verification is read-only; possession of this value never authorizes enabling.
+#[derive(Type, Debug, Clone, Serialize, Deserialize)]
+pub struct ShaderLoaderVerification {
+    pub instance_id: i32,
+    pub mc_version: String,
+    pub modloaders: Vec<String>,
+    pub filename: String,
+    pub sha1: String,
+    /// rspc refuses to export `u64`; exported as `number` like the other
+    /// file sizes (see `FEUntrackedFile::size`). Loader jars stay far below
+    /// 2^53 bytes, so the JSON number round-trips exactly.
+    #[specta(type = f64)]
+    pub size: u64,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub struct ShaderLoaderInstall {
+    pub task_id: i32,
+    pub verification: ShaderLoaderVerification,
+}
+
+impl ShaderLoaderVerification {
+    pub(super) async fn validate_target(
+        &self,
+        app: &std::sync::Arc<crate::managers::AppInner>,
+        id: InstanceId,
+    ) -> anyhow::Result<()> {
+        if self.instance_id != *id {
+            bail!("shader loader target instance changed");
+        }
+        let manager = app.instance_manager();
+        let instances = manager.instances.read().await;
+        let config = &instances
+            .get(&id)
+            .ok_or(InvalidInstanceIdError(id))?
+            .data()?
+            .config;
+        let Some(GameVersion::Standard(version)) = &config.game_configuration.version else {
+            bail!("unsupported shader target");
+        };
+        if version.release != self.mc_version || target_modloaders(version) != self.modloaders {
+            bail!("shader loader target changed during installation");
+        }
+        Ok(())
+    }
+}
+
+fn target_modloaders(version: &crate::domain::instance::info::StandardVersion) -> Vec<String> {
+    let mut loaders = version
+        .modloaders
+        .iter()
+        .map(|l| format!("{}:{}", l.type_.to_string(), l.version))
+        .collect::<Vec<_>>();
+    loaders.sort();
+    loaders
+}
+
 impl ManagerRef<'_, InstanceManager> {
+    /// Auto is the only entry point that grants enabling authority. Resolve an
+    /// exact compatible provider version; ordinary generic installs keep disabled intent.
+    pub async fn ensure_shader_loader(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<ShaderLoaderInstall> {
+        use super::installer::{IntoInstaller, ModrinthModInstaller};
+        use carbon_platforms::modrinth::{project::ProjectVersionsFilters, search::ProjectID};
+        self.ensure_modpack_not_locked(instance_id).await?;
+        let target = {
+            let instances = self.instances.read().await;
+            let instance = instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?;
+            let Some(GameVersion::Standard(version)) =
+                &instance.data()?.config.game_configuration.version
+            else {
+                bail!("unsupported shader target");
+            };
+            version.clone()
+        };
+        let loader = target
+            .modloaders
+            .iter()
+            .next()
+            .ok_or_else(|| anyhow!("install a supported modloader before shader Auto"))?
+            .type_;
+        let project_id = shader_loader_modrinth_id(recommend_loader(loader))
+            .unwrap()
+            .to_owned();
+        let platform = &self.app.modplatforms_manager().modrinth;
+        let project = platform.get_project(ProjectID(project_id.clone())).await?;
+        if project.id != project_id
+            || project.project_type != carbon_platforms::modrinth::project::ProjectType::Mod
+        {
+            bail!("shader provider returned an unexpected project or addon kind");
+        }
+        let versions = platform
+            .get_project_versions(ProjectVersionsFilters {
+                project_id: ProjectID(project_id.clone()),
+                game_versions: Some(vec![target.release.clone()]),
+                loaders: Some(vec![loader.to_string()]),
+                limit: None,
+                offset: None,
+            })
+            .await?;
+        let version = versions
+            .iter()
+            .find(|v| {
+                v.project_id == project_id
+                    && v.game_versions.contains(&target.release)
+                    && v.loaders
+                        .iter()
+                        .any(|l| l.eq_ignore_ascii_case(&loader.to_string()))
+            })
+            .ok_or_else(|| anyhow!("no compatible shader loader version"))?
+            .clone();
+        let resource = ModrinthModInstaller::from_version(version, project)?;
+        let path = super::installer::publication::current_path(self.app, instance_id).await?;
+        use super::installer::ResourceInstaller;
+        let download = resource
+            .downloadable(&path)
+            .await
+            .context("shader loader has no artifact")?;
+        let Some(carbon_net::Checksum::Sha1(sha1)) = download.checksum else {
+            bail!("shader loader has no supported checksum");
+        };
+        let verification = ShaderLoaderVerification {
+            instance_id: *instance_id,
+            mc_version: target.release.clone(),
+            modloaders: target_modloaders(&target),
+            filename: super::installer::publication::filename(&resource, &path)?,
+            sha1,
+            size: download.size.context("shader loader size missing")?,
+        };
+        let mut installer = resource.into_installer();
+        installer.required_enabled = Some(verification.clone());
+        let task = installer.install(self.app, instance_id, true, None).await?;
+        Ok(ShaderLoaderInstall {
+            task_id: task.0,
+            verification,
+        })
+    }
+
+    pub async fn verify_shader_loader(
+        self,
+        verification: ShaderLoaderVerification,
+    ) -> anyhow::Result<bool> {
+        use super::installer::publication;
+        let id = InstanceId(verification.instance_id);
+        let _operation = self.lock_instance(id).await;
+        verification.validate_target(self.app, id).await?;
+        let path = publication::current_path(self.app, id).await?;
+        let folder =
+            publication::checked_folder(&path, crate::domain::instance::AddonType::Mods).await?;
+        let Some((physical, enabled)) =
+            publication::selected_file(&folder, &verification.filename).await?
+        else {
+            return Ok(false);
+        };
+        if !enabled {
+            return Ok(false);
+        }
+        let rows =
+            carbon_repos::repos::mod_file_cache::get_instance_mods_full(&self.app.db, *id).await?;
+        if !rows.iter().any(|row| {
+            row.enabled && row.filename == verification.filename && row.addon_type == "mods"
+        }) {
+            return Ok(false);
+        }
+        let downloadable = carbon_net::Downloadable::new("", physical.clone())
+            .with_size(verification.size)
+            .with_checksum(Some(carbon_net::Checksum::Sha1(verification.sha1)));
+        publication::matches_download(&physical, &downloadable).await
+    }
+
     pub async fn install_fabric_loader_default(
         self,
         instance_id: InstanceId,
@@ -208,19 +382,79 @@ impl ManagerRef<'_, InstanceManager> {
         self,
         instance_id: InstanceId,
     ) -> anyhow::Result<Option<ShaderLoaderKind>> {
-        let instance_id_val = *instance_id;
-        let mods = carbon_repos::repos::mod_file_cache::get_enabled_instance_mod_modids(
-            &self.app.db,
-            instance_id_val,
-        )
-        .await?;
-
+        use super::installer::publication;
+        let (path, modloader) = {
+            let instances = self.instances.read().await;
+            let instance = instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?;
+            let modloader = match &instance.data()?.config.game_configuration.version {
+                Some(GameVersion::Standard(v)) => v.modloaders.iter().next().map(|l| l.type_),
+                _ => None,
+            };
+            (
+                self.app
+                    .settings_manager()
+                    .runtime_path
+                    .get_instances()
+                    .get_instance_path(&instance.shortpath),
+                modloader,
+            )
+        };
+        let folder =
+            publication::checked_folder(&path, crate::domain::instance::AddonType::Mods).await?;
+        let mods =
+            carbon_repos::repos::mod_file_cache::get_instance_mods_full(&self.app.db, *instance_id)
+                .await?;
         for entry in mods {
-            let Some(modid) = entry.modid else {
+            if !entry.enabled || entry.addon_type != "mods" {
+                continue;
+            }
+            let Some(loader) = entry.modid.as_deref().and_then(match_shader_loader_modid) else {
                 continue;
             };
-
-            if let Some(loader) = match_shader_loader_modid(&modid) {
+            if loader != ShaderLoaderKind::OptiFine
+                && modloader.map(recommend_loader) != Some(loader)
+            {
+                continue;
+            }
+            if let Some(target) = modloader {
+                let compatible = entry.modloaders.split(',').any(|value| {
+                    ModLoaderType::try_from(value).ok().is_some_and(|actual| {
+                        actual == target
+                            || (target == ModLoaderType::Quilt && actual == ModLoaderType::Fabric)
+                    })
+                });
+                if loader != ShaderLoaderKind::OptiFine && !compatible {
+                    continue;
+                }
+            }
+            let found = match publication::selected_file(&folder, &entry.filename).await {
+                Ok(found) => found,
+                Err(error) => {
+                    // A linked jar, or an enabled and a disabled copy of one
+                    // name: this only reads, and the scanner read the copy,
+                    // so trust its row, as 2.0.40 did and dependency
+                    // planning does.
+                    tracing::debug!(
+                        filename = %entry.filename,
+                        "Shader loader copy cannot be inspected, using its recorded state: {error:#}"
+                    );
+                    return Ok(Some(loader));
+                }
+            };
+            let Some((physical, enabled)) = found else {
+                continue;
+            };
+            if !enabled {
+                continue;
+            }
+            let download = carbon_net::Downloadable::new("", physical.clone())
+                .with_size(entry.filesize as u64)
+                .with_checksum(Some(carbon_net::Checksum::Sha512(hex::encode(
+                    &entry.sha512,
+                ))));
+            if publication::matches_download(&physical, &download).await? {
                 return Ok(Some(loader));
             }
         }
@@ -250,6 +484,124 @@ fn recommend_loader(modloader: ModLoaderType) -> ShaderLoaderKind {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[tokio::test]
+    async fn task05_shader_preflight_requires_real_enabled_loader_of_current_kind() {
+        use crate::domain::instance::{AddonType, info};
+        use carbon_repos::{
+            dbtypes::DbDateTime,
+            repos::{mod_file_cache, mod_metadata},
+        };
+        use sha1::Digest;
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, path) = super::super::mods::tests::addon_fixture(
+            &app,
+            "iris-preflight",
+            AddonType::Mods,
+            "iris.jar",
+            b"iris",
+        )
+        .await;
+        let now = DbDateTime(chrono::Utc::now().fixed_offset());
+        mod_metadata::insert_metadata(
+            &app.db,
+            "iris-actual",
+            0,
+            &sha2::Sha512::digest(b"iris"),
+            &sha1::Sha1::digest(b"iris"),
+            "fabric",
+            Some("Iris"),
+            Some("iris"),
+            None,
+            None,
+            None,
+            now,
+        )
+        .await
+        .unwrap();
+        mod_file_cache::upsert_mod_file_cache(
+            &app.db,
+            *id,
+            "iris.jar".into(),
+            4,
+            true,
+            "mods".into(),
+            "iris-actual".into(),
+            now,
+        )
+        .await
+        .unwrap();
+        {
+            let manager = app.instance_manager();
+            let mut instances = manager.instances.write().await;
+            instances
+                .get_mut(&id)
+                .unwrap()
+                .data_mut()
+                .unwrap()
+                .config
+                .game_configuration
+                .version = Some(GameVersion::Standard(info::StandardVersion {
+                release: "1.20.1".into(),
+                modloaders: [info::ModLoader {
+                    type_: ModLoaderType::Fabric,
+                    version: "fixture".into(),
+                }]
+                .into(),
+            }));
+        }
+        assert!(matches!(
+            app.instance_manager()
+                .check_shader_requirements(id)
+                .await
+                .unwrap(),
+            ShaderRecommendation::LoaderPresent {
+                loader: ShaderLoaderKind::Iris
+            }
+        ));
+        std::fs::remove_file(&path).unwrap();
+        assert!(matches!(
+            app.instance_manager()
+                .check_shader_requirements(id)
+                .await
+                .unwrap(),
+            ShaderRecommendation::RecommendLoader { .. }
+        ));
+        std::fs::write(&path, b"changed").unwrap();
+        assert!(matches!(
+            app.instance_manager()
+                .check_shader_requirements(id)
+                .await
+                .unwrap(),
+            ShaderRecommendation::RecommendLoader { .. }
+        ));
+        // An enabled and a disabled copy of one name, or a jar linked from
+        // elsewhere, cannot be inspected as one file. This only reads, so the
+        // row is trusted, as 2.0.40 did, rather than failing the preflight.
+        let present = || async {
+            matches!(
+                app.instance_manager()
+                    .check_shader_requirements(id)
+                    .await
+                    .unwrap(),
+                ShaderRecommendation::LoaderPresent {
+                    loader: ShaderLoaderKind::Iris
+                }
+            )
+        };
+        std::fs::write(&path, b"iris").unwrap();
+        std::fs::write(path.with_file_name("iris.jar.disabled"), b"iris").unwrap();
+        assert!(present().await);
+        #[cfg(unix)]
+        {
+            std::fs::remove_file(path.with_file_name("iris.jar.disabled")).unwrap();
+            let shared = tempfile::tempdir().unwrap();
+            let target = shared.path().join("iris.jar");
+            std::fs::rename(&path, &target).unwrap();
+            std::os::unix::fs::symlink(&target, &path).unwrap();
+            assert!(present().await);
+        }
+    }
 
     #[test]
     fn recommendation_matrix() {
