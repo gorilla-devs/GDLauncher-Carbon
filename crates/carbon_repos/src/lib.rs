@@ -72,8 +72,12 @@ pub fn get_migrations() -> (MigrationSet, i32) {
         historical_migration!("20260325000000_add_server_icon_revision"),
         historical_migration!("20260328000000_add_server_modloader_and_addons"),
         historical_migration!("20260410000000_add_server_modpack_info"),
-        // Downgrade cannot represent same-named addons in distinct worlds.
-        // Keep this boundary explicit rather than discarding ownership on downgrade.
+        // The downs of 26-28 run on users' data in an older build. Their rows are
+        // scan caches, so each down drops the rows the older schema cannot hold
+        // (datapacks of other worlds, a file name in two folders, two files of
+        // one Modrinth version) and that build rescans, rather than refusing.
+        // `data_down` stays the seeded round trip of the previous schema's
+        // data, which these deletes never touch.
         MigrationDef {
             name: "20261004000000_server_addon_location",
             up_sql: include_str!(
@@ -83,7 +87,7 @@ pub fn get_migrations() -> (MigrationSet, i32) {
                 "../prisma/migrations/20261004000000_server_addon_location/down.sql"
             )),
             kind: MigrationKind::Breaking,
-            data_down: "full",
+            data_down: "partial:ServerModFileCache.addonType,ServerModFileCache.enabled,ServerModFileCache.filename,ServerModFileCache.filesize,ServerModFileCache.id,ServerModFileCache.lastUpdatedAt,ServerModFileCache.metadataId,ServerModFileCache.serverId",
         },
         MigrationDef {
             name: "20261004010000_instance_addon_kind",
@@ -92,6 +96,17 @@ pub fn get_migrations() -> (MigrationSet, i32) {
             ),
             down_sql: Some(include_str!(
                 "../prisma/migrations/20261004010000_instance_addon_kind/down.sql"
+            )),
+            kind: MigrationKind::Breaking,
+            data_down: "full",
+        },
+        MigrationDef {
+            name: "20261005000000_modrinth_artifact_owner",
+            up_sql: include_str!(
+                "../prisma/migrations/20261005000000_modrinth_artifact_owner/migration.sql"
+            ),
+            down_sql: Some(include_str!(
+                "../prisma/migrations/20261005000000_modrinth_artifact_owner/down.sql"
             )),
             kind: MigrationKind::Breaking,
             data_down: "full",

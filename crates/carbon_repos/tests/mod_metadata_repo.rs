@@ -356,7 +356,7 @@ fn cf_get_by_metadata_reads_cached_at() {
 // --- Modrinth cache upsert --------------------------------------------------
 
 #[test]
-fn mr_upsert_composite_conflict_keeps_original_metadata_id() {
+fn mr_upsert_distinct_artifacts_preserve_each_metadata_id() {
     let (_d, mut conn) = migrated_db();
     mm::insert_metadata_conn(
         &wg(&mut conn),
@@ -391,7 +391,7 @@ fn mr_upsert_composite_conflict_keeps_original_metadata_id() {
 
     let r = mm::upsert_mr_mod_cache_conn(
         &wg(&mut conn),
-        "sha",
+        &hex::encode(sha512(1)),
         "proj",
         "ver",
         "t1",
@@ -411,7 +411,7 @@ fn mr_upsert_composite_conflict_keeps_original_metadata_id() {
 
     let r = mm::upsert_mr_mod_cache_conn(
         &wg(&mut conn),
-        "sha",
+        &hex::encode(sha512(2)),
         "proj",
         "ver",
         "t2",
@@ -427,12 +427,9 @@ fn mr_upsert_composite_conflict_keeps_original_metadata_id() {
         "mB",
     )
     .unwrap();
-    assert_eq!(
-        r, "mA",
-        "composite (projectId, versionId) conflict preserves metadataId"
-    );
+    assert_eq!(r, "mB", "each artifact retains its own metadataId");
 
-    let row = mm::get_mr_cache_by_metadata_conn(&wg(&mut conn), "mA")
+    let row = mm::get_mr_cache_by_metadata_conn(&wg(&mut conn), "mB")
         .unwrap()
         .unwrap();
     assert_eq!(row.title, "t2");
@@ -460,6 +457,7 @@ fn cf_image_upsert_marks_stale_and_download_clears_it() {
     )
     .unwrap();
 
+    cf_upsert(&wg(&mut conn), "m", 1, 1, "name", 1);
     // First upsert: inserts stale (upToDate = 0, data NULL).
     assert_eq!(
         mm::upsert_cf_image_conn(&wg(&mut conn), "m", "url-1").unwrap(),
@@ -530,6 +528,24 @@ fn mr_image_upsert_and_download() {
         ts(1),
     )
     .unwrap();
+    mm::upsert_mr_mod_cache_conn(
+        &wg(&mut conn),
+        &hex::encode(sha512(1)),
+        "p",
+        "v",
+        "t",
+        "v",
+        "slug",
+        "desc",
+        "",
+        0,
+        "",
+        "m.jar",
+        "fixture",
+        ts(1),
+        "m",
+    )
+    .unwrap();
     mm::upsert_mr_image_conn(&wg(&mut conn), "m", "u").unwrap();
     mm::mark_mr_image_downloaded_conn(&wg(&mut conn), "m", &[7]).unwrap();
     let (data, up): (Option<Vec<u8>>, i32) = conn
@@ -567,7 +583,7 @@ fn cf_export_enrich_includes_modrinth_cross_reference() {
     cf_upsert(&wg(&mut conn), "both", 111, 222, "cf-name", 1);
     mm::upsert_mr_mod_cache_conn(
         &wg(&mut conn),
-        "sha",
+        &hex::encode(sha512(1)),
         "mrproj",
         "mrver",
         "t",

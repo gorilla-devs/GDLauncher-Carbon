@@ -887,3 +887,80 @@ mod test {
         }
     }
 }
+
+#[cfg(test)]
+mod task15_bootstrap_tests {
+    use super::*;
+    #[test]
+    fn task15_populated_prisma_shim_and_post_shim_upgrade_keep_identities() {
+        for prisma in [true, false] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("fixture.db");
+            let (current, _) = carbon_repos::get_migrations();
+            let mut old = carbon_repos::get_migrations().0;
+            old.migrations.truncate(25);
+            {
+                let mut c = rusqlite::Connection::open(&path).unwrap();
+                old.to_latest(&mut c).unwrap();
+                c.execute_batch("INSERT INTO InstanceGroup(id,name,groupIndex) VALUES(1,'root',0);
+             INSERT INTO Instance(id,name,shortpath,\"index\",groupId) VALUES(1,'fixture','fixture',0,1);
+             INSERT INTO Java(id,path,major,fullVersion,type,os,arch,vendor,isValid) VALUES('java','fixture-java',21,'21','local','linux','x64','unknown',1);
+             INSERT INTO JavaProfile(name,isSystemProfile,javaId) VALUES('profile',0,'java');
+             INSERT INTO ModMetadata(id,murmur2,sha512,sha1,modloaders) VALUES('physical',1,x'01',x'02','forge');
+             INSERT INTO ModFileCache(id,instanceId,filename,filesize,enabled,addonType,metadataId) VALUES('file',1,'mod.jar',4,0,'mods','physical');
+             DROP TABLE _migrations;").unwrap();
+                if prisma {
+                    c.execute_batch("CREATE TABLE _prisma_migrations(id TEXT PRIMARY KEY,finished_at TEXT);PRAGMA user_version=0").unwrap();
+                    for i in 0..25 {
+                        c.execute(
+                            "INSERT INTO _prisma_migrations VALUES(?1,'fixture-success')",
+                            [i.to_string()],
+                        )
+                        .unwrap();
+                    }
+                }
+            }
+            assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+            assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+            let c = rusqlite::Connection::open(&path).unwrap();
+            assert_eq!(
+                c.query_row(
+                    "SELECT id||':'||metadataId||':'||enabled FROM ModFileCache",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+                "file:physical:0"
+            );
+            assert_eq!(
+                c.query_row(
+                    "SELECT javaId FROM JavaProfile WHERE name='profile'",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+                "java"
+            );
+            assert_eq!(
+                c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                    .unwrap(),
+                28
+            );
+            assert_eq!(
+                c.query_row("SELECT count(*) FROM _migrations", [], |r| r
+                    .get::<_, i32>(0))
+                    .unwrap(),
+                28
+            );
+            assert!(
+                c.prepare("PRAGMA foreign_key_check")
+                    .unwrap()
+                    .query([])
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+}

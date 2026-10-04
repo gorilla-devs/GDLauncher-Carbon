@@ -370,7 +370,7 @@ queries! {
          LEFT JOIN LocalModImageCache li ON li.metadataId = m.id
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
          LEFT JOIN CurseForgeModImageCache ci ON ci.metadataId = m.id
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          LEFT JOIN ModrinthModImageCache ri ON ri.metadataId = m.id
          WHERE f.instanceId = :instance_id";
 
@@ -397,7 +397,7 @@ queries! {
          LEFT JOIN LocalModImageCache li ON li.metadataId = m.id
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
          LEFT JOIN CurseForgeModImageCache ci ON ci.metadataId = m.id
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          LEFT JOIN ModrinthModImageCache ri ON ri.metadataId = m.id
          WHERE f.serverId = :server_id";
 
@@ -441,28 +441,28 @@ queries! {
         "SELECT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          WHERE f.instanceId = :instance_id AND f.addonType <> 'worlds'
            AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff)";
     fn server_mods_needing_mr_refresh(server_id: i32, cutoff: DbDateTime) -> Vec<RefreshMetaRow> =
         "SELECT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512
          FROM ServerModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          WHERE f.serverId = :server_id
            AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff)";
 
     fn instance_mods_needing_mr_context(instance_id: i32, context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =
         "SELECT DISTINCT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512, f.addonType AS addonType
          FROM ModFileCache f JOIN ModMetadata m ON m.id=f.metadataId
-         LEFT JOIN ModrinthModCache r ON r.metadataId=m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId=m.id AND lower(r.sha512)=lower(hex(m.sha512))
          LEFT JOIN ModrinthUpdateCache u ON u.metadataId=m.id AND u.context=:context || ':' || f.addonType
          WHERE f.instanceId=:instance_id AND f.addonType <> 'worlds'
          AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff OR u.metadataId IS NULL OR u.cachedAt <= :cutoff)";
     fn server_mods_needing_mr_context(server_id: i32, context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =
         "SELECT DISTINCT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512, f.addonType AS addonType
          FROM ServerModFileCache f JOIN ModMetadata m ON m.id=f.metadataId
-         LEFT JOIN ModrinthModCache r ON r.metadataId=m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId=m.id AND lower(r.sha512)=lower(hex(m.sha512))
          LEFT JOIN ModrinthUpdateCache u ON u.metadataId=m.id AND u.context=:context || ':' || f.addonType
          WHERE f.serverId=:server_id AND f.addonType <> 'worlds'
          AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff OR u.metadataId IS NULL OR u.cachedAt <= :cutoff)";
@@ -491,7 +491,7 @@ queries! {
                 ri.metadataId AS metadataId, ri.url AS url
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
-         JOIN ModrinthModCache r ON r.metadataId = m.id
+         JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          JOIN ModrinthModImageCache ri ON ri.metadataId = r.metadataId
          WHERE f.instanceId = :instance_id AND ri.upToDate = 0";
     fn server_mods_stale_mr_logo(server_id: i32) -> Vec<MrLogoRefreshRow> =
@@ -499,7 +499,7 @@ queries! {
                 ri.metadataId AS metadataId, ri.url AS url
          FROM ServerModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
-         JOIN ModrinthModCache r ON r.metadataId = m.id
+         JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          JOIN ModrinthModImageCache ri ON ri.metadataId = r.metadataId
          WHERE f.serverId = :server_id AND ri.upToDate = 0";
 
@@ -515,7 +515,7 @@ queries! {
         "SELECT f.id AS id
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
-         JOIN ModrinthModCache r ON r.metadataId = m.id
+         JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          WHERE f.instanceId = :instance_id AND r.projectId = :project_id
          LIMIT 1";
 
@@ -530,7 +530,7 @@ queries! {
         "SELECT r.projectId AS mrProjectId, r.versionId AS mrVersionId
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          WHERE f.id = :id";
     fn get_instance_mod_update_ids(id: &str) -> Option<ModUpdateIdsRow> =
         "SELECT c.projectId AS cfProjectId, c.fileId AS cfFileId, c.releaseType AS cfReleaseType,
@@ -538,7 +538,7 @@ queries! {
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          WHERE f.id = :id";
 
     // --- shader-loader detection ----------------------------------------------
@@ -556,7 +556,7 @@ queries! {
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          WHERE f.instanceId = :instance_id AND f.addonType = 'mods'";
     fn get_instance_cf_export_files(instance_id: i32) -> Vec<CfExportRow> =
         "SELECT f.filename AS filename, m.sha512 AS sha512, c.projectId AS cfProjectId, c.fileId AS cfFileId,
@@ -571,7 +571,7 @@ queries! {
                 f.fileStamp AS fileStamp
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          WHERE f.instanceId = :instance_id AND f.addonType = 'mods' AND f.enabled = 1";
     fn get_instance_gdl_export_files(instance_id: i32) -> Vec<GdlExportRow> =
         "SELECT f.filename AS filename, f.addonType AS addonType, f.enabled AS enabled, m.sha512 AS sha512, m.sha1 AS sha1, m.murmur2 AS murmur2,
@@ -579,7 +579,7 @@ queries! {
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
-         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
+         LEFT JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          WHERE f.instanceId = :instance_id";
 }
 
@@ -600,7 +600,7 @@ const UPSERT_MOD_FILE_CACHE_SQL: &str =
        addonType = excluded.addonType,
        lastUpdatedAt = excluded.lastUpdatedAt";
 
-/// Upserts a `ModFileCache` row on the `(instanceId, filename)` unique key.
+/// Upserts a file on its `(instanceId, addonType, filename)` owner key.
 /// The `id` is a generated UUID used only for the initial INSERT; a conflicting
 /// row keeps its existing id.
 #[allow(clippy::too_many_arguments)]
@@ -614,6 +614,7 @@ pub fn upsert_mod_file_cache_conn(
     metadata_id: &str,
     updated_at: DbDateTime,
 ) -> Result<usize, rusqlite::Error> {
+    super::mod_metadata::require_metadata(conn, metadata_id)?;
     let id = uuid::Uuid::new_v4().to_string();
     let mut st = conn.prepare_cached(UPSERT_MOD_FILE_CACHE_SQL)?;
     st.execute(rusqlite::named_params! {
@@ -761,6 +762,7 @@ pub fn upsert_server_mod_file_cache_at_location_conn(
     metadata_id: &str,
     updated_at: DbDateTime,
 ) -> Result<usize, rusqlite::Error> {
+    super::mod_metadata::require_metadata(conn, metadata_id)?;
     let id = uuid::Uuid::new_v4().to_string();
     let mut st = conn.prepare_cached(UPSERT_SERVER_MOD_FILE_CACHE_SQL)?;
     st.execute(rusqlite::named_params! {

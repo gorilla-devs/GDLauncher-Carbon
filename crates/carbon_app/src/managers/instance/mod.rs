@@ -3212,7 +3212,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     /// Delete an instance group and move all contained instances into the default group.
-    // TODO: handle deleting the default group while it has instances.
     pub async fn delete_group(self, group: GroupId) -> anyhow::Result<()> {
         // lock indexes before checking for instances to make sure none can be moved or created.
         let _index_lock = self.index_lock.lock().await;
@@ -3227,14 +3226,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         if any_instances {
             let default_group = self.get_default_group().await?;
 
-            // next_instance_index can't be used due to _index_lock, and dropping it
-            // first would be a race condition. base_index counts the group BEING
-            // DELETED here (the instance-side oddity — preserved verbatim).
-            let base_index =
-                instance_repo::count_instances_in_group(&self.app.db, group_id).await? as i32;
-
             let default_id = *default_group;
-            instance_repo::delete_group_tx(&self.app.db, group_id, default_id, base_index).await?;
+            instance_repo::delete_group_tx(&self.app.db, group_id, default_id).await?;
         } else {
             instance_repo::delete_group(&self.app.db, group_id).await?;
         }

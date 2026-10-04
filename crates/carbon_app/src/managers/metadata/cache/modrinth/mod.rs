@@ -579,9 +579,8 @@ async fn cache_modrinth_meta_unchecked(
     let file_url_owned = file_url.clone();
     let metadata_id_owned = metadata_id.clone();
 
-    // The composite `(projectId, versionId)` conflict may land on a row that
-    // owns a different `metadataId`; the upsert returns the surviving one so the
-    // image row attaches to the correct metadata.
+    // The repository validates the exact physical hash before publishing this
+    // artifact URL, filename and owner. Other files of this version are distinct.
     let result_metadata_id = metarepo::upsert_mr_mod_cache(
         &app.db,
         sha512_owned,
@@ -909,7 +908,7 @@ mod test {
         bad_version.files = vec![file("some-other-hash")];
 
         // A normal response where the file really does carry the queried hash.
-        let good_sha512 = "g".repeat(128);
+        let good_sha512 = "c".repeat(128);
         let mut good_version = version("good-version", "good-project", 2, VersionType::Release);
         good_version.files = vec![file(&good_sha512)];
 
@@ -917,15 +916,10 @@ mod test {
         versions.insert(bad_sha512.clone(), bad_version);
         versions.insert(good_sha512.clone(), good_version);
 
-        insert_test_metadata(&app, "bad-metadata", 1, b"bad-sha512-raw", b"bad-sha1-raw").await;
-        insert_test_metadata(
-            &app,
-            "good-metadata",
-            2,
-            b"good-sha512-raw",
-            b"good-sha1-raw",
-        )
-        .await;
+        // As in `query_platform`, each queried hash is the hex of its
+        // metadata row's own SHA-512, which the cache write checks again.
+        insert_test_metadata(&app, "bad-metadata", 1, &bad_sha512, b"bad-sha1-raw").await;
+        insert_test_metadata(&app, "good-metadata", 2, &good_sha512, b"good-sha1-raw").await;
 
         let bundle = (
             vec![bad_sha512.clone(), good_sha512.clone()],
@@ -1004,7 +998,7 @@ mod test {
         let mut versions = HashMap::new();
         versions.insert(queried_sha512.clone(), version);
 
-        insert_test_metadata(&app, "metadata", 1, b"sha512-raw", b"sha1-raw").await;
+        insert_test_metadata(&app, "metadata", 1, &queried_sha512, b"sha1-raw").await;
 
         let bundle = (
             vec![queried_sha512.clone()],
@@ -1031,18 +1025,20 @@ mod test {
         );
     }
 
+    /// A metadata row for a file whose SHA-512 is `sha512_hex`, the way a
+    /// scan stores it (raw bytes, queried as their lowercase hex).
     async fn insert_test_metadata(
         app: &App,
         metadata_id: &str,
         murmur: i32,
-        sha512: &[u8],
+        sha512_hex: &str,
         sha1: &[u8],
     ) {
         metarepo::insert_metadata(
             &app.db,
             metadata_id,
             murmur,
-            sha512,
+            &hex::decode(sha512_hex).unwrap(),
             sha1,
             "forge",
             None,

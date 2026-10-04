@@ -1408,11 +1408,7 @@ mod task11_tests {
             let now = DbDateTime(chrono::Utc::now().fixed_offset());
             metarepo::upsert_mr_mod_cache(
                 &app.db,
-                if mismatched_hash {
-                    "00".repeat(64)
-                } else {
-                    hex::encode(&meta.sha512)
-                },
+                hex::encode(&meta.sha512),
                 "project".into(),
                 "version".into(),
                 "title".into(),
@@ -1424,11 +1420,29 @@ mod task11_tests {
                 "".into(),
                 "mod.jar".into(),
                 "https://fixture.invalid/never-requested.jar".into(),
-                now,
+                now.clone(),
                 row.metadata_id.clone(),
             )
             .await
             .unwrap();
+            if mismatched_hash {
+                // 2.0.40 keyed this cache on (projectId, versionId), so caching
+                // another file of the same version rewrote the hash but kept the
+                // first file's owner. The write path now refuses that, but rows
+                // left by 2.0.40 stay, so put one in place directly.
+                use carbon_repos::db_exec::WriteAccess;
+                let metadata_id = row.metadata_id.clone();
+                app.db
+                    .write(move |conn| {
+                        conn.execute(
+                            "UPDATE ModrinthModCache SET sha512 = ?1 WHERE metadataId = ?2",
+                            rusqlite::params!["00".repeat(64), metadata_id],
+                        )?;
+                        Ok(())
+                    })
+                    .await
+                    .unwrap();
+            }
             let context = crate::managers::metadata::cache::modrinth::target_compatibility(
                 &app,
                 crate::managers::metadata::cache::CacheEntityId::Instance(id),

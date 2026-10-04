@@ -132,10 +132,9 @@ fn restricting_on_update_alone_does_not_make_a_new_table_breaking() {
 }
 
 #[test]
-fn new_table_with_non_restricting_fk_to_existing_table_is_additive() {
-    // CASCADE and SET NULL resolve the parent delete instead of rejecting it,
-    // so an old binary's writes still succeed.
-    for action in ["CASCADE", "SET NULL"] {
+fn new_table_with_cascade_fk_to_existing_table_is_additive() {
+    // Preserve the existing CASCADE classification policy.
+    for action in ["CASCADE"] {
         let up = format!(
             "CREATE TABLE \"C\" (id INTEGER PRIMARY KEY, aid INTEGER, \
              CONSTRAINT \"c_aid_fkey\" FOREIGN KEY (aid) REFERENCES \"A\" (id) ON DELETE {action});"

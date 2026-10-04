@@ -217,15 +217,12 @@ async fn delete_group_tx_moves_then_deletes() {
     seed_instance(&db, "d0", "d0", 0, def, None).await;
     let moved = seed_instance(&db, "g0", "g0", 0, grp, None).await;
 
-    // base_index computed the instance-side way: count of the group BEING deleted
-    let base_index = i::count_instances_in_group(&db, grp).await.unwrap() as i32;
-    assert_eq!(base_index, 1);
-    i::delete_group_tx(&db, grp, def, base_index).await.unwrap();
+    i::delete_group_tx(&db, grp, def).await.unwrap();
 
     assert!(i::get_group(&db, grp).await.unwrap().is_none());
     let row = i::get_instance(&db, moved).await.unwrap().unwrap();
     assert_eq!(row.group_id, def);
-    // index shifted by base_index (1) from its original 0
+    // Appended after the destination index, with a valid root position.
     assert_eq!(row.index, 1);
 }
 
@@ -308,4 +305,110 @@ async fn register_instance_tx_preserves_an_existing_shortpath_owner() {
         before
     );
     assert_eq!(i::get_all_instances(&db).await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn task15_unlink_allocates_separate_sparse_root_coordinates() {
+    let (_d, db) = migrated_db().await;
+    let root = seed_group(&db, "root", 0).await;
+    let folder = seed_group(&db, "folder", 1).await;
+    i::set_group_library_position(&db, folder, Some(500))
+        .await
+        .unwrap();
+    let existing = seed_instance(&db, "existing", "existing", 90, root, Some(-10)).await;
+    let a = seed_instance(&db, "a", "a", -7, folder, None).await;
+    let b = seed_instance(&db, "b", "b", -7, folder, None).await;
+    let c = seed_instance(&db, "c", "c", 80, folder, None).await;
+    i::delete_group_tx(&db, folder, root).await.unwrap();
+    for (n, id) in [a, b, c].into_iter().enumerate() {
+        let row = i::get_instance(&db, id).await.unwrap().unwrap();
+        assert_eq!(
+            (row.group_id, row.index, row.library_position),
+            (root, 91 + n as i32, Some(501 + n as i32))
+        );
+    }
+    let row = i::get_instance(&db, existing).await.unwrap().unwrap();
+    assert_eq!((row.index, row.library_position), (90, Some(-10)));
+}
+
+#[tokio::test]
+async fn task15_unlink_overflow_and_late_failure_roll_back() {
+    for failure in ["overflow", "trigger", "self"] {
+        let (_d, db) = migrated_db().await;
+        let root = seed_group(&db, "root", 0).await;
+        let folder = seed_group(&db, "folder", 1).await;
+        seed_instance(
+            &db,
+            "existing",
+            "existing",
+            if failure == "overflow" { i32::MAX } else { 0 },
+            root,
+            Some(0),
+        )
+        .await;
+        let a = seed_instance(&db, "a", "a", 0, folder, None).await;
+        let b = seed_instance(&db, "b", "b", 1, folder, None).await;
+        if failure == "trigger" {
+            db.write(move |c| {c.raw().execute_batch("CREATE TRIGGER stop_unlink BEFORE DELETE ON InstanceGroup BEGIN SELECT RAISE(ABORT,'fixture'); END;")?; Ok(())}).await.unwrap();
+        }
+        assert!(
+            i::delete_group_tx(&db, folder, if failure == "self" { folder } else { root })
+                .await
+                .is_err(),
+            "{failure}"
+        );
+        assert!(i::get_group(&db, folder).await.unwrap().is_some());
+        for id in [a, b] {
+            let row = i::get_instance(&db, id).await.unwrap().unwrap();
+            assert_eq!((row.group_id, row.library_position), (folder, None));
+        }
+    }
+}
+
+#[tokio::test]
+async fn task15_concurrent_and_empty_unlinks_preserve_root_order_after_reopen() {
+    let (dir, db) = migrated_db().await;
+    db.write(|c| {
+        c.raw().execute_batch("PRAGMA foreign_keys=ON")?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+    let root = seed_group(&db, "root", 0).await;
+    let first = seed_group(&db, "first", 1).await;
+    let second = seed_group(&db, "second", 2).await;
+    let empty = seed_group(&db, "empty", 3).await;
+    let original = seed_instance(&db, "existing", "existing", -5, root, Some(-3)).await;
+    let a = seed_instance(&db, "a", "a", 99, first, None).await;
+    let b = seed_instance(&db, "b", "b", -99, second, None).await;
+    let (a_result, b_result) = tokio::join!(
+        i::delete_group_tx(&db, first, root),
+        i::delete_group_tx(&db, second, root)
+    );
+    a_result.unwrap();
+    b_result.unwrap();
+    i::delete_group_tx(&db, empty, root).await.unwrap();
+    let conn = Connection::open(dir.path().join("t.db")).unwrap();
+    let positions: std::collections::BTreeSet<(i32, i32)> = conn
+        .prepare("SELECT \"index\",libraryPosition FROM Instance WHERE id IN (?1,?2)")
+        .unwrap()
+        .query_map([a, b], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        positions,
+        std::collections::BTreeSet::from([(-4, -2), (-3, -1)])
+    );
+    let row = i::get_instance(&db, original).await.unwrap().unwrap();
+    assert_eq!((row.index, row.library_position), (-5, Some(-3)));
+    assert!(
+        conn.prepare("PRAGMA foreign_key_check")
+            .unwrap()
+            .query([])
+            .unwrap()
+            .next()
+            .unwrap()
+            .is_none()
+    );
 }

@@ -362,20 +362,51 @@ pub async fn add_instance_tx(
     .await
 }
 
-/// Moves every instance of `group_id` into `default_group_id` (offsetting their
-/// index by `base_index`) then deletes the group, in one write-pool transaction.
-///
-/// `base_index` is computed by the caller (the instance-side oddity counts the
-/// group being deleted); this fn does not recompute it.
-pub async fn delete_group_tx(
-    db: &Db,
-    group_id: i32,
-    default_group_id: i32,
-    base_index: i32,
-) -> DbResult<()> {
+/// Return members to the root using its separate legacy and library coordinates.
+/// Allocation, movement and deletion share one writer transaction; no row count
+/// or sparse source index is treated as a free destination coordinate.
+pub async fn delete_group_tx(db: &Db, group_id: i32, default_group_id: i32) -> DbResult<()> {
     db.write(move |mut conn| {
         let tx = conn.transaction()?;
-        move_all_instances_to_group_conn(&tx, group_id, default_group_id, base_index)?;
+        if group_id == default_group_id {
+            return Err(crate::db_error::DbError::Conversion(
+                "Cannot unlink the default group".into(),
+            ));
+        }
+        let mut members = get_instances_by_group_conn(&tx, group_id)?;
+        members.sort_by_key(|row| (row.index, row.id));
+        if !members.is_empty() {
+            if get_group_conn(&tx, default_group_id)?.is_none() {
+                return Err(crate::db_error::DbError::Conversion(
+                    "Destination group disappeared".into(),
+                ));
+            }
+            let mut index =
+                max_index_instance_in_group_conn(&tx, default_group_id)?.map(|r| r.index);
+            let mut position =
+                max_library_position_instance_conn(&tx)?.map(|r| r.library_position.unwrap());
+            for group in get_groups_with_library_position_ordered_conn(&tx)? {
+                position = position.max(group.library_position);
+            }
+            for member in members {
+                let next = |value: Option<i32>| -> DbResult<i32> {
+                    value.map_or(Some(0), |v| v.checked_add(1)).ok_or_else(|| {
+                        crate::db_error::DbError::Conversion("Library coordinate overflow".into())
+                    })
+                };
+                let new_index = next(index)?;
+                let new_position = next(position)?;
+                set_instance_group_index_library_position_conn(
+                    &tx,
+                    member.id,
+                    default_group_id,
+                    new_index,
+                    Some(new_position),
+                )?;
+                index = Some(new_index);
+                position = Some(new_position);
+            }
+        }
         delete_group_conn(&tx, group_id)?;
         tx.commit()?;
         Ok(())

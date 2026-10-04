@@ -184,37 +184,7 @@ impl ManagerRef<'_, JavaManager> {
         profile_name: String,
         java_id: Option<String>,
     ) -> anyhow::Result<()> {
-        // make sure profile doesn't start with system profile prefix
-        if profile_name.starts_with(SYSTEM_JAVA_PROFILE_NAME_PREFIX) {
-            anyhow::bail!(
-                "Profile name cannot start with {}",
-                SYSTEM_JAVA_PROFILE_NAME_PREFIX
-            );
-        }
-
-        let java_id = java_id.ok_or_else(|| anyhow::anyhow!("java_id is required"))?;
-
-        let name_for_lookup = profile_name.clone();
-        let exists = java_repo::get_profile(&self.app.db, &name_for_lookup).await?;
-
-        if exists.is_some() {
-            anyhow::bail!("Profile with name {} already exists", profile_name);
-        }
-
-        // Two statements (create the profile, then link its java) run in one
-        // writer dispatch and ONE transaction — all-or-nothing: the profile and
-        // its java link land together or not at all, and readers never observe
-        // an intermediate state. `_conn` forms on the tx guard.
-        self.app
-            .db
-            .write(move |mut conn| {
-                let tx = conn.transaction()?;
-                java_repo::upsert_profile_conn(&tx, &profile_name, false)?;
-                java_repo::set_profile_java_conn(&tx, &profile_name, Some(&java_id))?;
-                tx.commit()?;
-                Ok(())
-            })
-            .await?;
+        create_custom_profile(&self.app.db, profile_name, java_id).await?;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
 
@@ -632,6 +602,54 @@ impl ManagerRef<'_, JavaManager> {
     }
 }
 
+// Kept separate from manager construction so the database boundary can be
+// exercised without starting discovery, Java processes or background services.
+async fn create_custom_profile(
+    db: &carbon_repos::db_exec::Db,
+    profile_name: String,
+    java_id: Option<String>,
+) -> anyhow::Result<()> {
+    // make sure profile doesn't start with system profile prefix
+    if profile_name.starts_with(SYSTEM_JAVA_PROFILE_NAME_PREFIX) {
+        anyhow::bail!(
+            "Profile name cannot start with {}",
+            SYSTEM_JAVA_PROFILE_NAME_PREFIX
+        );
+    }
+
+    let java_id = java_id.ok_or_else(|| anyhow::anyhow!("java_id is required"))?;
+
+    let name_for_lookup = profile_name.clone();
+    let exists = java_repo::get_profile(db, &name_for_lookup).await?;
+
+    if exists.is_some() {
+        anyhow::bail!("Profile with name {} already exists", profile_name);
+    }
+
+    #[cfg(test)]
+    TASK15_PROFILE_LOOKUPS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+    // The unique name boundary and its valid Java assignment commit together.
+    // The pre-read is only a friendly error; it cannot authorize an upsert.
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        if java_repo::insert_profile_conn(&tx, &profile_name, &java_id)? != 1 {
+            return Err(carbon_repos::db_error::DbError::Conversion(
+                "Selected Java no longer exists".into(),
+            ));
+        }
+        tx.commit()?;
+        Ok(())
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+static TASK15_PROFILE_LOOKUPS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
 #[cfg(test)]
 mod test {
     use crate::{
@@ -750,5 +768,98 @@ mod test {
         let children = std::fs::read_dir(managed_javas_root).unwrap();
 
         assert_eq!(children.count(), 0);
+    }
+}
+
+#[cfg(test)]
+mod task15_profile_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task15_concurrent_profile_creation_keeps_winners_assignment() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("profile.db");
+        {
+            let mut c = rusqlite::Connection::open(&path).unwrap();
+            carbon_repos::get_migrations().0.to_latest(&mut c).unwrap();
+            c.execute_batch("INSERT INTO Java(id,path,major,fullVersion,type,os,arch,vendor,isValid) VALUES ('jdk8','fixture8',8,'8','local','linux','x64','unknown',1),('jdk21','fixture21',21,'21','local','linux','x64','unknown',1)").unwrap();
+        }
+        let db = carbon_repos::db_exec::Db::open(&path, 2, true).unwrap();
+        let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let held = db.write(move |_c| {
+            let _ = entered_tx.send(());
+            release_rx.recv().unwrap();
+            Ok(())
+        });
+        let work = async {
+            entered_rx.await.unwrap();
+            let a = create_custom_profile(&db, "new".into(), Some("jdk8".into()));
+            let b = create_custom_profile(&db, "new".into(), Some("jdk21".into()));
+            let release = async {
+                while TASK15_PROFILE_LOOKUPS.load(std::sync::atomic::Ordering::SeqCst) < 2 {
+                    tokio::task::yield_now().await;
+                }
+                release_tx.send(()).unwrap();
+            };
+            let (a, b, ()) = tokio::join!(a, b, release);
+            assert_ne!(
+                a.is_ok(),
+                b.is_ok(),
+                "exactly one create succeeds: {a:?} / {b:?}"
+            );
+            let winner = if a.is_ok() { "jdk8" } else { "jdk21" };
+            assert_eq!(
+                java_repo::get_profile(&db, "new")
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .java_id
+                    .as_deref(),
+                Some(winner)
+            );
+            assert!(
+                create_custom_profile(&db, "new".into(), Some("jdk8".into()))
+                    .await
+                    .is_err()
+            );
+            assert!(
+                create_custom_profile(&db, "missing".into(), None)
+                    .await
+                    .is_err()
+            );
+            assert!(
+                create_custom_profile(
+                    &db,
+                    format!("{}test", SYSTEM_JAVA_PROFILE_NAME_PREFIX),
+                    Some("jdk8".into())
+                )
+                .await
+                .is_err()
+            );
+            assert!(
+                create_custom_profile(&db, "bad-parent".into(), Some("absent".into()))
+                    .await
+                    .is_err()
+            );
+            assert!(
+                java_repo::get_profile(&db, "bad-parent")
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+        };
+        let (held, ()) = tokio::join!(held, work);
+        held.unwrap();
+        let reopened = rusqlite::Connection::open(path).unwrap();
+        assert_eq!(
+            reopened
+                .query_row(
+                    "SELECT count(*) FROM JavaProfile WHERE name='new'",
+                    [],
+                    |r| r.get::<_, i32>(0)
+                )
+                .unwrap(),
+            1
+        );
     }
 }

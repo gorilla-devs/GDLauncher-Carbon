@@ -140,6 +140,10 @@ const FROZEN: &[(&str, &str)] = &[
         "20261004010000_instance_addon_kind",
         "83ec55cbae34573acd2be9601db5e35be0e62548846b3545958236874602919d",
     ),
+    (
+        "20261005000000_modrinth_artifact_owner",
+        "d030874ca0c4ad1d2c45217b89e64b53c050d31aa1d1d7ac0c74bcceef54464b",
+    ),
     // new-migration:anchor — new_migration appends the new (name, checksum) tuple directly above this line
 ];
 

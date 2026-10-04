@@ -233,7 +233,7 @@ fn task07r1_r4_selected_source_down_keeps_the_row_and_falls_back_to_the_hash_cac
             } else {
                 metadata::upsert_mr_mod_cache_conn(
                     &wg(&mut conn),
-                    "hash",
+                    &hex::encode([7u8; 64]),
                     "23",
                     "1",
                     "title",

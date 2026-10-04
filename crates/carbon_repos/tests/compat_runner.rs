@@ -15,7 +15,16 @@ use std::path::{Path, PathBuf};
 
 /// The real floor list (25 historical migrations), the "old binary".
 fn base() -> MigrationSet {
-    carbon_repos::get_migrations().0
+    let mut set = carbon_repos::get_migrations().0;
+    assert!(set.migrations.len() >= 25);
+    assert_eq!(set.migrations[0].name, "20240120134904_init");
+    assert_eq!(
+        set.migrations[24].name,
+        "20260410000000_add_server_modpack_info"
+    );
+    set.migrations.truncate(25);
+    assert_eq!(set.migrations.len(), 25, "historical old-binary boundary");
+    set
 }
 
 /// Clones a set and appends synthetic migrations, the "new binary".

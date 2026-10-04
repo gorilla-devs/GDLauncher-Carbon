@@ -1068,7 +1068,12 @@ fn cache_modplatform<C: ModplatformCacher>(
 
 impl ManagerRef<'_, MetaCacheManager> {
     pub async fn gc_mod_metadata(self) {
-        let _ = metarepo::gc_orphan_metadata(&self.app.db).await;
+        if let Err(error) = metarepo::gc_orphan_metadata(&self.app.db).await {
+            warn!(
+                ?error,
+                "Metadata garbage collection failed; database changes were rolled back"
+            );
+        }
     }
 
     // this will need further refactoring. left for later.
@@ -1911,45 +1916,56 @@ impl ManagerRef<'_, MetaCacheManager> {
             self.hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled)
                 .await?
         };
-        let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
-        let stamp = if let Some(observed) = result.file_stamp.as_deref() {
-            let metadata = metarepo::get_metadata_by_id(&self.app.db, &meta_id)
-                .await?
-                .context("Parsed addon metadata disappeared before ownership publication")?;
-            Some(qualified_file_stamp(&metadata, observed))
-        } else {
-            None
-        };
-
-        let instance_id_val = *instance_id;
-        let filename_owned = mod_filename.to_string();
-        let filesize = result.content_len as i32;
-        let addon_type_owned = addon_type.clone();
-        let meta_id_owned = meta_id.clone();
-        mfcdb::upsert_mod_file_cache(
-            &self.app.db,
-            instance_id_val,
-            filename_owned,
-            filesize,
-            enabled,
-            addon_type_owned,
-            meta_id_owned,
-            DbDateTime(Utc::now().fixed_offset()),
-        )
-        .await?;
-
-        mfcdb::update_mod_file_stamp(
-            &self.app.db,
-            *instance_id,
-            &addon_type,
-            &mod_filename,
-            &meta_id,
-            stamp.as_deref(),
-            DbDateTime(Utc::now().fixed_offset()),
-        )
-        .await?;
-
-        Ok(meta_id)
+        // GC may collect an unreferenced ensured owner before this dispatch.
+        // Re-ensure once on that exact stale-owner outcome; publication and the
+        // qualified marker share a writer transaction, including with FKs off.
+        for attempt in 0..2 {
+            let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
+            let id = meta_id.clone();
+            let filename = mod_filename.clone();
+            let kind = addon_type.clone();
+            let observed = result.file_stamp.clone();
+            let filesize = result.content_len as i32;
+            let published = self
+                .app
+                .db
+                .write(move |mut conn| {
+                    let tx = conn.transaction()?;
+                    mfcdb::upsert_mod_file_cache_conn(
+                        &tx,
+                        *instance_id,
+                        &filename,
+                        filesize,
+                        enabled,
+                        &kind,
+                        &id,
+                        DbDateTime(Utc::now().fixed_offset()),
+                    )?;
+                    let metadata = metarepo::get_metadata_by_id_conn(&tx, &id)?
+                        .expect("validated owner in the same transaction");
+                    let stamp = observed
+                        .as_deref()
+                        .map(|value| qualified_file_stamp(&metadata, value));
+                    mfcdb::update_mod_file_stamp_conn(
+                        &tx,
+                        *instance_id,
+                        &kind,
+                        &filename,
+                        &id,
+                        stamp.as_deref(),
+                        DbDateTime(Utc::now().fixed_offset()),
+                    )?;
+                    tx.commit()?;
+                    Ok(())
+                })
+                .await;
+            match published {
+                Ok(()) => return Ok(meta_id),
+                Err(error) if attempt == 0 && error.is_foreign_key_violation() => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        unreachable!("bounded publication loop returns on its last attempt")
     }
 
     /// Prepare hash-deduplicated metadata while bytes are still privately staged.
@@ -1987,20 +2003,27 @@ impl ManagerRef<'_, MetaCacheManager> {
         let result = self
             .hash_and_parse_mod_file(folder, &filename, enabled)
             .await?;
-        let meta_id = self.ensure_mod_metadata(&result, &filename).await?;
-        mfcdb::upsert_server_mod_file_cache_at_location(
-            &self.app.db,
-            server_id,
-            filename,
-            location,
-            result.content_len as i32,
-            enabled,
-            addon_type,
-            meta_id.clone(),
-            DbDateTime(Utc::now().fixed_offset()),
-        )
-        .await?;
-        Ok(meta_id)
+        for attempt in 0..2 {
+            let meta_id = self.ensure_mod_metadata(&result, &filename).await?;
+            match mfcdb::upsert_server_mod_file_cache_at_location(
+                &self.app.db,
+                server_id,
+                filename.clone(),
+                location.clone(),
+                result.content_len as i32,
+                enabled,
+                addon_type.clone(),
+                meta_id.clone(),
+                DbDateTime(Utc::now().fixed_offset()),
+            )
+            .await
+            {
+                Ok(_) => return Ok(meta_id),
+                Err(error) if attempt == 0 && error.is_foreign_key_violation() => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        unreachable!("bounded publication loop returns on its last attempt")
     }
 
     /// Scan a server's `mods/` and selected world's `datapacks/` and bring

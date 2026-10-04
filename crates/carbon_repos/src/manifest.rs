@@ -67,6 +67,8 @@ struct Idx {
     table: String,
     unique: bool,
     origin: String,
+    /// Complete stored explicit-index semantics, including expressions and predicates.
+    ddl: Option<String>,
 }
 
 /// Reads every user table's columns, keyed by table name.
@@ -124,12 +126,18 @@ fn read_indexes(
         })?;
         for row in rows {
             let (name, unique, origin) = row?;
+            let ddl = conn.query_row(
+                "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?1",
+                [&name],
+                |row| row.get(0),
+            )?;
             out.insert(
                 name,
                 Idx {
                     table: table.clone(),
                     unique,
                     origin,
+                    ddl,
                 },
             );
         }
@@ -191,10 +199,10 @@ struct RestrictingFk {
     action: String,
 }
 
-/// Reads `table`'s foreign keys and keeps those whose `ON DELETE` action refuses
-/// the parent delete. `CASCADE`, `SET NULL` and `SET DEFAULT` resolve it and so
-/// cannot reject an old binary; `RESTRICT` and `NO ACTION` (what SQLite reports
-/// when the clause is omitted) refuse it.
+/// Keeps actions that can reject an old parent delete. SET NULL and SET DEFAULT
+/// can violate child constraints or reference a missing default parent, so they
+/// are conservatively breaking even when some nullable schemas permit deletion.
+/// CASCADE retains the existing additive policy.
 ///
 /// `ON UPDATE` is deliberately not consulted. It restricts updates to the
 /// *referenced key*, which here is always a synthetic primary key the app never
@@ -214,7 +222,12 @@ fn read_restricting_fks(conn: &Connection, table: &str) -> DbResult<Vec<Restrict
 
     Ok(rows
         .into_iter()
-        .filter(|(_, on_delete)| matches!(on_delete.as_str(), "RESTRICT" | "NO ACTION"))
+        .filter(|(_, on_delete)| {
+            matches!(
+                on_delete.as_str(),
+                "RESTRICT" | "NO ACTION" | "SET NULL" | "SET DEFAULT"
+            )
+        })
         .map(|(parent, action)| RestrictingFk { parent, action })
         .collect())
 }
@@ -622,8 +635,8 @@ pub fn verify_data_down(
 ///
 /// A field is *lost* when, for some seeded row (matched by primary key), the
 /// value visible under the old schema after `up`+`down` differs from what was
-/// seeded — or the row/table is gone entirely. An empty result is a
-/// proven-lossless down.
+/// seeded — or the row/table is gone entirely (including primary-key fields).
+/// An empty result attests only these bounded seeds, not every possible database.
 pub fn seeded_lost_fields(prev_ups: &[&str], up: &str, down: &str) -> DbResult<BTreeSet<String>> {
     let conn = build(prev_ups)?;
     let old_tables = read_tables(&conn)?;
@@ -674,11 +687,9 @@ pub fn seeded_lost_fields(prev_ups: &[&str], up: &str, down: &str) -> DbResult<B
                     }
                 }
                 None => {
-                    // The whole seeded row is gone: every non-key field is lost.
+                    // The whole seeded identity is gone: every field, including its key, is lost.
                     for col in &tbl.cols {
-                        if col.pk == 0 {
-                            lost.insert(format!("{table}.{}", col.name));
-                        }
+                        lost.insert(format!("{table}.{}", col.name));
                     }
                 }
             }

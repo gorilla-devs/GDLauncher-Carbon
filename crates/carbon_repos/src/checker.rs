@@ -692,11 +692,17 @@ pub const SCAN_GUARDED_TABLES: &[&str] = &[
 /// Registered queries whose full scan of a guarded table is intentional or
 /// unavoidable on the frozen schema. Each entry is a query `name`.
 pub const SCAN_ALLOWLIST: &[&str] = &[
-    // A whole-table garbage-collection sweep: it deletes every ModMetadata row
-    // with no referencing file-cache row, so it must visit every row (and the
-    // correlated NOT-EXISTS probes walk the file caches by the unindexed
-    // `metadataId`). Runs rarely, off the hot path.
-    "gc_orphan_metadata",
+    // Whole-cache collection uses a fixed number of set-based scans. Reference
+    // metadataId indexes also bound SQLite's implicit FK checks for every
+    // deleted parent. task15_metadata measures the complete transaction with
+    // both FK-off cleanup and FK-on growing live/orphan populations.
+    "gc_local_images",
+    "gc_cf_images",
+    "gc_mr_images",
+    "gc_mr_contexts",
+    "gc_cf_cache",
+    "gc_mr_cache",
+    "gc_orphan_metadata_rows",
     // Content-hash dedup lookup on ModMetadata by `(sha512, murmur2)`, neither
     // of which is indexed in the schema. The schema is frozen here, so an index
     // would need a future migration.

@@ -57,6 +57,9 @@ queries! {
         "SELECT name, isSystemProfile, javaId FROM JavaProfile WHERE name = :name";
     fn get_profile_linked_java_paths() -> Vec<JavaPathRow> =
         "SELECT j.path FROM JavaProfile p INNER JOIN Java j ON p.javaId = j.id";
+    fn insert_profile(name: &str, java_id: &str) -> usize =
+        "INSERT INTO JavaProfile (name, isSystemProfile, javaId)
+         SELECT :name, 0, id FROM Java WHERE id = :java_id";
     fn upsert_profile(name: &str, is_system: bool) -> usize =
         "INSERT INTO JavaProfile (name, isSystemProfile) VALUES (:name, :is_system)
          ON CONFLICT(name) DO UPDATE SET isSystemProfile = excluded.isSystemProfile";

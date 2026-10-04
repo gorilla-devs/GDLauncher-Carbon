@@ -5,7 +5,9 @@ index|Instance_shortpath_key|Instance|CREATE UNIQUE INDEX "Instance_shortpath_ke
 index|Java_id_key|Java|CREATE UNIQUE INDEX "Java_id_key" ON "Java" ( "id" )
 index|Java_path_key|Java|CREATE UNIQUE INDEX "Java_path_key" ON "Java" ( "path" )
 index|ModFileCache_instanceId_addonType_filename_key|ModFileCache|CREATE UNIQUE INDEX ModFileCache_instanceId_addonType_filename_key ON ModFileCache ( instanceId , addonType , filename )
-index|ModrinthModCache_projectId_versionId_key|ModrinthModCache|CREATE UNIQUE INDEX "ModrinthModCache_projectId_versionId_key" ON "ModrinthModCache" ( "projectId" , "versionId" )
+index|ModFileCache_metadataId_idx|ModFileCache|CREATE INDEX ModFileCache_metadataId_idx ON ModFileCache ( metadataId )
+index|ModrinthModCache_projectId_versionId_idx|ModrinthModCache|CREATE INDEX ModrinthModCache_projectId_versionId_idx ON ModrinthModCache ( projectId , versionId )
+index|ServerModFileCache_metadataId_idx|ServerModFileCache|CREATE INDEX ServerModFileCache_metadataId_idx ON ServerModFileCache ( metadataId )
 index|ServerModFileCache_owner_location_key|ServerModFileCache|CREATE UNIQUE INDEX ServerModFileCache_owner_location_key ON ServerModFileCache ( serverId , addonType , location )
 index|Server_shortpath_key|Server|CREATE UNIQUE INDEX "Server_shortpath_key" ON "Server" ( "shortpath" )
 index|sqlite_autoindex_Account_1|Account|

@@ -600,6 +600,17 @@ fn is_effectively_empty(sql: &str) -> bool {
 mod tests {
     use super::*;
 
+    #[test]
+    fn task15_authoring_declares_key_only_row_loss() {
+        let entry = build_list_entry(
+            "fixture",
+            &["CREATE TABLE Membership(id INTEGER PRIMARY KEY)"],
+            "DELETE FROM Membership",
+            "",
+        );
+        assert!(entry.contains("partial:Membership.id"), "{entry}");
+    }
+
     const SCRATCH_LIB_SRC: &str = "pub fn get_migrations() -> (MigrationSet, i32) {\n\
         let migrations = vec![\n\
             historical_migration!(\"20240120134904_init\"),\n\

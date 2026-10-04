@@ -73,7 +73,7 @@ fn insert_mr(
     conn.execute(
         "INSERT INTO ModrinthModCache
            (metadataId, sha512, projectId, versionId, title, version, urlslug, description, authors, releaseType, updatePaths, filename, fileUrl, cachedAt)
-         VALUES (?, 'sha', ?, ?, ?, 'v', ?, 'desc', 'auth', 2, '', 'f.jar', ?, ?)",
+         VALUES (?1, (SELECT lower(hex(sha512)) FROM ModMetadata WHERE id=?1), ?2, ?3, ?4, 'v', ?5, 'desc', 'auth', 2, '', 'f.jar', ?6, ?7)",
         rusqlite::params![metadata_id, project_id, version_id, title, urlslug, file_url, cached_at],
     )
     .unwrap();
@@ -1112,17 +1112,8 @@ fn export_joins_drop_files_whose_metadata_is_missing() {
     seed_export_file(&mut conn, 1, "kept.jar", "m1", 500, true, true);
     // A cache row pointing at metadata that is not there: the inner join drops
     // it, matching the `Some(metadata) else continue` the exporters had.
-    mfc::upsert_mod_file_cache_conn(
-        &wg(&mut conn),
-        1,
-        "orphan.jar",
-        1,
-        true,
-        "mods",
-        "does_not_exist",
-        ts(1),
-    )
-    .unwrap();
+    // Deliberately model historical FK-off corruption, bypassing the now-guarded writer.
+    conn.execute("INSERT INTO ModFileCache(id,instanceId,filename,filesize,enabled,addonType,metadataId) VALUES ('dead',1,'orphan.jar',1,1,'mods','does_not_exist')", []).unwrap();
 
     for names in [
         mfc::get_instance_cf_export_files_conn(&wg(&mut conn), 1)

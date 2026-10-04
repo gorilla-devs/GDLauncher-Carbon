@@ -15,9 +15,6 @@ const JavaProfileCreationModal = (props: ModalProps) => {
   const createProfileMutation = rspc.createMutation(() => ({
     mutationKey: ["java.createJavaProfile"]
   }))
-  const createCustomJavaVersionMutation = rspc.createMutation(() => ({
-    mutationKey: ["java.createCustomJavaVersion"]
-  }))
 
   const allProfiles = rspc.createQuery(() => ({
     queryKey: ["java.getJavaProfiles"]
@@ -44,7 +41,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
             <Trans key="general:_trn_profile_name" />
           </h4>
           <Input
-            disabled={createCustomJavaVersionMutation.isPending}
+            disabled={createProfileMutation.isPending}
             placeholder={t("placeholders:_trn_type_profile_name")}
             value={profileName()}
             onInput={(e) => setProfileName(e.currentTarget.value)}
@@ -59,7 +56,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
           </h4>
           <JavaPathAutoComplete
             inputColor="bg-darkSlate-600"
-            disabled={createCustomJavaVersionMutation.isPending}
+            disabled={createProfileMutation.isPending}
             updateValue={(value) => {
               if (value) setJavaId(value)
             }}
@@ -68,7 +65,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
         <div class="flex justify-between">
           <Button
             type="secondary"
-            disabled={createCustomJavaVersionMutation.isPending}
+            disabled={createProfileMutation.isPending}
             onClick={() => {
               modalsContext?.closeModal()
             }}
@@ -80,7 +77,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
               profileAlreadyExists() ||
               !javaId() ||
               !profileName() ||
-              createCustomJavaVersionMutation.isPending
+              createProfileMutation.isPending
             }
             onClick={async () => {
               await createProfileMutation.mutateAsync({
