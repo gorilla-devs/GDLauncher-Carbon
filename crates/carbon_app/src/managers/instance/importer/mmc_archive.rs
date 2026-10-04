@@ -345,6 +345,26 @@ mod test {
     }
 
     #[test]
+    fn task14_disabled_loader_zip_metadata() {
+        let tmp = tempfile::tempdir().unwrap();
+        for prefix in ["", "Pack/"] {
+            let path = tmp.path().join("pack.zip");
+            write_zip(&path, &[
+                (&format!("{prefix}instance.cfg"), b"name=Pack\nIntendedVersion=1.20.1\nForgeVersion=47.2.0\n"),
+                (&format!("{prefix}mmc-pack.json"), br#"{"components":[{"uid":"net.minecraft","version":"1.20.1"},{"uid":"net.minecraftforge","version":"47.2.0","disabled":true},{"uid":"net.fabricmc.fabric-loader","version":"0.15.6"}]}"#),
+            ]);
+            let archive = read_archive_meta(&path).unwrap();
+            assert_eq!(
+                archive.meta.loaders,
+                vec![super::super::common::DeclaredModLoader::new(
+                    ModLoaderType::Fabric,
+                    "0.15.6"
+                )]
+            );
+        }
+    }
+
+    #[test]
     fn instance_prefix_is_found_at_root_or_one_level_down() {
         assert_eq!(
             find_instance_prefix(["instance.cfg", "mmc-pack.json"].into_iter()),

@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use chrono::{DateTime, Utc};
 use tokio::sync::RwLock;
 use tracing::{trace, warn};
@@ -44,9 +44,11 @@ struct Importable {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let warnings = value.settings.warnings();
         Self {
             filename: value.filename,
             instance_name: value.name,
+            warnings,
         }
     }
 }
@@ -183,7 +185,7 @@ impl InstanceImporter for ModrinthAppImporter {
         }
 
         let layout = Layout::detect(&scan_path);
-        let records = load_records(&layout).await;
+        let (records, metadata_error) = load_records(&layout).await;
 
         if let Some(profile) = &layout.single_profile {
             let record = records.get(&dir_name(profile)).cloned();
@@ -191,7 +193,7 @@ impl InstanceImporter for ModrinthAppImporter {
                 self.state.write().await.set_single(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
-            return Ok(());
+            return metadata_error.map_or(Ok(()), Err);
         }
 
         let mut dir = match super::common::scan_directory(&layout.profiles_dir).await {
@@ -215,7 +217,7 @@ impl InstanceImporter for ModrinthAppImporter {
             }
         }
 
-        Ok(())
+        metadata_error.map_or(Ok(()), Err)
     }
 
     async fn get_status(&self) -> ImportScanStatus {
@@ -346,7 +348,7 @@ impl Layout {
 }
 
 /// A custom profiles location leaves `app.db` behind in the default data directory.
-async fn load_records(layout: &Layout) -> HashMap<String, ProfileRecord> {
+async fn load_records(layout: &Layout) -> (HashMap<String, ProfileRecord>, Option<anyhow::Error>) {
     let mut db_candidates = Vec::new();
     if let Some(settings_dir) = &layout.settings_dir {
         db_candidates.push(settings_dir.join("app.db"));
@@ -355,42 +357,177 @@ async fn load_records(layout: &Layout) -> HashMap<String, ProfileRecord> {
         db_candidates.push(dir.join("app.db"));
     }
 
-    for db_path in db_candidates {
-        if !db_path.is_file() {
-            continue;
-        }
-
-        let db_path_clone = db_path.clone();
-        let result =
-            tokio::task::spawn_blocking(move || read_database_records(&db_path_clone)).await;
-
-        match result {
-            Ok(Ok(records)) if !records.is_empty() => return records,
-            Ok(Ok(_)) => trace!("Modrinth database {db_path:?} lists no profiles"),
-            Ok(Err(e)) => warn!("Cannot read Modrinth database {db_path:?}: {e}"),
-            Err(e) => warn!("Modrinth database reader panicked: {e}"),
-        }
-    }
-
-    HashMap::new()
+    load_records_from_candidates(layout, db_candidates).await
 }
 
-/// Reads a copy (with WAL/SHM) so a running app or a read-only location doesn't get in the way.
-fn read_database_records(db_path: &Path) -> anyhow::Result<HashMap<String, ProfileRecord>> {
-    let tmp = tempfile::tempdir()?;
-    let copy = tmp.path().join("app.db");
-    std::fs::copy(db_path, &copy)?;
-    for suffix in ["-wal", "-shm"] {
-        let sidecar = PathBuf::from(format!("{}{suffix}", db_path.to_string_lossy()));
-        if sidecar.is_file() {
-            let _ = std::fs::copy(&sidecar, tmp.path().join(format!("app.db{suffix}")));
+async fn load_records_from_candidates(
+    layout: &Layout,
+    db_candidates: Vec<PathBuf>,
+) -> (HashMap<String, ProfileRecord>, Option<anyhow::Error>) {
+    let selected = match path_identity(&layout.profiles_dir) {
+        Ok(path) => path,
+        Err(e) => {
+            return (
+                HashMap::new(),
+                Some(anyhow!(e).context("Cannot identify selected Modrinth profiles directory")),
+            );
+        }
+    };
+    let mut error = None;
+    for db_path in dedup_paths(db_candidates) {
+        match std::fs::metadata(&db_path) {
+            Ok(meta) if meta.is_file() => {}
+            Ok(_) => continue,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                let failure =
+                    anyhow!(e).context(format!("Cannot inspect Modrinth database {db_path:?}"));
+                warn!("{failure:#}");
+                error.get_or_insert(failure);
+                continue;
+            }
+        }
+        let selected = selected.clone();
+        let candidate = db_path.clone();
+        // Root association and records are read under the same SQLite snapshot.
+        let result = tokio::task::spawn_blocking(move || {
+            with_database_snapshot(
+                &candidate,
+                || {},
+                || {},
+                |conn| {
+                    let settings_dir = candidate
+                        .parent()
+                        .context("Database has no settings directory")?;
+                    let custom = read_custom_dir_from_connection(conn)?;
+                    let root = profiles_dir_from_config(settings_dir, custom)?;
+                    if path_identity(&root).with_context(|| {
+                        format!("Cannot identify Modrinth profiles directory {root:?}")
+                    })? != selected
+                    {
+                        return Ok(HashMap::new());
+                    }
+                    read_records_from_connection(conn)
+                },
+            )
+        })
+        .await;
+        match result {
+            Ok(Ok(records)) if !records.is_empty() => return (records, error),
+            Ok(Ok(_)) => trace!("Modrinth database {db_path:?} has no associated profiles"),
+            result => {
+                let failure = match result {
+                    Ok(Err(e)) => e,
+                    Err(e) => anyhow!(e),
+                    _ => unreachable!(),
+                }
+                .context(format!(
+                    "Cannot read associated Modrinth database {db_path:?}"
+                ));
+                warn!("{failure:#}");
+                error.get_or_insert(failure);
+            }
         }
     }
+    (HashMap::new(), error)
+}
 
-    let conn = rusqlite::Connection::open(&copy)?;
-    let records = read_records_from_connection(&conn)?;
-    drop(conn);
-    Ok(records)
+/// Canonical where the filesystem allows it. Some volumes (RAM disks, some
+/// virtual drives) cannot canonicalize, and a root that does not exist has
+/// nothing to resolve; their absolute path still compares. A folder that may
+/// not be looked at stays an error, as it could be the selected one.
+fn path_identity(path: &Path) -> std::io::Result<PathBuf> {
+    match std::fs::canonicalize(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Err(e),
+        Err(_) => std::path::absolute(path),
+        result => result,
+    }
+}
+
+/// A deferred transaction is pinned by the first real read, not by opening it.
+/// Both metadata and DB root configuration must be consumed inside this closure.
+/// Read-only WAL access uses SQLite's normal shared-state protocol; no
+/// checkpoints, journal changes or immutable mode are used on the source.
+/// Only when SQLite cannot set up that protocol in place (a read-only folder
+/// without the `-wal`/`-shm` files) is a private copy read instead; nothing
+/// can be writing to such a folder, so the copy is consistent.
+fn with_database_snapshot<T>(
+    db_path: &Path,
+    before_read: impl FnOnce(),
+    after_read: impl FnOnce(),
+    read: impl FnOnce(&rusqlite::Connection) -> anyhow::Result<T>,
+) -> anyhow::Result<T> {
+    // Declared before the connection so the copy outlives it.
+    let copy: tempfile::TempDir;
+    let mut conn = match open_database_read_only(db_path) {
+        Ok(conn) => conn,
+        Err(e) if needs_private_copy(&e) => {
+            warn!("Reading a copy of Modrinth database {db_path:?}: {e}");
+            copy = copy_database(db_path)
+                .with_context(|| format!("Cannot copy Modrinth database {db_path:?}"))?;
+            open_database_read_only(&copy.path().join("app.db"))?
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let transaction = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)?;
+    before_read();
+    transaction.query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| {
+        row.get::<_, i64>(0)
+    })?;
+    after_read();
+    read(&transaction)
+    // Dropping the transaction ends the read even on an error.
+}
+
+/// Opens read-only and probes one read, which is where SQLite reports that
+/// it cannot create the `-shm`/`-wal` files a WAL database needs.
+fn open_database_read_only(db_path: &Path) -> rusqlite::Result<rusqlite::Connection> {
+    let conn =
+        rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    conn.busy_timeout(std::time::Duration::from_millis(250))?;
+    conn.query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| {
+        row.get::<_, i64>(0)
+    })?;
+    Ok(conn)
+}
+
+fn needs_private_copy(error: &rusqlite::Error) -> bool {
+    matches!(
+        error.sqlite_error_code(),
+        Some(rusqlite::ErrorCode::ReadOnly | rusqlite::ErrorCode::CannotOpen)
+    )
+}
+
+/// The database and its write-ahead log; SQLite rebuilds the `-shm` index.
+fn copy_database(db_path: &Path) -> std::io::Result<tempfile::TempDir> {
+    let dir = tempfile::tempdir()?;
+    let mut sources = vec![(db_path.to_path_buf(), dir.path().join("app.db"))];
+    let wal = PathBuf::from(format!("{}-wal", db_path.to_string_lossy()));
+    if wal.is_file() {
+        sources.push((wal, dir.path().join("app.db-wal")));
+    }
+    for (from, to) in sources {
+        std::fs::copy(&from, &to)?;
+        // A read-only source would hand its permissions to the copy.
+        let mut permissions = std::fs::metadata(&to)?.permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        permissions.set_readonly(false);
+        std::fs::set_permissions(&to, permissions)?;
+    }
+    Ok(dir)
+}
+
+#[cfg(test)]
+fn read_database_records(db_path: &Path) -> anyhow::Result<HashMap<String, ProfileRecord>> {
+    read_database_records_at(db_path, || {})
+}
+
+#[cfg(test)]
+fn read_database_records_at(
+    db_path: &Path,
+    before_read: impl FnOnce(),
+) -> anyhow::Result<HashMap<String, ProfileRecord>> {
+    with_database_snapshot(db_path, before_read, || {}, read_records_from_connection)
 }
 
 fn table_exists(conn: &rusqlite::Connection, table: &str) -> bool {
@@ -587,14 +724,12 @@ fn settings_from_overrides_json(json: &serde_json::Value) -> ImportedSettings {
             items
                 .iter()
                 .filter_map(|v| v.as_str())
-                .map(str::trim)
-                .filter(|v| !v.is_empty())
                 .map(str::to_string)
                 .collect()
         })
         .unwrap_or_default();
     if !args.is_empty() {
-        settings.absorb_jvm_args(&args.join(" "));
+        settings.absorb_jvm_argv(args.iter().map(String::as_str));
     }
 
     settings
@@ -604,7 +739,7 @@ fn read_profiles_table(
     conn: &rusqlite::Connection,
 ) -> anyhow::Result<HashMap<String, ProfileRecord>> {
     let mut stmt = conn.prepare(
-        "SELECT path, name, icon_path, game_version, mod_loader, mod_loader_version, linked_project_id, linked_version_id, last_played, submitted_time_played, recent_time_played, override_java_path, override_extra_launch_args, override_mc_memory_max, override_mc_game_resolution_x, override_mc_game_resolution_y, override_hook_pre_launch, override_hook_wrapper, override_hook_post_exit, groups FROM profiles",
+        "SELECT path, name, icon_path, game_version, mod_loader, mod_loader_version, linked_project_id, linked_version_id, last_played, submitted_time_played, recent_time_played, override_java_path, json(override_extra_launch_args), override_mc_memory_max, override_mc_game_resolution_x, override_mc_game_resolution_y, override_hook_pre_launch, override_hook_wrapper, override_hook_post_exit, json(groups) FROM profiles",
     )?;
     let rows = stmt.query_map([], |row| {
         let mut settings = ImportedSettings {
@@ -632,7 +767,7 @@ fn read_profiles_table(
             .and_then(|a| serde_json::from_str::<Vec<String>>(&a).ok())
             .filter(|a| !a.is_empty())
         {
-            settings.absorb_jvm_args(&args.join(" "));
+            settings.absorb_jvm_argv(args.iter().map(String::as_str));
         }
 
         Ok((
@@ -776,53 +911,78 @@ fn resolve_icon_path(profile_dir: &Path, icon: &str) -> Option<PathBuf> {
 }
 
 async fn profiles_dir_for_settings_dir(settings_dir: &Path) -> PathBuf {
-    let db_path = settings_dir.join("app.db");
-    if db_path.is_file() {
-        let custom = tokio::task::spawn_blocking(move || read_custom_dir(&db_path))
-            .await
-            .ok()
-            .flatten();
-        if let Some(custom) = custom {
-            let profiles = PathBuf::from(custom).join("profiles");
-            if profiles.is_dir() {
-                return profiles;
+    let settings_dir = settings_dir.to_path_buf();
+    let fallback = settings_dir.join("profiles");
+    match tokio::task::spawn_blocking(move || {
+        let db_path = settings_dir.join("app.db");
+        let custom = if db_path.is_file() {
+            match with_database_snapshot(&db_path, || {}, || {}, read_custom_dir_from_connection) {
+                Ok(custom) => custom,
+                Err(e) => {
+                    warn!("Cannot read Modrinth root configuration {db_path:?}: {e}");
+                    None
+                }
             }
+        } else {
+            None
+        };
+        profiles_dir_from_config(&settings_dir, custom)
+    })
+    .await
+    {
+        Ok(Ok(path)) => path,
+        result => {
+            warn!("Cannot resolve Modrinth profiles root: {result:?}");
+            fallback
         }
     }
-
-    if let Some(json) = read_json_value(&settings_dir.join("settings.json")).await {
-        if let Some(custom) = json_string(&json, "loaded_config_dir") {
-            let profiles = PathBuf::from(custom).join("profiles");
-            if profiles.is_dir() {
-                return profiles;
-            }
-        }
-    }
-
-    settings_dir.join("profiles")
 }
 
-fn read_custom_dir(db_path: &Path) -> Option<String> {
-    let tmp = tempfile::tempdir().ok()?;
-    let copy = tmp.path().join("app.db");
-    std::fs::copy(db_path, &copy).ok()?;
-    for suffix in ["-wal", "-shm"] {
-        let sidecar = PathBuf::from(format!("{}{suffix}", db_path.to_string_lossy()));
-        if sidecar.is_file() {
-            let _ = std::fs::copy(&sidecar, tmp.path().join(format!("app.db{suffix}")));
+fn profiles_dir_from_config(
+    settings_dir: &Path,
+    custom: Option<String>,
+) -> anyhow::Result<PathBuf> {
+    if let Some(custom) = custom {
+        let profiles = PathBuf::from(custom).join("profiles");
+        match std::fs::metadata(&profiles) {
+            Ok(meta) if meta.is_dir() => return Ok(profiles),
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
         }
     }
-
-    let conn = rusqlite::Connection::open(&copy).ok()?;
-    if !table_exists(&conn, "settings") {
-        return None;
+    match std::fs::read(settings_dir.join("settings.json")) {
+        Ok(bytes) => {
+            let json: serde_json::Value = serde_json::from_slice(&bytes)
+                .context("Cannot parse Modrinth legacy root configuration")?;
+            if let Some(custom) = json_string(&json, "loaded_config_dir") {
+                let profiles = PathBuf::from(custom).join("profiles");
+                match std::fs::metadata(&profiles) {
+                    Ok(meta) if meta.is_dir() => return Ok(profiles),
+                    Ok(_) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(e.into()),
+                }
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
     }
-    conn.query_row("SELECT custom_dir FROM settings LIMIT 1", [], |row| {
-        row.get::<_, Option<String>>(0)
-    })
-    .ok()
-    .flatten()
-    .filter(|dir| !dir.trim().is_empty())
+    Ok(settings_dir.join("profiles"))
+}
+
+fn read_custom_dir_from_connection(conn: &rusqlite::Connection) -> anyhow::Result<Option<String>> {
+    use rusqlite::OptionalExtension;
+    if !table_exists(conn, "settings") {
+        return Ok(None);
+    }
+    Ok(conn
+        .query_row("SELECT custom_dir FROM settings LIMIT 1", [], |row| {
+            row.get::<_, Option<String>>(0)
+        })
+        .optional()?
+        .flatten()
+        .filter(|dir| !dir.trim().is_empty()))
 }
 
 fn settings_dir_candidates() -> Vec<PathBuf> {
@@ -861,6 +1021,539 @@ mod test {
     #[test]
     fn modrinth_settings_dir_candidates_are_unique() {
         super::super::common::assert_paths_unique(&settings_dir_candidates());
+    }
+
+    #[test]
+    fn task14_checkpoint_before_snapshot_preserves_committed_runtime() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        old_schema_db(&db);
+        let writer = rusqlite::Connection::open(&db).unwrap();
+        writer.execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; PRAGMA wal_checkpoint(TRUNCATE);
+            UPDATE profiles SET game_version='1.21.1',mod_loader='neoforge',mod_loader_version='21.1.1';").unwrap();
+        let records = read_database_records_at(&db, || {
+            let result: (i64, i64, i64) = writer
+                .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+                })
+                .unwrap();
+            eprintln!("checkpoint before snapshot: {result:?}");
+            assert_eq!(result, (0, 0, 0));
+        })
+        .unwrap();
+        assert_eq!(records["ATM9"].game_version.as_deref(), Some("1.21.1"));
+        assert_eq!(records["ATM9"].loader.as_deref(), Some("neoforge"));
+    }
+
+    async fn selected_profile(root: &Path, candidates: Vec<PathBuf>) -> Importable {
+        let layout = Layout::detect(root);
+        let (mut records, error) = load_records_from_candidates(&layout, candidates).await;
+        assert!(error.is_none(), "{error:?}");
+        let path = layout
+            .single_profile
+            .unwrap_or_else(|| layout.profiles_dir.join("ATM9"));
+        let entry = ModrinthAppImporter::new()
+            .scan_profile(path, records.remove("ATM9"))
+            .await
+            .unwrap()
+            .unwrap();
+        let InternalImportEntry::Valid(entry) = entry else {
+            panic!("valid profile required")
+        };
+        entry
+    }
+
+    #[tokio::test]
+    async fn task14_foreign_database_cannot_override_portable_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+        let selected = tmp.path().join("portable/profiles/ATM9");
+        let foreign = tmp.path().join("default");
+        std::fs::create_dir_all(&selected).unwrap();
+        std::fs::create_dir_all(foreign.join("profiles/ATM9")).unwrap();
+        let manifest = serde_json::json!({"metadata":{"name":"Local", "game_version":"1.19.2", "loader":"fabric", "loader_version":"0.14.22", "linked_data":{"project_id":"local", "version_id":"local-v"}}, "memory":{"maximum":2048}}).to_string();
+        std::fs::write(selected.join("profile.json"), &manifest).unwrap();
+        old_schema_db(&foreign.join("app.db"));
+        let before = std::fs::read(foreign.join("app.db")).unwrap();
+        let entry = selected_profile(&selected, vec![foreign.join("app.db")]).await;
+        assert_eq!(entry.minecraft_version, "1.19.2");
+        assert_eq!(
+            entry.loaders,
+            vec![DeclaredModLoader::new(ModLoaderType::Fabric, "0.14.22")]
+        );
+        assert_eq!(entry.settings.memory(), Some((2048, 2048)));
+        assert!(matches!(entry.modpack, Some(Modpack::Modrinth(ref m)) if m.project_id == "local"));
+        assert_eq!(
+            std::fs::read_to_string(selected.join("profile.json")).unwrap(),
+            manifest
+        );
+        assert_eq!(std::fs::read(foreign.join("app.db")).unwrap(), before);
+    }
+
+    fn jsonb_legacy(groups: bool, args: bool) {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        old_schema_db(&db);
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        if groups {
+            conn.execute("UPDATE profiles SET groups=jsonb(groups)", [])
+                .unwrap();
+        }
+        if args {
+            conn.execute(
+                "UPDATE profiles SET override_extra_launch_args=jsonb(override_extra_launch_args)",
+                [],
+            )
+            .unwrap();
+        }
+        let records = read_database_records(&db).unwrap();
+        assert_eq!(records.len(), 1);
+        let record = &records["ATM9"];
+        assert_eq!(record.game_version.as_deref(), Some("1.20.1"));
+        assert_eq!(record.loader.as_deref(), Some("forge"));
+        assert_eq!(record.settings.group.as_deref(), Some("Kitchen sink"));
+        assert_eq!(record.settings.memory(), Some((8192, 8192)));
+        assert_eq!(
+            super::super::common::task14_persisted_args(&record.settings),
+            ["-XX:+UseZGC"]
+        );
+    }
+    #[test]
+    fn task14_legacy_jsonb_groups() {
+        jsonb_legacy(true, false);
+    }
+    #[test]
+    fn task14_legacy_jsonb_args() {
+        jsonb_legacy(false, true);
+    }
+    #[test]
+    fn task14_legacy_jsonb_both() {
+        jsonb_legacy(true, true);
+    }
+
+    #[test]
+    fn task14_r2_modrinth_minimum_without_managed_maximum_survives() {
+        for args in [["-Xmx65536M", "-Xms512M"], ["-Xms512M", "-Xmx65536M"]] {
+            let overrides =
+                settings_from_overrides_json(&serde_json::json!({"extra_launch_args":args}));
+            let profile =
+                record_from_profile_json(&serde_json::json!({"java":{"extra_arguments":args}}));
+            for settings in [&overrides, &profile.settings] {
+                assert_eq!(
+                    super::super::common::task14_persisted_config(settings).memory,
+                    None
+                );
+                assert_eq!(super::super::common::task14_persisted_args(settings), args);
+            }
+        }
+    }
+
+    #[test]
+    fn task14_r1_modrinth_memory_tokens_survive_all_array_routes() {
+        let args = [
+            "-Xmx2GB",
+            "-Xms512MB",
+            "-Xmx65536",
+            "-Xms2097153",
+            "-Xmx2G",
+            "-Xms512M",
+        ];
+        let overrides =
+            settings_from_overrides_json(&serde_json::json!({"extra_launch_args":args}));
+        let profile =
+            record_from_profile_json(&serde_json::json!({"java":{"extra_arguments":args}}));
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        old_schema_db(&db);
+        new_schema_db(&db);
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute(
+            "UPDATE profiles SET override_extra_launch_args=jsonb(?1)",
+            [serde_json::to_string(&args).unwrap()],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE instance_launch_overrides SET overrides=jsonb(?1)",
+            [serde_json::json!({"extra_launch_args":args}).to_string()],
+        )
+        .unwrap();
+        let records = read_database_records(&db).unwrap();
+        for (settings, memory) in [
+            (&overrides, None),
+            (&profile.settings, None),
+            (&records["ATM9"].settings, Some((8192, 8192))),
+            (&records["Fabulously Optimized"].settings, None),
+        ] {
+            assert_eq!(super::super::common::task14_persisted_args(settings), args);
+            assert_eq!(
+                super::super::common::task14_persisted_config(settings).memory,
+                memory
+            );
+        }
+    }
+
+    #[test]
+    fn task14_argv_overrides_persists_tokens() {
+        let args = [
+            r"-javaagent:C:\Program Files\Local Agent\agent.jar",
+            "-Dlabel=My  Pack",
+        ];
+        let settings = settings_from_overrides_json(&serde_json::json!({"extra_launch_args":args}));
+        assert_eq!(super::super::common::task14_persisted_args(&settings), args);
+    }
+    #[test]
+    fn task14_argv_profile_json_persists_tokens() {
+        let args = ["-Dlabel=My Pack"];
+        let record =
+            record_from_profile_json(&serde_json::json!({"java":{"extra_arguments":args}}));
+        assert_eq!(
+            super::super::common::task14_persisted_args(&record.settings),
+            args
+        );
+    }
+    #[test]
+    fn task14_argv_legacy_text_persists_tokens() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        old_schema_db(&db);
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute(
+            "UPDATE profiles SET override_extra_launch_args=?1",
+            [r#"["-Dlabel=My Pack"]"#],
+        )
+        .unwrap();
+        let records = read_database_records(&db).unwrap();
+        assert_eq!(
+            super::super::common::task14_persisted_args(&records["ATM9"].settings),
+            ["-Dlabel=My Pack"]
+        );
+    }
+
+    #[test]
+    fn task14_snapshot_wal_and_post_boundary_coherence() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        new_schema_db(&db);
+        let writer = rusqlite::Connection::open(&db).unwrap();
+        writer
+            .busy_timeout(std::time::Duration::from_millis(20))
+            .unwrap();
+        writer.execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; PRAGMA wal_checkpoint(TRUNCATE);
+            BEGIN; UPDATE settings SET custom_dir='before'; UPDATE instance_content_sets SET game_version='1.21.1',loader='neoforge',loader_version='21.1.1' WHERE id='cs1'; COMMIT;").unwrap();
+        let records = read_database_records(&db).unwrap();
+        assert_eq!(
+            records["Fabulously Optimized"].game_version.as_deref(),
+            Some("1.21.1")
+        );
+        // A writer commits after the first real read. The same transaction must
+        // keep both root association and joined metadata at the pinned boundary.
+        let (custom, records) = with_database_snapshot(&db, || {}, || {
+            writer.execute_batch("BEGIN; UPDATE settings SET custom_dir='after'; UPDATE instance_content_sets SET game_version='1.22' WHERE id='cs1'; UPDATE instance_launch_overrides SET overrides=jsonb('{\"memory\":{\"maximum\":2048}}'); COMMIT;").unwrap();
+            let checkpoint: (i64,i64,i64) = writer.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+            eprintln!("checkpoint while snapshot pinned: {checkpoint:?}");
+            assert_eq!(checkpoint.0,1);
+        }, |conn| Ok((read_custom_dir_from_connection(conn)?, read_records_from_connection(conn)?))).unwrap();
+        assert_eq!(custom.as_deref(), Some("before"));
+        let record = &records["Fabulously Optimized"];
+        assert_eq!(record.game_version.as_deref(), Some("1.21.1"));
+        assert_eq!(record.loader.as_deref(), Some("neoforge"));
+        assert_eq!(record.settings.memory(), Some((6144, 6144)));
+        let checkpoint: (i64, i64, i64) = writer
+            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
+            .unwrap();
+        eprintln!("checkpoint after snapshot disposal: {checkpoint:?}");
+        assert_eq!(checkpoint, (0, 0, 0));
+        let records = read_database_records(&db).unwrap();
+        assert_eq!(
+            records["Fabulously Optimized"].game_version.as_deref(),
+            Some("1.22")
+        );
+    }
+
+    #[test]
+    fn task14_snapshot_readonly_and_error_disposal() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        old_schema_db(&db); // ordinary rollback journal; no settings table
+        let before = std::fs::read(&db).unwrap();
+        let result = with_database_snapshot(
+            &db,
+            || {},
+            || {},
+            |conn| {
+                assert!(read_custom_dir_from_connection(conn)?.is_none());
+                conn.execute("DELETE FROM profiles", [])?;
+                Ok(())
+            },
+        );
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(&db).unwrap(), before);
+        let writer = rusqlite::Connection::open(&db).unwrap();
+        writer.busy_timeout(std::time::Duration::ZERO).unwrap();
+        writer.execute_batch("BEGIN EXCLUSIVE; ROLLBACK;").unwrap();
+        let missing = tmp.path().join("missing.db");
+        assert!(read_database_records(&missing).is_err());
+        assert!(!missing.exists());
+        let corrupt = tmp.path().join("corrupt.db");
+        std::fs::write(&corrupt, b"invalid SQLite").unwrap();
+        assert!(read_database_records(&corrupt).is_err());
+        assert_eq!(std::fs::read(&corrupt).unwrap(), b"invalid SQLite");
+    }
+
+    #[tokio::test]
+    async fn task14_associated_database_precedence_and_relocation_controls() {
+        let tmp = tempfile::tempdir().unwrap();
+        let local = tmp.path().join("local");
+        let selected = local.join("profiles/ATM9");
+        let foreign = tmp.path().join("foreign");
+        std::fs::create_dir_all(&selected).unwrap();
+        std::fs::create_dir_all(foreign.join("profiles/ATM9")).unwrap();
+        std::fs::write(selected.join("profile.json"), r#"{"metadata":{"game_version":"1.19.2","loader":"fabric","loader_version":"0.14.22"}}"#).unwrap();
+        // No candidates: valid local manifest fallback.
+        assert_eq!(
+            selected_profile(&selected, vec![]).await.minecraft_version,
+            "1.19.2"
+        );
+        old_schema_db(&local.join("app.db"));
+        old_schema_db(&foreign.join("app.db"));
+        for root in [&local, &local.join("profiles"), &selected] {
+            let entry =
+                selected_profile(root, vec![foreign.join("app.db"), local.join("app.db")]).await;
+            assert_eq!(entry.minecraft_version, "1.20.1");
+            assert_eq!(entry.settings.memory(), Some((8192, 8192)));
+            assert_eq!(
+                entry.loaders,
+                vec![DeclaredModLoader::new(ModLoaderType::Forge, "47.2.0")]
+            );
+        }
+        // Relocated root: a DB in another settings directory can be authoritative.
+        let conn = rusqlite::Connection::open(foreign.join("app.db")).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE settings(custom_dir TEXT); INSERT INTO settings VALUES(NULL);",
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE settings SET custom_dir=?1",
+            [local.to_str().unwrap()],
+        )
+        .unwrap();
+        assert_eq!(
+            selected_profile(&selected, vec![foreign.join("app.db")])
+                .await
+                .minecraft_version,
+            "1.20.1"
+        );
+        assert_eq!(
+            profiles_dir_for_settings_dir(&foreign).await,
+            local.join("profiles")
+        );
+        // Legacy settings-only relocation remains supported.
+        conn.execute("UPDATE settings SET custom_dir=NULL", [])
+            .unwrap();
+        std::fs::write(
+            foreign.join("settings.json"),
+            serde_json::json!({"loaded_config_dir":local}).to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            selected_profile(&selected, vec![foreign.join("app.db")])
+                .await
+                .minecraft_version,
+            "1.20.1"
+        );
+        // Nearby DB is not authoritative when its own root points elsewhere.
+        let conn = rusqlite::Connection::open(local.join("app.db")).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE settings(custom_dir TEXT); INSERT INTO settings VALUES(NULL);",
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE settings SET custom_dir=?1",
+            [foreign.to_str().unwrap()],
+        )
+        .unwrap();
+        assert_eq!(
+            selected_profile(&selected, vec![local.join("app.db")])
+                .await
+                .minecraft_version,
+            "1.19.2"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task14_existing_root_alias_preserves_database_authority() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("source");
+        std::fs::create_dir_all(root.join("profiles/ATM9")).unwrap();
+        old_schema_db(&root.join("app.db"));
+        let alias = tmp.path().join("alias");
+        std::os::unix::fs::symlink(root.join("profiles"), &alias).unwrap();
+        assert_eq!(
+            selected_profile(&alias, vec![root.join("app.db")])
+                .await
+                .minecraft_version,
+            "1.20.1"
+        );
+    }
+
+    #[tokio::test]
+    async fn task14_unknown_association_retains_manifest_with_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let profile = root.join("profiles/ATM9");
+        std::fs::create_dir_all(&profile).unwrap();
+        std::fs::write(
+            profile.join("profile.json"),
+            r#"{"metadata":{"game_version":"1.19.2"}}"#,
+        )
+        .unwrap();
+        old_schema_db(&root.join("app.db"));
+        std::fs::write(root.join("settings.json"), b"malformed").unwrap();
+        let (records, error) =
+            load_records_from_candidates(&Layout::detect(&profile), vec![root.join("app.db")])
+                .await;
+        assert!(records.is_empty());
+        assert!(error.is_some());
+        let InternalImportEntry::Valid(entry) = ModrinthAppImporter::new()
+            .scan_profile(profile, None)
+            .await
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("fallback required")
+        };
+        assert_eq!(entry.minecraft_version, "1.19.2");
+    }
+
+    #[test]
+    fn task14_legacy_null_malformed_and_current_precedence() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        old_schema_db(&db);
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        // The fixture producer's NOT NULL columns preclude SQL NULL, so create
+        // the compatible nullable projection to exercise old nullable schemas.
+        conn.execute_batch("ALTER TABLE profiles RENAME TO old_profiles; CREATE TABLE profiles AS SELECT * FROM old_profiles; UPDATE profiles SET groups=NULL,override_extra_launch_args=NULL;").unwrap();
+        let records = read_profiles_table(&conn).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records["ATM9"].settings.group, None);
+        assert_eq!(records["ATM9"].settings.extra_java_args, None);
+        for field in ["groups", "override_extra_launch_args"] {
+            conn.execute(&format!("UPDATE profiles SET {field}='malformed'"), [])
+                .unwrap();
+            assert!(
+                read_profiles_table(&conn).is_err(),
+                "malformed {field} must be observable"
+            );
+            conn.execute(&format!("UPDATE profiles SET {field}=NULL"), [])
+                .unwrap();
+        }
+        new_schema_db(&db);
+        conn.execute("UPDATE instances SET path='ATM9' WHERE id='i1'", [])
+            .unwrap();
+        let records = read_database_records(&db).unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records["ATM9"].game_version.as_deref(), Some("1.20.4"));
+    }
+
+    #[test]
+    fn task14_argv_jsonb_and_current_database_round_trip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        old_schema_db(&db);
+        let args = ["", " ", "-Dlabel=My  Pack", r"C:\path\", "-Xmx2G"];
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute(
+            "UPDATE profiles SET override_extra_launch_args=jsonb(?1)",
+            [serde_json::to_string(&args).unwrap()],
+        )
+        .unwrap();
+        let records = read_database_records(&db).unwrap();
+        // Blank elements are dropped, as the Modrinth App does when it launches.
+        assert_eq!(
+            super::super::common::task14_persisted_args(&records["ATM9"].settings),
+            args[2..4]
+        );
+        assert_eq!(records["ATM9"].settings.memory_max_mb, Some(2048));
+        new_schema_db(&db);
+        conn.execute(
+            "UPDATE instance_launch_overrides SET overrides=jsonb(?1)",
+            [serde_json::json!({"extra_launch_args":args}).to_string()],
+        )
+        .unwrap();
+        let records = read_database_records(&db).unwrap();
+        assert_eq!(
+            super::super::common::task14_persisted_args(&records["Fabulously Optimized"].settings),
+            args[2..4]
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task14_unreadable_candidate_reports_unknown_association() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let selected = tmp.path().join("profiles");
+        let blocked = tmp.path().join("blocked");
+        std::fs::create_dir_all(&selected).unwrap();
+        std::fs::create_dir_all(&blocked).unwrap();
+        old_schema_db(&blocked.join("app.db"));
+        struct Restore(PathBuf);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o700)).unwrap();
+            }
+        }
+        let _restore = Restore(blocked.clone());
+        std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0)).unwrap();
+        assert!(std::fs::metadata(blocked.join("app.db")).is_err());
+        let (records, error) =
+            load_records_from_candidates(&Layout::detect(&selected), vec![blocked.join("app.db")])
+                .await;
+        assert!(records.is_empty());
+        assert!(
+            error.is_some(),
+            "unreadable association must be reported, not treated as absent"
+        );
+    }
+
+    #[test]
+    fn task14_checkpoint_rendezvous_with_retained_writer() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = tmp.path().join("app.db");
+        old_schema_db(&db);
+        let writer = rusqlite::Connection::open(&db).unwrap();
+        writer.execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; PRAGMA wal_checkpoint(TRUNCATE); UPDATE profiles SET game_version='1.21.1', mod_loader='neoforge';").unwrap();
+        let entered = std::sync::Barrier::new(2);
+        let resumed = std::sync::Barrier::new(2);
+        std::thread::scope(|scope| {
+            let entered = &entered;
+            let resumed = &resumed;
+            let worker = scope.spawn(move || {
+                entered.wait();
+                let checkpoint = writer.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| {
+                    Ok((
+                        r.get::<_, i64>(0)?,
+                        r.get::<_, i64>(1)?,
+                        r.get::<_, i64>(2)?,
+                    ))
+                });
+                resumed.wait();
+                checkpoint
+            });
+            let records = read_database_records_at(&db, || {
+                entered.wait();
+                resumed.wait();
+            });
+            let checkpoint = worker.join().unwrap().unwrap();
+            eprintln!("checkpoint at reader/writer barrier: {checkpoint:?}");
+            assert_eq!(checkpoint, (0, 0, 0));
+            let records = records.unwrap();
+            assert_eq!(records["ATM9"].game_version.as_deref(), Some("1.21.1"));
+            assert_eq!(records["ATM9"].loader.as_deref(), Some("neoforge"));
+        });
     }
 
     fn new_schema_db(path: &Path) {
@@ -944,6 +1637,40 @@ mod test {
             "#,
         )
         .unwrap();
+    }
+
+    /// A Modrinth folder on read-only media or a backup copy without the
+    /// `-wal`/`-shm` files cannot be opened in place; its profiles used to
+    /// disappear from the scan.
+    #[cfg(unix)]
+    #[test]
+    fn database_in_a_read_only_folder_is_read_from_a_copy() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let folder = tmp.path().join("ModrinthApp");
+        std::fs::create_dir(&folder).unwrap();
+        let db = folder.join("app.db");
+        old_schema_db(&db);
+        {
+            let conn = rusqlite::Connection::open(&db).unwrap();
+            conn.execute_batch("PRAGMA journal_mode=WAL;").unwrap();
+        }
+        // A clean close checkpoints and removes the sidecars.
+        assert!(!folder.join("app.db-wal").exists());
+        assert!(!folder.join("app.db-shm").exists());
+        std::fs::set_permissions(&db, std::fs::Permissions::from_mode(0o444)).unwrap();
+        std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let in_place = open_database_read_only(&db);
+        let records = read_database_records(&db);
+        std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // Running as root ignores permissions, so the fallback is not needed.
+        if let Err(e) = in_place {
+            assert!(needs_private_copy(&e), "{e}");
+        }
+        let records = records.unwrap();
+        assert_eq!(records["ATM9"].game_version.as_deref(), Some("1.20.1"));
+        assert!(!folder.join("app.db-wal").exists());
+        assert!(!folder.join("app.db-shm").exists());
     }
 
     #[test]
@@ -1143,7 +1870,9 @@ mod test {
         std::fs::create_dir_all(&unknown).unwrap();
 
         let layout = Layout::detect(root);
-        let records = load_records(&layout).await;
+        let (records, error) =
+            load_records_from_candidates(&layout, vec![root.join("app.db")]).await;
+        assert!(error.is_none(), "{error:?}");
         assert!(records.contains_key("Fabulously Optimized"));
 
         let importer = ModrinthAppImporter::new();

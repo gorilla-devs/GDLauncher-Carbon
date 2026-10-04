@@ -514,6 +514,7 @@ async fn find_icon(instance_root: &Path, icon_key: Option<&str>) -> Option<PathB
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct ParsedPack {
+    disabled_forge: bool,
     minecraft: Option<String>,
     loaders: Vec<DeclaredModLoader>,
 }
@@ -534,6 +535,16 @@ fn parse_mmc_pack(text: &str) -> ParsedPack {
         let Some(uid) = component.get("uid").and_then(|u| u.as_str()) else {
             continue;
         };
+
+        let disabled = component.get("disabled").and_then(|v| v.as_bool()) == Some(true)
+            && component.get("important").and_then(|v| v.as_bool()) != Some(true)
+            && component.get("dependencyOnly").and_then(|v| v.as_bool()) != Some(true);
+        if disabled {
+            // Remember the declaration even without a version: stale cfg keys
+            // cannot re-enable a component the producer explicitly disabled.
+            pack.disabled_forge |= uid.eq_ignore_ascii_case("net.minecraftforge");
+            continue;
+        }
 
         let version = ["version", "cachedVersion"]
             .iter()
@@ -592,7 +603,7 @@ fn resolve_versions(cfg: &HashMap<String, String>, pack: &ParsedPack) -> Option<
 
     let mut loaders = pack.loaders.clone();
 
-    if loaders.is_empty() {
+    if loaders.is_empty() && !pack.disabled_forge {
         if let Some(forge) = cfg_value("ForgeVersion") {
             loaders.push(DeclaredModLoader::new(
                 ModLoaderType::Forge,
@@ -989,6 +1000,7 @@ mod test {
         );
 
         let pack = ParsedPack {
+            disabled_forge: false,
             minecraft: Some("1.20.1".to_string()),
             loaders: vec![DeclaredModLoader::new(
                 ModLoaderType::Forge,
@@ -1257,4 +1269,100 @@ fn has_launcher_placeholder(value: &str) -> bool {
         }
         false
     })
+}
+
+#[cfg(test)]
+mod task14_tests {
+    use super::*;
+    const CFG: &str = "name=Pack\nIntendedVersion=1.20.1\nForgeVersion=47.2.0\n";
+    fn pack(fabric: bool) -> String {
+        let mut components = vec![
+            serde_json::json!({"uid":"net.minecraft","version":"1.20.1"}),
+            serde_json::json!({"uid":"net.minecraftforge","version":"47.2.0","disabled":true}),
+        ];
+        if fabric {
+            components
+                .push(serde_json::json!({"uid":"net.fabricmc.fabric-loader","version":"0.15.6"}));
+        }
+        serde_json::json!({"components":components}).to_string()
+    }
+    #[test]
+    fn task14_disabled_forge_with_fabric() {
+        let meta = parse_mmc_meta(CFG, Some(&pack(true))).unwrap();
+        assert_eq!(
+            meta.loaders,
+            vec![DeclaredModLoader::new(ModLoaderType::Fabric, "0.15.6")]
+        );
+    }
+    #[test]
+    fn task14_disabled_forge_cannot_return_from_cfg() {
+        assert!(
+            parse_mmc_meta(CFG, Some(&pack(false)))
+                .unwrap()
+                .loaders
+                .is_empty()
+        );
+    }
+    #[tokio::test]
+    async fn task14_disabled_loader_folder_scan() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("instance.cfg"), CFG).unwrap();
+        std::fs::write(tmp.path().join("mmc-pack.json"), pack(true)).unwrap();
+        let entry = MmcImporter::new(MmcFlavor::Prism)
+            .scan_instance(tmp.path().to_path_buf())
+            .await
+            .unwrap()
+            .unwrap();
+        let InternalImportEntry::Valid(entry) = entry else {
+            panic!("valid folder required")
+        };
+        assert_eq!(
+            entry.loaders,
+            vec![DeclaredModLoader::new(ModLoaderType::Fabric, "0.15.6")]
+        );
+    }
+}
+
+#[cfg(test)]
+mod task14_component_controls {
+    use super::*;
+    #[test]
+    fn task14_enabled_disabled_and_legacy_component_controls() {
+        let cfg = "IntendedVersion=1.20.1\nForgeVersion=1.20.1-47.2.0\n";
+        for pack in [None, Some("malformed"), Some(r#"{"components":[]}"#)] {
+            assert_eq!(
+                parse_mmc_meta(cfg, pack).unwrap().loaders,
+                vec![DeclaredModLoader::new(ModLoaderType::Forge, "47.2.0")]
+            );
+        }
+        for disabled in [
+            serde_json::Value::Null,
+            serde_json::json!(false),
+            serde_json::json!("true"),
+        ] {
+            let pack = serde_json::json!({"components":[{"uid":"net.minecraft","cachedVersion":"1.21.1"},{"uid":"net.minecraftforge","version":"1.21.1-52.0.0","disabled":disabled}]}).to_string();
+            let meta = parse_mmc_meta(cfg, Some(&pack)).unwrap();
+            assert_eq!(meta.minecraft_version, "1.21.1");
+            assert_eq!(
+                meta.loaders,
+                vec![DeclaredModLoader::new(ModLoaderType::Forge, "52.0.0")]
+            );
+        }
+        for marker in ["important", "dependencyOnly"] {
+            let mut component = serde_json::json!({"uid":"net.minecraftforge","cachedVersion":"47.2.0","disabled":true});
+            component[marker] = serde_json::json!(true);
+            let pack = serde_json::json!({"components":[component]}).to_string();
+            assert_eq!(parse_mmc_meta(cfg, Some(&pack)).unwrap().loaders.len(), 1);
+        }
+        let pack = r#"{"components":[{"uid":"net.minecraftforge","disabled":true}]}"#;
+        assert!(parse_mmc_meta(cfg, Some(pack)).unwrap().loaders.is_empty());
+        let pack = r#"{"components":[{"uid":"net.fabricmc.fabric-loader","version":"0.15.6"},{"uid":"org.quiltmc.quilt-loader","version":"0.25.0"},{"uid":"net.fabricmc.fabric-loader","version":"ignored"}]}"#;
+        assert_eq!(
+            parse_mmc_meta(cfg, Some(pack)).unwrap().loaders,
+            vec![
+                DeclaredModLoader::new(ModLoaderType::Fabric, "0.15.6"),
+                DeclaredModLoader::new(ModLoaderType::Quilt, "0.25.0")
+            ]
+        );
+    }
 }

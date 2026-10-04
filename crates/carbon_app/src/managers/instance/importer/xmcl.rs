@@ -76,12 +76,7 @@ impl XmclImporter {
     }
 
     pub async fn get_default_scan_path() -> anyhow::Result<Option<PathBuf>> {
-        let Some(app_data) = first_existing_dir(app_data_candidates()) else {
-            return Ok(None);
-        };
-        Ok(Some(
-            game_root_for_app_data(&app_data).await.join("instances"),
-        ))
+        default_scan_path_from_candidates(app_data_candidates()).await
     }
 
     async fn scan_instance(
@@ -167,40 +162,7 @@ impl InstanceImporter for XmclImporter {
             return Ok(());
         }
 
-        let mut instance_dirs: Vec<PathBuf> = Vec::new();
-
-        let (instances_dir, app_data) = if is_app_data_dir(&scan_path) {
-            let root = game_root_for_app_data(&scan_path).await;
-            (root.join("instances"), Some(scan_path.clone()))
-        } else if scan_path.join("instances").is_dir() {
-            (scan_path.join("instances"), Some(scan_path.clone()))
-        } else {
-            (scan_path.clone(), scan_path.parent().map(Path::to_path_buf))
-        };
-
-        let directory = match super::common::scan_directory(&instances_dir).await {
-            Ok(dir) => Some(dir),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound && app_data.is_some() => None,
-            Err(e) => return Err(e.into()),
-        };
-        if let Some(mut dir) = directory {
-            while let Some(entry) = dir.next_entry().await? {
-                let path = entry.path();
-                if path.is_dir() && !dir_name(&path).starts_with('.') {
-                    instance_dirs.push(path);
-                }
-            }
-        }
-
-        let mut groups = HashMap::new();
-        if let Some(app_data) = app_data {
-            for external in external_instances(&app_data, &instances_dir).await {
-                if !instance_dirs.contains(&external) {
-                    instance_dirs.push(external);
-                }
-            }
-            groups = instance_groups(&app_data, &instances_dir).await;
-        }
+        let (instance_dirs, mut groups) = collect_instances(&scan_path).await?;
 
         for path in instance_dirs {
             let group = groups.remove(&path);
@@ -288,6 +250,59 @@ impl InstanceImporter for XmclImporter {
             .await
             .map(|r| r.1)
     }
+}
+
+async fn default_scan_path_from_candidates(
+    candidates: Vec<PathBuf>,
+) -> anyhow::Result<Option<PathBuf>> {
+    let Some(app_data) = first_existing_dir(candidates) else {
+        return Ok(None);
+    };
+    Ok(Some(app_data))
+}
+
+async fn collect_instances(
+    scan_path: &Path,
+) -> anyhow::Result<(Vec<PathBuf>, HashMap<PathBuf, String>)> {
+    let mut instance_dirs: Vec<PathBuf> = Vec::new();
+
+    let (instances_dir, app_data) = if is_app_data_dir(&scan_path) {
+        let root = game_root_for_app_data(&scan_path).await;
+        (root.join("instances"), Some(scan_path.to_path_buf()))
+    } else if scan_path.join("instances").is_dir() {
+        (scan_path.join("instances"), Some(scan_path.to_path_buf()))
+    } else {
+        (
+            scan_path.to_path_buf(),
+            scan_path.parent().map(Path::to_path_buf),
+        )
+    };
+
+    let directory = match super::common::scan_directory(&instances_dir).await {
+        Ok(dir) => Some(dir),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound && app_data.is_some() => None,
+        Err(e) => return Err(e.into()),
+    };
+    if let Some(mut dir) = directory {
+        while let Some(entry) = dir.next_entry().await? {
+            let path = entry.path();
+            if path.is_dir() && !dir_name(&path).starts_with('.') {
+                instance_dirs.push(path);
+            }
+        }
+    }
+
+    let mut groups = HashMap::new();
+    if let Some(app_data) = app_data {
+        for external in external_instances(&app_data, &instances_dir).await {
+            if !instance_dirs.contains(&external) {
+                instance_dirs.push(external);
+            }
+        }
+        groups = instance_groups(&app_data, &instances_dir).await;
+    }
+
+    Ok((instance_dirs, groups))
 }
 
 /// Entries are a bare path (ungrouped) or `{"name", "instances": [paths]}`; paths may be relative to the instances directory.
@@ -427,19 +442,12 @@ fn instance_settings(json: &serde_json::Value) -> ImportedSettings {
         ..Default::default()
     };
 
-    let vm_options: Vec<String> = match json.get("vmOptions") {
-        Some(serde_json::Value::Array(items)) => items
-            .iter()
-            .filter_map(|v| v.as_str())
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .map(str::to_string)
-            .collect(),
-        Some(serde_json::Value::String(s)) => vec![s.clone()],
-        _ => Vec::new(),
-    };
-    if !vm_options.is_empty() {
-        settings.absorb_jvm_args(&vm_options.join(" "));
+    match json.get("vmOptions") {
+        Some(serde_json::Value::Array(items)) => {
+            settings.absorb_jvm_argv(items.iter().filter_map(|v| v.as_str()))
+        }
+        Some(serde_json::Value::String(command)) => settings.absorb_jvm_args(command),
+        _ => {}
     }
 
     settings
@@ -909,5 +917,164 @@ mod test {
         )
         .unwrap();
         assert!(importer.scan_instance(other, None).await.unwrap().is_none());
+    }
+}
+
+#[cfg(test)]
+mod task14_tests {
+    use super::*;
+    #[test]
+    fn task14_r2_xmcl_minimum_without_managed_maximum_survives() {
+        for args in [["-Xmx65536M", "-Xms512M"], ["-Xms512M", "-Xmx65536M"]] {
+            let settings = instance_settings(&serde_json::json!({"vmOptions":args}));
+            assert_eq!(
+                super::super::common::task14_persisted_config(&settings).memory,
+                None
+            );
+            assert_eq!(super::super::common::task14_persisted_args(&settings), args);
+        }
+    }
+
+    #[test]
+    fn task14_r1_xmcl_memory_tokens_survive_array_route() {
+        let args = [
+            "-Xmx2GB",
+            "-Xms512MB",
+            "-Xmx65536",
+            "-Xms2097153",
+            "-Xmx2g",
+            "-Xms512m",
+        ];
+        let settings = instance_settings(&serde_json::json!({"vmOptions":args}));
+        assert_eq!(super::super::common::task14_persisted_args(&settings), args);
+        assert_eq!(
+            super::super::common::task14_persisted_config(&settings).memory,
+            None
+        );
+    }
+
+    #[test]
+    fn task14_argv_xmcl_array_persists_tokens() {
+        let args = [
+            "-Dlabel=My Pack",
+            r"-javaagent:C:\Program Files\Local Agent\agent.jar",
+        ];
+        let settings = instance_settings(&serde_json::json!({"vmOptions":args}));
+        assert_eq!(super::super::common::task14_persisted_args(&settings), args);
+    }
+    #[tokio::test]
+    async fn task14_default_relocation_keeps_external_and_groups() {
+        let tmp = tempfile::tempdir().unwrap();
+        let appdata = tmp.path().join("appdata");
+        let game = tmp.path().join("gamedata");
+        let managed = game.join("instances/Managed");
+        let external = tmp.path().join("external/Pack");
+        std::fs::create_dir_all(&appdata).unwrap();
+        for path in [&managed, &external] {
+            std::fs::create_dir_all(path).unwrap();
+            std::fs::write(path.join("instance.json"), serde_json::json!({"runtime":{"minecraft":if path == &managed { "1.20.1" } else { "1.19.2" }}}).to_string()).unwrap();
+        }
+        std::fs::write(appdata.join("root"), game.to_str().unwrap()).unwrap();
+        std::fs::write(appdata.join("instances.json"), serde_json::json!({"instances":[external, "Managed"], "groups":[{"name":"Packs", "instances":["Managed"]}]}).to_string()).unwrap();
+        let expected = collect_instances(&appdata).await.unwrap();
+        assert_eq!(expected.0.len(), 2);
+        assert_eq!(expected.1.get(&managed).map(String::as_str), Some("Packs"));
+        let selected = default_scan_path_from_candidates(vec![appdata.clone()])
+            .await
+            .unwrap()
+            .unwrap();
+        let actual = collect_instances(&selected).await.unwrap();
+        assert_eq!(actual, expected);
+        let importer = XmclImporter::new();
+        for path in actual.0 {
+            let InternalImportEntry::Valid(entry) = importer
+                .scan_instance(path.clone(), actual.1.get(&path).cloned())
+                .await
+                .unwrap()
+                .unwrap()
+            else {
+                panic!("valid metadata required")
+            };
+            assert_eq!(
+                entry.minecraft_version,
+                if path == managed { "1.20.1" } else { "1.19.2" }
+            );
+            if path == managed {
+                assert_eq!(entry.settings.group.as_deref(), Some("Packs"));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod task14_discovery_controls {
+    use super::*;
+    #[tokio::test]
+    async fn task14_default_missing_invalid_and_legacy_layouts() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(
+            default_scan_path_from_candidates(vec![tmp.path().join("missing")])
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let appdata = tmp.path().join("app");
+        let managed = appdata.join("instances/Managed");
+        std::fs::create_dir_all(&managed).unwrap();
+        std::fs::write(
+            managed.join("instance.json"),
+            r#"{"runtime":{"minecraft":"1.20.1"}}"#,
+        )
+        .unwrap();
+        let absent = tmp.path().join("absent");
+        for root_contents in [
+            None,
+            Some("not-an-absolute-root"),
+            Some(absent.to_str().unwrap()),
+        ] {
+            if let Some(contents) = root_contents {
+                std::fs::write(appdata.join("root"), contents).unwrap();
+            }
+            let selected = default_scan_path_from_candidates(vec![
+                tmp.path().join("missing"),
+                appdata.clone(),
+            ])
+            .await
+            .unwrap()
+            .unwrap();
+            assert_eq!(selected, appdata);
+            let (dirs, groups) = collect_instances(&selected).await.unwrap();
+            assert_eq!(dirs, vec![managed.clone()]);
+            assert!(groups.is_empty());
+        }
+        let game = tmp.path().join("legacygame");
+        let legacy = game.join("instances/Legacy");
+        let external = tmp.path().join("external");
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::create_dir_all(&external).unwrap();
+        std::fs::write(appdata.join("root"), game.to_str().unwrap()).unwrap();
+        std::fs::write(game.join("instances.json"),serde_json::json!({"instances":["Legacy",external,external],"groups":[{"name":"Legacy packs","instances":["Legacy"]}]}).to_string()).unwrap();
+        let selected = default_scan_path_from_candidates(vec![appdata.clone()])
+            .await
+            .unwrap()
+            .unwrap();
+        let (dirs, groups) = collect_instances(&selected).await.unwrap();
+        assert_eq!(dirs, vec![legacy.clone(), external]);
+        assert_eq!(
+            groups.get(&legacy).map(String::as_str),
+            Some("Legacy packs")
+        );
+        assert_eq!(collect_instances(&appdata).await.unwrap(), (dirs, groups));
+    }
+    #[test]
+    fn task14_xmcl_legacy_command_string_keeps_grammar() {
+        let settings = instance_settings(
+            &serde_json::json!({"vmOptions":r#"-Xmx2G -Dfoo=bar "-Dlabel=My Pack""#}),
+        );
+        assert_eq!(settings.memory_max_mb, Some(2048));
+        assert_eq!(
+            super::super::common::task14_persisted_args(&settings),
+            ["-Dfoo=bar", "-Dlabel=My Pack"]
+        );
     }
 }

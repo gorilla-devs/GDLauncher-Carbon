@@ -412,32 +412,53 @@ fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
 /// natural `-javaagent:"C:\With Spaces\a.jar"` work, joining the quoted and
 /// unquoted runs into one token). Within an argument, `\"` is a literal quote
 /// and `\\` a literal backslash; every other character — including lone
-/// backslashes in Windows paths — is taken verbatim. Empty tokens are dropped.
-fn parse_extra_java_args(input: &str) -> Vec<String> {
+/// backslashes in Windows paths — is taken verbatim. Explicitly quoted empty
+/// tokens are retained; blank command strings contain no tokens.
+pub(crate) fn parse_extra_java_args(input: &str) -> Vec<String> {
     let mut args = Vec::new();
     let mut current = String::new();
     let mut in_quotes = false;
+    let mut token_present = false;
     let mut chars = input.chars().peekable();
 
     while let Some(c) = chars.next() {
         match c {
             '\\' if matches!(chars.peek(), Some(&('"' | '\\'))) => {
+                token_present = true;
                 current.push(chars.next().expect("peeked char is present"));
             }
-            '"' => in_quotes = !in_quotes,
+            '"' => {
+                token_present = true;
+                in_quotes = !in_quotes;
+            }
             c if c.is_whitespace() && !in_quotes => {
-                if !current.is_empty() {
+                if token_present {
                     args.push(std::mem::take(&mut current));
+                    token_present = false;
                 }
             }
-            c => current.push(c),
+            c => {
+                token_present = true;
+                current.push(c);
+            }
         }
     }
 
-    if !current.is_empty() {
+    if token_present {
         args.push(current);
     }
 
+    args
+}
+
+/// The extra JVM arguments as passed to Java. They sit right before the main
+/// class, and Java stops reading options at the first argument that is not one,
+/// so a blank token (a stray `""`, a lone trailing quote, or a blank element
+/// imported from another launcher) would be taken as the class name and the
+/// game would not start. No JVM option is blank, so those tokens are dropped.
+fn extra_java_launch_args(input: &str) -> Vec<String> {
+    let mut args = parse_extra_java_args(input);
+    args.retain(|arg| !arg.trim().is_empty());
     args
 }
 
@@ -654,14 +675,9 @@ pub async fn generate_startup_command(
         substitute_arguments(&mut command, jvm_arguments);
     }
 
-    // `extra_java_args` is user-authored: it only ever comes from the instance's
-    // own settings or the global Java-args setting. No import path — gdlpack,
-    // legacy GDL, or the CurseForge/Modrinth archive importers — populates it, so
-    // it is trusted and passed through verbatim, including `-javaagent`/`-agentpath`/
-    // `-agentlib`, which legitimate tooling needs (profilers, hot-swap agents,
-    // authlib-injector). If a future import path ever ingests third-party JVM args,
-    // sanitize them at THAT boundary; a blanket launch-time filter here cannot tell
-    // user input from imported input and would only break real agents.
+    // Extra JVM arguments come from instance/global settings and supported
+    // launcher imports. Preserve their token grammar, including legitimate
+    // agent arguments used by profilers, hot-swap tools and authlib-injector.
     command.extend(parse_extra_java_args(extra_java_args));
 
     if Os::native() == Os::Osx {
@@ -1066,6 +1082,91 @@ mod tests {
                 .unwrap();
 
         file.write_all(command.as_bytes()).await.unwrap();
+    }
+
+    #[test]
+    fn task14_extra_java_args_retains_explicit_empty_tokens() {
+        assert_eq!(parse_extra_java_args(r#"a "" " " b"#), ["a", "", " ", "b"]);
+        assert!(parse_extra_java_args(" \t\n ").is_empty());
+    }
+
+    /// A blank argument before the main class makes Java exit with "Could not
+    /// find or load main class", so launch never passes one.
+    #[test]
+    fn blank_extra_java_args_never_reach_the_command_line() {
+        for input in [
+            r#"-XX:+UseG1GC """#,
+            r#"-XX:+UseG1GC ""#,
+            r#""" -XX:+UseG1GC " ""#,
+            "-XX:+UseG1GC \"\t\"",
+        ] {
+            assert_eq!(extra_java_launch_args(input), ["-XX:+UseG1GC"], "{input}");
+        }
+        assert_eq!(
+            extra_java_launch_args(r#"-Dlabel="My Pack" " padded""#),
+            ["-Dlabel=My Pack", " padded"]
+        );
+        assert!(extra_java_launch_args(r#""" "  ""#).is_empty());
+    }
+
+    /// Pins the launch path itself: Java takes the first argument that is not an
+    /// option as the main class, so a blank one must not come before it.
+    #[tokio::test]
+    async fn the_startup_command_has_no_blank_argument_before_the_main_class() {
+        let dir = tempfile::tempdir().unwrap();
+        let version: VersionInfo = serde_json::from_value(serde_json::json!({
+            "id": "fixture",
+            "assetIndex": {"id": "test", "sha1": "", "size": 0, "totalSize": 0, "url": "https://fixture.invalid/assets"},
+            "assets": "test",
+            "downloads": {},
+            "libraries": [{
+                "name": "fixture:library:1",
+                "downloads": {"artifact": {"path": "fixture/library.jar", "sha1": "", "size": 0, "url": "https://fixture.invalid/library.jar"}}
+            }],
+            "mainClass": "fixture.Main",
+            "minimumLauncherVersion": 0,
+            "releaseTime": "2025-01-01T00:00:00Z",
+            "time": "2025-01-01T00:00:00Z",
+            "type": "release"
+        }))
+        .unwrap();
+        let lwjgl_group: LibraryGroup = serde_json::from_value(serde_json::json!({
+            "id": "test", "version": "1", "uid": "test", "releaseTime": "2025-01-01T00:00:00Z", "type": "release", "libraries": []
+        }))
+        .unwrap();
+        let java_component = JavaComponent {
+            path: "java".to_owned(),
+            arch: JavaArch::X86_64,
+            os: crate::domain::java::JavaOs::Linux,
+            _type: crate::domain::java::JavaComponentType::Local,
+            version: crate::domain::java::JavaVersion::from_major(21),
+            vendor: "fixture".to_owned(),
+        };
+        let command = generate_startup_command(
+            java_component,
+            get_account().await,
+            2048,
+            1024,
+            None,
+            r#"-XX:+UseG1GC "" " ""#,
+            &RuntimePath::new(dir.path().to_path_buf()),
+            version,
+            &lwjgl_group,
+            InstancePath::new(dir.path().join("instance")),
+            crate::managers::minecraft::assets::AssetsDir::Index(dir.path().join("assets")),
+        )
+        .await
+        .unwrap();
+
+        let main_class = command
+            .iter()
+            .position(|arg| arg == "fixture.Main")
+            .unwrap();
+        let blank = command[..main_class]
+            .iter()
+            .find(|arg| arg.trim().is_empty());
+        assert_eq!(blank, None, "{command:?}");
+        assert_eq!(command[main_class - 1], "-XX:+UseG1GC", "{command:?}");
     }
 
     #[test]
